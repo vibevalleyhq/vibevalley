@@ -77,6 +77,9 @@ update channel set archived_at = sqlc.narg(archived_at) where id = sqlc.arg(id) 
 -- name: SetNotify :exec
 update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 
+-- name: SetOrchestrator :exec
+update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id) and type = 'channel';
+
 -- name: ChannelInUse :one
 -- What still points at a channel, so deleting it would take it from under them.
 select (select count(*) from recurrence r where r.channel_id = sqlc.arg(id))::int as recurrences,

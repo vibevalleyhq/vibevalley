@@ -1,22 +1,27 @@
 import { expect, test } from "vite-plus/test";
-import type { Channel, WorkspaceState } from "@vibevalley/protocol";
+import type { Channel, OrchestratorState, WorkspaceState } from "@vibevalley/protocol";
 import { archivedOf, groupsOf, linkedMessages, messagePath, orchestratorTyping, pointedAt, switchTargets, threadsIn, topsOf } from "./rules";
 
 const at = (id: string): Channel => ({ id, type: "channel", replies: 0, at: 0 });
-const state = (orchestrator: WorkspaceState["orchestrator"], where?: string): WorkspaceState => ({
+const state = (orchestrator: OrchestratorState, where?: string): WorkspaceState => ({
   call: "idle",
-  orchestrator,
-  ...(where ? { orchestratorChannel: where } : {}),
+  orchestrators: { orchestrator: { state: orchestrator, ...(where ? { channel: where } : {}) } },
   sessions: [],
 });
 
 test("the orchestrator's dots show only in the channel it thinks or writes in", () => {
-  expect(orchestratorTyping(state("thinking", "c1"), at("c1"))).toBe("thinking");
-  expect(orchestratorTyping(state("speaking", "c1"), at("c1"))).toBe("speaking");
+  expect(orchestratorTyping(state("thinking", "c1"), at("c1"))).toEqual({ agent: "orchestrator", mood: "thinking" });
+  expect(orchestratorTyping(state("speaking", "c1"), at("c1"))).toEqual({ agent: "orchestrator", mood: "speaking" });
   expect(orchestratorTyping(state("thinking", "c1"), at("c2"))).toBeUndefined();
   expect(orchestratorTyping(state("thinking"), at("c1"))).toBeUndefined();
   expect(orchestratorTyping(state("listening", "c1"), at("c1"))).toBeUndefined();
   expect(orchestratorTyping(undefined, at("c1"))).toBeUndefined();
+  const two: WorkspaceState = {
+    call: "idle",
+    sessions: [],
+    orchestrators: { orchestrator: { state: "listening" }, lead: { state: "speaking", channel: "c2" } },
+  };
+  expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking" }]);
 });
 
 test("the sidebar lists the default first, then by place, grouped in the order the groups first come", () => {

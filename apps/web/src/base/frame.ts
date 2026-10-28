@@ -1,5 +1,5 @@
 import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
-import type { StateFrame, WorkspaceState } from "@vibevalley/protocol";
+import { defaultOrchestrator, type OrchestratorState, type StateFrame, type WorkspaceState } from "@vibevalley/protocol";
 import { createExternal } from "./external";
 import { type Frames, frames } from "./frames";
 
@@ -38,6 +38,10 @@ export function useCore(): () => WorkspaceState | undefined {
   const f = useFrames();
   return () => f.frame?.state;
 }
+
+/** An orchestrator's mood; one the state does not list is idle. */
+export const orchestratorMood = (state: WorkspaceState | undefined, agent = defaultOrchestrator): OrchestratorState =>
+  state?.orchestrators?.[agent]?.state ?? "idle";
 
 /**
  * The frame as the stream sent it: a new object each time, for code that compares the one before with the one after

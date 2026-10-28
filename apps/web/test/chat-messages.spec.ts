@@ -47,7 +47,8 @@ test("a message is answered, changed, reacted to, pinned and deleted from the to
   await page.getByRole("button", { name: "成员" }).click();
   const members = page.getByRole("complementary", { name: "成员" });
   await expect(members.getByText("主人")).toBeVisible();
-  await expect(members.getByText("管家")).toBeVisible();
+  await expect(members.getByText("管家", { exact: true })).toBeVisible();
+  await expect(members.getByText("照看这里的管家")).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("chat-messages.png") });
 
   await answer.hover();

@@ -3,7 +3,7 @@
 
 import { agentWording } from "./words.ts";
 import { join } from "node:path";
-import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings, seedAgents } from "./seed.ts";
 import { Context, Effect, Layer, Predicate, Schema } from "effect";
@@ -49,9 +49,10 @@ const readStored = (text: string): Stored => {
 export const orchestratorRuntime = "vibevalley";
 
 const orchestratorProfile = (): Agent => ({
-  id: orchestratorAgent,
+  id: defaultOrchestrator,
   name: agentWording().orchestrator.name,
-  role: agentWording().orchestrator.role,
+  role: "orchestrator",
+  duty: agentWording().orchestrator.duty,
   enabled: true,
   runtime: orchestratorRuntime,
   model: "",
@@ -65,7 +66,7 @@ const orchestratorProfile = (): Agent => ({
   workdir: "",
   worktree: false,
   tags: [],
-  look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"],
+  look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", orchestrator: "farmer" },
 });
 
 /** Over each code point's first UTF-16 unit, wrapping at 32 bits, as the client counts. */
@@ -86,14 +87,19 @@ export function withCast(a: Agent): Agent {
   look.head ||= "rounded";
   look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length]!;
   look.outfit ??= "farmer";
+  if (a.role === "orchestrator") look.orchestrator ??= "farmer";
+  else delete look.orchestrator;
   return { ...a, look };
 }
 
 export interface AgentShape {
-  /** The profiles work is sent to: every one but the orchestrator's. */
+  /** The profiles work is sent to: the workers. */
   readonly agents: () => Agent[];
-  /** All the profiles, the orchestrator's too. */
+  /** All the profiles, the orchestrators too. */
   readonly all: () => Agent[];
+  readonly orchestrators: () => Agent[];
+  /** A profile with this id is an orchestrator. */
+  readonly isOrchestrator: (id: string) => boolean;
   readonly agent: (id: string) => Agent | undefined;
   /** A profile work is sent to, by its id or its name, as a person or a model says it. */
   readonly named: (key: string) => Agent | undefined;
@@ -124,7 +130,10 @@ export const make = Effect.gen(function* () {
   const seed: Stored = { agents: seedAgents(), skills: [], settings: {} };
   let s: Stored = seed;
   s = (yield* readOrSetAside(file, readStored, "the profiles start from the seeds")) ?? seed;
-  const agents = s.agents.some((a) => a.id === orchestratorAgent) ? s.agents : [...s.agents, orchestratorProfile()];
+  // The default orchestrator is always there, and always an orchestrator: a farm is never without one.
+  const agents = s.agents.some((a) => a.id === defaultOrchestrator)
+    ? s.agents.map((a) => (a.id === defaultOrchestrator ? { ...a, role: "orchestrator" as const } : a))
+    : [...s.agents, orchestratorProfile()];
   s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
   disk.write(() => JSON.stringify(s));
 
@@ -140,12 +149,19 @@ export const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
-  /** The profiles work is sent to: every one but the orchestrator's. */
-  const sendable = () => all().filter((a) => a.id !== orchestratorAgent);
+  const sendable = () => all().filter((a) => a.role === "worker");
+
+  /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
+   * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */
+  const roleProblem = (a: Agent): string => {
+    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return agentWording().defaultStaysOrchestrator;
+    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return agentWording().orchestratorRuntime(orchestratorRuntime);
+    return "";
+  };
 
   // The delete and its dry run judge by these, so the dry run is refused exactly when the delete would be.
   const deletableAgent = (id: string) => {
-    if (id === orchestratorAgent) return Effect.fail(refused(agentWording().orchestratorStays));
+    if (id === defaultOrchestrator) return Effect.fail(refused(agentWording().orchestratorStays));
     const a = s.agents.find((x) => x.id === id);
     return a ? Effect.succeed(a) : Effect.fail(missing(agentWording().noAgent(id), [lookIn.agent]));
   };
@@ -164,15 +180,19 @@ export const make = Effect.gen(function* () {
     },
     skills: () => structuredClone([...s.skills]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
+    orchestrators: () => all().filter((a) => a.role === "orchestrator"),
+    isOrchestrator: (id) => s.agents.some((a) => a.id === id && a.role === "orchestrator"),
     saveAgent: Effect.fn("Agents.saveAgent")(function* (a) {
-      if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
-        return yield* Effect.fail(refused(agentWording().orchestratorRuntime(orchestratorRuntime)));
+      const why = roleProblem(a);
+      if (why) return yield* Effect.fail(refused(why));
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
       return cast;
     }),
     createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(agentWording().newAgentId));
+      const why = roleProblem(draft);
+      if (why) return yield* Effect.fail(refused(why));
       let n = 1;
       while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
       const created = withCast({ ...draft, id: `agent-${n}` });

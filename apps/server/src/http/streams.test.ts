@@ -41,7 +41,7 @@ describe("the SSE contract", () => {
         expect(res.status).toBe(200);
         const text = await firstChunk(res);
         expect(text.startsWith("data: ")).toBe(true);
-        expect(JSON.parse(text.trim().slice(6)).state.orchestrator).toBe("idle");
+        expect(JSON.parse(text.trim().slice(6)).state.call).toBe("idle");
       },
     );
   });

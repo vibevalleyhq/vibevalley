@@ -26,7 +26,7 @@ import { Settings } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
-export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", orchestrator: "idle", sessions: [] });
+export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessions: [] });
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
@@ -64,7 +64,7 @@ export interface CoreShape {
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
   readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
   /** channel: where it thinks or writes, while it does. */
-  readonly setOrchestrator: (state: OrchestratorState, channel?: string) => Effect.Effect<void>;
+  readonly setOrchestrator: (agent: string, state: OrchestratorState, channel?: string) => Effect.Effect<void>;
   readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
   /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
   readonly open: () => Effect.Effect<void>;
@@ -100,8 +100,8 @@ const toKeep = ({
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
 const restarted = (kept: WorkspaceState): WorkspaceState => {
-  const { callReason: _callReason, orchestratorChannel: _where, ...rest } = toKeep(kept);
-  return { ...rest, call: "idle", orchestrator: "idle" };
+  const { callReason: _callReason, orchestrators: _orchestrators, ...rest } = toKeep(kept);
+  return { ...rest, call: "idle" };
 };
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
@@ -225,7 +225,7 @@ export const make = Effect.gen(function* () {
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
-    setOrchestrator: (orchestrator, channel) => apply({ type: "orchestrator", state: orchestrator, ...(channel ? { channel } : {}) }),
+    setOrchestrator: (agent, orchestrator, channel) => apply({ type: "orchestrator", agent, state: orchestrator, ...(channel ? { channel } : {}) }),
     setCommits: (commits) => apply({ type: "commits", commits }),
     open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" }))),
     sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity })),

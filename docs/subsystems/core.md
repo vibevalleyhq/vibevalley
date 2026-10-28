@@ -143,7 +143,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、不记得管家在哪个对话、库的部分不进文件、帮工回到各自的地）；管家的状态带着它在哪个对话想和写，听着时不带；形状不对的 `state.json` 原样留在一边、从空的开始；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧；延迟保存失败记日志，文件恢复可写后关机仍能留下最后一份。
+- `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、不记得管家在哪个对话、库的部分不进文件、帮工回到各自的地）；每个管家的状态（`orchestrators`）带着它在哪个对话想和写，听着时不带，歇着就不在表里；形状不对的 `state.json` 原样留在一边、从空的开始；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧；延迟保存失败记日志，文件恢复可写后关机仍能留下最后一份。
 - `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`recurrence/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `delete` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在。`apps/server/src/cli/golden.test.ts`：帮助、典型的错误和试跑录在 `cli/testdata/cli.jsonl.gz`，改了 `vp run golden:update cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
 - `packages/protocol/src/api.test.ts`：每个操作名是 `模块[.名词].动词`、单数、路径各不相同；试跑叫 `preview<动词>`；`about` 的字段输入里都有。`apps/server/src/http/api.test.ts`：接口都是 POST，输入不合 Schema 是 400，不在表里的路径 404。

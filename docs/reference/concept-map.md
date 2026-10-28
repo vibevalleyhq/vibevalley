@@ -12,11 +12,11 @@
 |---|---|---|---|---|
 | Workspace | 大地图 | `/projects` 的「全部」（`features/project/ProjectMap.tsx`） | `Config.workRoot`、`Config.home`（服务端的配置，不进协议） | |
 | 项目 | 大地图上的一座岛 | `/projects/:project`（`features/project`；岛的地和空位是 `ProjectMap.tsx` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `Workplace` | `/api/v1/project/…` |
-| 帮工档案 | 一种小动物 | `/agents`（`features/agent`） | `Agent` | `/api/v1/agent/…` |
+| 档案 | 一种小动物（管家是田头的人） | `/agents`（`features/agent`） | `Agent`（`role` 是管家或帮工） | `/api/v1/agent/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
 | 技能书 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skill/…` |
-| 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是 `orchestrator` 的是管家的） |
-| 管家 | 管家 | `/orchestrator`（`features/orchestrator`） | `WorkspaceState.orchestrator`（管家的状态） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
+| 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是管家的档案时是那个管家的） |
+| 管家 | 管家 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `WorkspaceState.orchestrators`（每个管家的状态）、`Channel.orchestrator`（照看那处的管家） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.sessions`（这张工单用过的帮工） | `/api/v1/issue/…` |
 | 计划 | 种植计划：图纸桌、计划板 | `farm/panels/TaskBoard.tsx`、工作台 `features/issue/TaskDetail.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graph/…` |
 | 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`WorkspaceState.sessions`） | `/api/v1/session/stop`；别的按工单：`/api/v1/issue/…` |
@@ -44,10 +44,10 @@
 |---|---|---|---|
 | Workspace | `base/config.ts` 的 `Config`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_HOME` | |
 | 项目 | `Projects`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
-| 帮工档案、技能书 | `Agents` | `config.json` | |
+| 档案、技能书 | `Agents` | `config.json` | |
 | 农机 | `Runtimes` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
-| 记性 | `Memories` | `memory` 表；管家的在 `orchestrator/MEMORY.md` | |
-| 管家 | `Orchestrator` | `orchestrator/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
+| 记性 | `Memories` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
+| 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
 | 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
 | 计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
 | 帮工 | `Sessions`（`session/session.ts`） | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |

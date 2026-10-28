@@ -7,10 +7,10 @@
 
 import { ownersLanguage } from "../prompts.ts";
 import { orchestratorWording } from "./words.ts";
-import { agentPrompt, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
+import { agentPrompt, identityNote, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { orchestrator } from "../base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
-import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
@@ -22,18 +22,17 @@ import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/
 import { Llm } from "../ai/llm.ts";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
-import { projectsDir, Settings } from "../base/config.ts";
+import { agentHome, projectsDir, Settings } from "../base/config.ts";
 import { Channels, type OrchestratorNews, type SayMore } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import type { ApiError } from "../errors.ts";
 import { Issues, type OrchestratorWork } from "../issue/issue.ts";
-import { orchestratorHome } from "../memory/memory.ts";
 import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
 import type { Answer } from "../agent/brain/openai.ts";
-import { Caller } from "../session/host.ts";
+import { type AgentHost, Caller } from "../session/host.ts";
 import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
 import { Tasks } from "../task/task.ts";
@@ -67,6 +66,8 @@ interface Route {
 
 /** One input as its producer gives it: the intake table fills in the rest by its source. */
 interface Intake {
+  /** The orchestrator it is for, by its profile id; the default one when none is named. */
+  readonly to?: string;
   readonly source: Source;
   readonly line: string;
   readonly channel: string;
@@ -90,9 +91,10 @@ export interface OrchestratorShape {
   /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
    * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
   readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
-  /** The lines waiting for the orchestrator are dropped with the run; the sessions it sent keep working. */
-  readonly stop: () => Effect.Effect<void>;
-  readonly markWrong: (on: number, want: string) => Effect.Effect<OrchestratorEval, ApiError>;
+  /** The lines waiting for an orchestrator (the default one when none is named) are dropped with its run; the sessions
+   * it sent keep working. */
+  readonly stop: (agent?: string) => Effect.Effect<void>;
+  readonly markWrong: (on: number, want: string, agent?: string) => Effect.Effect<OrchestratorEval, ApiError>;
 }
 
 export class Orchestrator extends Context.Service<Orchestrator, OrchestratorShape>()("vibevalley/Orchestrator") {}
@@ -127,62 +129,88 @@ export const make = (options: OrchestratorOptions = {}) =>
     const service = yield* Llm;
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
-    const home = orchestratorHome(config.home);
+    const scope = yield* Effect.scope;
 
-    const selected = new Map<string, Pick>();
-    let latestCall: Caller | undefined;
-    /** What the orchestrator last said it cannot start for, per channel: said once, not to every line, until it starts. */
-    const cannot = new Map<string, string>();
-    /** The farm's situation as the model last saw it in an input; "" when it should see the whole of it next. */
-    let shown = "";
-
-    const llmOf = (): LLM => {
-      if (options.llm) return options.llm();
-      // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-      return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
-    };
-
-    const toolsFor = (current: () => Route) =>
+    const toolsFor = (id: string) => (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: orchestratorAgent, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
+        return { agent: id, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
       });
 
-    // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
-    const wakeSoon = (withinMs: number) => {
-      const by = clock.currentTimeMillisUnsafe() + withinMs;
-      return recurrence.list().some((s) => {
-        const next = nextRun(s);
-        return next !== undefined && (!s.agent || s.agent === orchestratorAgent) && next <= by;
-      });
+    /** What the owner picked beside a message (a profile, a project), until an orchestrator takes the message. */
+    const selected = new Map<string, Pick>();
+
+    /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
+    interface Instance {
+      readonly id: string;
+      readonly home: string;
+      readonly host: AgentHost<Route>;
+      /** What it last said it cannot start for, per channel: said once, not to every line, until it starts. */
+      readonly cannot: Map<string, string>;
+      /** The farm's situation as its model last saw it in an input; "" when it should see the whole of it next. */
+      shown: string;
+      /** The caller its last spoken answer streams to (a call, chat/completions): a newer one ends it. */
+      latestCall: Caller | undefined;
+    }
+    const instances = new Map<string, Instance>();
+
+    const instanceOf = (id: string): Instance => {
+      const had = instances.get(id);
+      if (had) return had;
+      const home = agentHome(config, id);
+      const llmOf = (): LLM => {
+        if (options.llm) return options.llm();
+        // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
+        return deepseek(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
+      };
+      // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
+      const wakeSoon = (withinMs: number) => {
+        const by = clock.currentTimeMillisUnsafe() + withinMs;
+        return recurrence.list().some((s) => {
+          const next = nextRun(s);
+          return next !== undefined && (s.agent || chat.orchestratorOf(s.channel)) === id && next <= by;
+        });
+      };
+      const profile = store.agent(id);
+      const me: Instance = {
+        id,
+        home,
+        cannot: new Map(),
+        shown: "",
+        latestCall: undefined,
+        host: run.host<Route>({
+          name: id,
+          label: profile?.name || orchestratorWording().label,
+          inputType: "orchestratorInput",
+          home,
+          cwd: projectsDir(config),
+          // The default orchestrator's prefix is the one its evals hold; another says who it is after it.
+          instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
+          llm: llmOf,
+          tools: toolsFor(id),
+          wakeSoon,
+          first: { channel: chat.defaultChannel(), source: "owner" },
+          quiet: (r) => r.quiet ?? false,
+          say: (r, text, runId) => go(chat.orchestratorSays(r.channel, text, runId, id)),
+          // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
+          state: (s, r) => go(core.setOrchestrator(id, s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.channel : undefined)),
+          fresh: () => {
+            me.shown = "";
+          },
+          restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
+          keepEvents,
+          toolStart: tool.start,
+          scope,
+          notice,
+          log: (level, text) => (level === "error" ? logs.error(text) : logs.info(text)),
+          go,
+        }),
+      };
+      instances.set(id, me);
+      return me;
     };
-
-    const host = run.host<Route>({
-      name: orchestratorAgent,
-      label: orchestratorWording().label,
-      inputType: "orchestratorInput",
-      home,
-      cwd: projectsDir(config),
-      instructions: systemPrompt + agentPrompt,
-      llm: llmOf,
-      tools: toolsFor,
-      wakeSoon,
-      first: { channel: chat.defaultChannel(), source: "owner" },
-      quiet: (r) => r.quiet ?? false,
-      say: (r, text, runId) => go(chat.orchestratorSays(r.channel, text, runId)),
-      // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
-      state: (s, r) => go(core.setOrchestrator(s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.channel : undefined)),
-      fresh: () => {
-        shown = "";
-      },
-      restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
-      keepEvents,
-      toolStart: tool.start,
-      scope: yield* Effect.scope,
-      notice,
-      log: (level, text) => (level === "error" ? logs.error(text) : logs.info(text)),
-      go,
-    });
+    /** The orchestrator an input goes to: the one named while it is an orchestrator, else the default one. */
+    const target = (id: string | undefined) => instanceOf(id && store.isOrchestrator(id) ? id : defaultOrchestrator);
 
     const agentLines = async () => {
       const lines: string[] = [];
@@ -226,15 +254,15 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     // The situation for the next input: the whole of it, or what changed since the input before. An input given while
     // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
-    const situationNow = async (busy: boolean, channel: string) => {
+    const situationNow = async (me: Instance, busy: boolean, channel: string) => {
       const now = await situation(channel);
-      const shownNow = !busy && shown !== "" ? situationDelta(shown, now) : now;
-      shown = busy ? "" : now;
+      const shownNow = !busy && me.shown !== "" ? situationDelta(me.shown, now) : now;
+      me.shown = busy ? "" : now;
       return shownNow;
     };
 
-    const news = async (): Promise<[string, string[]]> => {
-      const digest = await go(chat.orchestratorDigest());
+    const news = async (me: Instance): Promise<[string, string[]]> => {
+      const digest = await go(chat.orchestratorDigest(me.id));
       if (digest.length === 0) return ["", []];
       return [situationWords.news(orchestratorInboxLines(digest)), digest.map((m) => m.id)];
     };
@@ -249,6 +277,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       });
 
     const taking = async (i: Intake): Promise<boolean> => {
+      const me = target(i.to);
       const rule = intake[i.source];
       const asked = rule.head + i.line;
       const route: Route = {
@@ -258,13 +287,13 @@ export const make = (options: OrchestratorOptions = {}) =>
         ...(i.issue ? { issue: i.issue } : {}),
         ...(i.owner ? { owner: true } : {}),
       };
-      const taken = await host.submit(
+      const taken = await me.host.submit(
         async (busy, memoryNews) => {
-          const [heard, ids] = await news();
+          const [heard, ids] = await news(me);
           // The log shows the line; the model also gets the time, the farm and the news before it.
           const text = [
             situationWords.now(localeMinute(new Date(clock.currentTimeMillisUnsafe()))),
-            await situationNow(busy, i.channel),
+            await situationNow(me, busy, i.channel),
             memoryNews,
             heard,
             asked,
@@ -277,13 +306,13 @@ export const make = (options: OrchestratorOptions = {}) =>
         rule.now,
       );
       if (taken.ok) {
-        cannot.clear();
+        me.cannot.clear();
         return true;
       }
       const words = taken.why === noDeepSeekKey() ? orchestratorWording().noKey : orchestratorWording().cannotStart(taken.why);
-      const again = cannot.get(i.channel) === words;
-      cannot.set(i.channel, words);
-      if (!again) await go(chat.orchestratorSays(i.channel, words, taken.run));
+      const again = me.cannot.get(i.channel) === words;
+      me.cannot.set(i.channel, words);
+      if (!again) await go(chat.orchestratorSays(i.channel, words, taken.run, me.id));
       return false;
     };
 
@@ -310,7 +339,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
           ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
           : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
-      await take({ source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
+      await take({ to: n.agent, source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
     };
 
     // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
@@ -323,24 +352,28 @@ export const make = (options: OrchestratorOptions = {}) =>
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";
         line = lineWords.recurrence(s.name, missed, s.text, channel.name, s.id);
       }
-      await take({ source: s ? "recurrence" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
+      // The issue's assignee is the orchestrator it is for; a recurrence that names none is its channel's orchestrator's.
+      const to = w.issue.assignee || chat.orchestratorOf(channel.id);
+      await take({ to, source: s ? "recurrence" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
     };
 
-    // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
+    // One answer streams at a time, the call's or chat/completions', from the default orchestrator: a newer line ends the
+    // one before.
     const answer = (line: string, signal?: AbortSignal): AsyncIterable<string> => {
+      const main = target(undefined);
       const me = new Caller();
       // A caller that already left (the request was cancelled before this ran) is not answered: no run starts for it.
       if (signal?.aborted) {
         me.end();
         return me.words(signal);
       }
-      latestCall?.end();
-      latestCall = me;
+      main.latestCall?.end();
+      main.latestCall = me;
       signal?.addEventListener(
         "abort",
         () => {
           me.end();
-          if (latestCall === me) latestCall = undefined;
+          if (main.latestCall === me) main.latestCall = undefined;
         },
         { once: true },
       );
@@ -360,7 +393,9 @@ export const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(
         Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
           Effect.flatMap(chat.topOf(o.channel), (c) =>
-            handled("the patrol", (line: string) => take({ source: "patrol", line, channel: o.channel }))(patrolText(c.name, o.notes)),
+            handled("the patrol", (line: string) => take({ to: chat.orchestratorOf(o.channel), source: "patrol", line, channel: o.channel }))(
+              patrolText(c.name, o.notes),
+            ),
           ),
         ),
       );
@@ -370,16 +405,20 @@ export const make = (options: OrchestratorOptions = {}) =>
           handled("a task graph's line", (line: string) => take({ source: "graph", line, channel: chat.defaultChannel() })),
         ),
       );
-      if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
+      // Each orchestrator goes on with the run a stop cut off.
+      for (const a of store.orchestrators()) {
+        const me = instanceOf(a.id);
+        if (me.host.unfinished() && (options.llm || settings.deepseekApiKey())) void me.host.resume(resumeWithinMs);
+      }
     }
 
-    yield* Effect.addFinalizer(() => Effect.promise(() => host.close()));
+    yield* Effect.addFinalizer(() => Effect.promise(() => Promise.all([...instances.values()].map((me) => me.host.close()))));
 
-    const modelId = () => {
+    const modelId = (id: string) => {
       try {
-        return llmOf().model.id;
+        return options.llm ? options.llm().model.id : deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
       } catch {
-        return store.agent(orchestratorAgent)?.model ?? "";
+        return store.agent(id)?.model ?? "";
       }
     };
 
@@ -426,14 +465,16 @@ export const make = (options: OrchestratorOptions = {}) =>
           return answer(voiceNote + "\n" + lineWords.owner(text), signal);
         };
       },
-      stop: () => Effect.promise(() => host.stop()),
-      markWrong: (on, want) =>
-        host.markWrong(
+      stop: (agent) => Effect.promise(() => target(agent).host.stop()),
+      markWrong: (on, want, agent) => {
+        const me = target(agent);
+        return me.host.markWrong(
           on,
           want,
-          modelId(),
-          [...toolsFor(() => host.current().route), ...selfTools({ home, skills: () => [], memory: true, now: () => 0 })].map((t) => t.name),
-        ),
+          modelId(me.id),
+          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map((t) => t.name),
+        );
+      },
     });
   });
 

@@ -75,6 +75,7 @@ export const Head: Codec<T.Head> = Schema.Literals(T.HeadValues);
 export const Look: Codec<T.Look> = Schema.Struct({
   species: Schema.optionalKey(Species),
   outfit: Schema.optionalKey(Outfit),
+  orchestrator: Schema.optionalKey(Schema.Literals(T.OrchestratorLookValues)),
   build: Build,
   head: Head,
   body: Schema.String,
@@ -86,7 +87,8 @@ export const Look: Codec<T.Look> = Schema.Struct({
 export const Agent: Codec<T.Agent> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  role: Schema.String,
+  role: Schema.Literals(T.AgentRoleValues),
+  duty: Schema.String,
   enabled: Schema.Boolean,
   runtime: Schema.String,
   model: Schema.String,
@@ -175,6 +177,11 @@ export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
 export const OrchestratorState: Codec<T.OrchestratorState> = Schema.Literals(T.OrchestratorStateValues);
 
+export const OrchestratorNow: Codec<T.OrchestratorNow> = Schema.Struct({
+  state: OrchestratorState,
+  channel: Schema.optionalKey(Schema.String),
+});
+
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
 export const MessageKind: Codec<T.MessageKind> = Schema.Literals(T.MessageKindValues);
@@ -237,6 +244,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   type: ChannelType,
   default: Schema.optionalKey(Schema.Boolean),
   peer: Schema.optionalKey(Schema.String),
+  orchestrator: Schema.optionalKey(Schema.String),
   parent: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   position: Schema.optionalKey(Schema.Number),
@@ -699,8 +707,7 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
 export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
-  orchestrator: OrchestratorState,
-  orchestratorChannel: Schema.optionalKey(Schema.String),
+  orchestrators: Schema.optionalKey(Schema.Record(Schema.String, OrchestratorNow)),
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -1235,6 +1242,7 @@ export const Skill: Codec<T.Skill> = Schema.Struct({
 });
 
 export const OrchestratorEvalRequest: Codec<T.OrchestratorEvalRequest> = Schema.Struct({
+  agent: Schema.optionalKey(Schema.String),
   on: Schema.Number,
   want: Schema.String,
 });
@@ -1430,6 +1438,7 @@ export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   before: Schema.optionalKey(Schema.String),
+  orchestrator: Schema.optionalKey(Schema.String),
 });
 
 export const RecurrenceRequest: Codec<T.RecurrenceRequest> = Schema.Struct({
@@ -1633,6 +1642,7 @@ export const FactCall: Codec<T.FactCall> = Schema.Struct({
 export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
   type: Schema.Literal("orchestrator"),
   at: Schema.Number,
+  agent: Schema.String,
   state: OrchestratorState,
   channel: Schema.optionalKey(Schema.String),
 });

@@ -8,8 +8,9 @@ export type IssueId = string & Brand.Brand<"IssueId">;
 /** A session's id: w1, w2…, for the whole life of the farm. */
 export type SessionId = string & Brand.Brand<"SessionId">;
 
-/** The orchestrator's participant id, and the agent of an issue for it. No agent profile has this id. */
-export const orchestratorAgent = "orchestrator";
+/** The built-in orchestrator's profile id: it cannot be deleted or made a worker, so a farm always has an orchestrator, and
+ * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
+export const defaultOrchestrator = "orchestrator";
 
 /** The owner's participant id: who @主人 is. */
 export const ownerId = "owner";
@@ -292,8 +293,12 @@ export interface Channel {
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
   default?: boolean;
-  /** A direct channel's other participant: the orchestrator, or a helper profile. The owner talks with it there alone. */
+  /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
+  /** The orchestrator that looks after the place, by its profile id, as the server resolves it: a channel's own (the
+   * default one when it has none), a thread's channel's, a direct channel's peer when that is an orchestrator. The
+   * owner's words there go to it. */
+  orchestrator?: string;
   /** A thread's channel. */
   parent?: string;
   /** A channel's group in the sidebar. */
@@ -558,9 +563,8 @@ export interface ChannelReset {
 export interface WorkspaceState {
   call: CallState;
   callReason?: string;
-  orchestrator: OrchestratorState;
-  /** Where the orchestrator is thinking or writing, as its last orchestrator fact says. */
-  orchestratorChannel?: string;
+  /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
+  orchestrators?: Record<string, OrchestratorNow>;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -982,6 +986,8 @@ export interface Skill {
 }
 
 export interface OrchestratorEvalRequest {
+  /** The orchestrator whose log it is, by its profile id; the default one when none is given. */
+  agent?: string;
   on: number;
   want: string;
 }
@@ -1064,10 +1070,16 @@ export interface MemorySourceInfo {
   transcripts: boolean;
 }
 
+/** What a profile is: an orchestrator (管家) stays, leads and does no work itself; a worker (帮工) is sent on an issue. */
+export const AgentRoleValues = ["orchestrator", "worker"] as const;
+export type AgentRole = (typeof AgentRoleValues)[number];
+
 export interface Agent {
   id: string;
   name: string;
-  role: string;
+  role: AgentRole;
+  /** What it does, in a sentence (职责): orchestrators read it to pick who takes a job. */
+  duty: string;
   enabled: boolean;
   runtime: string;
   model: string;
@@ -1087,6 +1099,8 @@ export interface Agent {
 export interface Look {
   species?: Species;
   outfit?: Outfit;
+  /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A worker has none. */
+  orchestrator?: OrchestratorLook;
   build: Build;
   head: Head;
   body: string;
@@ -1100,6 +1114,9 @@ export type Head = (typeof HeadValues)[number];
 
 export const BuildValues = ["biped", "treads", "wheel", "hopper", "hover"] as const;
 export type Build = (typeof BuildValues)[number];
+
+export const OrchestratorLookValues = ["farmer", "foreman", "auntie", "grandpa", "gardener", "robot"] as const;
+export type OrchestratorLook = (typeof OrchestratorLookValues)[number];
 
 export const OutfitValues = ["farmer", "gardener", "rain", "winter"] as const;
 export type Outfit = (typeof OutfitValues)[number];
@@ -1448,6 +1465,8 @@ export interface ChannelUpdate {
   category?: string;
   /** Placed before this channel in the sidebar; empty is last. */
   before?: string;
+  /** The orchestrator that looks after the channel, by its profile id; empty is the default one. */
+  orchestrator?: string;
 }
 
 export interface RecurrenceRequest {
@@ -1994,9 +2013,18 @@ export interface FactCall {
   reason?: string;
 }
 
+/** What an orchestrator is doing now. */
+export interface OrchestratorNow {
+  state: OrchestratorState;
+  /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
+  channel?: string;
+}
+
 export interface FactOrchestrator {
   type: "orchestrator";
   at: number;
+  /** Its profile id. */
+  agent: string;
   state: OrchestratorState;
   /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
   channel?: string;

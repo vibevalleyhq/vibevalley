@@ -20,8 +20,7 @@ describe("core", () => {
       ...emptyWorkspaceState(),
       call: "live",
       callReason: "挂了",
-      orchestrator: "speaking",
-      orchestratorChannel: "c1",
+      orchestrators: { orchestrator: { state: "speaking", channel: "c1" } },
       sessions: [helper],
       progress: emptyProgress(),
       recurrences: [],
@@ -30,7 +29,7 @@ describe("core", () => {
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
-      expect([s.call, s.callReason, s.orchestrator, s.orchestratorChannel]).toEqual(["idle", undefined, "idle", undefined]);
+      expect([s.call, s.callReason, s.orchestrators]).toEqual(["idle", undefined, undefined]);
       expect([s.progress, s.recurrences, s.issues]).toEqual([undefined, undefined, undefined]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
@@ -39,7 +38,7 @@ describe("core", () => {
 
   it.effect("valid JSON with the wrong state shape is kept aside untouched, and the farm starts empty", () => {
     const config = testConfig();
-    const raw = JSON.stringify({ call: "idle", orchestrator: "idle", sessions: {} });
+    const raw = JSON.stringify({ call: "idle", orchestrators: {}, sessions: {} });
     writeFileSync(join(config.home, "state.json"), raw);
     return Effect.gen(function* () {
       yield* Effect.scoped(
@@ -76,8 +75,8 @@ describe("core", () => {
           const seen = yield* core.events.pipe(Stream.take(4), Stream.runCollect, Effect.forkScoped);
           yield* TestClock.adjust(5);
           yield* core.apply({ type: "hired", session: { ...helper, phase: { _tag: "arriving" } } });
-          yield* core.setOrchestrator("thinking");
-          yield* core.setOrchestrator("thinking");
+          yield* core.setOrchestrator("orchestrator", "thinking");
+          yield* core.setOrchestrator("orchestrator", "thinking");
           yield* core.apply({ type: "progress", progress: emptyProgress() });
           yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
           const got = yield* Fiber.join(seen);
@@ -86,7 +85,7 @@ describe("core", () => {
         }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
       );
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
-      expect(kept.orchestrator).toBe("thinking");
+      expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking" } });
       expect(kept.progress).toBeUndefined();
       expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/);
     });
@@ -100,12 +99,12 @@ describe("core", () => {
         Stream.runForEach((f) => Queue.offer(frames, f)),
         Effect.forkScoped,
       );
-      expect((yield* Queue.take(frames)).state.orchestrator).toBe("idle");
-      yield* core.setOrchestrator("speaking");
+      expect((yield* Queue.take(frames)).state.orchestrators).toBeUndefined();
+      yield* core.setOrchestrator("orchestrator", "speaking");
       yield* core.setCommits({ total: 2 } as never);
       yield* TestClock.adjust(stateEveryMs);
       const next = yield* Queue.take(frames);
-      expect([next.state.orchestrator, next.state.commits?.total]).toEqual(["speaking", 2]);
+      expect([next.state.orchestrators?.orchestrator?.state, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
@@ -125,7 +124,7 @@ describe("core", () => {
         ),
       );
       yield* TestClock.adjust(5);
-      for (let i = 0; i < 128; i++) yield* core.setOrchestrator(i % 2 === 0 ? "thinking" : "speaking");
+      for (let i = 0; i < 128; i++) yield* core.setOrchestrator("orchestrator", i % 2 === 0 ? "thinking" : "speaking");
       yield* TestClock.adjust(200);
       expect(yield* Fiber.join(seen)).toBe(128);
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
@@ -142,7 +141,7 @@ describe("core", () => {
         Effect.gen(function* () {
           mkdirSync(join(config.home, "state.json"));
           const core = yield* Core;
-          yield* core.setOrchestrator("thinking");
+          yield* core.setOrchestrator("orchestrator", "thinking");
           yield* TestClock.adjust(600);
           expect(messages.some((message) => String(message).includes("state.json could not be saved"))).toBe(true);
           rmSync(join(config.home, "state.json"), { recursive: true });
@@ -152,24 +151,25 @@ describe("core", () => {
     }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
   });
 
-  it.effect("the orchestrator's state says where it thinks and writes, and forgets it once it listens", () =>
+  it.effect("each orchestrator's state says where it thinks and writes, forgets it once it listens, and leaves at rest", () =>
     Effect.gen(function* () {
       const core = yield* Core;
-      yield* core.setOrchestrator("thinking", "c1");
-      expect([core.state().orchestrator, core.state().orchestratorChannel]).toEqual(["thinking", "c1"]);
-      yield* core.setOrchestrator("speaking", "c2");
-      expect([core.state().orchestrator, core.state().orchestratorChannel]).toEqual(["speaking", "c2"]);
-      yield* core.setOrchestrator("listening");
-      expect(core.state().orchestrator).toBe("listening");
-      expect("orchestratorChannel" in core.state()).toBe(false);
+      yield* core.setOrchestrator("orchestrator", "thinking", "c1");
+      yield* core.setOrchestrator("lead", "speaking", "c2");
+      expect(core.state().orchestrators).toEqual({ orchestrator: { state: "thinking", channel: "c1" }, lead: { state: "speaking", channel: "c2" } });
+      yield* core.setOrchestrator("orchestrator", "listening");
+      expect(core.state().orchestrators?.orchestrator).toEqual({ state: "listening" });
+      yield* core.setOrchestrator("orchestrator", "idle");
+      yield* core.setOrchestrator("lead", "idle");
+      expect("orchestrators" in core.state()).toBe(false);
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
   );
 
   it.effect("apply stays synchronous for oar callbacks", () =>
     Effect.gen(function* () {
       const core = yield* Core;
-      yield* Effect.sync(() => Effect.runSync(core.apply({ type: "orchestrator", state: "thinking" })));
-      expect(core.state().orchestrator).toBe("thinking");
+      yield* Effect.sync(() => Effect.runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
+      expect(core.state().orchestrators?.orchestrator?.state).toBe("thinking");
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
   );
 });

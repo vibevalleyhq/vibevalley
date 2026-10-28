@@ -64,10 +64,10 @@ export class VibeValleyApi {
   readonly orchestrator = {
     open: (): Promise<void> => this.call("/api/v1/orchestrator/open", undefined) as Promise<void>,
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (): Promise<void> => this.call("/api/v1/orchestrator/stop", undefined) as Promise<void>,
+    stop: (a: { agent?: string }): Promise<void> => this.call("/api/v1/orchestrator/stop", a) as Promise<void>,
     archive: {
-      list: (a: { q?: string }): Promise<T.ArchiveListing> => this.call("/api/v1/orchestrator/archive/list", a) as Promise<T.ArchiveListing>,
-      get: (a: { name: string }): Promise<string> => this.call("/api/v1/orchestrator/archive/get", a) as Promise<string>,
+      list: (a: { agent?: string; q?: string }): Promise<T.ArchiveListing> => this.call("/api/v1/orchestrator/archive/list", a) as Promise<T.ArchiveListing>,
+      get: (a: { agent?: string; name: string }): Promise<string> => this.call("/api/v1/orchestrator/archive/get", a) as Promise<string>,
     },
     eval: {
       /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */

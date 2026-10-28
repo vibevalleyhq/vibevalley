@@ -4,7 +4,8 @@ import { appWording } from "../base/words";
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
 import { castPrefix } from "./cast";
-import { ready, useSprites } from "../base/query";
+import { orchestratorLookOf } from "../base/agents";
+import { ready, useAgents, useSprites } from "../base/query";
 import { RuntimeBadge } from "./RuntimeBadge";
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */
@@ -42,13 +43,15 @@ export function AgentFace(props: { agentId: string; runtime?: string; look?: Loo
 }
 
 /** The orchestrator's head (orchestrator-<look>-face; the farmer's until looks are picked). */
-export function OrchestratorFace(props: { size?: number; look?: string }) {
+/** An orchestrator's head (the default one when agent is none), in its profile's look unless look is given. */
+export function OrchestratorFace(props: { size?: number; agent?: string; look?: string }) {
   const sprites = useSprites();
+  const agents = useAgents();
   const size = () => props.size ?? 24;
   const cut = () => {
     const all = ready(sprites, undefined);
     if (!all) return undefined;
-    const look = props.look ?? "farmer";
+    const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
     const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
     const sp = all[name]!;
     const k = size() / (sp.w * 0.86);

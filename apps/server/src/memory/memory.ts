@@ -4,21 +4,12 @@
 
 import { memoryWording } from "./words.ts";
 import { fromOwner } from "./prompts.ts";
-import { join } from "node:path";
-import {
-  type ArchiveListing,
-  orchestratorAgent,
-  type Memory,
-  type MemoryList,
-  type MemorySourceInfo,
-  type Preview,
-  type RecallPreview,
-} from "@vibevalley/protocol";
+import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
-import { Settings } from "../base/config.ts";
+import { agentHome, Settings } from "../base/config.ts";
 import { type ApiError, memoriesOf, missing, refused } from "../errors.ts";
 import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
@@ -36,10 +27,8 @@ export interface Recalled {
   readonly lines: string[];
 }
 
-export const orchestratorHome = (home: string) => join(home, "orchestrator");
-
 export interface MemoryShape {
-  /** An agent's memories: the orchestrator's are MEMORY.md's lines; every other agent's are rows and its sources'. */
+  /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a worker's are rows and its sources'. */
   readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
   readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
   readonly forgetOf: (agent: string, id: string) => Effect.Effect<void, ApiError>;
@@ -56,13 +45,14 @@ export interface MemoryShape {
   readonly write: (n: Note) => Effect.Effect<Memory, ApiError>;
   readonly list: (agent: string) => Effect.Effect<Memory[]>;
   readonly sources: () => MemorySourceInfo[];
-  readonly archive: (query: string) => ArchiveListing;
-  readonly archiveFile: (name: string) => string | undefined;
+  /** An orchestrator's archive: what its compactions folded away. */
+  readonly archive: (agent: string, query: string) => ArchiveListing;
+  readonly archiveFile: (agent: string, name: string) => string | undefined;
 }
 
 export class Memories extends Context.Service<Memories, MemoryShape>()("vibevalley/Memory") {}
 
-const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
+const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory => {
   const person = line.text.startsWith(fromOwner);
   let at = fileTime;
   if (line.date) {
@@ -71,12 +61,12 @@ const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
   }
   return {
     id: line.id,
-    agent: orchestratorAgent,
+    agent,
     kind: "note",
     text: person ? line.text.slice(fromOwner.length).trim() : line.text,
     at,
     recalled: 0,
-    ...(person ? {} : { session: orchestratorAgent }),
+    ...(person ? {} : { session: agent }),
   } as Memory;
 };
 
@@ -100,7 +90,9 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
     // What an older cut left is cut again in the background.
     yield* Effect.forkScoped(local.recutTerms);
-    const home = orchestratorHome(config.home);
+    // An orchestrator carries its whole MEMORY.md into every turn; a worker is reminded of rows by its runs' cues.
+    const inFile = (agent: string) => agents.isOrchestrator(agent);
+    const homeOf = (agent: string) => agentHome(config, agent);
 
     const list = (agent: string) => Effect.map(sources.list(agent), (r) => r.memories);
 
@@ -112,17 +104,25 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const forget = (agent: string, id: string) => Effect.mapError(sources.forget(agent, id), (e) => refused(e.message));
 
-    const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (text: string) {
+    const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (agent: string, text: string) {
       const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
       if (body === "") return yield* Effect.fail(refused(memoryWording().empty));
       const at = yield* Clock.currentTimeMillis;
-      const written = yield* Effect.try({ try: () => remember(home, fromOwner + body, new Date(at)), catch: () => refused(memoryWording().fileFailed) });
-      return lineMemory(written, at);
+      const written = yield* Effect.try({
+        try: () => remember(homeOf(agent), fromOwner + body, new Date(at)),
+        catch: () => refused(memoryWording().fileFailed),
+      });
+      return lineMemory(agent, written, at);
     });
 
-    const orchestrator = (): MemoryList => {
-      const snapshot = readMemory(home);
-      return { file: snapshot.file, memories: snapshot.lines.map((l) => lineMemory(l, snapshot.updatedAt)).reverse(), carried: snapshot.carried, sources: [] };
+    const orchestrator = (agent: string): MemoryList => {
+      const snapshot = readMemory(homeOf(agent));
+      return {
+        file: snapshot.file,
+        memories: snapshot.lines.map((l) => lineMemory(agent, l, snapshot.updatedAt)).reverse(),
+        carried: snapshot.carried,
+        sources: [],
+      };
     };
 
     const preview = (agent: string, project: string, text: string) =>
@@ -134,28 +134,27 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
     const fileRefused = (e: unknown) => refused(e instanceof Error ? e.message : String(e));
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
-      const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
+      const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
-      const listed = agent === orchestratorAgent ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* sources.list(agent);
+      const listed = inFile(agent) ? yield* Effect.try({ try: () => orchestrator(agent), catch: fileRefused }) : yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
       if (!m) return yield* Effect.fail(missing(memoryWording().noMemory(agent, id), [memoriesOf(agent)]));
       return m;
     });
 
     const shape: MemoryShape = {
-      memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : sources.list(agent)),
-      remember: (n) => (n.agent === orchestratorAgent ? writeOrchestrator(n.text) : write(n)),
+      memoriesOf: (agent) => (inFile(agent) ? Effect.sync(() => orchestrator(agent)) : sources.list(agent)),
+      remember: (n) => (inFile(n.agent) ? writeOrchestrator(n.agent, n.text) : write(n)),
       forgetOf: (agent, id) =>
         Effect.andThen(
           forgettable(agent, id),
-          agent === orchestratorAgent ? Effect.try({ try: () => forgetLine(home, id), catch: fileRefused }) : forget(agent, id),
+          inFile(agent) ? Effect.try({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : forget(agent, id),
         ),
       previewForgetOf: (agent, id) =>
         Effect.map(forgettable(agent, id), (m) => ({
-          does: [agent === orchestratorAgent ? memoryWording().forgetOrchestrator(m.text) : memoryWording().forget(agent, m.text)],
+          does: [inFile(agent) ? memoryWording().forgetOrchestrator(m.text) : memoryWording().forget(agent, m.text)],
         })),
-      recallOf: (agent, project, text) =>
-        agent === orchestratorAgent ? Effect.fail(refused(memoryWording().orchestratorRecall)) : preview(agent, project, text),
+      recallOf: (agent, project, text) => (inFile(agent) ? Effect.fail(refused(memoryWording().orchestratorRecall)) : preview(agent, project, text)),
       recall: Effect.fn("Memories.recall")(function* (cue) {
         const told = mergeRecalled(yield* sources.prefetch(cue));
         const ids = told.map((l) => l.id).filter((id) => id !== "");
@@ -185,11 +184,11 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       write,
       list,
       sources: () => sources.info(),
-      archive: (query) => ({
-        files: archiveFiles(home),
-        hits: query.trim() ? searchArchive(home, query) : [],
+      archive: (agent, query) => ({
+        files: archiveFiles(homeOf(agent)),
+        hits: query.trim() ? searchArchive(homeOf(agent), query) : [],
       }),
-      archiveFile: (name) => readArchive(home, name),
+      archiveFile: (agent, name) => readArchive(homeOf(agent), name),
     };
     return shape;
   });

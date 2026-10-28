@@ -42,6 +42,8 @@ CREATE TABLE channel (
   archived_at   double precision,
   -- What of it counts for the owner: everything, only what @s the owner, or nothing.
   notify        text not null default 'all' check (notify in ('all', 'mentions', 'none')),
+  -- The orchestrator's profile id that looks after a channel: the owner's words there go to it; none is the default one.
+  orchestrator  text,
   check ((type = 'thread') = (root_id is not null)),
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
@@ -49,7 +51,8 @@ CREATE TABLE channel (
   -- A direct channel with a helper profile is its talk issue's thread too.
   check ((subject_kind is null) or type in ('thread', 'direct')),
   check (not is_default or type = 'channel'),
-  check (not is_default or archived_at is null)
+  check (not is_default or archived_at is null),
+  check (orchestrator is null or type = 'channel')
 );
 CREATE TABLE channel_message (
   id              text primary key,

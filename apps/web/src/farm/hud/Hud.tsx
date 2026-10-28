@@ -27,7 +27,8 @@ import { Overlay } from "./Overlay";
 import { ProjectSign } from "./ProjectSign";
 import { QuotaPill } from "./QuotaPill";
 import { titleBar } from "../../ui/TitleBar";
-import { usePrefs } from "../../base/prefs";
+import { orchestratorLookOf } from "../../base/agents";
+import { ready, useAgents } from "../../base/query";
 
 const edge = 8;
 const gap = 4;
@@ -76,7 +77,8 @@ function TopLeft() {
   const frames = useFrames();
   const core = useCore();
   const tod = timeOfDay();
-  const look = usePrefs((p) => p.orchestratorLook);
+  const agents = useAgents();
+  const look = () => orchestratorLookOf(ready(agents, []));
   const lv = () => frames.frame?.view.level ?? { level: 1, xp: 0, need: 10 };
   const level = () => Math.round(lv().level);
   const need = () => Math.round(lv().need);

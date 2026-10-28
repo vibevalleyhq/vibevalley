@@ -19,7 +19,13 @@ import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
 import { TaskBoard } from "./TaskBoard";
 import { tint } from "./bits";
-import { setOrchestratorLook, setPet, usePrefs } from "../../base/prefs";
+import { setPet, usePrefs } from "../../base/prefs";
+import { useQueryClient } from "@tanstack/solid-query";
+import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+import { orchestratorLookOf } from "../../base/agents";
+import { api, reasonOf } from "../../base/api";
+import { ready, useAgents } from "../../base/query";
+import { toast } from "../../ui/toasts";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [farmWording().panel.shop, "icon-shop", "sm"],
@@ -134,9 +140,22 @@ function Tile(props: { chosen: boolean; ready: boolean; onClick: () => void; chi
   );
 }
 
+/** The default orchestrator's look, kept in its profile. */
 function OrchestratorLooks() {
   const loaded = useVillage();
-  const current = usePrefs((p) => p.orchestratorLook);
+  const agents = useAgents();
+  const client = useQueryClient();
+  const current = () => orchestratorLookOf(ready(agents, []));
+  const choose = async (look: OrchestratorLook) => {
+    const me = ready(agents, []).find((a) => a.id === defaultOrchestrator);
+    if (!me) return;
+    try {
+      await api.agent.update({ ...me, look: { ...me.look, orchestrator: look } });
+      await client.invalidateQueries({ queryKey: ["agents"] });
+    } catch (e) {
+      toast(reasonOf(e));
+    }
+  };
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
@@ -145,7 +164,7 @@ function OrchestratorLooks() {
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <For each={orchestratorLooks}>
           {(look) => (
-            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => setOrchestratorLook(look.id)}>
+            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
               <span class="h-28">
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />

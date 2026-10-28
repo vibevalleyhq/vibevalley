@@ -77,7 +77,7 @@ export class ChatModel {
   }
 
   /** RenameChannel, SetCategory, PlaceChannel, SetArchived, SetNotify. */
-  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify">>) {
+  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify" | "orchestrator">>) {
     const c = this.byId.get(id);
     if (c) this.byId.set(id, { ...c, ...change });
   }

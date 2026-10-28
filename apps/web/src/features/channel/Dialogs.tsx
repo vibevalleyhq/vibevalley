@@ -13,7 +13,8 @@ import { autofocus } from "../../base/util";
 import { ready, useProjects } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
-import { Field, TextArea, TextInput } from "../../ui/Field";
+import { Field, Select, TextArea, TextInput } from "../../ui/Field";
+import { useOrchestrators } from "../../base/agents";
 
 function ProjectInput(props: { value: string; onChange: (v: string) => void }) {
   const projects = useProjects();
@@ -123,6 +124,7 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
   // The dialog mounts the form when it opens: it starts from the channel as it is then.
   const form = createChannelForm(untrack(() => props.channel));
   const core = useCore();
+  const orchestrators = useOrchestrators();
   const top = () => props.channel.type === "channel";
   // The groups the farm's channels are in, for the field to offer.
   const categories = () => [...new Set((core()?.chat?.channels ?? []).flatMap((c) => (c.category ? [c.category] : [])))];
@@ -147,6 +149,16 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
           <Field label={chatWording().dialog.project} hint={chatWording().dialog.projectNone}>
             <ProjectInput value={form.project()} onChange={form.setProject} />
           </Field>
+          <Show when={orchestrators().length > 1}>
+            <Field label={chatWording().manage.orchestrator} hint={chatWording().manage.orchestratorHint}>
+              <Select
+                label={chatWording().manage.orchestrator}
+                value={form.orchestrator()}
+                onChange={(v) => form.setOrchestrator(v)}
+                options={orchestrators().map((a) => ({ value: a.id, label: a.name }))}
+              />
+            </Field>
+          </Show>
           <Field label={chatWording().manage.category} hint={chatWording().manage.categoryHint}>
             <TextInput value={form.category()} onInput={(e) => form.setCategory(e.currentTarget.value)} list="chat-categories" />
             <datalist id="chat-categories">

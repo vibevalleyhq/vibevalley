@@ -1,4 +1,4 @@
-import { orchestratorAgent } from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "runtime-avatars" });
@@ -8,7 +8,7 @@ test("helper avatars show their actual runtime on cards and small issue rows", a
   const codex = profiles.find((a) => a.runtime === "codex");
   const claude = profiles.find((a) => a.runtime === "claude");
   if (!codex || !claude) throw new Error("the farm's seed profiles must include Codex and Claude Code");
-  for (const a of profiles) if (![orchestratorAgent, codex.id, claude.id].includes(a.id)) await api.agent.delete({ id: a.id });
+  for (const a of profiles) if (![defaultOrchestrator, codex.id, claude.id].includes(a.id)) await api.agent.delete({ id: a.id });
   await api.issue.create({ title: "Codex 的工单", assignee: codex.id });
   await api.issue.create({ title: "Claude Code 的工单", assignee: claude.id });
 

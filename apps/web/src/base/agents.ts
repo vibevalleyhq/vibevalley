@@ -1,14 +1,27 @@
 import { keepPreviousData } from "@tanstack/solid-query";
-import { type Agent, type AgentProblem, orchestratorAgent } from "@vibevalley/protocol";
+import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 import { api } from "./api";
 import { createSettled } from "./util";
 import { ready, useAgents, useQuery } from "./query";
 
-/** The profiles work is sent to: the orchestrator's is apart; enabled, only those not switched off. */
+/** The profiles work is sent to, the workers; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
   const all = useAgents();
-  return (): Agent[] => ready(all, []).filter((a) => a.id !== orchestratorAgent && (!enabled || a.enabled));
+  return (): Agent[] => ready(all, []).filter((a) => a.role === "worker" && (!enabled || a.enabled));
 }
+
+/** The orchestrators' profiles, the default one first. */
+export function useOrchestrators() {
+  const all = useAgents();
+  return (): Agent[] =>
+    ready(all, [])
+      .filter((a) => a.role === "orchestrator")
+      .sort((a, b) => (a.id === defaultOrchestrator ? -1 : b.id === defaultOrchestrator ? 1 : 0));
+}
+
+/** An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. */
+export const orchestratorLookOf = (agents: readonly Agent[], id = defaultOrchestrator): OrchestratorLook =>
+  agents.find((a) => a.id === id)?.look.orchestrator ?? "farmer";
 
 /** A profile by its id, once the profiles are read; undefined for none or one gone. */
 export function useAgent(id: () => string | undefined) {

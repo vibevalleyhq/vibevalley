@@ -15,7 +15,8 @@
       "tags": ["backend", "endpoint", "server", "go", "token", "validation", "reconnect", "push"],
       "id": "backend",
       "name": "Backend Zhou",
-      "role": "Writes endpoints, changes the server, runs the Go tests",
+      "role": "worker",
+      "duty": "Writes endpoints, changes the server, runs the Go tests",
       "runtime": "pi",
       "look": {
         "eye": "#a6f4ff",
@@ -42,7 +43,8 @@
       "tags": ["test", "test", "ci", "run them", "failing"],
       "id": "tester",
       "name": "Tester Wu",
-      "role": "Runs tests, fixes tests, watches CI",
+      "role": "worker",
+      "duty": "Runs tests, fixes tests, watches CI",
       "runtime": "pi",
       "look": {
         "eye": "#9dffb0",
@@ -70,7 +72,8 @@
       "tags": ["frontend", "page", "panel", "captions", "animation", "robot", "dark mode", "ui"],
       "id": "frontend",
       "name": "Frontend Zheng",
-      "role": "Pages, the 3D scene, interaction and animation",
+      "role": "worker",
+      "duty": "Pages, the 3D scene, interaction and animation",
       "runtime": "pi",
       "look": {
         "eye": "#a6f4ff",
@@ -97,7 +100,8 @@
       "tags": ["docs", "readme", "read through", "guide", "docs"],
       "id": "docs",
       "name": "Kimi the Writer",
-      "role": "Reads the docs through, writes READMEs, tidies guides",
+      "role": "worker",
+      "duty": "Reads the docs through, writes READMEs, tidies guides",
       "runtime": "pi",
       "look": {
         "eye": "#ffd25e",
@@ -125,7 +129,8 @@
       "tags": ["look up", "research", "agora", "reference", "how to call the API"],
       "id": "scout",
       "name": "Grok the Scout",
-      "role": "Looks things up, reads outside docs, researches options",
+      "role": "worker",
+      "duty": "Looks things up, reads outside docs, researches options",
       "runtime": "pi",
       "look": {
         "eye": "#a6f4ff",
@@ -153,7 +158,8 @@
       "tags": ["odd jobs", "small change", "patch"],
       "id": "night",
       "name": "Antigravity on Night Shift",
-      "role": "Odd jobs, small changes, the night shift",
+      "role": "worker",
+      "duty": "Odd jobs, small changes, the night shift",
       "runtime": "pi",
       "look": {
         "eye": "#9dffb0",
@@ -181,7 +187,8 @@
       "tags": ["refactor", "hard", "bug", "debug", "root cause", "architecture", "claude"],
       "id": "claude",
       "name": "Master Claude",
-      "role": "Reads big code bases, refactors, chases nasty bugs",
+      "role": "worker",
+      "duty": "Reads big code bases, refactors, chases nasty bugs",
       "runtime": "claude",
       "look": {
         "eye": "#a6f4ff",
@@ -209,7 +216,8 @@
       "tags": ["implement", "feature", "fix", "until it passes", "codex"],
       "id": "codex",
       "name": "Codex the Craftsman",
-      "role": "Builds the feature as the ticket says, until the tests pass",
+      "role": "worker",
+      "duty": "Builds the feature as the ticket says, until the tests pass",
       "runtime": "codex",
       "look": {
         "eye": "#a6f4ff",
@@ -237,7 +245,8 @@
       "tags": ["prototype", "try", "experiment", "script"],
       "id": "lab",
       "name": "Pi the Tinkerer",
-      "role": "Writes prototypes, tries new approaches",
+      "role": "worker",
+      "duty": "Writes prototypes, tries new approaches",
       "runtime": "pi",
       "look": {
         "eye": "#ff9de2",

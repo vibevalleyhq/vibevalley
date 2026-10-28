@@ -159,14 +159,14 @@ const RULES: readonly Rule[] = [
   {
     name: "the orchestrator under the manager name",
     pattern: /\b(Manager|Manager[A-Z]\w*|manager[A-Z]\w*|\w+Manager\w*)\b/,
-    says: "Orchestrator, orchestratorAgent, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
+    says: "Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
     // The village map's entity is Manager (public/village.ldtk).
     except: /^apps\/web\/src\/farm\/world\/(level|world)\.ts$/,
   },
   {
     name: "the orchestrator under the assistant name",
     pattern: /\b(Assistant(?!Message)[A-Z]\w*|assistant(?!Message)[A-Z]\w*|\w+Assistant(?!Message)\w*)\b/,
-    says: 'Orchestrator, orchestratorAgent, OrchestratorShape, forOrchestrator; a model\'s message role stays assistant (AssistantMessage, role: "assistant")',
+    says: 'Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; a model\'s message role stays assistant (AssistantMessage, role: "assistant")',
   },
   {
     name: "an issue's state in farm words",
@@ -202,6 +202,19 @@ const RULES: readonly Rule[] = [
     ],
     // What the owner types in a test is the owner's words; the pixel pieces are the skins' own.
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//,
+  },
+  {
+    name: "the one orchestrator under its old names",
+    pattern: /\b(orchestratorAgent|orchestratorHome|orchestratorLook|setOrchestratorLook|orchestratorChannel)\b/,
+    says: "a profile's role (isOrchestrator, role: \"orchestrator\"); defaultOrchestrator only for what names none; agentHome; the profile's look.manager; WorkspaceState.orchestrators[id].channel",
+  },
+  {
+    name: "a profile called a helper's where the owner reads it",
+    pattern: /帮工档案/,
+    says: "档案 (a profile): its role is 管家 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
+    dirs: ["apps/web/src", "apps/server/src"],
+    // On the server only the word tables are the owner's; prompts.ts is a model's.
+    except: /^apps\/server\/src\/(?!.*\/words\.ts$)/,
   },
   {
     name: "a place to talk under another name",

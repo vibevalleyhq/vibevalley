@@ -161,7 +161,8 @@ test("a file dropped on the channel goes up; a video plays in place and a PDF op
 const helper: Agent = {
   id: "",
   name: "阿狐",
-  role: "",
+  role: "worker",
+  duty: "",
   enabled: true,
   runtime: "pi",
   model: "",

@@ -1,7 +1,7 @@
 import { chatWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Channel, type ChatMessage, type MessageHit, orchestratorAgent, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import {
   archivedOf,
@@ -28,7 +28,7 @@ import {
 } from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
-import { useCore } from "../../base/frame";
+import { orchestratorMood, useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
@@ -36,6 +36,7 @@ import { Composer, FileDrop } from "./Composer";
 import { switcher } from "./QuickSwitcher";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
 import { ready, useAgents } from "../../base/query";
+import { useAgent, useOrchestrators } from "../../base/agents";
 import { toast } from "../../ui/toasts";
 import { Dialog } from "../../ui/Dialog";
 import { Select } from "../../ui/Field";
@@ -387,15 +388,16 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           </Section>
         </Show>
       </div>
-      <OrchestratorLine mood={core()?.orchestrator ?? "idle"} />
+      <OrchestratorLine agent={(props.thread ?? props.channel)?.orchestrator ?? defaultOrchestrator} />
     </aside>
   );
 }
 
-/** The helper profiles the owner can talk with alone: picking one opens its direct channel, made the first time. */
+/** The profiles the owner can talk with alone, the orchestrators first: picking one opens its direct channel, made the
+ * first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();
-  const agents = () => ready(all, []).filter((a) => a.id !== orchestratorAgent);
+  const agents = () => [...ready(all, [])].sort((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
   const open = (agent: string) =>
     api.channel.direct
       .create({ agent })
@@ -419,7 +421,9 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
             class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-hover"
             onClick={() => void open(a().id)}
           >
-            <HelperFace agent={a().id} runtime={a().runtime} size={20} />
+            <Show when={a().role === "orchestrator"} fallback={<HelperFace agent={a().id} runtime={a().runtime} size={20} />}>
+              <OrchestratorFace size={20} agent={a().id} />
+            </Show>
             <span class="min-w-0 flex-1 truncate">{a().name}</span>
           </button>
         )}
@@ -591,6 +595,9 @@ function Members(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
+  const orchestrators = useOrchestrators();
+  const here = () => props.channel.orchestrator ?? defaultOrchestrator;
+  const nameOf = (id: string) => orchestrators().find((a) => a.id === id)?.name || chatWording().orchestrator;
   const helpers = () => {
     if (props.channel.type === "direct") return [];
     const fallback = defaultOf(core()?.chat)?.id;
@@ -604,9 +611,12 @@ function Members(props: { channel: Channel }) {
         {chatWording().members.owner}
       </div>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
-        <OrchestratorFace size={28} />
-        <span class="flex-1">{chatWording().orchestrator}</span>
-        <span class="text-xs text-muted">{mood[core()?.orchestrator ?? "idle"]}</span>
+        <OrchestratorFace size={28} agent={here()} />
+        <span class="flex min-w-0 flex-1 flex-col">
+          <span class="truncate">{nameOf(here())}</span>
+          <span class="truncate text-xs text-muted">{chatWording().members.looksAfter}</span>
+        </span>
+        <span class="text-xs text-muted">{mood[orchestratorMood(core(), here())]}</span>
       </div>
       <For each={helpers()} keyed={(h) => h.id}>
         {(h) => (
@@ -641,14 +651,18 @@ function Members(props: { channel: Channel }) {
   );
 }
 
-function OrchestratorLine(props: { mood: OrchestratorState }) {
+/** The orchestrator that looks after the place open, and what it is doing. */
+function OrchestratorLine(props: { agent: string }) {
+  const core = useCore();
+  const profile = useAgent(() => props.agent);
+  const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
   return (
     <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={chatWording().orchestrator}>
-      <OrchestratorFace size={32} />
-      {chatWording().orchestrator}
-      <Dot tone={props.mood === "idle" ? "idle" : props.mood === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
-      <span class="text-xs text-muted">{mood[props.mood]}</span>
-      <Show when={props.mood === "thinking"}>
+      <OrchestratorFace size={32} agent={props.agent} />
+      {profile()?.name || chatWording().orchestrator}
+      <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
+      <span class="text-xs text-muted">{mood[now()]}</span>
+      <Show when={now() === "thinking"}>
         <ThinkingDots />
       </Show>
     </div>

@@ -4,10 +4,12 @@
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
 import { createMemo, createSignal, onSettled } from "solid-js";
-import { type ChatMessage, type Channel, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
+import { orchestratorMood } from "../../base/frame";
+import { useOrchestrators } from "../../base/agents";
 
 export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
   await api.channel.message.send({ id: channel.id, text, agent, sendKey });
@@ -59,11 +61,14 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     return id ? all.find((c) => c.id === id) : all.find((c) => c.default);
   };
 
+  const orchestrators = useOrchestrators();
+  /** The orchestrator that looks after the place the next line goes to. */
+  const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
   // No one else is in a direct channel to be named.
   const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
   const offered = createMemo(() => {
     const t = typing();
-    return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];
+    return t ? offeredFor(nameables(core()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
 
   const edit = (value: string, at: number) => {
@@ -166,7 +171,8 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     blur: () => setClosed(true),
     focus: () => setClosed(false),
     canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
-    /** The orchestrator is in a round the owner may stop. */
-    stoppable: () => core()?.orchestrator === "thinking" || core()?.orchestrator === "speaking",
+    here,
+    /** The place's orchestrator is in a round the owner may stop. */
+    stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),
   };
 }

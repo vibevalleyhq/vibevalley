@@ -39,7 +39,7 @@ const zh = {
   due: (name: string, missed: boolean, text: string) => "⏰ 定时「" + name + "」到点了" + (missed ? "（服务端没开着时错过的，补一次）" : "") + "：" + text,
   noRecurrence: (id: string) => `没有 ${id} 号定时`,
   noChannel: (name: string) => `没有 ${name} 这个频道`,
-  noProfile: (name: string) => `没有叫 ${name} 的帮工档案`,
+  noProfile: (name: string) => `没有叫 ${name} 的档案`,
   noProject: (channel: string) => `#${channel} 没有默认项目：直接派给帮工的定时要写 project`,
   remove: (name: string, when: string) => `删掉定时「${name}」${when ? `（${when}）` : ""}：以后不再到点开工，它开过的工单留着`,
 };
@@ -78,7 +78,7 @@ const en: typeof zh = {
   due: (name, missed, text) => `⏰ The schedule "${name}" is due` + (missed ? " (missed while the server was off, made up once)" : "") + ": " + text,
   noRecurrence: (id) => `There is no schedule ${id}`,
   noChannel: (name) => `There is no channel ${name}`,
-  noProfile: (name) => `There is no helper profile called ${name}`,
+  noProfile: (name) => `There is no profile called ${name}`,
   noProject: (channel) => `#${channel} has no default project: a schedule sent straight to a helper needs a project`,
   remove: (name, when) => `Delete the schedule "${name}"${when ? ` (${when})` : ""}: it no longer starts work when due; the tickets it opened stay`,
 };

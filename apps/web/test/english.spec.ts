@@ -10,7 +10,7 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
   const nav = page.getByRole("navigation", { name: "Workbench" });
-  for (const label of ["Chat", "Tickets", "Docs", "Helpers", "Machines", "Projects", "Catalog", "Settings"])
+  for (const label of ["Chat", "Tickets", "Docs", "Profiles", "Machines", "Projects", "Catalog", "Settings"])
     await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `) })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(page.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");

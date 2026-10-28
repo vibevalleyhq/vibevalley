@@ -105,7 +105,7 @@ const zh = {
   },
   reopen: {
     title: "重开这张工单",
-    line: (issue: string) => `「${issue}」由同一个帮工档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。`,
+    line: (issue: string) => `「${issue}」由同一份档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。`,
     what: "这次要它做什么（不填就是接着做完）",
     whatLabel: "这次要做什么",
     reopen: "重开",

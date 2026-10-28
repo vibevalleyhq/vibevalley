@@ -2,14 +2,15 @@
 // recorded cases (rules.test.ts).
 
 import { channelWording } from "./words.ts";
-import { type Channel, everyone, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
+import { type Channel, everyone, defaultOrchestrator, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
-// The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English.
+// The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English. The
+// orchestrator's names are the place's orchestrator, filled in where the place is known.
 const chatNamed: Readonly<Record<string, string>> = {
-  管家: orchestratorAgent,
+  管家: defaultOrchestrator,
   主人: ownerId,
   所有人: everyone,
-  manager: orchestratorAgent,
+  manager: defaultOrchestrator,
   owner: ownerId,
   everyone,
 };
@@ -19,14 +20,31 @@ export const mentionOf = (id: string): string | undefined => channelWording().me
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;
-const chatMention = /(^|[^\p{L}\p{N}_@])@(w[0-9]+|管家|主人|所有人|manager|owner|everyone)/gu;
+const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Code is not prose: a mention inside backticks or a fence names no one. A name ends where its token ends, so `@w3你看` names w3. */
-export function mentionsIn(text: string): string[] {
+/** Who a place's words can name besides the sessions: its own orchestrator (@管家) and every orchestrator by its profile id. */
+export interface Nameable {
+  readonly here: string;
+  readonly orchestrators: readonly string[];
+}
+
+const onlyDefault: Nameable = { here: defaultOrchestrator, orchestrators: [defaultOrchestrator] };
+
+/** Code is not prose: a mention inside backticks or a fence names no one. A name ends where its token ends, so `@w3你看`
+ * names w3; the longest name is tried first, so `@agent-12` is not agent-1. */
+export function mentionsIn(text: string, names: Nameable = onlyDefault): string[] {
+  const pattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}_@])@(w[0-9]+|${[...names.orchestrators, ...Object.keys(chatNamed)]
+      .sort((a, b) => b.length - a.length)
+      .map(escaped)
+      .join("|")})`,
+    "gu",
+  );
   const prose = text.replace(chatFence, " ").replace(chatTick, " ");
   const found: string[] = [];
-  for (const m of prose.matchAll(chatMention)) {
-    const id = chatNamed[m[2]!] ?? m[2]!;
+  for (const m of prose.matchAll(pattern)) {
+    const named = chatNamed[m[2]!];
+    const id = named === defaultOrchestrator ? names.here : (named ?? m[2]!);
     if (!found.includes(id)) found.push(id);
   }
   return found;
@@ -78,6 +96,10 @@ export interface AudienceInput {
   readonly mentions: readonly string[];
   /** Only its type and a direct channel's peer are read. */
   readonly channel: Pick<Channel, "type" | "peer">;
+  /** The place's orchestrator, by its profile id: the one the owner's words there go to when they name no one else. */
+  readonly orchestrator: string;
+  /** Every orchestrator's profile id: each is always there to be named, and none cools down. */
+  readonly orchestrators: readonly string[];
   /** In a thread, the session its words are for: the one working the thread's issue now, "" when none is. */
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
@@ -102,24 +124,25 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   let hops = i.hops;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
     if (recipient === i.from || out.some((d) => d.recipient === recipient)) return;
-    if (recipient !== orchestratorAgent && !present.includes(recipient)) return;
+    if (!i.orchestrators.includes(recipient) && !present.includes(recipient)) return;
     let heldBy: HeldBy | undefined;
     if (wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
-    else if (wakes && byAgent && recipient !== orchestratorAgent && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
+    else if (wakes && byAgent && !i.orchestrators.includes(recipient) && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
     else if (wakes && i.fromKind !== "owner" && (i.broken ?? []).includes(recipient)) heldBy = "wake_breaker";
     if (wakes && byAgent && !heldBy) hops++;
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
   };
 
-  // With the orchestrator, the owner's words go to it; with a helper profile, to the session talking for it now (none
+  // With an orchestrator, the owner's words go to it; with a helper profile, to the session talking for it now (none
   // between its rounds: the talk's issue hears the words and sends one).
   if (i.channel.type === "direct") {
-    const to = i.channel.peer === orchestratorAgent ? orchestratorAgent : (i.threadOwner ?? "");
+    const peer = i.channel.peer ?? "";
+    const to = i.orchestrators.includes(peer) ? peer : (i.threadOwner ?? "");
     if (i.fromKind === "owner" && to) add(to, "direct", true);
     return out;
   }
   if (i.kind === "report") {
-    if (!i.forTask) add(orchestratorAgent, "addressed", i.outcome === "failed");
+    if (!i.forTask) add(i.orchestrator, "addressed", i.outcome === "failed");
     return out;
   }
   const mentions = i.mentions ?? [];
@@ -134,7 +157,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     if (owner) add(owner, "own_thread", true);
     if (thread) for (const f of i.followers ?? []) add(f, "follower", true);
     else {
-      if (!mentions.some((m) => m !== ownerId)) add(orchestratorAgent, "addressed", true);
+      if (!mentions.some((m) => m !== ownerId)) add(i.orchestrator, "addressed", true);
       for (const h of i.sessions ?? []) add(h, "channel", false);
     }
   } else if (owner) add(owner, "own_thread", true);

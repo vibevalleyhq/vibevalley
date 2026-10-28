@@ -187,5 +187,8 @@ export const serverAddress = (c: Config) => `127.0.0.1:${c.port}`;
 /** Where the projects are: each folder in it is one. */
 export const projectsDir = (c: Config) => join(c.workRoot, "projects");
 
+/** A profile's own folder, an orchestrator's conversation, MEMORY.md, archive and evals among what it keeps there. */
+export const agentHome = (c: Config, agent: string) => join(c.home, "agent", agent);
+
 /** The configuration, as a service. */
 export class Settings extends Context.Service<Settings, Config>()("vibevalley/Config") {}

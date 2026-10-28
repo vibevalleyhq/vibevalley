@@ -1,6 +1,6 @@
 # 帮工
 
-一个帮工档案为一张工单接的活是一个 Session（帮工），农场里是地上干活的小动物。它是 [oar](https://www.npmjs.com/package/@botiverse/oar) 的一个子 agent（`@botiverse/oar/agents`），按档案设置在项目目录或工单的 worktree 里一次一次干活：一次触发到一次汇报是一次 run（一季庄稼）。Session 跨好几次 run，重启后还是同一个；底下的 oar 会话可以换。
+一个帮工的档案为一张工单接的活是一个 Session（帮工），农场里是地上干活的小动物。它是 [oar](https://www.npmjs.com/package/@botiverse/oar) 的一个子 agent（`@botiverse/oar/agents`），按档案设置在项目目录或工单的 worktree 里一次一次干活：一次触发到一次汇报是一次 run（一季庄稼）。Session 跨好几次 run，重启后还是同一个；底下的 oar 会话可以换。
 
 ## 管什么，不管什么
 
@@ -12,7 +12,7 @@
 | 农场的规矩、汇报怎么读（结论、失败、问题）、没动静 | worktree、分支、合并、PR 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
 | 同时干活的上限；额度、花费和「派不出去」（`runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（频道，[频道](docs/subsystems/channel.md)） |
 | 进程内的 agent（管家）怎么跑：起大脑、排输入、边说边写、记 run 和日志、重启后接着做、做错的一轮存成评测（`session/host.ts`、`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/orchestrator.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
-| | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/features/session/WorkLog.tsx`，管家页和帮工档案的轨迹 `apps/web/src/features/session/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/features/session/rounds.ts`） |
+| | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/features/session/WorkLog.tsx`，管家页和帮工的档案的轨迹 `apps/web/src/features/session/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/features/session/rounds.ts`） |
 
 ## 在哪
 

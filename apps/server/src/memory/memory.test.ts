@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { owner } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { memoryKeep } from "@vibevalley/protocol";
+import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
@@ -10,11 +10,11 @@ import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { remember, rewriteMemory } from "../agent/brain/memory.ts";
-import { Settings } from "../base/config.ts";
+import { agentHome, Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
-import { orchestratorHome, Memories, make } from "./memory.ts";
+import { Memories, make } from "./memory.ts";
 import { memoryIsNewNote, memoryJobText, memoryNotesOf, recallChars } from "./recall.ts";
 
 const world = (config = testConfig()) =>
@@ -106,7 +106,7 @@ describe("memory", () => {
 
   it.effect("the orchestrator's MEMORY.md: its lines, the owner's marked, dated, forgotten", () => {
     const config = testConfig();
-    const folder = orchestratorHome(config.home);
+    const folder = agentHome(config, defaultOrchestrator);
     return Effect.gen(function* () {
       const m = yield* Memories;
       expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
@@ -138,17 +138,17 @@ describe("memory", () => {
 
   it.effect("the orchestrator's archive", () => {
     const config = testConfig();
-    const folder = orchestratorHome(config.home);
+    const folder = agentHome(config, defaultOrchestrator);
     mkdirSync(join(folder, "archive"), { recursive: true });
     writeFileSync(join(folder, "archive", "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
     return Effect.gen(function* () {
       const m = yield* Memories;
-      const listing = m.archive("CLOCK-IN");
+      const listing = m.archive(defaultOrchestrator, "CLOCK-IN");
       expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
       expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
-      expect(m.archive("").hits).toEqual([]);
-      expect(m.archiveFile("orchestrator-2026-10-12.md")).toContain("派给老周");
-      expect(m.archiveFile("../MEMORY.md")).toBeUndefined();
+      expect(m.archive(defaultOrchestrator, "").hits).toEqual([]);
+      expect(m.archiveFile(defaultOrchestrator, "orchestrator-2026-10-12.md")).toContain("派给老周");
+      expect(m.archiveFile(defaultOrchestrator, "../MEMORY.md")).toBeUndefined();
     }).pipe(Effect.provide(world(config)));
   });
 
@@ -239,7 +239,7 @@ describe("memory", () => {
 
   it.effect("forget and its preview turn file failures into Refused", () => {
     const config = testConfig();
-    mkdirSync(join(orchestratorHome(config.home), "MEMORY.md"), { recursive: true });
+    mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     return Effect.gen(function* () {
       const m = yield* Memories;
       expect((yield* Effect.flip(m.previewForgetOf("orchestrator", "m1")))._tag).toBe("Refused");

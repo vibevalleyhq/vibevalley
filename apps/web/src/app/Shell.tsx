@@ -12,7 +12,6 @@ import { Icon } from "../ui/Icon";
 import { A } from "../ui/A";
 import { useRouter } from "../base/router";
 import { titleBar } from "../ui/TitleBar";
-import { usePrefs } from "../base/prefs";
 import { QuickSwitcher, switcher } from "../features/channel";
 
 /** The head's height, the rail's top slot's too. */
@@ -46,7 +45,6 @@ function Slot(props: { to: string; label: string; current?: boolean; fill?: stri
 
 function Rail(props: { here?: Place }) {
   const frames = useFrames();
-  const look = usePrefs((p) => p.orchestratorLook);
   const settings = places.find((p) => p.id === "settings")!;
   return (
     <nav aria-label={appWording().rail} class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">
@@ -54,7 +52,7 @@ function Rail(props: { here?: Place }) {
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
         <Slot to="/" label={appWording().farm} current fill="#e5a93c">
-          <OrchestratorFace size={38} look={look()} />
+          <OrchestratorFace size={38} />
         </Slot>
       </div>
       <div class="flex flex-col gap-2">

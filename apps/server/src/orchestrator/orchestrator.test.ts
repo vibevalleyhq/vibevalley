@@ -3,7 +3,7 @@ import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Message } from "../ai/messages.ts";
 import { type Answer, answer, toolCall } from "../ai/testing.ts";
-import { orchestratorAgent } from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Said } from "../testing/said.ts";
 import { seedAgents } from "../agent/seed.ts";
 import { Effect, Layer } from "effect";
@@ -108,7 +108,7 @@ const said = Effect.gen(function* () {
   const chat = yield* Channels;
   return () =>
     saidIn(chat.defaultChannel())
-      .filter((m) => m.from === orchestratorAgent && m.kind === "chat")
+      .filter((m) => m.from === defaultOrchestrator && m.kind === "chat")
       .map((m) => m.text);
 });
 
@@ -136,7 +136,7 @@ describe("the orchestrator", () => {
       expect(first.system).not.toContain("【现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
       const trail = yield* until(() => {
-        const events = (sessions.events(orchestratorAgent) ?? []).filter((e) => e.type !== "llm/usage");
+        const events = (sessions.events(defaultOrchestrator) ?? []).filter((e) => e.type !== "llm/usage");
         return events.length >= 6 && events.at(-1)!.type === "run/end" && events;
       }, "its log");
       const [ask, tool, result, answer] = trail.slice(-5, -1);
@@ -167,14 +167,49 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
-      const direct = (yield* Core).state().chat!.channels.find((c) => c.type === "direct" && c.peer === orchestratorAgent)!;
+      const direct = (yield* Core).state().chat!.channels.find((c) => c.type === "direct" && c.peer === defaultOrchestrator)!;
       yield* orchestrator.say("单独问你一句：地里怎么样", {}, direct.id, "");
-      const answered = () => saidIn(direct.id).filter((m) => m.from === orchestratorAgent);
+      const answered = () => saidIn(direct.id).filter((m) => m.from === defaultOrchestrator);
       expect((yield* until(() => answered().length >= 1 && answered(), "its answer there")).map((m) => m.text)).toEqual(["收到"]);
-      expect(saidIn(chat.defaultChannel()).some((m) => m.from === orchestratorAgent)).toBe(false);
+      expect(saidIn(chat.defaultChannel()).some((m) => m.from === defaultOrchestrator)).toBe(false);
       const asked = f.requests.at(-1)!;
       expect(lastLine(asked)).toBe("[来源：主人]\n主人说：单独问你一句：地里怎么样");
       expect(lastInput(asked)).toContain("你正在回话的地方：和主人的私聊 @owner");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("several orchestrators: each answers in its own direct channel, the channels it looks after and where it is named", () => {
+    const config = testConfig();
+    const f = farm(respond, config);
+    return Effect.gen(function* () {
+      const agents = yield* Agents;
+      const issues = yield* Issues;
+      const orchestrator = yield* Orchestrator;
+      const { in: saidIn } = yield* Said;
+      const chat = yield* Channels;
+      const lead = yield* agents.createAgent({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
+      const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
+      const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
+
+      const direct = yield* issues.talkWith(lead.name);
+      expect(direct).not.toBe(chat.orchestratorDirect(defaultOrchestrator));
+      yield* orchestrator.say("私下问你", {}, direct, "");
+      expect((yield* until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");
+      expect(asked("私下问你")[0]!.system).toContain("你是管家「阿青」");
+      expect(readFileSync(join(config.home, "agent", lead.id, `${lead.id}.jsonl`), "utf8")).toContain("私下问你");
+
+      const notes = (yield* chat.openChannel("notes-room", "", "")).id;
+      yield* chat.updateChannel(notes, { orchestrator: lead.id });
+      expect(chat.orchestratorOf(notes)).toBe(lead.id);
+      yield* orchestrator.say("这边怎么样", {}, notes, "");
+      yield* until(() => from(notes, lead.id)[0], "the answer from the one that looks after the channel");
+      yield* orchestrator.say(`@${lead.id} 你也看看`, {}, undefined, "");
+      yield* until(() => from(chat.defaultChannel(), lead.id)[0], "the answer from the one named");
+      yield* orchestrator.say("默认频道里随便说", {}, undefined, "");
+      yield* until(() => from(chat.defaultChannel(), defaultOrchestrator)[0], "the default one's answer");
+      expect(asked("默认频道里随便说")[0]!.system).not.toContain("你是管家");
+      expect(from(chat.defaultChannel(), lead.id)).toHaveLength(1);
+      expect((yield* Effect.flip(chat.updateChannel(notes, { orchestrator: "lab" })))._tag).toBe("Refused");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -189,7 +224,7 @@ describe("the orchestrator", () => {
       // The owner speaking, from any door, opens the farm.
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
-      const kept = readFileSync(join(config.home, "orchestrator", "orchestrator.jsonl"), "utf8");
+      const kept = readFileSync(join(config.home, "agent", "orchestrator", "orchestrator.jsonl"), "utf8");
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/);
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -211,7 +246,7 @@ describe("the orchestrator", () => {
       expect(f.requests.length).toBe(1);
       const call = () =>
         saidIn(chat.defaultChannel())
-          .filter((m) => m.spoken || m.from === orchestratorAgent)
+          .filter((m) => m.spoken || m.from === defaultOrchestrator)
           .map((m) => m.from + "：" + m.text);
       expect(yield* until(() => call().length === 2 && call(), "the call in the default channel")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -306,7 +341,7 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
-      const me = agents.agent(orchestratorAgent)!;
+      const me = agents.agent(defaultOrchestrator)!;
       yield* agents.saveAgent({ ...me, model: "openai/gpt" });
       const pieces = (text: string) =>
         Effect.promise(async () => {
@@ -317,7 +352,7 @@ describe("the orchestrator", () => {
       const first = yield* pieces("在吗");
       expect(first.length).toBe(1);
       expect(first[0]).toContain("只接 DeepSeek");
-      const refusal = () => saidIn(chat.defaultChannel()).filter((m) => m.from === orchestratorAgent);
+      const refusal = () => saidIn(chat.defaultChannel()).filter((m) => m.from === defaultOrchestrator);
       expect((yield* until(() => refusal()[0], "the refusal in the default channel")).text).toMatch(/^我这边起不来：/);
       expect((yield* pieces("还在吗")).length).toBe(1);
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
@@ -404,7 +439,7 @@ describe("the orchestrator", () => {
       yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "done"), "the work handed back");
       yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
       const thread = (yield* chat.jobThread(helper))!;
-      const refused = yield* until(() => saidIn(thread).find((m) => m.from === orchestratorAgent && m.text.startsWith("合并：")), "the completion refused");
+      const refused = yield* until(() => saidIn(thread).find((m) => m.from === defaultOrchestrator && m.text.startsWith("合并：")), "the completion refused");
       expect(refused.text).toBe("合并：没挪：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
@@ -416,7 +451,7 @@ describe("the orchestrator", () => {
       expect(merged.delivered).toBe("none");
       const general = (yield* Channels).defaultChannel();
       yield* until(
-        () => saidIn(general).some((m) => m.from === orchestratorAgent && m.text === `合并：#${number} 已完成，没有改动要合`),
+        () => saidIn(general).some((m) => m.from === defaultOrchestrator && m.text === `合并：#${number} 已完成，没有改动要合`),
         "what it delivered said",
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -548,7 +583,7 @@ describe("the orchestrator", () => {
       const words = yield* said;
       yield* orchestrator.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");
-      const asked = yield* until(() => (sessions.events(orchestratorAgent) ?? []).find((e) => e.type === "user/message"), "its log");
+      const asked = yield* until(() => (sessions.events(defaultOrchestrator) ?? []).find((e) => e.type === "user/message"), "its log");
       const made = yield* orchestrator.markWrong(asked.seq, "应该先看一眼地里");
       const saved = JSON.parse(readFileSync(made.file, "utf8")) as { want: string; input: { customType: string }; did: { role: string }[]; tools: string[] };
       expect(saved.want).toBe("应该先看一眼地里");

@@ -4,12 +4,13 @@
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {
-  orchestrator: { name: "管家", role: "替主人派活、转告结果" },
+  orchestrator: { name: "管家", duty: "替主人派活、转告结果" },
   notSaved: (file: string, why: string) => `没存下来：${file} 写不进去（${why}）`,
-  orchestratorStays: "管家删不了：每个工作区都有一个",
+  orchestratorStays: "默认管家删不了：每个农场至少有一个管家",
+  defaultStaysOrchestrator: "默认管家只能是管家：每个农场至少有一个管家",
   noAgent: (id: string) => `没有 ${id} 这个档案`,
   noSkill: (id: string) => `没有 ${id} 这个技能`,
-  orchestratorRuntime: (runtime: string) => "管家只在 VibeValley 自己的 agent 上跑：农机留着 " + runtime,
+  orchestratorRuntime: (runtime: string) => "管家只在 VibeValley 自己的 agent 上跑：农机要是 " + runtime,
   newAgentId: "新档案的 id 要留空；指定 id 请用保存",
   newSkillId: "新技能的 id 要留空；指定 id 请用保存",
   deleteAgent: (name: string, id: string, runtime: string) => `删掉档案「${name}」（${id}，跑在 ${runtime} 上）：已经派给它的工单不跟着改`,
@@ -24,12 +25,13 @@ const zh = {
 };
 
 const en: typeof zh = {
-  orchestrator: { name: "Manager", role: "Hands out the owner's work and reports back" },
+  orchestrator: { name: "Manager", duty: "Hands out the owner's work and reports back" },
   notSaved: (file, why) => `Not saved: could not write ${file} (${why})`,
-  orchestratorStays: "The manager cannot be deleted: every workspace has one",
+  orchestratorStays: "The default manager cannot be deleted: every farm has at least one manager",
+  defaultStaysOrchestrator: "The default manager stays a manager: every farm has at least one",
   noAgent: (id) => `There is no profile ${id}`,
   noSkill: (id) => `There is no skill ${id}`,
-  orchestratorRuntime: (runtime) => "The manager runs only on VibeValley's own agent: its machine stays " + runtime,
+  orchestratorRuntime: (runtime) => "A manager runs only on VibeValley's own agent: its machine must be " + runtime,
   newAgentId: "Leave a new profile's id empty; to choose the id, save it instead",
   newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
   deleteAgent: (name, id, runtime) => `Delete the profile "${name}" (${id}, on ${runtime}): tickets already sent to it keep it`,

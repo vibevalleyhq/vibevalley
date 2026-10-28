@@ -33,7 +33,7 @@ import { farm } from "../store";
 import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
 import { TurnSteps } from "../../features/session";
-import { useCore } from "../../base/frame";
+import { orchestratorMood, useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";
 import { PxButton, SpriteIcon } from "../../ui/pixel";
@@ -41,7 +41,6 @@ import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
-import { usePrefs } from "../../base/prefs";
 
 const suggestions = farmWording().chat.suggestions;
 
@@ -67,7 +66,8 @@ const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
   if (s.call === "connecting") return "connecting";
   if (s.call === "error" || v.problem !== undefined) return "error";
   if (s.call !== "live") return "off";
-  return s.orchestrator === "speaking" ? "speaking" : s.orchestrator === "thinking" ? "thinking" : "listening";
+  const mood = orchestratorMood(s);
+  return mood === "speaking" ? "speaking" : mood === "thinking" ? "thinking" : "listening";
 };
 
 function Dots() {
@@ -127,7 +127,6 @@ export function ChatWindow() {
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const large = useFarm((s) => s.chatLarge);
   const shownId = useFarm((s) => s.chatShown);
-  const look = usePrefs((p) => p.orchestratorLook);
   const [problem, setProblem] = createSignal<string>();
   const shown = createMemo(() => (shownId() ? channelOf(chat(), shownId()!) : undefined) ?? defaultOf(chat()));
   const thread = () => (shown()?.type === "thread" ? shown() : undefined);
@@ -223,7 +222,7 @@ export function ChatWindow() {
             </Show>
             <Show when={parent()}>{(m) => <ParentMessage m={m()} face={<FaceOf m={m()} agents={agents()} />} />}</Show>
             <Show when={items().length === 0 && !thread()}>
-              <ChatRow mine={false} first face={<OrchestratorFace size={30} look={look()} />} name={farmWording().orchestrator}>
+              <ChatRow mine={false} first face={<OrchestratorFace size={30} />} name={farmWording().orchestrator}>
                 <span class="whitespace-pre-line">{greeting}</span>
               </ChatRow>
             </Show>
@@ -256,7 +255,7 @@ export function ChatWindow() {
                   <ChatRow
                     mine={t().speaker === "you"}
                     first
-                    face={t().speaker === "you" ? undefined : <OrchestratorFace size={30} look={look()} />}
+                    face={t().speaker === "you" ? undefined : <OrchestratorFace size={30} />}
                     name={t().speaker === "you" ? undefined : farmWording().orchestrator}
                     title={t().done ? farmWording().chat.done : farmWording().chat.speaking}
                   >
@@ -269,7 +268,7 @@ export function ChatWindow() {
               )}
             </For>
             <Show when={thinking()}>
-              <ChatRow mine={false} first face={<OrchestratorFace size={30} look={look()} />}>
+              <ChatRow mine={false} first face={<OrchestratorFace size={30} />}>
                 <span class="flex h-5 items-center px-1">
                   <Dots />
                 </span>
@@ -385,7 +384,7 @@ function Item(props: { m: ChatMessage; thread?: Channel; first: boolean; agents:
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <TurnSteps session="orchestrator" run={props.m.run} orchestrator /> : undefined;
+    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <TurnSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
   return (
     <Switch
       fallback={

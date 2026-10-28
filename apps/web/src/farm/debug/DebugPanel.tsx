@@ -16,7 +16,7 @@ import { clock, farm } from "../store";
 import { typing } from "../tools";
 import { aria } from "../../base/util";
 import { createExternal } from "../../base/external";
-import { useCore, useFrames } from "../../base/frame";
+import { orchestratorMood, useCore, useFrames } from "../../base/frame";
 import { ready, useQuery } from "../../base/query";
 import { toasts, ToastType } from "../../ui/pixel";
 import { rawFrame } from "../../base/frame";
@@ -35,7 +35,7 @@ const frameSummary = (f: StateFrame) => {
   const s = f.state;
   const sessions = s.sessions.map((h) => `${h.id}:${h.phase._tag}`).join(" ");
   const effects = f.effects.length === 0 ? "" : ` · ${f.effects.map((e) => e.kind).join(" ")}`;
-  return `call=${s.call} orchestrator=${s.orchestrator} sessions=${sessions || "0"}${effects}`;
+  return `call=${s.call} orchestrator=${orchestratorMood(s)} sessions=${sessions || "0"}${effects}`;
 };
 
 export function DebugPanel() {
@@ -127,7 +127,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           title={farmWording().debug.call}
           aside={
             <span>
-              call={core()?.call} orchestrator={core()?.orchestrator}
+              call={core()?.call} orchestrator={orchestratorMood(core())}
             </span>
           }
         >

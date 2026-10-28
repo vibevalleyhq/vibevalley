@@ -165,11 +165,12 @@ export const AllChannelsResult = Schema.Struct({
   ["position"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["archived_at"]: Schema.NullOr(Schema.Number),
   ["notify"]: Schema.String,
+  ["orchestrator"]: Schema.NullOr(Schema.String),
 })
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\" from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\", \"channel\".\"orchestrator\" from channel order by id;"
 
 export const allChannels = Effect.fn("AllChannels")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -207,11 +208,12 @@ export const RecentChannelsResult = Schema.Struct({
   ["position"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["archived_at"]: Schema.NullOr(Schema.Number),
   ["notify"]: Schema.String,
+  ["orchestrator"]: Schema.NullOr(Schema.String),
 })
 export type RecentChannelsResult = typeof RecentChannelsResult.Type
 
 
-export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
+export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\", \"channel\".\"orchestrator\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
 
 export const recentChannels = Effect.fn("RecentChannels")(function* (params: RecentChannelsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -377,6 +379,23 @@ export const setNotify = Effect.fn("SetNotify")(function* (params: SetNotifyPara
   return yield* SqlSchema.void({
     Request: SetNotifyParams,
     execute: (p) => sql.unsafe(SetNotifySql, [p["notify"], p["id"]]),
+  })(params)
+})
+
+export const SetOrchestratorParams = Schema.Struct({
+  ["orchestrator"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetOrchestratorParams = typeof SetOrchestratorParams.Type
+
+
+export const SetOrchestratorSql = "-- name: SetOrchestrator :exec\nupdate channel set orchestrator = $1 where id = $2 and type = 'channel';"
+
+export const setOrchestrator = Effect.fn("SetOrchestrator")(function* (params: SetOrchestratorParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetOrchestratorParams,
+    execute: (p) => sql.unsafe(SetOrchestratorSql, [p["orchestrator"], p["id"]]),
   })(params)
 })
 

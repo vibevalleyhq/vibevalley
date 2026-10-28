@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { orchestratorAgent, type SayRequest, pathOf } from "@vibevalley/protocol";
+import { defaultOrchestrator, type SayRequest, pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "composer-intent" });
@@ -71,7 +71,7 @@ test("the same words sent to another channel after a lost reply have a new ident
 
 test("changing the picked helper after a lost reply makes a new send intent", async ({ page, api }) => {
   const channel = await api.channel.create({ name: "intent-helper" });
-  const helpers = (await api.agent.list()).filter((a) => a.id !== orchestratorAgent && a.enabled).slice(0, 2);
+  const helpers = (await api.agent.list()).filter((a) => a.id !== defaultOrchestrator && a.enabled).slice(0, 2);
   expect(helpers).toHaveLength(2);
   const sent = await loseFirstReply(page);
   const box = await openFarmChat(page);

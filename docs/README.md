@@ -33,7 +33,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [foundation.md](docs/subsystems/foundation.md) | 地基：一个仓库、一块业务一个服务、Effect 的 layer、形状和规则、effect-sqlc、表结构、测试 |
 | [app.md](docs/subsystems/app.md) | 客户端：一份 Solid 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
-| [agent.md](docs/subsystems/agent.md) | 档案和农机：帮工档案、种子、农机的探测和清单、技能书 |
+| [agent.md](docs/subsystems/agent.md) | 档案和农机：档案和它的角色、种子、农机的探测和清单、技能书 |
 | [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
 | [site.md](docs/subsystems/site.md) | 官网：Astro、island、图从游戏来 |
 
@@ -58,11 +58,11 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 叫法 | English | 代码里 | 意思 | 不用 |
 |---|---|---|---|---|
-| 管家 | manager | orchestrator | 你直接说话的 agent，替你派活 | 工头、主 agent |
+| 管家 | manager | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认管家 | 工头、主 agent |
 | 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，工单不换 | 工人、子 agent、worker |
 | 在场 | here | `presentSessions`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
 | 一次干活 | a round of work | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己 | 一轮、turn |
-| 帮工档案 | helper profile | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
+| 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家或帮工 | 帮工档案、角色 |
 | 农机 | machine | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
 | 项目 | project | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
@@ -84,8 +84,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 账本 | ledger | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | trajectory | 一个 agent 干活的每一步 | 日志、trace |
 | 干活过程 | work steps | `SessionEvent`（一个帮工的日志） | 帮工每一轮收到的话、想、说、工具调用和结果 | 日志、trace |
-| 记性 | memory | memory | 一个帮工档案记得的事 | 记忆库 |
-| 技能书 | skill book | skill（`Skill`） | 帮工档案能带的技能 | 插件 |
+| 记性 | memory | memory | 一份档案记得的事 | 记忆库 |
+| 技能书 | skill book | skill（`Skill`） | 档案能带的技能 | 插件 |
 | 计划 | plan | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
 | 一件 | step | task（`Task`，带 `task` 的子工单） | 计划里的一件，一个帮工做 | 步骤、step、节点、node |
 | 主人 | owner | owner | 你 | |

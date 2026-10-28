@@ -3,10 +3,10 @@
 
 import { memoryWording } from "./words";
 import { appWording } from "../../base/words";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import { type Memory, type MemorySourceInfo, orchestratorAgent, memoryKeep } from "@vibevalley/protocol";
+import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { ago } from "../../base/format";
 import { toast } from "../../ui/toasts";
@@ -251,10 +251,12 @@ function RecallPreview(props: { agent: string }) {
   );
 }
 
-export function OrchestratorMemoryPanel() {
-  const viewQuery = useMemory(() => orchestratorAgent);
+/** An orchestrator's own MEMORY.md, by its profile id. */
+export function OrchestratorMemoryPanel(props: { agent: string }) {
+  const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
-  const act = memoryActions(orchestratorAgent);
+  // The page is made again for another orchestrator (OrchestratorPage keys it): the agent does not change here.
+  const act = memoryActions(untrack(() => props.agent));
   const now = useNow();
   return (
     <Show when={view()} fallback={<Quiet>{memoryWording().memory.orchestratorReading}</Quiet>}>
@@ -272,7 +274,7 @@ export function OrchestratorMemoryPanel() {
                       memory={m()}
                       faded={i() >= carried()}
                       onForget={() => void act.forget(m().id)}
-                      meta={[m().session === orchestratorAgent ? memoryWording().memory.orchestratorOwn : memoryWording().memory.told, ago(m().at, now())]}
+                      meta={[m().session === props.agent ? memoryWording().memory.orchestratorOwn : memoryWording().memory.told, ago(m().at, now())]}
                       warning={i() >= carried() ? memoryWording().memory.tooOld : undefined}
                     />
                   )}
@@ -286,20 +288,21 @@ export function OrchestratorMemoryPanel() {
   );
 }
 
-export function ArchivePanel() {
+/** An orchestrator's folded conversation, by its profile id. */
+export function ArchivePanel(props: { agent: string }) {
   const [query, setQuery] = createSignal("");
   const [asked, setAsked] = createSignal<string>();
   const [open, setOpen] = createSignal<{ name: string; text: string }>();
   const listing = useQuery(() => ({
-    queryKey: ["archive", asked() ?? ""],
-    queryFn: () => api.orchestrator.archive.list(asked() ? { q: asked() } : {}),
+    queryKey: ["archive", props.agent, asked() ?? ""],
+    queryFn: () => api.orchestrator.archive.list({ agent: props.agent, ...(asked() ? { q: asked() } : {}) }),
   }));
   const now = useNow();
   const show = async (name: string) => {
     if (open()?.name === name) return setOpen(undefined);
     let text: string;
     try {
-      text = await api.orchestrator.archive.get({ name });
+      text = await api.orchestrator.archive.get({ agent: props.agent, name });
     } catch (e) {
       text = reasonOf(e);
     }

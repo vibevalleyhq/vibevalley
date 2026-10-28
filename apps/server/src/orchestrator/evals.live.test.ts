@@ -6,7 +6,7 @@
 import { standaloneLlm } from "../cli/llm.ts";
 import type { Tool } from "../agent/loop/agent.ts";
 import { orchestrator } from "../base/actor.ts";
-import { orchestratorAgent } from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,7 +30,7 @@ const orchestratorTools = () =>
     Effect.scoped(
       Effect.gen(function* () {
         const t = yield* Tools;
-        return t.orchestrator(() => ({ agent: orchestratorAgent, session: "", project: "", here: "", picked: "", actor: orchestrator(true) }));
+        return t.orchestrator(() => ({ agent: defaultOrchestrator, session: "", project: "", here: "", picked: "", actor: orchestrator(true) }));
       }).pipe(Effect.provide(world())),
     ),
   );
@@ -40,9 +40,9 @@ const orchestratorTools = () =>
 async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-eval-"));
   writeFileSync(memoryFile(home), c.memory);
-  writeFileSync(join(home, orchestratorAgent + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
+  writeFileSync(join(home, defaultOrchestrator + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
   const brain = await openBrain(standaloneOwner(), {
-    name: orchestratorAgent,
+    name: defaultOrchestrator,
     instructions: systemPrompt + agentPrompt,
     llm: deepseek(model, key, standaloneLlm()),
     home,

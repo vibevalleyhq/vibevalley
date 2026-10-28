@@ -1,7 +1,7 @@
 // Each handler only forwards to the service that owns the rule.
 
 import { gatewayWording } from "./words.ts";
-import { docOwner, type IssueUpdate, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, docOwner, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
 import { missing, lookIn, reasonOf, refused } from "./errors.ts";
@@ -50,7 +50,7 @@ export const handlers = Effect.gen(function* () {
   const done: Handlers = {
     "server.health.get": () => Effect.succeed({ ok: true, version: config.version }),
     "orchestrator.open": () => core.open(),
-    "orchestrator.stop": () => orchestrator.stop(),
+    "orchestrator.stop": ({ agent }) => orchestrator.stop(agent),
     "game.achievement.list": () => Effect.sync(game.achievements),
     "voice.session.create": () => voice.session(),
     "voice.session.renew": (body) => voice.renew(body.channel, body.uid),
@@ -81,7 +81,7 @@ export const handlers = Effect.gen(function* () {
       ),
     "game.title.set": (body) => game.chooseTitle(body.achievement, body.tier),
     "github.refresh": () => Effect.flatMap(projects.refreshGitHub(), (status) => Effect.as(issues.refreshPullRequests, status)),
-    "orchestrator.eval.create": (body) => orchestrator.markWrong(body.on, body.want),
+    "orchestrator.eval.create": (body) => orchestrator.markWrong(body.on, body.want, body.agent),
     "channel.message.send": (body) =>
       Effect.andThen(
         Effect.sync(() => body.station !== undefined && game.want(body.station)),
@@ -128,10 +128,10 @@ export const handlers = Effect.gen(function* () {
     "memory.create": ({ agent, ...body }) => memory.remember({ agent, text: body.text, project: body.project ?? "", by: owner }),
     "memory.delete": ({ agent, memory: id }) => memory.forgetOf(agent, id),
     "memory.previewDelete": ({ agent, memory: id }) => memory.previewForgetOf(agent, id),
-    "orchestrator.archive.list": ({ q }) => Effect.sync(() => memory.archive(q ?? "")),
-    "orchestrator.archive.get": ({ name }) =>
+    "orchestrator.archive.list": ({ agent, q }) => Effect.sync(() => memory.archive(agent || defaultOrchestrator, q ?? "")),
+    "orchestrator.archive.get": ({ agent, name }) =>
       Effect.suspend(() => {
-        const text = memory.archiveFile(name);
+        const text = memory.archiveFile(agent || defaultOrchestrator, name);
         return text !== undefined ? Effect.succeed(text) : Effect.fail(missing(gatewayWording().archiveRef(name), [lookIn.archive]));
       }),
     "runtime.list": () => Effect.sync(runtimes.list),

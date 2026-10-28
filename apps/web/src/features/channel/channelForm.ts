@@ -3,7 +3,7 @@
 // window only draws them and says what happens once it went through.
 
 import { createSignal, untrack } from "solid-js";
-import type { Channel, Notify } from "@vibevalley/protocol";
+import { type Channel, defaultOrchestrator, type Notify } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
@@ -14,12 +14,14 @@ export function createChannelForm(channel?: Channel) {
     project: channel?.project ?? "",
     category: channel?.category ?? "",
     notify: channel?.notify ?? "all",
+    orchestrator: channel?.orchestrator ?? defaultOrchestrator,
   }));
   const [name, setName] = createSignal(was.name);
   const [description, setDescription] = createSignal(was.description);
   const [project, setProject] = createSignal(was.project);
   const [category, setCategory] = createSignal(was.category);
   const [notify, setNotify] = createSignal<Notify>(was.notify);
+  const [orchestrator, setOrchestrator] = createSignal(was.orchestrator);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
 
@@ -37,6 +39,7 @@ export function createChannelForm(channel?: Channel) {
             project: project(),
             category: category().trim(),
             ...(name().trim() !== was.name ? { name: name().trim() } : {}),
+            ...(orchestrator() !== was.orchestrator ? { orchestrator: orchestrator() } : {}),
           });
         if (notify() !== was.notify) await api.channel.notify.set({ id: channel.id, notify: notify() });
         return channel.id;
@@ -64,6 +67,9 @@ export function createChannelForm(channel?: Channel) {
     setCategory,
     notify,
     setNotify,
+    /** The orchestrator that looks after the channel, by its profile id. */
+    orchestrator,
+    setOrchestrator,
     busy,
     error,
     /** Pressing save now would be sent: not busy, and a new channel has a name. */

@@ -20,12 +20,12 @@ import {
   type PointLight,
   type Sky,
 } from "@vibevalley/engine/pixi";
-import type { Agent, Crop, Session, StateFrame, SessionId } from "@vibevalley/protocol";
+import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { castPrefix } from "../../ui/cast";
 import { playSound } from "../../ui/pixel/sound";
 import { clock, farmState } from "../store";
-import { orchestratorLooks, orchestratorSprite } from "../../features/orchestrator";
+import { orchestratorSprite } from "../../features/orchestrator";
 import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
 import type { Box, Point } from "../world/level";
@@ -49,6 +49,7 @@ import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
+import { orchestratorMood } from "../../base/frame";
 import { prefsNow } from "../../base/prefs";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
@@ -232,6 +233,9 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     world.addChild(f.cast, f.contact);
   }
   world.addChild(orchestrator, dog);
+  // The other orchestrators stand beside the default one, made as they come and gone with their profiles.
+  const others = new Map<string, Sprite>();
+  const besideAt = (i: number) => ({ x: v.orchestrator.x + (i % 2 === 0 ? 1 : -1) * 18 * (Math.floor(i / 2) + 1), y: v.orchestrator.y + 2 });
 
   const props = v.props.flatMap((p) => {
     if (!has(p.sprite)) return [];
@@ -590,15 +594,35 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     };
     fx.update(dt, store.bedFx, store.rewards, bedOfSession);
 
-    // The orchestrator talks and listens; the pet wakes up for a call.
-    const mood = state.orchestrator;
-    const chosen = prefsNow().orchestratorLook;
-    const lookId = chosen !== "farmer" && orchestratorLooks.some((l) => l.id === chosen) && has(`manager-${chosen}`) ? chosen : "farmer";
-    const base = lookId === "farmer" ? "manager" : `manager-${lookId}`;
-    const orchestratorPose =
-      mood === "speaking" ? orchestratorSprite(lookId, "-talk", has) : mood === "listening" ? orchestratorSprite(lookId, "-listen", has) : base;
-    stand(orchestrator, has(orchestratorPose) ? orchestratorPose : base);
-    rise(orchestrator, mood === "speaking" ? frameAt(t, 2, 4) : frameAt(t, 2, 0.6));
+    // Each orchestrator talks and listens in its own look; the pet wakes up for a call.
+    const pose = (sprite: Sprite, id: string) => {
+      const mood = orchestratorMood(state, id);
+      const chosen = agents.get(id)?.look.orchestrator ?? "farmer";
+      const lookId = chosen !== "farmer" && has(`manager-${chosen}`) ? chosen : "farmer";
+      const base = lookId === "farmer" ? "manager" : `manager-${lookId}`;
+      const named = mood === "speaking" ? orchestratorSprite(lookId, "-talk", has) : mood === "listening" ? orchestratorSprite(lookId, "-listen", has) : base;
+      stand(sprite, has(named) ? named : base);
+      rise(sprite, mood === "speaking" ? frameAt(t, 2, 4) : frameAt(t, 2, 0.6));
+    };
+    pose(orchestrator, defaultOrchestrator);
+    const besides = [...agents.values()].filter((a) => a.role === "orchestrator" && a.id !== defaultOrchestrator).map((a) => a.id);
+    for (const [id, sprite] of others)
+      if (!besides.includes(id)) {
+        sprite.destroy();
+        others.delete(id);
+      }
+    besides.forEach((id, i) => {
+      let sprite = others.get(id);
+      if (!sprite) {
+        sprite = new Sprite(texture("manager"));
+        others.set(id, sprite);
+        world.addChild(sprite);
+      }
+      const at = besideAt(i);
+      sprite.position.set(at.x, at.y);
+      sprite.zIndex = depth(at.y);
+      pose(sprite, id);
+    });
     const dogLook = pup.look(t, state.call === "live");
     const awake = dogLook.picture !== "dog-sleep";
     const pet = prefsNow().pet;

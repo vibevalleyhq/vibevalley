@@ -2,7 +2,7 @@ import { expect, settled, test } from "./fixtures";
 
 test("a helper is made, edited, turned off and deleted", async ({ page }) => {
   await page.goto("/agents");
-  await expect(page.getByRole("link", { name: "管家" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "管家", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "捏一个新帮工" }).first().click();
   await expect(page).toHaveURL(/\/agents\/new$/);
   await expect(page.getByText("新的", { exact: true })).toBeVisible();
@@ -37,7 +37,7 @@ test("a helper is made, edited, turned off and deleted", async ({ page }) => {
   await page.getByRole("button", { name: "放弃改动" }).click();
   await expect(page.getByLabel("职责")).toHaveValue("跑测试、写测试");
 
-  await page.getByRole("link", { name: "← 全部帮工" }).click();
+  await page.getByRole("link", { name: "← 全部档案" }).click();
   const card = page.getByRole("link", { name: "测试员小狐" });
   await expect(card).toContainText("跑测试、写测试");
   await expect(card).toContainText("测试");
@@ -55,13 +55,13 @@ test("a helper is made, edited, turned off and deleted", async ({ page }) => {
 
 test("a profile that does not exist says so", async ({ page }) => {
   await page.goto("/agents/nobody-here");
-  await expect(page.getByText("没有这个帮工。")).toBeVisible();
+  await expect(page.getByText("没有这份档案。")).toBeVisible();
 });
 
-test("帮工 as it looks", async ({ page }) => {
+test("档案 as it looks", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 860 });
   await page.goto("/agents");
-  await expect(page.getByRole("link", { name: "管家" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "管家", exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("agents.png") });
   await page.goto("/agents/new");
   await expect(page.getByText("新的", { exact: true })).toBeVisible();

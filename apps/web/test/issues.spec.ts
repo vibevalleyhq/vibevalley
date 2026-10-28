@@ -6,7 +6,8 @@ import { expect, test } from "./fixtures";
 const helper = (name: string, species: "fox" | "rabbit"): Agent => ({
   id: "",
   name,
-  role: "",
+  role: "worker",
+  duty: "",
   enabled: true,
   runtime: "nobody",
   model: "",

@@ -5,12 +5,13 @@ import { chatWording } from "./words";
 import { appWording } from "../../base/words";
 import { wording } from "@vibevalley/protocol/words";
 import {
+  type Agent,
   type Chat,
   type ChatMessage,
   type Channel,
   everyone,
   type Issue,
-  orchestratorAgent,
+  defaultOrchestrator,
   ownerId,
   type Phase,
   type Session,
@@ -207,10 +208,15 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
   });
 }
 
-/** The orchestrator's dots in a channel: it is thinking or writing its answer there, as the server says. */
-export function orchestratorTyping(state: WorkspaceState | undefined, channel: Channel | undefined): "thinking" | "speaking" | undefined {
-  if (!state || !channel || state.orchestratorChannel !== channel.id) return undefined;
-  return state.orchestrator === "thinking" || state.orchestrator === "speaking" ? state.orchestrator : undefined;
+/** An orchestrator's dots in a channel: one is thinking or writing its answer there, as the server says. */
+export function orchestratorTyping(
+  state: WorkspaceState | undefined,
+  channel: Channel | undefined,
+): { readonly agent: string; readonly mood: "thinking" | "speaking" } | undefined {
+  if (!channel) return undefined;
+  for (const [agent, now] of Object.entries(state?.orchestrators ?? {}))
+    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking")) return { agent, mood: now.state };
+  return undefined;
 }
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -275,14 +281,14 @@ export function phaseIcon(p: Phase): string | undefined {
 
 export const runtimeLabel: Record<string, string> = { claude: "Claude", codex: "Codex" };
 
-/** A profile's role up to its first stop, at most 18 characters. */
-export function roleShort(role: string) {
-  const first = role.split(/[，。,.]/)[0] ?? "";
+/** A profile's duty up to its first stop, at most 18 characters. */
+export function dutyShort(duty: string) {
+  const first = duty.split(/[，。,.]/)[0] ?? "";
   return first.length > 18 ? first.slice(0, 18) : first;
 }
 
 export const mentionOf: Record<string, string> = {
-  [orchestratorAgent]: chatWording().names.mention.orchestrator,
+  [defaultOrchestrator]: chatWording().names.mention.orchestrator,
   [ownerId]: chatWording().names.mention.owner,
   [everyone]: chatWording().names.mention.everyone,
 };
@@ -292,14 +298,25 @@ export interface Nameable {
   name: string;
   note: string;
   session?: Session;
+  /** An orchestrator's profile id. */
+  orchestrator?: string;
 }
 
 export const menuMax = 6;
 
-/** Everyone only when there is more than one helper. */
-export const nameables = (sessions: Session[], now: number): Nameable[] => [
+/** The place's orchestrator (here) is @管家, every other orchestrator its @<profile id>; everyone only when there is
+ * more than one helper. */
+export const nameables = (sessions: Session[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  { token: mentionOf[orchestratorAgent]!, name: appWording().orchestrator, note: chatWording().names.orchestratorNote },
+  {
+    token: mentionOf[defaultOrchestrator]!,
+    name: orchestrators.find((a) => a.id === here)?.name || appWording().orchestrator,
+    note: chatWording().names.orchestratorNote,
+    orchestrator: here,
+  },
+  ...orchestrators
+    .filter((a) => a.id !== here)
+    .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || chatWording().names.orchestratorNote, orchestrator: a.id })),
   ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: chatWording().names.everyone, note: chatWording().names.everyoneNote }] : []),
 ];
 

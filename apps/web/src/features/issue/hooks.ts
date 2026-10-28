@@ -1,6 +1,6 @@
 import { issuesWording } from "./words";
 import { createMemo } from "solid-js";
-import { orchestratorAgent, type TaskGraph } from "@vibevalley/protocol";
+import { defaultOrchestrator, type TaskGraph } from "@vibevalley/protocol";
 import { reasonOf } from "../../base/api";
 import { toast } from "../../ui/toasts";
 import { useFrames } from "../../base/frame";
@@ -13,12 +13,12 @@ export function useGraphs(): () => TaskGraph[] {
   return () => frames.frame?.graphs ?? noGraphs;
 }
 
-/** A profile's name by its id; the orchestrator is 管家, a profile gone is its id. */
+/** A profile's name by its id; the default orchestrator with no name is 管家, a profile gone is its id. */
 export function useNameOf(): () => (id: string) => string {
   const agents = useAgents();
   return createMemo(() => {
     const all = ready(agents, []);
-    return (id: string) => (id === orchestratorAgent ? issuesWording().orchestrator : (all.find((a) => a.id === id)?.name ?? id));
+    return (id: string) => all.find((a) => a.id === id)?.name || (id === defaultOrchestrator ? issuesWording().orchestrator : id);
   });
 }
 

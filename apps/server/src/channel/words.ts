@@ -1,14 +1,14 @@
 // What the chat says to the owner: who the owner and the orchestrator are in it, how a mention of them is written, the
 // lines it posts when work is sent or handed on, its notices, and why a message or a channel is refused.
 
-import { everyone, orchestratorAgent, ownerId } from "@vibevalley/protocol";
+import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {
   /** The names the owner and the orchestrator speak under. */
   name: { owner: "主人", orchestrator: "管家" },
   /** How a mention of who is not a helper is written. */
-  mention: { [orchestratorAgent]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" } as Readonly<Record<string, string>>,
+  mention: { [defaultOrchestrator]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" } as Readonly<Record<string, string>>,
   list: (items: readonly string[]) => items.join("、"),
   channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
   channelTaken: (name: string) => "已经有叫 " + name + " 的频道了",
@@ -34,6 +34,7 @@ const zh = {
   absent: (who: readonly string[]) => who.join("、") + " 不在场，没送到",
   noHelper: (id: string) => `没有 ${id} 这个帮工`,
   noChannel: (id: string) => `没有 ${id} 这个频道`,
+  notOrchestrator: (id: string) => `${id} 不是管家的档案：频道只能交给管家照看`,
   noMessageId: (id: string) => `没有 ${id} 这条消息`,
   threadOnlyTitle: "串只能改标题",
   defaultStays: "默认频道不能归档、不能删：先把别的频道设成默认",
@@ -59,7 +60,7 @@ const zh = {
 
 const en: typeof zh = {
   name: { owner: "You", orchestrator: "Manager" },
-  mention: { [orchestratorAgent]: "@manager", [ownerId]: "@owner", [everyone]: "@everyone" },
+  mention: { [defaultOrchestrator]: "@manager", [ownerId]: "@owner", [everyone]: "@everyone" },
   list: (items) => items.join(", "),
   channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
   channelTaken: (name) => "There is already a channel called " + name,
@@ -85,6 +86,7 @@ const en: typeof zh = {
   absent: (who) => who.join(", ") + (who.length === 1 ? " is" : " are") + " not here; not delivered",
   noHelper: (id) => `There is no helper ${id}`,
   noChannel: (id) => `There is no channel ${id}`,
+  notOrchestrator: (id) => `${id} is not an orchestrator's profile: only an orchestrator can look after a channel`,
   noMessageId: (id) => `There is no message ${id}`,
   threadOnlyTitle: "A thread can only get a title",
   defaultStays: "The default channel cannot be archived or deleted: make another one the default first",

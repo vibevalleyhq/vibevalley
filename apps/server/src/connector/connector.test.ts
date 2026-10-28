@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { rmSync } from "node:fs";
-import { type ConnectorID, type ConnectorState, type ConnectorStatus, orchestratorAgent } from "@vibevalley/protocol";
+import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
@@ -167,7 +167,7 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
     qq: script.qq,
     ...retry,
     say: (text, channel, chat) =>
-      Effect.flatMap(chat.say(text, channel, ""), ({ message }) => chat.orchestratorSays(message.channel, "收到：**" + text + "**", "")),
+      Effect.flatMap(chat.say(text, channel, ""), ({ message }) => chat.orchestratorSays(message.channel, "收到：**" + text + "**", "", defaultOrchestrator)),
   }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 
 const statusOf = (id: ConnectorID) =>
@@ -289,7 +289,7 @@ describe("the chat apps", () => {
       expect(yield* Effect.flip(c.setChannel("weixin", "#nowhere"))).toMatchObject({
         reason: expect.stringContaining("没有叫"),
       });
-      yield* chat.orchestratorSays(chat.defaultChannel(), "默认频道里的话", "");
+      yield* chat.orchestratorSays(chat.defaultChannel(), "默认频道里的话", "", defaultOrchestrator);
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       expect(yield* nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
         app: "weixin",
@@ -535,7 +535,7 @@ describe("the chat apps", () => {
         const chat = yield* Channels;
         yield* weixinConnected(first);
         const parent = (yield* chat.say("这个话题", undefined, "")).message;
-        const written = yield* chat.speak(orchestratorAgent, "旧的答复", {
+        const written = yield* chat.speak(defaultOrchestrator, "旧的答复", {
           target: `#general:${parent.number}`,
           anyway: true,
         });
@@ -563,7 +563,7 @@ describe("the chat apps", () => {
         const linked = yield* chat.openChannel("linked", "", "");
         yield* c.setChannel("weixin", "linked");
         const parent = (yield* chat.say("旧话题", linked.id, "")).message;
-        thread = (yield* chat.speak(orchestratorAgent, "旧的答复", {
+        thread = (yield* chat.speak(defaultOrchestrator, "旧的答复", {
           target: `#linked:${parent.number}`,
           anyway: true,
         })).message!.channel;
@@ -572,7 +572,7 @@ describe("the chat apps", () => {
         yield* status((s) => s.pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
           const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-          const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", {
+          const fresh = (yield* chat.speak(defaultOrchestrator, "其他答复", {
             target: `#general:${other.number}`,
             anyway: true,
           })).message!.channel;
@@ -586,7 +586,7 @@ describe("the chat apps", () => {
         const chat = yield* Channels;
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
-        yield* chat.orchestratorSays(thread, "在旧串里继续答复", "");
+        yield* chat.orchestratorSays(thread, "在旧串里继续答复", "", defaultOrchestrator);
         expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
         expect(second.by("weixin")).toHaveLength(1);
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);

@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
-| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/orchestrator.md)；档案的默认项目在帮工档案上） |
+| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/orchestrator.md)；档案的默认项目在帮工的档案上） |
 | 开了 worktree 时，一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.ts` 的 `noRoom`，上限从这里取） |
 | 改动：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 完成的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
 | 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 计划的分支和每一件的检查什么时候跑（[计划](docs/subsystems/task.md)） |

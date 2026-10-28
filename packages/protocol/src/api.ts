@@ -98,7 +98,7 @@ export interface Handlers<R = never> {
   readonly "server.health.get": () => Effect.Effect<T.Health, ApiError, R>;
   readonly "orchestrator.open": () => Effect.Effect<void, ApiError, R>;
   /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
-  readonly "orchestrator.stop": () => Effect.Effect<void, ApiError, R>;
+  readonly "orchestrator.stop": (a: { readonly agent?: string }) => Effect.Effect<void, ApiError, R>;
   readonly "setting.get": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
   /** The first thing Save would refuse in these settings, without saving them. */
   readonly "setting.check": (a: T.SettingsUpdate) => Effect.Effect<T.Check, ApiError, R>;
@@ -227,8 +227,8 @@ export interface Handlers<R = never> {
   readonly "memory.delete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "memory.previewDelete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "orchestrator.archive.list": (a: { readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
-  readonly "orchestrator.archive.get": (a: { readonly name: string }) => Effect.Effect<string, ApiError, R>;
+  readonly "orchestrator.archive.list": (a: { readonly agent?: string; readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
+  readonly "orchestrator.archive.get": (a: { readonly agent?: string; readonly name: string }) => Effect.Effect<string, ApiError, R>;
   /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
   readonly "orchestrator.eval.create": (a: T.OrchestratorEvalRequest) => Effect.Effect<T.OrchestratorEval, ApiError, R>;
   readonly "skill.list": () => Effect.Effect<T.Skill[], ApiError, R>;
@@ -351,7 +351,7 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "orchestrator.stop",
     about: [],
-    input: undefined,
+    input: input({ agent: Schema.optionalKey(Schema.String) }),
     result: undefined,
     can: ["owner", "remote"],
   },
@@ -933,14 +933,14 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "orchestrator.archive.list",
     about: [],
-    input: input({ q: Schema.optionalKey(Schema.String) }),
+    input: input({ agent: Schema.optionalKey(Schema.String), q: Schema.optionalKey(Schema.String) }),
     result: S.ArchiveListing,
     can: ["owner", "remote"],
   },
   {
     op: "orchestrator.archive.get",
     about: ["name"],
-    input: input({ name: Schema.String }),
+    input: input({ agent: Schema.optionalKey(Schema.String), name: Schema.String }),
     result: Schema.String,
     can: ["owner", "remote"],
   },

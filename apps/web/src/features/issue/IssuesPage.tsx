@@ -11,6 +11,7 @@ import { toast } from "../../ui/toasts";
 import { useRouter } from "../../base/router";
 import { useSelectValue } from "../../base/util";
 import { useCore } from "../../base/frame";
+import { useOrchestrators } from "../../base/agents";
 import { useIssueHistory } from "./data";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
@@ -63,7 +64,9 @@ export function IssuesPage(props: { rest: string }) {
   const open = (to: string | undefined) => router.navigate(to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`);
   const notice = dispatchedNotice(open);
 
-  const all = createMemo(() => buildCards(history.rows() ?? [], core(), graphs()));
+  const orchestrators = useOrchestrators();
+  const orchestratorIds = createMemo(() => new Set(orchestrators().map((a) => a.id)));
+  const all = createMemo(() => buildCards(history.rows() ?? [], core(), graphs(), orchestratorIds()));
   const shown = () => all().filter((c) => filterShows(filter(), c));
   const card = () => {
     const at = id();
