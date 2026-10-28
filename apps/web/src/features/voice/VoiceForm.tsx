@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // now: the other part may have been saved meanwhile.
 
 import { saveSettings } from "../../base/settings";
-import { wording } from "@vibevalley/protocol/words";
+
 import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { keepPreviousData } from "@tanstack/solid-query";
@@ -560,7 +560,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
               <button
                 type="button"
                 disabled={!sample}
-                title={sample ? t("web.voice.voice.persona.sample", { greeting: wording().greeting }) : t("web.voice.voice.persona.noSample")}
+                title={sample ? t("web.voice.voice.persona.sample", { greeting: t("shared.greeting") }) : t("web.voice.voice.persona.noSample")}
                 aria-label={playing() === v.id ? t("web.voice.voice.persona.stop", { name: v.label }) : t("web.voice.voice.persona.play", { name: v.label })}
                 class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-40"
                 onClick={() => sample && play(v.id, sample)}

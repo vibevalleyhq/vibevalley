@@ -1,6 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
-import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import {
@@ -104,7 +103,7 @@ export function IssueDetail(props: {
           {s().title}
         </h1>
         <span class="shrink-0 text-xs text-muted @max-[560px]:basis-full">
-          {[s().project, wording().priority[props.issue.priority]].filter(Boolean).join(" · ")}
+          {[s().project, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
         </span>
       </div>
       <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")}>
@@ -333,7 +332,7 @@ export function IssueDetail(props: {
               const id = props.issue.id;
               void act(() => api.issue.update({ id, deliver: v as Deliverable }));
             }}
-            options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
+            options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
           />
         </Property>
       </Show>
@@ -559,7 +558,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           <For each={props.issue.attention.acts}>
             {(a) => (
               <Button tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
-                {wording().act[a.act]}
+                {t(`shared.act.${a.act}`)}
               </Button>
             )}
           </For>

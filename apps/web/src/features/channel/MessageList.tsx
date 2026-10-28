@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
 
-import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
@@ -37,9 +36,9 @@ import { TurnSteps } from "../session";
 import { useAgent, useOrchestrators } from "../../base/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: IconName }> = {
-  completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "check" },
-  failed: { label: wording().outcome.failed, fill: "#e9a092", icon: "cross" },
-  interrupted: { label: wording().outcome.interrupted, fill: "#e2c995", icon: "stop" },
+  completed: { label: t("shared.outcome.completed"), fill: "#b4cb7c", icon: "check" },
+  failed: { label: t("shared.outcome.failed"), fill: "#e9a092", icon: "cross" },
+  interrupted: { label: t("shared.outcome.interrupted"), fill: "#e2c995", icon: "stop" },
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */

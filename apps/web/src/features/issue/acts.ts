@@ -5,7 +5,6 @@ import { t } from "@vibevalley/i18n";
 // box, its words and the busy flag. A page only says how it runs a button its own way (the farm's commands with their
 // effects) and how it shows a failure.
 
-import { wording } from "@vibevalley/protocol/words";
 import { createSignal } from "solid-js";
 import type { Issue, IssueAct, IssueAction } from "@vibevalley/protocol";
 import { api, newSendKey } from "../../base/api";
@@ -126,7 +125,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
         ? t("web.issue.acts.rejectWith")
         : a === "tell" && box() === "tell"
           ? t("web.issue.acts.carry")
-          : (ways.words?.[a] ?? wording().act[a]),
+          : (ways.words?.[a] ?? t(`shared.act.${a}`)),
     /** Pressing it now would send nothing. */
     disabled: (a: IssueAct) => busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim()),
     /** 打回 with its box open is the red one. */

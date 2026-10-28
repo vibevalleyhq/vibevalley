@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
-import { wording } from "@vibevalley/protocol/words";
 import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
 
@@ -30,7 +29,7 @@ export function ownerLine(m: ChatMessage, where: Channel | undefined): string {
   const who = m.fromKind === "orchestrator" ? t("server.connector.line.orchestrator") : m.name;
   const what =
     m.kind === "report"
-      ? wording().outcome[m.outcome ?? "interrupted"]
+      ? t(`shared.outcome.${m.outcome ?? "interrupted"}`)
       : m.kind === "dispatch"
         ? t("server.connector.line.dispatch")
         : where?.type === "thread"

@@ -2,7 +2,6 @@ import { currentLocale, t } from "@vibevalley/i18n";
 // What settings may be saved, and how the voice keeps only what differs from its defaults
 //.
 
-import { wording } from "@vibevalley/protocol/words";
 import { voiceOrchestratorPersona } from "./prompts.ts";
 import {
   MemorySourceKindValues,
@@ -138,7 +137,7 @@ export const defaultVoice = (): VoiceSettings => ({
   answer: { vendor: "orchestrator" },
   tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
   persona: voiceOrchestratorPersona(),
-  greeting: wording().greeting,
+  greeting: t("shared.greeting"),
   failureMessage: t("server.setting.defaults.failureMessage"),
   silenceMs: 480,
   interruptMs: 160,

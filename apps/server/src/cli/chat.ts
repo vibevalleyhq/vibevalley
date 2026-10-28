@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { standaloneLlm } from "./llm.ts";
 
 import { instructions } from "./prompts.ts";
-import { currentLocale } from "@vibevalley/protocol/words";
+import { currentLocale } from "@vibevalley/i18n";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";

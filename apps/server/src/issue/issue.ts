@@ -1,7 +1,6 @@
 import { list, t } from "@vibevalley/i18n";
 import { needsOwner, talkJob } from "./prompts.ts";
 import { commandOf } from "@vibevalley/protocol/api";
-import { wording } from "@vibevalley/protocol/words";
 import {
   type Agent,
   type Question,
@@ -199,7 +198,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   if (issue.answer) out += t("server.issue.job.answer", { conclusion: cut(issue.answer.conclusion, askedMax) });
   if (issue.closedAt !== undefined) out += t("server.issue.job.closed", { closed: closedText(issue) });
   if (last.lastRun)
-    out += t("server.issue.job.lastRun", { outcome: wording().outcome[last.lastRun.outcome], summary: cut(last.lastRun.summary.trim(), askedMax) });
+    out += t("server.issue.job.lastRun", { outcome: t(`shared.outcome.${last.lastRun.outcome}`), summary: cut(last.lastRun.summary.trim(), askedMax) });
   if (previous) out += t("server.issue.job.previous");
   return out + t("server.issue.job.end");
 }

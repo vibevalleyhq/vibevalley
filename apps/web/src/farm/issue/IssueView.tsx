@@ -4,7 +4,6 @@ import { list, t } from "@vibevalley/i18n";
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
 
-import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -380,7 +379,7 @@ function IssueBody(props: {
                           disabled={busy() || props.issue.deliver === d || !s().open}
                           onClick={() => void setDeliver(d)}
                         >
-                          {wording().deliverable[d]}
+                          {t(`shared.deliverable.${d}`)}
                         </PxButton>
                       )}
                     </For>

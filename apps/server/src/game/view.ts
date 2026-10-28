@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // What the farm draws of the core state: levels, plots,
 // the effects a fact sets off, and the achievements in words.
 
-import { wording } from "@vibevalley/protocol/words";
 import type {
   Achievement,
   AchievementDef,
@@ -69,13 +68,13 @@ function growth(h: Session): Crop {
 // Made when asked for: their words are the locale's of the moment.
 const badgeRipe = (): Badge => ({ text: t("server.game.badge.ripe"), tone: "ripe" });
 const badgeBugs = (): Badge => ({ text: t("server.game.badge.bugs"), tone: "bug" });
-const badgeConflict = (): Badge => ({ text: wording().stuck.conflict, tone: "bug" });
-const badgeQuiet = (): Badge => ({ text: wording().stuck.quiet, tone: "stuck" });
-const badgeHalfway = (): Badge => ({ text: wording().stuck.interrupted, tone: "stuck" });
+const badgeConflict = (): Badge => ({ text: t("shared.stuck.conflict"), tone: "bug" });
+const badgeQuiet = (): Badge => ({ text: t("shared.stuck.quiet"), tone: "stuck" });
+const badgeHalfway = (): Badge => ({ text: t("shared.stuck.interrupted"), tone: "stuck" });
 const badgeRetrying = (): Badge => ({ text: t("server.game.badge.retrying"), tone: "stuck" });
 const badgeRest = (): Badge => ({ text: t("server.game.badge.rest"), tone: "rest" });
-const badgeReview = (): Badge => ({ text: wording().attention.reviewing, tone: "wait" });
-const badgeQuestions = (): Badge => ({ text: wording().attention.asking, tone: "wait" });
+const badgeReview = (): Badge => ({ text: t("shared.attention.reviewing"), tone: "wait" });
+const badgeQuestions = (): Badge => ({ text: t("shared.attention.asking"), tone: "wait" });
 
 /**
  * A plot is a picture of its issue's attention, never a second reading of it: the crop and the badge say where the

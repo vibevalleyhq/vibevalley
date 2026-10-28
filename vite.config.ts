@@ -141,15 +141,15 @@ export default defineConfig({
         rules: { "vibevalley/no-test-sleep": "off" },
       },
       {
-        // What the shipped code says is in word tables (scripts/oxlint-plugin.ts, no-cjk-literal): Chinese is written
-        // only in them, in what is said to models, and in the tests.
+        // What the shipped code says to the owner is in the catalogs (packages/i18n/locales, read as t("key");
+        // scripts/oxlint-plugin.ts, no-cjk-literal): Chinese is written only there, in what is said to models, and in the tests.
         files: ["apps/*/src/**", "packages/*/src/**", "apps/mobile/App.tsx"],
         rules: { "vibevalley/no-cjk-literal": "error" },
       },
       {
         files: [
-          "**/words.ts",
-          "**/words/**",
+          // Written by scripts/i18n.ts gen from the catalogs.
+          "packages/i18n/src/catalogs.ts",
           "**/prompts.ts",
           "**/*.test.ts",
           "**/*.test.tsx",

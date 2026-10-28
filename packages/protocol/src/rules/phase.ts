@@ -1,9 +1,13 @@
+import { list, t } from "@vibevalley/i18n";
 // What a session is doing and what it waits on.
 
 import type { Conflict, Retry, Session } from "../shapes";
-import { wording } from "../words";
 
 /** It takes one of the places for those working at once. */
+
+/** A short span: seconds under a minute (at least one), else minutes. */
+export const spanText = (ms: number) =>
+  ms < 60_000 ? t("shared.seconds", { n: Math.max(1, Math.round(ms / 1000)) }) : t("shared.minutes", { n: Math.round(ms / 60_000) });
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";
 
 /** How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once,
@@ -52,31 +56,34 @@ const phaseSpan = "{span}";
 export function phaseText(h: Session, now: number): string {
   const said = phaseWords(h);
   const need = needOf(h);
-  return need?.kind === "quiet" ? said.replaceAll(phaseSpan, wording().span(now - need.since)) : said;
+  return need?.kind === "quiet" ? said.replaceAll(phaseSpan, spanText(now - need.since)) : said;
 }
 
 /** What a session is doing in words, how long it has been quiet left as {span}. */
 export function phaseWords(h: Session): string {
-  const w = wording();
   const need = needOf(h);
-  const conflict = need?.kind === "conflict" ? w.phase.conflict(need.conflict.base, need.conflict.files ?? []) : "";
+  const conflict = need?.kind === "conflict" ? t("shared.phase.conflict", { base: need.conflict.base, files: list(need.conflict.files ?? []) }) : "";
   const p = h.phase;
   switch (p._tag) {
     case "arriving":
-      return w.phase.arriving;
+      return t("shared.phase.arriving");
     case "working": {
-      const what = w.phase.working(w.action[p.doing.action] ?? "", p.doing.label);
-      if (need?.kind === "quiet") return w.phase.quiet(what, phaseSpan);
-      if (need?.kind === "retrying") return w.phase.retrying(what, need.retry.attempt, need.retry.of);
+      const action = t(`shared.action.${p.doing.action}`);
+      const what = p.doing.label !== "" ? t("shared.phase.workingOn", { action, label: p.doing.label }) : t("shared.phase.working", { action });
+      if (need?.kind === "quiet") return t("shared.phase.quiet", { what, span: phaseSpan });
+      if (need?.kind === "retrying")
+        return need.retry.of
+          ? t("shared.phase.retryingOf", { what, attempt: need.retry.attempt, of: need.retry.of })
+          : t("shared.phase.retrying", { what, attempt: need.retry.attempt });
       return what;
     }
     case "done":
-      return w.phase.done(conflict);
+      return t("shared.phase.done", { conflict });
     case "failed":
-      return w.phase.failed;
+      return t("shared.phase.failed");
     case "resting": {
       const outcome = h.lastRun?.outcome;
-      return w.phase.resting(outcome === undefined ? w.phase.unfinished : w.outcome[outcome], conflict);
+      return t("shared.phase.resting", { last: outcome === undefined ? t("shared.phase.unfinished") : t(`shared.outcome.${outcome}`), conflict });
     }
     default:
       return "";

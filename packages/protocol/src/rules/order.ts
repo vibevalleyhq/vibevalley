@@ -1,9 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // A document's order keys are fractional indexes in base62 (David Greenspan's midpoint between two keys; one digit up
 // or down at either end): a key sorts between its neighbours as a plain string, never ends in '0' (so there is always
 // room before it), and siblings that got the same key sort by id. The server checks them; the page makes them for the
 // blocks it inserts.
-
-import { wording } from "../words";
 
 const keyDigits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
@@ -16,8 +15,8 @@ export class KeyError extends Error {}
 
 /** A key after a and before b; "" for a is the start, "" for b the end. */
 export function keyBetween(a: string, b: string): string {
-  if ((a !== "" && !validKey(a)) || (b !== "" && !validKey(b))) throw new KeyError(wording().order.invalid);
-  if (a !== "" && b !== "" && a >= b) throw new KeyError(wording().order.unordered(a, b));
+  if ((a !== "" && !validKey(a)) || (b !== "" && !validKey(b))) throw new KeyError(t("shared.order.invalid"));
+  if (a !== "" && b !== "" && a >= b) throw new KeyError(t("shared.order.unordered", { a, b }));
   if (b === "") return after(a);
   if (a === "") return before(b);
   return midpoint(a, b);

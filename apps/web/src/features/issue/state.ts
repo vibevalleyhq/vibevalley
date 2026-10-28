@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
-import { wording } from "@vibevalley/protocol/words";
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./rules";
@@ -100,7 +99,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
   const head = session ?? sessions[sessions.length - 1]!;
   const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
-  const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((t) => t.id === head.graph!.task);
+  const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === head.graph!.task);
   const attention = issue.attention;
   const current = doingOf(head);
   const rows = criteriaRows(issue);
@@ -155,7 +154,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       const s = session ?? head;
       const turns = Math.round(s.runs);
       return [
-        wording().attention[attention.state],
+        t(`shared.attention.${attention.state}`),
         ...(attention.since !== undefined ? [t("web.issue.issue.since", { span: spanText(now - attention.since) })] : []),
         head.name,
         ...(turns > 0 ? [t("web.issue.issue.ran", { n: turns })] : []),

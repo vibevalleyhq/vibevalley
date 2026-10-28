@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
-import { setLocale } from "@vibevalley/protocol/words";
+import { setLocale } from "@vibevalley/i18n";
 import { builtInDir, builtInIds, builtInTemplates, readTemplate } from "./template.ts";
 
 describe("the built-in templates", () => {

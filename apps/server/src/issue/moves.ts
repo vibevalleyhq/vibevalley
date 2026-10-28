@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // out with each issue's status and attention (withIssueStatuses), so a round that ends changes what the issue may do at
 // once, wherever it is read.
 
-import { wording } from "@vibevalley/protocol/words";
 import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
 import { commandOf, type Next } from "@vibevalley/protocol/api";
 
@@ -59,7 +58,7 @@ export function statusMove(issue: Issue, to: IssueStatus): [Move, string] {
       if (to === "backlog" && !sent) return ["revive", ""];
       return sent ? ["none", t("server.issue.move.reopen")] : ["none", t("server.issue.move.revive")];
   }
-  return ["none", t("server.issue.move.cannot", { from: wording().status[from], to: wording().status[to] })];
+  return ["none", t("server.issue.move.cannot", { from: t(`shared.status.${from}`), to: t(`shared.status.${to}`) })];
 }
 
 export const statusMoves = (issue: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(issue, to)[0] !== "none");
@@ -69,7 +68,7 @@ export function nextSteps(item: Issue): Next[] {
   const n = String(item.number);
   const session = item.sessions.at(-1);
   const acts = item.attention.acts.flatMap((a): Next[] => {
-    const label = wording().act[a.act];
+    const label = t(`shared.act.${a.act}`);
     switch (a.does) {
       case "move":
         return a.words === "required"
@@ -85,7 +84,7 @@ export function nextSteps(item: Issue): Next[] {
   const moves = statusMoves(item)
     .filter((to) => !pressed.has(to))
     .map((to): Next => {
-      const say = t("server.issue.move.moveTo", { status: wording().status[to] });
+      const say = t("server.issue.move.moveTo", { status: t(`shared.status.${to}`) });
       return statusMove(item, to)[0] === "round"
         ? { say: t("server.issue.move.roundWithText", { say, command: commandOf("issue.status.update", [n]).join(" "), to }) }
         : { say, run: commandOf("issue.status.update", [n], { status: to }) };

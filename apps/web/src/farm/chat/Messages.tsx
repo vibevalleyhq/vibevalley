@@ -5,7 +5,7 @@ const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyTo
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
 import { spentText } from "../../base/format";
-import { wording } from "@vibevalley/protocol/words";
+
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
@@ -341,9 +341,9 @@ function Answers(props: { channel: string; number: number }) {
 }
 
 const outcomeTag: Record<Outcome, [label: string, fill: string, ink: string]> = {
-  completed: [wording().outcome.completed, "#e5a93c66", "#2f1f13"],
-  failed: [wording().outcome.failed, "#c84a3a26", "#c84a3a"],
-  interrupted: [wording().outcome.interrupted, "#e2c995", "#67482d"],
+  completed: [t("shared.outcome.completed"), "#e5a93c66", "#2f1f13"],
+  failed: [t("shared.outcome.failed"), "#c84a3a26", "#c84a3a"],
+  interrupted: [t("shared.outcome.interrupted"), "#e2c995", "#67482d"],
 };
 
 export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.Element; steps?: JSX.Element }) {

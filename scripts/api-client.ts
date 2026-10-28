@@ -74,7 +74,7 @@ const text = `// Written by scripts/api-client.ts from api.ts (Handlers and endp
 
 import type { ApiError } from "./api";
 import type * as T from "./shapes";
-import { wording } from "./words";
+import { t } from "@vibevalley/i18n";
 
 /** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
 export class VibeValleyApiError extends Error {
@@ -151,7 +151,7 @@ ${[...groups].map(groupText).join("")}
           ? j.reason
           : typeof j.what === "string"
             ? j.what
-            : text.trim() || wording().serverAnswered(res.status);
+            : text.trim() || t("shared.serverAnswered", { status: res.status });
       throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason, error, text);
     }
     return text === "" ? undefined : JSON.parse(text);

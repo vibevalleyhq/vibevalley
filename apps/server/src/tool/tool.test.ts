@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Spent } from "@vibevalley/protocol";
-import { setLocale } from "@vibevalley/protocol/words";
+import { setLocale } from "@vibevalley/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";

@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
 
-import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -283,7 +282,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.todo.priority")}
           value={d().priority}
           onChange={(v) => edit({ priority: v as Priority })}
-          options={PriorityValues.map((p) => ({ value: p, label: wording().priority[p] }))}
+          options={PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) }))}
         />
       </Property>
       <Property label={t("web.issue.detail.deliver")}>
@@ -291,7 +290,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.detail.deliver")}
           value={d().deliver}
           onChange={(v) => edit({ deliver: v as Deliverable })}
-          options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
+          options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
         />
       </Property>
       <More>

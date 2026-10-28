@@ -10,7 +10,7 @@ import { FarmConnection } from "./src/farm";
 import { FarmScreen } from "./src/FarmScreen";
 import { PairScreen } from "./src/PairScreen";
 import { deviceName } from "./src/rules";
-import { followDevice } from "./src/words";
+import { followDevice } from "./src/locale";
 
 followDevice();
 

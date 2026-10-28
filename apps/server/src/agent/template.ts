@@ -7,7 +7,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from
 import { join } from "node:path";
 import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { currentLocale } from "@vibevalley/protocol/words";
+import { currentLocale } from "@vibevalley/i18n";
 import { Schema } from "effect";
 
 export const builtInDir = join(import.meta.dirname, "templates");

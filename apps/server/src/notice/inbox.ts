@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 // questions in their place; a quiet one still questions.
 
 import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
-import { wording } from "@vibevalley/protocol/words";
+
 import { defaultOf } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
@@ -261,7 +261,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.fix.tray", { who }),
       };
     case "interrupted":
-      return { label: wording().stuck.interrupted, title: t("server.notice.item.interrupted.title", { who }), body: text };
+      return { label: t("shared.stuck.interrupted"), title: t("server.notice.item.interrupted.title", { who }), body: text };
     case "conflict":
       return {
         label: t("server.notice.item.conflict.label"),

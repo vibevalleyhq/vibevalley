@@ -53,22 +53,19 @@ function messages(locale: Locale): Map<string, string> {
   return out;
 }
 
-const ident = (locale: Locale, ns: string) => `${locale}_${ns.replace(/[^A-Za-z0-9]/g, "_")}`;
 const quote = (s: string) => JSON.stringify(s);
 
 function generated(): string {
   const zh = messages("zh");
   const all = locales.map(messages);
+  // The catalogs are written in as data, not imported as JSON: every bundler and Node read a .ts the same way.
   const lines = ["// Written by `vpx scripts/i18n.ts gen` from packages/i18n/locales: do not edit.", ""];
-  for (const locale of locales)
-    for (const ns of namespaces(locale)) lines.push(`import ${ident(locale, ns)} from "../locales/${locale}/${ns}.json" with { type: "json" };`);
-  lines.push("", "/** Each language's catalogs by namespace. */", "export const catalogs = {");
-  for (const locale of locales)
-    lines.push(
-      `  ${locale}: { ${namespaces(locale)
-        .map((ns) => `${quote(ns)}: ${ident(locale, ns)}`)
-        .join(", ")} },`,
-    );
+  lines.push("/** Each language's catalogs by namespace. */", "export const catalogs = {");
+  for (const locale of locales) {
+    lines.push(`  ${locale}: {`);
+    for (const ns of namespaces(locale)) lines.push(`    ${quote(ns)}: ${JSON.stringify(readCatalog(locale, ns))},`);
+    lines.push("  },");
+  }
   lines.push("};", "", "/** Every key, and the params its zh message names (undefined: none). */", "export interface Messages {");
   for (const [key, text] of [...zh].sort(([a], [b]) => (a < b ? -1 : 1))) {
     // A message's params are every language's: an English plural may name a count the Chinese does not say.
@@ -243,7 +240,8 @@ function choiceOf(fn: Function): string | undefined {
     if (one !== undefined && many !== undefined) {
       const body = (r: string, count: number) => named(r).split(String(count)).join("#");
       const message = `{${n}, plural, one {${body(one, 1)}} other {${body(many, 7)}}}`;
-      const samples = [0, 1, 2, 5, 11, 21, 100].map((c) => others(i, c));
+      // Large values too: a count of milliseconds can read the same for every small one.
+      const samples = [0, 1, 2, 5, 11, 21, 100, 1000, 61_000, 3_600_000].map((c) => others(i, c));
       if (body(one, 1) !== body(many, 7) && agrees(message, samples)) return message;
     }
     const yes = call(others(i, true));

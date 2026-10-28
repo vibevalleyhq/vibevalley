@@ -1,10 +1,10 @@
+import { spanText } from "@vibevalley/protocol/rules";
 import { t } from "@vibevalley/i18n";
 // The chat's words: channels and threads, feeds and unread counts, names to @, the clocks and a helper's
 // phase. Nothing here folds facts: it only reads the chat the server sent.
 
 import { actionIcon, type IconName } from "../../ui/icons";
 
-import { wording } from "@vibevalley/protocol/words";
 import {
   type Agent,
   type Chat,
@@ -238,7 +238,7 @@ export function workbenchClock(at: number) {
   return t("web.base.time.clock", { am: d.getHours() < 12, hh: String(h12).padStart(2, "0"), mm: String(d.getMinutes()).padStart(2, "0") });
 }
 
-const span = (ms: number) => wording().span(ms);
+const span = spanText;
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
 export function phaseText(h: Session, now: number) {

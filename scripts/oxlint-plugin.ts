@@ -15,10 +15,10 @@
  *   is recognised (a run of ─ ━ ═, or a comment of nothing but -=*#~_/); the comments a pattern cannot judge are
  *   scripts/comment-review.ts's.
  *
- *   no-cjk-literal: what is said to the owner is in a word table, in Chinese and in English (words.ts, a words/ folder;
- *   @vibevalley/protocol/words), and what is said to a model in a prompts.ts; vite.config.ts turns the rule off for
- *   those files and the tests. A string, a template or JSX text with a Chinese character anywhere else is a word left
- *   out of the tables. A regular expression is not: it reads what people and models write.
+ *   no-cjk-literal: what is said to the owner is in the catalogs, in Chinese and in English (packages/i18n/locales,
+ *   read as t("key")), and what is said to a model in a prompts.ts; vite.config.ts turns the rule off for those files
+ *   and the tests. A string, a template or JSX text with a Chinese character anywhere else is a word left out of the
+ *   catalogs. A regular expression is not: it reads what people and models write.
  *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
@@ -92,7 +92,7 @@ const han = /\p{Script=Han}/u;
 const noCjkLiteral = defineRule({
   meta: {
     messages: {
-      cjk: "words for the owner go in a word table (words.ts, with their English), words for a model in a prompts.ts (@vibevalley/protocol/words)",
+      cjk: 'words for the owner go in the catalogs (packages/i18n/locales, with their English; t("key")), words for a model in a prompts.ts',
     },
   },
   create(context) {

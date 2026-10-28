@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 
 import { spentText } from "../../base/format";
 
-import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { defaultOf, useFollowed, useReports } from "../../features/channel";
@@ -16,9 +15,9 @@ import { DashedLine, PxMarkdown } from "../../ui/pixel";
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
-  completed: [wording().outcome.completed, "#efcf92", "#2f1f13"],
-  failed: [wording().outcome.failed, "#f0cda6", "#c84a3a"],
-  interrupted: [wording().outcome.interrupted, "#e2c995", "#67482d"],
+  completed: [t("shared.outcome.completed"), "#efcf92", "#2f1f13"],
+  failed: [t("shared.outcome.failed"), "#f0cda6", "#c84a3a"],
+  interrupted: [t("shared.outcome.interrupted"), "#e2c995", "#67482d"],
 };
 
 const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined =>

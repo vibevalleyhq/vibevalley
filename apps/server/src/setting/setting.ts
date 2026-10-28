@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Check, Dictation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { setLocale } from "@vibevalley/protocol/words";
+import { setLocale } from "@vibevalley/i18n";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";

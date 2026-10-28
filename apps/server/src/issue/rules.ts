@@ -1,5 +1,5 @@
 import { maybe, t } from "@vibevalley/i18n";
-import { wording } from "@vibevalley/protocol/words";
+
 import { reportVerdict } from "../session/rules.ts";
 import type {
   Deliverable,
@@ -242,10 +242,10 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
           });
         break;
       case "failed":
-        out.push({ at: r.endedAt, kind: "failed", ...by, text: wording().outcome.failed + said });
+        out.push({ at: r.endedAt, kind: "failed", ...by, text: t("shared.outcome.failed") + said });
         break;
       case "interrupted":
-        out.push({ at: r.endedAt, kind: "stopped", ...by, text: wording().outcome.interrupted + said });
+        out.push({ at: r.endedAt, kind: "stopped", ...by, text: t("shared.outcome.interrupted") + said });
         break;
     }
   });

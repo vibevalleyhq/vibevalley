@@ -23,7 +23,7 @@ import { KeyField, SaveBar } from "../../ui/KeyField";
 import { Segmented } from "../../ui/Segmented";
 import { Hint, Tip } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
-import { currentLocale } from "@vibevalley/protocol/words";
+import { currentLocale } from "@vibevalley/i18n";
 import { Quiet, SecretInput, Toggle } from "../../ui/layout";
 
 export type SettingsPart = "deepseek" | "memory";

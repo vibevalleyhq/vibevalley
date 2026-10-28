@@ -7,6 +7,7 @@
     "start": "expo start"
   },
   "dependencies": {
+    "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "expo": "catalog:expo",
     "expo-build-properties": "catalog:expo",

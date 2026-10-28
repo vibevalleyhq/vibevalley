@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // What the owner does to the farm: each calls the server, then plays the bed's effect.
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
-import { wording } from "@vibevalley/protocol/words";
 import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
 import { api, newSendKey } from "../base/api";
 import { actionOf, perform } from "../features/issue";
@@ -45,7 +44,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   const send = async (s: Session, act: IssueAct, words = "", sendKey?: string) => {
     const found = issue(s);
     const action = found && actionOf(found, act);
-    if (!found || !action) throw new Error(t("web.farm.command.cannot", { act: wording().act[act] }));
+    if (!found || !action) throw new Error(t("web.farm.command.cannot", { act: t(`shared.act.${act}`) }));
     await perform(found, action, words, sendKey);
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {

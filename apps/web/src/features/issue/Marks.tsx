@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
 
-import { wording } from "@vibevalley/protocol/words";
 import { For, Match, Show, Switch } from "solid-js";
 import type { IssueStatus, Priority } from "@vibevalley/protocol";
 import type { BoardCard, Tone } from "./cards";
@@ -8,7 +7,7 @@ import { cardAgent } from "./cards";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { useAgent } from "../../base/agents";
 
-export const toneVar = (t: Tone) => `var(--color-${t})`;
+export const toneVar = (tone: Tone) => `var(--color-${tone})`;
 
 const statusTone: Record<IssueStatus, Tone> = { backlog: "faint", todo: "muted", in_progress: "water", in_review: "wheat", done: "leaf", canceled: "faint" };
 
@@ -31,7 +30,7 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
       height={size()}
       viewBox={`0 0 ${size()} ${size()}`}
       role="img"
-      aria-label={props.label ?? wording().status[props.status]}
+      aria-label={props.label ?? t(`shared.status.${props.status}`)}
       class="shrink-0"
     >
       <Switch
@@ -87,7 +86,7 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
 /** Bars that rise with the priority; urgent is a filled berry square with a bang, so it stands out on a busy lane. */
 export function PriorityMark(props: { priority: Priority; size?: number }) {
   const s = () => props.size ?? 14;
-  const label = () => t("web.issue.marks.priority", { word: wording().priority[props.priority] });
+  const label = () => t("web.issue.marks.priority", { word: t(`shared.priority.${props.priority}`) });
   const lit = () => (props.priority === "high" ? 3 : props.priority === "medium" ? 2 : 1);
   const w = () => s() / 5;
   return (

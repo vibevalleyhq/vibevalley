@@ -1,7 +1,6 @@
 import { t } from "@vibevalley/i18n";
 // An issue's lane, title and status and priority words.
 
-import { wording } from "@vibevalley/protocol/words";
 import { closedText } from "@vibevalley/protocol/rules";
 import { type WorkspaceState, type Issue, type IssueStatus, type Run, type RunTrigger, type Session, type TaskGraph } from "@vibevalley/protocol";
 
@@ -26,7 +25,7 @@ export function issueTag(issue: Issue): IssueTag {
 export const tagOpen = (tag: IssueTag) => tag !== "closed";
 
 /** The tag in words: the status while open, what its close says after. */
-export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? wording().status[issue.status] : closedText(issue));
+export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? t(`shared.status.${issue.status}`) : closedText(issue));
 
 /** Assigned to an orchestrator (orchestrators: their profile ids): it answers it, no helper works it. */
 export const isForOrchestrator = (issue: Issue, orchestrators: ReadonlySet<string>) => orchestrators.has(issue.assignee ?? "");
@@ -157,7 +156,7 @@ function runTriggerText(trigger: RunTrigger) {
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),
-    r.outcome ? wording().outcome[r.outcome] : t("web.issue.run.working"),
+    r.outcome ? t(`shared.outcome.${r.outcome}`) : t("web.issue.run.working"),
     took((r.endedAt ?? now) - r.startedAt),
     ...(r.spent?.cny !== undefined ? [`¥${r.spent.cny.toFixed(2)}`] : []),
     ...(r.heard.length ? [t("web.issue.run.heard", { n: r.heard.length })] : []),

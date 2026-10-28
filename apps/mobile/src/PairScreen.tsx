@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // Pairing: the camera reads the QR code the farm's 连接到本机 shows (or the link is pasted, or arrives as a
 // vibevalley:// link); the phone names itself and waits for the owner to nod on that computer.
 
-import { mobileWording } from "./words";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -20,7 +20,7 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
   }, [choice.link]);
 
   const scan = async () => {
-    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem(mobileWording().noCamera);
+    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem(t("mobile.noCamera"));
     setScanning(true);
   };
 
@@ -38,7 +38,7 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
           }}
         />
         <Pressable style={s.cancel} onPress={() => setScanning(false)}>
-          <Text style={s.cancelText}>{mobileWording().stopScan}</Text>
+          <Text style={s.cancelText}>{t("mobile.stopScan")}</Text>
         </Pressable>
       </View>
     );
@@ -46,44 +46,44 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
   return (
     <View style={s.page}>
       <View style={s.card}>
-        <Text style={s.title}>{mobileWording().title}</Text>
-        <Text style={s.muted}>{mobileWording().intro}</Text>
+        <Text style={s.title}>{t("mobile.title")}</Text>
+        <Text style={s.muted}>{t("mobile.intro")}</Text>
         {choice.link ? (
           <Text style={s.mono}>{choice.link.url}</Text>
         ) : (
           <>
             <Pressable style={s.button} onPress={scan}>
-              <Text style={s.buttonText}>{mobileWording().scan}</Text>
+              <Text style={s.buttonText}>{t("mobile.scan")}</Text>
             </Pressable>
             <TextInput
               style={s.input}
-              placeholder={mobileWording().paste}
+              placeholder={t("mobile.paste")}
               autoCapitalize="none"
               autoCorrect={false}
               value={typed}
-              onChangeText={(t) => {
-                setTyped(t);
-                const found = parsePairLink(t);
+              onChangeText={(text) => {
+                setTyped(text);
+                const found = parsePairLink(text);
                 if (found) connection.select(found);
               }}
             />
           </>
         )}
-        <Text style={s.label}>{mobileWording().name}</Text>
+        <Text style={s.label}>{t("mobile.name")}</Text>
         <TextInput style={s.input} value={choice.name} onChangeText={(name) => connection.setName(name)} editable={!choice.asking} maxLength={40} />
         {choice.asking ? (
           <View style={s.row} accessibilityRole="progressbar">
             <ActivityIndicator color={colors.accent} />
-            <Text style={s.muted}>{mobileWording().waiting}</Text>
+            <Text style={s.muted}>{t("mobile.waiting")}</Text>
           </View>
         ) : (
           <Pressable style={[s.button, !choice.link && s.off]} disabled={!choice.link} onPress={() => void connection.pair()}>
-            <Text style={s.buttonText}>{mobileWording().ask}</Text>
+            <Text style={s.buttonText}>{t("mobile.ask")}</Text>
           </Pressable>
         )}
         {choice.link ? (
           <Pressable onPress={() => void connection.cancel()}>
-            <Text style={s.cancelText}>{mobileWording().cancel}</Text>
+            <Text style={s.cancelText}>{t("mobile.cancel")}</Text>
           </Pressable>
         ) : null}
         {problem ? (

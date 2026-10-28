@@ -2,7 +2,6 @@ import { list, t } from "@vibevalley/i18n";
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
-import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./display";
 import {
@@ -168,7 +167,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       // A stuck issue says why on the board as on its page (有冲突, 没做成…).
       const st = issue.attention;
       if (attentionWantsOwner(st.state))
-        flags.push({ text: wording().attention[st.state] + (st.stuck ? "：" + wording().stuck[st.stuck] : ""), tone: attentionTone[st.state] });
+        flags.push({ text: t(`shared.attention.${st.state}`) + (st.stuck ? "：" + t(`shared.stuck.${st.stuck}`) : ""), tone: attentionTone[st.state] });
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
       if (issue.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
       lines.push(head.name);
