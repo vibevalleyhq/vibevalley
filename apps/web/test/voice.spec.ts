@@ -23,7 +23,7 @@ test("a call without Agora's keys says why, offers 设置, and the line tries ag
   const problem = page.getByRole("alert").filter({ hasText: "语音没接通" });
   await expect(problem).toContainText("Agora");
   await problem.getByRole("button", { name: "去设置" }).click();
-  await expect(page).toHaveURL(/\/settings\/agora$/);
+  await expect(page).toHaveURL(/\/settings\/voice$/);
   await expect(page.getByLabel("Agora App ID")).toBeVisible();
 });
 

@@ -29,7 +29,7 @@ export interface Missing {
 }
 
 /** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
-export type VoiceFix = "agora" | "deepseek" | "voice";
+export type VoiceFix = "deepseek" | "voice";
 
 export interface VoiceUnavailable {
   readonly _tag: "VoiceUnavailable";
@@ -77,7 +77,7 @@ export const ApiError: Schema.Codec<ApiError> = Schema.Union([
   Schema.Struct({
     _tag: Schema.tag("VoiceUnavailable"),
     reason: Schema.String,
-    settings: Schema.optionalKey(Schema.Literals(["agora", "deepseek", "voice"])),
+    settings: Schema.optionalKey(Schema.Literals(["deepseek", "voice"])),
   }),
   reasonOf("VoiceAgentFailed"),
   reasonOf("ConnectorRefused"),

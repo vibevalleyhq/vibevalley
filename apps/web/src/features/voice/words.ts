@@ -5,11 +5,7 @@ const zh = {
     section: { label: "声音", line: "和管家打电话" },
     noSettings: (why: string) => `问不到服务端的设置（${why}）。`,
     range: (min: number, max: number, fallback: number) => `${min} 到 ${max}，默认 ${fallback}`,
-    dirty: "有没存的改动。",
-    clean: "都存着。",
     saved: "存好了，下一通电话就用上。",
-    undo: "撤销",
-    saving: "在存…",
     answer: {
       orchestrator:
         "群聊里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
@@ -27,7 +23,7 @@ const zh = {
     missing: "还缺凭据",
     nextCall: "改了以后，下一通电话生效",
     credentials: "凭据",
-    console: "声网控制台 →",
+    console: "声网控制台",
     hex: "32 位十六进制",
     area: "区域",
     areaHint: "Agora 接口的区域，选离服务端近的；中国大陆的项目选中国大陆。",
@@ -139,11 +135,7 @@ const en: typeof zh = {
     section: { label: "Voice", line: "Calling the manager" },
     noSettings: (why) => `The server's settings cannot be asked (${why}).`,
     range: (min, max, fallback) => `${min} to ${max}, default ${fallback}`,
-    dirty: "Unsaved changes.",
-    clean: "All saved.",
     saved: "Saved: the next call uses it.",
-    undo: "Undo",
-    saving: "Saving…",
     answer: {
       orchestrator:
         "The manager of the farm chat itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
@@ -161,7 +153,7 @@ const en: typeof zh = {
     missing: "Credentials missing",
     nextCall: "Changes take effect on the next call",
     credentials: "Credentials",
-    console: "Agora console →",
+    console: "Agora console",
     hex: "32 hex characters",
     area: "Region",
     areaHint: "The region of Agora's endpoints: pick one near the server; projects in mainland China pick Mainland China.",

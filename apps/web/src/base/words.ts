@@ -39,9 +39,13 @@ const zh = {
   form: {
     asking: "在问服务端……",
     unreachable: (why: string) => `问不到服务端：${why}`,
-    clear: "清掉",
-    clearOnSave: "存的时候清掉",
     none: "还没有",
+    unset: "还没设",
+    removeOnSave: "保存后移除",
+    removeKey: (label: string) => `移除 ${label}`,
+    keepKey: (label: string) => `不移除 ${label}`,
+    undo: "撤销",
+    storedIn: (file: string) => `存在 ${file}`,
     keepEmpty: "不改就空着",
     save: "保存",
     reset: "恢复默认",
@@ -49,7 +53,7 @@ const zh = {
     remove: "删除",
     from: { settings: "存在设置里", config: "来自配置（vibevalley.yaml 或环境变量）" },
     inUse: (hint: string, from: string) => `在用 ${hint}（${from}）`,
-    fromOnly: (from: string) => `（${from}）`,
+    fromOnly: (from: string) => `在用（${from}）`,
   },
   time: {
     justNow: "刚刚",
@@ -90,7 +94,7 @@ const zh = {
   },
   reading: "在读……",
   write: "记下",
-  secret: { hide: "藏起来", peek: "看一眼", hideShort: "藏", peekShort: "看" },
+  secret: { hide: "藏起来", peek: "看一眼" },
 };
 
 const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -129,9 +133,13 @@ const en: typeof zh = {
   form: {
     asking: "Asking the server…",
     unreachable: (why) => `The server cannot be asked: ${why}`,
-    clear: "Clear",
-    clearOnSave: "Cleared on save",
     none: "None yet",
+    unset: "Not set",
+    removeOnSave: "Removed when saved",
+    removeKey: (label) => `Remove ${label}`,
+    keepKey: (label) => `Keep ${label}`,
+    undo: "Undo",
+    storedIn: (file) => `Saved in ${file}`,
     keepEmpty: "Leave empty to keep",
     save: "Save",
     reset: "Reset",
@@ -139,7 +147,7 @@ const en: typeof zh = {
     remove: "Delete",
     from: { settings: "saved in the settings", config: "from the configuration (vibevalley.yaml or the environment)" },
     inUse: (hint, from) => `Using ${hint} (${from})`,
-    fromOnly: (from) => `(${from})`,
+    fromOnly: (from) => `In use (${from})`,
   },
   time: {
     justNow: "just now",
@@ -181,7 +189,7 @@ const en: typeof zh = {
   },
   reading: "Reading…",
   write: "Remember it",
-  secret: { hide: "Hide", peek: "Peek", hideShort: "Hide", peekShort: "Show" },
+  secret: { hide: "Hide", peek: "Peek" },
 };
 
 export const appWording = localized({ zh, en });

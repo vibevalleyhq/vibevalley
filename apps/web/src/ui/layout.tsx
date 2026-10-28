@@ -7,6 +7,8 @@ import type { JSX } from "@solidjs/web";
 import { A } from "./A";
 import { aria } from "../base/util";
 import { TextInput } from "./Field";
+import { Icon } from "./Icon";
+import { Hint } from "./Tip";
 
 /** A list beside its detail; under md the list stacks over it. */
 export function Split(props: { list: JSX.Element; children: JSX.Element }) {
@@ -76,15 +78,24 @@ export function Quiet(props: { children: JSX.Element }) {
   return <p class="text-sm text-muted">{props.children}</p>;
 }
 
-/** An on/off with its label and a hint under it. */
-export function Toggle(props: { label: string; hint?: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
+/** An on/off with its label, and what it means under it (hint) or behind an info icon (tip). */
+export function Toggle(props: {
+  label: string;
+  /** What a screen reader says, where the label alone does not say which. */
+  ariaLabel?: string;
+  hint?: string;
+  tip?: string;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <label class={["flex items-start gap-2", props.disabled ? "opacity-50" : "cursor-pointer"]}>
       <button
         type="button"
         role="switch"
         aria-checked={aria(props.checked)}
-        aria-label={props.label}
+        aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
         onClick={() => props.onChange(!props.checked)}
         class={["mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors", props.checked ? "bg-accent" : "bg-selected"]}
@@ -92,7 +103,10 @@ export function Toggle(props: { label: string; hint?: string; checked: boolean; 
         <span class={["block size-3 rounded-full bg-page shadow transition-transform", { "translate-x-3": props.checked }]} />
       </button>
       <span class="flex flex-col">
-        <span class="text-sm">{props.label}</span>
+        <span class="flex items-center gap-1 text-sm">
+          {props.label}
+          <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
+        </span>
         <Show when={props.hint}>
           <span class="text-xs text-muted">{props.hint}</span>
         </Show>
@@ -101,20 +115,21 @@ export function Toggle(props: { label: string; hint?: string; checked: boolean; 
   );
 }
 
-/** A key: hidden until 看 is pressed. */
+/** A key: hidden until the eye is pressed. */
 export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
   const [shown, setShown] = createSignal(false);
   const rest = omit(props, "class");
   return (
     <span class="relative flex">
-      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-10 font-mono", props.class]} />
+      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-9 font-mono", props.class]} />
       <button
         type="button"
-        class="absolute inset-y-0 right-1 my-auto h-6 cursor-pointer rounded px-1.5 text-xs text-muted hover:bg-hover"
+        class="absolute inset-y-0 right-1 my-auto inline-flex size-7 cursor-pointer items-center justify-center rounded text-faint hover:bg-hover hover:text-ink"
         aria-label={shown() ? appWording().secret.hide : appWording().secret.peek}
+        title={shown() ? appWording().secret.hide : appWording().secret.peek}
         onClick={() => setShown(!shown())}
       >
-        {shown() ? appWording().secret.hideShort : appWording().secret.peekShort}
+        <Icon name={shown() ? "hide" : "show"} size={16} />
       </button>
     </span>
   );

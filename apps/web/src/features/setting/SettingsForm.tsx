@@ -1,15 +1,11 @@
-// The keys, the language and the memory sources (setting.load, setting.save), a part at a time; and what the server
-// found of gh.
+// The DeepSeek key, the language and the memory sources (setting.load, setting.save), a part at a time; and what the
+// server found of gh.
 
 import { appWording } from "../../base/words";
 import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
-import type { JSX } from "@solidjs/web";
-
 import {
   type GitHubStatus,
-  type KeySource,
-  type KeyStatus,
   type Locale,
   LocaleValues,
   type MemorySource,
@@ -21,18 +17,17 @@ import {
 import { api, reasonOf } from "../../base/api";
 import { saveSettings } from "../../base/settings";
 import { ready, useQuery, useSettings } from "../../base/query";
-import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
+import { Icon } from "../../ui/Icon";
+import { IconButton } from "../../ui/IconButton";
+import { KeyField, SaveBar } from "../../ui/KeyField";
 import { Segmented } from "../../ui/Segmented";
+import { Hint, Tip } from "../../ui/Tip";
+import { toast } from "../../ui/toasts";
 import { currentLocale } from "@vibevalley/protocol/words";
-import { Quiet, SecretInput, TextLink, Toggle } from "../../ui/layout";
+import { Quiet, SecretInput, Toggle } from "../../ui/layout";
 
-const from: Record<KeySource, string> = { settings: appWording().form.from.settings, config: appWording().form.from.config };
-const keyLine = (k: KeyStatus) => (k.source ? appWording().form.inUse(k.hint ?? "", from[k.source]) : appWording().form.none);
-
-export type SettingsPart = "deepseek" | "agora" | "memory";
-
-type Key = "deepseekApiKey" | "agoraAppId" | "agoraAppCertificate";
+export type SettingsPart = "deepseek" | "memory";
 
 const sourceLabels: Record<MemorySourceKind, string> = { nowledge: "Nowledge Mem", everos: "EverOS" };
 const sourceAddress: Record<MemorySourceKind, string> = { nowledge: "http://127.0.0.1:14242/mcp/", everos: "http://127.0.0.1:18791" };
@@ -69,6 +64,20 @@ const draftOf = (kind: MemorySourceKind, saved: MemorySource | undefined): Sourc
   open: false,
 });
 
+const draftsOf = (status: SettingsStatus) =>
+  MemorySourceKindValues.map((k) =>
+    draftOf(
+      k,
+      status.memorySources.find((m) => m.kind === k),
+    ),
+  );
+
+/** Where the settings are kept, said on hover: a card's header puts it beside its title. */
+export function SettingsFile() {
+  const settings = useSettings();
+  return <Show when={ready(settings, undefined)}>{(s) => <Hint text={appWording().form.storedIn(s().file)} />}</Show>;
+}
+
 /** Built again for each part (Keyed by the page): a saved form starts over from what the server answered. */
 export function SettingsForm(props: { part: SettingsPart }) {
   const settings = useSettings();
@@ -85,41 +94,25 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
   const start = untrack(() => snapshot(props.status));
   const [status, setStatus] = createSignal(start);
   const [deepseek, setDeepseek] = createSignal("");
-  const [certificate, setCertificate] = createSignal("");
-  const [appId, setAppId] = createSignal(start.agoraAppId.value ?? "");
-  const [cleared, setCleared] = createSignal<ReadonlySet<Key>>(new Set());
-  const [sources, setSources] = createSignal(
-    MemorySourceKindValues.map((k) =>
-      draftOf(
-        k,
-        start.memorySources.find((m) => m.kind === k),
-      ),
-    ),
-  );
+  const [removing, setRemoving] = createSignal(false);
+  const [sources, setSources] = createSignal(draftsOf(start));
   const [error, setError] = createSignal<string>();
-  const [saved, setSaved] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
 
-  const typed =
-    <T,>(set: (v: T) => void) =>
-    (v: T) => {
-      set(v);
-      setSaved(false);
-    };
-  const clear = (k: Key) => typed(setCleared)(new Set([...cleared(), k]));
-  const setSource = (kind: MemorySourceKind, change: Partial<SourceDraft>, touched = true) => {
+  const setSource = (kind: MemorySourceKind, change: Partial<SourceDraft>, touched = true) =>
     setSources((all) => all.map((d) => (d.kind === kind ? { ...d, ...change, changed: d.changed || touched } : d)));
-    setSaved(false);
+  const dirty = () => deepseek().trim() !== "" || removing() || sources().some((d) => d.changed);
+  const undo = () => {
+    setDeepseek("");
+    setRemoving(false);
+    setSources(draftsOf(status()).map((d, i) => ({ ...d, open: sources()[i]?.open ?? false })));
+    setError(undefined);
   };
 
   const submit = async () => {
-    // A key cleared and not typed again goes as "" (the server forgets it).
-    const value = (k: Key, v: string) => (v.trim() ? v.trim() : cleared().has(k) ? "" : undefined);
-    const id = appId().trim();
     const update: SettingsUpdate = {
-      deepseekApiKey: value("deepseekApiKey", deepseek()),
-      agoraAppId: id !== (status().agoraAppId.value ?? "") ? id : cleared().has("agoraAppId") ? "" : undefined,
-      agoraAppCertificate: value("agoraAppCertificate", certificate()),
+      // A key removed and not typed again goes as "" (the server forgets it).
+      deepseekApiKey: deepseek().trim() ? deepseek().trim() : removing() ? "" : undefined,
       memorySources: !sources().some((d) => d.changed)
         ? undefined
         : sources()
@@ -141,18 +134,9 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
       const now = await saveSettings(update);
       setStatus(now);
       setDeepseek("");
-      setCertificate("");
-      setAppId(now.agoraAppId.value ?? "");
-      setCleared(new Set<Key>());
-      setSources(
-        MemorySourceKindValues.map((k) =>
-          draftOf(
-            k,
-            now.memorySources.find((m) => m.kind === k),
-          ),
-        ),
-      );
-      setSaved(true);
+      setRemoving(false);
+      setSources(draftsOf(now));
+      toast(settingsWording().keys.saved);
     } catch (e) {
       setError(reasonOf(e));
     } finally {
@@ -162,201 +146,152 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
 
   return (
     <form
-      class="flex flex-col gap-5"
+      class="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!busy()) void submit();
+        if (!busy() && dirty()) void submit();
       }}
     >
       <Show when={props.part === "deepseek"}>
         <KeyField
           label="DeepSeek API Key"
-          help={<TextLink href="https://platform.deepseek.com/api_keys">platform.deepseek.com</TextLink>}
-          line={cleared().has("deepseekApiKey") ? appWording().form.clearOnSave : keyLine(status().deepseekApiKey)}
-          onClear={status().deepseekApiKey.source === "settings" && !cleared().has("deepseekApiKey") ? () => clear("deepseekApiKey") : undefined}
+          status={status().deepseekApiKey}
+          removing={removing()}
+          onRemove={setRemoving}
+          link={{ href: "https://platform.deepseek.com/api_keys", label: "platform.deepseek.com" }}
         >
           <SecretInput
             aria-label="DeepSeek API Key"
             placeholder={settingsWording().keys.deepseekHint}
             value={deepseek()}
-            onInput={(e) => typed(setDeepseek)(e.currentTarget.value)}
-          />
-        </KeyField>
-      </Show>
-      <Show when={props.part === "agora"}>
-        <KeyField
-          label="Agora App ID"
-          help={<TextLink href="https://console.agora.io/">console.agora.io</TextLink>}
-          line={
-            cleared().has("agoraAppId")
-              ? appWording().form.clearOnSave
-              : status().agoraAppId.source
-                ? `（${from[status().agoraAppId.source!]}）`
-                : appWording().form.none
-          }
-          onClear={status().agoraAppId.source === "settings" && !cleared().has("agoraAppId") ? () => clear("agoraAppId") : undefined}
-        >
-          <TextInput
-            aria-label="Agora App ID"
-            class="font-mono"
-            placeholder={settingsWording().keys.appIdHint}
-            value={appId()}
-            onInput={(e) => typed(setAppId)(e.currentTarget.value)}
-          />
-        </KeyField>
-        <KeyField
-          label="Agora App Certificate"
-          help={<span class="text-xs text-muted">{settingsWording().keys.certificateHelp}</span>}
-          line={cleared().has("agoraAppCertificate") ? appWording().form.clearOnSave : keyLine(status().agoraAppCertificate)}
-          onClear={status().agoraAppCertificate.source === "settings" && !cleared().has("agoraAppCertificate") ? () => clear("agoraAppCertificate") : undefined}
-        >
-          <SecretInput
-            aria-label="Agora App Certificate"
-            placeholder={appWording().form.keepEmpty}
-            value={certificate()}
-            onInput={(e) => typed(setCertificate)(e.currentTarget.value)}
+            onInput={(e) => setDeepseek(e.currentTarget.value)}
           />
         </KeyField>
       </Show>
       <Show when={props.part === "memory"}>
-        <For each={sources()} keyed={(d) => d.kind}>
-          {(d) => <SourceField draft={d()} set={(change, touched) => setSource(d().kind, change, touched)} />}
-        </For>
+        <div class="flex flex-col gap-2">
+          <For each={sources()} keyed={(d) => d.kind}>
+            {(d) => <SourceField draft={d()} set={(change, touched) => setSource(d().kind, change, touched)} />}
+          </For>
+        </div>
       </Show>
-      <Show when={error()}>
-        <p class="text-sm text-berry">{error()}</p>
+      <Show when={dirty() || error()}>
+        <SaveBar
+          dirty={dirty()}
+          busy={busy()}
+          onSave={() => void submit()}
+          onUndo={undo}
+          left={<Show when={error()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
+        />
       </Show>
-      <Show when={saved()}>
-        <p class="text-sm text-accent">{settingsWording().keys.saved}</p>
-      </Show>
-      <div class="flex items-center gap-3 border-t border-line pt-3">
-        <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted" title={status().file}>
-          {status().file}
-        </span>
-        <Button type="submit" tone="primary" disabled={busy()}>
-          {appWording().form.save}
-        </Button>
-      </div>
     </form>
+  );
+}
+
+/** A memory source's state as a dot: not set up, on, or off; what and where on hover. */
+function SourceMark(props: { draft: SourceDraft }) {
+  const text = () =>
+    !props.draft.saved
+      ? settingsWording().source.off
+      : props.draft.saved.enabled
+        ? `${settingsWording().source.on} · ${props.draft.saved.url}`
+        : settingsWording().source.closed;
+  return (
+    <Tip text={text()}>
+      <span role="img" aria-label={text()} tabindex={0} class="inline-flex p-1 outline-none focus-visible:outline-2 focus-visible:outline-focus">
+        <span class={["block size-2 rounded-full", !props.draft.saved ? "border border-faint" : props.draft.saved.enabled ? "bg-leaf" : "bg-faint"]} />
+      </span>
+    </Tip>
   );
 }
 
 function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDraft>, touched?: boolean) => void }) {
   const label = () => sourceLabels[props.draft.kind];
-  const savedKey = () => props.draft.saved?.key;
   return (
-    <Show
-      when={props.draft.open}
-      fallback={
-        <div class="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5">
-          <span class="flex-1 text-sm font-medium">
-            {settingsWording().source.state(
-              label(),
-              !props.draft.saved ? settingsWording().source.off : props.draft.saved.enabled ? settingsWording().source.on : settingsWording().source.closed,
-            )}
-          </span>
-          <Button aria-label={settingsWording().source.changeWhich(label())} onClick={() => props.set({ open: true }, false)}>
-            {settingsWording().source.change}
-          </Button>
-        </div>
-      }
-    >
-      <div class="rounded-lg border border-line p-3">
-        <KeyField
-          label={settingsWording().source.title(label())}
-          help={<Toggle label={settingsWording().source.enabled} checked={props.draft.enabled} onChange={(enabled) => props.set({ enabled })} />}
-          line={
-            props.draft.keyCleared ? settingsWording().source.keyCleared : savedKey()?.source ? `key ${keyLine(savedKey()!)}` : settingsWording().source.noKey
-          }
-          onClear={savedKey()?.source === "settings" && !props.draft.keyCleared ? () => props.set({ keyCleared: true }) : undefined}
-        >
-          <div class="flex flex-col gap-1.5">
-            <TextInput
-              aria-label={settingsWording().source.address(label())}
-              class="font-mono"
-              placeholder={sourceAddress[props.draft.kind]}
-              value={props.draft.url}
-              onInput={(e) => props.set({ url: e.currentTarget.value })}
-            />
+    <div class="rounded-lg border border-line">
+      <div class="flex items-center gap-2 px-3 py-2">
+        <span class="text-sm font-medium">{label()}</span>
+        <SourceMark draft={props.draft} />
+        <span class="flex-1" />
+        <Toggle
+          label={settingsWording().source.enabled}
+          ariaLabel={settingsWording().source.enable(label())}
+          checked={props.draft.enabled}
+          onChange={(enabled) => props.set({ enabled, open: props.draft.open || (enabled && !props.draft.url) })}
+        />
+        <IconButton
+          icon="settings"
+          label={settingsWording().source.configure(label())}
+          pressed={props.draft.open}
+          onClick={() => props.set({ open: !props.draft.open }, false)}
+        />
+      </div>
+      <Show when={props.draft.open}>
+        <div class="flex flex-col gap-3 border-t border-line p-3">
+          <TextInput
+            aria-label={settingsWording().source.address(label())}
+            class="font-mono"
+            placeholder={sourceAddress[props.draft.kind]}
+            value={props.draft.url}
+            onInput={(e) => props.set({ url: e.currentTarget.value })}
+          />
+          <KeyField
+            label="key"
+            status={props.draft.saved?.key ?? {}}
+            removing={props.draft.keyCleared}
+            onRemove={(keyCleared) => props.set({ keyCleared })}
+            tip={settingsWording().source.noKey}
+          >
             <SecretInput
               aria-label={settingsWording().source.key(label())}
               placeholder={settingsWording().source.keyHint}
               value={props.draft.key}
               onInput={(e) => props.set({ key: e.currentTarget.value })}
             />
-            <Show when={props.draft.kind === "everos"}>
-              <TextInput
-                aria-label={settingsWording().source.user(label())}
-                placeholder={settingsWording().source.userHint}
-                value={props.draft.user}
-                onInput={(e) => props.set({ user: e.currentTarget.value })}
-              />
-            </Show>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2.5">
+          </KeyField>
+          <Show when={props.draft.kind === "everos"}>
+            <TextInput
+              aria-label={settingsWording().source.user(label())}
+              placeholder={settingsWording().source.userHint}
+              value={props.draft.user}
+              onInput={(e) => props.set({ user: e.currentTarget.value })}
+            />
+          </Show>
+          <div class="flex flex-wrap gap-x-6 gap-y-2.5">
             <Toggle
               label={settingsWording().source.read}
-              hint={settingsWording().source.readHint}
+              tip={settingsWording().source.readHint}
               checked={props.draft.read}
               onChange={(read) => props.set({ read })}
             />
             <Toggle
               label={settingsWording().source.write}
-              hint={settingsWording().source.writeHint}
+              tip={settingsWording().source.writeHint}
               checked={props.draft.write}
               onChange={(write) => props.set({ write })}
             />
             <Show when={props.draft.kind === "nowledge"}>
               <Toggle
                 label={settingsWording().source.everything}
-                hint={settingsWording().source.everythingHint}
+                tip={settingsWording().source.everythingHint}
                 checked={props.draft.everything}
                 onChange={(everything) => props.set({ everything })}
               />
             </Show>
           </div>
-        </KeyField>
-      </div>
-    </Show>
-  );
-}
-
-function KeyField(props: { label: string; help: JSX.Element; line: string; onClear?: () => void; children: JSX.Element }) {
-  return (
-    <div class="flex flex-col gap-1.5">
-      <div class="flex items-center gap-2">
-        <span class="flex-1 text-sm font-semibold">{props.label}</span>
-        {props.help}
-      </div>
-      {props.children}
-      <div class="flex items-center gap-2">
-        <span class="flex-1 text-xs text-muted">{props.line}</span>
-        <Show when={props.onClear}>
-          <TextLink danger onClick={() => props.onClear?.()}>
-            {appWording().form.clear}
-          </TextLink>
-        </Show>
-      </div>
+        </div>
+      </Show>
     </div>
   );
 }
 
-/** What the server found of gh (github.status); a refresh questions it to look again. */
+/** What the server found of gh (github.status); the refresh asks it to look again. */
 export function GitHub() {
   const [refreshed, setRefreshed] = createSignal<GitHubStatus>();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   const status = useQuery(() => ({ queryKey: ["github"], queryFn: () => api.github.get() }));
-  const lines = () => {
-    const s = refreshed() ?? ready(status, undefined);
-    return !s
-      ? [status.error ? appWording().form.unreachable(reasonOf(status.error)) : appWording().form.asking]
-      : [
-          s.installed ? `gh ${s.version}` : settingsWording().github.noGh,
-          ...(s.loggedIn ? [settingsWording().github.signedIn(s.account ?? "")] : []),
-          ...(s.reason ? [s.reason] : []),
-        ];
-  };
+  const now = () => refreshed() ?? ready(status, undefined);
   const recheck = async () => {
     setBusy(true);
     setError(undefined);
@@ -369,17 +304,26 @@ export function GitHub() {
     }
   };
   return (
-    <div class="flex flex-col gap-1.5">
-      <For each={lines()}>{(l) => <p class="text-sm">{l}</p>}</For>
-      <p class="text-xs text-muted">{settingsWording().github.note}</p>
+    <div class="flex flex-col gap-2">
+      <Pick fallback={<Quiet>{status.error ? appWording().form.unreachable(reasonOf(status.error)) : appWording().form.asking}</Quiet>}>
+        <Match when={now()}>
+          {(s) => (
+            <div class="flex items-center gap-2 text-sm">
+              <Icon name={s().installed && s().loggedIn ? "check" : s().installed ? "warn" : "cross"} size={16} />
+              <span class="font-mono">{s().installed ? `gh ${s().version}` : settingsWording().github.noGh}</span>
+              <Show when={s().loggedIn}>
+                <span class="text-muted">· {s().account}</span>
+              </Show>
+              <Show when={s().reason}>{(r) => <Hint text={r()} />}</Show>
+              <span class="flex-1" />
+              <IconButton icon="refresh" label={settingsWording().github.recheck} disabled={busy()} onClick={() => void recheck()} />
+            </div>
+          )}
+        </Match>
+      </Pick>
       <Show when={error()}>
         <p class="text-sm text-berry">{error()}</p>
       </Show>
-      <div class="pt-2">
-        <Button disabled={busy()} onClick={() => void recheck()}>
-          {settingsWording().github.recheck}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -403,7 +347,6 @@ export function LanguageForm() {
   };
   return (
     <div class="flex flex-col gap-3">
-      <p class="text-sm text-muted">{settingsWording().language.line}</p>
       <div>
         <Segmented
           label={settingsWording().language.label}

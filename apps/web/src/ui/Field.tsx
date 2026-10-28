@@ -1,6 +1,7 @@
 import { For, omit } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useSelectValue } from "../base/util";
+import { Hint } from "./Tip";
 
 const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
 
@@ -14,13 +15,15 @@ export function TextArea(props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement>)
   return <textarea {...rest} class={[box, "resize-y", props.class]} />;
 }
 
-/** A label over its control. */
+/** A label over its control; what it means is behind an info icon beside the label. */
 export function Field(props: { label: string; hint?: string; children: JSX.Element }) {
   return (
     <label class="flex flex-col gap-1">
-      <span class="text-xs font-medium text-muted">{props.label}</span>
+      <span class="flex items-center gap-1.5 text-xs font-medium text-muted">
+        {props.label}
+        {props.hint && <Hint text={props.hint} />}
+      </span>
       {props.children}
-      {props.hint && <span class="text-xs text-faint">{props.hint}</span>}
     </label>
   );
 }

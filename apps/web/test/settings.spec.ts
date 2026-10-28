@@ -6,7 +6,7 @@ test("设置 lists its parts, and /settings opens the first", async ({ page }) =
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/settings\/deepseek$/);
   const menu = page.getByRole("region", { name: "设置的分区" });
-  for (const label of ["DeepSeek", "Agora 语音", "记性", "GitHub", "连接器", "技能", "声音", "连接到本机"])
+  for (const label of ["DeepSeek", "语言", "记性", "GitHub", "连接器", "技能", "声音", "连接到本机"])
     await expect(menu.getByRole("link", { name: new RegExp(`^${label}`) })).toBeVisible();
   await expect(menu.getByRole("link", { name: /^DeepSeek/ })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("link", { name: /^GitHub/ }).click();
@@ -14,9 +14,9 @@ test("设置 lists its parts, and /settings opens the first", async ({ page }) =
   await expect(page.getByRole("button", { name: "重新检测" })).toBeVisible();
 });
 
-test("a DeepSeek key is saved, shown by its end and cleared", async ({ page }) => {
+test("a DeepSeek key is saved, shown by its end and removed", async ({ page }) => {
   await page.goto("/settings/deepseek");
-  await expect(page.getByText("还没有")).toBeVisible();
+  await expect(page.getByRole("img", { name: "还没设" })).toBeVisible();
   const key = page.getByLabel("DeepSeek API Key", { exact: true });
   await key.fill("sk-test-0123456789abcdef");
   await expect(key).toHaveAttribute("type", "password");
@@ -25,26 +25,27 @@ test("a DeepSeek key is saved, shown by its end and cleared", async ({ page }) =
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText("存好了，马上就用上。")).toBeVisible();
   await expect(key).toHaveValue("");
-  await expect(page.getByText(/^在用 .*cdef.*（存在设置里）$/)).toBeVisible();
-  await page.getByRole("button", { name: "清掉" }).click();
-  await expect(page.getByText("存的时候清掉")).toBeVisible();
+  await expect(page.getByRole("img", { name: /^在用 .*cdef.*（存在设置里）$/ })).toBeVisible();
+  await page.getByRole("button", { name: "移除 DeepSeek API Key" }).click();
+  await expect(page.getByRole("img", { name: "保存后移除" })).toBeVisible();
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("还没有")).toBeVisible();
+  await expect(page.getByRole("img", { name: "还没设" })).toBeVisible();
 });
 
-test("a memory source is opened, connected and let go", async ({ page }) => {
+test("a memory source is set up, turned on and let go", async ({ page }) => {
   await page.goto("/settings/memory");
-  await expect(page.getByText("记性的来源：EverOS（没接）")).toBeVisible();
-  await page.getByRole("button", { name: "改 EverOS" }).click();
+  await expect(page.getByRole("img", { name: "没接" })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "保存" })).toHaveCount(0);
+  await page.getByRole("button", { name: "配置 EverOS" }).click();
   await page.getByLabel("EverOS 的地址").fill("http://127.0.0.1:18791");
-  await page.getByRole("switch", { name: "接上" }).click();
+  await page.getByRole("switch", { name: "启用 EverOS" }).click();
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("记性的来源：EverOS（接上了）")).toBeVisible();
-  await page.getByRole("button", { name: "改 EverOS" }).click();
+  await expect(page.getByRole("img", { name: "接上了 · http://127.0.0.1:18791" })).toBeVisible();
+  await page.getByRole("button", { name: "配置 EverOS" }).click();
   await page.getByLabel("EverOS 的地址").fill("");
-  await page.getByRole("switch", { name: "接上" }).click();
+  await page.getByRole("switch", { name: "启用 EverOS" }).click();
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("记性的来源：EverOS（没接）")).toBeVisible();
+  await expect(page.getByRole("img", { name: "没接" })).toHaveCount(2);
 });
 
 test("a skill of VibeValley's own is written, listed and deleted", async ({ page }) => {
@@ -101,10 +102,10 @@ test("连接到本机 opens, shows a pairing code and closes", async ({ page }) 
 
 test("the voice line saves its own part and goes back to the defaults", async ({ page }) => {
   await page.goto("/settings/voice");
-  await expect(page.getByText("都存着。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存" })).toBeDisabled();
   const area = page.getByRole("group", { name: "区域" });
   await area.getByRole("button", { name: "欧洲" }).click();
-  await expect(page.getByText("有没存的改动。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "撤销" })).toBeVisible();
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText("存好了，下一通电话就用上。")).toBeVisible();
   await page.reload();
