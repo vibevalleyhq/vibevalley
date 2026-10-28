@@ -55,7 +55,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
     <div ref={box} class="relative">
       <button
         type="button"
-        aria-label={`${props.agent.name}，${status[props.st].label}`}
+        aria-label={t("shared.join.and", { a: props.agent.name, b: status[props.st].label })}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
         class={["relative flex w-[72px] cursor-pointer flex-col items-center py-1", picked() ? "bg-leaf-300/60" : "hover:bg-cream-200"]}
@@ -92,7 +92,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
             <div class="min-w-0 text-[12px]">
               <p class="text-bark-800">{t("web.farm.friends.energy", { short: quota().short || "—" })}</p>
               <p class="truncate text-bark-500" title={quota().text}>
-                {runtime()?.preset.label ?? props.agent.runtime}：{quota().text}
+                {t("shared.join.labeled", { label: runtime()?.preset.label ?? props.agent.runtime, text: quota().text })}
               </p>
             </div>
           </div>

@@ -99,5 +99,13 @@
   "greeting": "来啦！今天想种点什么？",
   "serverAnswered": "服务端答 {status}",
   "seconds": "{n} 秒",
-  "minutes": "{n} 分钟"
+  "minutes": "{n} 分钟",
+  "join": {
+    "labeled": "{label}：{text}",
+    "aside": "{text}（{aside}）",
+    "sentence": "{text}。",
+    "and": "{a}，{b}",
+    "clauses": "{a}；{b}",
+    "separator": "、"
+  }
 }

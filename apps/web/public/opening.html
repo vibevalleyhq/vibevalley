@@ -87,16 +87,18 @@
     </style>
     <div id="opening">
       <div class="column">
-        <div class="bar" role="progressbar" aria-label="叫醒农场"><div class="fill"></div></div>
-        <span class="words">叫醒农场……</span>
+        <div class="bar" role="progressbar"><div class="fill"></div></div>
+        <span class="words"></span>
       </div>
     </div>
     <script>
-      // English when the served page (data-locale) or the desktop app (?locale=) says so; Chinese is the default.
-      if ((document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale")) === "en") {
-        document.querySelector("#opening .bar").setAttribute("aria-label", "Waking the farm");
-        document.querySelector("#opening .words").textContent = "Waking the farm…";
-      }
+      // The words are the catalogs' (packages/i18n, web.json's opening), written in by the build (apps/web vite.config.ts);
+      // the language is the served page's (data-locale) or the desktop app's (?locale=), Chinese when neither says.
+      const openingWords = "__OPENING_WORDS__";
+      const openingLocale = document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale");
+      const said = openingWords[openingLocale] ?? openingWords.zh;
+      document.querySelector("#opening .bar").setAttribute("aria-label", said.label);
+      document.querySelector("#opening .words").textContent = said.waking;
     </script>
     <!-- /opening -->
     <script>
@@ -106,8 +108,7 @@
         document.querySelector("#opening .bar").remove();
         const words = document.querySelector("#opening .words");
         words.className = "problem";
-        const en = new URLSearchParams(location.search).get("locale") === "en";
-        words.textContent = (en ? "The farm cannot start: " : "农场起不来：") + problem;
+        words.textContent = said.cannotStart.replace("{why}", problem);
       }
     </script>
   </body>

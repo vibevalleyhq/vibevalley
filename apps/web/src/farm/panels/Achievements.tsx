@@ -348,9 +348,9 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
           <Show when={props.a.tiers.length > 1}>
             <span class="flex" aria-label={t("web.farm.achievements.tiers", { tier: standing().tier, of: props.a.tiers.length })}>
               <For each={props.a.tiers}>
-                {(t, i) => (
+                {(tier, i) => (
                   <span
-                    title={`${tierText(i() + 1)}：${numberText(t.need)} ${unit()}`}
+                    title={t("shared.join.labeled", { label: tierText(i() + 1), text: `${numberText(tier.need)} ${unit()}` })}
                     class="ml-1 h-2 w-2"
                     style={{ background: i() < standing().tier ? pip[i() + 1] : "#c8a46e" }}
                   />

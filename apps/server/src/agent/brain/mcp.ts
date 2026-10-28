@@ -133,7 +133,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
   const parameters = (t.inputSchema as JsonSchema | undefined) ?? { type: "object", properties: {} };
   return textTool<Record<string, unknown> | null>({
     name: mcpToolName(server, t.name),
-    description: "（" + server + "）" + (t.description || t.name),
+    description: mcpWords.toolDescription(server, t.description || t.name),
     parameters,
     run: async (params, tc) => {
       let r: Awaited<ReturnType<Client["callTool"]>>;

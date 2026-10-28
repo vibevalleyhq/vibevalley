@@ -188,10 +188,8 @@ export const filledKinds = (kinds: readonly TemplateKind[], stack: Partial<Proje
   kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): TemplateBlank | undefined {
-  const start = text.indexOf("〔");
-  if (start < 0) return undefined;
-  const end = text.indexOf("〕", start);
-  return end < 0 ? undefined : { start, end: end + 1 };
+  const m = /〔[^〕]*〕/.exec(text);
+  return m ? { start: m.index, end: m.index + m[0].length } : undefined;
 }
 
 function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {

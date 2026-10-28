@@ -6,6 +6,7 @@ reaches the machine only through the host interface (`@vibevalley/protocol/host`
 
 ```
 src/main.ts        the window, the tray, notices, the voice shortcut, one instance, quitting
+src/menu.ts        the application menu, in the farm's language
 src/server.ts      the server as a child: the login shell's PATH, the ready line, SIGTERM then SIGKILL
 src/preload.ts     the host interface, through contextBridge
 src/island.ts      the island at the notch (apps/island): the state stream read here, the glance it is sent, a click back

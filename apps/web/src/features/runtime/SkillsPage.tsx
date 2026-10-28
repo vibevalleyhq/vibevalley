@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { list as listed, t } from "@vibevalley/i18n";
 // 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
 
@@ -74,7 +74,7 @@ export function SkillsPage(props: { id?: string }) {
                 to={skillPath(installedPrefix + s.name)}
                 on={open()?.name === s.name}
                 title={s.name}
-                detail={s.runtimes.map((x) => runtimeName(catalog(), x.runtime)).join("、")}
+                detail={listed(s.runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
               />
             )}
           </For>

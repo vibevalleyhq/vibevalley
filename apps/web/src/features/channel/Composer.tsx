@@ -124,7 +124,10 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           <div class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />
             <span class="min-w-0 flex-1 truncate">
-              {t("web.channel.composer.replying", { name: m().from === ownerId ? t("web.channel.messages.owner") : m().name })}：{m().text}
+              {t("shared.join.labeled", {
+                label: t("web.channel.composer.replying", { name: m().from === ownerId ? t("web.channel.messages.owner") : m().name }),
+                text: m().text,
+              })}
             </span>
             <button
               type="button"

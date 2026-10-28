@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { recallWords } from "./prompts.ts";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes. It is the owner's own knowledge, and the farm only adds to it. What
 // the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
 // reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
@@ -80,7 +81,7 @@ const hitID = (h: Hit) => h.memory_id || h.id || "";
 
 function hitText(h: Hit): string {
   const body = h.content_preview || h.content || "";
-  return !h.title || body.startsWith(h.title) ? body : `${h.title}：${body}`;
+  return !h.title || body.startsWith(h.title) ? body : recallWords.titled(h.title, body);
 }
 
 export function nowledge(c: MemorySourceConfig): Source {
@@ -173,7 +174,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const hits = yield* find(cue.agent, cue.text, recallCount, !!c.everything);
       return hits
         .filter((h) => !cue.skip?.has(hitID(h)))
-        .map((h) => ({ id: hitID(h), line: "- （Nowledge）" + clip(hitText(h), lineMost), score: h.relevance_score ?? 0 }));
+        .map((h) => ({ id: hitID(h), line: recallWords.sourceLine("Nowledge", clip(hitText(h), lineMost)), score: h.relevance_score ?? 0 }));
     }),
     // Its memories are notes; it has no jobs done.
     search: Effect.fnUntraced(function* (q) {

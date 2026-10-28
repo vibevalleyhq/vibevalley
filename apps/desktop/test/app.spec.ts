@@ -58,6 +58,15 @@ test("the desktop app shows the live board and sends a notice", async () => {
         () => (window as unknown as { vibevalleyHost: { voiceShortcut: { accelerator: string } | null } }).vibevalleyHost.voiceShortcut?.accelerator,
       ),
     ).toBe("Alt+Shift+Space");
+    // The menu bar speaks the farm's language, and follows it when the page loads in another.
+    const menu = () => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((i) => i.label) ?? []);
+    expect(await menu()).toContain("编辑");
+    await api.setting.update({ locale: "en" });
+    await page.reload();
+    await expect.poll(menu).toContain("Edit");
+    await api.setting.update({ locale: "zh" });
+    await page.reload();
+    await expect.poll(menu).toContain("编辑");
     // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
     const titleBar = await page.evaluate(() => (window as unknown as { vibevalleyHost: { titleBar: { left: number } | null } }).vibevalleyHost.titleBar);
     if (titleBar) expect((await page.getByRole("navigation", { name: "工作台" }).boundingBox())?.width).toBeGreaterThan(titleBar.left);

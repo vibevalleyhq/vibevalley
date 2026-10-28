@@ -44,7 +44,7 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
           problems = bad;
           return next;
         });
-        if (problems.length > 0) return words.notRecorded + problems.join("；") + "\n\n" + engine.text(g);
+        if (problems.length > 0) return words.notRecorded(problems) + "\n\n" + engine.text(g);
         yield* changed;
         return engine.text(g);
       }),
@@ -159,8 +159,8 @@ export const makeTaskRunner = (
           .pipe(Effect.catch((e) => Effect.as(Effect.logError(`agent: cannot record task ${t.id}:`, e), undefined)));
         if (!g) return;
         const state = g.find((x) => x.id === t.id)?.state ?? "failed";
-        if (state === "done") yield* tell(words.taskHeader + t.id + "（" + t.title + words.done + said.trim() + "\n\n" + engine.text(g));
-        else if (state === "failed") yield* tell(words.taskHeader + t.id + "（" + t.title + words.failed + head(said, 400) + words.retryNote + engine.text(g));
+        if (state === "done") yield* tell(words.done(t.id, t.title, said.trim()) + "\n\n" + engine.text(g));
+        else if (state === "failed") yield* tell(words.failed(t.id, t.title, head(said, 400)) + words.retryNote + engine.text(g));
         yield* advance;
       });
 
@@ -210,7 +210,7 @@ export const makeTaskRunner = (
         }
         if (nudges >= maxNudges) return "";
         nudges++;
-        return words.nudge(own.length, own.join("、"), seen);
+        return words.nudge(own.length, own, seen);
       }),
     };
   });

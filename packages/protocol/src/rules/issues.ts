@@ -14,7 +14,7 @@ export function shortTitle(text: string): string {
   const head = chars.slice(0, titleMax + 1).join("");
   const sentence = /^(.{4,}?)[。！？!?；;]/u.exec(head)?.[1];
   if (sentence) return sentence.trim();
-  const pause = Math.max(...[..."：:，,、"].map((p) => head.lastIndexOf(p)));
+  const pause = Math.max(-1, ...[...head.matchAll(/[：:，,、]/g)].map((m) => m.index));
   if (pause >= 4) return head.slice(0, pause).trim();
   return chars.slice(0, titleMax - 1).join("") + "…";
 }

@@ -19,6 +19,7 @@ import { piBalance } from "./pi.ts";
 import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
 import { TestClock } from "effect/testing";
+import { setLocale, t } from "@vibevalley/i18n";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
   defineRuntime({
@@ -77,6 +78,26 @@ const env = (name: string, value: string | undefined) => {
 };
 
 describe("runtime", () => {
+  it.live("what a runtime's probe said is said again in the farm's new language", () => {
+    const registry = new RuntimeRegistry([
+      fake("pi", { installation: async (): Promise<InstallationSnapshot> => ({ kind: "unsupported", reason: t("server.runtime.oarUnknown") }) }),
+    ]);
+    return Effect.gen(function* () {
+      const r = yield* make({ registry, background: false, usageOf: async () => null });
+      const reason = () => {
+        const got = r.list().find((x) => x.id === "pi")!.installation;
+        return got.status === "unsupported" ? got.reason : "";
+      };
+      yield* r.refresh("pi");
+      const chinese = reason();
+      setLocale("en");
+      // The list shows what it held until the probe in English lands.
+      expect(reason()).toBe(chinese);
+      yield* Effect.promise(() => until(() => reason() === "oar does not know this runtime"));
+      expect((yield* r.info("pi"))!.installation).toMatchObject({ reason: "oar does not know this runtime" });
+    }).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))), Effect.scoped, Effect.provide(world()));
+  });
+
   it.live("an accepted probe owns the installation its usage reads use, and a slow one does not overwrite a newer", () => {
     let n = 0;
     let release!: () => void;

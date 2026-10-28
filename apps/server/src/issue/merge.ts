@@ -65,7 +65,7 @@ export function merging(d: MergeDeps) {
       .submitPullRequest(place, issue, pullRequestConclusion(said))
       .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : MergeFailure.error(e.message))));
     yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
-    return { pullRequest: pr, text: "PR：" + pr.url, commits: 0 };
+    return { pullRequest: pr, text: t("shared.join.labeled", { label: "PR", text: pr.url }), commits: 0 };
   });
 
   const merge = Effect.fn("Issues.merge")(

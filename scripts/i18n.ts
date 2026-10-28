@@ -91,7 +91,12 @@ function gen() {
 const sources = () =>
   execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages"], { cwd: root, encoding: "utf8" })
     .split("\n")
-    .filter((f) => /^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/.test(f) && !f.endsWith("packages/i18n/src/catalogs.ts") && existsSync(join(root, f)));
+    .filter(
+      (f) =>
+        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/.test(f)) &&
+        !f.endsWith("packages/i18n/src/catalogs.ts") &&
+        existsSync(join(root, f)),
+    );
 
 interface Use {
   readonly file: string;

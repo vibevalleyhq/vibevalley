@@ -789,7 +789,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             <Show when={props.thread.last}>
               {(m) => (
                 <span class="truncate text-xs text-muted">
-                  {m().from === ownerId ? t("web.channel.messages.owner") : m().name}：{m().text}
+                  {t("shared.join.labeled", { label: m().from === ownerId ? t("web.channel.messages.owner") : m().name, text: m().text })}
                 </span>
               )}
             </Show>

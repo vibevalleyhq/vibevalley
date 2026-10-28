@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // 项目: the codebases in the work root; 全部 is the whole map, a project its island, its
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
@@ -269,9 +269,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
             {/* The bed itself, soil under the crops: it keeps the farm's brown. */}
             <div
               role="img"
-              aria-label={shares()
-                .map((s) => `${s.label} ${percent(s.share)}`)
-                .join("，")}
+              aria-label={list(shares().map((s) => `${s.label} ${percent(s.share)}`))}
               class="flex h-14 overflow-hidden rounded-md bg-[#7a5a3a] p-1"
             >
               <For each={shares()}>

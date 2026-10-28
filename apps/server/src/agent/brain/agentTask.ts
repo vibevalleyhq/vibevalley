@@ -114,13 +114,13 @@ export function update(g: readonly AgentTask[], id: string, c: Change): AgentTas
     const to = c.state;
     if (to === "waiting" && (t.state === "failed" || t.state === "skipped")) t = { ...t, tries: (t.tries ?? 0) + 1, state: "waiting" };
     else if ((to === "done" || to === "failed" || to === "skipped") && (t.state === "waiting" || t.state === "working")) t = { ...t, state: to };
-    else throw new AgentTaskError("「" + id + "」" + stateWords[t.state] + words.cannotMoveTo(stateWords[to]));
+    else throw new AgentTaskError(words.cannotMove(id, stateWords[t.state], stateWords[to]));
   }
   const next = [...g];
   next[i] = t;
   if (c.after !== undefined) {
     const problems = edgeProblems(next);
-    if (problems.length > 0) throw new AgentTaskError(problems.join("；"));
+    if (problems.length > 0) throw new AgentTaskError(words.problems(problems));
   }
   return next;
 }
@@ -133,7 +133,7 @@ export function text(g: readonly AgentTask[]): string {
     const mark = t.state === "waiting" ? (ready(g, t) ? words.canDo : words.waitingFor) : stateWords[t.state];
     let line = "- [" + mark + "] " + t.id + " " + t.title;
     if (t.by === "subagent") line += words.bySubagent;
-    if (t.after.length > 0 && !settled(t)) line += words.waitingOn + t.after.join("、") + "）";
+    if (t.after.length > 0 && !settled(t)) line += words.waitingOn(t.after);
     if (t.result) line += " → " + head(t.result.split(/\s+/).filter(Boolean).join(" "), 80);
     lines.push(line);
   }

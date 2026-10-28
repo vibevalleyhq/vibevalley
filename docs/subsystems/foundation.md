@@ -23,7 +23,7 @@
 - **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/state.ts`、`channel/rules.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`ai/testing.ts`（照脚本回答的模型，大脑经 `agent/brain/testing.ts` 用它）。
-- **话**：对主人说的都在 `packages/i18n`（`@vibevalley/i18n`）：词典是 `locales/<语言>/<命名空间>.json`，命名空间是「宿主.模块」（`web.setting`、`server.issue`、`desktop`、`mobile`，两边都说的是 `shared`）；代码里写 `t("web.setting.keys.saved")`、`t("server.issue.does.merge", { base, commits, helper })`，按一个值取、值可能不对应词条时用 `maybe()`，列表用 `list()`；`src/catalogs.ts` 由 `vp run i18n:gen` 从词典写出（词条连同每条的参数类型）；语言是 `currentLocale`、`setLocale`。命令行 `vpx scripts/i18n.ts`：`scan` 列出每个键在哪用，`check`（在 `docs:verify` 里）查用到却没有的、没人用的、英文缺或多的、占位对不上的、英文里有汉字的、中英一字不差的（`same.json` 列出有意一样的，比如「中文」），`find <文字>` 按文字找键，`migrate` 是把旧的词表搬进来用的。对模型说的在模块的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；种子和工单模板是 `agent/seeds.json`、`template_catalog.json` 和各自的 `.en.json`。
+- **话**：对主人说的都在 `packages/i18n`（`@vibevalley/i18n`）：词典是 `locales/<语言>/<命名空间>.json`，命名空间是「宿主.模块」（`web.setting`、`server.issue`、`desktop`、`mobile`，两边都说的是 `shared`）；代码里写 `t("web.setting.keys.saved")`、`t("server.issue.does.merge", { base, commits, helper })`，按一个值取、值可能不对应词条时用 `maybe()`，列表用 `list()`，把两段话接起来（「标签：内容」「内容（旁注）」）用 `shared.join` 的几条；`src/catalogs.ts` 由 `vp run i18n:gen` 从词典写出（词条连同每条的参数类型）；语言是 `currentLocale`、`setLocale`。命令行 `vpx scripts/i18n.ts`：`scan` 列出每个键在哪用，`check`（在 `docs:verify` 里）查用到却没有的、没人用的、英文缺或多的、占位对不上的、英文里有汉字的、中英一字不差的（`same.json` 列出有意一样的，比如「中文」），`find <文字>` 按文字找键，`migrate` 是把旧的词表搬进来用的。对模型说的在模块的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；种子和工单模板是 `agent/seeds.json`、`template_catalog.json` 和各自的 `.en.json`。
 - **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`vp run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
 
 ## 模型和不变量
@@ -103,7 +103,7 @@
 - **语言是农场的，一个进程一个**：存在设置里（`settings.json` 的 `locale`，默认 `zh`），服务端读出和保存时 `setLocale`；页面从服务端发的 `index.html` 上的 `data-locale` 读，换了语言重新打开；命令行和桌面壳开机读同一个 `settings.json`，桌面壳再听页面经宿主接口说的（`host.locale`），菜单栏和灵动岛跟着变；手机壳说手机自己的语言。存进库的话（频道里的消息、时间线）是写下那时的语言，换了不回头翻。
 - **频道的名字不翻**：开机建的默认频道叫 `general`（`firstChannelName`），名字存下来，地址和给模型的话都写它；农场把默认频道画成词典里的「田头」，工作台写它的名字。
 - **模型写的记号不翻**：提示要帮工照原样写「结论：」「要问主人：」「标准 N：」「记住：」；读的时候英文的写法（Conclusion、Ask the owner、Criterion N、Remember）也认。
-- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；生成的 `packages/i18n/src/catalogs.ts`、`prompts.ts`、测试和测试数据、记忆树的假数据不查；正则不查。对模型说的话也只在 `prompts.ts`：VibeValley 自己的 agent 在 `agent/brain/prompts.ts`，管家和帮工用的工具（说明、参数、回给模型的话）在 `tool/prompts.ts`，模块里的代码只引用它们。
+- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字和中文标点（拿「：」「、」把两段话粘起来，在英文的农场里也是中文）；生成的 `packages/i18n/src/catalogs.ts`、`prompts.ts`、测试和测试数据、记忆树的假数据不查；正则不查。对模型说的话也只在 `prompts.ts`：VibeValley 自己的 agent 在 `agent/brain/prompts.ts`，管家和帮工用的工具（说明、参数、回给模型的话）在 `tool/prompts.ts`，模块里的代码只引用它们。
 
 ## 怎么走
 
@@ -181,4 +181,5 @@
 - `vp run server:check`：`vp check`、protocol 的测试、`db:check`、服务端的 vitest。
 - `vp run web:check`、`vp run --filter @vibevalley/web e2e`、`vp run desktop:test`：类型、各包的规则测试、页面能构建，Playwright 对着真的服务端和整个应用。
 - `vp run docs:verify`：旧名字、能力表是否最新。
-- 话：`vp check` 的 `vibevalley/no-cjk-literal`；`agent/seed.test.ts`（种子和模板的英文版只有字不同）；`session/rules.test.ts`、`memory/memory.test.ts`（英文的记号也认）；`apps/web/test/english.spec.ts`（换成 English，工作台和服务端的话都变）。
+- 话：`vp check` 的 `vibevalley/no-cjk-literal`；`agent/seed.test.ts`（种子和模板的英文版只有字不同）；`session/rules.test.ts`、`memory/memory.test.ts`（英文的记号也认）；`apps/web/test/english.spec.ts`（换成 English，工作台和服务端的话都变；每一页都没有不是主人存下的中文）；`runtime/runtime.test.ts`（换了语言，农机探测时说的话重新探测一遍）；`apps/desktop/test/app.spec.ts`（菜单栏跟着语言）。
+- **服务端存下的话**：服务端算好又留着的话（农机的探测结果）记着是用哪种语言说的，语言换了就重新算一遍，在新的结果回来之前照旧显示；写进库和文件里的话（田头的系统消息、种子档案）是数据，不回头翻。

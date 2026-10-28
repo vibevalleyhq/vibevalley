@@ -715,7 +715,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const failedOpening = Effect.fnUntraced(function* (allocation: Allocation, why: string): Effect.fn.Return<OpenFailure> {
       const stopped = yield* Effect.result(stopOar(allocation));
       if (stopped._tag === "Success") return { refused: why, retained: false };
-      allocation.failure = why + "；" + reasonOf(stopped.failure);
+      allocation.failure = t("shared.join.clauses", { a: why, b: reasonOf(stopped.failure) });
       yield* core.notice("error", allocation.failure);
       return { refused: allocation.failure, retained: true };
     });
@@ -772,7 +772,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             })
             .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: e instanceof Error ? e.message : String(e) })),
         );
-        if (spawned.kind !== "spawned") return yield* failedOpening(allocation, `${spawned.reason}（${spawned.code}）`);
+        if (spawned.kind !== "spawned") return yield* failedOpening(allocation, t("shared.join.aside", { text: spawned.reason, aside: spawned.code }));
         const verb = resume ? "woke" : "sent";
         const how = r.model ? ", model " + r.model : ", the runtime's default model";
         const where = place.project + (place.branch ? " on " + place.branch : "");

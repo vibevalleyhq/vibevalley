@@ -8,5 +8,31 @@
   "exited": "The server exited ({code})",
   "waiting": "{n} for you",
   "working": "{n} working",
-  "idle": "idle"
+  "idle": "idle",
+  "menu": {
+    "about": "About {app}",
+    "hide": "Hide {app}",
+    "hideOthers": "Hide Others",
+    "unhide": "Show All",
+    "quit": "Quit {app}",
+    "edit": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "view": "View",
+    "reload": "Reload",
+    "devTools": "Developer Tools",
+    "resetZoom": "Actual Size",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "fullScreen": "Toggle Full Screen",
+    "window": "Window",
+    "minimize": "Minimize",
+    "zoom": "Zoom",
+    "front": "Bring All to Front",
+    "close": "Close Window"
+  }
 }

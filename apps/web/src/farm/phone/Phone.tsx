@@ -29,7 +29,7 @@ import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp,
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
 
 /** What rang, for the orchestrator to open the call with. */
-const aboutOf = (call: InboxItem) => `${call.who}：${call.words.label}。${call.text}`;
+const aboutOf = (call: InboxItem) => t("shared.join.sentence", { text: t("shared.join.labeled", { label: call.who, text: call.words.label }) }) + call.text;
 
 /** room: the most it may take, inside the farm's box. */
 export function Phone(props: { room: { w: number; h: number } }) {

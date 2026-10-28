@@ -167,7 +167,12 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       // A stuck issue says why on the board as on its page (有冲突, 没做成…).
       const st = issue.attention;
       if (attentionWantsOwner(st.state))
-        flags.push({ text: t(`shared.attention.${st.state}`) + (st.stuck ? "：" + t(`shared.stuck.${st.stuck}`) : ""), tone: attentionTone[st.state] });
+        flags.push({
+          text: st.stuck
+            ? t("shared.join.labeled", { label: t(`shared.attention.${st.state}`), text: t(`shared.stuck.${st.stuck}`) })
+            : t(`shared.attention.${st.state}`),
+          tone: attentionTone[st.state],
+        });
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
       if (issue.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
       lines.push(head.name);

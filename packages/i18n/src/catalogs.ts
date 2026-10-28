@@ -14,6 +14,32 @@ export const catalogs = {
       waiting: "{n} 等你",
       working: "{n} 在干",
       idle: "没在干",
+      menu: {
+        about: "关于 {app}",
+        hide: "隐藏 {app}",
+        hideOthers: "隐藏其他",
+        unhide: "全部显示",
+        quit: "退出 {app}",
+        edit: "编辑",
+        undo: "撤销",
+        redo: "重做",
+        cut: "剪切",
+        copy: "拷贝",
+        paste: "粘贴",
+        selectAll: "全选",
+        view: "显示",
+        reload: "重新载入",
+        devTools: "开发者工具",
+        resetZoom: "实际大小",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        fullScreen: "进入全屏幕",
+        window: "窗口",
+        minimize: "最小化",
+        zoom: "缩放",
+        front: "前置全部窗口",
+        close: "关闭窗口",
+      },
     },
     mobile: {
       cannotRead: "读不出保存的农场：{why}",
@@ -1118,7 +1144,9 @@ export const catalogs = {
       serverAnswered: "服务端答 {status}",
       seconds: "{n} 秒",
       minutes: "{n} 分钟",
+      join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", and: "{a}，{b}", clauses: "{a}；{b}", separator: "、" },
     },
+    web: { opening: { waking: "叫醒农场……", label: "叫醒农场", cannotStart: "农场起不来：{why}" } },
     "web.agent": {
       newName: "新的 {runtime}",
       noProfiles: "问不到服务端的档案：",
@@ -3307,6 +3335,32 @@ export const catalogs = {
       waiting: "{n} for you",
       working: "{n} working",
       idle: "idle",
+      menu: {
+        about: "About {app}",
+        hide: "Hide {app}",
+        hideOthers: "Hide Others",
+        unhide: "Show All",
+        quit: "Quit {app}",
+        edit: "Edit",
+        undo: "Undo",
+        redo: "Redo",
+        cut: "Cut",
+        copy: "Copy",
+        paste: "Paste",
+        selectAll: "Select All",
+        view: "View",
+        reload: "Reload",
+        devTools: "Developer Tools",
+        resetZoom: "Actual Size",
+        zoomIn: "Zoom In",
+        zoomOut: "Zoom Out",
+        fullScreen: "Toggle Full Screen",
+        window: "Window",
+        minimize: "Minimize",
+        zoom: "Zoom",
+        front: "Bring All to Front",
+        close: "Close Window",
+      },
     },
     mobile: {
       cannotRead: "The saved farm cannot be read: {why}",
@@ -4472,7 +4526,9 @@ export const catalogs = {
       serverAnswered: "the server answered {status}",
       seconds: "{n} s",
       minutes: "{n} min",
+      join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", and: "{a}, {b}", clauses: "{a}; {b}", separator: ", " },
     },
+    web: { opening: { waking: "Waking the farm…", label: "Waking the farm", cannotStart: "The farm cannot start: {why}" } },
     "web.agent": {
       newName: "New {runtime}",
       noProfiles: "The server's profiles could not be read: ",
@@ -6782,6 +6838,30 @@ export interface Messages {
   "desktop.exited": { readonly code: string | number };
   "desktop.failed": { readonly why: string | number };
   "desktop.idle": undefined;
+  "desktop.menu.about": { readonly app: string | number };
+  "desktop.menu.close": undefined;
+  "desktop.menu.copy": undefined;
+  "desktop.menu.cut": undefined;
+  "desktop.menu.devTools": undefined;
+  "desktop.menu.edit": undefined;
+  "desktop.menu.front": undefined;
+  "desktop.menu.fullScreen": undefined;
+  "desktop.menu.hide": { readonly app: string | number };
+  "desktop.menu.hideOthers": undefined;
+  "desktop.menu.minimize": undefined;
+  "desktop.menu.paste": undefined;
+  "desktop.menu.quit": { readonly app: string | number };
+  "desktop.menu.redo": undefined;
+  "desktop.menu.reload": undefined;
+  "desktop.menu.resetZoom": undefined;
+  "desktop.menu.selectAll": undefined;
+  "desktop.menu.undo": undefined;
+  "desktop.menu.unhide": undefined;
+  "desktop.menu.view": undefined;
+  "desktop.menu.window": undefined;
+  "desktop.menu.zoom": undefined;
+  "desktop.menu.zoomIn": undefined;
+  "desktop.menu.zoomOut": undefined;
   "desktop.noAddress": { readonly seconds: string | number };
   "desktop.open": undefined;
   "desktop.quit": undefined;
@@ -7854,6 +7934,12 @@ export interface Messages {
   "shared.delivered.pull_request": undefined;
   "shared.doneWith": { readonly what: string | number };
   "shared.greeting": undefined;
+  "shared.join.and": { readonly a: string | number; readonly b: string | number };
+  "shared.join.aside": { readonly aside: string | number; readonly text: string | number };
+  "shared.join.clauses": { readonly a: string | number; readonly b: string | number };
+  "shared.join.labeled": { readonly label: string | number; readonly text: string | number };
+  "shared.join.sentence": { readonly text: string | number };
+  "shared.join.separator": undefined;
   "shared.minutes": { readonly n: string | number };
   "shared.order.invalid": undefined;
   "shared.order.unordered": { readonly a: string | number; readonly b: string | number };
@@ -9524,6 +9610,9 @@ export interface Messages {
   "web.notice.tray.off": undefined;
   "web.notice.tray.unread": { readonly n: string | number };
   "web.notice.tray.working": { readonly n: number };
+  "web.opening.cannotStart": { readonly why: string | number };
+  "web.opening.label": undefined;
+  "web.opening.waking": undefined;
   "web.orchestrator.looks.auntie.blurb": undefined;
   "web.orchestrator.looks.auntie.name": undefined;
   "web.orchestrator.looks.farmer.blurb": undefined;

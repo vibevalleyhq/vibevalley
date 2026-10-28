@@ -75,10 +75,10 @@ export function describeReminder(j: Reminder): string {
       ? reminderWords.everyNote(j.everyMinutes)
       : "cron " + j.cron;
   const next = nextRun(j);
-  return "- " + j.id + "「" + j.name + "」" + when + reminderWords.nextNote + (next ? localeTime(next) : reminderWords.neverAgain) + "\n  " + j.message;
+  return reminderWords.line(j.id, j.name, when, next ? localeTime(next) : undefined, j.message);
 }
 
-export const dueMessage = (j: Reminder) => reminderWords.dueHeader + j.name + reminderWords.dueBody + j.id + "）】\n" + j.message;
+export const dueMessage = (j: Reminder) => reminderWords.due(j.id, j.name, j.message);
 
 export class Reminders {
   readonly tools: Tool[];
@@ -165,7 +165,7 @@ export class Reminders {
         const j = reminders.find((x) => x.id === p.id);
         if (!j) throw new Error(reminderWords.notFound(p.id));
         this.store(reminders.filter((x) => x !== j));
-        return reminderWords.canceled + j.name + "」。";
+        return reminderWords.canceled(j.name);
       },
     });
     return [add, list, cancel];

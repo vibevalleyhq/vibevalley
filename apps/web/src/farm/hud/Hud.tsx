@@ -223,7 +223,11 @@ function ToolBar() {
     <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={t("web.farm.hud.tools")}>
       <For each={tools}>
         {(tool, i) => (
-          <HudTap label={`${tool.label}：${tool.hint}（${i() + 1}）`} selected={held() === tool.id} onClick={() => farm.hold(tool.id)}>
+          <HudTap
+            label={t("shared.join.aside", { text: t("shared.join.labeled", { label: tool.label, text: tool.hint }), aside: i() + 1 })}
+            selected={held() === tool.id}
+            onClick={() => farm.hold(tool.id)}
+          >
             <span class="inline-block pr-0.5 pb-0.5">
               <span
                 class="box-border flex items-center justify-center gap-[3px] border-2 shadow-[2px_2px_0_0_#3a2a1899]"

@@ -408,13 +408,14 @@ export const answers = {
     confirm: (target: string, lastRead: string | undefined) =>
       `先没发：你刚读的是 ${lastRead}，这条却要发到 ${target} 顶层。要回在那个串里，就把 id 写成 ${lastRead}；确实要发到顶层，就加 confirm: true。`,
     sent: (target: string, msgNumber: number, absent: string) => `发出去了：${target} msg=${msgNumber}${absent}`,
-    absentNote: (names: string) => "。" + names + " 不在场，没送到",
+    absentNote: (names: readonly string[]) => "。" + names.map((m) => "@" + m).join("、") + " 不在场，没送到",
   },
   readChat: {
     failed: (why: string) => "读不了：" + why,
     noUnread: (target: string) => target + " 里没有你没读的消息",
     empty: (target: string) => target + " 里还没有话",
     olderNote: (number: number) => `（更早的还有：before:${number} 往前翻）`,
+    head: (target: string, older: string) => target + older + "：\n",
   },
   channelInbox: {
     empty: "没有没读的消息。",
@@ -450,6 +451,7 @@ export const answers = {
     queuedInChannel: (noted: string, channel: string, queueNote: string) => `${noted}，在 #${channel} 排进待办：${queueNote}`,
     branchNote: (branch: string) => "，分支 " + branch,
     noAgentFallback: "帮工",
+    who: (name: string, id: string) => name + "（" + id + "）",
     dispatched: (noted: string, channel: string, who: string, project: string, branch: string) => `${noted}，已在 #${channel} 派 ${who}去 ${project}${branch}`,
     notStartedNote: "，没开工",
     inBacklog: (noted: string, suffix: string) => `${noted}，在备选里${suffix}`,
