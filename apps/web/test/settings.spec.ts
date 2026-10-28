@@ -152,6 +152,25 @@ test("the voice line saves its own part and goes back to the defaults", async ({
   await expect(page.getByTestId("reset")).toBeDisabled();
 });
 
+test("dictation goes to MOSS unless the owner picks an own address, which then saves its address and model", async ({ page, api }) => {
+  await page.goto("/settings/dictation");
+  const via = page.getByTestId("dictation-via");
+  await expect(via.locator('[data-key="moss"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("dictation-moss-key").locator("input")).toBeVisible();
+  await expect(page.getByTestId("dictation-url")).toHaveCount(0);
+  await via.locator('[data-key="own"]').click();
+  await expect(page.getByTestId("dictation-moss-key")).toHaveCount(0);
+  await page.getByTestId("dictation-url").fill("http://127.0.0.1:8080/v1");
+  await page.getByTestId("dictation-model").fill("qwen3");
+  await page.getByTestId("save").click();
+  await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
+  expect((await api.setting.get()).dictation).toEqual({ via: "own", url: "http://127.0.0.1:8080/v1", model: "qwen3" });
+  await via.locator('[data-key="moss"]').click();
+  await page.getByTestId("save").click();
+  await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
+  expect((await api.setting.get()).dictation.via).toBe("moss");
+});
+
 test("the settings navigation is as wide as it was dragged, on this machine, until a double click puts it back", async ({ page }) => {
   await page.goto("/settings/general");
   const edge = page.locator('[data-testid="splitter"][data-key="settingsNav"]');

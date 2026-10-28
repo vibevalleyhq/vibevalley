@@ -33,14 +33,15 @@
   "manyCalls": "有几通电话正在接通，请升级客户端后重试",
   "noCall": "没有正在接通的电话",
   "dictation": {
-    "unset": "听写还没配：在「声音」页的「听写」里填地址和模型",
+    "unset": "听写还没配：在「听写」里填自己的地址和模型，或者换成 MOSS",
     "format": "听写认不得 {format} 这种录音",
     "empty": "录音是空的，或者不是 base64",
     "tooLong": "录音太长了：一段不超过 25 MB",
     "unreachable": "听写的地址连不上：{why}",
     "cut": "听写的回答读到一半断了：{why}",
     "status": "听写的地址回了 {status}：{detail}",
-    "shape": "听写的地址回的不是 OpenAI 的转写格式"
+    "shape": "听写的地址回的不是 OpenAI 的转写格式",
+    "noMossKey": "听写走 MOSS，还没填 MOSS 的 API Key：在「听写」里填上"
   },
   "moss": {
     "noKey": "还没填 MOSS Live 的 API Key",

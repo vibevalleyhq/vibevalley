@@ -155,7 +155,7 @@ describe("settings", () => {
             const s = yield* Setting;
             expect(s.agora()).toBeUndefined();
             // A save after it writes a new file; the one set aside keeps the owner's bytes.
-            yield* s.save({ dictation: { url: "http://127.0.0.1:1/v1", model: "m" } });
+            yield* s.save({ dictation: { via: "own", url: "http://127.0.0.1:1/v1", model: "m" } });
           }),
         );
         const kept = readdirSync(config.home).filter((f) => f.startsWith("settings.json.unreadable-"));

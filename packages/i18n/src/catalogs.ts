@@ -1069,7 +1069,7 @@ export const catalogs = {
       manyCalls: "有几通电话正在接通，请升级客户端后重试",
       noCall: "没有正在接通的电话",
       dictation: {
-        unset: "听写还没配：在「声音」页的「听写」里填地址和模型",
+        unset: "听写还没配：在「听写」里填自己的地址和模型，或者换成 MOSS",
         format: "听写认不得 {format} 这种录音",
         empty: "录音是空的，或者不是 base64",
         tooLong: "录音太长了：一段不超过 25 MB",
@@ -1077,6 +1077,7 @@ export const catalogs = {
         cut: "听写的回答读到一半断了：{why}",
         status: "听写的地址回了 {status}：{detail}",
         shape: "听写的地址回的不是 OpenAI 的转写格式",
+        noMossKey: "听写走 MOSS，还没填 MOSS 的 API Key：在「听写」里填上",
       },
       moss: {
         noKey: "还没填 MOSS Live 的 API Key",
@@ -3420,6 +3421,11 @@ export const catalogs = {
           play: "试听 {name}",
         },
         moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
+        dictationVia: "听写走哪",
+        dictationOwn: "自己的地址",
+        dictationMossIntro:
+          "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。录音经服务端交给 MOSS 的转写（moss-transcribe-1.0），用的是和 MOSS Live 同一把 API Key。",
+        dictationMossKey: "MOSS 的 API Key（和 MOSS Live 共用）",
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -4623,7 +4629,7 @@ export const catalogs = {
       manyCalls: "Several calls are connecting: update the app and try again",
       noCall: "No call is connecting",
       dictation: {
-        unset: "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
+        unset: "Dictation is not set up: fill in your own address and model under Dictation, or switch to MOSS",
         format: "Dictation does not know recordings in {format}",
         empty: "The recording is empty, or not base64",
         tooLong: "The recording is too long: at most 25 MB a piece",
@@ -4631,6 +4637,7 @@ export const catalogs = {
         cut: "The dictation answer broke off halfway: {why}",
         status: "The dictation address answered {status}: {detail}",
         shape: "The dictation address did not answer in OpenAI's transcription format",
+        noMossKey: "Dictation goes through MOSS, and no MOSS API key is saved: add it under Dictation",
       },
       moss: {
         noKey: "No MOSS Live API key yet",
@@ -7107,6 +7114,11 @@ export const catalogs = {
           ok: "Connected",
           keyHint: "A key from the MOSS platform, used only by this machine's server",
         },
+        dictationVia: "Dictation goes to",
+        dictationOwn: "Your own address",
+        dictationMossIntro:
+          "The record button beside the chat box: say something, stop, and it becomes text in the box to read before sending. The server hands the recording to MOSS's transcription (moss-transcribe-1.0), with the same API key as MOSS Live.",
+        dictationMossKey: "MOSS API key (shared with MOSS Live)",
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -8228,6 +8240,7 @@ export interface Messages {
   "server.voice.dictation.cut": { readonly why: string | number };
   "server.voice.dictation.empty": undefined;
   "server.voice.dictation.format": { readonly format: string | number };
+  "server.voice.dictation.noMossKey": undefined;
   "server.voice.dictation.shape": undefined;
   "server.voice.dictation.status": { readonly detail: string | number; readonly status: string | number };
   "server.voice.dictation.tooLong": undefined;
@@ -10715,6 +10728,10 @@ export interface Messages {
   "web.voice.voice.dictationKey": undefined;
   "web.voice.voice.dictationModel": undefined;
   "web.voice.voice.dictationModelLabel": undefined;
+  "web.voice.voice.dictationMossIntro": undefined;
+  "web.voice.voice.dictationMossKey": undefined;
+  "web.voice.voice.dictationOwn": undefined;
+  "web.voice.voice.dictationVia": undefined;
   "web.voice.voice.hex": undefined;
   "web.voice.voice.hosted": undefined;
   "web.voice.voice.intro": undefined;

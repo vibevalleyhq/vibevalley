@@ -24,7 +24,7 @@ export function DictationButton(props: {
   onSettled(() => () => dictation.release(me));
   // Unknown until the settings are read; the server says what is missing then.
   const settings = useSettings();
-  const off = () => ready(settings, undefined)?.dictation.url === "";
+  const off = () => ready(settings, undefined)?.dictationReady === false;
   const look = (): [IconName, string] =>
     off()
       ? ["record", t("web.voice.dictation.unset")]

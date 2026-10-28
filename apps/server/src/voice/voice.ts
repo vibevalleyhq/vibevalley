@@ -10,7 +10,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { type AgoraGrant, type Area, type Check, type Dictated, defaultOrchestrator, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
-import { checkMoss, type MossTransport, relay } from "./moss.ts";
+import { checkMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
 import type { Socket } from "effect/socket";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
@@ -824,6 +824,8 @@ export const make = (options: VoiceOptions = {}) =>
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
+        if (d.via === "moss" && d.key === "") return yield* Effect.fail(unavailable(t("server.voice.dictation.noMossKey"), "dictation"));
+        const { url, model } = d.via === "moss" ? mossTranscription : d;
         const format = given.trim().replace(/^\./, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
@@ -844,13 +846,13 @@ export const make = (options: VoiceOptions = {}) =>
           });
         const form = new FormData();
         form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
-        form.append("model", d.model);
+        form.append("model", model);
         form.append("response_format", "json");
         // A local model's first request loads it, which takes a while.
         const res = yield* Effect.tryPromise({
           // Effect's own signal too: an interrupted dictation (the page went away) stops its upload, not only the timeout.
           try: (signal) =>
-            fetch(d.url + "/audio/transcriptions", {
+            fetch(url + "/audio/transcriptions", {
               method: "POST",
               body: form,
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
