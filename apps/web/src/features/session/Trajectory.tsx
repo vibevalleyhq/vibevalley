@@ -429,7 +429,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
     }
   };
   return (
-    <div class="group relative">
+    <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} class="group relative">
       {props.children}
       <Show when={!props.file && !writing()}>
         <button

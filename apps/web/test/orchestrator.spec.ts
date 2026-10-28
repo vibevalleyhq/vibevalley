@@ -18,12 +18,16 @@ test("the orchestrator's trajectory shows what it was told, and a round it never
   // Without the model's key the orchestrator cannot start: the line is in its log, not in its channel.
   await api.channel.message.send({ id: await defaultChannel(api), text: told });
   await page.goto("/orchestrator/trajectory");
-  const row = page.getByTestId("step").filter({ hasText: told }).first();
-  await expect(row).toBeVisible({ timeout: 15_000 });
-  await row.hover();
-  await page.getByTestId("mark-wrong").first().click();
-  await page.getByTestId("mark-want").fill("ask me which project first");
-  await page.getByTestId("mark-submit").click();
+  // The worker's server is shared: the orchestrator has other files' rounds too, each with its own mark.
+  const round = page
+    .getByTestId("round")
+    .filter({ has: page.getByTestId("step").filter({ hasText: told }) })
+    .first();
+  await expect(round).toBeVisible({ timeout: 15_000 });
+  await round.hover();
+  await round.getByTestId("mark-wrong").click();
+  await round.getByTestId("mark-want").fill("ask me which project first");
+  await round.getByTestId("mark-submit").click();
   // The server refuses it, and the page says so.
   await expect(page.getByTestId("toast")).toBeVisible();
   await page.getByTestId("trajectory-search").fill("nothing like this");
