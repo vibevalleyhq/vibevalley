@@ -2,10 +2,11 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（23 篇）
+## proposed（24 篇）
 
 ### feature
 
+- 2026-10-29 [产出（artifact）：帮工和管家做出来的一页，在 VibeValley 里看、改版、评论](.agents/notes/proposed/feature/2026-10-29-artifacts.md)
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [管家给主人报告：早报、项目健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)
 - 2026-10-21 [管家的授权：按动作分档，跨轮的同意记下来](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)
