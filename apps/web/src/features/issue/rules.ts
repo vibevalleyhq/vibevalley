@@ -23,7 +23,7 @@ export function issueTag(issue: Issue): IssueTag {
   }
 }
 
-export const tagOpen = (t: IssueTag) => t !== "closed";
+export const tagOpen = (tag: IssueTag) => tag !== "closed";
 
 /** The tag in words: the status while open, what its close says after. */
 export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? wording().status[issue.status] : closedText(issue));
@@ -136,16 +136,16 @@ export function matchesQuery(query: string, fields: (string | undefined)[]) {
 
 export const closedShown = 15;
 
-function runTriggerText(t: RunTrigger) {
-  switch (t.kind) {
+function runTriggerText(trigger: RunTrigger) {
+  switch (trigger.kind) {
     case "issue":
       return issuesWording().trigger.issue;
     case "comment":
-      return t.message ? issuesWording().trigger.commentNumbered(t.message.slice(0, 8)) : issuesWording().trigger.comment;
+      return trigger.message ? issuesWording().trigger.commentNumbered(trigger.message.slice(0, 8)) : issuesWording().trigger.comment;
     case "task":
       return issuesWording().trigger.task;
     case "recurrence":
-      return t.missed ? issuesWording().trigger.missed : issuesWording().trigger.recurrence;
+      return trigger.missed ? issuesWording().trigger.missed : issuesWording().trigger.recurrence;
     case "refine":
       return issuesWording().trigger.refine;
     case "runtime":

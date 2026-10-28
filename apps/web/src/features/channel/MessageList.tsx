@@ -173,11 +173,11 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           )}
         </For>
         <Show when={typing()}>
-          {(t) => (
+          {(typer) => (
             <Frame
-              face={<OrchestratorFace size={36} agent={t().agent} />}
-              name={orchestrators().find((a) => a.id === t().agent)?.name || chatWording().orchestrator}
-              meta={t().mood === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
+              face={<OrchestratorFace size={36} agent={typer().agent} />}
+              name={orchestrators().find((a) => a.id === typer().agent)?.name || chatWording().orchestrator}
+              meta={typer().mood === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
             >
               <div class="flex h-5 items-center">
                 <ThinkingDots />

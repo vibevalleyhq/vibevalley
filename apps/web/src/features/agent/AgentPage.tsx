@@ -765,11 +765,11 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
   const [target, setTarget] = createSignal("");
   const add = () => {
     const n = name().trim();
-    const t = target().trim();
-    if (!n || !t) return;
-    const words = t.split(/\s+/);
+    const wanted = target().trim();
+    if (!n || !wanted) return;
+    const words = wanted.split(/\s+/);
     const server: MCPServer =
-      type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: t, headers: {} };
+      type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: wanted, headers: {} };
     props.patch({ ...props.draft, mcpServers: [...props.draft.mcpServers.filter((s) => s.name !== n), server] });
     setName("");
     setTarget("");
@@ -847,14 +847,14 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
         <Show when={!toolsRefused() ? props.runtime?.tools : undefined}>
           {(tools) => (
             <div class="flex flex-wrap gap-1 pt-1.5">
-              <For each={tools().filter((t) => !props.draft.disallowedTools.includes(t.name))}>
-                {(t) => (
+              <For each={tools().filter((tool) => !props.draft.disallowedTools.includes(tool.name))}>
+                {(tool) => (
                   <button
                     type="button"
-                    onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, t.name] })}
+                    onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool.name] })}
                     class="cursor-pointer rounded border border-line bg-page px-1.5 py-px font-mono text-xs text-muted hover:bg-hover hover:text-ink"
                   >
-                    + {t.name}
+                    + {tool.name}
                   </button>
                 )}
               </For>

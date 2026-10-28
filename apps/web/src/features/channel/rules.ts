@@ -397,12 +397,12 @@ export function switchTargets(
   const typed = query.trim().toLowerCase();
   const only = typed.startsWith("#") ? "hash" : typed.startsWith("@") ? "at" : undefined;
   const words = only ? typed.slice(1) : typed;
-  const kept = targets.filter((t) => {
-    if (only === "hash" && t.kind !== "channel" && t.kind !== "thread") return false;
-    if (only === "at" && t.kind !== "direct" && t.kind !== "profile") return false;
-    return t.label.toLowerCase().includes(words);
+  const kept = targets.filter((target) => {
+    if (only === "hash" && target.kind !== "channel" && target.kind !== "thread") return false;
+    if (only === "at" && target.kind !== "direct" && target.kind !== "profile") return false;
+    return target.label.toLowerCase().includes(words);
   });
-  const starts = (t: SwitchTarget) => (words !== "" && t.label.toLowerCase().replace(/^[#@]/, "").startsWith(words) ? 0 : 1);
+  const starts = (target: SwitchTarget) => (words !== "" && target.label.toLowerCase().replace(/^[#@]/, "").startsWith(words) ? 0 : 1);
   return kept.sort((a, b) => starts(a) - starts(b) || b.unread - a.unread || b.at - a.at || compareIds(a.id, b.id)).slice(0, switchMax);
 }
 

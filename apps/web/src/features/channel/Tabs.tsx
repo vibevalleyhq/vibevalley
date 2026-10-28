@@ -43,8 +43,8 @@ export function Jobs(props: { channel: Channel }) {
                   </span>
                 </div>
                 <Show when={thread()}>
-                  {(t) => (
-                    <Button icon="thread" onClick={() => router.navigate(chatPath(t()))}>
+                  {(shown) => (
+                    <Button icon="thread" onClick={() => router.navigate(chatPath(shown()))}>
                       {chatWording().jobs.thread}
                     </Button>
                   )}
@@ -79,9 +79,9 @@ function RecurrenceCard(props: { s: Recurrence }) {
   createEffect(deleting, (on) => {
     if (!on) return;
     const away = () => setDeleting(false);
-    const t = setTimeout(() => document.addEventListener("pointerdown", away, { once: true }));
+    const timer = setTimeout(() => document.addEventListener("pointerdown", away, { once: true }));
     return () => {
-      clearTimeout(t);
+      clearTimeout(timer);
       document.removeEventListener("pointerdown", away);
     };
   });

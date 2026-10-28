@@ -517,25 +517,25 @@ export function IslandDetail(props: { island: Island }) {
         <span class="text-xs font-semibold text-muted">{projectsWording().map.worktrees(taken().length)}</span>
         <Show when={taken().length > 0} fallback={<Quiet>{projectsWording().map.noHelpers}</Quiet>}>
           <For each={taken()}>
-            {(t) => (
+            {(slot) => (
               <button
                 type="button"
-                onClick={() => go(router.navigate, t.session.id)}
-                aria-label={`${t.session.name}：${phaseText(t.session, now())}`}
+                onClick={() => go(router.navigate, slot.session.id)}
+                aria-label={`${slot.session.name}：${phaseText(slot.session, now())}`}
                 class="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-left hover:bg-hover"
               >
-                <AgentFace agentId={t.session.agent} runtime={t.session.runtime} size={32} />
+                <AgentFace agentId={slot.session.agent} runtime={slot.session.runtime} size={32} />
                 <span class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-sm font-medium">{t.session.name}</span>
-                  <span class="line-clamp-2 text-xs text-muted">{phaseText(t.session, now())}</span>
-                  <Show when={t.session.branch}>
+                  <span class="text-sm font-medium">{slot.session.name}</span>
+                  <span class="line-clamp-2 text-xs text-muted">{phaseText(slot.session, now())}</span>
+                  <Show when={slot.session.branch}>
                     <span class="flex items-center gap-1 font-mono text-xs text-muted">
                       <SpriteIcon name="icon-branch" size={14} />
-                      <span class="truncate">{t.session.branch}</span>
+                      <span class="truncate">{slot.session.branch}</span>
                     </span>
                   </Show>
                 </span>
-                <SpriteIcon name={cropSprite(t.plot.crop)} size={32} />
+                <SpriteIcon name={cropSprite(slot.plot.crop)} size={32} />
               </button>
             )}
           </For>

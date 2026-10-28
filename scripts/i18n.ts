@@ -58,6 +58,7 @@ const quote = (s: string) => JSON.stringify(s);
 
 function generated(): string {
   const zh = messages("zh");
+  const all = locales.map(messages);
   const lines = ["// Written by `vpx scripts/i18n.ts gen` from packages/i18n/locales: do not edit.", ""];
   for (const locale of locales) for (const ns of namespaces(locale)) lines.push(`import ${ident(locale, ns)} from "../locales/${locale}/${ns}.json";`);
   lines.push("", "/** Each language's catalogs by namespace. */", "export const catalogs = {");
@@ -69,7 +70,8 @@ function generated(): string {
     );
   lines.push("};", "", "/** Every key, and the params its zh message names (undefined: none). */", "export interface Messages {");
   for (const [key, text] of [...zh].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    const names = placeholdersOf(text);
+    // A message's params are every language's: an English plural may name a count the Chinese does not say.
+    const names = [...new Set([text, ...all.map((m) => m.get(key) ?? "")].flatMap(placeholdersOf))].sort();
     lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: string | number`).join("; ")} }` : "undefined"};`);
   }
   lines.push("}", "");
@@ -118,7 +120,7 @@ function check(): string[] {
         problems.push(`${locale}: ${k} is not in zh`);
         continue;
       }
-      if (placeholdersOf(v).join() !== placeholdersOf(source).join())
+      if (placeholdersOf(v).some((p) => !placeholdersOf(source).includes(p)) && placeholdersOf(source).some((p) => !placeholdersOf(v).includes(p)))
         problems.push(`${locale}: ${k} says {${placeholdersOf(v).join("}, {")}}, zh {${placeholdersOf(source).join("}, {")}}`);
       if (same.has(k)) continue;
       if (locale === "en" && han.test(v)) problems.push(`en: ${k} has Chinese in it: ${v}`);
@@ -194,6 +196,8 @@ function templateOf(fn: Function): string | undefined {
   const one = call(names.map(() => 1));
   const two = call(names.map(() => 2));
   if (a === undefined || one === undefined || two === undefined) return undefined;
+  // A param read as an object or a list shows up as undefined or [object …]: not a template.
+  if ([a, one, two].some((r) => /undefined|NaN|\[object /.test(r))) return undefined;
   // A message that depends on the value (a plural, a comparison) is not a template.
   const shape = (s: string, n: string) => s.split(n).join("#");
   if (shape(one, "1") !== shape(two, "2")) return undefined;
@@ -333,27 +337,31 @@ async function migrate(file: string) {
   const left: string[] = converted.skipped.map((p) => `${file}: ${p} has logic: write it as messages by hand`);
   const callers = execFileSync("git", ["grep", "-l", accessorName + "()", "--", "apps", "packages"], { cwd: root, encoding: "utf8" })
     .split("\n")
-    .filter((f) => /\.tsx?$/.test(f) && f !== file);
+    // Tables in different apps share names (voiceWording): only the app that has this one calls it.
+    .filter(
+      (f) => /\.tsx?$/.test(f) && f !== file && (file.startsWith("packages/") || f.split("/").slice(0, 2).join("/") === file.split("/").slice(0, 2).join("/")),
+    );
   const chain = new RegExp(`\\b${accessorName}\\(\\)((?:\\.[A-Za-z_$][\\w$]*)+)`, "g");
-  for (const caller of callers) {
-    const path = join(root, caller);
-    let text = readFileSync(path, "utf8");
+  /** Rewrites every chain in `text` that ends in a moved message; arguments are rewritten the same way first. */
+  const rewrite = (text: string, caller: string, base: number): { out: string; changed: boolean } => {
     let out = "";
     let at = 0;
     let changed = false;
     for (const m of text.matchAll(chain)) {
+      if (m.index < at) continue;
       const keyPath = m[1]!.slice(1).split(".");
       const kind = has(converted.catalog, keyPath);
       const end = m.index + m[0].length;
       const key = `${ns}.${keyPath.join(".")}`;
-      const lineNo = text.slice(0, m.index).split("\n").length;
+      const lineNo = base + text.slice(0, m.index).split("\n").length - 1;
       if (kind === "leaf" && converted.params.has(keyPath.join("."))) {
         if (text[end] !== "(") {
           left.push(`${caller}:${lineNo}: ${key} is passed as a function`);
           continue;
         }
         const close = closing(text, end);
-        const args = splitArgs(text.slice(end + 1, close - 1));
+        const inner = rewrite(text.slice(end + 1, close - 1), caller, lineNo);
+        const args = splitArgs(inner.out);
         const names = converted.params.get(keyPath.join("."))!;
         if (args.length !== names.length) {
           left.push(`${caller}:${lineNo}: ${key} called with ${args.length} of ${names.length} params`);
@@ -369,7 +377,12 @@ async function migrate(file: string) {
         changed = true;
       } else left.push(`${caller}:${lineNo}: ${accessorName}()${m[1]} is ${kind === "branch" ? "a whole table" : "not moved"}`);
     }
-    out += text.slice(at);
+    return { out: out + text.slice(at), changed };
+  };
+  for (const caller of callers) {
+    const path = join(root, caller);
+    const { out, changed } = rewrite(readFileSync(path, "utf8"), caller, 1);
+    let text: string;
     for (const m of out.matchAll(new RegExp(`\\b${accessorName}\\(\\)`, "g")))
       left.push(`${caller}:${out.slice(0, m.index).split("\n").length}: ${accessorName}() used another way`);
     if (!changed) continue;

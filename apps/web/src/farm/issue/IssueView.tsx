@@ -336,8 +336,8 @@ function IssueBody(props: {
           </Show>
           <Fold label={farmWording().plot.story}>
             <Show when={timeline()} fallback={<p class={xs}>{timelineQuery.isPending ? farmWording().reading : farmWording().unread}</p>}>
-              {(t) => (
-                <For each={t().milestones}>
+              {(line) => (
+                <For each={line().milestones}>
                   {(m) => (
                     <Row label={wallClockText(m.at)}>
                       <p class={[body, { "text-berry": m.kind === "failed" || m.kind === "rejected" }]}>
@@ -525,7 +525,7 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
               type="button"
               aria-pressed={aria(ticked().has(i()))}
               aria-label={r().text}
-              onClick={() => setTicked((t) => (t.has(i()) ? new Set([...t].filter((x) => x !== i())) : new Set([...t, i()])))}
+              onClick={() => setTicked((was) => (was.has(i()) ? new Set([...was].filter((x) => x !== i())) : new Set([...was, i()])))}
               class="group flex cursor-pointer items-start gap-2 py-0.5 text-left"
             >
               <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 border-bark-400 bg-cream-50 group-hover:border-bark-600">

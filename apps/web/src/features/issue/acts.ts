@@ -72,12 +72,12 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   };
 
   const reopen = () => {
-    const t = issue();
-    const action = actionOf(t, "reopen");
+    const current = issue();
+    const action = actionOf(current, "reopen");
     if (action?.does !== "move") return;
     const words = text().trim();
     void act(async () => {
-      const got = await api.issue.status.update({ id: t.id, status: action.status, ...(words ? { text: words } : {}) });
+      const got = await api.issue.status.update({ id: current.id, status: action.status, ...(words ? { text: words } : {}) });
       const helper = got.sessions.at(-1);
       if (helper) {
         setText("");

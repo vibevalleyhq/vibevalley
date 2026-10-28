@@ -43,10 +43,10 @@ export interface FarmCommands {
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
   const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
   const send = async (s: Session, act: IssueAct, words = "", sendKey?: string) => {
-    const t = issue(s);
-    const action = t && actionOf(t, act);
-    if (!t || !action) throw new Error(farmWording().command.cannot(wording().act[act]));
-    await perform(t, action, words, sendKey);
+    const found = issue(s);
+    const action = found && actionOf(found, act);
+    if (!found || !action) throw new Error(farmWording().command.cannot(wording().act[act]));
+    await perform(found, action, words, sendKey);
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {
     const f = frame();

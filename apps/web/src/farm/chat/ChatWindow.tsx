@@ -147,8 +147,8 @@ export function ChatWindow() {
 
   const items = createMemo(() => feedOf(chat(), said().messages));
   const parent = useMessage(() => {
-    const t = thread();
-    return t ? parentAt(chat(), t) : undefined;
+    const current = thread();
+    return current ? parentAt(chat(), current) : undefined;
   });
   const hasOlder = () => said().ready && !said().complete;
   const sending = createMemo(() => {
@@ -165,7 +165,7 @@ export function ChatWindow() {
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
-    return liveCaptions(c.captions.turns, spoken, tick()).map((t) => ({ ...t }));
+    return liveCaptions(c.captions.turns, spoken, tick()).map((turn) => ({ ...turn }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
   const thinking = () => captions().length === 0 && orchestratorTyping(core(), shown()) !== undefined;
@@ -202,7 +202,7 @@ export function ChatWindow() {
             </div>
           }
         >
-          {(t) => <ThreadHead thread={t()} large={large()} onLarge={toggleLarge} onFold={fold} onDouble={onHeadDouble} />}
+          {(shown) => <ThreadHead thread={shown()} large={large()} onLarge={toggleLarge} onFold={fold} onDouble={onHeadDouble} />}
         </Show>
         <CallProblem call={call()} />
         <div
@@ -236,7 +236,7 @@ export function ChatWindow() {
                   thread={item().thread}
                   first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
                   agents={agents()}
-                  chatUnread={(t) => unreadIn(t)}
+                  chatUnread={(channel) => unreadIn(channel)}
                 />
               )}
             </For>
@@ -249,18 +249,18 @@ export function ChatWindow() {
                 </div>
               )}
             </For>
-            <For each={captions()} keyed={(t) => t.speaker + t.turn}>
-              {(t) => (
+            <For each={captions()} keyed={(caption) => caption.speaker + caption.turn}>
+              {(caption) => (
                 <div class="opacity-70" aria-label={farmWording().chat.captions}>
                   <ChatRow
-                    mine={t().speaker === "you"}
+                    mine={caption().speaker === "you"}
                     first
-                    face={t().speaker === "you" ? undefined : <OrchestratorFace size={30} />}
-                    name={t().speaker === "you" ? undefined : farmWording().orchestrator}
-                    title={t().done ? farmWording().chat.done : farmWording().chat.speaking}
+                    face={caption().speaker === "you" ? undefined : <OrchestratorFace size={30} />}
+                    name={caption().speaker === "you" ? undefined : farmWording().orchestrator}
+                    title={caption().done ? farmWording().chat.done : farmWording().chat.speaking}
                   >
-                    <span class="whitespace-pre-line">{t().text}</span>
-                    <Show when={!t().done}>
+                    <span class="whitespace-pre-line">{caption().text}</span>
+                    <Show when={!caption().done}>
                       <span class="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current align-middle" aria-hidden="true" />
                     </Show>
                   </ChatRow>
@@ -379,8 +379,8 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
 function Item(props: { m: ChatMessage; thread?: Channel; first: boolean; agents: ReadonlyMap<string, Agent>; chatUnread: (t: Channel) => number }) {
   const face = () => <FaceOf m={props.m} agents={props.agents} />;
   const chip = () => {
-    const t = props.thread;
-    return t ? <ThreadChip thread={t} unread={props.chatUnread(t)} onOpen={() => farm.showChat(t.id)} /> : undefined;
+    const inThread = props.thread;
+    return inThread ? <ThreadChip thread={inThread} unread={props.chatUnread(inThread)} onOpen={() => farm.showChat(inThread.id)} /> : undefined;
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>

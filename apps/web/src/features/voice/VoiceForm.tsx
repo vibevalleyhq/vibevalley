@@ -440,38 +440,38 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
               />
             </Labeled>
             <Show when={tts().vendor === "minimax" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "minimax" }>) : undefined}>
-              {(t) => (
+              {(narrowed) => (
                 <Labeled label={voiceWording().voice.persona.ttsModel}>
                   <Segmented
                     label={voiceWording().voice.persona.ttsModel}
-                    value={t().model}
+                    value={narrowed().model}
                     options={plain(VoiceTTSMinimaxModelValues)}
-                    onChange={(model) => set({ ...draft(), tts: { ...t(), model } })}
+                    onChange={(model) => set({ ...draft(), tts: { ...narrowed(), model } })}
                   />
                 </Labeled>
               )}
             </Show>
             <Show when={tts().vendor === "openai" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "openai" }>) : undefined}>
-              {(t) => (
+              {(narrowed) => (
                 <Labeled label={voiceWording().voice.persona.voice} hint={voiceWording().voice.persona.openaiVoice}>
                   <Segmented
                     label={voiceWording().voice.persona.voice}
-                    value={t().voice}
+                    value={narrowed().voice}
                     options={plain(VoiceValues)}
-                    onChange={(voice) => set({ ...draft(), tts: { ...t(), voice } })}
+                    onChange={(voice) => set({ ...draft(), tts: { ...narrowed(), voice } })}
                   />
                 </Labeled>
               )}
             </Show>
             <Show when={tts().vendor === "microsoft" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "microsoft" }>) : undefined}>
-              {(t) => (
+              {(narrowed) => (
                 <>
                   <Labeled label={voiceWording().voice.azureArea}>
                     <TextInput
                       aria-label={voiceWording().voice.persona.ttsArea}
                       class="font-mono"
-                      value={t().region}
-                      onInput={(e) => set({ ...draft(), tts: { ...t(), region: e.currentTarget.value } })}
+                      value={narrowed().region}
+                      onInput={(e) => set({ ...draft(), tts: { ...narrowed(), region: e.currentTarget.value } })}
                     />
                   </Labeled>
                   <Labeled label={voiceWording().voice.persona.voice} hint={voiceWording().voice.persona.azureVoice}>
@@ -479,8 +479,8 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
                       aria-label={voiceWording().voice.persona.microsoftVoice}
                       class="font-mono"
                       list="microsoft-voices"
-                      value={t().voiceName}
-                      onInput={(e) => set({ ...draft(), tts: { ...t(), voiceName: e.currentTarget.value } })}
+                      value={narrowed().voiceName}
+                      onInput={(e) => set({ ...draft(), tts: { ...narrowed(), voiceName: e.currentTarget.value } })}
                     />
                     <datalist id="microsoft-voices">
                       <For each={microsoftVoices}>{(v) => <option value={v} />}</For>
@@ -492,18 +492,18 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
             </Show>
           </Cols>
           <Show when={tts().vendor === "minimax" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "minimax" }>) : undefined}>
-            {(t) => (
+            {(narrowed) => (
               <>
                 <Labeled label={voiceWording().voice.persona.voice} hint={voiceWording().voice.persona.minimaxVoice}>
-                  <MiniMaxVoices value={t().voiceId} onChange={(voiceId) => set({ ...draft(), tts: { ...t(), voiceId } })} />
+                  <MiniMaxVoices value={narrowed().voiceId} onChange={(voiceId) => set({ ...draft(), tts: { ...narrowed(), voiceId } })} />
                 </Labeled>
                 <Cols>
                   <Labeled label={voiceWording().voice.persona.voiceId}>
                     <TextInput
                       aria-label={voiceWording().voice.persona.voiceId}
                       class="font-mono"
-                      value={t().voiceId}
-                      onInput={(e) => set({ ...draft(), tts: { ...t(), voiceId: e.currentTarget.value } })}
+                      value={narrowed().voiceId}
+                      onInput={(e) => set({ ...draft(), tts: { ...narrowed(), voiceId: e.currentTarget.value } })}
                     />
                   </Labeled>
                 </Cols>

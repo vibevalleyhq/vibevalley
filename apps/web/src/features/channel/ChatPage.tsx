@@ -93,9 +93,9 @@ function Chat() {
         </Keyed>
       </Show>
       <Show when={thread()}>
-        {(t) => (
+        {(shown) => (
           <div class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 ease-out starting:translate-x-full lg:static lg:z-auto lg:w-[416px] lg:shrink-0">
-            <Keyed key={t().id}>{() => <ThreadPane thread={t()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
+            <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
           </div>
         )}
       </Show>
@@ -222,20 +222,20 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         </button>
       </header>
       <div role="tablist" aria-label={chatWording().inChannel} class="flex shrink-0 gap-1 border-b border-line px-3">
-        <For each={props.channel?.type === "direct" ? tabs.filter((t) => t.tab === "chat") : tabs}>
-          {(t) => (
+        <For each={props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs}>
+          {(entry) => (
             <button
               type="button"
               role="tab"
-              aria-selected={aria(tab() === t.tab)}
-              onClick={() => setTab(t.tab)}
+              aria-selected={aria(tab() === entry.tab)}
+              onClick={() => setTab(entry.tab)}
               class={[
                 "group -mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-2 pt-2 pb-1.5 text-sm",
-                tab() === t.tab ? "border-ink font-semibold" : "border-transparent text-muted hover:text-ink",
+                tab() === entry.tab ? "border-ink font-semibold" : "border-transparent text-muted hover:text-ink",
               ]}
             >
-              <Icon name={t.icon} size={16} class={tab() === t.tab ? "" : "opacity-70 group-hover:opacity-100"} />
-              {t.label}
+              <Icon name={entry.icon} size={16} class={tab() === entry.tab ? "" : "opacity-70 group-hover:opacity-100"} />
+              {entry.label}
             </button>
           )}
         </For>
@@ -515,8 +515,8 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) =
   const now = useNow();
   const thread = () => jobThreadOf(core()?.chat, props.h);
   const unread = () => {
-    const t = thread();
-    return t ? unreadIn(t) : 0;
+    const current = thread();
+    return current ? unreadIn(current) : 0;
   };
   const phase = () => phaseText(props.h, now());
   return (
@@ -524,8 +524,8 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) =
       type="button"
       disabled={!thread()}
       onClick={() => {
-        const t = thread();
-        if (t) props.onShow(t);
+        const current = thread();
+        if (current) props.onShow(current);
       }}
       title={phase()}
       class={["flex items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm enabled:cursor-pointer", props.active ? "bg-selected" : "hover:bg-hover"]}
@@ -727,8 +727,10 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
   const [showArchived, setShowArchived] = createSignal(false);
   const live = () => threadsIn(core()?.chat, props.channel);
   const archived = () => threadsIn(core()?.chat, props.channel, true);
-  const title = (t: Channel) => threadTitle(t, core()?.issues ?? [], core()?.sessions ?? []);
-  const item = (t: Channel) => <ThreadItem thread={t} title={title(t)} onOpen={() => (router.navigate(chatPath(t)), untrack(() => props.onPick)())} />;
+  const title = (channel: Channel) => threadTitle(channel, core()?.issues ?? [], core()?.sessions ?? []);
+  const item = (channel: Channel) => (
+    <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
+  );
   return (
     <div
       role="dialog"

@@ -271,7 +271,7 @@ export function IssueDetail(props: {
           when={timeline()}
           fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? issuesWording().reading : issuesWording().detail.unread}</p>}
         >
-          {(t) => <Story milestones={t().milestones} />}
+          {(line) => <Story milestones={line().milestones} />}
         </Show>
         <div class="mt-3 border-t border-line">
           <Show when={s().description}>
@@ -408,8 +408,8 @@ const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; 
 function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const [ticked, setTicked] = createSignal<ReadonlySet<number>>(new Set());
   const tick = (i: number) =>
-    setTicked((t) => {
-      const n = new Set(t);
+    setTicked((was) => {
+      const n = new Set(was);
       if (n.has(i)) n.delete(i);
       else n.add(i);
       return n;
