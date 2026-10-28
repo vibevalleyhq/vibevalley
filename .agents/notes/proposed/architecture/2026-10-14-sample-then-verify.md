@@ -79,7 +79,7 @@ Status: proposed
 
 给还得靠模型、但每次都差不多的做法用：「这个项目发版要先改 CHANGELOG、再打 tag」「改了接口要跑 `bun run capabilities`」。它对应 [Hermes](https://github.com/NousResearch/hermes-agent) 的第三类记忆（程序性记忆：复杂的活做完后 agent 自己写技能），也是[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)第 1 节的第三类。和第 3 步的分别：脚本不调模型，技能是写给模型看的步骤。
 
-- **起草**：帮工经 `/mcp` 的 `skill_draft` 交一份 Agent Skills 形状的技能（名字、`description` 写「什么时候用」、正文是步骤），附上为什么（来自哪张工单、哪个 Session）。改一份已有的技能也是交草稿，带上它的 id。规矩（`session/rules.ts`）告诉帮工：一件活走了很多步、而且以后还会遇到，才起草；`memory_add` 记的是事实，技能记的是做法。
+- **起草**：帮工经 `/mcp` 的 `skill_draft` 交一份 Agent Skills 形状的技能（名字、`description` 写「什么时候用」、正文是步骤），附上为什么（来自哪张工单、哪个 Session）。改一份已有的技能也是交草稿，带上它的 id。规矩（`session/rules.ts`）告诉帮工：一件活走了很多步、而且以后还会遇到，才起草；`memory_create` 记的是事实，技能记的是做法。
 - **验收是主人**：草稿不生效。技能书（`/skills`）上多一栏「待批」，看得到全文和改了什么（改已有的技能时是前后对比），点同意才写进技能书（`agent.Service.SaveSkill`，照旧存在 `config.json`），点拒绝留下理由。这一关是第「背后的想法」第 2 条：写技能的一方批不了自己的技能。也对应 Grok Bot 的「新的定时要你点头」：技能会影响以后每一次派活。
 - **用了以后回来**：档案勾上的技能随派活交给帮工；收工时农场记下这一轮带了哪些技能、做没做成。技能书上每个技能显示用过几次、做成几次；做不成的多了标出来，请主人看要不要改或删。这是第 5 条的「故障是样本」，样本是那几次失败的 Session。
 - **存在哪**：草稿和用过的记录进 `vibevalley.db`，模块是拥有技能的 `apps/server/src/agent`：`agent_skill_draft`（草稿、出处、待批、批了、拒了和理由）和 `agent_skill_use`（哪个技能、哪个 Session、结局）。批了的技能本身照旧在技能书里；技能书整个搬进 SQLite（连同档案）是另一件事，不在这一步。

@@ -10,7 +10,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 **事件不知道自己属于哪一轮。** `Activity` 没有 Run：一个 Session 的记录是一长串，第二层要靠时间猜。它其实是事件不是步：照 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`packages/core/session/src/types.ts`），Session 是一份只追加的 `SessionEvent{type, seq, time, data}` 日志，turn 和 step 是事件标出的边界（`turn/start`…`turn/end`、`step/start`…`step/end`，step 是「one model call plus the tool executions it requested」），一条 `Activity`（一段话、一次工具调用）只是其中一个事件。
 
-**Session 自己往频道里说话。** MCP 的 `channel_say`、`channel_read`、`channel_inbox`、`session_list` 让 agent 在一轮中间直接发消息、翻串（`session/rules.ts` 教它这样用）；一轮结束时服务端又把最后一段话贴成汇报（`channel/chat.ts` 的 `postReport`）。一句对人说的话有两条路出去。
+**Session 自己往频道里说话。** MCP 的 `channel_message_send`、`channel_message_list`、`channel_unread_list`、`session_list` 让 agent 在一轮中间直接发消息、翻串（`session/rules.ts` 教它这样用）；一轮结束时服务端又把最后一段话贴成汇报（`channel/chat.ts` 的 `postReport`）。一句对人说的话有两条路出去。
 
 ## Proposal
 
@@ -67,5 +67,5 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 ## Risks
 
 - 帮工没法在一轮中间说话（边干边回一句「收到」），要说就结束这一轮；群聊里来回会慢一点。
-- 投递带多少上文：带少了它不知道在说什么，带多了一轮的 token 变多。先带「这个串里它没看过的」，上限照现在 `channel_read` 一次读的条数。
+- 投递带多少上文：带少了它不知道在说什么，带多了一轮的 token 变多。先带「这个串里它没看过的」，上限照现在 `channel_message_list` 一次读的条数。
 - 旧事件按时间落进 Run 可能落错（一轮的边界在事件里不总是清楚），所以落不进的留空，不硬猜。

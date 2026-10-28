@@ -9,7 +9,7 @@
 | 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，频道模块只为这张工单开工单串 |
 | 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（帮工经 `Helpers.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session/rules.ts` 的 `summaryOf`） |
-| 帮工在 `/mcp` 上的说话工具（`channel_say`、`read_chat`、`channel_inbox`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Sessions.who`） |
+| 帮工在 `/mcp` 上的说话工具（`channel_message_send`、`channel_message_list`、`channel_unread_list`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Sessions.who`） |
 | 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`orchestrator`）；连接器把话交给 `orchestrator.Say`，管家照频道的规则被叫醒 |
 | | Inbox 和巡查（[通知](docs/subsystems/notice.md)）；定时到点在频道里说的那句（[定时](docs/subsystems/recurrence.md)） |
 | | 频道、私聊和串在界面上的样子（[farm-ui.md](docs/reference/farm-ui.md)、`apps/web/src/farm/chat`、`apps/web/src/features/channel`） |
@@ -21,7 +21,7 @@
 - **订阅**：契约是 `packages/protocol/src/rpc.ts` 的 `Subscriptions`（Effect RPC），服务端 `apps/server/src/http/rpc.ts` 挂在 `/api/v1/rpc`，页面经 `apps/web/src/base/gateway.ts` 连、`features/channel/follow.ts` 按频道存。
 - **表**：`channel_participant`、`channel`（频道、私聊、串都是一行，照 Discord；`is_default` 至多一行为真，`peer_id` 每个对面至多一个私聊）、`channel_message`（每条带它的修订号、回复的号、改和删的时刻、置顶、回应）、`channel_attachment`（附件的名字、类型、大小，文件在家目录的 `attachments/<sha256>`）、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
 - **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
-- **接口**：`channel.message.send`、`channel.message.update`、`channel.message.delete`、`channel.message.list`、`channel.message.search`、`channel.reaction.toggle`、`channel.pin.toggle`、`channel.pin.list`、`channel.thread.create`、`channel.attachment.create`、`channel.create`、`channel.update`、`channel.default.set`、`channel.markRead`；读附件是 `GET /api/v1/attachment/<id>`（`http/attachment.ts`）；`voice.hear`、`voice.agent.hear`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel.set`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`apps/server/src/tool/tool.ts`）。
+- **接口**：`channel.message.send`、`channel.message.update`、`channel.message.delete`、`channel.message.list`、`channel.message.search`、`channel.reaction.toggle`、`channel.pin.toggle`、`channel.pin.list`、`channel.thread.create`、`channel.attachment.create`、`channel.create`、`channel.update`、`channel.default.set`、`channel.markRead`；读附件是 `GET /api/v1/attachment/<id>`（`http/attachment.ts`）；`voice.hear`、`voice.agent.hear`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel.set`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channel_list`、`channel_create`、`channel_update`、`issue_comment_create`、`channel_message_list`；帮工的 `channel_message_send`、`channel_message_list`、`channel_unread_list`、`session_list`（`apps/server/src/tool/tool.ts`）。
 - **配置**：`chat.notice_batch_ms`（忙时攒多久再提示，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
 - **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`，频道之下一段私聊）；整页的聊天页 `/chat`（`apps/web/src/features/channel`，侧栏分频道、私聊、帮工三段；`/chat` 是默认频道，别的在 `/chat/<id>`）；两边的输入框（回车发送、@ 叫人、失败了同一稿用同一把钥匙重发）在 `apps/web/src/features/channel/composing.ts` 的 `createComposer`，两边只画；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/features/channel/channelForm.ts` 的 `createChannelForm`；连接器页 `/settings/connectors`（`features/connector/ConnectorsPage.tsx`）。
 
@@ -40,9 +40,10 @@
 - **私聊在开机时建好**：和管家的那一个（`peer` 是 `orchestrator`），一个对面只有一个（`on conflict do nothing`）。和帮工档案的私聊在主人第一次点「私聊」时建（`channel.direct.create { agent }`），它挂着这个档案的私聊工单（`subject` 是工单，下一条），所以它也是那张工单的串。它不放活：从私聊里记的工单、定的定时落在默认频道（`topOf`），帮工也不在私聊里。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
 - **一张工单一个串**：重开、换帮工都还是这一个串，前后几个帮工的派活、汇报、主人的话都在里面。串的主人是这张工单现在在干活的帮工（`sessionOnIssue`），每次写消息时按工单现算，不存；没有帮工在干时串没有主人。从帮工找串只走一个函数（`threadOfSession`：先找它的工单，再找串），不拿帮工的 id 去找工单串。核心状态里 `message` 事实的 `thread` 是工单的 id。页面的串标题是工单标题，帮工走了也对（`apps/web/src/features/channel/rules.ts` 的 `threadTitle`、`threadOwnerOf`）。
 - **谁在频道里**：主人和管家在每个频道里，私聊里只有主人和它的 `peer`；参与者的种类和别处记「谁做的」是同一组词（`ActorKind`：`owner`、`orchestrator`、`session`、`system`），一条消息的 `fromKind` 就是说话的人的种类，主人的 id 是 `owner`（protocol 的 `ownerId`，`@主人` 指它）；帮工在它的活所在的频道里，在哪个频道派的活，工单串就开在哪个频道下面。帮工派出来时加入（`channel_participant`），离开时打上 `left_at`，说过的话留着，给它没交完的投递作废（`dropped`）。
-- **和帮工档案私聊是一张藏起来的工单**：每个档案一张私聊工单（`issue.talk` 是私聊的 id，交付物 `answer`，派给这个档案），不在看板、不在管家的 `issues` 里，没有要主人按的按钮。主人在私聊里说话，就是在这张工单的串里说话：有执行在做它就交给它；没有就派一个（`Issues.talkOn`），交给它的活是只读的私聊规矩加私聊里最近的 12 条（`talkJob`、`talkContext`），在工单的项目里，没有就在档案的工作目录，再没有就在最近干过活的那个项目。它占一个同时干活的名额；每一轮交回来就把它改的清掉（`discardWork`），它说的话和汇报都写在私聊里；交回来以后闲 10 分钟（`talkIdleMs`）就收工，下次再说就派新的一个。要改代码，它或主人把这件事记成工单，照常派、看、合。
+- **和帮工档案私聊是一张藏起来的工单**：每个档案一张私聊工单（`issue.talk` 是私聊的 id，交付物 `answer`，派给这个档案），不在看板、不在管家的 `issue_list` 里，没有要主人按的按钮。主人在私聊里说话，就是在这张工单的串里说话：有执行在做它就交给它；没有就派一个（`Issues.talkOn`），交给它的活是只读的私聊规矩加私聊里最近的 12 条（`talkJob`、`talkContext`），在工单的项目里，没有就在档案的工作目录，再没有就在最近干过活的那个项目。它占一个同时干活的名额；每一轮交回来就把它改的清掉（`discardWork`），它说的话和汇报都写在私聊里；交回来以后闲 10 分钟（`talkIdleMs`）就收工，下次再说就派新的一个。要改代码，它或主人把这件事记成工单，照常派、看、合。
 - **频道自己能改**：`channel.update` 改名（频道照旧不重名、能写进地址；串可以起一个标题，空着就是它挂着的那条消息的开头）、分组（`category`，空是不分组）和位置（`before`：排在哪个频道前面，服务端给全部频道重排 `position`）。侧栏按分组、按位置列，拖一个频道到另一个上就排在它前面、进它的组。归档（`channel.archive.toggle`）的频道和串不在侧栏、串列表里，消息和地址照旧在；默认频道不能归档。删除（`channel.delete`，先试跑 `channel.previewDelete`）只删没人用的：默认频道、还有帮工在那里干活、有定时、接着连接器、有排队的工单、挂着工单串的都拒绝，说是哪一样；删频道连它的串、消息、跟帖和已读一起删，施加 `channelGone`。
 - **提醒级别**（`notify`）：每个频道和串一个，`all`（默认）、`mentions`（只有 @主人 的算）、`none`；串没设时照它的频道（`notifyOf`）。`none` 的不算未读、不进 Inbox 的 @ 提醒、不转到连接器；`mentions` 的未读只数没处理的 @主人。`channel.notify.set` 改它。
+- **列出来**：`channel.list` 是全部频道和私聊，默认的在前（管家的 `channel_list`）；`channel.unread.list` 是调用者自己没读完的地方，最新的在前，每处带地址、几条、有没有提到它（帮工的 `channel_unread_list`，主人调就是主人的）。
 - **标成未读**：`channel.markUnread { id, number }` 把主人在那里的已读退到这一条之前；页面在主人离开那里之前不再自动标成已读。
 - **@ 名**：`@w3`（帮工的 id）、`@管家`、`@主人`、`@所有人`（只有主人用才算）。反引号和代码块里的不算；名字在它的词结束处结束（`@w3你看` 是 w3）。写 @ 就是叫醒；@ 了不在地里的，消息照发，发的人被告知没送到。
 - **给谁、叫不叫醒**（`chatAudience`）：
@@ -68,7 +69,7 @@
 - **消息的地址**：页面上一条消息在 `/chat/<频道或串>?m=<号>`：读到那一页、滚过去、亮一会儿。搜索结果、置顶、回复的引用点了都去那里，「复制链接」复制它。一条消息里贴着本农场的消息链接，页面就在它下面显示那条消息现在的样子（`linkedMessages`：频道是页面认得的，从哪个地址来都算，手机有它自己的；默认频道的链接不带频道，只认本页的地址），点了跳过去；服务端不给这种链接读预览（是本机或局域网的地址）。
 - **跳到**：工作台里任何一处按 Ctrl+K（Mac 上 ⌘K），或点聊天侧栏顶上的「跳到…」，按名字找频道、串、私聊（`#` 只找频道和串，`@` 只找私聊），还没私聊过的帮工档案也在里面，选了就开一个；名字开头对上的在前，再按未读、按最近说话排，归档的不列（`switchTargets`）。
 - **送达**：每条给帮工的投递走 `pending` → `announced`（插过不带正文的提示）→ `handed`（放进了一轮的输入）→ `seen`；离开的是 `dropped`。这一轮真的开口才算 `seen`；没开口就结束、会话关掉、服务端重启都退回 `pending`，过一会儿再叫。宁可重复给，不会丢。给管家的投递交出去当即算看到。
-- **主人的话重发不成两条**：`channel.message.send`、`issue.comment.create`、`voice.hear`、`voice.agent.hear` 带页面为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发就是已经说过的那一条：不另写、不再送，管家也不再听一遍（唯一索引 `channel_message_send_key` 在发送者和键上）。输入框由 `createComposer` 持有整次发送：文字、频道或串、指定档案、项目和地号共同决定意图；同一意图失败后重发用同一个键，改变其中一项就生成新键。发出去的参数取发送时的快照；迟到的成功只清掉没有再编辑、也没有换目标的那份草稿，输入框关掉后不再读取它的目标或回调。帮工的 `channel_say` 不带键：60 秒内（`retryWindowMs`）同一个帮工在同一处说一模一样的话，返回原来那条。连接器按外部消息 id 去重。
+- **主人的话重发不成两条**：`channel.message.send`、`issue.comment.create`、`voice.hear`、`voice.agent.hear` 带页面为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发就是已经说过的那一条：不另写、不再送，管家也不再听一遍（唯一索引 `channel_message_send_key` 在发送者和键上）。输入框由 `createComposer` 持有整次发送：文字、频道或串、指定档案、项目和地号共同决定意图；同一意图失败后重发用同一个键，改变其中一项就生成新键。发出去的参数取发送时的快照；迟到的成功只清掉没有再编辑、也没有换目标的那份草稿，输入框关掉后不再读取它的目标或回调。帮工的 `channel_message_send` 不带键：60 秒内（`retryWindowMs`）同一个帮工在同一处说一模一样的话，返回原来那条。连接器按外部消息 id 去重。
 - **消息带着产生它的那次干活**（`meta.run`）：过程面板按这个号取事件；没有号的消息不按时间推测归属。`meta` 按自己的 Schema 读回，整份无法解析或形状不对就当没有元数据，不拿半个坏值猜归属。创建频道的接口返回实际的频道号，页面用它跳转，不从名字猜号、不等状态流确认。
 - **连接器只认主人**：微信扫码的人就是主人；飞书返回扫码者的 OpenID 时直接绑定，没返回时和 QQ 一样，由第一个私聊机器人发 6 位配对码（前面可以带「配对」和空格）的人成为主人。别人的话丢掉，群里的不收。账号和密钥在 `connector_account`，不进日志、不发给页面；断开就删掉这一行。
 - **连接器只往外连**：微信长轮询，飞书、QQ 长连接，都是服务端连出去，不收 webhook。
@@ -92,14 +93,14 @@
 3. 帮工歇着、有要叫醒它的投递、没被熔断：开新的一轮，输入是 `wakeInput`：最新的 3 条全文（`wakeMessages`），别处没读的最多 20 处的摘要（`summaryChannels`），写明旧消息只读不回、除非直接问到它；投递标成 `handed`。
 4. 这一轮开口了（`launchActivity` 的 `spoke`）：交给它的都算看到。没开口就结束：退回 `pending`、记一次失败，过 `chat.retry_wake_ms` 再叫。
 
-**帮工说话**（`channel_say` → `speak`），发出前按顺序查：
+**帮工说话**（`channel_message_send` → `speak`），发出前按顺序查：
 
 1. 60 秒内同一处一模一样的话：返回原来那条。
 2. 刚读的是一个串、却要发到频道顶层：先让它确认一次（`confirm`）。
 3. 目标里有它没看过的新消息：先不发，给它看最多 3 条（`heldShown`），记成看过；改了再发，或带 `anyway` 照发。
 4. 发出去，推进它的已读；不在地里的 @ 回给它。
 
-`read_chat` 默认读 30 条、最多 100 条，推进已读；不写地址时帮工读自己的工单串。`channel_inbox` 列出它没读的频道和串。
+`channel_message_list` 默认读 30 条、最多 100 条，推进已读；不写地址时帮工读自己的工单串。`channel_unread_list` 列出它没读的频道和串。
 
 **汇报**：帮工一轮结束（`sessionNews` 的 `reported`），频道模块以帮工自己的名义把这一轮贴进它这张工单的串（`report`）：做完的是最后一段话里的结论（`session/rules.ts` 的 `summaryOf`），没有就用汇报的摘要，截到 1500 字；被打断的不贴。
 
@@ -148,8 +149,8 @@
 - **消息不跟着状态帧，按频道订阅。** 消息在核心状态里的时候，任何一条事实都把整份状态连同最近 300 条消息推一遍；一个热闹的串把别处的消息挤出状态，页面再拿 `channel.message.list` 补、两份合并；页面只拿得到「最近的」，断线回来只能重拿一整帧；页面对 SSE 的数据也不解码。#119 以后消息写下就不再改，每个频道的号码就是游标。用 Effect RPC：契约一份，两头照 Schema 解码；流式调用中断就是退订；socket 协议带心跳、按退避重连和流的回执，页面只管带着号码重新订阅。代价是页面多带 Effect（主包 gzip 后多约 53 KB），只在 `base/gateway.ts` 用。放弃了照 socket.io 自己写加入、离开、回执、重连；放弃了消息留在核心状态里、只是不进状态帧（帧和状态成了两种形状，服务端多存没人读的消息）；放弃了只把帧缩小、看到号码变大再用 HTTP 拉（多一个来回，设备多了还是要订阅）。
 - **用帮工的 id 来 @，不用名字。** 名字有空格、紧跟中文会被吞进去，都会 @ 错人；id 是稳定的，页面上显示名字。
 - **串跟着工单，不跟着帮工。** 原来工单串按派出去的 Session 开，重开、换帮工就另开一个串，同一张工单的话散在几个串里，新帮工和主人都要去翻旧串；叫「工单串」，`subject_id` 却是 Session，帮工走了界面上只剩 id。放弃了「重开时把旧串的 `subject_id` 改成新帮工」：串仍然是帮工的，取消后重开要挪串，挪的那一刻谁听得见说不清。也放弃了「串上存一列主人」：现在谁在干这张工单核心状态里已经有，存一份就要在换人时同步，违反核心状态只有一份。
-- **最后的汇报自动贴出，`channel_say` 只用于一轮中间。** 放弃了「只经工具说话」：帮工本来就用最后一段话汇报，每轮多调一次工具，模型容易忘。
-- **帮工的工具走会话级的 MCP，不给命令行。** pi、claude、codex 都接受会话级 MCP，工具有类型，不用处理 shell 引号和多行中文；不接受 MCP 的农机再补命令行。管家跑在服务端进程里，不绕 HTTP 调 `channel_say`：它的话直接写进频道。
+- **最后的汇报自动贴出，`channel_message_send` 只用于一轮中间。** 放弃了「只经工具说话」：帮工本来就用最后一段话汇报，每轮多调一次工具，模型容易忘。
+- **帮工的工具走会话级的 MCP，不给命令行。** pi、claude、codex 都接受会话级 MCP，工具有类型，不用处理 shell 引号和多行中文；不接受 MCP 的农机再补命令行。管家跑在服务端进程里，不绕 HTTP 调 `channel_message_send`：它的话直接写进频道。
 - **交给它不等于它看到了，开口才算。** 帮工会在任何时候死掉（登录失效、进程崩溃、重启）；不记下交到哪一步，消息要么丢、要么不知道该不该重发。新鲜度拦截、防发错地方、压缩时不插话、只提示一次也照 Raft，因为两个帮工被同时 @ 会抢着答，插话会占上下文。草稿不存：工具调用时模型手里有原文。
 - **聊天记录存 SQLite，一个写入方。** 一条消息要同时改消息、@、投递、跟帖、已读，还要按游标翻页、按人查未读，用文件得自己保证一致。只有一个写入方，`number` 的先后就是提交的先后，Raft 为多写入方做的「稳定窗口」和守护进程确认协议都省了。
 - **频道是安排活的地方，可以带默认项目。** Raft 的频道和代码仓库没关系；VibeValley 的帮工按工单在项目的 worktree 里干，频道带个默认项目，在那里派的活不说项目也知道去哪。

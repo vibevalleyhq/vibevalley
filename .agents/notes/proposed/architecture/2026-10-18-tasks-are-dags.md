@@ -48,7 +48,7 @@ type Task struct {
 
 | `By` | 谁 | 做完 |
 |---|---|---|
-| `self` | agent 自己 | 模型用 `task_update` 标上，写结果 |
+| `self` | agent 自己 | 模型用 `todo_update` 标上，写结果 |
 | `helper` | 进程里的帮手（现在 `spawn_agent` 的那种：同样的工具，不能再派，不存对话） | 运行时写结果，作为一条输入交回 agent |
 | `farm` | 农场的帮工：开一张子工单、一个 Session | 工单的状态就是它的状态；种植计划的宿主跑检查、合进计划分支以后才算 `done` |
 
@@ -63,7 +63,7 @@ type Task struct {
 
 照 [Hermes Agent](https://github.com/nousresearch/hermes-agent)（2026-06-11 的 `db7714d`）的 `todo`、`delegate_task` 和 Kanban 各取一部分：
 
-- **工具**：`task_add`（写图或往图里加）、`task_update`（改一件）、`task_graph`（看全图）；每次调用回整张图（Hermes `todo`）。
+- **工具**：`todo_add`（写图或往图里加）、`todo_update`（改一件）、`todo_list`（看全图）；每次调用回整张图（Hermes `todo`）。
 - **帮手**：ready 的 `helper` 节点自动派，后台并行跑，最多 `MaxHelpers`（默认 3），帮手不能再派；失败重试一次；做完的结果交回 agent，agent 闲着就开一轮，忙着就排到这一轮之后（Hermes `delegate_task`，但不同步等）。agent 被叫停时帮手一起停，节点退回 `waiting`；有帮手在跑时新来的话不打断这一轮，和 [编排层](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md) 同一条规则。
 - **提醒**：一轮停下时还有 ready 的 `self` 节点、又没有别的输入，提醒一次；图连续 `MaxNudges`（默认 3）次没变就不再提醒。不用另一个模型判断做没做完（Hermes `judge_goal` 不取）。
 - **看得见**：图不进系统提示（[提示开头不变](docs/subsystems/orchestrator.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
@@ -88,13 +88,13 @@ type Task struct {
 
 ### 做到哪了
 
-第 1–3 步 2026-10-18 做了：agent 和它的农机包装（`agent/brain/runtime.ts`）在 `apps/server/src/agent/brain`；`packages/protocol/src/rules/dag.ts` 有 `DagNode`、`DagProblems`、`DagLayers`、`DagIDValid`，种植计划的查环、分层改成调它；引擎（现在的 `apps/server/src/task/engine.ts`）有 `Task`、`Add`、`Update`、`Ready`、`Finished`、`Text`、`Begin`、`Settle`、`Requeue` 和存储接口 `Store`（`DBStore` 存表 `task_graph`，`MemoryStore` 给命令行）；`brain` 给模型 `task_add`、`task_update`、`task_graph` 三个工具，`agent/brain/tasks.ts` 后台派帮手、交回结果、叫停时叫回、开机退回再派，一轮停下时提醒，压缩的摘要接上打开的图，图每变一次发 `TasksChanged`；农机 `vibevalley` 每个会话（按 oar 会话 id）一张图，`cli.ts` 自己的对话给内存的。
+第 1–3 步 2026-10-18 做了：agent 和它的农机包装（`agent/brain/runtime.ts`）在 `apps/server/src/agent/brain`；`packages/protocol/src/rules/dag.ts` 有 `DagNode`、`DagProblems`、`DagLayers`、`DagIDValid`，种植计划的查环、分层改成调它；引擎（现在的 `apps/server/src/task/engine.ts`）有 `Task`、`Add`、`Update`、`Ready`、`Finished`、`Text`、`Begin`、`Settle`、`Requeue` 和存储接口 `Store`（`DBStore` 存表 `task_graph`，`MemoryStore` 给命令行）；`brain` 给模型 `todo_add`、`todo_update`、`todo_list` 三个工具，`agent/brain/tasks.ts` 后台派帮手、交回结果、叫停时叫回、开机退回再派，一轮停下时提醒，压缩的摘要接上打开的图，图每变一次发 `TasksChanged`；农机 `vibevalley` 每个会话（按 oar 会话 id）一张图，`cli.ts` 自己的对话给内存的。
 
 第 4、5 步同一天做了：
 
-- 文字字段：`Session.Task` → `Session.Brief`（表 `session.brief`），每件的工单文字、`FactRun` 的、`dispatch` 和 `task_edit` 的参数、拆活时帮工交回的 JSON（`tasks`、`brief`）、`spawn_agent` 的参数都叫 `brief`；冲突时给帮工的那段话叫 `ConflictBrief`。
+- 文字字段：`Session.Task` → `Session.Brief`（表 `session.brief`），每件的工单文字、`FactRun` 的、`dispatch` 和 `graph_task_update` 的参数、拆活时帮工交回的 JSON（`tasks`、`brief`）、`spawn_agent` 的参数都叫 `brief`；冲突时给帮工的那段话叫 `ConflictBrief`。
 - 协议：容器 `TaskGraph`（`GraphState`：`splitting`、`draft`、`running`、`paused`、`ready`、`done`、`abandoned`；`GraphAction`、`GraphEvent`（每件的事件是 `task_*`）、`GraphActor`、`IssueGraph`（`Issue.Graph`）、`SessionGraph`（`Session.Graph`）、`StateFrame.Graphs`），节点 `Task`（`TaskState`、`TaskAction`、`TaskEdit`、`IssueTask`（`Issue.Task`））；接口 `graph.split`、`graph.task.update`、`graph.task.delete`、`graph.act`、`graph.task.act`、`graph.diff.get`、`graph.event.list`，路径 `/api/v1/graphs…`；频道主题、投递原因、管家输入的来源是 `graph`，工单的交付 `merged_into_parent`，Inbox 的 `graph-draft`、`graph-ready`、`task-failed`；成就 `s_split`、`big_graph`、`parallel_graph`，账本的 `graph`、`split`。账号额度里原来叫 plan 的套餐改叫 `Subscription`。
-- 管家的工具：`graph_split`（派帮工拆）、`graphs`、`task_edit`、`graph_action`、`task_action`（单件重试、跳过）；`graph_action start` 和 `merge` 一样，这一轮不是主人叫的就不动手（`apps/server/src/tool/prompts.ts`）。agent 自己的三个工具是 `task_add`、`task_update`、`task_graph`。
+- 管家的工具：`graph_split`（派帮工拆）、`graph_list`、`graph_get`、`graph_task_update`、`graph_task_delete`、`graph_act`、`graph_task_act`（单件重试、跳过）；`graph_act` 的 `start` 和 `merge` 一样，这一轮不是主人叫的就不动手（`apps/server/src/tool/prompts.ts`）。agent 自己的三个工具是 `todo_add`、`todo_update`、`todo_list`。
 - 包：`apps/server/src/task`（`Tasks`），引擎 `task/engine.ts`；页面的面板 `FarmPanel` 的 `taskBoard`、`apps/web/src/farm/panels/TaskBoard.tsx`，贴图 `icon-task-board` 和三张徽章跟着改名，`village.ldtk` 里院子的那个点叫 `taskBoard`；分支 `vibevalley/task-<id>-<时间>`；`pb` 这样的缩写改成 `graph`、`task`（按类型改的，不是按字面）。
 - 表结构：`0002`–`0006` 并进 `0001_schema.sql`（`issue.graph`、`issue.task`、`session.brief`、`session.graph`、`task_event` 的 `graph_id`、`task_id`、`task_graph`……），旧库作废（AGENTS.md「不留兼容」，[只有一份表结构](docs/subsystems/foundation.md)）。
 

@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-主人想要的管家像一个熟练用 Linear 的人：问「这个项目怎么样了」给个准话，每天早上说说昨天收了什么、卡在哪、今天等主人拍板的。管家现在能列出在等主人的工单（`issues` 的 `wants_owner`，按等了多久排），但说不清一个项目怎么样了：没有健康度，没有固定的早报格式，标不了「这张和 #38 是一回事」，新记下的工单也不会建议优先级和谁来做。
+主人想要的管家像一个熟练用 Linear 的人：问「这个项目怎么样了」给个准话，每天早上说说昨天收了什么、卡在哪、今天等主人拍板的。管家现在能列出在等主人的工单（`issue_list` 的 `wantsOwner`，按等了多久排），但说不清一个项目怎么样了：没有健康度，没有固定的早报格式，标不了「这张和 #38 是一回事」，新记下的工单也不会建议优先级和谁来做。
 
 ## Proposal
 
@@ -22,11 +22,11 @@ Status: proposed
 
 ### 早报
 
-对应 Linear 的 Pulse。主人定一个每天的定时，管家照固定的三段说：昨天收了什么；现在卡在哪；今天等你拍板的。格式写进管家的提示，数据全来自 `issues` 和健康度。
+对应 Linear 的 Pulse。主人定一个每天的定时，管家照固定的三段说：昨天收了什么；现在卡在哪；今天等你拍板的。格式写进管家的提示，数据全来自 `issue_list` 和健康度。
 
 ### 工单之间的关系
 
-`issue_link`：标「重复」「相关」，只标记、不调度。`Issue.relations`（`{ kind: "duplicate" | "related"; issue: string }[]`），存在 `issue` 表的一列 JSON。记一件事之前查重已经有了（`issues` 的 `text`）；查到相像的，管家问主人是不是同一件，主人说是就标重复。
+`issue_link`：标「重复」「相关」，只标记、不调度。`Issue.relations`（`{ kind: "duplicate" | "related"; issue: string }[]`），存在 `issue` 表的一列 JSON。记一件事之前查重已经有了（`issue_list` 的 `text`）；查到相像的，管家问主人是不是同一件，主人说是就标重复。
 
 ### 分拣建议
 
@@ -36,7 +36,7 @@ Status: proposed
 
 - **`packages/protocol`**：`Issue.relations`；健康度的规则（`rules/health.ts`）和它的黄金数据。
 - **`apps/server/src/issue`**：`relations` 的读写。
-- **`apps/server/src/tool`**：`issue_link`；`issues` 加健康度。
+- **`apps/server/src/tool`**：`issue_link`；`issue_list` 加健康度。
 - **`apps/server/src/orchestrator`**：早报的格式；样例进 `testdata/evals`。
 - **页面**：项目页画健康度。
 
@@ -62,7 +62,7 @@ Status: proposed
 
 - 「clock-in 怎么样了」：说的健康度和项目页画的是同一个，理由是规则给的那几张工单。
 - 「#41 和 #38 是一回事」：两张都带上关系，看板上看得到；调度不变。
-- 早报照三段说，数据和 `issues`、健康度一致。
+- 早报照三段说，数据和 `issue_list`、健康度一致。
 - 管家建议的优先级、项目、谁来做，主人接受以前工单不变。
 
 ## Risks

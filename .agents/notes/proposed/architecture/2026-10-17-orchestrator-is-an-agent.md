@@ -22,7 +22,7 @@ Status: proposed
 | `protocol` | 给出去的形状：`Agent.can` 这个字段和 `Capability` 的取值，存盘、发给页面、档案页改它都用它。不放规则 |
 | `apps/server/src/agent` | 档案这个概念：默认给哪些能力、哪份是常驻的、谁能改 `Can` |
 | `apps/server/src/tool` | 工具表：每个工具要哪种能力、执行时放行、把结果写成给模型看的一句话 |
-| 能力表（`packages/protocol/src/api.ts` 的 `can`） | 只管 HTTP 入口：主人、「连接到本机」后的设备能调哪些接口；不管 agent |
+| 能力表（`packages/protocol/src/api.ts` 的 `can`） | 主人、「连接到本机」后的设备、管家、帮工能调哪些接口；agent 的工具照它给（[管家和帮工的工具就是接口](.agents/notes/proposed/architecture/2026-10-28-agent-tools-are-endpoints.md)），档案的 `Can` 在这之上再收窄 |
 
 ### 1. 能力是档案的字段
 
@@ -64,15 +64,7 @@ type Caller struct {
 - 放行在执行时再查一次 `Can`，不只靠列表过滤：档案的 `Can` 在 Session 干活时被主人改小，下一次调用就拒。
 - 同一件事只留一个名字（`read_chat` 和 `channel_read` 合成一个）；名字和说明照管家现在为模型调过的那份，帮工那份不同的地方逐条比过再定。
 
-### 3. 和能力表分开
-
-能力表的 `can` 管「农场往外给出哪些接口、给谁」；本篇的 `Can` 管「一个 agent 能调哪些工具」。这是两件事，不合在一处：
-
-- 模型的工具和 HTTP 接口不是一个形状：`dispatch` 收的是档案的名字和一句话，`tell` 是带话，`read_chat` 读出来的是给模型看的文字。工具里调哪些服务是工具自己的实现，不对应某个接口。
-- 所以 `can` 只留 `owner`、`remote`，去掉现在 23 个操作上的 `orchestrator` 和没用的 `session`；[先有能力，再有入口](docs/subsystems/core.md) 里的 `//vibevalley:tool` 和「管家的每个工具对得上一个 `can orchestrator` 的操作」的检查不做，换成工具表自己的检查（每个工具标了能力、每种能力都有工具）。
-- 那篇第 5 节的「管家建项目、改档案……不给」由这里的 `hire` 取代：建、改档案给，项目、设置、农机仍然不给。
-
-### 4. 不是能力的差别
+### 3. 不是能力的差别
 
 下面这些不是「工具多少」，并进档案以后照样不同，代码里保留，但都按「这份档案是不是常驻的」判断一次，不再散着写 `== OrchestratorAgent`：
 
@@ -82,7 +74,7 @@ type Caller struct {
 
 代码里给这件事一个名字：`agent.Service` 回答「这份档案是不是常驻的」（目前只有管家是），上面三处都问它。它是档案的规则，不挂在 `protocol.Agent` 上。
 
-### 5. 主人要看得见
+### 4. 主人要看得见
 
 `hire` 是管家第一次能改主人的配置，按「谁写的谁负责、主人要看得见」：
 
@@ -93,7 +85,7 @@ type Caller struct {
 
 1. `Capability` 和 `Agent.Can`，档案页能改；`agent.Service` 的「是不是常驻」替掉散着的 `OrchestratorAgent` 判断。档案存在家目录的 `config.json`，不加迁移。
 2. `apps/server/src/tool`：两边的工具都搬进去，管家和 `/mcp` 都从它拿（已做）。
-3. `/mcp` 按 `Can` 过滤和放行；能力表的 `can` 去掉 `orchestrator`、`session`。
+3. `/mcp` 按 `Can` 过滤和放行。
 4. `hire` 的工具和「管家建的」的展示。
 
 ### 做到哪了
@@ -102,7 +94,7 @@ type Caller struct {
 
 工具表（第 2 节的目录）2026-10-18 做了：`apps/server/src/tool` 排在 `task` 之后、`orchestrator` 之前，按事情分文件（`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`），管家的 23 个工具和帮工的 6 个都搬了进去；`tool/tool.ts`、`tool/schemas.ts` 删了，管家经 `tool.Service.Orchestrator` 拿工具，调用者从它正在回答的输入取；`apps/server/src/mcp` 只剩认证和把 `tool.Service.Session` 的工具注册到 `/mcp`。读频道合成一个 `read_chat`（帮工原来叫 `channel_read`，管家的多了 `unread`、`before`、`limit`）；记性的两个工具各一个函数，按调用者选写法。哪些工具给谁现在还是两张写死的表（`Orchestrator`、`Session`），没有 `Can`。
 
-还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 4 节）、按 `Can` 过滤和放行、能力表去掉 `orchestrator` 和 `session`（第 3 节）、`hire`（第 5 节）、管家页上改模型。从[先有能力，再有入口](docs/subsystems/core.md)并过来的「管家先写工单再开工、满了排队」已经做了：管家的工具里没有 `dispatch` 了，建单和开工是 `issue_create`（`start`），开工走 `Issues.start`；本文里的 `dispatch` 只指那项能力。
+还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 3 节）、按 `Can` 过滤和放行、`hire`（第 4 节）、管家页上改模型。从[先有能力，再有入口](docs/subsystems/core.md)并过来的「管家先写工单再开工、满了排队」已经做了：管家的工具里没有 `dispatch` 了，建单和开工是 `issue_create`（`start`），开工走 `Issues.start`；本文里的 `dispatch` 只指那项能力。
 
 ## Alternatives considered
 
@@ -111,8 +103,6 @@ type Caller struct {
 **管家改叫 Agent。** `Agent` 已经指全部档案；另外 `apps/server/src/agent/brain`（我们自己的 agent 循环）和 `cli.ts` 的 `Agent.Model` 也叫 agent，再加一个就是第四个意思。名字 Manager 只留给这个角色和服务 `apps/server/src/orchestrator`，界面上还叫管家。
 
 **频道里管家也说成 `agent`。** 2026-10-17 做到一半撤回：频道里管家和 Session 的处理处处不同，合并以后要在五处写「是 agent 但不是管家」：给 Session 拼的消息行（`MessageLine` 写 id 和名字，管家只写名字）、Inbox 里谁问的（`InboxFromOrchestrator`）、开机叫醒在地里的（`channel/chat.ts`）、把不在地里的标成离开（`channel/chat.ts`，管家会被标走）、账本里的交接（`game/progress.ts`）。`orchestrator` 这个种类把这件事说在一处，比五个例外清楚。
-
-**工具挂在 `packages/protocol/src/api.ts` 的操作上（`//vibevalley:tool`，`can` 里加 `agent`）。** 能力表那篇原来的打算，本篇第一稿也照着写了：能力表成为 agent 能做什么的唯一来源。不选：那样是 HTTP 接口决定 agent 能做什么，方向反了；模型的工具要的参数和说明和接口不一样，硬对上要么工具变差，要么为模型加接口。`protocol` 管给出去的形状，agent 的能力归档案和工具表。
 
 **能力按角色分（`orchestrator`、`lead`、`helper` 三档）。** 好懂，但每多一种用法就要多一档，档和档之间的差别还是要落到工具上；直接列能力，角色只是一组默认值。
 
@@ -129,7 +119,6 @@ type Caller struct {
 - 经 `/mcp`，一个只有默认能力的 Session 列不出也调不了 `dispatch`；主人给它的档案加上 `dispatch` 后，它能派出一张工单，排队规则和管家派的一样。
 - 干活中把档案的 `Can` 改小，下一次调用被拒。
 - 服务端里 `== protocol.OrchestratorAgent` 只剩 `agent` 包里，别的地方问 `agent.Service` 是不是常驻，或者查 `Can`。
-- `packages/protocol/src/api.ts` 的 `can` 里没有 `orchestrator`、`session`；`protocol` 里没有能力和工具的对应。
 - 管家用 `hire` 建的档案是停用的，频道里有一条说明。
 - `bun run server:check`、`bun run capabilities`、`bun run web:check` 通过；改了管家的工具描述，跑一次 `acceptance/orchestrator-evals.md`（要花钱，先问主人）。
 
