@@ -10,11 +10,12 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { type AgoraGrant, type Area, type Check, type Dictated, defaultOrchestrator, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
-import { checkMoss, type MossTransport } from "./moss.ts";
+import { checkMoss, type MossTransport, relay } from "./moss.ts";
+import type { Socket } from "effect/socket";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Effect, FiberSet, Layer, Schema, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream } from "effect";
 import { chatCompletions } from "../orchestrator/openai.ts";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
@@ -273,6 +274,10 @@ export interface VoiceShape {
   readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
   /** Whether MOSS Live takes the key given, or the saved one: the reason it does not, in the owner's words. */
   readonly checkMoss: (key: string) => Effect.Effect<Check>;
+  /** Why a page cannot have a line to MOSS Live now (no key saved), in the owner's words; undefined when it can. */
+  readonly mossProblem: () => string | undefined;
+  /** A page's line to MOSS Live (moss.ts relay), with the saved key, until either side closes. */
+  readonly mossLine: (page: Socket.Socket) => Effect.Effect<void, never, Scope.Scope>;
   /** The keys of the lines open now, by call. */
   readonly lines: () => number;
   /** Words read out on the call that is on, queued after what is being said; false when no call is on. */
@@ -814,6 +819,8 @@ export const make = (options: VoiceOptions = {}) =>
             return { problem: t("server.voice.moss.silent") };
         }
       }),
+      mossProblem: () => (settings.mossKey() === "" ? t("server.voice.moss.noKey") : undefined),
+      mossLine: (page) => relay(page, settings.mossKey(), options.moss),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "voice"));

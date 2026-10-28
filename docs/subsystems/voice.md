@@ -15,7 +15,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接和对 key 的检查（`checkMoss`）；通话还没接它。
+- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接、对 key 的检查（`checkMoss`）和页面的线路（`relay`）；`http/moss.ts` 把线路挂在 `mossLinePath`（`GET /api/v1/voice/moss/line`，WebSocket）。打电话还没接它，「设置 › MOSS Live」是单独试它的地方。
 - 服务端 `apps/server/src/voice/voice.ts`（`Voice`）：RTC 授予（签发、认领、续签、撤销）、通话（开始、停、`heard`、`said`）、把语音设置翻成声网的 vendors（`vendorsFor`、`agentFor`）、语音线路和隧道、听写。声网的令牌用 npm 的 `agora-token`，请 agent 进出用 `agora-agents`（声网的 ConvoAI SDK）。
 - 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `setting/rules.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/rules.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
 - 接口：`voice.session.create`、`voice.session.renew`、`voice.agent.start`、`voice.agent.stop`、`voice.agent.hear`、`voice.agent.say`、`voice.dictate`、`voice.moss.check`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
@@ -39,6 +39,8 @@
 - **一段听写拥有它的目标**：开始时绑定起始输入框和录音；同一时间只有一段在录，在另一个输入框按停止不改变文字去向。输入框销毁时取消这一段，迟到的转写结果不写进别的草稿。
 - **语音设置一份，只存差异**：`settings.json` 的 `voice` 只存和默认不一样的字段（页面发整份，服务端去掉和默认一样的），`{}` 就是恢复默认、从文件里删掉。默认是 `defaultVoice` 再叠配置的 `voice.id`。每通电话开始时现取（设置和三段的 key 从同一版读出），存了下一通生效。
 
+- **页面到 MOSS Live 的线路只经服务端转发**（`relay`）：页面说 MOSS 自己的协议，服务端只在握手时加上存下的 key，两头的帧原样过去；MOSS 还没连上时页面先发的等着。只认农场自己的页面（和订阅的 WebSocket 一样查 `Origin` 和 `Host`，`rpc.ts` 的 `fromTheFarm`），不是回 403；没存 key 时不升级，回 409 和原因，页面再用一次普通的 GET 读到它。MOSS 断开时页面收到关闭码 1011 和 MOSS 给的原因。
+- **MOSS Live 的协议里文档没写、实测出来的**：上行的音频帧前面带 `0x00`，下行的不带（每段是 9600 字节，正好 0.1 秒 48 kHz），每段前面有一条 `response.audio.context`；MOSS 只比已经放完的多发 2 秒左右，页面放完每段要回 `playback.chunk.completed`，否则它以 `playback_timeout` 停下；被打断时回 `playback.stopped`（放到第几毫秒），放完回 `playback.completed`。转写每次给到目前为止的全文（`*.transcript.updated`），主人的前几次还没有 `turn`；被打断的回答没有 `output.transcript.done`，说到哪里在 `response.interrupted` 的 `text` 里。工具调用（`session.update` 的 `tools`，OpenAI 的写法）会发 `response.function_call_arguments.done`，结果用 `conversation.item.create` 的 `function_call_output` 交回会被收下，但它不会接着把结果说出来，`response.create` 不认。
 - **试 MOSS Live 的 key 只接一个会话就关**（`voice.moss.check`，没给 key 用存下的）：服务端连 WebSocket、发 `attach_session`，收到 `session_attached` 就关掉（MOSS 从这一刻计费到关）。key 不对时握手直接断（关闭码 1006，和断网一样），所以握手失败再用同一个 key 发一次普通的 HTTPS：401、403 是 key 不认（带 MOSS 自己的话，比如「iam api key auth failed」），连不上是网络，别的说握手失败；8 秒（真实时间）没回话说没回应。key 只在服务端，页面只看到最后四个字，日志里的 `sk-…` 被抹掉。
 
 ## 怎么走
@@ -85,7 +87,7 @@
 3. 原样转给 `POST {url}/audio/transcriptions`（multipart，带 `model`、`response_format: json`，有 `dictationKey` 就带 `Authorization: Bearer`），不加提示、不改声音，时限 2 分钟（本机模型第一次要加载）。没配地址、地址不对、连不上、对方回非 2xx（带对方的错误，留头 200 字）、回的不是转写格式，都回 `VoiceUnavailable` 和原因。
 4. 回来的 `text` 插进输入框的光标处（没有光标就放末尾，只在拉丁词之间补空格），主人看过再发；发出去是一条普通的消息。
 
-**改设置**：「设置」的「声音」（`/settings/voice`）配线路：凭据和区域、识别、语言、断句、打断、没人时多久离开、谁接电话（`answer`），和「听写」的地址、模型、key，MOSS Live 的 API Key（旁边的插头试连一次：服务端接上一个会话马上关掉，回「接通了」或说不通的原因）。管家页的「声音」（`/orchestrator/voice`）配电话上的管家：人设（只对快嘴有用）、开场白、出错时说的话、音色。两处是同一个 `VoiceForm`，按 `part`（`line`、`agent`）分；每处只把自己那几项叠在当前最新的设置上存，「恢复默认」只动自己那几项，两页不会互相覆盖。页面一边改一边问 `POST /api/v1/setting/check`，显示的就是保存时会被拒的理由。自己服务的 key 页面只看到最后四个字。MiniMax 音色旁边的试听播的是仓库里预先生成的样音，不连网。
+**改设置**：「设置」的「MOSS Live」（`/settings/moss`，`features/voice/MossPlayground.tsx`、`mossLine.ts`）单独和 MOSS Live 说话：填人设和规则，开始说话（麦克风 16 kHz、20 毫秒一帧；回答 48 kHz 排着放），看双方说的、线路上发和收的消息（正在变的字、音频的通告和播放回报不列），和每秒算一次的线路质量：应答（主人说完到 MOSS 第一段声音到达，上一轮和平均，超过 2.5 秒标红）、上行和下行的码率、每秒发出的麦克风帧（该是 50）、发送积压、播放缓冲、断音（同一个回答里上一段放完下一段还没到）、被 MOSS 停下的次数和原因。说的话不进田头。「设置」的「声音」（`/settings/voice`）配线路：凭据和区域、识别、语言、断句、打断、没人时多久离开、谁接电话（`answer`），和「听写」的地址、模型、key，MOSS Live 的 API Key（旁边的插头试连一次：服务端接上一个会话马上关掉，回「接通了」或说不通的原因）。管家页的「声音」（`/orchestrator/voice`）配电话上的管家：人设（只对快嘴有用）、开场白、出错时说的话、音色。两处是同一个 `VoiceForm`，按 `part`（`line`、`agent`）分；每处只把自己那几项叠在当前最新的设置上存，「恢复默认」只动自己那几项，两页不会互相覆盖。页面一边改一边问 `POST /api/v1/setting/check`，显示的就是保存时会被拒的理由。自己服务的 key 页面只看到最后四个字。MiniMax 音色旁边的试听播的是仓库里预先生成的样音，不连网。
 
 听写的地址有两种用法：本机开着 [speech-swift](https://github.com/soniqo/speech-swift) 的 `speech-server`（`brew install speech`），填 `http://127.0.0.1:8080/v1`、模型 `qwen3`、key 空着，声音不出这台电脑；云上如 OpenAI 填 `https://api.openai.com/v1`、`gpt-4o-mini-transcribe` 和 key，声音送到那一家。
 
@@ -121,6 +123,7 @@
 
 - `apps/server/src/voice/voice.test.ts`（假的声网对端）：通话中一张工单交回来，管家的话经 `speak`（`APPEND`，带会话的 ConvoAI token）念出来，没通话时不念；两张接连交回来只问管家一次、只念一段；交给管家的那条把等着的事合成一段；接听来电开的电话不念开场白、管家先说那件事；brief 拒绝后能处理下一件，brief 未完成时关闭 Voice 会取消等待，多段播报中挂断不再发后面的段；长话在句末切到 512 字节以下；说缺哪个 key；只有凭据时才签授予、续签；管家在自己的线路上接通和挂断；一通电话的凭据和线路不随之后的设置变；挂断中的电话不收字幕；没带通话 id 的字幕只在只有一通电话时转；听写没设好时说为什么。
 - `setting` 的测试：语音设置只存差异、三段的 key 只给提示（`setting/*.test.ts`）。
+- `http/moss.test.ts`：别的页面连不上 MOSS Live 的线路，没存 key 时不升级、说原因，存了以后话和声音两头原样过去、带上 key；`voice/moss.test.ts`：试 key 的几种结果。页面：`moss.spec.ts`（没存 key 时「MOSS Live」页说原因）。
 - 页面：`apps/web/src/features/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮、两边的字都画到频道有了那一句）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
 - `apps/server/src/notice/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
 - 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；点「管家」就拨，打不通时通话屏和田头都说原因）。

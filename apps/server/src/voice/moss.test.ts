@@ -8,7 +8,7 @@ const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTran
   const transport: MossTransport = {
     connect: (_key, on) => {
       queueMicrotask(() => script(on, log.sent));
-      return { send: (text) => log.sent.push(text), close: () => log.closed++ };
+      return { send: (frame) => log.sent.push(typeof frame === "string" ? frame : "<binary>"), close: () => log.closed++ };
     },
     status: (key) => {
       log.asked++;
