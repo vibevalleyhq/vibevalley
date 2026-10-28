@@ -392,6 +392,37 @@ CREATE TABLE doc_change (
   created_at double precision not null,
   primary key (doc_id, seq)
 );
+CREATE TABLE artifact (
+  id          text primary key,
+  title       text not null,
+  kind        text not null check (kind in ('html', 'markdown')),
+  -- The channel or thread it was announced in; the issue it was made for, if any.
+  channel_id  text not null references channel (id),
+  issue       text,
+  -- Its maker, a profile's id or the owner's, and the name it went by then.
+  by_id       text not null,
+  by_name     text not null,
+  version     integer not null,
+  created_at  double precision not null,
+  updated_at  double precision not null
+);
+CREATE INDEX artifact_by_channel on artifact (channel_id, updated_at);
+CREATE INDEX artifact_by_issue on artifact (issue, updated_at);
+CREATE TABLE artifact_version (
+  artifact_id text not null references artifact (id) on delete cascade,
+  version     integer not null,
+  -- The sha256 of its bytes, kept under the home directory's artifacts/: the same content is kept once.
+  sha         text not null,
+  size        integer not null,
+  note        text,
+  by_id       text not null,
+  by_name     text not null,
+  -- The message that announced it: its comments are the replies to it.
+  message_id  text references channel_message (id) on delete set null,
+  created_at  double precision not null,
+  primary key (artifact_id, version)
+);
+CREATE INDEX artifact_version_by_sha on artifact_version (sha);
 
 -- A thread hangs under a message, which is made after its channel.
 ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);

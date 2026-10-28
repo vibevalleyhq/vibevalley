@@ -229,6 +229,68 @@ export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String,
 
 export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Number });
 
+export const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
+
+export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  kind: ArtifactKind,
+  version: Schema.Number,
+  note: Schema.optionalKey(Schema.String),
+});
+
+export const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
+  version: Schema.Number,
+  size: Schema.Number,
+  note: Schema.optionalKey(Schema.String),
+  by: Schema.String,
+  byName: Schema.String,
+  at: Schema.Number,
+  channel: Schema.String,
+  number: Schema.optionalKey(Schema.Number),
+});
+
+export const Artifact: Codec<T.Artifact> = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  kind: ArtifactKind,
+  channel: Schema.String,
+  issue: Schema.optionalKey(Schema.String),
+  by: Schema.String,
+  byName: Schema.String,
+  version: Schema.Number,
+  versions: Schema.mutable(Schema.Array(ArtifactVersion)),
+  at: Schema.Number,
+  updated: Schema.Number,
+});
+
+export const ArtifactRequest: Codec<T.ArtifactRequest> = Schema.Struct({
+  title: Schema.String,
+  kind: ArtifactKind,
+  content: Schema.String,
+  note: Schema.optionalKey(Schema.String),
+  channel: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(Schema.String),
+});
+
+export const ArtifactVersionRequest: Codec<T.ArtifactVersionRequest> = Schema.Struct({
+  id: Schema.String,
+  content: Schema.String,
+  note: Schema.optionalKey(Schema.String),
+});
+
+export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
+  channel: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(Schema.String),
+});
+
+export const ArtifactReadRequest: Codec<T.ArtifactReadRequest> = Schema.Struct({
+  id: Schema.String,
+  version: Schema.optionalKey(Schema.Number),
+});
+
+export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Number, content: Schema.String });
+
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: Schema.String,
   number: Schema.Number,
@@ -255,6 +317,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   reactions: Schema.optionalKey(Schema.mutable(Schema.Array(Reaction))),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Attachment))),
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(Embed))),
+  artifact: Schema.optionalKey(ArtifactCard),
 });
 
 export const ChannelType: Codec<T.ChannelType> = Schema.Literals(T.ChannelTypeValues);

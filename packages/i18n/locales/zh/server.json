@@ -13,7 +13,8 @@
     "archive": "列出管家的旧账",
     "channel": "列出频道，找它的 id",
     "graph": "列出计划，找它的 id",
-    "memories": "列出它的记性，找那一条的 id"
+    "memories": "列出它的记性，找那一条的 id",
+    "artifact": "列出产出，找它的 id"
   },
   "projectRef": "项目 {id}",
   "helperRef": "帮工 {id}",

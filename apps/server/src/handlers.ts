@@ -9,6 +9,7 @@ import { Projects } from "./project/project.ts";
 import { Effect, Option } from "effect";
 import { Settings } from "./base/config.ts";
 import { Core } from "./core/core.ts";
+import { Artifacts } from "./artifact/artifact.ts";
 import { Channels } from "./channel/chat.ts";
 import { Docs } from "./doc/doc.ts";
 import { Issues } from "./issue/issue.ts";
@@ -37,6 +38,7 @@ export const handlers = Effect.gen(function* () {
   const runtimes = yield* Runtimes;
   const sessions = yield* Sessions;
   const channels = yield* Channels;
+  const artifacts = yield* Artifacts;
   const recurrences = yield* Recurrences;
   const issues = yield* Issues;
   const tasks = yield* Tasks;
@@ -174,6 +176,19 @@ export const handlers = Effect.gen(function* () {
     "channel.pin.list": ({ id }) => channels.pins(id),
     "channel.thread.create": ({ id }) => channels.threadUnder(id),
     "channel.attachment.create": (upload) => channels.attach(upload),
+    "artifact.list": ({ channel, issue }) =>
+      Effect.flatMap(issue ? issues.idOf(issue) : Effect.succeed(undefined), (id) =>
+        artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) }),
+      ),
+    "artifact.get": ({ id }) => artifacts.get(id),
+    "artifact.content.get": ({ id, version }) => Effect.map(artifacts.content(id, version), (c) => ({ version: c.version, content: c.content })),
+    "artifact.create": (req) =>
+      Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.succeed(undefined), (issue) =>
+        artifacts.create({ from: ownerId, by: ownerId }, { ...req, ...(issue ? { issue } : {}) }),
+      ),
+    "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),
+    "artifact.delete": ({ id }) => artifacts.remove(id),
+    "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
     "recurrence.create": (body) => recurrences.add(body, owner),
     "recurrence.list": () => Effect.sync(recurrences.list),
     "recurrence.update": ({ id, ...body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(recurrences.setEnabled(id, body.enabled))),

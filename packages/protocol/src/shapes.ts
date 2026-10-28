@@ -262,6 +262,8 @@ export interface ChatMessage {
   attachments?: Attachment[];
   /** Previews of the links in its words, as the server read them. */
   embeds?: Embed[];
+  /** The artifact it announces, as it was at that version (docs/subsystems/artifact.md). */
+  artifact?: ArtifactCard;
 }
 
 export interface Embed {
@@ -293,6 +295,92 @@ export interface Attachment {
 
 /** The one read that is not a POST, since an <img src> can only GET. */
 export const attachmentPath = (id: string) => `/api/v1/attachment/${id}`;
+
+/** A page an agent or the owner made (docs/subsystems/artifact.md): a whole HTML page, run sandboxed, or Markdown the page
+ * draws itself. */
+export const ArtifactKindValues = ["html", "markdown"] as const;
+export type ArtifactKind = (typeof ArtifactKindValues)[number];
+
+/** At most this many bytes a version; a title at most artifactTitleMax characters. */
+export const artifactMax = 5 * 1024 * 1024;
+export const artifactTitleMax = 80;
+
+/** A version's content, a GET like an attachment's: an <iframe src> can only GET. */
+export const artifactPrefix = "/api/v1/artifact/";
+export const artifactPath = (id: string, version: number) => `${artifactPrefix}${id}/${version}`;
+
+/** What a message says of the artifact it announces. */
+export interface ArtifactCard {
+  id: string;
+  title: string;
+  kind: ArtifactKind;
+  version: number;
+  /** What this version changed, in the maker's words. */
+  note?: string;
+}
+
+export interface ArtifactVersion {
+  version: number;
+  size: number;
+  note?: string;
+  /** Who made it: a profile's id, or the owner's. */
+  by: string;
+  byName: string;
+  at: number;
+  /** The message that announced it, where its comments are the replies. */
+  channel: string;
+  number?: number;
+}
+
+export interface Artifact {
+  id: string;
+  title: string;
+  kind: ArtifactKind;
+  /** The channel or thread it was announced in. */
+  channel: string;
+  issue?: string;
+  by: string;
+  byName: string;
+  /** The latest version. */
+  version: number;
+  /** Oldest first. */
+  versions: ArtifactVersion[];
+  at: number;
+  updated: number;
+}
+
+/** channel: where it is announced, the caller's own place when absent (a helper's issue thread, the channel the
+ * orchestrator answers); issue: the issue it is for, a helper's own when absent. */
+export interface ArtifactRequest {
+  title: string;
+  kind: ArtifactKind;
+  content: string;
+  note?: string;
+  channel?: string;
+  issue?: string;
+}
+
+export interface ArtifactVersionRequest {
+  id: string;
+  content: string;
+  note?: string;
+}
+
+export interface ArtifactListRequest {
+  channel?: string;
+  issue?: string;
+}
+
+/** A version's words; the latest when version is absent. */
+export interface ArtifactReadRequest {
+  id: string;
+  version?: number;
+}
+
+export interface ArtifactContent {
+  version: number;
+  content: string;
+}
 
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];

@@ -83,6 +83,7 @@ export const catalogs = {
         channel: "列出频道，找它的 id",
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
+        artifact: "列出产出，找它的 id",
       },
       projectRef: "项目 {id}",
       helperRef: "帮工 {id}",
@@ -120,6 +121,21 @@ export const catalogs = {
       quoted: "「{name}」",
       efforts: "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
       effortsAnd: "、",
+    },
+    "server.artifact": {
+      noTitle: "产出要有个标题",
+      longTitle: "标题太长了，最多 {max} 个字",
+      badKind: "认不得 {kind} 这种产出，只认 {kinds}",
+      empty: "产出是空的",
+      tooBig: "一版最多 {mb} MB",
+      notKept: "产出没存下来：{why}",
+      missing: "没有 {id} 这个产出",
+      noVersion: "「{title}」没有第 {version} 版，最新是第 {latest} 版",
+      noFile: "「{title}」第 {version} 版的内容不见了",
+      made: "做了「{title}」",
+      versioned: "「{title}」出了第 {version} 版",
+      withNote: "{said}：{note}",
+      preview: { remove: "删掉「{title}」和它的 {n} 版", cards: "对话里的卡片还在，点开说已经删掉了" },
     },
     "server.base": {
       noFile: "{path}: 没有这个文件",
@@ -3595,6 +3611,7 @@ export const catalogs = {
         channel: "List the channels and find its id",
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
+        artifact: "List the artifacts to find its id",
       },
       projectRef: "project {id}",
       helperRef: "helper {id}",
@@ -3632,6 +3649,21 @@ export const catalogs = {
       quoted: '"{name}"',
       efforts: '{runtime} has only the {efforts} thinking efforts, not "{asked}"',
       effortsAnd: " and ",
+    },
+    "server.artifact": {
+      noTitle: "An artifact needs a title",
+      longTitle: "The title is too long: at most {max} characters",
+      badKind: "No artifact of kind {kind}: only {kinds}",
+      empty: "The artifact is empty",
+      tooBig: "A version is at most {mb} MB",
+      notKept: "The artifact was not kept: {why}",
+      missing: "There is no artifact {id}",
+      noVersion: '"{title}" has no version {version}; the latest is {latest}',
+      noFile: 'The content of "{title}" version {version} is gone',
+      made: 'Made "{title}"',
+      versioned: '"{title}" is at version {version}',
+      withNote: "{said}: {note}",
+      preview: { remove: 'Delete "{title}" and its {n} versions', cards: "Its cards stay in the conversation and say it was deleted when opened" },
     },
     "server.base": {
       noFile: "{path}: no such file",
@@ -7308,6 +7340,20 @@ export interface Messages {
   "server.agent.template.unreadable": { readonly file: string | number; readonly why: string | number };
   "server.agent.unequip": { readonly holders: string | number };
   "server.archiveRef": { readonly name: string | number };
+  "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
+  "server.artifact.empty": undefined;
+  "server.artifact.longTitle": { readonly max: string | number };
+  "server.artifact.made": { readonly title: string | number };
+  "server.artifact.missing": { readonly id: string | number };
+  "server.artifact.noFile": { readonly title: string | number; readonly version: string | number };
+  "server.artifact.noTitle": undefined;
+  "server.artifact.noVersion": { readonly latest: string | number; readonly title: string | number; readonly version: string | number };
+  "server.artifact.notKept": { readonly why: string | number };
+  "server.artifact.preview.cards": undefined;
+  "server.artifact.preview.remove": { readonly n: string | number; readonly title: string | number };
+  "server.artifact.tooBig": { readonly mb: string | number };
+  "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
+  "server.artifact.withNote": { readonly note: string | number; readonly said: string | number };
   "server.base.homeTaken": { readonly home: string | number };
   "server.base.homeUnlocked": { readonly home: string | number };
   "server.base.noFile": { readonly path: string | number };
@@ -7692,6 +7738,7 @@ export interface Messages {
   "server.lan.wrongCode": undefined;
   "server.lookIn.agent": undefined;
   "server.lookIn.archive": undefined;
+  "server.lookIn.artifact": undefined;
   "server.lookIn.channel": undefined;
   "server.lookIn.device": undefined;
   "server.lookIn.doc": undefined;

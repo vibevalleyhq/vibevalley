@@ -8,6 +8,10 @@ import { Effect } from "effect";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Docs } from "../doc/doc.ts";
+import { Artifacts } from "../artifact/artifact.ts";
+import { Sessions } from "../session/session.ts";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Issues } from "../issue/issue.ts";
 import { Memories } from "../memory/memory.ts";
 import { world } from "../testing/world.ts";
@@ -83,6 +87,11 @@ describe("mcp", () => {
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).sort()).toEqual([
+        "artifact_content_get",
+        "artifact_create",
+        "artifact_get",
+        "artifact_list",
+        "artifact_version_create",
         "channel_message_list",
         "channel_message_send",
         "channel_unread_list",
@@ -105,6 +114,52 @@ describe("mcp", () => {
       expect(yield* Effect.promise(() => c.tool("channel_message_list"))).toContain("从 MCP 说一句");
       expect(yield* Effect.promise(() => client(mcp, "").tool("session_list"))).toContain("没认出你是谁");
       expect(yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" }))).toContain("没认出你是谁");
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
+  });
+
+  it.live("lets a session hand in a file of its working directory as an artifact for its issue, and nothing outside it", () => {
+    const tokens: string[] = [];
+    const pi = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        for (const s of turn.options.mcpServers ?? [])
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers?.authorization ?? "").replace(/^Bearer /, ""));
+        turn.say("做完了");
+      },
+    });
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const chat = yield* Channels;
+      const mcp = yield* Mcp;
+      const sessions = yield* Sessions;
+      const artifacts = yield* Artifacts;
+      const got = yield* issues.hire(lab(), "画两种详情", "chat-j");
+      const id = got.session!.id;
+      yield* until(() => tokens.length > 0, "the session's token");
+      const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
+      const cwd = sessions.find(id)!.place.cwd;
+      mkdirSync(join(cwd, "out"), { recursive: true });
+      writeFileSync(join(cwd, "out", "two.html"), "<p>抽屉和整页</p>");
+      const c = client(mcp, tokens[0]!);
+      yield* Effect.promise(c.init);
+      const made = yield* Effect.promise(() => c.tool("artifact_create", { title: "两种详情", kind: "html", file: "out/two.html", note: "抽屉和整页" }));
+      expect(made).toContain("做好了");
+      const issue = sessions.sessionOf(id)!.issue!;
+      const [one] = yield* artifacts.list({ issue });
+      expect(one).toMatchObject({ title: "两种详情", channel: thread, by: "lab", version: 1 });
+      expect((yield* chat.history(thread!)).at(-1)!.artifact).toMatchObject({ id: one!.id, version: 1 });
+      expect(yield* artifacts.content(one!.id)).toMatchObject({ content: "<p>抽屉和整页</p>" });
+      expect(yield* Effect.promise(() => c.tool("artifact_list"))).toContain(one!.id);
+      expect(yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<p>改了</p>", note: "照评论改" }))).toContain("第 2 版");
+      expect(yield* Effect.promise(() => c.tool("artifact_content_get", { id: one!.id, version: 1 }))).toContain("<p>抽屉和整页</p>");
+      expect(yield* Effect.promise(() => c.tool("artifact_get", { id: one!.id }))).toContain("照评论改");
+      // A file outside, and a link inside that leads to it.
+      writeFileSync(join(cwd, "..", "secret.html"), "<p>外面的</p>");
+      symlinkSync(join(cwd, "..", "secret.html"), join(cwd, "out", "link.html"));
+      for (const file of ["../secret.html", "/etc/hosts", "out", "out/link.html"])
+        expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "外面的", kind: "html", file }))).toContain("没成");
+      expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "两个都给", kind: "html", file: "out/two.html", content: "x" }))).toContain("没成");
+      expect((yield* artifacts.list({ issue })).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
 

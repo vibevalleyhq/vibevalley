@@ -132,6 +132,18 @@
 | `graph.list` | `/api/v1/graph/list` | ✓ | ✓ | ✓ |   |
 | `graph.get` | `/api/v1/graph/get` | ✓ | ✓ | ✓ |   |
 
+## artifact
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|
+| `artifact.list` | `/api/v1/artifact/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.get` | `/api/v1/artifact/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.content.get` | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.create` | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.version.create` | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.delete` | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
+| `artifact.previewDelete` | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
+
 ## game
 
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |

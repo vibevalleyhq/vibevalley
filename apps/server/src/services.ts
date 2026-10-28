@@ -12,6 +12,7 @@ import { layer as agent } from "./agent/agent.ts";
 import { type Config, Settings } from "./base/config.ts";
 import { Database, DbLayer } from "./base/db.ts";
 import { layer as core } from "./core/core.ts";
+import { layer as artifact } from "./artifact/artifact.ts";
 import { layer as channel } from "./channel/chat.ts";
 import { type DocOptions, layer as doc } from "./doc/doc.ts";
 import { type IssueOptions, layer as issue } from "./issue/issue.ts";
@@ -90,7 +91,7 @@ export const agentSessions =
 export const collaboration =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(doc(o.doc)), on(channel));
+    below.pipe(on(doc(o.doc)), on(channel), on(artifact));
 
 /** Issues without its task graphs: for a test that makes its own task service. */
 export const issuesBelowTaskGraphs =
