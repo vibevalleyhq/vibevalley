@@ -130,7 +130,7 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
       <div class="flex gap-3">
         <div class="flex-1">
           <PxField label={t("web.farm.graph.project")}>
-            <PxTextInput value={where()} onChange={setProject} placeholder="clock-in" suggestions={known()} />
+            <PxTextInput value={where()} onChange={setProject} placeholder={t("web.base.form.example", { value: "clock-in" })} suggestions={known()} />
           </PxField>
         </div>
         <div class="flex-1">

@@ -46,9 +46,8 @@
     "llmAddressLabel": "Model address",
     "llmModel": "Model name",
     "llmKey": "Endpoint key",
-    "dictation": "Dictation",
-    "speechServer": "Local speech-server →",
-    "dictationIntro": "The record button by the farm chat's box: say something, stop, and it turns into text in the box for you to check before sending. The server passes the recording as is to the OpenAI-compatible transcription address below; with a local speech-server, the sound never leaves this computer.",
+    "speechServer": "Local speech-server",
+    "dictationIntro": "Sent to the OpenAI-compatible address you fill in; with a local speech-server, the sound stays on this computer.",
     "dictationAddress": "Up to /v1. Local: http://127.0.0.1:8080/v1; OpenAI: https://api.openai.com/v1. Empty turns dictation off.",
     "dictationAddressLabel": "Dictation address",
     "dictationModel": "qwen3 for a local speech-server; gpt-4o-mini-transcribe for OpenAI.",
@@ -90,8 +89,8 @@
     },
     "dictationVia": "Dictation goes to",
     "dictationOwn": "Your own address",
-    "dictationMossIntro": "The record button beside the chat box: say something, stop, and it becomes text in the box to read before sending. The server hands the recording to MOSS's transcription (moss-transcribe-1.0), with the same API key as MOSS Live.",
-    "dictationMossKey": "MOSS API key (shared with MOSS Live)"
+    "dictationMossIntro": "The server hands recordings to MOSS, with the same key as MOSS Live.",
+    "dictationMossKey": "API key"
   },
   "choices": {
     "area": {

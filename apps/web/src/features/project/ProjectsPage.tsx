@@ -542,7 +542,7 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
             data-testid="project-github"
             aria-label={t("web.project.githubAddress")}
             disabled={busy()}
-            placeholder="https://github.com/botiverse/raft-source"
+            placeholder={t("web.base.form.example", { value: "https://github.com/botiverse/raft-source" })}
             value={github()}
             onInput={(e) => {
               const typed = e.currentTarget.value;
