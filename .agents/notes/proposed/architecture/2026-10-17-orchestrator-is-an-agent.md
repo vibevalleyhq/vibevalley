@@ -22,7 +22,7 @@ Status: proposed
 | `protocol` | 给出去的形状：`Agent.can` 这个字段和 `Capability` 的取值，存盘、发给页面、档案页改它都用它。不放规则 |
 | `apps/server/src/agent` | 档案这个概念：默认给哪些能力、哪份是常驻的、谁能改 `Can` |
 | `apps/server/src/tool` | 工具表：每个工具要哪种能力、执行时放行、把结果写成给模型看的一句话 |
-| 能力表（`packages/protocol/src/api.ts` 的 `can`） | 主人、「连接到本机」后的设备、管家、帮工能调哪些接口；agent 的工具照它给（[管家和帮工的工具就是接口](.agents/notes/proposed/architecture/2026-10-28-agent-tools-are-endpoints.md)），档案的 `Can` 在这之上再收窄 |
+| 能力表（`packages/protocol/src/api.ts` 的 `can`） | 主人、「连接到本机」后的设备、管家、帮工能调哪些接口；agent 的工具照它给（[管家](docs/subsystems/orchestrator.md) 的 `apps/server/src/tool`），档案的 `Can` 在这之上再收窄 |
 
 ### 1. 能力是档案的字段
 
