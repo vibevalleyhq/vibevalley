@@ -39,7 +39,8 @@
     "dryRun": "{op} changes things, but has no dry run: drop --dry-run to do it",
     "retry": "The server asked the stream to reconnect; the command line does not",
     "stream": "The stream cannot be read: {why}",
-    "gone": "Ticket #{n} is gone: it was deleted"
+    "gone": "Ticket #{n} is gone: it was deleted",
+    "missingArgument": "<{name}> is missing: give it after the command, or in --json"
   },
   "chat": {
     "error": "\nSomething went wrong: {why}",

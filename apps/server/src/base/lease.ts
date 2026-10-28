@@ -1,8 +1,10 @@
 import { t } from "@vibevalley/i18n";
 // One server per home: .vibevalley.lock holds the pid of the server using it. Node
-// has no flock, so a lock whose process is gone is stale and is taken over.
+// has no flock, so a lock whose process is gone is stale and is taken over. server.json says where that server listens,
+// so the command line finds it on whatever port it got (the desktop app asks for a free one).
 
-import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 const alive = (pid: number) => {
@@ -42,4 +44,30 @@ export function leaseHome(home: string): () => void {
     }
   }
   throw new HomeTaken(t("server.base.homeUnlocked", { home }));
+}
+
+/** The home a server or the command line uses: VIBEVALLEY_HOME, or ~/.vibevalley (as loadConfig reads it). */
+export const homeOf = (env: Readonly<Record<string, string | undefined>> = process.env) => env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
+
+/** Says where this server listens, for as long as it does; the function it returns takes it back. */
+export function announce(home: string, url: string): () => void {
+  const path = join(home, "server.json");
+  writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", { mode: 0o600 });
+  return () => {
+    try {
+      if ((JSON.parse(readFileSync(path, "utf8")) as { pid?: number }).pid === process.pid) unlinkSync(path);
+    } catch {
+      // Already gone.
+    }
+  };
+}
+
+/** Where the server using this home listens; undefined when none says so or it has stopped. */
+export function announced(home: string): string | undefined {
+  try {
+    const { url, pid } = JSON.parse(readFileSync(join(home, "server.json"), "utf8")) as { url?: unknown; pid?: unknown };
+    return typeof url === "string" && typeof pid === "number" && alive(pid) ? url : undefined;
+  } catch {
+    return undefined;
+  }
 }

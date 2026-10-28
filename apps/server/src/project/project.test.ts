@@ -149,6 +149,30 @@ describe("projects", () => {
     );
   });
 
+  it.effect("a new worktree runs the project's .vibevalley/setup once, and one that fails still opens", () => {
+    const root = projectsDir();
+    return projects(
+      root,
+      Effect.gen(function* () {
+        const p = yield* Projects;
+        const made = yield* p.create({ name: "setup" });
+        mkdirSync(join(made.path, ".vibevalley"));
+        write(join(made.path, ".vibevalley/setup"), "#!/bin/sh\necho once >> ready.txt\n", 0o755);
+        gitSync(made.path, "add", ".vibevalley/setup");
+        gitSync(made.path, "commit", "-qm", "setup");
+        const place = yield* p.workplace("setup", 1, true, "");
+        expect(readFileSync(join(place.cwd, "ready.txt"), "utf8")).toBe("once\n");
+        yield* p.workplace("setup", 1, true, "");
+        expect(readFileSync(join(place.cwd, "ready.txt"), "utf8")).toBe("once\n");
+
+        write(join(made.path, ".vibevalley/setup"), "#!/bin/sh\nexit 3\n", 0o755);
+        gitSync(made.path, "commit", "-qam", "a setup that fails");
+        const failed = yield* p.workplace("setup", 2, true, "");
+        expect(existsSync(failed.cwd)).toBe(true);
+      }),
+    );
+  });
+
   it.effect("a branch opens where another stands", () => {
     const root = projectsDir();
     return projects(

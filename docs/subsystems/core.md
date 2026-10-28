@@ -72,7 +72,7 @@
 
 **命令行是皮**
 
-- `vibevalley <模块> [<名词>] <动词> [about 的值…] [--json 输入|-|@文件]` 经 HTTP 调服务端，不自己打开 `vibevalley.db`；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，默认 `http://127.0.0.1:8787`。命令树搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），从 `endpoints` 生成，每个操作一条命令、有帮助；位置参数并进 `--json` 的输入，发出去以前照接口的 Schema 查；输入只有 `about` 的字段时不收 `--json`。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
+- `vibevalley <模块> [<名词>] <动词> [about 的值…] [--json 输入|-|@文件]` 经 HTTP 调服务端，不自己打开 `vibevalley.db`；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，再没有就读家目录的 `server.json`（服务端监听上以后写进去、停下时收回，写着地址和 pid，pid 不在了就不认；桌面版的服务端在随机端口上，靠它找到），最后是 `http://127.0.0.1:8787`。命令树搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），从 `endpoints` 生成，每个操作一条命令、有帮助；位置参数并进 `--json` 的输入，发出去以前照接口的 Schema 查；`about` 的字段（比如 id）写在命令后面或放进 `--json` 都行，两边都没有是 `MissingArgument`；有输入的接口都收 `--json`。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
 - 输出是给脚本和 agent 读的：stdout 只放 JSON，失败是 stderr 最后一行的 `{"error":{…,"next":[…]}}`，退出码分得出是哪一种（[开发](docs/development.md#只用命令行派一个活)）。
 - 手写的只有组合命令：`state`（`/state` 的帧）、`events`（一直看 `/events`）、`issue work <id>`（挪到待办，跟着 `/state` 的帧等它交回来，打出改动）；和不经服务端的本机工具 `runtime chat`。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
 - **试跑**：会删、会合、会关、会让帮工走的接口在 `endpoints` 里带 `dryRun`，指向同参数、同请求体、答复 `Preview`（`{ does }`）的另一个接口；命令行的 `--dry-run` 调它。试跑归拥有规则的服务：能不能做是一处判断，真做和试跑都过它（工单的 `settledMove`，档案的 `deletableAgent`，记性的 `forgettable`……），所以试跑说能做的，真做不会因为同一个原因被拒；试跑不写库、不施加事实、不碰 git。每个 `delete` 都带试跑（`cli.test.ts` 查）。

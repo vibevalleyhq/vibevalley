@@ -39,7 +39,8 @@
     "dryRun": "{op} 会改东西，但没有试跑：去掉 --dry-run 才会做",
     "retry": "服务端要流重连，命令行不接着连",
     "stream": "流读不下去：{why}",
-    "gone": "工单 #{n} 不在了：被删掉了"
+    "gone": "工单 #{n} 不在了：被删掉了",
+    "missingArgument": "缺 <{name}>：写在命令后面，或放进 --json"
   },
   "chat": {
     "error": "\n出错了：{why}",

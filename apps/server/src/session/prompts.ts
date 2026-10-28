@@ -2,9 +2,11 @@
 // Said to models, in Chinese whatever the owner's locale: the helper answers in the owner's (ownersLanguage).
 
 import { ownersLanguage } from "../prompts.ts";
+import { pullRequestFile } from "../project/shapes.ts";
 import type { Workplace } from "../project/shapes.ts";
 
-export function workplaceRules(place: Workplace, house: string, id: string): string {
+/** pullRequest: the project delivers by pull request, so the helper writes its title and body (pullRequestText). */
+export function workplaceRules(place: Workplace, house: string, id: string, pullRequest = false): string {
   const where = place.branch
     ? `你在项目「${place.project}」的独立分支 ${place.branch} 上干活（这是一个 git worktree：${place.cwd}）。只改这个目录里的东西，不要切换或改动别的分支，不要 push。`
     : `你在项目「${place.project}」的目录里干活（${place.cwd}）。只改这个目录里的东西，不要 push。`;
@@ -14,6 +16,11 @@ export function workplaceRules(place: Workplace, house: string, id: string): str
     `- 汇报、提问都用${ownersLanguage()}写，那是主人的语言；下面说的「结论：」「要问主人：」「记住：」这几个开头照原样写。`,
     `- 做完一轮：git add 你改的文件，git commit。提交信息照项目的约定写（看它的 AGENTS.md 和 git log）；项目没约定的，用一句${ownersLanguage()}说清楚做了什么；主人这一轮另有说法的，照主人说的。`,
     "- 汇报时写上 commit 号，以及你是怎么验证的（跑了什么命令、结果如何）。",
+    ...(pullRequest && place.branch
+      ? [
+          `- 这个项目经 PR 交付：交回来以前，把这次改动的 PR 标题和正文写进 \`git rev-parse --git-path ${pullRequestFile}\` 说的那个文件（第一行是标题，空一行，下面是正文），照项目的 PR 约定写（看它的 AGENTS.md）。它不进提交；VibeValley 开 PR 时用它，没有就用工单的标题。`,
+        ]
+      : []),
     "- 你做的是一张工单，读完代码觉得它一个人做太大、能分成几件各自提交和验证的事：先提交已经做的，用 issue_split 把它拆成几张子工单，交给几个帮工分头做；拆完不再改代码，汇报拆成了哪几步就结束。",
     "- 汇报的最后一段以「结论：」开头，一两句话说清做成了什么（或卡在哪、需要主人定什么）；有提交就带上 commit 号。补充说明写在结论前面。",
     "",

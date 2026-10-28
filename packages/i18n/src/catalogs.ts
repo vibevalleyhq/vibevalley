@@ -219,6 +219,7 @@ export const catalogs = {
         retry: "服务端要流重连，命令行不接着连",
         stream: "流读不下去：{why}",
         gone: "工单 #{n} 不在了：被删掉了",
+        missingArgument: "缺 <{name}>：写在命令后面，或放进 --json",
       },
       chat: {
         error: "\n出错了：{why}",
@@ -3731,6 +3732,7 @@ export const catalogs = {
         retry: "The server asked the stream to reconnect; the command line does not",
         stream: "The stream cannot be read: {why}",
         gone: "Ticket #{n} is gone: it was deleted",
+        missingArgument: "<{name}> is missing: give it after the command, or in --json",
       },
       chat: {
         error: "\nSomething went wrong: {why}",
@@ -7394,6 +7396,7 @@ export interface Messages {
   "server.cli.failure.dryRun": { readonly op: string | number };
   "server.cli.failure.file": { readonly file: string | number; readonly why: string | number };
   "server.cli.failure.gone": { readonly n: string | number };
+  "server.cli.failure.missingArgument": { readonly name: string | number };
   "server.cli.failure.notJson": { readonly why: string | number };
   "server.cli.failure.retry": undefined;
   "server.cli.failure.shape": { readonly why: string | number };

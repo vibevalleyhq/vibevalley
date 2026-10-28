@@ -13,7 +13,7 @@ import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Otlp, OtlpSerialization } from "effect/observability";
 import { loadConfig, projectsDir } from "./base/config.ts";
-import { leaseHome } from "./base/lease.ts";
+import { announce, leaseHome } from "./base/lease.ts";
 import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
 
@@ -49,12 +49,16 @@ const main = Effect.gen(function* () {
     Effect.try(() => leaseHome(config.home)),
     (release) => Effect.sync(release),
   );
+  // Said once it listens, taken back when it stops.
+  let withdraw = () => {};
+  yield* Effect.addFinalizer(() => Effect.sync(() => withdraw()));
   const farm = app(
     config,
     config.port,
     (address) =>
       Effect.gen(function* () {
         yield* Effect.log(`vibevalley: listening on http://${address}`);
+        withdraw = announce(config.home, `http://${address}`);
         if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid }) + "\n");
       }),
     { runtime },
