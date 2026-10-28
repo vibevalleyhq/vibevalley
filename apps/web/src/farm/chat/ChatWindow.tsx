@@ -78,10 +78,11 @@ function Dots() {
   );
 }
 
-function HeadButton(props: { label: string; sprite: string; onClick: () => void }) {
+function HeadButton(props: { label: string; testid: string; sprite: string; onClick: () => void }) {
   return (
     <button
       type="button"
+      data-testid={props.testid}
       aria-label={props.label}
       title={props.label}
       onClick={() => props.onClick()}
@@ -194,11 +195,12 @@ export function ChatWindow() {
                 </p>
               </div>
               <HeadButton
+                testid="chat-large"
                 label={large() ? t("web.farm.chat.restore") : t("web.farm.chat.enlarge")}
                 sprite={large() ? "button-shrink" : "button-enlarge"}
                 onClick={toggleLarge}
               />
-              <HeadButton label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={fold} />
+              <HeadButton testid="chat-fold" label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={fold} />
             </div>
           }
         >
@@ -238,6 +240,8 @@ export function ChatWindow() {
                   data-from={item().message.from}
                   data-from-kind={item().message.fromKind}
                   data-kind={item().message.kind}
+                  data-deleted={item().message.deleted !== undefined ? "" : undefined}
+                  data-edited={item().message.edited !== undefined ? "" : undefined}
                 >
                   <Item
                     m={item().message}
@@ -373,7 +377,12 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   };
   return (
     <div onDblClick={(e) => props.onDouble(e)} class="flex shrink-0 items-center gap-1 border-b border-cream-200 py-2 pr-2 pl-1">
-      <HeadButton label={t("web.farm.chat.back", { channel: farmChannelLabel(channel()) })} sprite="button-back" onClick={() => farm.showChat(backTo())} />
+      <HeadButton
+        testid="chat-back"
+        label={t("web.farm.chat.back", { channel: farmChannelLabel(channel()) })}
+        sprite="button-back"
+        onClick={() => farm.showChat(backTo())}
+      />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px]">{title()}</span>
@@ -383,11 +392,12 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
         <p class={["h-4 truncate", small]}>{status()}</p>
       </div>
       <HeadButton
+        testid="chat-large"
         label={props.large ? t("web.farm.chat.restore") : t("web.farm.chat.enlarge")}
         sprite={props.large ? "button-shrink" : "button-enlarge"}
         onClick={() => props.onLarge()}
       />
-      <HeadButton label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={() => props.onFold()} />
+      <HeadButton testid="chat-fold" label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={() => props.onFold()} />
     </div>
   );
 }

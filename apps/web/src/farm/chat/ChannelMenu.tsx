@@ -33,6 +33,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
       <button
         type="button"
         data-testid="channel-menu"
+        data-key={props.current?.id}
         aria-label={t("web.farm.chat.channel", { channel: farmChannelLabel(props.current) })}
         aria-expanded={aria(open())}
         onClick={() => {
@@ -167,7 +168,14 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
     <div class="flex flex-col gap-1.5">
       <p class="text-[13px]">{t("web.farm.chat.newChannel")}</p>
       <p class="text-[12px] text-bark-500">{t("web.farm.chat.newChannelLine")}</p>
-      <PxTextInput value={form.name()} onChange={form.setName} placeholder={t("web.farm.chat.nameHint")} label={t("web.farm.chat.name")} autoFocus />
+      <PxTextInput
+        testid="channel-name"
+        value={form.name()}
+        onChange={form.setName}
+        placeholder={t("web.farm.chat.nameHint")}
+        label={t("web.farm.chat.name")}
+        autoFocus
+      />
       <PxTextInput
         value={form.description()}
         onChange={form.setDescription}
