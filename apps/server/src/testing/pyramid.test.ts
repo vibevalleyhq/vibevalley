@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
-import { importsOf, pyramid } from "./pyramid.ts";
+import { importsOf, pyramid } from "@vibevalley/testkit/pyramid";
 
 const root = join(import.meta.dirname, "../..");
 const { reach, layerOf } = pyramid(root);
