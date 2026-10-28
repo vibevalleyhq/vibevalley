@@ -327,7 +327,10 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
     >
       {props.children}
       <Show when={over()}>
-        <div class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent">
+        <div
+          data-testid="drop-hint"
+          class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent"
+        >
           {t("web.channel.media.drop")}
         </div>
       </Show>

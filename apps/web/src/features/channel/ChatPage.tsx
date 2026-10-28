@@ -336,6 +336,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/.test(navigator.userAgent) })}</span>
         </button>
         <Section
+          item="channels"
           title={t("web.channel.channelsTitle")}
           count={Math.max(1, channels().length)}
           action={
@@ -355,7 +356,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
             {(g) => (
               <Show when={g.category} fallback={<For each={g.channels}>{row}</For>}>
                 {(name) => (
-                  <Section title={name()} count={g.channels.length} nested>
+                  <Section title={name()} item={`category:${name()}`} count={g.channels.length} nested>
                     <For each={g.channels}>{row}</For>
                   </Section>
                 )}
@@ -364,6 +365,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           </For>
         </Section>
         <Section
+          item="directs"
           title={t("web.channel.directsTitle")}
           count={directsOf(chat()).length}
           action={
@@ -393,14 +395,14 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
         >
           <For each={directsOf(chat())}>{row}</For>
         </Section>
-        <Section title={t("web.channel.helpers")} count={sessions().length}>
+        <Section title={t("web.channel.helpers")} item="helpers" count={sessions().length}>
           <Show when={sessions().length === 0}>
             <p class="px-3 text-xs text-muted">{t("web.channel.noHelpers")}</p>
           </Show>
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
         <Show when={archived().length > 0}>
-          <Section title={t("web.channel.manage.archivedTitle")} count={archived().length} closed>
+          <Section title={t("web.channel.manage.archivedTitle")} item="archived" count={archived().length} closed>
             <For each={archived()}>{row}</For>
           </Section>
         </Show>
@@ -451,12 +453,18 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
   );
 }
 
-function Section(props: { title: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
+function Section(props: { title: string; item: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
   const [open, setOpen] = createSignal(untrack(() => !props.closed));
   return (
-    <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title}>
+    <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
       <div class="flex items-center px-1 pb-1">
-        <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} class="flex flex-1 cursor-pointer items-center gap-1 text-left">
+        <button
+          type="button"
+          data-testid="side-section-toggle"
+          aria-expanded={aria(open())}
+          onClick={() => setOpen(!open())}
+          class="flex flex-1 cursor-pointer items-center gap-1 text-left"
+        >
           <Icon name="expand" size={10} class={["opacity-60 transition-transform duration-150", { "rotate-90": open() }]} />
           <span class="text-xs font-semibold text-muted">{props.title}</span>
           <span class="text-xs text-faint">{props.count}</span>
@@ -491,6 +499,7 @@ function ChannelRow(props: {
       data-key={props.channel.id}
       data-type={props.channel.type}
       data-unread={props.unread}
+      data-notify={props.channel.notify ?? "all"}
       onClick={() => props.onClick?.()}
       aria-current={props.here ? "page" : undefined}
       draggable={props.movable ? "true" : "false"}
@@ -769,17 +778,21 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
   return (
     <div
       role="dialog"
+      data-testid="thread-list"
       aria-label={t("web.channel.threadList.title")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
-        <p class="px-1 py-2 text-sm text-muted">{t("web.channel.threadList.none")}</p>
+        <p data-testid="threads-empty" class="px-1 py-2 text-sm text-muted">
+          {t("web.channel.threadList.none")}
+        </p>
       </Show>
       <For each={live()}>{item}</For>
       <Show when={archived().length > 0}>
         <button
           type="button"
+          data-testid="threads-archived"
           aria-expanded={aria(showArchived())}
           class="mt-1 flex cursor-pointer items-center gap-1 px-1 text-left text-xs text-muted hover:text-ink"
           onClick={() => setShowArchived(!showArchived())}
@@ -806,7 +819,12 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
     if (next !== untrack(() => props.title)) run(() => api.channel.update({ id, name: next }));
   };
   return (
-    <div class="group/t flex items-center gap-1 rounded-md px-1 hover:bg-hover">
+    <div
+      data-testid="thread"
+      data-key={props.thread.id}
+      data-archived={props.thread.archived !== undefined ? "" : undefined}
+      class="group/t flex items-center gap-1 rounded-md px-1 hover:bg-hover"
+    >
       <Show
         when={renaming()}
         fallback={
@@ -828,6 +846,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       >
         <input
           ref={autofocus()}
+          data-testid="thread-name"
           value={name()}
           aria-label={t("web.channel.threadList.rename", { title: props.title })}
           onInput={(e) => setName(e.currentTarget.value)}
@@ -846,6 +865,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <button
         type="button"
         class={[iconButton, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        data-testid="thread-rename"
         aria-label={t("web.channel.threadList.rename", { title: props.title })}
         title={t("web.channel.threadList.rename", { title: props.title })}
         onClick={() => {
@@ -858,6 +878,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <button
         type="button"
         class={[iconButton, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        data-testid="thread-archive"
         aria-label={
           props.thread.archived !== undefined
             ? t("web.channel.threadList.unarchive", { title: props.title })
@@ -879,7 +900,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
 /** Every channel and thread searched at once, the server reading the filters; a hit opens where it is. */
 function FarmSearch(props: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.farmSearch.title")} wide>
+    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.farmSearch.title")} wide testid="farm-search">
       <FarmSearchBody onClose={() => props.onClose()} />
     </Dialog>
   );
@@ -905,6 +926,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
         <Icon name="search" size={16} />
         <input
           ref={autofocus()}
+          data-testid="farm-search-input"
           value={text()}
           onInput={(e) => setText(e.currentTarget.value)}
           placeholder={t("web.channel.farmSearch.hint")}
@@ -925,6 +947,8 @@ function FarmSearchBody(props: { onClose: () => void }) {
             <button
               type="button"
               role="listitem"
+              data-testid="search-hit"
+              data-key={h().message.id}
               class="flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-hover"
               onClick={() => {
                 router.navigate(messagePath(channelOf(core()?.chat, h().message.channel), h().message.number));

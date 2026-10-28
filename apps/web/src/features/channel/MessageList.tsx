@@ -156,6 +156,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               data-pinned={item().message.pinned !== undefined ? "" : undefined}
               data-kind={item().message.kind}
               data-number={item().message.channel === id() ? item().message.number : undefined}
+              data-lit={lit() === item().message.number && item().message.channel === id() ? "" : undefined}
               class={[
                 "rounded-md transition-[opacity,translate,background-color] duration-200 ease-out",
                 {
@@ -397,6 +398,9 @@ function ThreadPreview(props: { thread: Channel }) {
   return (
     <button
       type="button"
+      data-testid="thread-preview"
+      data-key={props.thread.id}
+      data-subject={props.thread.subjectKind}
       onClick={() => router.navigate(chatPath(props.thread))}
       class="group/t mt-2 flex w-full max-w-xl cursor-pointer flex-col gap-1 rounded-lg border border-line px-3 py-2 text-left hover:bg-hover focus-visible:border-focus"
     >

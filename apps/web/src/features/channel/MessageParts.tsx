@@ -31,6 +31,8 @@ export function ReplyQuote(props: { channel: string; number: number }) {
   return (
     <button
       type="button"
+      data-testid="quote"
+      data-key={props.number}
       onClick={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
       class="mb-0.5 flex w-full min-w-0 cursor-pointer items-center gap-1.5 text-left text-xs text-muted hover:text-ink"
     >
@@ -287,6 +289,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             type="button"
             ref={(el) => (moreEmoji = el)}
             class={tool}
+            data-testid="more-emoji"
             aria-label={t("web.channel.emoji.more")}
             title={t("web.channel.emoji.more")}
             aria-expanded={aria(everyEmoji())}
@@ -482,6 +485,8 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
               return (
                 <button
                   type="button"
+                  data-testid="edit-file"
+                  data-key={f.name}
                   aria-pressed={aria(keeps())}
                   aria-label={keeps() ? t("web.channel.media.takeOff", { name: f.name }) : t("web.channel.media.keep", { name: f.name })}
                   onClick={() => setKept((k) => (keeps() ? k.filter((x) => x !== f.id) : [...k, f.id]))}
@@ -527,6 +532,8 @@ function LinkedCard(props: { at: LinkedMessage }) {
   return (
     <button
       type="button"
+      data-testid="linked-message"
+      data-key={`${props.at.channel}:${props.at.number}`}
       aria-label={t("web.channel.messages.linked", { where: channelLabel(where()), number: props.at.number })}
       onClick={() => router.navigate(messagePath(where(), props.at.number))}
       class="flex max-w-lg cursor-pointer flex-col gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 text-left hover:bg-hover"
