@@ -1,8 +1,8 @@
+import { list, t } from "@vibevalley/i18n";
 // Documents, changed only by batches of ops (ops.ts), from the owner over HTTP and from helpers
 // through their tools, all down the same pipeline. One batch at a time for every document: a document's batches are
 // serial and its seq goes up in order.
 
-import { docWording } from "./words.ts";
 import type {
   Agent,
   Block,
@@ -39,6 +39,10 @@ const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.DocSpan))
 const idsOf = jsonOf(Schema.mutable(Schema.Array(Schema.String)));
 const resultsOf = jsonOf(Schema.mutable(Schema.Array(S.DocOpResult)));
 
+/** The demo's three sections, each a heading and three paragraphs in the catalog. */
+const demoSections = [0, 1, 2] as const;
+type DemoSection = (typeof demoSections)[number];
+const demoParagraphs = (section: number) => ([0, 1, 2] as const).map((p) => t(`server.doc.demo.${section as DemoSection}.paragraphs.${p}`));
 export interface DocShape {
   readonly list: () => Effect.Effect<Document[]>;
   readonly create: (title: string) => Effect.Effect<DocSnapshot, ApiError>;
@@ -77,9 +81,9 @@ export class Docs extends Context.Service<Docs, DocShape>()("vibevalley/Doc") {}
 /** The block kinds an agent appends; the editor has more (dividers, images), which an agent does not write. */
 const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
 
-const missingDoc = (id: string) => missing(docWording().doc(id), [lookIn.doc]);
+const missingDoc = (id: string) => missing(t("server.doc.doc", { id }), [lookIn.doc]);
 
-const titleOf = (title: string) => title.trim() || docWording().untitled;
+const titleOf = (title: string) => title.trim() || t("server.doc.untitled");
 
 const document = (d: qd.DocResult): Document => ({ id: d.id, title: d.title, seq: d.seq, created: d.created_at, updated: d.updated_at });
 
@@ -133,7 +137,7 @@ export const make = (options: DocOptions = {}) =>
 
     /** A batch already taken: its results then, its blocks now. */
     const again = Effect.fn("Docs.again")(function* (doc: string, seen: qc.DocChangeByBatchResult) {
-      if (seen.doc_id !== doc) return yield* Effect.fail(refused(docWording().otherDoc(seen.batch_id)));
+      if (seen.doc_id !== doc) return yield* Effect.fail(refused(t("server.doc.otherDoc", { batch: seen.batch_id })));
       const ids = idsOf(seen.block_ids);
       const all = yield* blocksOf(doc);
       return {
@@ -146,7 +150,7 @@ export const make = (options: DocOptions = {}) =>
 
     /** One batch, under the lock the caller holds. */
     const submitLocked = (id: string, actor: string, body: Pick<DocSubmit, "batchId" | "ops">): Effect.Effect<DocAck, ApiError> => {
-      if (!body.batchId?.trim()) return Effect.fail(refused(docWording().noBatch));
+      if (!body.batchId?.trim()) return Effect.fail(refused(t("server.doc.noBatch")));
       return sql
         .withTransaction(
           Effect.gen(function* () {
@@ -240,16 +244,16 @@ export const make = (options: DocOptions = {}) =>
 
     const appendBlock = Effect.fn("Docs.appendBlock")(function* (doc: string, actor: string, req: DocBlockCreate) {
       const type = (req.type ?? "").trim() || "paragraph";
-      if (!appendTypes.includes(type)) return yield* Effect.fail(refused(docWording().badBlockType(appendTypes)));
+      if (!appendTypes.includes(type)) return yield* Effect.fail(refused(t("server.doc.badBlockType", { types: list(appendTypes) })));
       const level = req.level !== undefined && req.level >= 1 && req.level <= 3 ? Math.trunc(req.level) : 2;
       const attrs: BlockAttrs = type === "heading" ? { level } : type === "todo" ? { checked: false } : {};
       const [, r] = yield* append(doc, actor, type, attrs, req.text);
-      return r ?? (yield* Effect.fail(refused(docWording().notApplied)));
+      return r ?? (yield* Effect.fail(refused(t("server.doc.notApplied"))));
     });
 
     const updateBlock = Effect.fn("Docs.updateBlock")(function* (doc: string, actor: string, req: DocBlockUpdate) {
       const [, r] = yield* updateText(doc, actor, req.block.trim(), Math.trunc(req.baseRev), req.text);
-      return r ?? (yield* Effect.fail(refused(docWording().notApplied)));
+      return r ?? (yield* Effect.fail(refused(t("server.doc.notApplied"))));
     });
 
     const importMarkdown = Effect.fn("Docs.importMarkdown")(function* (title: string, markdown: string, actor: string) {
@@ -298,13 +302,13 @@ export const make = (options: DocOptions = {}) =>
       const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
       const ack = yield* submitLocked(doc, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
       const r = ack.results[0];
-      if (r?.status !== "applied") return yield* Effect.fail(refused(docWording().demoNotInserted(String(r?.status))));
+      if (r?.status !== "applied") return yield* Effect.fail(refused(t("server.doc.demoNotInserted", { status: String(r?.status) })));
       return blockIn(ack, b.id)!.rev;
     }, lock.withPermits(1));
 
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
     const demoWrite = Effect.fn("Docs.demoWrite")(function* (doc: string, writer: string, headings: string[], section: number) {
-      for (const text of docWording().demo[section]!.paragraphs) {
+      for (const text of demoParagraphs(section)) {
         const b = { id: newId(), type: "paragraph", attrs: {}, text: [] };
         let rev = yield* demoInsert(doc, writer, b, { headings, section });
         const chars = Array.from(text);
@@ -323,7 +327,7 @@ export const make = (options: DocOptions = {}) =>
       function* (doc: string, writers: string[]) {
         const headings: string[] = [];
         for (const [i, w] of writers.entries()) {
-          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", docWording().demo[i]!.heading) };
+          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", t(`server.doc.demo.${i as DemoSection}.heading`)) };
           yield* demoInsert(doc, w, b);
           headings.push(b.id);
           yield* wait(0.5);
@@ -337,10 +341,10 @@ export const make = (options: DocOptions = {}) =>
       if (Option.isNone(yield* findDoc(id))) return yield* Effect.fail(missingDoc(id));
       const writers = helpers
         .filter((a) => a.enabled)
-        .slice(0, docWording().demo.length)
+        .slice(0, demoSections.length)
         .map((a) => a.id);
-      if (writers.length === 0) return yield* Effect.fail(refused(docWording().noWriter, [lookIn.agent]));
-      if (demoOn) return yield* Effect.fail(refused(docWording().demoRunning));
+      if (writers.length === 0) return yield* Effect.fail(refused(t("server.doc.noWriter"), [lookIn.agent]));
+      if (demoOn) return yield* Effect.fail(refused(t("server.doc.demoRunning")));
       demoOn = true;
       // The demo lives as long as the service: stopping the farm stops it.
       yield* Effect.forkIn(runDemo(id, writers), scope);

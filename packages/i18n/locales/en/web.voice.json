@@ -1,0 +1,148 @@
+{
+  "voice": {
+    "section": {
+      "label": "Voice",
+      "line": "Calling the manager"
+    },
+    "noSettings": "The server's settings cannot be asked ({why}).",
+    "range": "{min} to {max}, default {fallback}",
+    "saved": "Saved: the next call uses it.",
+    "answer": {
+      "orchestrator": "The manager of the farm chat itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
+      "agora": "A model hosted by Agora, no other key needed.",
+      "deepseek": "Uses the DeepSeek key in the settings ({from}).",
+      "noDeepseek": "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",
+      "openai": "Any OpenAI-compatible endpoint: Qwen, Kimi, your own deployment…"
+    },
+    "intro": "The manager hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The manager's persona, greeting and voice are on the",
+    "orchestratorPage": "manager page",
+    "period": ".",
+    "ready": "Can connect",
+    "missing": "Credentials missing",
+    "nextCall": "Changes take effect on the next call",
+    "credentials": "Credentials",
+    "console": "Agora console",
+    "hex": "32 hex characters",
+    "area": "Region",
+    "areaHint": "The region of Agora's endpoints: pick one near the server; projects in mainland China pick Mainland China.",
+    "listen": "Listen",
+    "listenParts": "Recognition · VAD",
+    "asr": "Recognition",
+    "microsoft": "Microsoft Azure speech, with your own key.",
+    "hosted": "Hosted by Agora, no other key needed.",
+    "language": "Language",
+    "languageHint": "Which language to hear. The persona should say to answer in it too.",
+    "deepgramModel": "Deepgram model",
+    "azureArea": "Azure region",
+    "azureAreaHint": "The region of the speech resource, such as eastasia or eastus.",
+    "asrArea": "Azure region for recognition",
+    "microsoftKey": "Microsoft speech key",
+    "think": "Think",
+    "who": "Who answers",
+    "model": "Model",
+    "deepseekModel": "DeepSeek's model name.",
+    "deepseekModelLabel": "DeepSeek model",
+    "address": "Address",
+    "llmAddress": "The full address of an OpenAI-compatible chat completions endpoint.",
+    "llmAddressLabel": "Model address",
+    "llmModel": "Model name",
+    "llmKey": "Endpoint key",
+    "dictation": "Dictation",
+    "speechServer": "Local speech-server →",
+    "dictationIntro": "The record button by the farm chat's box: say something, stop, and it turns into text in the box for you to check before sending. The server passes the recording as is to the OpenAI-compatible transcription address below; with a local speech-server, the sound never leaves this computer.",
+    "dictationAddress": "Up to /v1. Local: http://127.0.0.1:8080/v1; OpenAI: https://api.openai.com/v1. Empty turns dictation off.",
+    "dictationAddressLabel": "Dictation address",
+    "dictationModel": "qwen3 for a local speech-server; gpt-4o-mini-transcribe for OpenAI.",
+    "dictationModelLabel": "Dictation model",
+    "dictationKey": "Credentials (may be empty locally)",
+    "persona": {
+      "intro": "How the manager opens a call and what voice it uses. The credentials, how it listens and who answers are on the",
+      "page": "page.",
+      "open": "Opening",
+      "openParts": "Persona · greeting",
+      "ownCall": "The manager takes the call itself: it is the manager of the farm chat, with its own prompt and no separate persona.",
+      "persona": "Persona",
+      "personaHint": "Who the model that answers first on the call is, and how it speaks. It cannot see how things are; the manager on this computer sends work. Tell it not to make up progress.",
+      "greeting": "Greeting",
+      "greetingHint": "The first thing said when the call connects.",
+      "failure": "On a failure, say",
+      "failureHint": "What is said when the model fails.",
+      "speak": "Speak",
+      "tts": "Speech",
+      "ttsModel": "Speech model",
+      "voice": "Voice",
+      "openaiVoice": "An OpenAI tts-1 voice.",
+      "ttsArea": "Azure region for speech",
+      "azureVoice": "An Azure neural voice name, such as en-US-JennyNeural.",
+      "microsoftVoice": "Microsoft voice",
+      "minimaxVoice": "Click a name to pick it, the play button on its left to hear it first; or fill in another MiniMax system voice id below.",
+      "voiceId": "Voice id",
+      "sample": "Listen: {greeting}",
+      "noSample": "No sample",
+      "stop": "Stop {name}",
+      "play": "Listen to {name}"
+    }
+  },
+  "choices": {
+    "area": {
+      "US": "United States",
+      "EU": "Europe",
+      "AP": "Asia Pacific",
+      "CN": "Mainland China"
+    },
+    "language": {
+      "zh-CN": "Mandarin",
+      "zh-HK": "Cantonese (Hong Kong)",
+      "zh-TW": "Chinese (Taiwan)",
+      "en-US": "English (US)",
+      "ja-JP": "Japanese",
+      "ko-KR": "Korean"
+    },
+    "asr": {
+      "ares": "Agora ARES",
+      "microsoft": "Microsoft"
+    },
+    "answer": {
+      "agora": "Agora hosted",
+      "openai": "Your own endpoint"
+    },
+    "minimax": {
+      "gentle": "Gentle youth",
+      "qingse": "Shy youth",
+      "jingying": "Elite youth",
+      "badao": "Bossy youth",
+      "student": "College student",
+      "girl": "Young girl",
+      "yujie": "Poised woman",
+      "mature": "Mature woman",
+      "sweet": "Sweet woman",
+      "presenterMale": "Male presenter",
+      "presenterFemale": "Female presenter",
+      "audiobookMale": "Male audiobook",
+      "audiobookFemale": "Female audiobook"
+    },
+    "number": {
+      "silenceMs": "Pause that ends a turn (ms)",
+      "interruptMs": "Speech that interrupts it (ms)",
+      "idleSeconds": "Leave when nobody is there (s)"
+    }
+  },
+  "dictation": {
+    "unset": "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
+    "recording": "Listening… click again to stop",
+    "transcribing": "Transcribing…",
+    "failed": "Last time it was not recognized: {why}",
+    "start": "Dictation: click to start speaking, again to stop",
+    "stop": "Stop dictation",
+    "label": "Dictation",
+    "noMic": "Cannot record: no microphone permission",
+    "cannot": "Cannot record: {why}",
+    "nothing": "Nothing was recorded"
+  },
+  "call": {
+    "renew": "Renewing the token failed: {why}",
+    "noMic": "No microphone permission",
+    "cannotHear": "Agora: cannot hear the other side: {why}",
+    "agora": "Agora: {code} {msg}"
+  }
+}

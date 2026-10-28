@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
 
-import { runtimesWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -37,27 +37,27 @@ import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../../ui/layout";
 import { Hint } from "../../ui/Tip";
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
-  listModels: runtimesWording().capability.listModels,
-  accountUsage: runtimesWording().capability.accountUsage,
-  checkUpdate: runtimesWording().capability.checkUpdate,
-  upgrade: runtimesWording().capability.upgrade,
-  skills: runtimesWording().capability.skills,
-  mcpServers: runtimesWording().capability.mcpServers,
-  tools: runtimesWording().capability.tools,
+  listModels: t("web.runtime.capability.listModels"),
+  accountUsage: t("web.runtime.capability.accountUsage"),
+  checkUpdate: t("web.runtime.capability.checkUpdate"),
+  upgrade: t("web.runtime.capability.upgrade"),
+  skills: t("web.runtime.capability.skills"),
+  mcpServers: t("web.runtime.capability.mcpServers"),
+  tools: t("web.runtime.capability.tools"),
 };
 
 const statusOf = (r: RuntimeInfo) => {
   const i = r.installation;
   switch (i.status) {
     case "available":
-      return r.settings.enabled ? (i.version ?? runtimesWording().available) : runtimesWording().disabled;
+      return r.settings.enabled ? (i.version ?? t("web.runtime.available")) : t("web.runtime.disabled");
     // The reason, not just 不支持: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
     case "unsupported":
-      return i.reason || runtimesWording().unsupported;
+      return i.reason || t("web.runtime.unsupported");
     case "not_found":
-      return runtimesWording().notFound;
+      return t("web.runtime.notFound");
     case "checking":
-      return runtimesWording().checking;
+      return t("web.runtime.checking");
   }
 };
 
@@ -93,7 +93,7 @@ export function RuntimesPage(props: { rest: string }) {
       when={!runtimes.error}
       fallback={
         <p class="p-8 text-sm text-berry">
-          {runtimesWording().noRuntimes}
+          {t("web.runtime.noRuntimes")}
           {reasonOf(runtimes.error)}
         </p>
       }
@@ -101,8 +101,8 @@ export function RuntimesPage(props: { rest: string }) {
       <div class="h-full p-3">
         <Split
           list={
-            <ListCard title={runtimesWording().title} label={runtimesWording().list}>
-              <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{runtimesWording().intro}</li>
+            <ListCard title={t("web.runtime.title")} label={t("web.runtime.list")}>
+              <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</li>
               <For each={list()}>
                 {(r) => {
                   const ok = () => r.installation.status === "available";
@@ -113,7 +113,7 @@ export function RuntimesPage(props: { rest: string }) {
                       to={`/runtimes/${r.id}`}
                       active={selected()?.id === r.id}
                       title={r.preset.label}
-                      line={`${statusOf(r)}${using() > 0 ? runtimesWording().usedBy(using()) : ""}`}
+                      line={`${statusOf(r)}${using() > 0 ? t("web.runtime.usedBy", { n: using() }) : ""}`}
                       leading={
                         <span class={{ "opacity-50 grayscale": !ok() }}>
                           <RuntimeIcon runtime={r.id} size={36} />
@@ -134,7 +134,7 @@ export function RuntimesPage(props: { rest: string }) {
             </ListCard>
           }
         >
-          <Show when={selected()} fallback={<Quiet>{runtimesWording().reading}</Quiet>}>
+          <Show when={selected()} fallback={<Quiet>{t("web.runtime.reading")}</Quiet>}>
             {(s) => <Keyed key={s().id}>{() => <Detail info={s()} agents={agents().filter((a) => a.runtime === s().id)} />}</Keyed>}
           </Show>
         </Split>
@@ -179,31 +179,31 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
                 {(i) => (
                   <>
                     <span class="rounded bg-[#e3efd2] px-1.5 text-[#3f6427]">
-                      {runtimesWording().available} {i().version ?? ""}
+                      {t("web.runtime.available")} {i().version ?? ""}
                     </span>
                     <span class="font-mono">{i().command}</span>
-                    <span>{i().via === "bundled" ? runtimesWording().bundled : runtimesWording().commandLine}</span>
+                    <span>{i().via === "bundled" ? t("web.runtime.bundled") : t("web.runtime.commandLine")}</span>
                   </>
                 )}
               </Match>
               <Match when={inst().status === "unsupported" ? (inst() as Extract<RuntimeInfo["installation"], { status: "unsupported" }>) : undefined}>
-                {(i) => <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{runtimesWording().unsupportedWhy(i().reason)}</span>}
+                {(i) => <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
               </Match>
               <Match when={inst().status === "not_found"}>
-                <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{runtimesWording().notHere}</span>
+                <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{t("web.runtime.notHere")}</span>
               </Match>
             </Switch>
-            <Show when={inst().status !== "checking"} fallback={<span>{runtimesWording().checking}</span>}>
-              <span>{runtimesWording().checkedAt(wallClockText(props.info.checkedAt))}</span>
+            <Show when={inst().status !== "checking"} fallback={<span>{t("web.runtime.checking")}</span>}>
+              <span>{t("web.runtime.checkedAt", { clock: wallClockText(props.info.checkedAt) })}</span>
             </Show>
           </div>
         </div>
         <Button disabled={refreshing()} onClick={() => void refresh()}>
-          {refreshing() ? runtimesWording().checking : runtimesWording().recheck}
+          {refreshing() ? t("web.runtime.checking") : t("web.runtime.recheck")}
         </Button>
       </div>
       <div class="grid gap-3 md:grid-cols-2">
-        <Card title={runtimesWording().account}>
+        <Card title={t("web.runtime.account")}>
           <Usage info={props.info} />
         </Card>
         <FactsCard info={props.info} />
@@ -211,19 +211,19 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <SettingsCard info={props.info} onSaved={keep} />
       <ModelsCard info={props.info} />
       <div class="grid gap-3 md:grid-cols-3">
-        <InventoryCard title={runtimesWording().skills} entries={props.info.skills} />
-        <InventoryCard title={runtimesWording().mcp} entries={props.info.mcpServers} />
-        <InventoryCard title={runtimesWording().tools} entries={props.info.tools} />
+        <InventoryCard title={t("web.runtime.skills")} entries={props.info.skills} />
+        <InventoryCard title={t("web.runtime.mcp")} entries={props.info.mcpServers} />
+        <InventoryCard title={t("web.runtime.tools")} entries={props.info.tools} />
       </div>
       <Card
-        title={runtimesWording().agents}
+        title={t("web.runtime.agents")}
         action={
           <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} class="text-xs text-muted underline hover:text-ink">
-            {runtimesWording().makeAgent}
+            {t("web.runtime.makeAgent")}
           </A>
         }
       >
-        <Show when={props.agents.length > 0} fallback={<Quiet>{runtimesWording().noneYet}</Quiet>}>
+        <Show when={props.agents.length > 0} fallback={<Quiet>{t("web.runtime.noneYet")}</Quiet>}>
           <div class="flex flex-wrap gap-2">
             <For each={props.agents}>
               {(a) => (
@@ -250,15 +250,15 @@ function Usage(props: { info: RuntimeInfo }) {
   return (
     <Show
       when={props.info.usage}
-      fallback={<Quiet>{props.info.facts.capabilities.includes("accountUsage") ? runtimesWording().afterInstall : runtimesWording().noUsage}</Quiet>}
+      fallback={<Quiet>{props.info.facts.capabilities.includes("accountUsage") ? t("web.runtime.afterInstall") : t("web.runtime.noUsage")}</Quiet>}
     >
       {(usage) => (
         <Switch>
           <Match when={usage().status === "login_required"}>
-            <p class="text-xs text-[#b8682a]">{runtimesWording().signedOut(props.info.preset.label)}</p>
+            <p class="text-xs text-[#b8682a]">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
           </Match>
           <Match when={usage().status === "unavailable" ? (usage() as Extract<Usage, { status: "unavailable" }>) : undefined}>
-            {(u) => <Quiet>{runtimesWording().unreadable(u().reason)}</Quiet>}
+            {(u) => <Quiet>{t("web.runtime.unreadable", { why: u().reason })}</Quiet>}
           </Match>
           <Match when={usage()}>
             <div class="flex items-start gap-3">
@@ -271,12 +271,13 @@ function Usage(props: { info: RuntimeInfo }) {
                   <Match when={usage().status === "balance" ? (usage() as Extract<Usage, { status: "balance" }>) : undefined}>
                     {(u) => (
                       <>
-                        <p class={["text-sm", { "text-berry": !u().available }]}>{runtimesWording().balance(u().provider, u().available)}</p>
+                        <p class={["text-sm", { "text-berry": !u().available }]}>
+                          {t("web.runtime.balance", { provider: u().provider, enough: u().available })}
+                        </p>
                         <p class="text-sm text-muted">
-                          {runtimesWording().spentToday(
-                            yuan(props.info.spentToday ?? 0),
-                            (props.info.settings.dailyBudget ?? 0) > 0 ? yuan(props.info.settings.dailyBudget!) : undefined,
-                          )}
+                          {(props.info.settings.dailyBudget ?? 0) > 0
+                            ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget!) })
+                            : t("web.runtime.spentToday", { spent: yuan(props.info.spentToday ?? 0) })}
                         </p>
                       </>
                     )}
@@ -285,7 +286,7 @@ function Usage(props: { info: RuntimeInfo }) {
                     {(u) => (
                       <>
                         <Show when={u().subscription}>
-                          <p class="text-sm text-muted">{runtimesWording().subscription(u().subscription ?? "")}</p>
+                          <p class="text-sm text-muted">{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</p>
                         </Show>
                         <For each={u().windows}>{(w) => <Window window={w} />}</For>
                       </>
@@ -310,14 +311,19 @@ function Window(props: { window: UsageWindow }) {
     <div class="flex flex-col gap-1">
       <span class="flex text-xs">
         <span class="flex-1 text-muted">{label()}</span>
-        {runtimesWording().left(pct(left()))}
+        {t("web.runtime.left", { pct: pct(left()) })}
       </span>
       <Stamina
-        quota={{ level: quotaLevel(left()), fill: left() / 100, short: `${pct(left())}%`, text: runtimesWording().windowLeft(label(), pct(left())) }}
+        quota={{
+          level: quotaLevel(left()),
+          fill: left() / 100,
+          short: `${pct(left())}%`,
+          text: t("web.runtime.windowLeft", { label: label(), pct: pct(left()) }),
+        }}
         width={220}
         height={10}
       />
-      <Show when={props.window.resetsAt}>{(at) => <span class="text-xs text-muted">{runtimesWording().resets(momentText(at()))}</span>}</Show>
+      <Show when={props.window.resetsAt}>{(at) => <span class="text-xs text-muted">{t("web.runtime.resets", { moment: momentText(at()) })}</span>}</Show>
     </div>
   );
 }
@@ -326,15 +332,15 @@ function FactsCard(props: { info: RuntimeInfo }) {
   const facts = () => props.info.facts;
   const refused = () => Object.entries(facts().refused);
   return (
-    <Card title={runtimesWording().can}>
+    <Card title={t("web.runtime.can")}>
       <div class="flex flex-col gap-1.5">
         <span class="flex items-start gap-1.5 text-sm">
           <Icon name={facts().steer ? "check" : "cross"} size={12} class="mt-1" />
-          {facts().steer ? runtimesWording().steer : runtimesWording().noSteer}
+          {facts().steer ? t("web.runtime.steer") : t("web.runtime.noSteer")}
         </span>
-        <span class="text-sm">{facts().inProcess ? runtimesWording().inProcess : runtimesWording().ownProcess}</span>
-        <span class="pt-2 text-xs font-medium text-muted">{runtimesWording().refused}</span>
-        <Show when={refused().length > 0} fallback={<span class="text-sm">{runtimesWording().acceptsAll}</span>}>
+        <span class="text-sm">{facts().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
+        <span class="pt-2 text-xs font-medium text-muted">{t("web.runtime.refused")}</span>
+        <Show when={refused().length > 0} fallback={<span class="text-sm">{t("web.runtime.acceptsAll")}</span>}>
           <For each={refused()}>
             {([k, v]) => (
               <span class="text-sm">
@@ -343,7 +349,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
             )}
           </For>
         </Show>
-        <span class="pt-2 text-xs font-medium text-muted">{runtimesWording().queries}</span>
+        <span class="pt-2 text-xs font-medium text-muted">{t("web.runtime.queries")}</span>
         <div class="flex flex-wrap gap-1">
           <For each={RuntimeCapabilityValues}>
             {(c) => (
@@ -402,7 +408,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
   };
   const refusedEffort = () => props.info.facts.refused[sessionEffort];
   const refusedEnv = () => props.info.facts.refused[sessionEnv];
-  const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : runtimesWording().noEffort);
+  const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : t("web.runtime.noEffort"));
   const save = async () => {
     const id = props.info.id;
     const body = draft();
@@ -415,13 +421,13 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
   const budgeted = () => props.info.id === "pi" || props.info.id === "vibevalley";
   return (
     <Card
-      title={runtimesWording().settings}
+      title={t("web.runtime.settings")}
       action={
         <Show when={dirty()}>
           <span class="flex gap-2">
-            <Button onClick={() => setDraft(props.info.settings)}>{runtimesWording().discard}</Button>
+            <Button onClick={() => setDraft(props.info.settings)}>{t("web.runtime.discard")}</Button>
             <Button tone="primary" onClick={() => void save()}>
-              {runtimesWording().save}
+              {t("web.runtime.save")}
             </Button>
           </span>
         </Show>
@@ -429,46 +435,46 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
     >
       <div class="grid gap-4 md:grid-cols-2">
         <Toggle
-          label={runtimesWording().enabled}
-          tip={runtimesWording().enabledHint}
+          label={t("web.runtime.enabled")}
+          tip={t("web.runtime.enabledHint")}
           checked={draft().enabled}
           onChange={(enabled) => setDraft({ ...draft(), enabled })}
         />
-        <Field label={runtimesWording().binPath} hint={runtimesWording().binPathHint(props.info.id.toUpperCase())}>
+        <Field label={t("web.runtime.binPath")} hint={t("web.runtime.binPathHint", { id: props.info.id.toUpperCase() })}>
           <TextInput
-            aria-label={runtimesWording().binPath}
+            aria-label={t("web.runtime.binPath")}
             class="font-mono"
-            placeholder={runtimesWording().auto}
+            placeholder={t("web.runtime.auto")}
             value={draft().binPath}
             onInput={(e) => setDraft({ ...draft(), binPath: e.currentTarget.value })}
           />
         </Field>
-        <Field label={runtimesWording().defaultModel} hint={runtimesWording().defaultModelHint}>
+        <Field label={t("web.runtime.defaultModel")} hint={t("web.runtime.defaultModelHint")}>
           <Select
-            label={runtimesWording().defaultModel}
-            placeholder={runtimesWording().ownDefault}
+            label={t("web.runtime.defaultModel")}
+            placeholder={t("web.runtime.ownDefault")}
             value={draft().defaultModel}
             options={models().map((m) => ({ value: m.id, label: m.name }))}
             onChange={(defaultModel) => setDraft({ ...draft(), defaultModel, defaultEffort: "" })}
           />
         </Field>
-        <Field label={runtimesWording().defaultEffort} hint={effortHint()}>
+        <Field label={t("web.runtime.defaultEffort")} hint={effortHint()}>
           <Show when={(model()?.effortLevels.length ?? 0) > 0} fallback={<span class="text-sm text-faint">—</span>}>
             <Segmented
-              label={runtimesWording().defaultEffort}
+              label={t("web.runtime.defaultEffort")}
               value={draft().defaultEffort}
               options={[
-                { value: "", label: runtimesWording().default },
+                { value: "", label: t("web.runtime.default") },
                 ...(model()?.effortLevels ?? []).map((l) => ({ value: l, label: l, disabled: !!refusedEffort() })),
               ]}
               onChange={(defaultEffort) => setDraft({ ...draft(), defaultEffort })}
             />
           </Show>
         </Field>
-        <Field label={runtimesWording().maxWorking} hint={runtimesWording().maxWorkingHint}>
+        <Field label={t("web.runtime.maxWorking")} hint={t("web.runtime.maxWorkingHint")}>
           <NumberInput
-            label={runtimesWording().maxWorking}
-            placeholder={runtimesWording().noLimit}
+            label={t("web.runtime.maxWorking")}
+            placeholder={t("web.runtime.noLimit")}
             value={draft().maxWorking}
             onChange={(n) => {
               const { maxWorking: _, ...rest } = draft();
@@ -477,10 +483,10 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
           />
         </Field>
         <Show when={budgeted()}>
-          <Field label={runtimesWording().budget} hint={runtimesWording().budgetHint(yuan(props.info.spentToday ?? 0), props.info.id === "pi")}>
+          <Field label={t("web.runtime.budget")} hint={t("web.runtime.budgetHint", { spent: yuan(props.info.spentToday ?? 0), pi: props.info.id === "pi" })}>
             <NumberInput
-              label={runtimesWording().budgetLabel}
-              placeholder={runtimesWording().unlimited}
+              label={t("web.runtime.budgetLabel")}
+              placeholder={t("web.runtime.unlimited")}
               value={draft().dailyBudget}
               onChange={(n) => {
                 const { dailyBudget: _, ...rest } = draft();
@@ -490,7 +496,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
           </Field>
         </Show>
       </div>
-      <Field label={runtimesWording().env} hint={refusedEnv() ?? runtimesWording().envHint}>
+      <Field label={t("web.runtime.env")} hint={refusedEnv() ?? t("web.runtime.envHint")}>
         <KeyValueEditor value={draft().env} disabled={!!refusedEnv()} onChange={(env) => setDraft({ ...draft(), env })} />
       </Field>
     </Card>
@@ -500,19 +506,19 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
 function ModelsCard(props: { info: RuntimeInfo }) {
   return (
     <Card
-      title={runtimesWording().models}
-      action={<Show when={props.info.models}>{(m) => <span class="text-sm text-muted">{runtimesWording().modelCount(m().length)}</span>}</Show>}
+      title={t("web.runtime.models")}
+      action={<Show when={props.info.models}>{(m) => <span class="text-sm text-muted">{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>}
     >
       <Show
         when={props.info.models}
-        fallback={<Quiet>{props.info.installation.status === "available" ? runtimesWording().noModels : runtimesWording().afterInstall}</Quiet>}
+        fallback={<Quiet>{props.info.installation.status === "available" ? t("web.runtime.noModels") : t("web.runtime.afterInstall")}</Quiet>}
       >
         {(models) => (
           <table class="w-full text-left">
             <thead>
               <tr class="text-xs font-medium text-muted">
-                <th class="pb-2 font-medium">{runtimesWording().models}</th>
-                <th class="pb-2 font-medium">{runtimesWording().effort}</th>
+                <th class="pb-2 font-medium">{t("web.runtime.models")}</th>
+                <th class="pb-2 font-medium">{t("web.runtime.effort")}</th>
               </tr>
             </thead>
             <tbody>
@@ -522,7 +528,7 @@ function ModelsCard(props: { info: RuntimeInfo }) {
                     <td class="py-1.5">
                       <span class="font-mono text-sm">{m.id}</span>
                       <Show when={m.isDefault}>
-                        <span class="ml-2 rounded bg-[#e3efd2] px-1.5 text-xs text-[#3f6427]">{runtimesWording().default}</span>
+                        <span class="ml-2 rounded bg-[#e3efd2] px-1.5 text-xs text-[#3f6427]">{t("web.runtime.default")}</span>
                       </Show>
                     </td>
                     <td class="py-1.5 text-sm text-muted">{m.effortLevels.length === 0 ? "—" : m.effortLevels.join(" · ")}</td>
@@ -557,10 +563,10 @@ function InventoryCard(props: { title: string; entries: InventoryEntry[] | null 
         }
       >
         <Match when={!props.entries}>
-          <Quiet>{runtimesWording().unreported}</Quiet>
+          <Quiet>{t("web.runtime.unreported")}</Quiet>
         </Match>
         <Match when={props.entries!.length === 0}>
-          <Quiet>{runtimesWording().none}</Quiet>
+          <Quiet>{t("web.runtime.none")}</Quiet>
         </Match>
       </Switch>
     </Card>

@@ -1,10 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // 项目 and its map: what a codebase grows
 // (languages, the tilling calendar, growth by its newest commit), and every project as an island whose plots are its
 // helpers' worktrees. The room on an island is roomLeft, the rule the server refuses a start by: an open plot is one
 // more that may start now, a shut one waits for the farm to free up.
 
-import { projectsWording } from "./words";
-import { appWording } from "../../base/words";
 import { type Crop, dayMs, type Issue, type LanguageCount, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
 import type { Pose } from "../../ui/cast";
@@ -51,7 +50,7 @@ export const langs: Record<string, LangDef> = {
   sass: { label: "Sass", color: "#c6538c", names: ["scss", "sass"] },
   powershell: { label: "PowerShell", color: "#012456", names: ["powershell", "ps1"] },
   terraform: { label: "Terraform", color: "#844fba", names: ["hcl", "terraform", "tf"] },
-  other: { label: projectsWording().project.otherLang, color: "#a08c70", names: [] },
+  other: { label: t("web.project.project.otherLang"), color: "#a08c70", names: [] },
 };
 
 const byName = new Map(Object.entries(langs).flatMap(([id, def]) => def.names.map((n) => [n, id] as const)));
@@ -147,7 +146,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
       column.push({ day, at, commits: n, level: level(n), future: at > today });
       // A month's name over the week its first day is in; the first week names the month it shows.
       if ((at.getDate() === 1 || (w === 0 && d === 0)) && (months.length === 0 || months.at(-1)!.week !== w))
-        months.push({ week: w, label: appWording().time.month(at.getMonth() + 1) });
+        months.push({ week: w, label: t("web.base.time.month", { month: at.getMonth() + 1 }) });
     }
     grid.push(column);
   }
@@ -188,13 +187,13 @@ export interface Growth {
 }
 
 export function growthOf(last: number | undefined, now: number): Growth {
-  if (last === undefined) return { crop: "empty", label: projectsWording().project.growth.empty };
+  if (last === undefined) return { crop: "empty", label: t("web.project.project.growth.empty") };
   const days = (now - last) / dayMs;
-  if (days <= 1) return { crop: "flowering", label: projectsWording().project.growth.flowering };
-  if (days <= 7) return { crop: "leafy", label: projectsWording().project.growth.leafy };
-  if (days <= 30) return { crop: "sprout", label: projectsWording().project.growth.sprout };
-  if (days <= 90) return { crop: "dry", label: projectsWording().project.growth.dry };
-  return { crop: "withered", label: projectsWording().project.growth.withered };
+  if (days <= 1) return { crop: "flowering", label: t("web.project.project.growth.flowering") };
+  if (days <= 7) return { crop: "leafy", label: t("web.project.project.growth.leafy") };
+  if (days <= 30) return { crop: "sprout", label: t("web.project.project.growth.sprout") };
+  if (days <= 90) return { crop: "dry", label: t("web.project.project.growth.dry") };
+  return { crop: "withered", label: t("web.project.project.growth.withered") };
 }
 
 /** Only repository home URLs, never credentials, arbitrary git transports or command-line options. */
@@ -212,22 +211,26 @@ export const sortProjects = (list: readonly ProjectSummary[]) =>
 
 export function since(at: number, now: number) {
   const minutes = Math.max(0, (now - at) / 60000);
-  if (minutes < 2) return appWording().time.justNow;
-  if (minutes < 60) return appWording().time.minutesAgo(Math.round(minutes));
+  if (minutes < 2) return t("web.base.time.justNow");
+  if (minutes < 60) return t("web.base.time.minutesAgo", { m: Math.round(minutes) });
   const hours = minutes / 60;
-  if (hours < 24) return appWording().time.hoursAgo(Math.round(hours));
+  if (hours < 24) return t("web.base.time.hoursAgo", { h: Math.round(hours) });
   const days = hours / 24;
-  if (days < 45) return appWording().time.daysAgo(Math.round(days));
-  if (days < 365) return appWording().time.monthsAgo(Math.round(days / 30));
-  return appWording().time.yearsAgo((days / 365).toFixed(1));
+  if (days < 45) return t("web.base.time.daysAgo", { d: Math.round(days) });
+  if (days < 365) return t("web.base.time.monthsAgo", { m: Math.round(days / 30) });
+  return t("web.base.time.yearsAgo", { y: (days / 365).toFixed(1) });
 }
 
 export const dateText = (at: number) => {
   const d = new Date(Math.round(at));
-  return appWording().time.date(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  return t("web.base.time.date", { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() });
 };
 
-export const dayText = (d: Date) => appWording().time.day(d.getMonth() + 1, d.getDate(), appWording().time.weekdays[d.getDay()]!);
+export const dayText = (d: Date) =>
+  t("web.base.time.day", { m: d.getMonth() + 1, d: d.getDate(), weekday: t(`web.base.time.weekdays.${d.getDay() as Weekday}`) });
+
+/** A day of the week as Date.getDay counts it, Sunday first. */
+type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /** As toLocaleString('zh-CN') writes it: 「12,345」. */
 export const number = (n: number) => (n < 0 ? "-" : "") + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -349,18 +352,18 @@ export function mapPose(h: Session): Pose {
 export function spotText(spot: Spot, now: number) {
   switch (spot.kind) {
     case "taken":
-      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? projectsWording().project.branch(spot.session.branch) : ""}`;
+      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? t("web.project.project.branch", { branch: spot.session.branch }) : ""}`;
     case "open":
-      return projectsWording().project.open;
+      return t("web.project.project.open");
     case "shut":
-      return projectsWording().project.shut(maxRunning);
+      return t("web.project.project.shut", { n: maxRunning });
   }
 }
 
 export const islandText = (i: Island) =>
   [
-    !i.summary ? projectsWording().project.gone : projectsWording().project.working(i.working, i.maxSessions, isFull(i)),
-    ...(i.queued.length > 0 ? [projectsWording().project.queued(i.queued.length)] : []),
+    !i.summary ? t("web.project.project.gone") : t("web.project.project.working", { n: i.working, of: i.maxSessions, full: isFull(i) }),
+    ...(i.queued.length > 0 ? [t("web.project.project.queued", { n: i.queued.length })] : []),
   ].join(" · ");
 
 /** Twice as big two to a row, smaller to fit two, one to a row on a narrow page. */

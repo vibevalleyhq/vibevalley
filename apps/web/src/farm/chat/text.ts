@@ -1,12 +1,12 @@
+import { t } from "@vibevalley/i18n";
 // The farm chat window's words: a channel's name as the farm says it, a message's clock time, and whether it is long
 // enough to fold.
 
 import type { Channel } from "@vibevalley/protocol";
 import { channelLabel } from "../../features/channel";
-import { farmWording } from "../words";
 
 /** The farm calls the default channel by its words' chat.label (田头). */
-export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? farmWording().chat.label : channelLabel(c));
+export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? t("web.farm.chat.label") : channelLabel(c));
 
 export const farmClock = (at: number) => {
   const d = new Date(Math.round(at));

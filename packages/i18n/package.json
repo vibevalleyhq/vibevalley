@@ -1,0 +1,11 @@
+{
+  "name": "@vibevalley/i18n",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

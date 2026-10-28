@@ -1,0 +1,8 @@
+{
+  "tray": {
+    "working": "{n, plural, one {# helper working} other {# helpers working}}",
+    "idle": "Open, nothing being worked on",
+    "off": "Not open yet",
+    "unread": "{n} unread in the chat"
+  }
+}

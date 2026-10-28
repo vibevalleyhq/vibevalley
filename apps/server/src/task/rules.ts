@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
-import { taskWording } from "./words.ts";
 import {
   type WorkspaceState,
   type GraphEvent,
@@ -81,29 +81,29 @@ function parseJson(body: string): unknown {
 
 /** Optional fields may be missing but never null; other keys are ignored. */
 function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } | string {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return taskWording().parse.object;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return t("server.task.parse.object");
   const obj = raw as Record<string, unknown>;
   let title: string | undefined;
   if ("title" in obj) {
-    if (typeof obj.title !== "string") return taskWording().parse.string(`["title"]`);
+    if (typeof obj.title !== "string") return t("server.task.parse.string", { at: `["title"]` });
     title = obj.title;
   }
-  if (!Array.isArray(obj.tasks)) return taskWording().parse.array(`["tasks"]`);
+  if (!Array.isArray(obj.tasks)) return t("server.task.parse.array", { at: `["tasks"]` });
   const tasks: StepDraft[] = [];
   for (const [i, item] of obj.tasks.entries()) {
     const at = `["tasks"][${i}]`;
-    if (typeof item !== "object" || item === null || Array.isArray(item)) return taskWording().parse.stepObject(at);
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return t("server.task.parse.stepObject", { at });
     const o = item as Record<string, unknown>;
     const text = (key: string, required: boolean): string | undefined | { problem: string } => {
-      if (!(key in o)) return required ? { problem: taskWording().parse.missing(`${at}["${key}"]`) } : undefined;
-      return typeof o[key] === "string" ? o[key] : { problem: taskWording().parse.string(`${at}["${key}"]`) };
+      if (!(key in o)) return required ? { problem: t("server.task.parse.missing", { at: `${at}["${key}"]` }) } : undefined;
+      return typeof o[key] === "string" ? o[key] : { problem: t("server.task.parse.string", { at: `${at}["${key}"]` }) };
     };
     const texts = (key: string): string[] | undefined | { problem: string } => {
       if (!(key in o)) return undefined;
       const a = o[key];
-      if (!Array.isArray(a)) return { problem: taskWording().parse.array(`${at}["${key}"]`) };
+      if (!Array.isArray(a)) return { problem: t("server.task.parse.array", { at: `${at}["${key}"]` }) };
       const bad = a.findIndex((x) => typeof x !== "string");
-      return bad >= 0 ? { problem: taskWording().parse.string(`${at}["${key}"][${bad}]`) } : (a as string[]);
+      return bad >= 0 ? { problem: t("server.task.parse.string", { at: `${at}["${key}"][${bad}]` }) } : (a as string[]);
     };
     const step: Record<string, unknown> = {};
     for (const [key, read] of [
@@ -120,7 +120,7 @@ function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } 
       if (v !== undefined) step[key] = v;
     }
     if ("acceptance" in o) {
-      if (typeof o.acceptance !== "boolean") return taskWording().parse.boolean(at + `["acceptance"]`);
+      if (typeof o.acceptance !== "boolean") return t("server.task.parse.boolean", { at: at + `["acceptance"]` });
       step.acceptance = o.acceptance;
     }
     tasks.push(step as unknown as StepDraft);
@@ -130,19 +130,19 @@ function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } 
 
 export function parseSplit(text: string): ParsedSplit {
   const blocks = [...text.matchAll(taskBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { ok: false, problems: [taskWording().parse.noBlock] };
+  if (blocks.length === 0) return { ok: false, problems: [t("server.task.parse.noBlock")] };
   let last = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let raw: unknown;
     try {
       raw = parseJson(blocks[i]!);
     } catch (e) {
-      last = taskWording().parse.unreadable((e as Error).message);
+      last = t("server.task.parse.unreadable", { why: (e as Error).message });
       continue;
     }
     const draft = decodeSplitDraft(raw);
     if (typeof draft === "string") {
-      last = taskWording().parse.shape(draft);
+      last = t("server.task.parse.shape", { why: draft });
       continue;
     }
     const tasks = draft.tasks.map(freshTask);
@@ -168,8 +168,8 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
     return {
       ok: false,
       problem: task
-        ? taskWording().edit.taskSettled(task.title, taskWording().taskState[task.state])
-        : taskWording().edit.graphSettled(taskWording().graphState[graph.state]),
+        ? t("server.task.edit.taskSettled", { title: task.title, state: t(`server.task.taskState.${task.state}`) })
+        : t("server.task.edit.graphSettled", { state: t(`server.task.graphState.${graph.state}`) }),
     };
   const base: Task = task ?? { id, title: id, brief: "", needs: [], state: "waiting", tries: 0 };
   const agent = edit.agent !== undefined ? edit.agent.trim() : base.agent;
@@ -191,8 +191,9 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
 
 export function removeTask(graph: TaskGraph, id: string): EditResult {
   const task = taskOf(graph, id);
-  if (!task) return { ok: false, problem: taskWording().edit.noStep(id) };
-  if (!canRemoveTask(graph, task)) return { ok: false, problem: taskWording().edit.cannotRemove(task.title, taskWording().taskState[task.state]) };
+  if (!task) return { ok: false, problem: t("server.task.edit.noStep", { id }) };
+  if (!canRemoveTask(graph, task))
+    return { ok: false, problem: t("server.task.edit.cannotRemove", { title: task.title, state: t(`server.task.taskState.${task.state}`) }) };
   return checked({ ...graph, tasks: graph.tasks.filter((n) => n.id !== id).map((n) => ({ ...n, needs: n.needs.filter((x) => x !== id) })) });
 }
 
@@ -210,20 +211,20 @@ export const taskIssueID = (graph: string, key: string): IssueId => issueId(grap
 
 /** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
-  const was = new Map(before.map((t) => [t.id, t]));
+  const was = new Map(before.map((item) => [item.id, item]));
   const keep = (draft: Draft, closed: Closing | undefined): Issue => {
-    const t = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
-    const old = was.get(t.id);
+    const item = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
+    const old = was.get(item.id);
     if (old) {
-      Object.assign(t, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
-      if (closed !== undefined && old.closedAt !== undefined) t.closedAt = old.closedAt;
+      Object.assign(item, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
+      if (closed !== undefined && old.closedAt !== undefined) item.closedAt = old.closedAt;
     }
-    t.sessions ??= [];
-    delete t.delivered;
-    delete t.canceled;
-    if (closed) Object.assign(t, closed);
-    if (closed !== undefined && t.closedAt === undefined) t.closedAt = now;
-    return t;
+    item.sessions ??= [];
+    delete item.delivered;
+    delete item.canceled;
+    if (closed) Object.assign(item, closed);
+    if (closed !== undefined && item.closedAt === undefined) item.closedAt = now;
+    return item;
   };
   const project = graph.project;
   const out = [
@@ -279,8 +280,8 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
 
 export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
   const issues = state.issues ?? [];
-  const t = issues.find((t) => t.id === id && t.graph);
-  return t ? graphFrom(t, issues) : undefined;
+  const item = issues.find((issue) => issue.id === id && issue.graph);
+  return item ? graphFrom(item, issues) : undefined;
 }
 
 /** How a task graph's issue closes: done with what it delivered, or canceled. */

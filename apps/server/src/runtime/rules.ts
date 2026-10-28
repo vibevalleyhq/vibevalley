@@ -1,8 +1,8 @@
+import { list, t } from "@vibevalley/i18n";
 // What a runtime's state says about dispatching to it: whether its money is
 // gone, what is left of its quota, and what stops a profile on it. agentProblems mirrors the checks oar makes when a session
 // opens, so a profile that would be refused is shown so before it is sent.
 
-import { runtimeWording } from "./words.ts";
 import type { AccountUsage, Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, runtimeLabel } from "../agent/seed.ts";
 import { yuan } from "./money.ts";
@@ -11,7 +11,7 @@ const two = (n: number) => String(n).padStart(2, "0");
 
 function whenText(at: number): string {
   const d = new Date(at);
-  return runtimeWording().date(d.getMonth() + 1, d.getDate(), `${two(d.getHours())}:${two(d.getMinutes())}`);
+  return t("server.runtime.date", { month: d.getMonth() + 1, day: d.getDate(), time: `${two(d.getHours())}:${two(d.getMinutes())}` });
 }
 
 /** Why a runtime takes no work now because of money (quota gone, balance gone, the day's budget spent); "" when it does. */
@@ -21,15 +21,15 @@ export function moneyStop(info: RuntimeInfo | null | undefined): string {
   if (u?.status === "ok") {
     for (const w of u.windows) {
       if (w.usedPercent < 100) continue;
-      const resets = w.resetsAt ? runtimeWording().resets(whenText(w.resetsAt)) : "";
-      return runtimeWording().quotaGone(runtimeLabel(info.id), w.label, resets);
+      const resets = w.resetsAt ? t("server.runtime.resets", { when: whenText(w.resetsAt) }) : "";
+      return t("server.runtime.quotaGone", { runtime: runtimeLabel(info.id), window: w.label, resets });
     }
   } else if (u?.status === "balance" && u.balances.length > 0) {
-    if (!u.available || u.balances.every((b) => !(b.amount > 0))) return runtimeWording().balanceGone(u.provider);
+    if (!u.available || u.balances.every((b) => !(b.amount > 0))) return t("server.runtime.balanceGone", { provider: u.provider });
   }
   const budget = info.settings.dailyBudget ?? 0;
   const spent = info.spentToday ?? 0;
-  if (budget > 0 && spent >= budget) return runtimeWording().budget(yuan(spent), yuan(budget));
+  if (budget > 0 && spent >= budget) return t("server.runtime.budget", { spent: yuan(spent), budget: yuan(budget) });
   return "";
 }
 
@@ -42,23 +42,23 @@ export function quotaLeft(usage: AccountUsage | null | undefined): number | unde
 const balanceText = (currency: string, amount: number) => (currency === "CNY" ? "¥" : currency === "USD" ? "$" : currency + " ") + amount.toFixed(2);
 
 export function quotaText(usage: AccountUsage | null | undefined): string {
-  const q = runtimeWording().quota;
-  if (!usage) return q.none;
+  if (!usage) return t("server.runtime.quota.none");
   switch (usage.status) {
     case "login_required":
-      return q.signedOut;
+      return t("server.runtime.quota.signedOut");
     case "unavailable":
-      return q.unread(usage.reason);
+      return t("server.runtime.quota.unread", { why: usage.reason });
     case "balance":
-      if (usage.balances.length === 0) return q.noBalance(usage.provider);
-      return q.balance(
-        usage.provider,
-        usage.balances.map((b) => balanceText(b.currency, b.amount)),
-        !usage.available,
-      );
+      if (usage.balances.length === 0) return t("server.runtime.quota.noBalance", { provider: usage.provider });
+      return t(usage.available ? "server.runtime.quota.balance" : "server.runtime.quota.balanceLow", {
+        provider: usage.provider,
+        balances: list(usage.balances.map((b) => balanceText(b.currency, b.amount))),
+      });
     case "ok":
-      if (usage.windows.length === 0) return usage.subscription ?? q.some;
-      return q.windows(usage.windows.map((w) => ({ label: w.label, left: 100 - w.usedPercent })));
+      if (usage.windows.length === 0) return usage.subscription ?? t("server.runtime.quota.some");
+      return usage.windows
+        .map((w) => t("server.runtime.quota.window", { label: w.label, left: 100 - w.usedPercent }))
+        .join(t("server.runtime.quota.windowSeparator"));
   }
 }
 
@@ -87,17 +87,17 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
   const facts = runtime?.facts?.refused ? runtime.facts : factsOf(agent.runtime);
   const refused = facts.refused ?? {};
   const promptOption = agent.personaMode === "append" ? "appendSystemPrompt" : agent.personaMode === "replace" ? "systemPrompt" : "";
-  if (!blank(agent.persona) && promptOption && refused[promptOption]) add("persona", "error", runtimeWording().persona(refused[promptOption]));
+  if (!blank(agent.persona) && promptOption && refused[promptOption]) add("persona", "error", t("server.runtime.persona", { refused: refused[promptOption] }));
   if (options.effort && refused.effort) add("effort", "error", refused.effort);
   if (Object.keys(options.env).length > 0 && refused.env) add("env", "error", refused.env);
   if ((agent.mcpServers ?? []).length > 0 && refused.mcpServers) add("mcpServers", "error", refused.mcpServers);
   if ((agent.disallowedTools ?? []).length > 0 && refused.disallowedTools) add("disallowedTools", "error", refused.disallowedTools);
-  if (runtime && options.missingModel) add("model", "warn", runtimeWording().noModel(runtime.id, options.missingModel));
+  if (runtime && options.missingModel) add("model", "warn", t("server.runtime.noModel", { runtime: runtime.id, model: options.missingModel }));
   if (runtime && models && options.effort) {
     const model = models.find((m) => (options.model ? m.id === options.model : m.isDefault));
     if (model && model.effortLevels.length > 0 && !model.effortLevels.includes(options.effort)) {
-      const name = agent.model && options.model ? model.name : runtimeWording().runtimeDefault(runtime.id, model.name);
-      add("effort", "error", runtimeWording().effort(name, options.effort, model.effortLevels));
+      const name = agent.model && options.model ? model.name : t("server.runtime.runtimeDefault", { runtime: runtime.id, model: model.name });
+      add("effort", "error", t("server.runtime.effort", { model: name, effort: options.effort, levels: list(model.effortLevels) }));
     }
   }
   return { ...options, problems };
@@ -107,9 +107,9 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
 export function agentProblems(agent: Agent, runtime: RuntimeInfo | null | undefined): AgentProblem[] {
   const problems: AgentProblem[] = [];
   const add = (text: string) => problems.push({ field: "runtime", level: "error", text });
-  if (!runtime) add(runtimeWording().unknownRuntime(agent.runtime));
-  else if (runtime.installation.status !== "available") add(runtimeWording().notInstalled);
-  else if (!runtime.settings.enabled) add(runtimeWording().disabled);
+  if (!runtime) add(t("server.runtime.unknownRuntime", { runtime: agent.runtime }));
+  else if (runtime.installation.status !== "available") add(t("server.runtime.notInstalled"));
+  else if (!runtime.settings.enabled) add(t("server.runtime.disabled"));
   const broke = moneyStop(runtime);
   if (broke) add(broke);
   return [...problems, ...sessionOptions(agent, runtime?.settings, runtime).problems];
@@ -135,7 +135,7 @@ export function chooseAgent(candidates: readonly Candidate[], task: string, name
   let bestScore = -1;
   for (const c of candidates) {
     if (!c.usable) continue;
-    const score = (c.agent.tags ?? []).filter((t) => text.includes(t.toLowerCase())).length;
+    const score = (c.agent.tags ?? []).filter((item) => text.includes(item.toLowerCase())).length;
     if (score > bestScore) {
       best = c.agent;
       bestScore = score;

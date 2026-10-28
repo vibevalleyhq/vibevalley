@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // 贪吃虫 on the phone: the rules are farm/phone/games/bugSnake.ts; here the clock, the pad and the drawing, each cell
 // six of the game's pixels, zoomed whole. Leaving the game (or putting the phone away) pauses it.
 
-import { phoneWording } from "../words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import {
   type BugSnake,
@@ -51,7 +51,11 @@ const turned = (rows: readonly string[]) =>
   );
 const heads: Record<SnakeHeading, readonly string[]> = { right: head, down: turned(head), left: turned(turned(head)), up: turned(turned(turned(head))) };
 
-const ended: Record<BugSnakeEnd, string> = { wall: phoneWording().bugs.ended.wall, self: phoneWording().bugs.ended.self, full: phoneWording().bugs.ended.full };
+const ended: Record<BugSnakeEnd, string> = {
+  wall: t("web.farm.phone.bugs.ended.wall"),
+  self: t("web.farm.phone.bugs.ended.self"),
+  full: t("web.farm.phone.bugs.ended.full"),
+};
 
 const five = (n: number) => String(n).padStart(5, "0");
 
@@ -122,13 +126,13 @@ export function BugSnakeGame() {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
       <div class="flex w-full px-2">
-        <span>{phoneWording().game.bugs}</span>
+        <span>{t("web.farm.phone.game.bugs")}</span>
         <span class="ml-auto tabular-nums">
-          {phoneWording().blocks.best} {five(Math.max(top(), score()))}
+          {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
       <div class="mt-1 flex w-full px-2 tabular-nums">
-        <span>{phoneWording().bugs.tally(g()?.eaten ?? 0, g()?.bugs ?? 0)}</span>
+        <span>{t("web.farm.phone.bugs.tally", { seeds: g()?.eaten ?? 0, bugs: g()?.bugs ?? 0 })}</span>
         <span class="ml-auto">{five(score())}</span>
       </div>
       <div class="relative mt-2" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
@@ -137,26 +141,28 @@ export function BugSnakeGame() {
           width={width}
           height={height}
           role="img"
-          aria-label={phoneWording().bugs.field}
+          aria-label={t("web.farm.phone.bugs.field")}
           class="block [image-rendering:pixelated]"
           style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
         <Show when={!g() || g()!.over !== null || !playing()}>
           <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
             <span>
-              {g()?.over ? ended[g()!.over!] : g() ? phoneWording().paused : phoneWording().game.bugs}
+              {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />
               <span class="phone-blink">
-                {phoneWording().pressA(g() && g()!.over === null ? phoneWording().resume : g() ? phoneWording().again : phoneWording().start)}
+                {t("web.farm.phone.pressA", {
+                  what: g() && g()!.over === null ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
+                })}
               </span>
             </span>
           </div>
         </Show>
       </div>
       <p class="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
-        {phoneWording().bugs.help}
+        {t("web.farm.phone.bugs.help")}
         <br />
-        {phoneWording().bugs.help2}
+        {t("web.farm.phone.bugs.help2")}
       </p>
     </div>
   );

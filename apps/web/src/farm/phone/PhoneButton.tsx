@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The phone's button at the HUD's bottom left: it opens and closes the phone, shakes while a call rings, counts the missed
 // ones, and says when 田头 has something new while the phone is not unfolded to it. The phone itself is Phone.tsx, over
 // the button.
 
-import { phoneWording } from "./words";
 import { Show } from "solid-js";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
@@ -26,15 +26,15 @@ export function PhoneButton(props: { height: number }) {
   return (
     <button
       type="button"
-      title={phoneWording().phone}
+      title={t("web.farm.phone.phone")}
       aria-label={
         ringing()
-          ? phoneWording().phoneRinging
+          ? t("web.farm.phone.phoneRinging")
           : count() > 0
-            ? phoneWording().phoneMissed(count())
+            ? t("web.farm.phone.phoneMissed", { n: count() })
             : unread() > 0
-              ? phoneWording().phoneUnread(unread())
-              : phoneWording().phone
+              ? t("web.farm.phone.phoneUnread", { n: unread() })
+              : t("web.farm.phone.phone")
       }
       aria-expanded={aria(open())}
       class={["pointer-events-auto relative cursor-pointer", { "phone-shake": ringing() }]}
@@ -48,7 +48,7 @@ export function PhoneButton(props: { height: number }) {
         rows={[
           [
             { kind: "glyph", cells: phoneCells(ringing()), px: 20, grid: { w: 10, h: 16 } },
-            { kind: "words", text: ringing() ? phoneWording().ring : phoneWording().phone },
+            { kind: "words", text: ringing() ? t("web.farm.phone.ring") : t("web.farm.phone.phone") },
           ],
         ]}
       />
@@ -56,7 +56,7 @@ export function PhoneButton(props: { height: number }) {
         <span class="absolute -top-1.5 -right-1.5 bg-[#c84a3a] px-1 font-pixel text-[10px] leading-[14px] text-[#f7e8c4]">{count()}</span>
       </Show>
       <Show when={count() === 0 && unread() > 0}>
-        <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{phoneWording().new}</span>
+        <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{t("web.farm.phone.new")}</span>
       </Show>
     </button>
   );

@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // One profile, made or edited: its
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
 // orchestrator from sending it, the server's answer (agent.check), under them.
 
-import { agentsWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -56,7 +56,7 @@ export function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agen
   const info = catalog.find((r) => r.id === runtime);
   return {
     id: "",
-    name: agentsWording().newName(runtimeName(catalog, runtime)),
+    name: t("web.agent.newName", { runtime: runtimeName(catalog, runtime) }),
     role: "worker",
     duty: "",
     enabled: true,
@@ -91,19 +91,21 @@ export function AgentPage(props: { id: string }) {
       <Match when={agents.error}>
         {(e) => (
           <p class="p-8 text-sm text-muted">
-            {agentsWording().noProfiles}
+            {t("web.agent.noProfiles")}
             {reasonOf(e())}
           </p>
         )}
       </Match>
       <Match when={!loaded() || (isNew() && !ready(runtimes, undefined))}>
-        <p class="p-8 text-sm text-muted">{isNew() && runtimes.error ? agentsWording().noRuntimes(reasonOf(runtimes.error)) : agentsWording().loading}</p>
+        <p class="p-8 text-sm text-muted">
+          {isNew() && runtimes.error ? t("web.agent.noRuntimes", { why: reasonOf(runtimes.error) }) : t("web.agent.loading")}
+        </p>
       </Match>
       <Match when={!isNew() && !saved()}>
         <p class="p-8 text-sm text-muted">
-          {agentsWording().noSuch}
+          {t("web.agent.noSuch")}
           <A href="/agents" class="underline">
-            {agentsWording().backToAll}
+            {t("web.agent.backToAll")}
           </A>
         </p>
       </Match>
@@ -136,7 +138,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
   const save = async () => {
     setSaving(true);
     const d = draft();
-    const body = { ...d, name: d.name.trim() || agentsWording().unnamedAgent };
+    const body = { ...d, name: d.name.trim() || t("web.agent.unnamedAgent") };
     try {
       const got = isNew ? await api.agent.create(body) : await api.agent.update(body);
       client.setQueryData<Agent[]>(["agents"], (list) => (list ? [...list.filter((a) => a.id !== got.id), got] : list));
@@ -153,13 +155,13 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
   const bar = () => (
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
       <A href="/agents" class="text-sm text-muted hover:underline">
-        {agentsWording().all}
+        {t("web.agent.all")}
       </A>
       <span class="text-sm text-faint">/</span>
       <span class="flex min-w-0 flex-1 items-center gap-3">
-        <span class="truncate text-lg font-semibold">{draft().name || agentsWording().unnamed}</span>
+        <span class="truncate text-lg font-semibold">{draft().name || t("web.agent.unnamed")}</span>
         <span class={["shrink-0 rounded px-1.5 text-xs", isNew || dirty() ? "bg-hat text-bark-900" : "bg-hover text-muted"]}>
-          {isNew ? agentsWording().isNew : dirty() ? agentsWording().unsaved : agentsWording().saved}
+          {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
         </span>
       </span>
       <span class="flex flex-wrap items-center gap-2">
@@ -176,16 +178,16 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
                     .catch((e) => toast(reasonOf(e), "bad"))
                 }
               >
-                {agentsWording().talk}
+                {t("web.agent.talk")}
               </Button>
               <Show when={dirty()}>
-                <Button onClick={() => setDraft(saved())}>{agentsWording().discard}</Button>
+                <Button onClick={() => setDraft(saved())}>{t("web.agent.discard")}</Button>
               </Show>
             </>
           )}
         </Show>
         <Button tone="primary" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
-          {saving() ? agentsWording().saving : isNew ? agentsWording().create : agentsWording().save}
+          {saving() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
         </Button>
       </span>
     </div>
@@ -199,10 +201,10 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
           {bar()}
           <div class="flex items-center gap-3">
             <button type="button" class="cursor-pointer text-sm text-muted hover:underline" onClick={() => setTrajectories(false)}>
-              {agentsWording().backToProfile}
+              {t("web.agent.backToProfile")}
             </button>
-            <span class="text-sm font-semibold" title={agentsWording().trajectoriesHint}>
-              {agentsWording().trajectories}
+            <span class="text-sm font-semibold" title={t("web.agent.trajectoriesHint")}>
+              {t("web.agent.trajectories")}
             </span>
           </div>
           <div class="min-h-0 flex-1">
@@ -267,13 +269,13 @@ function DeleteButton(props: { agent: Agent }) {
     }
   };
   return (
-    <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{agentsWording().remove}</Button>}>
+    <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.agent.remove")}</Button>}>
       <span class="flex items-center gap-2">
-        <span class="text-sm text-muted">{agentsWording().removeWhich(props.agent.name)}</span>
+        <span class="text-sm text-muted">{t("web.agent.removeWhich", { name: props.agent.name })}</span>
         <Button tone="danger" onClick={() => void remove()}>
-          {agentsWording().remove}
+          {t("web.agent.remove")}
         </Button>
-        <Button onClick={() => setSure(false)}>{agentsWording().never}</Button>
+        <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>
       </span>
     </Show>
   );
@@ -286,16 +288,16 @@ function Problems(props: { problems: AgentProblem[] }) {
       fallback={
         <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-[#3f6427]">
           <Icon name="check" size={12} />
-          {agentsWording().fine}
+          {t("web.agent.fine")}
         </p>
       }
     >
-      <ul aria-label={agentsWording().problems} class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
+      <ul aria-label={t("web.agent.problems")} class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
         <For each={props.problems}>
           {(i) => (
             <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-[#b8682a]"]}>
               <Icon name={i.level === "error" ? "cross" : "warn"} size={12} class="mt-1" />
-              {i.level === "error" ? agentsWording().cannot : ""}
+              {i.level === "error" ? t("web.agent.cannot") : ""}
               {i.text}
             </li>
           )}
@@ -312,10 +314,10 @@ function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => voi
     <div class="flex flex-col gap-5">
       <div>
         <Button icon="shuffle" onClick={() => props.onChange(randomLook())}>
-          {agentsWording().random}
+          {t("web.agent.random")}
         </Button>
       </div>
-      <Labeled label={agentsWording().looksAs} hint={agentsWording().looksHint}>
+      <Labeled label={t("web.agent.looksAs")} hint={t("web.agent.looksHint")}>
         <div class="grid grid-cols-4 gap-1.5">
           <For each={SpeciesValues}>
             {(species) => (
@@ -326,7 +328,7 @@ function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => voi
           </For>
         </div>
       </Labeled>
-      <Labeled label={agentsWording().wears}>
+      <Labeled label={t("web.agent.wears")}>
         <div class="grid grid-cols-4 gap-1.5">
           <For each={OutfitValues}>
             {(outfit) => {
@@ -390,7 +392,7 @@ function Stage(props: { draft: Agent; pose: Pose }) {
         </div>
       </div>
       <div class="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1">
-        <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || agentsWording().unnamedAgent}</span>
+        <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || t("web.agent.unnamedAgent")}</span>
         <Show when={props.draft.duty}>
           <span class="max-w-96 rounded bg-paper/75 px-2 py-px text-center text-xs">{props.draft.duty}</span>
         </Show>
@@ -408,24 +410,24 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
   const [tab, setTab] = createSignal<Tab>("who");
   const facts = () => factsOf(props.runtime);
   const tabs = (): [Tab, string][] => [
-    ["who", agentsWording().tab.who],
-    ["runtime", agentsWording().tab.runtime],
-    ["persona", agentsWording().tab.persona],
-    ["skills", agentsWording().tab.skills],
-    ["tools", agentsWording().tab.tools],
-    ["env", agentsWording().tab.env],
+    ["who", t("web.agent.tab.who")],
+    ["runtime", t("web.agent.tab.runtime")],
+    ["persona", t("web.agent.tab.persona")],
+    ["skills", t("web.agent.tab.skills")],
+    ["tools", t("web.agent.tab.tools")],
+    ["env", t("web.agent.tab.env")],
     ...(props.isNew
       ? []
       : ([
-          ["memory", agentsWording().tab.memory],
-          ["trajectories", agentsWording().trajectories],
+          ["memory", t("web.agent.tab.memory")],
+          ["trajectories", t("web.agent.trajectories")],
         ] as [Tab, string][])),
   ];
   const envRefused = () => facts().refused[sessionEnv];
   const draft = () => props.draft;
   return (
     <div class="flex min-h-0 flex-1 flex-col">
-      <div role="tablist" aria-label={agentsWording().tabs} class="flex flex-wrap gap-0.5 border-b border-line px-3 py-2">
+      <div role="tablist" aria-label={t("web.agent.tabs")} class="flex flex-wrap gap-0.5 border-b border-line px-3 py-2">
         <For each={tabs()}>
           {([t, label]) => (
             <button
@@ -443,28 +445,28 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
       <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <Switch>
           <Match when={tab() === "who"}>
-            <Labeled label={agentsWording().name} tip={agentsWording().nameTip} error={props.nameTaken ? agentsWording().nameTaken : undefined}>
-              <TextInput aria-label={agentsWording().name} value={draft().name} onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })} />
+            <Labeled label={t("web.agent.name")} tip={t("web.agent.nameTip")} error={props.nameTaken ? t("web.agent.nameTaken") : undefined}>
+              <TextInput aria-label={t("web.agent.name")} value={draft().name} onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })} />
             </Labeled>
-            <Labeled label={agentsWording().duty} tip={agentsWording().dutyTip}>
+            <Labeled label={t("web.agent.duty")} tip={t("web.agent.dutyTip")}>
               <TextInput
-                aria-label={agentsWording().duty}
-                placeholder={agentsWording().roleHint}
+                aria-label={t("web.agent.duty")}
+                placeholder={t("web.agent.roleHint")}
                 value={draft().duty}
                 onInput={(e) => props.patch({ ...draft(), duty: e.currentTarget.value })}
               />
             </Labeled>
-            <Labeled label={agentsWording().tags} tip={agentsWording().tagsTip}>
+            <Labeled label={t("web.agent.tags")} tip={t("web.agent.tagsTip")}>
               <ChipsInput
-                label={agentsWording().tags}
-                placeholder={agentsWording().tagsHint}
+                label={t("web.agent.tags")}
+                placeholder={t("web.agent.tagsHint")}
                 value={draft().tags}
                 onChange={(tags) => props.patch({ ...draft(), tags })}
               />
             </Labeled>
             <Toggle
-              label={agentsWording().enabled}
-              hint={agentsWording().enabledHint}
+              label={t("web.agent.enabled")}
+              hint={t("web.agent.enabledHint")}
               checked={draft().enabled}
               onChange={(enabled) => props.patch({ ...draft(), enabled })}
             />
@@ -484,24 +486,24 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
             <Tools draft={draft()} runtime={props.runtime} patch={props.patch} />
           </Match>
           <Match when={tab() === "env"}>
-            <Labeled label={agentsWording().workdir} tip={agentsWording().workdirTip}>
+            <Labeled label={t("web.agent.workdir")} tip={t("web.agent.workdirTip")}>
               <TextInput
-                aria-label={agentsWording().workdir}
+                aria-label={t("web.agent.workdir")}
                 class="font-mono"
-                placeholder={agentsWording().workdirHint}
+                placeholder={t("web.agent.workdirHint")}
                 value={draft().workdir}
                 onInput={(e) => props.patch({ ...draft(), workdir: e.currentTarget.value })}
               />
             </Labeled>
             <Toggle
-              label={agentsWording().worktree}
-              hint={agentsWording().worktreeHint}
+              label={t("web.agent.worktree")}
+              hint={t("web.agent.worktreeHint")}
               checked={draft().worktree}
               onChange={(worktree) => props.patch({ ...draft(), worktree })}
             />
             <Labeled
-              label={agentsWording().env}
-              hint={envRefused() ?? agentsWording().envHint}
+              label={t("web.agent.env")}
+              hint={envRefused() ?? t("web.agent.envHint")}
               error={envRefused() && Object.keys(draft().env).length > 0 ? envRefused() : undefined}
             >
               <KeyValueEditor value={draft().env} disabled={!!envRefused()} onChange={(env) => props.patch({ ...draft(), env })} />
@@ -551,8 +553,8 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
     });
   };
   return (
-    <Labeled label={agentsWording().machine} tip={agentsWording().machineTip}>
-      <Show when={runtimes().length > 0} fallback={<span class="text-xs text-muted">{agentsWording().readingMachines}</span>}>
+    <Labeled label={t("web.agent.machine")} tip={t("web.agent.machineTip")}>
+      <Show when={runtimes().length > 0} fallback={<span class="text-xs text-muted">{t("web.agent.readingMachines")}</span>}>
         <div class="grid gap-1.5 sm:grid-cols-2">
           <For each={runtimes()}>
             {(info) => {
@@ -563,11 +565,11 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                 const inst = info.installation;
                 return inst.status === "available"
                   ? info.settings.enabled
-                    ? (inst.version ?? agentsWording().available)
-                    : agentsWording().disabled
+                    ? (inst.version ?? t("web.agent.available"))
+                    : t("web.agent.disabled")
                   : inst.status === "checking"
-                    ? agentsWording().checking
-                    : agentsWording().notHere;
+                    ? t("web.agent.checking")
+                    : t("web.agent.notHere");
               };
               return (
                 <button
@@ -605,27 +607,34 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo; patch: Pat
   const levels = () => model()?.effortLevels ?? [];
   return (
     <>
-      <Labeled label={agentsWording().model} hint={models().length === 0 ? agentsWording().noModels : undefined}>
+      <Labeled label={t("web.agent.model")} hint={models().length === 0 ? t("web.agent.noModels") : undefined}>
         <Select
-          label={agentsWording().model}
+          label={t("web.agent.model")}
           value={props.draft.model}
-          placeholder={agentsWording().runtimeDefault(fallback() ?? "")}
+          placeholder={fallback() ? t("web.agent.runtimeDefaultModel", { model: fallback() }) : t("web.agent.runtimeDefault")}
           options={models().map((m) => ({
             value: m.id,
-            label: m.effortLevels.length > 0 ? agentsWording().modelLevels(m.name, m.effortLevels.length) : m.name,
+            label: m.effortLevels.length > 0 ? t("web.agent.modelLevels", { name: m.name, n: m.effortLevels.length }) : m.name,
           }))}
           onChange={(m) => props.patch({ ...props.draft, model: m, effort: "" })}
         />
       </Labeled>
       <Labeled
-        label={agentsWording().effort}
-        hint={refusedEffort() ?? (levels().length === 0 ? agentsWording().noEffort(model()?.name) : agentsWording().effortDefault)}
+        label={t("web.agent.effort")}
+        hint={
+          refusedEffort() ??
+          (levels().length === 0
+            ? model()?.name
+              ? t("web.agent.noEffortModel", { model: model()!.name })
+              : t("web.agent.noEffort")
+            : t("web.agent.effortDefault"))
+        }
       >
         <div>
           <Segmented
-            label={agentsWording().effort}
+            label={t("web.agent.effort")}
             value={props.draft.effort}
-            options={[{ value: "", label: agentsWording().defaultEffort }, ...levels().map((l) => ({ value: l, label: l, disabled: !!refusedEffort() }))]}
+            options={[{ value: "", label: t("web.agent.defaultEffort") }, ...levels().map((l) => ({ value: l, label: l, disabled: !!refusedEffort() }))]}
             onChange={(effort) => props.patch({ ...props.draft, effort })}
           />
         </div>
@@ -639,19 +648,19 @@ function Facts(props: { runtime: string; info?: RuntimeInfo }) {
   const facts = () => factsOf(props.info);
   return (
     <section class="flex flex-col gap-1.5 rounded-lg border border-line p-3">
-      <h3 class="text-sm font-semibold">{agentsWording().can(props.info ? props.info.preset.label : props.runtime)}</h3>
-      <Show when={props.info} fallback={<span class="text-sm">{agentsWording().readingMachines}</span>}>
+      <h3 class="text-sm font-semibold">{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
+      <Show when={props.info} fallback={<span class="text-sm">{t("web.agent.readingMachines")}</span>}>
         <span class="flex items-start gap-1.5 text-sm">
           <Icon name={facts().steer ? "check" : "cross"} size={12} class="mt-1" />
-          {facts().steer ? agentsWording().steer : agentsWording().noSteer}
+          {facts().steer ? t("web.agent.steer") : t("web.agent.noSteer")}
         </span>
-        <span class="text-sm">{facts().inProcess ? agentsWording().inProcess : agentsWording().ownProcess}</span>
+        <span class="text-sm">{facts().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
         <For each={Object.entries(facts().refused)}>
           {([option, reason]) => (
             <span class="text-sm text-muted">
-              {agentsWording().refuses}
+              {t("web.agent.refuses")}
               <span class="font-mono text-ink">{option}</span>
-              {agentsWording().colon}
+              {t("web.agent.colon")}
               {reason}
             </span>
           )}
@@ -662,28 +671,28 @@ function Facts(props: { runtime: string; info?: RuntimeInfo }) {
 }
 
 const personaModes: { value: PersonaMode; label: string; detail: string; option?: string }[] = [
-  { value: "append", label: agentsWording().persona.append.label, detail: agentsWording().persona.append.detail, option: sessionAppendSystemPrompt },
-  { value: "replace", label: agentsWording().persona.replace.label, detail: agentsWording().persona.replace.detail, option: sessionSystemPrompt },
-  { value: "prompt", label: agentsWording().persona.prompt.label, detail: agentsWording().persona.prompt.detail },
+  { value: "append", label: t("web.agent.persona.append.label"), detail: t("web.agent.persona.append.detail"), option: sessionAppendSystemPrompt },
+  { value: "replace", label: t("web.agent.persona.replace.label"), detail: t("web.agent.persona.replace.detail"), option: sessionSystemPrompt },
+  { value: "prompt", label: t("web.agent.persona.prompt.label"), detail: t("web.agent.persona.prompt.detail") },
 ];
 
 function Persona(props: { draft: Agent; facts: RuntimeFacts; patch: Patch }) {
   const mode = () => personaModes.find((m) => m.value === props.draft.personaMode);
   return (
     <>
-      <Labeled label={agentsWording().tab.persona} tip={agentsWording().personaTip}>
+      <Labeled label={t("web.agent.tab.persona")} tip={t("web.agent.personaTip")}>
         <TextArea
-          aria-label={agentsWording().tab.persona}
+          aria-label={t("web.agent.tab.persona")}
           rows={9}
-          placeholder={agentsWording().personaHint}
+          placeholder={t("web.agent.personaHint")}
           value={props.draft.persona}
           onInput={(e) => props.patch({ ...props.draft, persona: e.currentTarget.value })}
         />
       </Labeled>
-      <Labeled label={agentsWording().personaMode} hint={mode()?.detail}>
+      <Labeled label={t("web.agent.personaMode")} hint={mode()?.detail}>
         <div>
           <Segmented
-            label={agentsWording().personaMode}
+            label={t("web.agent.personaMode")}
             value={props.draft.personaMode}
             options={personaModes.map((m) => ({
               value: m.value,
@@ -708,11 +717,11 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch 
   return (
     <>
       <Labeled
-        label={agentsWording().library}
-        tip={agentsWording().libraryTip}
+        label={t("web.agent.library")}
+        tip={t("web.agent.libraryTip")}
         aside={
           <A href="/settings/skills" class="text-xs text-muted underline">
-            {agentsWording().manageLibrary}
+            {t("web.agent.manageLibrary")}
           </A>
         }
       >
@@ -747,7 +756,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch 
           </For>
         </div>
       </Labeled>
-      <Labeled label={agentsWording().ownSkills(props.runtime?.preset.label ?? props.draft.runtime)} tip={agentsWording().ownSkillsTip}>
+      <Labeled label={t("web.agent.ownSkills", { runtime: props.runtime?.preset.label ?? props.draft.runtime })} tip={t("web.agent.ownSkillsTip")}>
         <Inventory entries={props.runtime?.skills} />
       </Labeled>
     </>
@@ -765,11 +774,11 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
   const [target, setTarget] = createSignal("");
   const add = () => {
     const n = name().trim();
-    const t = target().trim();
-    if (!n || !t) return;
-    const words = t.split(/\s+/);
+    const wanted = target().trim();
+    if (!n || !wanted) return;
+    const words = wanted.split(/\s+/);
     const server: MCPServer =
-      type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: t, headers: {} };
+      type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: wanted, headers: {} };
     props.patch({ ...props.draft, mcpServers: [...props.draft.mcpServers.filter((s) => s.name !== n), server] });
     setName("");
     setTarget("");
@@ -777,8 +786,8 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
   return (
     <>
       <Labeled
-        label={agentsWording().mcp}
-        hint={mcpRefused() ?? agentsWording().mcpHint}
+        label={t("web.agent.mcp")}
+        hint={mcpRefused() ?? t("web.agent.mcpHint")}
         error={mcpRefused() && props.draft.mcpServers.length > 0 ? mcpRefused() : undefined}
       >
         <div class={["flex flex-col gap-1.5", { "opacity-50": !!mcpRefused() }]}>
@@ -791,18 +800,18 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
                 <button
                   type="button"
                   disabled={!!mcpRefused()}
-                  aria-label={agentsWording().removeNamed(s.name)}
+                  aria-label={t("web.agent.removeNamed", { name: s.name })}
                   onClick={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s.name) })}
                   class="cursor-pointer text-xs text-muted hover:text-berry"
                 >
-                  {agentsWording().remove}
+                  {t("web.agent.remove")}
                 </button>
               </div>
             )}
           </For>
           <div class="flex flex-wrap items-center gap-1.5">
             <Segmented
-              label={agentsWording().mcpKind}
+              label={t("web.agent.mcpKind")}
               value={type()}
               options={[
                 { value: "stdio", label: "stdio" },
@@ -811,15 +820,15 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
               onChange={setType}
             />
             <TextInput
-              aria-label={agentsWording().mcpName}
+              aria-label={t("web.agent.mcpName")}
               disabled={!!mcpRefused()}
-              placeholder={agentsWording().name}
+              placeholder={t("web.agent.name")}
               class="w-28"
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
             />
             <TextInput
-              aria-label={agentsWording().mcpTarget}
+              aria-label={t("web.agent.mcpTarget")}
               disabled={!!mcpRefused()}
               placeholder={type() === "stdio" ? "npx -y @scope/server" : "https://…/mcp"}
               class="min-w-40 flex-1 font-mono"
@@ -827,19 +836,19 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
               onInput={(e) => setTarget(e.currentTarget.value)}
             />
             <Button disabled={!!mcpRefused() || !name().trim() || !target().trim()} onClick={add}>
-              {agentsWording().add}
+              {t("web.agent.add")}
             </Button>
           </div>
         </div>
       </Labeled>
       <Labeled
-        label={agentsWording().disallowed}
-        hint={toolsRefused() ?? agentsWording().disallowedHint}
+        label={t("web.agent.disallowed")}
+        hint={toolsRefused() ?? t("web.agent.disallowedHint")}
         error={toolsRefused() && props.draft.disallowedTools.length > 0 ? toolsRefused() : undefined}
       >
         <ChipsInput
-          label={agentsWording().disallowed}
-          placeholder={agentsWording().disallowedExample}
+          label={t("web.agent.disallowed")}
+          placeholder={t("web.agent.disallowedExample")}
           disabled={!!toolsRefused()}
           value={props.draft.disallowedTools}
           onChange={(disallowedTools) => props.patch({ ...props.draft, disallowedTools })}
@@ -847,14 +856,14 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
         <Show when={!toolsRefused() ? props.runtime?.tools : undefined}>
           {(tools) => (
             <div class="flex flex-wrap gap-1 pt-1.5">
-              <For each={tools().filter((t) => !props.draft.disallowedTools.includes(t.name))}>
-                {(t) => (
+              <For each={tools().filter((tool) => !props.draft.disallowedTools.includes(tool.name))}>
+                {(tool) => (
                   <button
                     type="button"
-                    onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, t.name] })}
+                    onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool.name] })}
                     class="cursor-pointer rounded border border-line bg-page px-1.5 py-px font-mono text-xs text-muted hover:bg-hover hover:text-ink"
                   >
-                    + {t.name}
+                    + {tool.name}
                   </button>
                 )}
               </For>
@@ -862,7 +871,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
           )}
         </Show>
       </Labeled>
-      <Labeled label={agentsWording().ownMcp(props.runtime?.preset.label ?? props.draft.runtime)} tip={agentsWording().ownMcpTip}>
+      <Labeled label={t("web.agent.ownMcp", { runtime: props.runtime?.preset.label ?? props.draft.runtime })} tip={t("web.agent.ownMcpTip")}>
         <Inventory entries={props.runtime?.mcpServers} />
       </Labeled>
     </>
@@ -889,10 +898,10 @@ function Inventory(props: { entries?: InventoryEntry[] | null }) {
       }
     >
       <Match when={!props.entries}>
-        <span class="text-xs text-muted">{agentsWording().unreported}</span>
+        <span class="text-xs text-muted">{t("web.agent.unreported")}</span>
       </Match>
       <Match when={props.entries!.length === 0}>
-        <span class="text-xs text-muted">{agentsWording().none}</span>
+        <span class="text-xs text-muted">{t("web.agent.none")}</span>
       </Match>
     </Switch>
   );

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // Lan access (连接到本机). The main server listens on loopback alone; lan access is a second listener
 // on every interface, shut until the owner opens it. Through it go the endpoints marked remote and the state and side-event
 // streams, never /mcp, and only with a paired device's key (a Bearer header, or the cookie a paired browser keeps):
@@ -7,7 +8,6 @@
 // speaks plain HTTP: a key can be overheard on the network it is open on. What it lets through it hands to the loopback
 // server, saying which device asks.
 
-import { lanWording } from "./words.ts";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
@@ -102,7 +102,7 @@ export function lanAddress(): string {
   return best;
 }
 
-const deviceName = (name: string) => [...name.split(/\s+/).filter(Boolean).join(" ")].slice(0, 40).join("") || lanWording().aDevice;
+const deviceName = (name: string) => [...name.split(/\s+/).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
 
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
 export const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
@@ -176,7 +176,7 @@ export const make = (options: LanOptions = {}) =>
     // forget and its dry run judge by this.
     const known = (id: string) => {
       const d = devices.get(id);
-      return d ? Effect.succeed(d) : Effect.fail(missing(lanWording().noDevice(id), [lookIn.device]));
+      return d ? Effect.succeed(d) : Effect.fail(missing(t("server.lan.noDevice", { id }), [lookIn.device]));
     };
     const dropPairing = () => {
       pairing?.answer?.(false);
@@ -234,7 +234,7 @@ export const make = (options: LanOptions = {}) =>
       const done = new AbortController();
       res.on("close", () => done.abort());
       const go = async () => {
-        if (!upstream) return refuseHttp(res, 503, lanWording().notUp);
+        if (!upstream) return refuseHttp(res, 503, t("server.lan.notUp"));
         if (req.method === "POST" && path === pathOf("lan.pair")) return forward(req, res, "", done.signal);
         if (!path.startsWith("/api/v1/")) {
           if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return forward(req, res, "", done.signal);
@@ -242,8 +242,8 @@ export const make = (options: LanOptions = {}) =>
           return void res.end("404 page not found\n");
         }
         const d = deviceOf(req);
-        if (!d) return refuseHttp(res, 401, lanWording().unpaired);
-        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, lanWording().notRemote);
+        if (!d) return refuseHttp(res, 401, t("server.lan.unpaired"));
+        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, t("server.lan.notRemote"));
         const mine = conns.get(d) ?? new Set();
         conns.set(d, mine);
         mine.add(done);
@@ -254,7 +254,7 @@ export const make = (options: LanOptions = {}) =>
         }
       };
       go().catch(() => {
-        if (!res.headersSent) refuseHttp(res, 502, lanWording().badGateway);
+        if (!res.headersSent) refuseHttp(res, 502, t("server.lan.badGateway"));
         else res.end();
       });
     };
@@ -301,7 +301,7 @@ export const make = (options: LanOptions = {}) =>
         const s = createServer(guard);
         s.on("upgrade", tunnel);
         s.once("error", (e) => {
-          problem = lanWording().cannotOpen(e.message);
+          problem = t("server.lan.cannotOpen", { why: e.message });
           logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
           resolve();
         });
@@ -332,7 +332,7 @@ export const make = (options: LanOptions = {}) =>
       if (problem) s.problem = problem;
       const addr = url();
       if (open && server) {
-        if (!addr) s.problem = lanWording().noAddress;
+        if (!addr) s.problem = t("server.lan.noAddress");
         else s.url = addr;
       }
       const p = livePairing();
@@ -367,8 +367,8 @@ export const make = (options: LanOptions = {}) =>
       }, opening.withPermits(1)),
       startPairing: () =>
         Effect.suspend(() => {
-          if (!open || !server) return Effect.fail(refuse(lanWording().notOpen));
-          if (!url()) return Effect.fail(refuse(lanWording().noAddress));
+          if (!open || !server) return Effect.fail(refuse(t("server.lan.notOpen")));
+          if (!url()) return Effect.fail(refuse(t("server.lan.noAddress")));
           dropPairing();
           pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
           return Effect.succeed(status());
@@ -380,7 +380,7 @@ export const make = (options: LanOptions = {}) =>
       answer: (allow) =>
         Effect.suspend(() => {
           const p = livePairing();
-          if (!p || !p.asking) return Effect.fail(refuse(lanWording().noneAsking));
+          if (!p || !p.asking) return Effect.fail(refuse(t("server.lan.noneAsking")));
           const answer = p.answer;
           pairing = undefined;
           answer?.(allow);
@@ -389,14 +389,14 @@ export const make = (options: LanOptions = {}) =>
       pair: Effect.fn("Lan.pair")(function* (code, given) {
         const name = deviceName(given);
         const p = livePairing();
-        if (!open) return yield* Effect.fail(refuse(lanWording().closedThere));
-        if (!p) return yield* Effect.fail(refuse(lanWording().codeExpired));
+        if (!open) return yield* Effect.fail(refuse(t("server.lan.closedThere")));
+        if (!p) return yield* Effect.fail(refuse(t("server.lan.codeExpired")));
         if (!same(code.trim().toUpperCase(), p.code)) {
           p.wrong++;
           if (p.wrong >= wrongTries) dropPairing();
-          return yield* Effect.fail(refuse(lanWording().wrongCode));
+          return yield* Effect.fail(refuse(t("server.lan.wrongCode")));
         }
-        if (p.asking) return yield* Effect.fail(refuse(lanWording().anotherAsking));
+        if (p.asking) return yield* Effect.fail(refuse(t("server.lan.anotherAsking")));
         p.asking = name;
         p.expires = now() + pairingForMs;
         logs.info(`vibevalley: lan access: "${name}" questions to pair`);
@@ -410,15 +410,15 @@ export const make = (options: LanOptions = {}) =>
         }).pipe(Effect.timeoutOption(pairingForMs), Effect.map(Option.getOrElse(() => "late" as const)));
         if (allow === "late") {
           if (pairing === p) pairing = undefined;
-          return yield* Effect.fail(refuse(lanWording().ownerLate));
+          return yield* Effect.fail(refuse(t("server.lan.ownerLate")));
         }
-        if (!allow) return yield* Effect.fail(refuse(lanWording().denied));
+        if (!allow) return yield* Effect.fail(refuse(t("server.lan.denied")));
         return yield* addDevice(name);
       }),
       previewStopPairing: () => {
         const p = livePairing();
-        if (!p) return { does: [lanWording().noCode] };
-        return { does: [lanWording().dropCode(p.code), ...(p.asking ? [lanWording().dropAsking(p.asking)] : [])] };
+        if (!p) return { does: [t("server.lan.noCode")] };
+        return { does: [t("server.lan.dropCode", { code: p.code }), ...(p.asking ? [t("server.lan.dropAsking", { name: p.asking })] : [])] };
       },
       forget: Effect.fn("Lan.forget")(function* (id) {
         yield* known(id);
@@ -431,11 +431,11 @@ export const make = (options: LanOptions = {}) =>
       previewForget: (id) =>
         Effect.map(known(id), (d) => {
           const open = conns.get(id)?.size ?? 0;
-          return { does: [lanWording().forget(d.name), ...(open > 0 ? [lanWording().cut(open)] : [])] };
+          return { does: [t("server.lan.forget", { name: d.name }), ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
         }),
       me: (device) => {
         const d = device ? devices.get(device) : undefined;
-        if (!d) return Effect.fail(refuse(lanWording().local));
+        if (!d) return Effect.fail(refuse(t("server.lan.local")));
         const { keyHash: _, written: __, ...shown } = d;
         return Effect.succeed(shown);
       },

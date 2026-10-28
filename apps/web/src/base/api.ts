@@ -1,4 +1,5 @@
-import { appWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 
 /** The page is served by the server it talks to: the same origin. */
@@ -6,7 +7,7 @@ export const api = new VibeValleyApi("", async (url, init) => {
   try {
     return await fetch(url, init);
   } catch (error) {
-    if (error instanceof TypeError) throw new Error(appWording().unreachable, { cause: error });
+    if (error instanceof TypeError) throw new Error(t("web.base.unreachable"), { cause: error });
     throw error;
   }
 });

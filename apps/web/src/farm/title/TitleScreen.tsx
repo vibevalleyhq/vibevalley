@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The title screen over the farm: the farm at the hour it is, slowly moving; the game's name; the menu: 开始游戏,
 // 继续游戏 (when there is a farm to go back to), 设置. Arrow keys and Enter work as in a game; leaving it, it does not
 // show again on this machine. Without the orchestrator's key 开始游戏 says so in place: the workbench pages have no toasts to
 // carry it there.
 
-import { farmWording } from "../words";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { api } from "../../base/api";
 import { playSound } from "../../ui/pixel/sound";
@@ -27,9 +27,9 @@ export function TitleScreen() {
   const canContinue = () => hasFarm(core());
   const settings = useSettings();
   const items = () => [
-    { id: "start" as const, label: farmWording().title.start, enabled: true },
-    { id: "continue" as const, label: farmWording().title.continue, enabled: canContinue() },
-    { id: "settings" as const, label: farmWording().chat.settingsLink, enabled: true },
+    { id: "start" as const, label: t("web.farm.title.start"), enabled: true },
+    { id: "continue" as const, label: t("web.farm.title.continue"), enabled: canContinue() },
+    { id: "settings" as const, label: t("web.farm.chat.settingsLink"), enabled: true },
   ];
   const [picked, setPicked] = createSignal<Item>();
   const [note, setNote] = createSignal<string>();
@@ -40,7 +40,7 @@ export function TitleScreen() {
     switch (item) {
       case "start":
         // The orchestrator cannot think without DeepSeek's key: say so under the menu, where 设置 is.
-        if (!orchestratorReady(ready(settings, undefined))) return setNote(farmWording().title.keyFirst);
+        if (!orchestratorReady(ready(settings, undefined))) return setNote(t("web.farm.title.keyFirst"));
         farm.closeTitle();
         return void api.orchestrator.open().catch(() => {});
       case "continue":
@@ -70,19 +70,19 @@ export function TitleScreen() {
   });
 
   return (
-    <div class="absolute inset-0 z-[60] overflow-hidden bg-[#2a1d2e] font-pixel" role="dialog" aria-label={farmWording().title.label}>
+    <div class="absolute inset-0 z-[60] overflow-hidden bg-[#2a1d2e] font-pixel" role="dialog" aria-label={t("web.farm.title.label")}>
       <TitleStage scene={startScene()} />
       <div class="absolute inset-y-0 left-0 w-[min(46rem,70vw)] bg-gradient-to-r from-[#1e1424]/75 via-[#1e1424]/35 to-transparent" />
       <div class="relative flex h-full flex-col justify-center gap-8 overflow-y-auto px-[6vw] py-8 sm:gap-10">
         <header class="title-float">
           <h1 class="text-[clamp(40px,6vw,72px)] leading-none text-cream-50" style={deep}>
-            {farmWording().title.name}
+            {t("web.farm.title.name")}
           </h1>
           <p class="mt-3 text-[24px] text-cream-100" style={soft}>
-            {farmWording().title.tagline}
+            {t("web.farm.title.tagline")}
           </p>
         </header>
-        <nav class="flex w-56 flex-col gap-3" aria-label={farmWording().sow.start}>
+        <nav class="flex w-56 flex-col gap-3" aria-label={t("web.farm.sow.start")}>
           <For each={items()} keyed={(item) => item.id}>
             {(item, i) => {
               const on = () => at() === item().id && item().enabled;
@@ -111,7 +111,7 @@ export function TitleScreen() {
           </Show>
           <Show when={!canContinue()}>
             <p class="px-1 text-[12px] text-cream-100" style={soft}>
-              {farmWording().title.nothingToContinue}
+              {t("web.farm.title.nothingToContinue")}
             </p>
           </Show>
         </nav>

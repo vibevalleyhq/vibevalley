@@ -1,0 +1,31 @@
+{
+  "docs": {
+    "memoryItem": "记性",
+    "list": "文档列表",
+    "title": "文档",
+    "newTitle": "新文档的标题",
+    "new": "新文档",
+    "none": "还没有文档。写个标题，点「新文档」。",
+    "all": "全部文档",
+    "saving": "在存……",
+    "saved": "都存好了",
+    "blocks": "{n} 块",
+    "helpersWriting": "帮工在写",
+    "doc": "文档",
+    "demo": "演示：几个帮工一起写",
+    "append": "在末尾写一段",
+    "owner": "主人",
+    "done": "做完了",
+    "notDone": "没做完",
+    "writing": "{who} 在写",
+    "wrote": "{who} 写的",
+    "issue": "工单 {id}",
+    "unknown": "这一块是「{type}」，这个版本的客户端还画不了，只能看不能改",
+    "block": "块 {id}",
+    "heading": "标题",
+    "notSaved": "没存上：{why}",
+    "changed": "这一块刚被别人改过",
+    "conflict": "{why}：你写的没存上，留在修订里了",
+    "image": "图片：{alt} {src}"
+  }
+}

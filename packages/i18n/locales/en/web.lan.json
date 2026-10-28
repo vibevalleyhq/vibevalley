@@ -1,0 +1,53 @@
+{
+  "lan": {
+    "section": {
+      "label": "Connect to this machine",
+      "line": "Phones and other computers"
+    },
+    "open": "On",
+    "closed": "Off",
+    "intro": "Once on, a phone or another computer on the same local network can scan to pair, then use VibeValley on this computer: see helpers, send work, talk in the farm chat.",
+    "allow": "Allow connections",
+    "address": "Address",
+    "add": "Add a device",
+    "close": "Turn off",
+    "devices": "Paired devices",
+    "deviceCount": "{n}",
+    "removeWhich": "Remove {name}",
+    "remove": "Remove",
+    "copied": "Copied: open it in the other computer's browser.",
+    "notCopied": "Cannot copy: select the link and copy it yourself.",
+    "qr": "Pairing QR code",
+    "scan": "Scan this code with the phone's camera; on another computer, open this link in the browser:",
+    "left": "Valid for {s} more seconds, once.",
+    "copy": "Copy the link",
+    "newCode": "Another code",
+    "stop": "Stop adding",
+    "asking": "\"{name}\" wants to connect to this computer. Let in, it can use VibeValley on this computer as you do.",
+    "letIn": "Let it in",
+    "refuse": "Refuse",
+    "paired": "Paired {at} · last seen {seen}",
+    "pairedNever": "Paired {at} · never seen",
+    "notes": {
+      "0": "Helpers can run commands on this computer, so only paired devices may connect; pairing needs your approval here.",
+      "1": "A paired device uses VibeValley on this computer as you do. The switch and the devices are managed only on this computer.",
+      "2": "The connection is plain HTTP: people on the same network may see what goes over it. Turn it on only on networks you trust, such as your home Wi-Fi or your own hotspot.",
+      "3": "When the computer's address changes (another network), devices cannot connect; add the device here and scan again, without approving again."
+    }
+  },
+  "devices": {
+    "android": "Android phone",
+    "windows": "Windows PC",
+    "device": "A device"
+  },
+  "pair": {
+    "title": "Connect to that computer",
+    "intro": "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the farm chat. Pairing needs the owner's approval on that computer.",
+    "code": "Pairing code",
+    "codeHint": "On that computer, press Add a device under Connect to this machine",
+    "name": "This device is called",
+    "nameHint": "The name the owner sees in the list of devices",
+    "ask": "Ask the owner to let it in",
+    "waiting": "Waiting for the owner on that computer to approve…"
+  }
+}

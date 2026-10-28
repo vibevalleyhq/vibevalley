@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // The beds (the village's plots), what grows in them and what a tool does on them: the server folds the state, these
 // only read it.
 
-import { farmWording } from "../words";
 import type { Crop, FarmView, PlotView, Session } from "@vibevalley/protocol";
 
 export interface Bed {
@@ -58,16 +58,16 @@ export function cropOfBed(bed: Bed, sessions: readonly Session[], view: FarmView
 }
 
 export const cropLabel: Record<Crop, string> = {
-  empty: farmWording().crop.empty,
-  seeded: farmWording().crop.seeded,
-  sprout: farmWording().crop.sprout,
-  leafy: farmWording().crop.leafy,
-  flowering: farmWording().crop.flowering,
-  wheat: farmWording().crop.wheat,
-  carrot: farmWording().crop.wheat,
-  withered: farmWording().crop.withered,
-  weeds: farmWording().crop.weeds,
-  dry: farmWording().crop.dry,
-  harvested: farmWording().crop.harvested,
-  locked: farmWording().crop.locked,
+  empty: t("web.farm.crop.empty"),
+  seeded: t("web.farm.crop.seeded"),
+  sprout: t("web.farm.crop.sprout"),
+  leafy: t("web.farm.crop.leafy"),
+  flowering: t("web.farm.crop.flowering"),
+  wheat: t("web.farm.crop.wheat"),
+  carrot: t("web.farm.crop.wheat"),
+  withered: t("web.farm.crop.withered"),
+  weeds: t("web.farm.crop.weeds"),
+  dry: t("web.farm.crop.dry"),
+  harvested: t("web.farm.crop.harvested"),
+  locked: t("web.farm.crop.locked"),
 };

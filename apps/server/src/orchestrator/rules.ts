@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // The orchestrator's pure rules: where an input came from, how the farm reads to it and what changed
 // in it, what the patrol finds, and how a model answer's tokens are worded.
 
-import { orchestratorWording } from "./words.ts";
 import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts";
 import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
 import { head } from "../base/text.ts";
@@ -55,7 +55,7 @@ export function deepseekModel(configured: string, fallback: string): string {
   const slash = configured.indexOf("/");
   if (slash < 0) return configured;
   if (configured.slice(0, slash) === "deepseek") return configured.slice(slash + 1);
-  throw new Error(orchestratorWording().onlyDeepseek(configured));
+  throw new Error(t("server.orchestrator.onlyDeepseek", { configured }));
 }
 
 interface SituationLine {

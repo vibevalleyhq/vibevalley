@@ -1,0 +1,58 @@
+{
+  "weekdays": {
+    "0": "Sun",
+    "1": "Mon",
+    "2": "Tue",
+    "3": "Wed",
+    "4": "Thu",
+    "5": "Fri",
+    "6": "Sat"
+  },
+  "when": {
+    "once": "once at {clock}",
+    "hours": "{n, plural, one {every hour} other {every # hours}}",
+    "minutes": "every {n} minutes",
+    "daily": "every day at {time}",
+    "weekdays": "weekdays at {time}",
+    "weekend": "weekends at {time}",
+    "monthly": "on day {day} of every month at {time}",
+    "hourly": "every hour at minute {minute}",
+    "cron": "cron {expr}",
+    "weekly": "every {days} at {time}"
+  },
+  "next": {
+    "never": "never again",
+    "pending": "waiting for your approval",
+    "done": "done",
+    "off": "off"
+  },
+  "cron": {
+    "fields": {
+      "0": "minute",
+      "1": "hour",
+      "2": "day",
+      "3": "month",
+      "4": "weekday"
+    },
+    "badField": "the cron {name} is wrong: {field}",
+    "fiveFields": "cron takes five fields: minute hour day month weekday, such as 0 9 * * 1-5",
+    "never": "this cron never comes due: {expr}"
+  },
+  "problem": {
+    "noName": "A schedule needs a name",
+    "noText": "A schedule needs what to do when it is due",
+    "zone": "Unknown time zone: {tz}",
+    "past": "A one-off time must be in the future",
+    "every": "The interval is at least {min} minutes",
+    "time": "Write the time as HH:MM, such as 09:00: {time}",
+    "days": "Which days of the week: 0 to 6, 0 is Sunday",
+    "kind": "Unknown kind of schedule"
+  },
+  "due": "{missed, select, true {⏰ The schedule \"{name}\" is due (missed while the server was off, made up once): {text}} other {⏰ The schedule \"{name}\" is due: {text}}}",
+  "noRecurrence": "There is no schedule {id}",
+  "noChannel": "There is no channel {name}",
+  "noProfile": "There is no profile called {name}",
+  "noProject": "#{channel} has no default project: a schedule sent straight to a helper needs a project",
+  "remove": "Delete the schedule \"{name}\": it no longer starts work when due; the tickets it opened stay",
+  "removeWhen": "Delete the schedule \"{name}\" ({when}): it no longer starts work when due; the tickets it opened stay"
+}

@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // Agora exposes one native engine. Each attempt owns it until it ends; late permission replies and callbacks from an
 // ended attempt cannot initialize, release or send events through its successor.
 
-import { mobileWording } from "./words";
 import {
   ChannelProfileType,
   ClientRoleType,
@@ -16,7 +16,7 @@ import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
 import { level } from "./rules";
 
 const fail = (code: number, what: string) => {
-  if (code < 0) throw new Error(mobileWording().agora(what, code));
+  if (code < 0) throw new Error(t("mobile.agora", { what, code }));
 };
 
 let releaseCurrent: (() => void) | undefined;
@@ -36,7 +36,7 @@ export function nativeRtc() {
       resolveJoin = resolve;
       rejectJoin = reject;
     });
-    const close = (reason = new Error(mobileWording().callEnded)) => {
+    const close = (reason = new Error(t("mobile.callEnded"))) => {
       if (closed) return;
       closed = true;
       if (stop === close) stop = undefined;
@@ -51,22 +51,22 @@ export function nativeRtc() {
     releaseCurrent = close;
     const line: RtcLine = {
       mute: async (on) => {
-        if (closed || !engine) throw new Error(mobileWording().callEnded);
-        fail(engine.muteLocalAudioStream(on), on ? mobileWording().step.mute : mobileWording().step.unmute);
+        if (closed || !engine) throw new Error(t("mobile.callEnded"));
+        fail(engine.muteLocalAudioStream(on), on ? t("mobile.step.mute") : t("mobile.step.unmute"));
       },
       renew: async (token) => {
-        if (closed || !engine) throw new Error(mobileWording().callEnded);
-        fail(engine.renewToken(token), mobileWording().step.renew);
+        if (closed || !engine) throw new Error(t("mobile.callEnded"));
+        fail(engine.renewToken(token), t("mobile.step.renew"));
       },
       leave: async () => close(),
     };
     void (async () => {
       try {
         if (Platform.OS === "android" && (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) !== PermissionsAndroid.RESULTS.GRANTED)
-          throw new Error(mobileWording().noMic);
+          throw new Error(t("mobile.noMic"));
         if (closed) return;
         engine = createAgoraRtcEngine();
-        fail(engine.initialize({ appId: grant.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting }), mobileWording().step.initialize);
+        fail(engine.initialize({ appId: grant.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting }), t("mobile.step.initialize"));
         handler = {
           onJoinChannelSuccess: (connection) => {
             if (!owns(connection)) return;
@@ -90,15 +90,15 @@ export function nativeRtc() {
           // onError has no connection identity; queued errors from a released engine cannot end this attempt.
           onConnectionStateChanged: (connection, state, reason) => {
             if (!owns(connection) || state !== ConnectionStateType.ConnectionStateFailed) return;
-            const text = mobileWording().agoraLost(reason);
+            const text = t("mobile.agoraLost", { reason });
             if (!joined) close(new Error(text));
             else events.problem(text);
           },
           onTokenPrivilegeWillExpire: (connection) => owns(connection) && events.expiring(),
         };
         engine.registerEventHandler(handler);
-        fail(engine.enableAudio(), mobileWording().step.mic);
-        fail(engine.enableAudioVolumeIndication(200, 3, true), mobileWording().step.volume);
+        fail(engine.enableAudio(), t("mobile.step.mic"));
+        fail(engine.enableAudioVolumeIndication(200, 3, true), t("mobile.step.volume"));
         // The agent listens only to the numeric uid in the grant.
         fail(
           engine.joinChannel(grant.token, grant.channel, Number(grant.uid), {
@@ -107,7 +107,7 @@ export function nativeRtc() {
             publishMicrophoneTrack: true,
             autoSubscribeAudio: true,
           }),
-          mobileWording().step.join,
+          t("mobile.step.join"),
         );
       } catch (e) {
         close(e instanceof Error ? e : new Error(String(e)));

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The sessions: each helper on the farm is an oar session in its project's worktree, run by
 // oar's subagents, and its events are read into facts (facts.ts) and its log (journal.ts). Every session is a row from the
 // moment it is sent; ended, its row says when and how its issue took it, and its runs are session_run.
@@ -10,7 +11,6 @@
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
 import { restartedNote, workplaceRules } from "./prompts.ts";
-import { sessionWording } from "./words.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -448,7 +448,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       return token;
     };
     const revokeToken = (session: string) => void tokens.delete(session);
-    const who = (token: string) => [...tokens.entries()].find(([, t]) => t === token)?.[0] ?? "";
+    const who = (token: string) => [...tokens.entries()].find(([, item]) => item === token)?.[0] ?? "";
 
     // A session's own row keeps what taking it up again needs, so it goes with the database: one made again from a new
     // schema brings back no session (and none on an issue the database no longer has).
@@ -632,7 +632,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           summary: read.summary,
         }),
       );
-      if (read.needsYou) notice("error", sessionWording().life.stoppedNeedsYou(session.name, read.failure));
+      if (read.needsYou) notice("error", t("server.session.life.stoppedNeedsYou", { name: session.name, why: read.failure }));
       if (launch) signal({ kind: "ended", id: h.id, launch, outcome: read.outcome, spoke });
       runtimes.usageSoon(session.runtime);
       save();
@@ -643,11 +643,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       if (session?.phase._tag !== "working") return;
       h.tracking = { ...h.tracking, quiet: true };
       apply({ type: "quiet", id: h.id, since: at - silentForMs });
-      const w = sessionWording();
-      const quiet = w.life.span(silentForMs);
-      const last = session.phase.doing.label ? w.log.quietLast(session.phase.doing.label) : "";
-      h.journal.note("run/error", w.log.quiet(quiet, last));
-      notice("warn", w.life.quietNotice(session.name, quiet, last));
+      const quiet =
+        silentForMs < 60_000
+          ? t("server.session.life.seconds", { n: Math.round(silentForMs / 1000) })
+          : t("server.session.life.minutes", { n: Math.round(silentForMs / 60_000) });
+      const last = session.phase.doing.label ? t("server.session.log.quietLast", { label: session.phase.doing.label }) : "";
+      h.journal.note("run/error", t("server.session.log.quiet", { span: quiet, last }));
+      notice("warn", t("server.session.life.quietNotice", { name: session.name, span: quiet, last }));
     };
 
     const release = (h: Hand) => {
@@ -699,7 +701,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       Effect.tryPromise({
         try: () => closeAllocation(allocation),
         catch: (e) => {
-          allocation.failure = sessionWording().life.notStopped(reasonText(e));
+          allocation.failure = t("server.session.life.notStopped", { why: reasonText(e) });
           return refused(allocation.failure);
         },
       }).pipe(
@@ -722,7 +724,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const open = Effect.fnUntraced(function* (agent: Agent, owner: Session, place: Workplace, input: string, resume: string): Effect.fn.Return<Opened> {
       const id = owner.id;
       const prior = allocations.get(id);
-      if (prior) return { refused: prior.failure ?? sessionWording().life.notReturned, retained: true };
+      if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
       const resolved = yield* Effect.result(runtimes.resolve(agent));
       if (resolved._tag === "Failure") return { refused: reasonOf(resolved.failure), retained: false };
       const r = resolved.success;
@@ -843,7 +845,7 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const wake = Effect.fn("Sessions.wake")(function* (h: Hand, session: Session, input: string, recall: string): Effect.fn.Return<Delivered> {
       const agent = store.agent(session.agent);
-      if (!agent) return { kind: "refused", reason: sessionWording().life.agentGone(session.name) };
+      if (!agent) return { kind: "refused", reason: t("server.session.life.agentGone", { name: session.name }) };
       const stopped = yield* Effect.result(rest(h));
       if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) };
       const resume = h.oarSessionId;
@@ -853,25 +855,25 @@ export const make = (options: SessionOptionsIn = {}) =>
         const again = yield* remind(session.agent, h.id, h.place.project, input, h.recalled);
         opened = yield* open(agent, session, h.place, withRecall(again, restartedNote + input), "");
       }
-      if (!opened.session) return { kind: "refused", reason: sessionWording().life.cannotWake(session.name, opened.refused ?? "") };
+      if (!opened.session) return { kind: "refused", reason: t("server.session.life.cannotWake", { name: session.name, why: opened.refused ?? "" }) };
       attach(h, opened.session, session.runtime);
       return { kind: "run", launch: h.launch || h.id, woke: true };
     });
 
     const deliver = Effect.fn("Sessions.deliver")(function* (id: string, text: string, by: RunTrigger): Effect.fn.Return<Delivered> {
       const h = hands.get(id);
-      if (!h) return { kind: "refused", reason: sessionWording().life.noHelper(id) };
+      if (!h) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
       return yield* h.access.withPermits(1)(
         admission.withPermits(1)(
           Effect.gen(function* (): Effect.fn.Return<Delivered> {
             const session = core.session(id);
-            if (hands.get(id) !== h || !session) return { kind: "refused", reason: sessionWording().life.noHelper(id) };
-            if (h.sess?.closing) return { kind: "refused", reason: sessionWording().life.stillClosing(session.name) };
+            if (hands.get(id) !== h || !session) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
+            if (h.sess?.closing) return { kind: "refused", reason: t("server.session.life.stillClosing", { name: session.name }) };
             const starts = !isBusy(session);
             let recall = "";
             if (starts) {
               const full = noRoom(capacity(), session.runtime, h.place.project, limits(session.runtime), id);
-              if (full) return { kind: "refused", reason: sessionWording().life.noRoom(session.name, full) };
+              if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
               recall = yield* remind(session.agent, id, h.place.project, text, h.recalled);
             }
             const s = h.sess;
@@ -890,7 +892,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             );
             if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch };
             if (starts) unexpect(h);
-            if (sent.kind !== "accepted") return { kind: "refused", reason: sessionWording().life.notReceived(session.name, sent.reason) };
+            if (sent.kind !== "accepted") return { kind: "refused", reason: t("server.session.life.notReceived", { name: session.name, why: sent.reason }) };
             if (sent.landed === "queued") {
               expect(h, by);
               return { kind: "queued", launch };
@@ -909,15 +911,16 @@ export const make = (options: SessionOptionsIn = {}) =>
       settle: Settle = "owner",
     ) {
       const h = hands.get(id);
-      if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing(sessionWording().life.helperRef(id), [lookIn.session]));
+      if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing(t("server.session.life.helperRef", { id }), [lookIn.session]));
       return yield* h.access.withPermits(1)(
         Effect.gen(function* () {
           const current = core.session(id);
-          if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing(sessionWording().life.helperRef(id), [lookIn.session]));
+          if (hands.get(id) !== h || !current)
+            return yield* Effect.fail<ApiError | NotTakenIn>(missing(t("server.session.life.helperRef", { id }), [lookIn.session]));
           if (closed === "merged" && current.graph)
-            return yield* Effect.fail<ApiError | NotTakenIn>(refused(sessionWording().life.inGraph(current.name, current.graph.id)));
+            return yield* Effect.fail<ApiError | NotTakenIn>(refused(t("server.session.life.inGraph", { name: current.name, graph: current.graph.id })));
           if (isBusy(current) || h.triggers.length > 0)
-            return yield* Effect.fail<ApiError | NotTakenIn>(refused(sessionWording().life.stillWorking(current.name)));
+            return yield* Effect.fail<ApiError | NotTakenIn>(refused(t("server.session.life.stillWorking", { name: current.name })));
           yield* rest(h);
           const merged = yield* use(h.place, h.lastText).pipe(
             Effect.mapError((e) => {
@@ -963,7 +966,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db(qr.openRuns())) yield* keptRun(`run ${r.id}`, runs.finish(r.id, "interrupted", sessionWording().log.restarted));
+      for (const r of yield* db(qr.openRuns())) yield* keptRun(`run ${r.id}`, runs.finish(r.id, "interrupted", t("server.session.log.restarted")));
       const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
@@ -981,7 +984,10 @@ export const make = (options: SessionOptionsIn = {}) =>
           yield* ended(session.id, "lost");
           yield* core.notice(
             "warn",
-            sessionWording().life.notBack(session.name, place ? sessionWording().life.placeGone(place.cwd) : sessionWording().life.noRecord),
+            t("server.session.life.notBack", {
+              name: session.name,
+              why: place ? t("server.session.life.placeGone", { cwd: place.cwd }) : t("server.session.life.noRecord"),
+            }),
           );
           continue;
         }
@@ -1002,8 +1008,8 @@ export const make = (options: SessionOptionsIn = {}) =>
           heard: [],
         });
         if (isBusy(session)) {
-          yield* core.apply({ type: "report", id: session.id, outcome: "interrupted", summary: sessionWording().log.restarted, runs: session.runs });
-          yield* core.notice("info", sessionWording().life.restartedNotice(session.name));
+          yield* core.apply({ type: "report", id: session.id, outcome: "interrupted", summary: t("server.session.log.restarted"), runs: session.runs });
+          yield* core.notice("info", t("server.session.life.restartedNotice", { name: session.name }));
         }
       }
       if (hands.size > 0) yield* Effect.logInfo(`vibevalley: brought back ${hands.size} helpers`);
@@ -1059,13 +1065,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       }),
       send: Effect.fn("Sessions.send")(function* (agent, task, where, opt) {
         const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);
-        if (unclosed) return { refused: unclosed.failure ?? sessionWording().life.issueNotReturned, retainedWork: true as const };
+        if (unclosed) return { refused: unclosed.failure ?? t("server.session.life.issueNotReturned"), retainedWork: true as const };
         const full = roomFor(agent.runtime, where);
         if (full) return { refused: full };
         hired++;
         const id = sessionId(`w${hired}`);
         const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? ""));
-        if (placed._tag === "Failure") return { refused: sessionWording().life.noPlace(agent.name, placed.failure.message) };
+        if (placed._tag === "Failure") return { refused: t("server.session.life.noPlace", { name: agent.name, why: placed.failure.message }) };
         const place = placed.success;
         let committed = false;
         let released = false;
@@ -1098,15 +1104,18 @@ export const make = (options: SessionOptionsIn = {}) =>
               return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
             });
           const opened = yield* open(agent, session, place, withRecall(recall, task), "");
-          if (!opened.session) return yield* refuseStart(sessionWording().life.cannotSend(agent.name, opened.refused ?? ""), opened.retained);
+          if (!opened.session) return yield* refuseStart(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused ?? "" }), opened.retained);
           const registered = yield* Effect.result(
             Effect.gen(function* () {
               if (opt.hiring) yield* opt.hiring(session);
               return yield* logOf(session);
             }).pipe(Effect.catchDefect((e) => (SqlError.isSqlError(e) ? Effect.fail(e) : Effect.die(e)))),
-          ).pipe(Effect.onError((cause) => failedOpening(opened.session, sessionWording().life.notRecorded(agent.name, reasonText(cause)))));
+          ).pipe(Effect.onError((cause) => failedOpening(opened.session, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(cause) }))));
           if (registered._tag === "Failure") {
-            const failed = yield* failedOpening(opened.session, sessionWording().life.notRecorded(agent.name, reasonText(registered.failure)));
+            const failed = yield* failedOpening(
+              opened.session,
+              t("server.session.life.notRecorded", { name: agent.name, why: reasonText(registered.failure) }),
+            );
             return yield* refuseStart(failed.refused, failed.retained);
           }
           const h: Hand = {
@@ -1160,11 +1169,11 @@ export const make = (options: SessionOptionsIn = {}) =>
           const name = core.session(id)?.name ?? id;
           switch (d.kind) {
             case "steered":
-              return sessionWording().life.steered(name);
+              return t("server.session.life.steered", { name });
             case "queued":
-              return sessionWording().life.queued(name);
+              return t("server.session.life.queued", { name });
             case "run":
-              return sessionWording().life.started(name, d.woke === true);
+              return t("server.session.life.started", { name, woke: d.woke === true });
             case "refused":
               break;
           }
@@ -1190,11 +1199,11 @@ export const make = (options: SessionOptionsIn = {}) =>
             yield* closeOar(h);
             if (work === "discard" && h.place.branch) {
               const reset = yield* Effect.result(projects.reset(h.place));
-              if (reset._tag === "Failure") yield* core.notice("warn", sessionWording().life.notReset(name, reset.failure.message));
+              if (reset._tag === "Failure") yield* core.notice("warn", t("server.session.life.notReset", { name, why: reset.failure.message }));
             }
             yield* leave(h, closed, 0);
             const kept = yield* projects.release(h.place);
-            if (kept.kept) yield* core.notice("info", sessionWording().life.left(name, kept.reason));
+            if (kept.kept) yield* core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
             return true;
           }),
         );
@@ -1207,14 +1216,14 @@ export const make = (options: SessionOptionsIn = {}) =>
             const s = core.session(id);
             if (hands.get(id) !== h || !s || isBusy(s)) return;
             const reset = yield* Effect.result(projects.reset(h.place));
-            if (reset._tag === "Failure") yield* core.notice("warn", sessionWording().life.notReset(s.name, reset.failure.message));
+            if (reset._tag === "Failure") yield* core.notice("warn", t("server.session.life.notReset", { name: s.name, why: reset.failure.message }));
           }),
         );
       }),
       clearWorkplace: Effect.fn("Sessions.clearWorkplace")(function* (issue, project, number, work) {
         const unclosed = [...allocations.values()].find((a) => a.owner.issue === issue);
-        if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? sessionWording().life.issueNotReturned));
-        if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused(sessionWording().life.stillHasHelper));
+        if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? t("server.session.life.issueNotReturned")));
+        if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused(t("server.session.life.stillHasHelper")));
         return yield* projects.clear(project, number, work);
       }, admission.withPermits(1)),
       roster: () =>

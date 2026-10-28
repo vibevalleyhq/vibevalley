@@ -1,8 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // 图鉴's shelves: every drawing in sprites.json on a shelf by its name, a
 // helper's by animal and outfit; which ones are a walk's frames; how one is drawn again.
 
-import { catalogWording } from "./words";
-import { appWording } from "../../base/words";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { outfitLabel, speciesLabel } from "../../ui/cast";
 
@@ -45,30 +44,30 @@ export interface Shelf {
 }
 
 export const shelves: readonly Shelf[] = [
-  { id: "helpers", label: catalogWording().shelf.helpers.label, hint: catalogWording().shelf.helpers.hint, match: isHelper },
-  { id: "orchestrator", label: appWording().orchestrator, hint: catalogWording().shelf.orchestrator.hint, match: (n) => n.startsWith("manager-") },
-  { id: "dog", label: catalogWording().shelf.dog.label, hint: catalogWording().shelf.dog.hint, match: (n) => n.startsWith("dog-") },
-  { id: "plots", label: catalogWording().shelf.plots.label, hint: catalogWording().shelf.plots.hint, match: (n) => n.startsWith("plot-") },
+  { id: "helpers", label: t("web.catalog.shelf.helpers.label"), hint: t("web.catalog.shelf.helpers.hint"), match: isHelper },
+  { id: "orchestrator", label: t("web.base.orchestrator"), hint: t("web.catalog.shelf.orchestrator.hint"), match: (n) => n.startsWith("manager-") },
+  { id: "dog", label: t("web.catalog.shelf.dog.label"), hint: t("web.catalog.shelf.dog.hint"), match: (n) => n.startsWith("dog-") },
+  { id: "plots", label: t("web.catalog.shelf.plots.label"), hint: t("web.catalog.shelf.plots.hint"), match: (n) => n.startsWith("plot-") },
   {
     id: "yard",
-    label: catalogWording().shelf.yard.label,
-    hint: catalogWording().shelf.yard.hint,
+    label: t("web.catalog.shelf.yard.label"),
+    hint: t("web.catalog.shelf.yard.hint"),
     match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/.test(n),
   },
-  { id: "map", label: catalogWording().shelf.map.label, hint: catalogWording().shelf.map.hint, match: (n) => /^(island|map)-/.test(n) },
-  { id: "machines", label: catalogWording().shelf.machines.label, hint: catalogWording().shelf.machines.hint, match: (n) => n.startsWith("machine-") },
-  { id: "icons", label: catalogWording().shelf.icons.label, hint: catalogWording().shelf.icons.hint, match: (n) => n.startsWith("icon-") },
-  { id: "acts", label: catalogWording().shelf.acts.label, hint: catalogWording().shelf.acts.hint, match: (n) => n.startsWith("act-") },
+  { id: "map", label: t("web.catalog.shelf.map.label"), hint: t("web.catalog.shelf.map.hint"), match: (n) => /^(island|map)-/.test(n) },
+  { id: "machines", label: t("web.catalog.shelf.machines.label"), hint: t("web.catalog.shelf.machines.hint"), match: (n) => n.startsWith("machine-") },
+  { id: "icons", label: t("web.catalog.shelf.icons.label"), hint: t("web.catalog.shelf.icons.hint"), match: (n) => n.startsWith("icon-") },
+  { id: "acts", label: t("web.catalog.shelf.acts.label"), hint: t("web.catalog.shelf.acts.hint"), match: (n) => n.startsWith("act-") },
   {
     id: "medals",
-    label: catalogWording().shelf.medals.label,
-    hint: catalogWording().shelf.medals.hint,
+    label: t("web.catalog.shelf.medals.label"),
+    hint: t("web.catalog.shelf.medals.hint"),
     match: (n) => /^(medal|emblem|stamp|coins|banner)-/.test(n),
   },
-  { id: "logos", label: "Logo", hint: catalogWording().shelf.logos.hint, match: (n) => /^(logo|connector|app)-/.test(n) },
-  { id: "langs", label: catalogWording().shelf.langs.label, hint: catalogWording().shelf.langs.hint, match: (n) => n.startsWith("lang-") },
-  { id: "ui", label: catalogWording().shelf.ui.label, hint: catalogWording().shelf.ui.hint, match: (n) => /^(button|energy|day)-/.test(n) },
-  { id: "other", label: catalogWording().shelf.other.label, hint: catalogWording().shelf.other.hint, match: () => true },
+  { id: "logos", label: "Logo", hint: t("web.catalog.shelf.logos.hint"), match: (n) => /^(logo|connector|app)-/.test(n) },
+  { id: "langs", label: t("web.catalog.shelf.langs.label"), hint: t("web.catalog.shelf.langs.hint"), match: (n) => n.startsWith("lang-") },
+  { id: "ui", label: t("web.catalog.shelf.ui.label"), hint: t("web.catalog.shelf.ui.hint"), match: (n) => /^(button|energy|day)-/.test(n) },
+  { id: "other", label: t("web.catalog.shelf.other.label"), hint: t("web.catalog.shelf.other.hint"), match: () => true },
 ];
 
 export const shelfOf = (name: string) => shelves.find((s) => s.match(name))!.id;

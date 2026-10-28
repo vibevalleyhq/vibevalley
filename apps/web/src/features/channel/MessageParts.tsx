@@ -1,6 +1,6 @@
+import { t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
-import { chatWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -20,7 +20,7 @@ import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePat
 const sizeText = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-const nameOf = (m: ChatMessage) => (m.from === ownerId ? chatWording().messages.owner : m.name);
+const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
 const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(reasonOf(e), "bad"));
 
@@ -37,7 +37,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
       <Icon name="reply" size={10} class="opacity-60" />
       <Show when={answered()} fallback={<span>#{props.number}</span>}>
         {(m) => (
-          <Show when={m().deleted === undefined} fallback={<span class="italic">{chatWording().messages.replyGone}</span>}>
+          <Show when={m().deleted === undefined} fallback={<span class="italic">{t("web.channel.messages.replyGone")}</span>}>
             <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
             <span class="min-w-0 truncate">
               {m().text ||
@@ -54,12 +54,12 @@ export function ReplyQuote(props: { channel: string; number: number }) {
 
 export function MessageBody(props: { m: ChatMessage }) {
   return (
-    <Show when={props.m.deleted === undefined} fallback={<p class="text-sm text-muted italic">{chatWording().messages.deleted}</p>}>
+    <Show when={props.m.deleted === undefined} fallback={<p class="text-sm text-muted italic">{t("web.channel.messages.deleted")}</p>}>
       <Show when={props.m.text}>
         <Markdown text={props.m.text} mentions />
       </Show>
       <Show when={props.m.edited !== undefined}>
-        <span class="text-xs text-faint">{chatWording().messages.edited}</span>
+        <span class="text-xs text-faint">{t("web.channel.messages.edited")}</span>
       </Show>
     </Show>
   );
@@ -101,7 +101,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   <span class="flex min-w-0 flex-col">
                     <span class="max-w-64 truncate">{file.name}</span>
                     <span class="text-xs text-muted">
-                      {shownAs(file.type) === "pdf" ? chatWording().media.pdf : chatWording().messages.file(sizeText(file.size))}
+                      {shownAs(file.type) === "pdf" ? t("web.channel.media.pdf") : t("web.channel.messages.file", { size: sizeText(file.size) })}
                     </span>
                   </span>
                 </a>
@@ -116,7 +116,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
 /** The links' previews the server read: what the page says of itself, and its picture from its own site. */
 export function Embeds(props: { embeds: readonly Embed[] }) {
   return (
-    <div class="mt-1 flex flex-col gap-1.5" aria-label={chatWording().media.preview}>
+    <div class="mt-1 flex flex-col gap-1.5" aria-label={t("web.channel.media.preview")}>
       <For each={props.embeds} keyed={(e) => e.url}>
         {(e) => (
           <a
@@ -156,7 +156,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
             <button
               type="button"
               aria-pressed={aria(mine())}
-              title={chatWording().messages.reactedBy(r().emoji, r().by.map(props.names).join("、"))}
+              title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: r().by.map(props.names).join("、") })}
               onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji: r().emoji }))}
               class={[
                 "flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
@@ -183,8 +183,8 @@ function AddReaction(props: { id: string }) {
       <button
         type="button"
         ref={(el) => (button = el)}
-        aria-label={chatWording().emoji.more}
-        title={chatWording().emoji.more}
+        aria-label={t("web.channel.emoji.more")}
+        title={t("web.channel.emoji.more")}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
         // Only on the message under the pointer or the focus, as the toolbar: every message has a 👀 to sit beside.
@@ -225,14 +225,14 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
     const link = location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number);
     run(async () => {
       await navigator.clipboard.writeText(link);
-      toast(chatWording().more.copied);
+      toast(t("web.channel.more.copied"));
     });
   };
   const editable = () => props.m.from === ownerId && props.m.kind === "chat";
   return (
     <div
       role="toolbar"
-      aria-label={chatWording().tools.label}
+      aria-label={t("web.channel.tools.label")}
       // Shown while hovered, and while something it opened is: the picker is outside the row.
       class={[
         "absolute -top-3 right-2 z-10 items-center gap-0.5 rounded-md border border-line bg-page p-0.5 shadow-float",
@@ -240,7 +240,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       ]}
     >
       <Show when={picking()}>
-        <div role="group" aria-label={chatWording().tools.pick} class="flex items-center gap-0.5 border-r border-line pr-0.5">
+        <div role="group" aria-label={t("web.channel.tools.pick")} class="flex items-center gap-0.5 border-r border-line pr-0.5">
           <For each={quickReactions}>
             {(emoji) => (
               <button
@@ -260,8 +260,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             type="button"
             ref={(el) => (moreEmoji = el)}
             class={tool}
-            aria-label={chatWording().emoji.more}
-            title={chatWording().emoji.more}
+            aria-label={t("web.channel.emoji.more")}
+            title={t("web.channel.emoji.more")}
             aria-expanded={aria(everyEmoji())}
             onClick={() => setEveryEmoji(!everyEmoji())}
           >
@@ -281,14 +281,14 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           }}
         />
       </Show>
-      <button type="button" class={tool} aria-label={chatWording().tools.react} title={chatWording().tools.react} onClick={() => setPicking(!picking())}>
+      <button type="button" class={tool} aria-label={t("web.channel.tools.react")} title={t("web.channel.tools.react")} onClick={() => setPicking(!picking())}>
         <Icon name="react" size={16} />
       </button>
       <button
         type="button"
         class={tool}
-        aria-label={chatWording().tools.reply}
-        title={chatWording().tools.reply}
+        aria-label={t("web.channel.tools.reply")}
+        title={t("web.channel.tools.reply")}
         onClick={() => drafts.reply(props.m.channel, props.m)}
       >
         <Icon name="reply" size={14} />
@@ -297,8 +297,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <button
           type="button"
           class={tool}
-          aria-label={chatWording().tools.thread}
-          title={chatWording().tools.thread}
+          aria-label={t("web.channel.tools.thread")}
+          title={t("web.channel.tools.thread")}
           onClick={() =>
             run(async () => {
               const thread = await api.channel.thread.create({ id: props.m.id });
@@ -312,15 +312,15 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       <button
         type="button"
         class={tool}
-        aria-label={props.m.pinned !== undefined ? chatWording().tools.unpin : chatWording().tools.pin}
-        title={props.m.pinned !== undefined ? chatWording().tools.unpin : chatWording().tools.pin}
+        aria-label={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
+        title={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
         aria-pressed={aria(props.m.pinned !== undefined)}
         onClick={() => run(() => api.channel.pin.toggle({ id: props.m.id }))}
       >
         <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
       </button>
       <Show when={editable()}>
-        <button type="button" class={tool} aria-label={chatWording().tools.edit} title={chatWording().tools.edit} onClick={() => props.onEdit()}>
+        <button type="button" class={tool} aria-label={t("web.channel.tools.edit")} title={t("web.channel.tools.edit")} onClick={() => props.onEdit()}>
           <Icon name="edit" size={14} />
         </button>
       </Show>
@@ -328,8 +328,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <button
           type="button"
           class={tool}
-          aria-label={chatWording().more.label}
-          title={chatWording().more.label}
+          aria-label={t("web.channel.more.label")}
+          title={t("web.channel.more.label")}
           aria-expanded={aria(more())}
           onClick={() => setMore(!more())}
         >
@@ -338,11 +338,11 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <Show when={more()}>
           <div
             role="menu"
-            aria-label={chatWording().more.label}
+            aria-label={t("web.channel.more.label")}
             class="absolute right-0 bottom-full z-20 mb-1 flex w-44 flex-col rounded-md border border-line bg-page p-1 shadow-float"
           >
             <button type="button" role="menuitem" class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover" onClick={copyLink}>
-              {chatWording().more.copyLink}
+              {t("web.channel.more.copyLink")}
             </button>
             <button
               type="button"
@@ -353,7 +353,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
                 run(() => markUnread(props.m.channel, props.m.number));
               }}
             >
-              {chatWording().more.markUnread}
+              {t("web.channel.more.markUnread")}
             </button>
           </div>
         </Show>
@@ -361,8 +361,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       <button
         type="button"
         class={[tool, { "bg-berry/15": sure() }]}
-        aria-label={sure() ? chatWording().tools.sure : chatWording().tools.remove}
-        title={sure() ? chatWording().tools.sure : chatWording().tools.remove}
+        aria-label={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
+        title={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
         onBlur={() => setSure(false)}
         onClick={() => {
           if (!sure()) return void setSure(true);
@@ -397,7 +397,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
       <textarea
         ref={autofocus()}
         value={text()}
-        aria-label={chatWording().tools.edit}
+        aria-label={t("web.channel.tools.edit")}
         onInput={(e) => setText(e.currentTarget.value)}
         onKeyDown={(e) => {
           if (e.isComposing) return;
@@ -421,7 +421,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
                 <button
                   type="button"
                   aria-pressed={aria(keeps())}
-                  aria-label={keeps() ? chatWording().media.takeOff(f.name) : chatWording().media.keep(f.name)}
+                  aria-label={keeps() ? t("web.channel.media.takeOff", { name: f.name }) : t("web.channel.media.keep", { name: f.name })}
                   onClick={() => setKept((k) => (keeps() ? k.filter((x) => x !== f.id) : [...k, f.id]))}
                   class={[
                     "flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs",
@@ -437,7 +437,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
           </For>
         </div>
       </Show>
-      <p class="mt-1 text-xs text-muted">{chatWording().tools.editHint}</p>
+      <p class="mt-1 text-xs text-muted">{t("web.channel.tools.editHint")}</p>
     </div>
   );
 }
@@ -465,7 +465,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
   return (
     <button
       type="button"
-      aria-label={chatWording().messages.linked(channelLabel(where()), props.at.number)}
+      aria-label={t("web.channel.messages.linked", { where: channelLabel(where()), number: props.at.number })}
       onClick={() => router.navigate(messagePath(where(), props.at.number))}
       class="flex max-w-lg cursor-pointer flex-col gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 text-left hover:bg-hover"
     >
@@ -476,7 +476,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
       </span>
       <Show when={m()}>
         {(said) => (
-          <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{chatWording().messages.replyGone}</span>}>
+          <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</span>}>
             <span class="line-clamp-3 text-sm">
               {said().text ||
                 said()

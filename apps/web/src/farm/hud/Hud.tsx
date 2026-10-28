@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The farm's HUD over the village: the orchestrator's face and the farm's level, coins and clock at the top left; the
 // memory tree, the map, the channels, the quota and the menu at the top right; the phone and the helpers at the bottom left; the tools along the
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
 
-import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { clockText, thousands } from "./rules";
@@ -54,7 +54,7 @@ export function HudTap(props: { label: string; onClick: () => void; selected?: b
 export function Hud() {
   const shown = useFarm((s) => s.screen?.shown);
   return (
-    <div class="pointer-events-none absolute inset-0" aria-label={farmWording().hud.label}>
+    <div class="pointer-events-none absolute inset-0" aria-label={t("web.farm.hud.label")}>
       <Overlay />
       <ProjectSign />
       <Show when={shown()}>
@@ -91,7 +91,7 @@ function TopLeft() {
   };
   return (
     <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
-      <HudTap label={farmWording().hud.look} onClick={() => open("orchestrator")}>
+      <HudTap label={t("web.farm.hud.look")} onClick={() => open("orchestrator")}>
         <span class="inline-block pr-0.5 pb-0.5">
           <span
             class="box-border flex items-center justify-center border-2 shadow-[2px_2px_0_0_#3a2a1899]"
@@ -101,7 +101,7 @@ function TopLeft() {
           </span>
         </span>
       </HudTap>
-      <HudTap label={farmWording().panel.graphs} onClick={() => open("graphs")}>
+      <HudTap label={t("web.farm.panel.graphs")} onClick={() => open("graphs")}>
         <span class="inline-block pr-0.5 pb-0.5 text-left">
           <span
             class="box-border flex flex-col justify-center border-2 px-1.5 py-0.5 shadow-[2px_2px_0_0_#3a2a1899]"
@@ -118,7 +118,9 @@ function TopLeft() {
               <span class="block h-full" style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%`, background: CardColors.barFill }} />
             </span>
             <span class="text-[12px] leading-[14px]" style={{ color: CardColors.muted }}>
-              {farmWording().hud.toLevel(Math.round(lv().xp), need(), next())}
+              {next() !== undefined
+                ? t("web.farm.hud.toLevelNext", { xp: Math.round(lv().xp), need: need(), next: next()! })
+                : t("web.farm.hud.toLevel", { xp: Math.round(lv().xp), need: need() })}
             </span>
           </span>
         </span>
@@ -126,7 +128,7 @@ function TopLeft() {
       {/* A link, so it opens in a new tab too; in the row, so it covers nothing. */}
       <a
         href="/issues"
-        title={farmWording().hud.workbenchHint}
+        title={t("web.farm.hud.workbenchHint")}
         onClick={(e) => {
           if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
           e.preventDefault();
@@ -137,7 +139,7 @@ function TopLeft() {
       >
         <HudCard height={top}>
           <SpriteIcon name="icon-tasks" size={20} />
-          {farmWording().hud.workbench}
+          {t("web.farm.hud.workbench")}
         </HudCard>
       </a>
     </div>
@@ -154,24 +156,24 @@ function TopRight() {
   };
   return (
     <div class="absolute flex items-start" style={{ right: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
-      <HudTap label={farmWording().hud.treeHint} onClick={() => go("/tree")}>
+      <HudTap label={t("web.farm.hud.treeHint")} onClick={() => go("/tree")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-tree" size={20} />
-          {farmWording().hud.tree}
+          {t("web.farm.hud.tree")}
         </HudCard>
       </HudTap>
       <Show when={webRoutes.includes("/projects")}>
-        <HudTap label={farmWording().hud.mapHint} onClick={() => go("/projects")}>
+        <HudTap label={t("web.farm.hud.mapHint")} onClick={() => go("/projects")}>
           <HudCard height={top}>
             <SpriteIcon name="icon-map" size={20} />
-            {farmWording().hud.map}
+            {t("web.farm.hud.map")}
           </HudCard>
         </HudTap>
       </Show>
-      <HudTap label={unread() > 0 ? farmWording().hud.channelsUnread(unread()) : farmWording().chat.channels} onClick={() => go("/chat")}>
+      <HudTap label={unread() > 0 ? t("web.farm.hud.channelsUnread", { n: unread() }) : t("web.farm.chat.channels")} onClick={() => go("/chat")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-board" size={20} />
-          {farmWording().chat.channels}
+          {t("web.farm.chat.channels")}
           <Show when={unread() > 0}>
             <span class="bg-berry px-1 text-[10px] text-cream-50">{unread()}</span>
           </Show>
@@ -179,7 +181,7 @@ function TopRight() {
       </HudTap>
       <QuotaPill height={top} />
       <HudTap
-        label={farmWording().hud.menuHint}
+        label={t("web.farm.hud.menuHint")}
         onClick={() => {
           playSound("open");
           farm.menu(true);
@@ -189,7 +191,7 @@ function TopRight() {
           height={top}
           rows={[
             [
-              { kind: "words", text: farmWording().panel.menu },
+              { kind: "words", text: t("web.farm.panel.menu") },
               { kind: "words", text: "Esc", color: CardColors.muted },
             ],
           ]}
@@ -218,7 +220,7 @@ function BottomLeft() {
 function ToolBar() {
   const held = useFarm((s) => s.tool);
   return (
-    <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={farmWording().hud.tools}>
+    <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={t("web.farm.hud.tools")}>
       <For each={tools}>
         {(tool, i) => (
           <HudTap label={`${tool.label}：${tool.hint}（${i() + 1}）`} selected={held() === tool.id} onClick={() => farm.hold(tool.id)}>

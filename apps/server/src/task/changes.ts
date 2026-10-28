@@ -1,9 +1,9 @@
+import { list, t } from "@vibevalley/i18n";
 // What changed in a task graph, step by step, and how each change is said. What is kept is the fact (a field's key, a
 // count), so the history reads in the locale of whoever reads it.
 
 import type { GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
 import { taskOf } from "./graph.ts";
-import { type TaskField, taskWording } from "./words.ts";
 
 /** A graph event before it is stored: no id, actor or time yet. */
 export interface GraphChange {
@@ -16,20 +16,23 @@ export interface GraphChange {
   commits?: string[];
 }
 
+/** A task's fields as a graph's history keeps them (TaskFieldChange.field): the key, said at read time. */
+export type TaskField = "title" | "brief" | "needs" | "agent" | "check" | "scope";
+
 const taskFields: readonly { field: TaskField; text: (n: Task) => string }[] = [
   { field: "title", text: (n) => n.title },
   { field: "brief", text: (n) => n.brief },
-  { field: "needs", text: (n) => taskWording().list(n.needs ?? []) },
+  { field: "needs", text: (n) => list(n.needs ?? []) },
   { field: "agent", text: (n) => n.agent ?? "" },
   { field: "check", text: (n) => n.check ?? "" },
-  { field: "scope", text: (n) => taskWording().list(n.scope ?? []) },
+  { field: "scope", text: (n) => list(n.scope ?? []) },
 ];
 
 const isField = (f: string): f is TaskField => taskFields.some((x) => x.field === f);
 
 /** The changes as they are shown: each field by its name. */
 export const renderedChanges = (changes: readonly TaskFieldChange[]): TaskFieldChange[] =>
-  changes.map((c) => ({ ...c, field: isField(c.field) ? taskWording().field[c.field] : c.field }));
+  changes.map((c) => ({ ...c, field: isField(c.field) ? t(`server.task.field.${c.field}`) : c.field }));
 
 export function taskFieldChanges(was: Task, now: Task): TaskFieldChange[] {
   const out: TaskFieldChange[] = [];
@@ -121,52 +124,53 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
 }
 
 export function graphEventText(e: GraphChange, titleOf: (task: string) => string = (id) => id): string {
-  const w = taskWording().event;
-  const step = w.step(e.task ? titleOf(e.task) : "");
-  const by = e.session ? w.by(e.session) : "";
+  const step = t("server.task.event.step", { title: e.task ? titleOf(e.task) : "" });
+  const by = e.session ? t("server.task.event.by", { session: e.session }) : "";
   const detail = e.detail ?? "";
-  const why = detail ? w.why(detail) : "";
+  const why = detail ? t("server.task.event.why", { detail }) : "";
   switch (e.kind) {
     case "splitting":
-      return w.splitting(why);
+      return t("server.task.event.splitting", { why });
     case "drafted":
-      return w.drafted(detail);
+      return detail ? t("server.task.event.draftedSteps", { steps: detail }) : t("server.task.event.drafted");
     case "started":
-      return w.started(detail);
+      return detail ? t("server.task.event.startedOn", { branch: detail }) : t("server.task.event.started");
     case "paused":
-      return w.paused(why);
+      return t("server.task.event.paused", { why });
     case "resumed":
-      return w.resumed;
+      return t("server.task.event.resumed");
     case "ready":
-      return w.ready;
+      return t("server.task.event.ready");
     case "merged":
-      return w.merged;
+      return t("server.task.event.merged");
     case "abandoned":
-      return w.abandoned(why);
+      return t("server.task.event.abandoned", { why });
     case "noted":
       return detail;
     case "task_started":
-      return w.taskStarted(step, by);
+      return t("server.task.event.taskStarted", { step, by });
     case "task_sent_back":
-      return w.taskSentBack(step, by, why);
+      return t("server.task.event.taskSentBack", { step, by, why });
     case "task_merged":
-      return w.taskMerged(step, e.commits ?? [], why);
+      return (e.commits ?? []).length > 0
+        ? t("server.task.event.taskMergedCommits", { step, commits: list(e.commits ?? []), why })
+        : t("server.task.event.taskMerged", { step, why });
     case "task_failed":
-      return w.taskFailed(step, why);
+      return t("server.task.event.taskFailed", { step, why });
     case "task_retried":
-      return w.taskRetried(step);
+      return t("server.task.event.taskRetried", { step });
     case "task_requeued":
-      return w.taskRequeued(step);
+      return t("server.task.event.taskRequeued", { step });
     case "task_skipped":
-      return w.taskSkipped(step);
+      return t("server.task.event.taskSkipped", { step });
     case "task_edited":
-      return w.taskEdited(
-        step,
-        (e.changes ?? []).map((c) => (isField(c.field) ? taskWording().field[c.field] : c.field)),
-      );
+      return t("server.task.event.taskEdited", {
+        step: step,
+        fields: list((e.changes ?? []).map((c) => (isField(c.field) ? t(`server.task.field.${c.field}`) : c.field))),
+      });
     case "task_added":
-      return w.taskAdded(step);
+      return t("server.task.event.taskAdded", { step });
     case "task_removed":
-      return w.taskRemoved(e.detail !== undefined ? e.detail : (e.task ?? ""));
+      return t("server.task.event.taskRemoved", { title: e.detail !== undefined ? e.detail : (e.task ?? "") });
   }
 }

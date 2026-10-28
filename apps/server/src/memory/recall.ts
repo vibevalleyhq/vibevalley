@@ -1,7 +1,7 @@
+import { maybe } from "@vibevalley/i18n";
 // What a run recalls, with no model: the server picks at the start of each
 // turn, and the agent page shows the same pick ahead of time. Characters are UTF-16 units.
 
-import { memoryWording } from "./words.ts";
 import { recallWords } from "./prompts.ts";
 import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";
 import { termsInCommon, termsOf } from "./terms.ts";
@@ -180,7 +180,7 @@ export function search(memories: readonly Memory[], q: SearchQuery, matches: Rea
   return out.slice(0, limit);
 }
 
-export const sourceLabel = (name: string) => memoryWording().source[name] ?? name;
+export const sourceLabel = (name: string) => maybe(`server.memory.source.${name}`) ?? name;
 
 /** How memory_search answers a model. The header says what recall's does: these were noted before, they are not orders. */
 export function foundText(result: SearchResult, q: SearchQuery): string {

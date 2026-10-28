@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // 项目: the codebases in the work root; 全部 is the whole map, a project its island, its
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
-import { projectsWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
@@ -65,24 +65,24 @@ export function ProjectsPage(props: { rest: string }) {
     <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3 md:flex-row md:overflow-hidden">
       <div class="max-h-60 shrink-0 overflow-y-auto md:max-h-none md:w-72">
         <ListCard
-          title={projectsWording().title}
-          label={projectsWording().list}
+          title={t("web.project.title")}
+          label={t("web.project.list")}
           action={
             <Button icon="add" onClick={() => setCreating(true)}>
-              {projectsWording().add}
+              {t("web.project.add")}
             </Button>
           }
         >
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{projectsWording().repos}</li>
+          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.project.repos")}</li>
           <Switch
             fallback={
               <>
-                <ListRow to="/projects" active={!selected()} title={projectsWording().all} line={projectsWording().allLine} />
+                <ListRow to="/projects" active={!selected()} title={t("web.project.all")} line={t("web.project.allLine")} />
                 <For each={sorted()}>
                   {(p) => {
                     const growth = () => growthOf(p.last, now());
                     const line = () =>
-                      !p.git ? projectsWording().notGit : p.last !== undefined ? `${growth().label} · ${since(p.last, now())}` : growth().label;
+                      !p.git ? t("web.project.notGit") : p.last !== undefined ? `${growth().label} · ${since(p.last, now())}` : growth().label;
                     return (
                       <ListRow
                         to={`/projects/${encodeURIComponent(p.name)}`}
@@ -98,10 +98,10 @@ export function ProjectsPage(props: { rest: string }) {
             }
           >
             <Match when={!ready(list, undefined)}>
-              <li class="px-2.5 pb-2 text-sm text-muted">{projectsWording().finding}</li>
+              <li class="px-2.5 pb-2 text-sm text-muted">{t("web.project.finding")}</li>
             </Match>
             <Match when={sorted().length === 0}>
-              <li class="px-2.5 pb-2 text-sm text-muted">{projectsWording().none}</li>
+              <li class="px-2.5 pb-2 text-sm text-muted">{t("web.project.none")}</li>
             </Match>
           </Switch>
         </ListCard>
@@ -113,7 +113,7 @@ export function ProjectsPage(props: { rest: string }) {
           {(name) => <ProjectPanel name={name} projects={sorted} now={now()} />}
         </Show>
       </div>
-      <Dialog open={creating()} onClose={() => setCreating(false)} title={projectsWording().add}>
+      <Dialog open={creating()} onClose={() => setCreating(false)} title={t("web.project.add")}>
         <NewProjectForm
           onDone={(made) => {
             setCreating(false);
@@ -165,9 +165,9 @@ function Stat(props: { label: string; value: string }) {
 async function copyPath(path: string) {
   try {
     await navigator.clipboard.writeText(path);
-    toast(projectsWording().copied(path));
+    toast(t("web.project.copied", { path }));
   } catch {
-    toast(projectsWording().notCopied);
+    toast(t("web.project.notCopied"));
   }
 }
 
@@ -185,26 +185,26 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
   return (
     <section class="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
       <span class="flex size-24 shrink-0 items-center justify-center rounded-lg bg-hover">
-        <SpriteIcon name={`plot-${growth().crop}`} size={80} label={projectsWording().growth(growth().label)} />
+        <SpriteIcon name={`plot-${growth().crop}`} size={80} label={t("web.project.growth", { label: growth().label })} />
       </span>
       <div class="flex min-w-0 flex-1 flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <h2 class="truncate text-xl font-semibold">{props.project.name}</h2>
-          <span class="rounded bg-leaf-300/50 px-1.5 text-xs">{projectsWording().growthTag(growth().label)}</span>
+          <span class="rounded bg-leaf-300/50 px-1.5 text-xs">{t("web.project.growthTag", { label: growth().label })}</span>
         </div>
         <div class="flex flex-wrap gap-x-6 gap-y-2">
           <Stat
-            label={projectsWording().broken}
-            value={worked()?.first !== undefined ? dateText(worked()!.first!) : worked() ? projectsWording().neverDug : "…"}
+            label={t("web.project.broken")}
+            value={worked()?.first !== undefined ? dateText(worked()!.first!) : worked() ? t("web.project.neverDug") : "…"}
           />
-          <Stat label={projectsWording().tilled} value={worked() ? projectsWording().commits(number(worked()!.total)) : "…"} />
+          <Stat label={t("web.project.tilled")} value={worked() ? t("web.project.commits", { n: number(worked()!.total) }) : "…"} />
           <Stat
-            label={projectsWording().crops}
-            value={lines() !== undefined ? projectsWording().lines(number(lines()!)) : notCounted() ? projectsWording().uncounted : "…"}
+            label={t("web.project.crops")}
+            value={lines() !== undefined ? t("web.project.lines", { n: number(lines()!) }) : notCounted() ? t("web.project.uncounted") : "…"}
           />
           <Stat
-            label={projectsWording().planted}
-            value={crops() !== undefined ? projectsWording().kinds(crops()!) : notCounted() ? projectsWording().uncounted : "…"}
+            label={t("web.project.planted")}
+            value={crops() !== undefined ? t("web.project.kinds", { n: crops()! }) : notCounted() ? t("web.project.uncounted") : "…"}
           />
         </div>
         <div class="flex items-center gap-1.5">
@@ -214,8 +214,8 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
           </span>
           <button
             type="button"
-            title={projectsWording().copyPath}
-            aria-label={projectsWording().copyPath}
+            title={t("web.project.copyPath")}
+            aria-label={t("web.project.copyPath")}
             class="cursor-pointer rounded p-1 hover:bg-hover"
             onClick={() => void copyPath(props.project.path)}
           >
@@ -226,8 +226,8 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
       <div class="flex flex-col items-end gap-1">
         <button
           type="button"
-          title={busy() ? projectsWording().counting : projectsWording().recount}
-          aria-label={projectsWording().recount}
+          title={busy() ? t("web.project.counting") : t("web.project.recount")}
+          aria-label={t("web.project.recount")}
           disabled={busy()}
           onClick={() => {
             void props.languages.refetch();
@@ -237,7 +237,7 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
         >
           <Icon name="refresh" size={16} />
         </button>
-        <Show when={counted()}>{(c) => <span class="text-xs text-muted">{projectsWording().countedAgo(since(c().at, props.now))}</span>}</Show>
+        <Show when={counted()}>{(c) => <span class="text-xs text-muted">{t("web.project.countedAgo", { ago: since(c().at, props.now) })}</span>}</Show>
       </div>
     </section>
   );
@@ -262,7 +262,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
     return d ? languageShares(d.languages) : [];
   };
   return (
-    <Card title={projectsWording().whatPlanted} action={<span class="text-xs text-muted">{projectsWording().byLines}</span>}>
+    <Card title={t("web.project.whatPlanted")} action={<span class="text-xs text-muted">{t("web.project.byLines")}</span>}>
       <Switch
         fallback={
           <>
@@ -299,7 +299,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
                         <span class="text-muted">{percent(s.share)}</span>
                       </span>
                       <Bar share={s.share < 0.02 ? 0.02 : s.share} color={s.color} />
-                      <span class="text-xs text-muted">{projectsWording().linesAndFiles(number(s.lines), number(s.files))}</span>
+                      <span class="text-xs text-muted">{t("web.project.linesAndFiles", { lines: number(s.lines), files: number(s.files) })}</span>
                     </div>
                   </div>
                 )}
@@ -315,7 +315,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
           <div class="h-12 rounded-md bg-hover" />
         </Match>
         <Match when={shares().length === 0}>
-          <Quiet>{projectsWording().empty}</Quiet>
+          <Quiet>{t("web.project.empty")}</Quiet>
         </Match>
       </Switch>
     </Card>
@@ -327,21 +327,21 @@ function NotCounted(props: { reason: string }) {
   const code = (t: string) => <code class="rounded bg-selected px-1.5 py-px font-mono text-sm">{t}</code>;
   return (
     <div class="flex flex-col gap-2 rounded-lg bg-hover p-3 text-sm">
-      <p>{install() ? projectsWording().noTokei : props.reason}</p>
+      <p>{install() ? t("web.project.noTokei") : props.reason}</p>
       <Show when={install()}>
         <p class="text-muted">
-          {projectsWording().install}
+          {t("web.project.install")}
           {code("brew install tokei")}
-          {projectsWording().or}
+          {t("web.project.or")}
           {code("cargo install tokei")}
-          {projectsWording().thenRecount}
+          {t("web.project.thenRecount")}
         </p>
       </Show>
     </div>
   );
 }
 
-const levelName = projectsWording().level;
+const levelName = (level: number) => (level >= 0 && level <= 4 ? t(`web.project.level.${level as 0 | 1 | 2 | 3 | 4}`) : "");
 const tile = 12;
 const tileGap = 3;
 
@@ -350,31 +350,31 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
   const worked = () => ready(props.activity, undefined);
   const calendar = createMemo(() => calendarOf(worked()?.days ?? [], new Date()));
   const streaks = createMemo(() => streaksOf(calendar()));
-  const aside = () => <span class="text-xs text-muted">{projectsWording().year}</span>;
+  const aside = () => <span class="text-xs text-muted">{t("web.project.year")}</span>;
   const line = () => {
     const p = pointed();
     const busiest = streaks().busiest;
     return p && !p.future
-      ? `${dayText(p.at)} · ${p.commits > 0 ? projectsWording().dayCommits(p.commits, levelName[p.level] ?? "") : projectsWording().untouched}`
+      ? `${dayText(p.at)} · ${p.commits > 0 ? t("web.project.dayCommits", { n: p.commits, level: levelName(p.level) }) : t("web.project.untouched")}`
       : busiest
-        ? projectsWording().busiest(dayText(new Date(`${busiest.day}T12:00`)), busiest.commits)
+        ? t("web.project.busiest", { day: dayText(new Date(`${busiest.day}T12:00`)), n: busiest.commits })
         : " ";
   };
   return (
     <Show
       when={!(props.activity.error && !worked())}
       fallback={
-        <Card title={projectsWording().calendar} action={aside()}>
+        <Card title={t("web.project.calendar")} action={aside()}>
           <p class="text-sm">{reasonOf(props.activity.error)}</p>
         </Card>
       }
     >
-      <Card title={projectsWording().calendar} action={aside()}>
+      <Card title={t("web.project.calendar")} action={aside()}>
         <div class="grid grid-cols-4 gap-6">
-          <Stat label={projectsWording().inYear} value={worked() ? projectsWording().commits(number(streaks().total)) : "…"} />
-          <Stat label={projectsWording().daysWorked} value={worked() ? projectsWording().days(streaks().days) : "…"} />
-          <Stat label={projectsWording().longest} value={worked() ? projectsWording().days(streaks().longest) : "…"} />
-          <Stat label={projectsWording().current} value={worked() ? projectsWording().days(streaks().current) : "…"} />
+          <Stat label={t("web.project.inYear")} value={worked() ? t("web.project.commits", { n: number(streaks().total) }) : "…"} />
+          <Stat label={t("web.project.daysWorked")} value={worked() ? t("web.project.days", { n: streaks().days }) : "…"} />
+          <Stat label={t("web.project.longest")} value={worked() ? t("web.project.days", { n: streaks().longest }) : "…"} />
+          <Stat label={t("web.project.current")} value={worked() ? t("web.project.days", { n: streaks().current }) : "…"} />
         </div>
         <div class="overflow-x-auto pb-1">
           <div class="min-w-[704px]">
@@ -389,12 +389,12 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
             </div>
             <div
               role="img"
-              aria-label={worked() ? projectsWording().yearLabel(streaks().total, streaks().days) : projectsWording().readingCommits}
+              aria-label={worked() ? t("web.project.yearLabel", { commits: streaks().total, days: streaks().days }) : t("web.project.readingCommits")}
               class="mt-1 flex"
               onMouseLeave={() => setPointed(undefined)}
             >
               <div class="flex w-5 flex-col" style={{ gap: `${tileGap}px` }}>
-                <For each={projectsWording().rows}>
+                <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.project.rows.${i}`))}>
                   {(d) => (
                     <span class="flex items-center text-[10px] leading-none text-muted" style={{ height: `${tile}px` }}>
                       {d}
@@ -421,15 +421,15 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs text-muted">{line()}</span>
           <span class="flex items-center gap-1 text-xs text-muted">
-            {projectsWording().fewer}
-            <For each={levelName}>
-              {(n, l) => (
-                <span title={n}>
-                  <SpriteIcon name={`day-${l()}`} size={tile} />
+            {t("web.project.fewer")}
+            <For each={[0, 1, 2, 3, 4]}>
+              {(l) => (
+                <span title={levelName(l)}>
+                  <SpriteIcon name={`day-${l}`} size={tile} />
                 </span>
               )}
             </For>
-            {projectsWording().more}
+            {t("web.project.more")}
           </span>
         </div>
       </Card>
@@ -449,7 +449,7 @@ function Hands(props: { activity?: ProjectActivity }) {
       .reduce((n, a) => n + a.commits, 0);
   return (
     <Show when={authors().length > 0}>
-      <Card title={projectsWording().who} action={<span class="text-xs text-muted">{projectsWording().whoWhen}</span>}>
+      <Card title={t("web.project.who")} action={<span class="text-xs text-muted">{t("web.project.whoWhen")}</span>}>
         <div class="grid gap-2.5 sm:grid-cols-2">
           <For each={authors().slice(0, hands)}>
             {(author) => {
@@ -469,7 +469,7 @@ function Hands(props: { activity?: ProjectActivity }) {
                   <div class="flex min-w-0 flex-1 flex-col gap-1">
                     <span class="flex text-sm">
                       <span class="min-w-0 flex-1 truncate font-medium">{author.name}</span>
-                      <span class="text-xs text-muted">{projectsWording().times(number(author.commits))}</span>
+                      <span class="text-xs text-muted">{t("web.project.times", { n: number(author.commits) })}</span>
                     </span>
                     <Bar share={author.commits / top()} color="#74a046" />
                   </div>
@@ -479,7 +479,7 @@ function Hands(props: { activity?: ProjectActivity }) {
           </For>
         </div>
         <Show when={rest() > 0}>
-          <p class="text-xs text-muted">{projectsWording().rest(authors().length - hands, number(rest()))}</p>
+          <p class="text-xs text-muted">{t("web.project.rest", { people: authors().length - hands, commits: number(rest()) })}</p>
         </Show>
       </Card>
     </Show>
@@ -526,11 +526,11 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
     >
       <div>
         <Segmented
-          label={projectsWording().how}
+          label={t("web.project.how")}
           value={importing()}
           options={[
-            { value: "new", label: projectsWording().fresh, disabled: busy() },
-            { value: "github", label: projectsWording().github, disabled: busy() },
+            { value: "new", label: t("web.project.fresh"), disabled: busy() },
+            { value: "github", label: t("web.project.github"), disabled: busy() },
           ]}
           onChange={(v) => {
             setImporting(v);
@@ -539,10 +539,10 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
         />
       </div>
       <Show when={importing() === "github"}>
-        <Field label={projectsWording().githubAddress} hint={projectsWording().githubHint}>
+        <Field label={t("web.project.githubAddress")} hint={t("web.project.githubHint")}>
           <TextInput
             ref={autofocus()}
-            aria-label={projectsWording().githubAddress}
+            aria-label={t("web.project.githubAddress")}
             disabled={busy()}
             placeholder="https://github.com/botiverse/raft-source"
             value={github()}
@@ -555,11 +555,11 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
           />
         </Field>
       </Show>
-      <Field label={projectsWording().name} hint={projectsWording().nameHint}>
+      <Field label={t("web.project.name")} hint={t("web.project.nameHint")}>
         <TextInput
-          aria-label={projectsWording().name}
+          aria-label={t("web.project.name")}
           disabled={busy()}
-          placeholder={projectsWording().nameExample}
+          placeholder={t("web.project.nameExample")}
           value={name()}
           onInput={(e) => {
             setNamed(true);
@@ -574,14 +574,14 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
         </p>
       </Show>
       <Show when={busy()}>
-        <p class="text-sm text-muted">{importing() === "github" ? projectsWording().downloading : projectsWording().making}</p>
+        <p class="text-sm text-muted">{importing() === "github" ? t("web.project.downloading") : t("web.project.making")}</p>
       </Show>
       <div class="flex justify-end gap-2 pt-2">
         <Button disabled={busy()} onClick={() => props.onDone()}>
-          {projectsWording().cancel}
+          {t("web.project.cancel")}
         </Button>
         <Button type="submit" tone="primary" disabled={!canSubmit()}>
-          {busy() ? projectsWording().busy : importing() === "github" ? projectsWording().download : projectsWording().create}
+          {busy() ? t("web.project.busy") : importing() === "github" ? t("web.project.download") : t("web.project.create")}
         </Button>
       </div>
     </form>

@@ -1,12 +1,12 @@
+import { t } from "@vibevalley/i18n";
 // How the memory tree page lays out what the server (for now mock.ts) says: what a filter keeps, what the panel lists,
 // and where each memory sits in the sky (the tree's own shape is grow.ts). Presentation only; the stage's name comes
 // with the data (MemoryTree.stage).
 
-import { treeWording } from "./words";
 import type { MemoryItem, MemoryKind, MemoryLink, MemoryTree, TreeStage } from "./mock";
 
 /** What each stage is called; the stage itself is the server's (MemoryTree.stage). */
-export const stageName: Record<TreeStage, string> = treeWording().stage;
+export const stageName = (stage: TreeStage) => t(`web.tree.stage.${stage}`);
 
 export interface TreeFilter {
   /** "" is every helper, every project. */

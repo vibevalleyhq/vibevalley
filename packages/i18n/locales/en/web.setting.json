@@ -1,0 +1,55 @@
+{
+  "sections": {
+    "title": "Settings",
+    "label": "Settings sections",
+    "deepseek": {
+      "line": "The manager's key"
+    },
+    "language": {
+      "label": "Language",
+      "line": "What language the page and the manager speak"
+    },
+    "memory": {
+      "label": "Memory"
+    },
+    "github": {
+      "line": "gh and sign-in, whether PRs can be opened"
+    }
+  },
+  "language": {
+    "title": "Language",
+    "line": "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
+    "zh": "中文",
+    "en": "English",
+    "label": "Page language"
+  },
+  "keys": {
+    "deepseekHint": "sk-… (leave empty to keep)",
+    "saved": "Saved, in use at once."
+  },
+  "source": {
+    "off": "Not set up",
+    "on": "On",
+    "closed": "Off",
+    "configure": "Set up {label}",
+    "enabled": "On",
+    "enable": "Turn on {label}",
+    "noKey": "A local one needs no key",
+    "address": "{label}'s address",
+    "key": "{label}'s key",
+    "keyHint": "key (leave empty if none or to keep)",
+    "user": "{label}'s user_id",
+    "userHint": "Your user_id in EverOS (empty means owner)",
+    "read": "Read",
+    "readHint": "Also asked when recalling at the start and when a helper looks things up",
+    "write": "Write",
+    "writeHint": "What is remembered is sent there too",
+    "everything": "Read everything",
+    "everythingHint": "Not only what VibeValley remembered for helpers: every helper reads your own memories there too"
+  },
+  "github": {
+    "noGh": "gh is not installed",
+    "note": "Which projects can open PRs is on the Projects page; opening a PR on completion is turned on in the configuration (github.pr_projects).",
+    "recheck": "Check again"
+  }
+}

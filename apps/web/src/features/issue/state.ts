@@ -1,16 +1,16 @@
+import { t } from "@vibevalley/i18n";
 // What an issue's page says, top to bottom, for the owner: what it is, where it stands, what is asked of the owner, how far
 // it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
-import { issuesWording } from "./words";
-import { appWording } from "../../base/words";
-import { wording } from "@vibevalley/protocol/words";
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./rules";
 import { tookText } from "../../base/format";
 import type { Tone } from "./cards";
 
+/** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
+const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export const attentionTone: Record<Attention, Tone> = {
   draft: "faint",
   queued: "faint",
@@ -25,10 +25,10 @@ export const attentionTone: Record<Attention, Tone> = {
 /** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
 export function spanText(ms: number) {
   const m = Math.floor(Math.max(0, ms) / 60_000);
-  if (m < 1) return appWording().time.round.underMinute;
-  if (m < 60) return appWording().time.round.minutes(m);
-  if (m < 60 * 24) return appWording().time.round.hours(Math.floor(m / 60));
-  return appWording().time.round.days(Math.floor(m / 60 / 24));
+  if (m < 1) return t("web.base.time.round.underMinute");
+  if (m < 60) return t("web.base.time.round.minutes", { m });
+  if (m < 60 * 24) return t("web.base.time.round.hours", { h: Math.floor(m / 60) });
+  return t("web.base.time.round.days", { d: Math.floor(m / 60 / 24) });
 }
 
 /** The block that asks the owner for the one thing: its head and what it says under it. */
@@ -61,31 +61,31 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
   const said = head.lastRun?.summary;
   switch (attention.state) {
     case "asking":
-      return { head: issuesWording().issue.asking(who, issue.questions.length), line: issuesWording().issue.askingLine, tone: "wheat" };
+      return { head: t("web.issue.issue.asking", { who, n: issue.questions.length }), line: t("web.issue.issue.askingLine"), tone: "wheat" };
     case "reviewing":
       return issue.reviewedAt !== undefined
-        ? { head: issuesWording().issue.reviewed, ...(said ? { line: said } : {}), tone: "leaf" }
-        : { head: issuesWording().issue.handedBack(who), ...(said ? { line: said } : {}), tone: "wheat" };
+        ? { head: t("web.issue.issue.reviewed"), ...(said ? { line: said } : {}), tone: "leaf" }
+        : { head: t("web.issue.issue.handedBack", { who }), ...(said ? { line: said } : {}), tone: "wheat" };
     case "stuck":
       switch (attention.stuck) {
         case "conflict":
           return {
-            head: issuesWording().issue.conflict(head.conflict?.base ?? issuesWording().issue.main),
-            line: head.conflict?.files.join(issuesWording().issue.and),
+            head: t("web.issue.issue.conflict", { base: head.conflict?.base ?? t("web.issue.issue.main") }),
+            line: head.conflict?.files.join(t("web.issue.issue.and")),
             tone: "berry",
           };
         case "failed":
-          return { head: issuesWording().issue.failed, ...(said ? { line: said } : {}), tone: "berry" };
+          return { head: t("web.issue.issue.failed"), ...(said ? { line: said } : {}), tone: "berry" };
         case "interrupted":
-          return { head: issuesWording().issue.interrupted, ...(said ? { line: said } : {}), tone: "wheat" };
+          return { head: t("web.issue.issue.interrupted"), ...(said ? { line: said } : {}), tone: "wheat" };
         case "quiet":
-          return { head: issuesWording().issue.quiet(who), line: issuesWording().issue.quietLine, tone: "berry" };
+          return { head: t("web.issue.issue.quiet", { who }), line: t("web.issue.issue.quietLine"), tone: "berry" };
         case undefined:
-          return { head: issuesWording().issue.stuck, tone: "berry" };
+          return { head: t("web.issue.issue.stuck"), tone: "berry" };
       }
       break;
     case "canceled":
-      return attention.lead === "reopen" ? { head: issuesWording().issue.canceled, line: issuesWording().issue.reopenLine, tone: "faint" } : undefined;
+      return attention.lead === "reopen" ? { head: t("web.issue.issue.canceled"), line: t("web.issue.issue.reopenLine"), tone: "faint" } : undefined;
     case "draft":
     case "queued":
     case "working":
@@ -99,7 +99,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
   const head = session ?? sessions[sessions.length - 1]!;
   const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
-  const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((t) => t.id === head.graph!.task);
+  const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === head.graph!.task);
   const attention = issue.attention;
   const current = doingOf(head);
   const rows = criteriaRows(issue);
@@ -121,36 +121,44 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     project: issue.project ?? head.project,
     taskText: !graph
-      ? issuesWording().issue.inGraph
+      ? t("web.issue.issue.inGraph")
       : !node
-        ? issuesWording().issue.splitting(graph.title)
-        : issuesWording().issue.planStep(graph.title, node.title),
+        ? t("web.issue.issue.splitting", { graph: graph.title })
+        : t("web.issue.issue.graphStep", { graph: graph.title, step: node.title }),
     ask: ownerQuestion(attention, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
     lead: attention.lead,
     others: attention.acts.map((a) => a.act).filter((a) => a !== attention.lead),
     criteria: rows,
     met: rows.filter((r) => r.result === "met").length,
-    doing: attention.state === "working" && current.action !== "none" ? issuesWording().issue.doing(current.actionText ?? "", current.label) : undefined,
+    doing:
+      attention.state === "working" && current.action !== "none"
+        ? current.label
+          ? t("web.issue.issue.doingLabel", { action: capitalized(current.actionText ?? ""), label: current.label })
+          : t("web.issue.issue.doing", { action: capitalized(current.actionText ?? "") })
+        : undefined,
     openFindings: issue.findings.filter((f) => !f.resolved),
     resolvedFindings: issue.findings.filter((f) => f.resolved),
     crewLine:
       crew.length <= 1 && !hand
         ? undefined
         : // One plot, one worktree: only the session on it now changes the code.
-          [crew.map((c) => c.name).join(issuesWording().issue.and), ...(hand ? [issuesWording().issue.editing(hand.name)] : [])].join(" · "),
-    whoLine: issuesWording().issue.who(head.name, head.runtime),
-    historyLine: issuesWording().issue.history(sessions.length, sessions.map((r) => issuesWording().issue.historyItem(r.name, r.id)).join(" → ")),
+          [crew.map((c) => c.name).join(t("web.issue.issue.and")), ...(hand ? [t("web.issue.issue.editing", { who: hand.name })] : [])].join(" · "),
+    whoLine: head.runtime ? t("web.issue.issue.whoRuntime", { name: head.name, runtime: head.runtime }) : t("web.issue.issue.who", { name: head.name }),
+    historyLine: t("web.issue.issue.history", {
+      n: sessions.length,
+      line: sessions.map((r) => t("web.issue.issue.historyItem", { name: r.name, id: r.id })).join(" → "),
+    }),
     /** 在等你 · 已经 3 分钟 · Claude 师傅 · 第 2 轮 · 用了 4 分钟 · ¥0.42; cny is all the issue's runs when known. */
     statusLine(now: number, cny?: number) {
       const s = session ?? head;
       const turns = Math.round(s.runs);
       return [
-        wording().attention[attention.state],
-        ...(attention.since !== undefined ? [issuesWording().issue.since(spanText(now - attention.since))] : []),
+        t(`shared.attention.${attention.state}`),
+        ...(attention.since !== undefined ? [t("web.issue.issue.since", { span: spanText(now - attention.since) })] : []),
         head.name,
-        ...(turns > 0 ? [issuesWording().issue.ran(turns)] : []),
-        issuesWording().issue.used(spanText((endedAt(head) ?? now) - sessions[0]!.hiredAt)),
+        ...(turns > 0 ? [t("web.issue.issue.ran", { n: turns })] : []),
+        t("web.issue.issue.used", { span: spanText((endedAt(head) ?? now) - sessions[0]!.hiredAt) }),
         ...((cny ?? s.spent?.cny) !== undefined ? [`¥${(cny ?? s.spent!.cny!).toFixed(2)}`] : []),
       ].join(" · ");
     },
@@ -158,9 +166,9 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       const s = session ?? head;
       const turns = s.runs > 0 ? Math.round(s.runs) : steps.filter((e) => e.type === "run/start").length;
       return [
-        issuesWording().card.turns(turns),
+        t("web.issue.card.turns", { n: turns }),
         tookText((endedAt(head) ?? now) - head.hiredAt),
-        ...(s.spent?.cny !== undefined ? [appWording().money.spent(`¥${s.spent.cny.toFixed(2)}`)] : []),
+        ...(s.spent?.cny !== undefined ? [t("web.base.money.spent", { yuan: `¥${s.spent.cny.toFixed(2)}` })] : []),
         ...(head.spent && head.spent.tokens > 0 ? [`${Math.round(head.spent.tokens)} token`] : []),
       ].join(" · ");
     },
@@ -180,11 +188,14 @@ export const lineCounts = (c: Changes): [number, number] => [
 /** The one line over an issue's changes. */
 export function changesLine(c: Changes) {
   const [added, removed] = lineCounts(c);
-  return issuesWording().issue.changes(c.branch ?? "", c.base, c.commits.length, added, removed, c.uncommitted.length);
+  const counts = { branch: c.branch ?? "", base: c.base, commits: c.commits.length, added, removed };
+  return c.uncommitted.length
+    ? t("web.issue.issue.changesUncommitted", { ...counts, uncommitted: c.uncommitted.length })
+    : t("web.issue.issue.changes", counts);
 }
 
 /** The empty 干活过程 says why. */
-export const noStepsText = (head: Session) => (endedAt(head) === undefined ? issuesWording().issue.noSteps : issuesWording().issue.stepsGone);
+export const noStepsText = (head: Session) => (endedAt(head) === undefined ? t("web.issue.issue.noSteps") : t("web.issue.issue.stepsGone"));
 
 /** Nothing to merge: completing only lets the helper go. */
 export const nothingChanged = (c: Changes) => c.commits.length === 0 && c.uncommitted.length === 0;
@@ -193,11 +204,11 @@ export const nothingChanged = (c: Changes) => c.commits.length === 0 && c.uncomm
 export function changeKind(status: string) {
   switch (status) {
     case "A":
-      return { mark: issuesWording().issue.change.A.mark, label: issuesWording().issue.change.A.label };
+      return { mark: t("web.issue.issue.change.A.mark"), label: t("web.issue.issue.change.A.label") };
     case "M":
-      return { mark: issuesWording().issue.change.M.mark, label: issuesWording().issue.change.M.label };
+      return { mark: t("web.issue.issue.change.M.mark"), label: t("web.issue.issue.change.M.label") };
     case "D":
-      return { mark: issuesWording().issue.change.D.mark, label: issuesWording().issue.change.D.label };
+      return { mark: t("web.issue.issue.change.D.mark"), label: t("web.issue.issue.change.D.label") };
     default:
       return { mark: status, label: status };
   }

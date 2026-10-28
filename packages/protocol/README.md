@@ -11,7 +11,6 @@ state's fold and the frame (`apps/server/src/projection`). No files, no network.
 | `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call), `Handlers`, `errorStatus` |
 | `@vibevalley/protocol/rpc` | `Subscriptions`: the RPCs a page follows a channel and the farm's reports by, over the WebSocket at `rpcPath` |
 | `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `ToNative`, `FromNative` and `mobileHost`, the page's end of the phone's bridge |
-| `@vibevalley/protocol/words` | what both sides say to the owner, in Chinese (`zh.ts`, the source of the shape) and English (`en.ts`): `wording()`, and `localized`, `setLocale`, `currentLocale` for every other word table ([where words go](docs/subsystems/foundation.md#话放在哪)) |
 | `@vibevalley/protocol/rules` | the core state's fold (`reduce`, `frameOf`), the inbox, plots and achievements, task graphs, schedules, the doc's order keys, text as JavaScript measures it |
 
 The golden cases of the fold and the frame are the server's (`apps/server/src/core/testdata`, `core/golden.test.ts`).

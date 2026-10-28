@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // The model the agent talks to, and MCP servers in the shape Claude Code and Cursor use:
 // { "mcpServers": { name: { command, args, env } | { url } } }.
 
-import { agentWording } from "../words.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { type Effect, Schema } from "effect";
 import type { LlmShape } from "../../ai/llm.ts";
@@ -13,7 +13,7 @@ import { mcpConfig } from "./prompts.ts";
 export const defaultModel = "deepseek-flash";
 
 /** Said for the command line; the farm says where to put one in the app. */
-export const noDeepSeekKey = () => agentWording().noDeepSeekKey;
+export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
 
 export interface LLM {
   readonly model: Model;

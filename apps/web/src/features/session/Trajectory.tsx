@@ -1,9 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // A trajectory a row per step: the round in the gutter, what kind of step in the tag, its text cut to a line until the
 // row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
 
-import { sessionWording } from "./words";
-import { appWording } from "../../base/words";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -40,9 +39,9 @@ import { Quiet } from "../../ui/layout";
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
 const laneNames: Record<Lane, string> = {
-  asked: sessionWording().trajectory.lane.asked,
-  model: sessionWording().trajectory.lane.model,
-  tool: sessionWording().trajectory.lane.tool,
+  asked: t("web.session.trajectory.lane.asked"),
+  model: t("web.session.trajectory.lane.model"),
+  tool: t("web.session.trajectory.lane.tool"),
 };
 
 const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "#2f1f131a" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
@@ -61,14 +60,14 @@ const haystack = (step: SessionEvent, tag: string) => [tag, step.text, step.tool
 function summaryText(s: TrajectorySummary) {
   const hit = cacheHit(s);
   return [
-    sessionWording().trajectory.rounds(s.rounds),
-    sessionWording().trajectory.steps(s.steps),
-    sessionWording().trajectory.modelTime(secondsText(s.modelMs)),
-    sessionWording().trajectory.toolTime(secondsText(s.toolMs)),
+    t("web.session.trajectory.rounds", { n: s.rounds }),
+    t("web.session.trajectory.steps", { n: s.steps }),
+    t("web.session.trajectory.modelTime", { took: secondsText(s.modelMs) }),
+    t("web.session.trajectory.toolTime", { took: secondsText(s.toolMs) }),
     ...(hit !== undefined
       ? [
-          sessionWording().trajectory.cacheHit(Math.round(hit * 100)),
-          sessionWording().trajectory.tokens(tokensText(s.input + s.cacheRead), tokensText(s.output)),
+          t("web.session.trajectory.cacheHit", { pct: Math.round(hit * 100) }),
+          t("web.session.trajectory.tokens", { input: tokensText(s.input + s.cacheRead), output: tokensText(s.output) }),
         ]
       : []),
   ].join(" · ");
@@ -93,7 +92,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
       fallback={
         <div class="flex flex-col gap-2">
           {head()}
-          <Quiet>{props.empty ?? sessionWording().trajectory.quiet}</Quiet>
+          <Quiet>{props.empty ?? t("web.session.trajectory.quiet")}</Quiet>
         </div>
       }
     >
@@ -155,7 +154,7 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
         out.push({
           step,
           tag,
-          gutter: first ? (round.asked ? sessionWording().trajectory.round(turn) : sessionWording().trajectory.earlier) : undefined,
+          gutter: first ? (round.asked ? t("web.session.trajectory.round", { n: turn }) : t("web.session.trajectory.earlier")) : undefined,
           when: first ? ago((round.asked ?? round.steps[0]!).time, props.now) : undefined,
           markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
         });
@@ -172,8 +171,8 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
       <div class="flex items-center gap-3 pb-2">
         <div class="min-w-0 flex-1">{props.head}</div>
         <TextInput
-          aria-label={sessionWording().trajectory.search}
-          placeholder={sessionWording().trajectory.searchHint}
+          aria-label={t("web.session.trajectory.search")}
+          placeholder={t("web.session.trajectory.searchHint")}
           class="w-36 sm:w-56"
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
@@ -188,7 +187,7 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
           atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
         }}
       >
-        <Show when={rows().length > 0} fallback={<p class="pt-2 text-sm text-muted">{sessionWording().trajectory.noMatch}</p>}>
+        <Show when={rows().length > 0} fallback={<p class="pt-2 text-sm text-muted">{t("web.session.trajectory.noMatch")}</p>}>
           <For each={rows()} keyed={(r) => r.step.seq}>
             {(r) => {
               // The key, the same for the row's life; a ref reading the item's accessor while the row is made suspends it.
@@ -290,8 +289,8 @@ function ToolLine(props: { step: SessionEvent }) {
       </Show>
       {" → "}
       <Switch fallback={<span class={["font-mono", { "text-berry": props.step.ok === false }]}>{out()}</span>}>
-        <Match when={props.step.ok === undefined}>{sessionWording().trajectory.pending}</Match>
-        <Match when={!out()}>{sessionWording().trajectory.noOutput}</Match>
+        <Match when={props.step.ok === undefined}>{t("web.session.trajectory.pending")}</Match>
+        <Match when={!out()}>{t("web.session.trajectory.noOutput")}</Match>
       </Switch>
     </span>
   );
@@ -303,22 +302,22 @@ function ToolDetail(props: { step: SessionEvent }) {
     <div class="flex flex-col gap-1 pt-1 pb-1.5 pl-[164px] text-xs">
       <span class="text-muted">
         {[
-          ...(props.step.tool ? [sessionWording().trajectory.tool(props.step.tool)] : []),
+          ...(props.step.tool ? [t("web.session.trajectory.tool", { name: props.step.tool })] : []),
           props.step.ok === undefined
-            ? sessionWording().trajectory.running
+            ? t("web.session.trajectory.running")
             : props.step.ok
-              ? sessionWording().trajectory.ok
-              : sessionWording().trajectory.failed,
+              ? t("web.session.trajectory.ok")
+              : t("web.session.trajectory.failed"),
         ].join(" · ")}
       </span>
       <Show when={input()}>
-        <span class="text-muted">{sessionWording().trajectory.input}</span>
+        <span class="text-muted">{t("web.session.trajectory.input")}</span>
         <pre class="font-mono whitespace-pre-wrap select-text">{input()}</pre>
       </Show>
-      <span class="text-muted">{sessionWording().trajectory.output}</span>
+      <span class="text-muted">{t("web.session.trajectory.output")}</span>
       <Show
         when={props.step.output}
-        fallback={<span class="text-muted">{props.step.ok === undefined ? sessionWording().trajectory.pending : sessionWording().trajectory.noOutput}</span>}
+        fallback={<span class="text-muted">{props.step.ok === undefined ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</span>}
       >
         <pre class="font-mono whitespace-pre-wrap select-text">{props.step.output}</pre>
       </Show>
@@ -426,13 +425,13 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
           class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
         >
           <Icon name="bug" size={12} />
-          {sessionWording().trajectory.wrong}
+          {t("web.session.trajectory.wrong")}
         </button>
       </Show>
       <Show when={props.file}>
         <div title={props.file} class="my-0.5 mr-2 ml-[164px] flex items-center gap-1.5 rounded-md bg-berry/12 px-2 py-1 text-xs">
           <Icon name="bug" size={12} />
-          {sessionWording().trajectory.marked}
+          {t("web.session.trajectory.marked")}
         </div>
       </Show>
       <Show when={writing()}>
@@ -445,9 +444,9 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
         >
           <TextInput
             ref={autofocus()}
-            aria-label={sessionWording().trajectory.want}
+            aria-label={t("web.session.trajectory.want")}
             disabled={busy()}
-            placeholder={sessionWording().trajectory.wantHint}
+            placeholder={t("web.session.trajectory.wantHint")}
             value={want()}
             onInput={(e) => setWant(e.currentTarget.value)}
           />
@@ -456,7 +455,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
             disabled={busy() || !want().trim()}
             class="h-7 shrink-0 cursor-pointer rounded-md bg-accent px-2.5 text-sm text-page disabled:opacity-50"
           >
-            {appWording().write}
+            {t("web.base.write")}
           </button>
           <button
             type="button"
@@ -464,7 +463,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
             onClick={() => setWriting(false)}
             class="h-7 shrink-0 cursor-pointer rounded-md border border-line px-2.5 text-sm"
           >
-            {appWording().form.never}
+            {t("web.base.form.never")}
           </button>
         </form>
       </Show>
@@ -483,11 +482,11 @@ export function TrajectoryList(props: { agent: string }) {
     return all?.find((h) => h.id === (picked() ?? all[0]?.id));
   };
   return (
-    <Show when={list()} fallback={<Quiet>{heads.error ? reasonOf(heads.error) : appWording().reading}</Quiet>}>
+    <Show when={list()} fallback={<Quiet>{heads.error ? reasonOf(heads.error) : t("web.base.reading")}</Quiet>}>
       {(all) => (
-        <Show when={all().length > 0} fallback={<Quiet>{sessionWording().trajectory.neverSent}</Quiet>}>
+        <Show when={all().length > 0} fallback={<Quiet>{t("web.session.trajectory.neverSent")}</Quiet>}>
           <div class="flex h-full min-h-0 flex-col gap-3 md:flex-row">
-            <ul aria-label={sessionWording().trajectory.sent} class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
+            <ul aria-label={t("web.session.trajectory.sent")} class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
                   const ended = () => (h().phase._tag === "closed" ? (h().phase as { at: number }).at : undefined);
@@ -508,13 +507,13 @@ export function TrajectoryList(props: { agent: string }) {
                             <span class="text-xs text-muted">{h().project}</span>
                           </Show>
                           <Show when={ended() === undefined}>
-                            <span class="rounded bg-hat px-1.5 text-xs text-bark-900">{sessionWording().trajectory.here}</span>
+                            <span class="rounded bg-hat px-1.5 text-xs text-bark-900">{t("web.session.trajectory.here")}</span>
                           </Show>
                         </span>
                         <span class="text-xs text-muted">
                           {ended() === undefined
-                            ? sessionWording().trajectory.hired(ago(h().hiredAt, now()))
-                            : sessionWording().trajectory.hiredAndLeft(ago(h().hiredAt, now()), ago(ended()!, now()))}
+                            ? t("web.session.trajectory.hired", { ago: ago(h().hiredAt, now()) })
+                            : t("web.session.trajectory.hiredAndLeft", { hired: ago(h().hiredAt, now()), left: ago(ended()!, now()) })}
                         </span>
                         <Show when={h().brief}>
                           <span class="truncate text-xs">{oneLine(h().brief)}</span>
@@ -526,7 +525,7 @@ export function TrajectoryList(props: { agent: string }) {
               </For>
             </ul>
             <div class="min-h-0 min-w-0 flex-1">
-              <Show when={open()} fallback={<Quiet>{sessionWording().trajectory.pick}</Quiet>}>
+              <Show when={open()} fallback={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>
                     {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief)}` : o().name} about={o().brief} />}

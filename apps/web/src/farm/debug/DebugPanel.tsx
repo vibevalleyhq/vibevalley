@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The debug console: ` opens it over the farm, unless a field has the keys. It drives the farm by its real calls (open
 // the farm, stop or dismiss a helper, harvest) and the page's own clock and effects (which earn nothing), plays each
 // sound, and keeps the frames and side events it saw, to copy as JSON lines.
 
-import { farmWording } from "../words";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -101,7 +101,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     try {
       await f();
     } catch (e) {
-      toasts.add({ type: ToastType.error, title: farmWording().debug.title, description: reasonOf(e), timeout: 4500 });
+      toasts.add({ type: ToastType.error, title: t("web.farm.debug.title"), description: reasonOf(e), timeout: 4500 });
     }
   };
   const sessions = () => core()?.sessions ?? [];
@@ -113,18 +113,18 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
     <aside
-      aria-label={farmWording().debug.title}
+      aria-label={t("web.farm.debug.title")}
       class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-[#14110ef5] p-3 font-mono text-[12px] text-paper shadow-px"
     >
       <header class="flex items-center gap-2">
-        <span class="flex-1 text-[13px] text-hat">{farmWording().debug.title}</span>
+        <span class="flex-1 text-[13px] text-hat">{t("web.farm.debug.title")}</span>
         <button type="button" class={btn()} onClick={() => props.onClose()}>
-          {farmWording().debug.close}
+          {t("web.farm.debug.close")}
         </button>
       </header>
       <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         <Section
-          title={farmWording().debug.call}
+          title={t("web.farm.debug.call")}
           aside={
             <span>
               call={core()?.call} orchestrator={orchestratorMood(core())}
@@ -133,17 +133,17 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         >
           <div class="flex gap-1.5">
             <button type="button" class={btn("hat")} onClick={() => void run(() => api.orchestrator.open())}>
-              {farmWording().debug.open}
+              {t("web.farm.debug.open")}
             </button>
             <button type="button" class={btn()} onClick={() => void everyone("dismiss")}>
-              {farmWording().debug.dismiss}
+              {t("web.farm.debug.dismiss")}
             </button>
           </div>
         </Section>
-        <Section title={farmWording().debug.sky} aside={<span>{clockText(day().tod)}</span>}>
+        <Section title={t("web.farm.debug.sky")} aside={<span>{clockText(day().tod)}</span>}>
           <input
             type="range"
-            aria-label={farmWording().debug.time}
+            aria-label={t("web.farm.debug.time")}
             min={0}
             max={0.999}
             step={0.005}
@@ -155,7 +155,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             <For
               each={
                 [
-                  [0, farmWording().debug.stop],
+                  [0, t("web.farm.debug.stop")],
                   [1, "1×"],
                   [10, "10×"],
                   [60, "60×"],
@@ -175,10 +175,10 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </For>
           </div>
         </Section>
-        <Section title={farmWording().debug.progress} aside={<span>Lv.{level()}</span>}>
+        <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
           <div class="flex gap-1.5">
             <button type="button" class={btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
-              {farmWording().debug.levelUp}
+              {t("web.farm.debug.levelUp")}
             </button>
             <button
               type="button"
@@ -201,13 +201,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 });
               }}
             >
-              {farmWording().debug.achievement}
+              {t("web.farm.debug.achievement")}
             </button>
           </div>
         </Section>
-        <Section title={farmWording().debug.helpers(sessions().length)}>
+        <Section title={t("web.farm.debug.helpers", { n: sessions().length })}>
           <Show when={sessions().length === 0}>
-            <span class="text-ink-300">{farmWording().debug.nobody}</span>
+            <span class="text-ink-300">{t("web.farm.debug.nobody")}</span>
           </Show>
           <For each={sessions()}>
             {(h) => (
@@ -217,26 +217,26 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 </button>
                 <Show when={h.phase._tag === "done"}>
                   <button type="button" class={btn("hat")} onClick={() => void run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
-                    {farmWording().tool.harvest.label}
+                    {t("web.farm.tool.harvest.label")}
                   </button>
                 </Show>
                 <button type="button" class={btn()} onClick={() => void run(() => api.session.stop({ id: h.id }))}>
-                  {farmWording().debug.halt}
+                  {t("web.farm.debug.halt")}
                 </button>
                 <button type="button" class={btn("bad")} onClick={() => void run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
-                  {farmWording().debug.dismiss}
+                  {t("web.farm.debug.dismiss")}
                 </button>
               </div>
             )}
           </For>
         </Section>
-        <Section title={farmWording().debug.all}>
+        <Section title={t("web.farm.debug.all")}>
           <div class="flex gap-1.5">
             <button type="button" class={btn()} onClick={() => void everyone("stop")}>
-              {farmWording().debug.haltAll}
+              {t("web.farm.debug.haltAll")}
             </button>
             <button type="button" class={btn("bad")} onClick={() => void everyone("dismiss")}>
-              {farmWording().debug.dismissAll}
+              {t("web.farm.debug.dismissAll")}
             </button>
           </div>
         </Section>
@@ -256,14 +256,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           )}
         </For>
         <Section
-          title={farmWording().debug.frames(props.log.entries().length)}
+          title={t("web.farm.debug.frames", { n: props.log.entries().length })}
           aside={
             <span class="flex gap-1">
               <button type="button" class={btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
-                {props.log.paused() ? farmWording().debug.resume : farmWording().debug.pause}
+                {props.log.paused() ? t("web.farm.debug.resume") : t("web.farm.debug.pause")}
               </button>
               <button type="button" class={btn()} onClick={() => props.log.clear()}>
-                {farmWording().debug.clear}
+                {t("web.farm.debug.clear")}
               </button>
               <button
                 type="button"
@@ -279,7 +279,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                     .catch(() => undefined)
                 }
               >
-                {farmWording().debug.copy}
+                {t("web.farm.debug.copy")}
               </button>
             </span>
           }

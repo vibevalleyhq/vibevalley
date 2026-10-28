@@ -1,4 +1,5 @@
-import { issuesWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Tone } from "./cards";
@@ -67,7 +68,7 @@ export function More(props: { children: JSX.Element }) {
     <div class="mt-1">
       <button type="button" onClick={() => setOpen(!open())} class="flex cursor-pointer items-center gap-1.5 py-1 text-xs text-muted hover:text-ink">
         <Icon name="expand" size={8} class={{ "rotate-90": open() }} />
-        {open() ? issuesWording().sheet.less : issuesWording().sheet.more}
+        {open() ? t("web.issue.sheet.less") : t("web.issue.sheet.more")}
       </button>
       <Show when={open()}>
         <div class="mt-1">{props.children}</div>
@@ -96,7 +97,7 @@ export function Note(props: { tone?: Tone; children: JSX.Element; class?: string
 export function Stages(props: { at: Stage }) {
   const ati = () => stages.indexOf(props.at);
   return (
-    <div class="flex items-center text-sm" aria-label={issuesWording().sheet.at(stageLabel[props.at])}>
+    <div class="flex items-center text-sm" aria-label={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
       <For each={stages}>
         {(s, i) => (
           <div class={["flex items-center", { "flex-1": i() > 0 }]}>
@@ -105,7 +106,7 @@ export function Stages(props: { at: Stage }) {
             </Show>
             <span class="flex items-center gap-1.5 whitespace-nowrap">
               <Show when={i() < ati()} fallback={<span class={["size-2 rounded-full", s === props.at ? "bg-wheat" : "bg-line"]} />}>
-                <Icon name="check" size={12} label={issuesWording().sheet.stageDone(stageLabel[s])} />
+                <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s] })} />
               </Show>
               <span class={s === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}>{stageLabel[s]}</span>
             </span>

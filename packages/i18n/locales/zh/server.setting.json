@@ -1,0 +1,33 @@
+{
+  "deepseekKey": "DeepSeek 的 API Key 看着不对：一串不带空格的字，通常以 sk- 开头",
+  "agoraId": "Agora 的 App ID 是 32 位的十六进制，在声网控制台的项目里找",
+  "agoraCertificate": "Agora 的 App Certificate 是 32 位的十六进制，在声网控制台的项目里找",
+  "voiceKeySpace": "语音服务的 key 里不该有空格",
+  "dictationUrl": "听写的地址要是 http(s) 开头的完整地址，到 /v1 为止，比如本机的 http://127.0.0.1:8080/v1",
+  "dictationModel": "听写要填模型名，比如本机 speech-server 的 qwen3，或 OpenAI 的 gpt-4o-mini-transcribe",
+  "memory": {
+    "unknown": "不认识的记性来源：{kind}",
+    "twice": "同一种记性来源只能接一个：{kind}",
+    "noUrl": "要接上记性来源，先填它的地址",
+    "url": "记性来源的地址要是 http(s) 开头的完整地址，比如 Nowledge Mem 的 http://127.0.0.1:14242/mcp/",
+    "keySpace": "记性来源的 key 里不该有空格"
+  },
+  "voice": {
+    "label": {
+      "silenceMs": "停顿多久算说完（毫秒）",
+      "interruptMs": "说多久能打断他（毫秒）",
+      "idleSeconds": "没人时多久离开（秒）"
+    },
+    "range": "{label}要在 {min} 到 {max} 之间",
+    "region": "微软识别要填区域，比如 eastasia",
+    "model": "大模型要填模型名",
+    "url": "大模型的地址要是 http(s) 开头的完整地址，比如 https://api.openai.com/v1/chat/completions",
+    "voiceId": "音色不能空着：选一个或填 MiniMax 的音色 id",
+    "microsoft": "微软合成要填区域和音色名",
+    "persona": "管家的人设不能空着"
+  },
+  "defaults": {
+    "failureMessage": "我这边卡了一下，你再说一遍？"
+  },
+  "notSaved": "存不进 {file}：{why}"
+}

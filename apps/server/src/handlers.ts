@@ -1,6 +1,6 @@
+import { t } from "@vibevalley/i18n";
 // Each handler only forwards to the service that owns the rule.
 
-import { gatewayWording } from "./words.ts";
 import { defaultOrchestrator, docOwner, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
@@ -107,10 +107,10 @@ export const handlers = Effect.gen(function* () {
     "project.language.list": ({ id }) =>
       projects.languages(id).pipe(
         Effect.mapError((e) => refused(e.message)),
-        Effect.flatMap((l) => (l ? Effect.succeed(l) : Effect.fail(missing(gatewayWording().projectRef(id), [lookIn.project])))),
+        Effect.flatMap((l) => (l ? Effect.succeed(l) : Effect.fail(missing(t("server.projectRef", { id }), [lookIn.project])))),
       ),
     "project.activity.get": ({ id }) =>
-      Effect.flatMap(projects.activity(id), (a) => (a ? Effect.succeed(a) : Effect.fail(missing(gatewayWording().projectRef(id), [lookIn.project])))),
+      Effect.flatMap(projects.activity(id), (a) => (a ? Effect.succeed(a) : Effect.fail(missing(t("server.projectRef", { id }), [lookIn.project])))),
     "agent.list": () => Effect.sync(agents.all),
     "agent.create": (body) => agents.createAgent(body),
     "agent.update": (agent) => agents.saveAgent(agent),
@@ -138,7 +138,7 @@ export const handlers = Effect.gen(function* () {
     "orchestrator.archive.get": ({ agent, name }) =>
       Effect.suspend(() => {
         const text = memory.archiveFile(agent || defaultOrchestrator, name);
-        return text !== undefined ? Effect.succeed(text) : Effect.fail(missing(gatewayWording().archiveRef(name), [lookIn.archive]));
+        return text !== undefined ? Effect.succeed(text) : Effect.fail(missing(t("server.archiveRef", { name }), [lookIn.archive]));
       }),
     "runtime.list": () => Effect.sync(runtimes.list),
     "runtime.refresh": ({ id }) =>
@@ -146,10 +146,10 @@ export const handlers = Effect.gen(function* () {
     "runtime.setting.update": ({ id, ...body }) =>
       Effect.flatMap(runtimes.update(id, body), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
     "agent.check": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.check(agent), (problems) => ({ id: agent.id, problems }))),
-    "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(gatewayWording().helperRef(id), [lookIn.session]))),
+    "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) =>
-      Effect.flatMap(sessions.get(id), (s) => (s ? Effect.succeed(s) : Effect.fail(missing(gatewayWording().helperRef(id), [lookIn.session])))),
+      Effect.flatMap(sessions.get(id), (s) => (s ? Effect.succeed(s) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session])))),
     "session.event.list": ({ id, run }) => Effect.sync(() => sessions.events(id, run ?? "") ?? []),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),

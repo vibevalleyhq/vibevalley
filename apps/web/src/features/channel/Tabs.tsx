@@ -1,4 +1,5 @@
-import { chatWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createEffect, createSignal, For, Show } from "solid-js";
 import type { Channel, Recurrence } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -20,7 +21,7 @@ export function Jobs(props: { channel: Channel }) {
   const now = useNow();
   const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : !!props.channel.default));
   return (
-    <Show when={sessions().length > 0} fallback={<Empty icon="issues">{chatWording().jobs.empty}</Empty>}>
+    <Show when={sessions().length > 0} fallback={<Empty icon="issues">{t("web.channel.jobs.empty")}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={sessions()}>
           {(h) => {
@@ -43,9 +44,9 @@ export function Jobs(props: { channel: Channel }) {
                   </span>
                 </div>
                 <Show when={thread()}>
-                  {(t) => (
-                    <Button icon="thread" onClick={() => router.navigate(chatPath(t()))}>
-                      {chatWording().jobs.thread}
+                  {(shown) => (
+                    <Button icon="thread" onClick={() => router.navigate(chatPath(shown()))}>
+                      {t("web.channel.jobs.thread")}
                     </Button>
                   )}
                 </Show>
@@ -62,7 +63,7 @@ export function Recurrences(props: { channel: Channel }) {
   const core = useCore();
   const recurrences = () => (core()?.recurrences ?? []).filter((s) => s.channel === props.channel.id);
   return (
-    <Show when={recurrences().length > 0} fallback={<Empty icon="clock">{chatWording().recurrences.empty}</Empty>}>
+    <Show when={recurrences().length > 0} fallback={<Empty icon="clock">{t("web.channel.recurrences.empty")}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={recurrences()}>{(s) => <RecurrenceCard s={s} />}</For>
       </div>
@@ -79,23 +80,23 @@ function RecurrenceCard(props: { s: Recurrence }) {
   createEffect(deleting, (on) => {
     if (!on) return;
     const away = () => setDeleting(false);
-    const t = setTimeout(() => document.addEventListener("pointerdown", away, { once: true }));
+    const timer = setTimeout(() => document.addEventListener("pointerdown", away, { once: true }));
     return () => {
-      clearTimeout(t);
+      clearTimeout(timer);
       document.removeEventListener("pointerdown", away);
     };
   });
   const meta = () =>
     [
       props.s.whenText ?? "",
-      props.s.pending ? (props.s.nextText ?? "") : chatWording().recurrences.next(props.s.nextText ?? ""),
-      ...(props.s.agent ? [chatWording().recurrences.direct(props.s.agent)] : []),
-      ...(props.s.by === "orchestrator" ? [chatWording().recurrences.byOrchestrator] : []),
+      props.s.pending ? (props.s.nextText ?? "") : t("web.channel.recurrences.next", { next: props.s.nextText ?? "" }),
+      ...(props.s.agent ? [t("web.channel.recurrences.direct", { agent: props.s.agent })] : []),
+      ...(props.s.by === "orchestrator" ? [t("web.channel.recurrences.byOrchestrator")] : []),
     ].join(" · ");
   return (
     <div
       class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]}
-      aria-label={chatWording().recurrences.label(props.s.name)}
+      aria-label={t("web.channel.recurrences.label", { name: props.s.name })}
     >
       <Icon name="clock" size={20} class="mt-0.5" />
       <div class="flex min-w-0 flex-1 flex-col">
@@ -113,32 +114,37 @@ function RecurrenceCard(props: { s: Recurrence }) {
         fallback={
           <div class="flex gap-2">
             <Button tone={props.s.enabled ? "primary" : "plain"} onClick={() => void setEnabled(!props.s.enabled)}>
-              {props.s.enabled ? chatWording().recurrences.on : chatWording().recurrences.off}
+              {props.s.enabled ? t("web.channel.recurrences.on") : t("web.channel.recurrences.off")}
             </Button>
             <Show
               when={deleting()}
               fallback={
                 <Button
                   icon="delete"
-                  title={chatWording().recurrences.remove}
-                  aria-label={chatWording().recurrences.removeWhich(props.s.name)}
+                  title={t("web.channel.recurrences.remove")}
+                  aria-label={t("web.channel.recurrences.removeWhich", { name: props.s.name })}
                   onClick={() => setDeleting(true)}
                 />
               }
             >
               <Button tone="danger" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
-                {chatWording().recurrences.sure}
+                {t("web.channel.recurrences.sure")}
               </Button>
             </Show>
           </div>
         }
       >
         <div class="flex gap-2">
-          <Button tone="primary" icon="check" aria-label={chatWording().recurrences.approveWhich(props.s.name)} onClick={() => void setEnabled(true)}>
-            {chatWording().recurrences.approve}
+          <Button
+            tone="primary"
+            icon="check"
+            aria-label={t("web.channel.recurrences.approveWhich", { name: props.s.name })}
+            onClick={() => void setEnabled(true)}
+          >
+            {t("web.channel.recurrences.approve")}
           </Button>
-          <Button icon="cross" aria-label={chatWording().recurrences.refuseWhich(props.s.name)} onClick={() => void remove()}>
-            {chatWording().recurrences.refuse}
+          <Button icon="cross" aria-label={t("web.channel.recurrences.refuseWhich", { name: props.s.name })} onClick={() => void remove()}>
+            {t("web.channel.recurrences.refuse")}
           </Button>
         </div>
       </Show>

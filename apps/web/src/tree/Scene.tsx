@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The memory tree's one scene, drawn small on a 2D canvas and scaled up whole so it is pixel art like the farm: a
 // golden-hour meadow with the tree grown from the memories (grow.ts), and, looking up, the night sky where the same
 // memories are stars (rules.ts starsOf). Opening, the tree grows from a sprout to its size; moving the time slider
 // grows it back or on. Looking up, the meadow sinks, the sky goes dark and every leaf and fruit rises to its star.
 
-import { treeWording } from "./words";
 import { onSettled } from "solid-js";
 import { reducedMotion } from "../ui/pixel";
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
@@ -592,7 +592,7 @@ export function Scene(props: {
     <canvas
       ref={(el) => (canvas = el)}
       role="img"
-      aria-label={treeWording().scene}
+      aria-label={t("web.tree.scene")}
       data-testid="memory-scene"
       class="absolute inset-0 block size-full touch-none [image-rendering:pixelated]"
     />

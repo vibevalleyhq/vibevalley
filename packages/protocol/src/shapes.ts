@@ -1524,8 +1524,9 @@ export interface ChannelRequest {
 }
 
 /** The language the farm speaks to the owner in (words/locale.ts). */
-export const LocaleValues = ["zh", "en"] as const;
-export type Locale = (typeof LocaleValues)[number];
+import { type Locale } from "@vibevalley/i18n";
+
+export { LocaleValues, type Locale } from "@vibevalley/i18n";
 
 export interface SettingsStatus {
   file: string;

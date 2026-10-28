@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
-import { agentWording } from "../words.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { homedir } from "node:os";
@@ -54,8 +54,9 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   const start = async (_installation: unknown, o: SessionOptions) => {
     // oar's refusableOrder, for these two.
     for (const option of ["serviceTier", "launchArgs"] as const)
-      if (o[option] !== undefined) throw new UnsupportedOptionError(option, agentWording().refused[option]);
-    if (o.effort && !(efforts as readonly string[]).includes(o.effort)) throw new Error(agentWording().efforts(vibevalleyRuntime, efforts, o.effort));
+      if (o[option] !== undefined) throw new UnsupportedOptionError(option, t(`server.agent.refused.${option}`));
+    if (o.effort && !(efforts as readonly string[]).includes(o.effort))
+      throw new Error(t("server.agent.efforts", { runtime: vibevalleyRuntime, efforts: efforts.join(t("server.agent.effortsAnd")), asked: o.effort }));
     const llm = llmOf(o.model ?? "");
     const kernel = createSessionKernel(o.resume);
     const instructions = o.systemPrompt ?? [helperInstructions(), ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
@@ -228,7 +229,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   return defineRuntime({
     id: vibevalleyRuntime,
     session: start,
-    refusedSessionOptions: agentWording().refused,
+    refusedSessionOptions: { launchArgs: t("server.agent.refused.launchArgs"), serviceTier: t("server.agent.refused.serviceTier") },
     installation: async () => {
       try {
         llmOf("");

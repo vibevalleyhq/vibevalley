@@ -1,6 +1,6 @@
+import { list, t } from "@vibevalley/i18n";
 // A task graph's rules. Texts are measured as JavaScript does.
 
-import { taskWording } from "./words.ts";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "../base/dag.ts";
 
@@ -47,26 +47,26 @@ const dagOf = (tasks: readonly Task[]): DagNode[] => tasks.map((n) => ({ id: n.i
 export function graphProblems(tasks: readonly Task[] | null | undefined): string[] {
   const all = tasks ?? [];
   const problems: string[] = [];
-  if (all.length === 0) problems.push(taskWording().problem.empty);
-  if (all.length > maxTasks) problems.push(taskWording().problem.tooMany(maxTasks, all.length));
+  if (all.length === 0) problems.push(t("server.task.problem.empty"));
+  if (all.length > maxTasks) problems.push(t("server.task.problem.tooMany", { max: maxTasks, n: all.length }));
   const ids = new Set<string>();
   for (const n of all) {
-    if (!dagIDValid(n.id)) problems.push(taskWording().problem.badId(n.id));
-    if (ids.has(n.id)) problems.push(taskWording().problem.duplicate(n.id));
+    if (!dagIDValid(n.id)) problems.push(t("server.task.problem.badId", { id: n.id }));
+    if (ids.has(n.id)) problems.push(t("server.task.problem.duplicate", { id: n.id }));
     ids.add(n.id);
-    if (n.brief.trim() === "") problems.push(taskWording().problem.noBrief(n.id));
-    if (isAcceptance(n) && (n.check ?? "").trim() === "") problems.push(taskWording().problem.noCheck(n.id));
+    if (n.brief.trim() === "") problems.push(t("server.task.problem.noBrief", { id: n.id }));
+    if (isAcceptance(n) && (n.check ?? "").trim() === "") problems.push(t("server.task.problem.noCheck", { id: n.id }));
   }
   for (const p of dagProblems(dagOf(all))) {
     switch (p.kind) {
       case "self":
-        problems.push(taskWording().problem.self(p.id));
+        problems.push(t("server.task.problem.self", { id: p.id }));
         break;
       case "missing":
-        problems.push(taskWording().problem.missing(p.id, p.other));
+        problems.push(t("server.task.problem.missing", { id: p.id, other: p.other }));
         break;
       case "circle":
-        if (problems.length === 0) problems.push(taskWording().problem.circle(p.circle));
+        if (problems.length === 0) problems.push(t("server.task.problem.circle", { ids: list(p.circle) }));
         break;
       case "duplicate":
         // Said above, in the step's own place.

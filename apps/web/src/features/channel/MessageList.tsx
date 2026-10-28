@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
-import { chatWording } from "./words";
-import { wording } from "@vibevalley/protocol/words";
+
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
@@ -36,9 +36,9 @@ import { TurnSteps } from "../session";
 import { useAgent, useOrchestrators } from "../../base/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: IconName }> = {
-  completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "check" },
-  failed: { label: wording().outcome.failed, fill: "#e9a092", icon: "cross" },
-  interrupted: { label: wording().outcome.interrupted, fill: "#e2c995", icon: "stop" },
+  completed: { label: t("shared.outcome.completed"), fill: "#b4cb7c", icon: "check" },
+  failed: { label: t("shared.outcome.failed"), fill: "#e9a092", icon: "cross" },
+  interrupted: { label: t("shared.outcome.interrupted"), fill: "#e2c995", icon: "stop" },
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
@@ -106,7 +106,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div ref={(el) => (log = el)} class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={chatWording().messages.label}>
+    <div ref={(el) => (log = el)} class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={t("web.channel.messages.label")}>
       <div class="flex flex-col px-4 pt-3 pb-4">
         <div class="flex justify-center pb-2">
           <Show
@@ -115,14 +115,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               <span class="text-xs text-muted">
                 {searching()
                   ? hits() === undefined
-                    ? chatWording().messages.searching
-                    : chatWording().messages.containing((props.filter ?? "").trim())
-                  : chatWording().messages.start}
+                    ? t("web.channel.messages.searching")
+                    : t("web.channel.messages.containing", { text: (props.filter ?? "").trim() })
+                  : t("web.channel.messages.start")}
               </span>
             }
           >
             <button type="button" onClick={() => void followed.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
-              {chatWording().messages.older}
+              {t("web.channel.messages.older")}
             </button>
           </Show>
         </div>
@@ -134,7 +134,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           )}
         </Show>
         <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
-          <p class="py-8 text-center text-sm text-muted">{searching() ? chatWording().messages.notFound : props.emptyText}</p>
+          <p class="py-8 text-center text-sm text-muted">{searching() ? t("web.channel.messages.notFound") : props.emptyText}</p>
         </Show>
         <For each={items()} keyed={(item) => item.message.id}>
           {(item) => (
@@ -150,7 +150,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             >
               <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
               <Show when={item().message.id === firstNew()}>
-                <DayLine label={chatWording().messages.newMessages} tone="new" />
+                <DayLine label={t("web.channel.messages.newMessages")} tone="new" />
               </Show>
               <Show
                 when={item().message.kind === "notice" || item().message.fromKind === "system"}
@@ -173,11 +173,11 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           )}
         </For>
         <Show when={typing()}>
-          {(t) => (
+          {(typer) => (
             <Frame
-              face={<OrchestratorFace size={36} agent={t().agent} />}
-              name={orchestrators().find((a) => a.id === t().agent)?.name || chatWording().orchestrator}
-              meta={t().mood === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
+              face={<OrchestratorFace size={36} agent={typer().agent} />}
+              name={orchestrators().find((a) => a.id === typer().agent)?.name || t("web.channel.orchestrator")}
+              meta={typer().mood === "speaking" ? t("web.channel.messages.typing") : t("web.channel.messages.thinking")}
             >
               <div class="flex h-5 items-center">
                 <ThinkingDots />
@@ -267,7 +267,7 @@ function Dispatch(props: { text: string }) {
       <button
         type="button"
         onClick={() => setOpen(!open())}
-        aria-label={open() ? chatWording().messages.foldDispatch : chatWording().messages.unfoldDispatch}
+        aria-label={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")}
         aria-expanded={aria(open())}
         class="mt-[5px] cursor-pointer"
       >
@@ -284,13 +284,13 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
   const orchestrators = useOrchestrators();
   const nameOf = (who: string) =>
     who === ownerId
-      ? chatWording().messages.owner
+      ? t("web.channel.messages.owner")
       : (orchestrators().find((a) => a.id === who)?.name ??
-        (who === defaultOrchestrator ? chatWording().orchestrator : undefined) ??
+        (who === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
         (core()?.sessions ?? []).find((h) => h.id === who)?.name ??
         who);
   const meta = () =>
-    [props.where ? chatWording().messages.inThread(props.where) : "", props.m.pinned !== undefined ? chatWording().messages.pinned : ""]
+    [props.where ? t("web.channel.messages.inThread", { address: props.where }) : "", props.m.pinned !== undefined ? t("web.channel.messages.pinned") : ""]
       .filter(Boolean)
       .join(" · ");
   const agentOf = useAgent(() => props.m.agent);
@@ -306,7 +306,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
     <Frame
       face={<SenderFace m={props.m} />}
       dot={session() && <Dot tone={phaseDot(session()!.phase)} size={11} />}
-      name={props.m.fromKind === "owner" ? chatWording().messages.owner : props.m.name}
+      name={props.m.fromKind === "owner" ? t("web.channel.messages.owner") : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
       quote={props.m.replyTo !== undefined ? { channel: props.m.channel, number: props.m.replyTo } : undefined}
@@ -317,7 +317,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
             onClick={() => props.onJump?.()}
             class="absolute -top-3 right-2 z-10 hidden cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs shadow-float group-focus-within/m:block group-hover/m:block"
           >
-            {chatWording().more.jump}
+            {t("web.channel.more.jump")}
           </button>
         ) : props.m.deleted === undefined && !props.where ? (
           <MessageTools m={props.m} inChannel={!!props.inChannel} onEdit={() => setEditing(true)} />
@@ -326,7 +326,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
     >
       <Show when={props.m.kind === "dispatch"}>
         <div class="mb-1">
-          <Tag icon="send" label={chatWording().messages.dispatch} fill="#f3d38a" />
+          <Tag icon="send" label={t("web.channel.messages.dispatch")} fill="#f3d38a" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
@@ -356,7 +356,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
         {(spent) => (
           <div class="mt-1 flex items-center gap-1 text-xs text-muted">
             <Icon name="spend" size={12} />
-            {chatWording().messages.spent(spentText(spent()))}
+            {t("web.channel.messages.spent", { spent: spentText(spent()) })}
           </div>
         )}
       </Show>
@@ -388,13 +388,13 @@ function ThreadPreview(props: { thread: Channel }) {
         <Icon name="thread" size={16} />
         <span class="text-sm font-semibold text-accent">
           {props.thread.replies > 0
-            ? chatWording().replies(props.thread.replies)
+            ? t("web.channel.replies", { n: props.thread.replies })
             : props.thread.subjectKind === "issue"
-              ? chatWording().jobs.thread
-              : chatWording().names.thread}
+              ? t("web.channel.jobs.thread")
+              : t("web.channel.names.thread")}
         </span>
         <Show when={unread() > 0}>
-          <Tag label={chatWording().messages.unread(unread())} fill="#b4cb7c" />
+          <Tag label={t("web.channel.messages.unread", { n: unread() })} fill="#b4cb7c" />
         </Show>
         <Show when={session()} fallback={<span class="flex-1" />}>
           {(s) => (
@@ -409,7 +409,7 @@ function ThreadPreview(props: { thread: Channel }) {
       <Show when={last()}>
         {(m) => (
           <span class="flex w-full items-center gap-2 text-sm">
-            <span class="shrink-0 font-medium">{m().from === ownerId ? chatWording().messages.owner : m().name}</span>
+            <span class="shrink-0 font-medium">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
             <span class="min-w-0 flex-1 truncate text-muted">{m().text}</span>
             <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
           </span>

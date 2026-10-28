@@ -1,14 +1,14 @@
+import { t } from "@vibevalley/i18n";
 // The owner's settings: settings.json in the home, readable by the owner only
 // (0600). A key saved here wins over the configuration's. Keys are read each time they are used, so one saved is used at
 // once; a page sees only where each comes from and its last characters; keys are never logged. The locale is the
 // process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
-import { settingWording } from "./words.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Check, Dictation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { setLocale } from "@vibevalley/protocol/words";
+import { setLocale } from "@vibevalley/i18n";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
@@ -166,7 +166,7 @@ export const make = Effect.gen(function* () {
     try {
       disk.write(() => JSON.stringify(kept, null, 2) + "\n");
     } catch (e) {
-      return yield* new SettingRefused({ message: settingWording().notSaved(file, (e as Error).message) });
+      return yield* new SettingRefused({ message: t("server.setting.notSaved", { file, why: (e as Error).message }) });
     }
     stored = kept;
     setLocale(kept.locale ?? "zh");

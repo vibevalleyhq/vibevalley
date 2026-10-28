@@ -1,7 +1,7 @@
+import { maybe, t } from "@vibevalley/i18n";
 // Who hears a message and how it is put to them: the chat's rules, held to their
 // recorded cases (rules.test.ts).
 
-import { channelWording } from "./words.ts";
 import { type Channel, everyone, defaultOrchestrator, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 // The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English. The
@@ -16,7 +16,7 @@ const chatNamed: Readonly<Record<string, string>> = {
 };
 
 /** How a mention of who is not a helper is written, in the owner's words. */
-export const mentionOf = (id: string): string | undefined => channelWording().mention[id];
+export const mentionOf = (id: string): string | undefined => maybe(`server.channel.mention.${id}`);
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;
@@ -55,8 +55,8 @@ const channelNamePattern = /^[\p{L}\p{N}_-]{1,24}$/u;
 const chatThreadTarget = /^[\p{L}\p{N}_-]{1,24}:([0-9]+)$/u;
 
 export function channelNameProblem(name: string, taken: readonly string[]): string {
-  if (!channelNamePattern.test(name)) return channelWording().channelName;
-  if (taken.includes(name)) return channelWording().channelTaken(name);
+  if (!channelNamePattern.test(name)) return t("server.channel.channelName");
+  if (taken.includes(name)) return t("server.channel.channelTaken", { name });
   return "";
 }
 
@@ -73,10 +73,10 @@ const int64Max = 9223372036854775807n;
 export function parseChatTarget(target: string): ChatTarget | undefined {
   const direct = chatDirectTarget.exec(target.trim());
   if (direct) return { kind: "direct", peer: chatNamed[direct[1]!] ?? direct[1]! };
-  const t = target.trim().replace(/^#/, "");
-  const m = chatThreadTarget.exec(t);
+  const text = target.trim().replace(/^#/, "");
+  const m = chatThreadTarget.exec(text);
   if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
-  return channelNamePattern.test(t) ? { kind: "channel", name: t } : undefined;
+  return channelNamePattern.test(text) ? { kind: "channel", name: text } : undefined;
 }
 
 export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "direct" | "dispatch" | "addressed" | "graph";
@@ -164,7 +164,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   return out;
 }
 
-export const hopLimitText = (limit: number) => channelWording().hopLimit(limit);
+export const hopLimitText = (limit: number) => t("server.channel.hopLimit", { limit });
 
 export interface UnreadRow {
   readonly target: string;

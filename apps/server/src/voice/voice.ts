@@ -1,10 +1,11 @@
+import { t } from "@vibevalley/i18n";
 // The owner's calls: Agora RTC grants, the voice agent Agora runs for a call, the voice line the
 // orchestrator answers it on, and dictation. A grant is signed for one channel and uid and lives as long as its token, or the
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
 import { onCallLine } from "./prompts.ts";
-import { voiceWording } from "./words.ts";
+
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
@@ -68,7 +69,7 @@ export interface CallLine {
 }
 
 /** For a member added to the union and not to vendorsFor. */
-export const voiceUnknown = () => voiceWording().unknownSuffix;
+export const voiceUnknown = () => t("server.voice.unknownSuffix");
 
 type Vendors = {
   stt: AresSTT | DeepgramSTT | MicrosoftSTT;
@@ -97,26 +98,26 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         stt = new DeepgramSTT({ model: asr.model, language: voice.language });
         break;
       case "microsoft":
-        if (!keys.asrKey) return unavailable(voiceWording().noAsrKey, "voice");
+        if (!keys.asrKey) return unavailable(t("server.voice.noAsrKey"), "voice");
         stt = new MicrosoftSTT({ key: keys.asrKey, region: asr.region, language: voice.language });
         break;
       default: {
         const exhaustive: never = asr;
-        return unavailable(voiceWording().unknown(voiceWording().part.asr, (exhaustive as { vendor: string }).vendor));
+        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.asr"), vendor: (exhaustive as { vendor: string }).vendor }));
       }
     }
     let llm: OpenAI;
     const answer = voice.answer;
     switch (answer.vendor) {
       case "orchestrator":
-        if (!line) return unavailable(voiceWording().noLine);
+        if (!line) return unavailable(t("server.voice.noLine"));
         llm = new OpenAI({ apiKey: line.key, url: line.url, model: orchestratorModel, ...speech });
         break;
       case "agora":
         llm = new OpenAI({ model: answer.model, ...speech });
         break;
       case "deepseek":
-        if (!deepseekKey) return unavailable(voiceWording().noDeepseekKey, "deepseek");
+        if (!deepseekKey) return unavailable(t("server.voice.noDeepseekKey"), "deepseek");
         llm = new OpenAI({
           apiKey: deepseekKey,
           url: deepseekChat,
@@ -125,36 +126,36 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         });
         break;
       case "openai":
-        if (!keys.llmKey) return unavailable(voiceWording().noLlmKey, "voice");
+        if (!keys.llmKey) return unavailable(t("server.voice.noLlmKey"), "voice");
         llm = new OpenAI({ apiKey: keys.llmKey, url: answer.url, model: answer.model, ...speech });
         break;
       default: {
         const exhaustive: never = answer;
-        return unavailable(voiceWording().unknown(voiceWording().part.llm, (exhaustive as { vendor: string }).vendor));
+        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.llm"), vendor: (exhaustive as { vendor: string }).vendor }));
       }
     }
     let tts: Vendors["tts"];
-    const t = voice.tts;
-    switch (t.vendor) {
+    const item = voice.tts;
+    switch (item.vendor) {
       case "minimax":
-        tts = new MiniMaxTTS({ model: t.model, voiceId: t.voiceId });
+        tts = new MiniMaxTTS({ model: item.model, voiceId: item.voiceId });
         break;
       case "openai":
-        tts = new OpenAITTS({ voice: t.voice });
+        tts = new OpenAITTS({ voice: item.voice });
         break;
       case "microsoft":
-        if (!keys.ttsKey) return unavailable(voiceWording().noTtsKey, "voice");
-        tts = new MicrosoftTTS({ key: keys.ttsKey, region: t.region, voiceName: t.voiceName });
+        if (!keys.ttsKey) return unavailable(t("server.voice.noTtsKey"), "voice");
+        tts = new MicrosoftTTS({ key: keys.ttsKey, region: item.region, voiceName: item.voiceName });
         break;
       default: {
-        const exhaustive: never = t;
-        return unavailable(voiceWording().unknown(voiceWording().part.tts, (exhaustive as { vendor: string }).vendor));
+        const exhaustive: never = item;
+        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.tts"), vendor: (exhaustive as { vendor: string }).vendor }));
       }
     }
     return { stt, llm, tts };
   } catch (e) {
     // The SDK throws on a configuration it refuses; that is a problem with the settings, not the server's.
-    return unavailable(voiceWording().unusable(message(e)), "voice");
+    return unavailable(t("server.voice.unusable", { why: message(e) }), "voice");
   }
 }
 
@@ -277,7 +278,7 @@ export interface VoiceShape {
 
 /** Agora reads out at most 512 bytes at a time: the words in pieces under that, cut after a sentence where one ends. */
 export function speakPieces(text: string, max = 480): string[] {
-  const bytes = (t: string) => Buffer.byteLength(t, "utf8");
+  const bytes = (text: string) => Buffer.byteLength(text, "utf8");
   const out: string[] = [];
   let rest = text.trim();
   while (rest !== "") {
@@ -323,7 +324,7 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
     // A real process: its deadline is real time.
     const cancel = afterRealTime(30_000, () => {
       close();
-      reject(new Error(voiceWording().tunnel.timedOut));
+      reject(new Error(t("server.voice.tunnel.timedOut")));
     });
     // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
     const read = (b: Buffer) => {
@@ -337,11 +338,11 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
     child.stderr?.on("data", read);
     child.on("error", (e) => {
       cancel();
-      reject((e as NodeJS.ErrnoException).code === "ENOENT" ? new Error(voiceWording().tunnel.missing) : e);
+      reject((e as NodeJS.ErrnoException).code === "ENOENT" ? new Error(t("server.voice.tunnel.missing")) : e);
     });
     child.on("exit", () => {
       cancel();
-      reject(new Error(voiceWording().tunnel.exited));
+      reject(new Error(t("server.voice.tunnel.exited")));
     });
   });
 }
@@ -390,7 +391,7 @@ export const make = (options: VoiceOptions = {}) =>
     // Asked each time: credentials saved from the title screen work without a restart.
     const creds = () => {
       const c = settings.agora();
-      return c ? Effect.succeed(c) : Effect.fail(unavailable(voiceWording().noAgora, "voice"));
+      return c ? Effect.succeed(c) : Effect.fail(unavailable(t("server.voice.noAgora"), "voice"));
     };
 
     // The voice line: local only, like the farm; the tunnel is the one way in from outside.
@@ -403,7 +404,7 @@ export const make = (options: VoiceOptions = {}) =>
     let closing: (() => void) | undefined;
     const answer = chatCompletions({
       answerer: orchestrator.answerer("phone"),
-      misheard: voiceWording().misheard,
+      misheard: t("server.voice.misheard"),
       log: (l) => logs.info(l),
       now: () => clock.currentTimeMillisUnsafe(),
     });
@@ -459,7 +460,7 @@ export const make = (options: VoiceOptions = {}) =>
             });
           });
           s.once("error", (e) => {
-            lineProblem = voiceWording().lineDown(e.message);
+            lineProblem = t("server.voice.lineDown", { why: e.message });
             logs.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
             resolve();
           });
@@ -481,9 +482,9 @@ export const make = (options: VoiceOptions = {}) =>
     const openTunnel =
       options.tunnel ??
       (async (port: number) => {
-        const t = await cloudflared(port);
-        if (!(await tunnelAnswers(t.url))) logs.info(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
-        return t;
+        const item = await cloudflared(port);
+        if (!(await tunnelAnswers(item.url))) logs.info(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`);
+        return item;
       });
     // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
     let opening: Promise<string> | undefined;
@@ -493,13 +494,13 @@ export const make = (options: VoiceOptions = {}) =>
       closing = undefined;
       if (!tunnel) {
         opening ??= openTunnel(linePort)
-          .then((t) => {
+          .then((item) => {
             if (stopped) {
-              t.close();
-              throw new Error(voiceWording().lineClosed);
+              item.close();
+              throw new Error(t("server.voice.lineClosed"));
             }
-            tunnel = t;
-            return t.url;
+            tunnel = item;
+            return item.url;
           })
           .finally(() => {
             opening = undefined;
@@ -509,11 +510,11 @@ export const make = (options: VoiceOptions = {}) =>
       return tunnel.url;
     };
     const openLine = async (): Promise<CallLine> => {
-      if (stopped) throw new Error(voiceWording().lineClosed);
+      if (stopped) throw new Error(t("server.voice.lineClosed"));
       if (lineProblem) throw new Error(lineProblem);
-      if (!line) throw new Error(voiceWording().lineNotOpen);
+      if (!line) throw new Error(t("server.voice.lineNotOpen"));
       const url = await base();
-      if (stopped) throw new Error(voiceWording().lineClosed);
+      if (stopped) throw new Error(t("server.voice.lineClosed"));
       const id = randomBytes(8).toString("hex");
       const key = randomBytes(24).toString("base64url");
       keys.set(id, key);
@@ -533,7 +534,7 @@ export const make = (options: VoiceOptions = {}) =>
 
     const callOf = (agentId: string) => {
       const call = calls.get(agentId);
-      return call && !call.ending ? Effect.succeed(call) : Effect.fail(failed(voiceWording().hungUp));
+      return call && !call.ending ? Effect.succeed(call) : Effect.fail(failed(t("server.voice.hungUp")));
     };
 
     const liveCall = () => [...calls].find(([, c]) => !c.ending)?.[0];
@@ -640,9 +641,9 @@ export const make = (options: VoiceOptions = {}) =>
         const uid = newUid();
         const issued = yield* Effect.try({
           try: () => sign(c, channel, uid),
-          catch: (e) => unavailable(voiceWording().noToken(message(e))),
+          catch: (e) => unavailable(t("server.voice.noToken", { why: message(e) })),
         });
-        if (stopped) return yield* Effect.fail(unavailable(voiceWording().stopped));
+        if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
         prune();
         grants.set(keyOf(channel, uid), {
           credentials: c,
@@ -655,10 +656,10 @@ export const make = (options: VoiceOptions = {}) =>
       renew: Effect.fn("Voice.renew")(function* (channel, uid) {
         prune();
         const g = grants.get(keyOf(channel, uid));
-        if (!g) return yield* Effect.fail(unavailable(voiceWording().grantGone));
+        if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
         const issued = yield* Effect.try({
           try: () => sign(g.credentials, channel, uid),
-          catch: (e) => unavailable(voiceWording().noToken(message(e))),
+          catch: (e) => unavailable(t("server.voice.noToken", { why: message(e) })),
         });
         g.expires = now() + tokenSeconds * 1000;
         return issued;
@@ -667,8 +668,8 @@ export const make = (options: VoiceOptions = {}) =>
         prune();
         const key = keyOf(channel, uid);
         const g = grants.get(key);
-        if (!g) return yield* Effect.fail(unavailable(voiceWording().grantGone));
-        if (g.starting || g.agent) return yield* Effect.fail(unavailable(voiceWording().connecting));
+        if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
+        if (g.starting || g.agent) return yield* Effect.fail(unavailable(t("server.voice.connecting")));
         g.starting = true;
         let release = () => {};
         let callLine: CallLine | undefined;
@@ -682,7 +683,7 @@ export const make = (options: VoiceOptions = {}) =>
             openingLine = openLine();
             callLine = yield* Effect.tryPromise({
               try: () => openingLine!,
-              catch: (e) => unavailable(voiceWording().lineFailed(message(e))),
+              catch: (e) => unavailable(t("server.voice.lineFailed", { why: message(e) })),
             });
             const opened = callLine;
             let once = false;
@@ -709,9 +710,9 @@ export const make = (options: VoiceOptions = {}) =>
           starting = pending;
           const id = yield* Effect.tryPromise({
             try: () => pending,
-            catch: (e) => failed(voiceWording().joinFailed(message(e))),
+            catch: (e) => failed(t("server.voice.joinFailed", { why: message(e) })),
           });
-          if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable(voiceWording().stopped));
+          if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
           g.agent = id;
           g.starting = false;
           calls.set(id, {
@@ -771,7 +772,7 @@ export const make = (options: VoiceOptions = {}) =>
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
           catch: (e) => e,
-        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed(voiceWording().leaveFailed(message(e)))))));
+        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed(t("server.voice.leaveFailed", { why: message(e) }))))));
         yield* Effect.ensuring(
           stopping,
           Effect.sync(() => call?.release()),
@@ -782,8 +783,8 @@ export const make = (options: VoiceOptions = {}) =>
       heardCurrent: (text, picked, sendKey) =>
         Effect.suspend(() => {
           const live = [...calls].filter(([, c]) => !c.ending);
-          if (live.length > 1) return Effect.fail(failed(voiceWording().manyCalls));
-          if (live.length === 0) return Effect.fail(failed(voiceWording().noCall));
+          if (live.length > 1) return Effect.fail(failed(t("server.voice.manyCalls")));
+          if (live.length === 0) return Effect.fail(failed(t("server.voice.noCall")));
           return heard(live[0]![0], text, picked, sendKey);
         }),
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
@@ -793,24 +794,24 @@ export const make = (options: VoiceOptions = {}) =>
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
-        if (!d) return yield* Effect.fail(unavailable(voiceWording().dictation.unset, "voice"));
+        if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "voice"));
         const format = given.trim().replace(/^\./, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
-            reason: voiceWording().dictation.format(JSON.stringify(format)),
+            reason: t("server.voice.dictation.format", { format: JSON.stringify(format) }),
           });
         const audio = Buffer.from(audio64, "base64");
         if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
-            reason: voiceWording().dictation.empty,
+            reason: t("server.voice.dictation.empty"),
           });
         if (audio.length > dictateMaxBytes)
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
-            reason: voiceWording().dictation.tooLong,
+            reason: t("server.voice.dictation.tooLong"),
           });
         const form = new FormData();
         form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
@@ -826,16 +827,19 @@ export const make = (options: VoiceOptions = {}) =>
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
               signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
-          catch: (e) => unavailable(voiceWording().dictation.unreachable(message(e)), "voice"),
+          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: message(e) }), "voice"),
         });
         const raw = (yield* Effect.tryPromise({
           try: () => res.text(),
-          catch: (e) => unavailable(voiceWording().dictation.cut(message(e)), "voice"),
+          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: message(e) }), "voice"),
         })).slice(0, 1 << 20);
         const got = Schema.decodeUnknownOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
-        if (!res.ok) return yield* Effect.fail(unavailable(voiceWording().dictation.status(res.status, [...(detail || raw.trim())].slice(0, 200).join(""))));
-        if (got._tag === "None") return yield* Effect.fail(unavailable(voiceWording().dictation.shape));
+        if (!res.ok)
+          return yield* Effect.fail(
+            unavailable(t("server.voice.dictation.status", { status: res.status, detail: [...(detail || raw.trim())].slice(0, 200).join("") })),
+          );
+        if (got._tag === "None") return yield* Effect.fail(unavailable(t("server.voice.dictation.shape")));
         return { text: (got.value.text ?? "").trim() };
       }),
       lines: () => keys.size,

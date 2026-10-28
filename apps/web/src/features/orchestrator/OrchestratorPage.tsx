@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
 // folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
 // the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
 
-import { orchestratorWording } from "./words";
 import { For, Match, Show, Switch } from "solid-js";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -17,10 +17,10 @@ import { VoiceForm } from "../voice";
 import { TrajectoryLog } from "../session";
 
 const tabs = [
-  { id: "memory", label: orchestratorWording().orchestrator.tab.memory },
-  { id: "trajectory", label: orchestratorWording().orchestrator.tab.trajectory },
-  { id: "archive", label: orchestratorWording().orchestrator.tab.archive },
-  { id: "voice", label: orchestratorWording().orchestrator.tab.voice },
+  { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },
+  { id: "trajectory", label: t("web.orchestrator.orchestrator.tab.trajectory") },
+  { id: "archive", label: t("web.orchestrator.orchestrator.tab.archive") },
+  { id: "voice", label: t("web.orchestrator.orchestrator.tab.voice") },
 ] as const;
 type Tab = (typeof tabs)[number]["id"];
 
@@ -60,21 +60,21 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
       </span>
       <div class="flex min-w-0 flex-col gap-0.5">
         <A href="/agents" class="text-xs text-muted hover:underline">
-          {orchestratorWording().orchestrator.all}
+          {t("web.orchestrator.orchestrator.all")}
         </A>
-        <h1 class="text-2xl font-semibold">{profile()?.name || orchestratorWording().orchestrator.title}</h1>
+        <h1 class="text-2xl font-semibold">{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
         <p class="text-sm text-muted">
-          {orchestratorWording().orchestrator.intro}
-          {look() ? orchestratorWording().orchestrator.look(look()!.name) : ""}{" "}
+          {t("web.orchestrator.orchestrator.intro")}
+          {look() ? t("web.orchestrator.orchestrator.look", { name: look()!.name }) : ""}{" "}
           <A href={`/agents/${encodeURIComponent(props.agent)}`} class="underline">
-            {orchestratorWording().orchestrator.profile}
+            {t("web.orchestrator.orchestrator.profile")}
           </A>
         </p>
       </div>
     </div>
   );
   const bar = () => (
-    <div role="tablist" aria-label={orchestratorWording().orchestrator.tabs} class="flex gap-1 border-b border-line pb-2">
+    <div role="tablist" aria-label={t("web.orchestrator.orchestrator.tabs")} class="flex gap-1 border-b border-line pb-2">
       <For each={shown()}>
         {(t) => (
           <button
@@ -100,10 +100,10 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
           <div class="min-h-0 flex-1">
             <TrajectoryLog
               id={props.agent}
-              asked={orchestratorWording().orchestrator.heard}
-              empty={orchestratorWording().orchestrator.quiet}
-              title={orchestratorWording().orchestrator.trajectory}
-              about={orchestratorWording().orchestrator.about}
+              asked={t("web.orchestrator.orchestrator.heard")}
+              empty={t("web.orchestrator.orchestrator.quiet")}
+              title={t("web.orchestrator.orchestrator.trajectory")}
+              about={t("web.orchestrator.orchestrator.about")}
               onMarkWrong={(on, want) => api.orchestrator.eval.create({ agent: props.agent, on, want })}
             />
           </div>

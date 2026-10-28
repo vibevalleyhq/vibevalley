@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
 // sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
 // the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
-import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -25,14 +25,14 @@ function PickChip(props: { named: boolean }) {
   return (
     <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
       {(a) => (
-        <span class="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={farmWording().chat.sendTo(a().name)}>
+        <span class="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={t("web.farm.chat.sendTo", { name: a().name })}>
           <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={26} />
           <Show when={props.named}>
-            <span class="max-w-20 truncate text-[12px] text-bark-800">{farmWording().chat.sendTo(a().name)}</span>
+            <span class="max-w-20 truncate text-[12px] text-bark-800">{t("web.farm.chat.sendTo", { name: a().name })}</span>
           </Show>
           <button
             type="button"
-            aria-label={farmWording().chat.anyone}
+            aria-label={t("web.farm.chat.anyone")}
             onClick={() => setPick("auto")}
             class="flex h-6 w-6 cursor-pointer items-center justify-center hover:bg-cream-300"
           >
@@ -54,11 +54,11 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
   const placeholder = () =>
     props.thread
       ? owner()
-        ? farmWording().chat.inThread(owner()!.name)
-        : farmWording().chat.inThreadAnyone
+        ? t("web.farm.chat.inThread", { name: owner()!.name })
+        : t("web.farm.chat.inThreadAnyone")
       : props.channel?.type === "direct"
-        ? farmWording().chat.toOrchestratorAlone
-        : farmWording().chat.toOrchestrator;
+        ? t("web.farm.chat.toOrchestratorAlone")
+        : t("web.farm.chat.toOrchestrator");
 
   const box = createComposer(core, () => input, {
     target: () => {
@@ -67,7 +67,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
     },
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,
-    failed: (reason) => props.onProblem(farmWording().chat.notSent(reason)),
+    failed: (reason) => props.onProblem(t("web.farm.chat.notSent", { why: reason })),
     edited: () => props.onProblem(undefined),
     sent: () => {
       const id = props.channel?.id;
@@ -81,10 +81,12 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
       <Show when={replying()}>
         {(m) => (
           <div class="mb-1 flex items-center gap-1.5 bg-cream-100 px-2 py-1">
-            <span class="min-w-0 flex-1 truncate font-pixel text-[12px] text-bark-500">{farmWording().chat.replyTo(m().name, m().text)}</span>
+            <span class="min-w-0 flex-1 truncate font-pixel text-[12px] text-bark-500">
+              {m().text ? t("web.farm.chat.replyToText", { name: m().name, text: m().text }) : t("web.farm.chat.replyTo", { name: m().name })}
+            </span>
             <button
               type="button"
-              aria-label={farmWording().chat.actions.cancelReply}
+              aria-label={t("web.farm.chat.actions.cancelReply")}
               onClick={() => drafts.reply(m().channel, undefined)}
               class="cursor-pointer p-0.5"
             >
@@ -98,7 +100,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
           <div
             class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
             role="listbox"
-            aria-label={farmWording().chat.who}
+            aria-label={t("web.farm.chat.who")}
           >
             <For each={box.offered()} keyed={(n) => n.token}>
               {(n, i) => (
@@ -136,8 +138,8 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
           <Show when={box.stoppable()}>
             <button
               type="button"
-              aria-label={farmWording().chat.stop}
-              title={farmWording().chat.stopHint}
+              aria-label={t("web.farm.chat.stop")}
+              title={t("web.farm.chat.stopHint")}
               onClick={() => void api.orchestrator.stop({ agent: box.here() }).catch(() => {})}
               class="cursor-pointer p-1"
             >
@@ -147,7 +149,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
           <DictationButton field={() => input} value={box.text()} onValue={box.edit} />
           <button
             type="button"
-            aria-label={farmWording().chat.send}
+            aria-label={t("web.farm.chat.send")}
             disabled={!box.canSend()}
             onClick={() => void box.send()}
             class="cursor-pointer p-1 disabled:opacity-40"

@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
 // when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
 // It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists, PGlite's wasm and the
 // coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
 
-import { desktopWording } from "./words";
 import { execFile, spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -73,16 +73,16 @@ export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0
   return new Promise((resolve, reject) => {
     const fail = (reason: string) => {
       void stop();
-      reject(new Error(desktopWording().seeLog(reason, files.log)));
+      reject(new Error(t("desktop.seeLog", { reason, log: files.log })));
     };
-    const timer = setTimeout(() => fail(desktopWording().noAddress(startTimeoutMs / 1000)), startTimeoutMs);
+    const timer = setTimeout(() => fail(t("desktop.noAddress", { seconds: startTimeoutMs / 1000 })), startTimeoutMs);
     child.once("error", (e) => {
       clearTimeout(timer);
-      fail(desktopWording().failed(e.message));
+      fail(t("desktop.failed", { why: e.message }));
     });
     void exited.then((code) => {
       clearTimeout(timer);
-      fail(desktopWording().exited(code));
+      fail(t("desktop.exited", { code: String(code) }));
     });
     let ready = false;
     createInterface({ input: child.stdout }).on("line", (line) => {

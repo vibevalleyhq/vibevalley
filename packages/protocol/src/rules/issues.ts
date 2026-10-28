@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // An issue's title in one short line, and its state in words, as the board, the phone, the tools and the orchestrator say them.
 
 import type { Issue } from "../shapes";
-import { wording } from "../words";
 
 const titleMax = 40;
 
@@ -20,7 +20,10 @@ export function shortTitle(text: string): string {
 }
 
 /** What its close says: done with what it delivered, or canceled and why. */
-export const closedText = (t: Pick<Issue, "status" | "delivered" | "canceled">): string => {
-  const w = wording();
-  return t.delivered ? w.doneWith(w.delivered[t.delivered]) : t.canceled ? w.canceledFor(w.canceled[t.canceled]) : w.status[t.status];
+export const closedText = (pick: Pick<Issue, "status" | "delivered" | "canceled">): string => {
+  return pick.delivered
+    ? t("shared.doneWith", { what: t(`shared.delivered.${pick.delivered}`) })
+    : pick.canceled
+      ? t("shared.canceledFor", { why: t(`shared.canceled.${pick.canceled}`) })
+      : t(`shared.status.${pick.status}`);
 };

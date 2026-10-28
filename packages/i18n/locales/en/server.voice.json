@@ -1,0 +1,45 @@
+{
+  "misheard": "Hm? I didn't catch that. Could you say it again?",
+  "unknownSuffix": "the server cannot use it yet",
+  "unknown": "{vendor} for {what}: the server cannot use it yet",
+  "part": {
+    "asr": "recognition",
+    "llm": "the model",
+    "tts": "speech"
+  },
+  "noAsrKey": "Microsoft recognition has no key yet: fill it in under Recognition on the Voice page",
+  "noLine": "The manager's voice line is not connected",
+  "noDeepseekKey": "DeepSeek needs a DeepSeek key first: fill it in under Settings",
+  "noLlmKey": "Your own model has no key yet: fill it in under Think on the Voice page",
+  "noTtsKey": "Microsoft speech has no key yet: fill it in under Speak on the Voice page",
+  "unusable": "The voice settings cannot be used: {why}",
+  "tunnel": {
+    "timedOut": "cloudflared gave no address within 30 seconds",
+    "missing": "cloudflared is not installed: brew install cloudflared, or set voice.line.url in the configuration to use your own tunnel",
+    "exited": "cloudflared exited without giving an address"
+  },
+  "noAgora": "No Agora credentials yet: fill in the App ID and the App Certificate under Settings",
+  "lineDown": "The voice line cannot open: {why}",
+  "lineClosed": "The voice line is closed",
+  "lineNotOpen": "The voice line is not open yet",
+  "hungUp": "This call has already hung up",
+  "noToken": "Could not sign a voice token: {why}",
+  "stopped": "The voice service has stopped",
+  "grantGone": "This call's voice credentials have expired: connect again",
+  "connecting": "This call is already connecting",
+  "lineFailed": "The manager's voice line cannot connect: {why}",
+  "joinFailed": "Could not bring the manager into the channel: {why}",
+  "leaveFailed": "Could not have the manager leave: {why}",
+  "manyCalls": "Several calls are connecting: update the app and try again",
+  "noCall": "No call is connecting",
+  "dictation": {
+    "unset": "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
+    "format": "Dictation does not know recordings in {format}",
+    "empty": "The recording is empty, or not base64",
+    "tooLong": "The recording is too long: at most 25 MB a piece",
+    "unreachable": "The dictation address cannot be reached: {why}",
+    "cut": "The dictation answer broke off halfway: {why}",
+    "status": "The dictation address answered {status}: {detail}",
+    "shape": "The dictation address did not answer in OpenAI's transcription format"
+  }
+}

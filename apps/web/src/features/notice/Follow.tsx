@@ -5,7 +5,7 @@
 import { createEffect, onSettled } from "solid-js";
 import { currentHost } from "../../base/host";
 import { freshOf } from "@vibevalley/protocol/rules";
-import { currentLocale } from "@vibevalley/protocol/words";
+import { currentLocale } from "@vibevalley/i18n";
 import { traySummary } from "./tray";
 import { voiceCall } from "../voice";
 import { rawFrame } from "../../base/frame";

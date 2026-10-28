@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // This farm's own memories, rows in the memory table: what each agent noted (its
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
-import { memoryWording } from "./words.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 import { type ActorKind, type Memory, MemoryKindValues, type Outcome } from "@vibevalley/protocol";
 import type { Actor } from "../base/actor.ts";
@@ -173,12 +173,12 @@ export const makeMemories = Effect.gen(function* () {
 
   const write = Effect.fnUntraced(function* (n: Note) {
     const body = clip(n.text, noteMaxChars);
-    if (body === "") return yield* new MemoryRefused({ message: memoryWording().empty });
+    if (body === "") return yield* new MemoryRefused({ message: t("server.memory.empty") });
     const project = n.project.trim() || undefined;
     const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
     const { id, at } = yield* insertNote(n.agent, body, project, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
-        Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: memoryWording().dbFailed }))),
+        Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed") }))),
       ),
     );
     return {

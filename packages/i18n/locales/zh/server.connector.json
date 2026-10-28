@@ -1,0 +1,65 @@
+{
+  "media": {
+    "image": "[图片]",
+    "file": "[文件]",
+    "audio": "[语音]",
+    "video": "[视频]",
+    "sticker": "[表情]",
+    "message": "[消息]",
+    "attachment": "[附件]"
+  },
+  "namedFile": "[文件：{name}]",
+  "staleLogin": "微信说登录过期了",
+  "qqKeys": "要填 QQ 机器人的 AppID 和 AppSecret（在 q.qq.com 的机器人管理页里）。",
+  "unreadSecrets": "存着的登录信息读不出来，断开重新连一次",
+  "expired": "登录过期了，一小时后再试；也可以断开重新连。",
+  "paired": "配对好了：以后在这里说的话，就是你在默认频道里说的。",
+  "stopped": "收消息停了",
+  "switched": "换了账号",
+  "disconnected": "断开了",
+  "noConnector": "没有 {id} 这个连接",
+  "noChannel": "没有叫 {name} 的频道",
+  "line": {
+    "orchestrator": "管家",
+    "dispatch": "派活",
+    "thread": "在工单串里",
+    "head": "【{who}】",
+    "headWhat": "【{who} · {what}】"
+  },
+  "feishu": {
+    "register": "飞书注册：{why}",
+    "registerTimeout": "飞书注册：超时了",
+    "noQr": "飞书现在不支持扫码建应用，请稍后再试。",
+    "noLink": "飞书没给二维码，请重试。",
+    "denied": "在飞书里拒绝了。",
+    "qrExpired": "二维码过期了。",
+    "incomplete": "飞书确认了，但没给齐登录信息，请重试。",
+    "tooLong": "等太久没扫，二维码过期了。",
+    "disconnected": "飞书长连接断了：{why}",
+    "send": "飞书发消息：{why}",
+    "noId": "飞书发消息：没有确认消息编号"
+  },
+  "qq": {
+    "auth": "QQ 鉴权：{why}",
+    "authTimeout": "QQ 鉴权：超时了",
+    "badKeys": "AppID 或 AppSecret 不对",
+    "gateway": "QQ 网关：{why}",
+    "noGateway": "QQ 没给网关地址",
+    "gatewayError": "QQ 网关：连接出错",
+    "reconnect": "QQ 网关：QQ 让重新连接",
+    "invalid": "QQ 网关：QQ 说会话无效",
+    "closed": "QQ 网关：连接关了（{code}）",
+    "send": "QQ 发消息：{why}",
+    "unread": "QQ 发消息：读不出发送结果：{why}",
+    "noId": "QQ 发消息：没有确认消息编号 {why}"
+  },
+  "weixin": {
+    "noQr": "拿不到登录二维码：{why}",
+    "qrExpiredTimes": "二维码过期了几次，请重新开始。",
+    "codeWrongTimes": "数字输错了几次，请重新开始。",
+    "taken": "这个微信已经连过了：先在微信里删掉它，或者换一个微信扫。",
+    "incomplete": "微信确认了，但没给齐登录信息，请重试。",
+    "tooLong": "等太久没扫，二维码过期了。"
+  },
+  "digest": "你不在的时候有 {n} 条消息：\n{lines}\n\n完整的在默认频道里。"
+}

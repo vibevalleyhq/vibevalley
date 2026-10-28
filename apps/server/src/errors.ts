@@ -1,11 +1,28 @@
+import { t } from "@vibevalley/i18n";
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
-import { gatewayWording } from "./words.ts";
 import { type ApiError, commandOf, type Next } from "@vibevalley/protocol/api";
 
 export type { ApiError, Next };
 
 export const refused = (reason: string, next?: readonly Next[]): ApiError => ({ _tag: "Refused", reason, ...(next && next.length > 0 ? { next } : {}) });
+
+/** What a hint to list the ones that are names (server.lookIn in the catalog). */
+type LookIn =
+  | "issue"
+  | "session"
+  | "project"
+  | "runtime"
+  | "doc"
+  | "agent"
+  | "skill"
+  | "template"
+  | "recurrence"
+  | "device"
+  | "archive"
+  | "channel"
+  | "graph"
+  | "memories";
 
 /** Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). */
 export const missing = (what: string, next: readonly Next[]): ApiError => ({ _tag: "Missing", what, ...(next.length > 0 ? { next } : {}) });
@@ -13,9 +30,9 @@ export const missing = (what: string, next: readonly Next[]): ApiError => ({ _ta
 /** Where to find the ones that are there, as the command that lists them; cli.test.ts runs each one's help, so a command
  * renamed away breaks the test, not the hint. */
 // say is read when the error is made, in the locale of the moment.
-const listed = (key: keyof ReturnType<typeof gatewayWording>["lookIn"], run: readonly string[]): Next => ({
+const listed = (key: LookIn, run: readonly string[]): Next => ({
   get say() {
-    return gatewayWording().lookIn[key];
+    return t(`server.lookIn.${key}`);
   },
   run: [...run],
 });
@@ -37,7 +54,7 @@ export const lookIn = {
 } satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */
-export const memoriesOf = (agent: string): Next => ({ say: gatewayWording().lookIn.memories, run: commandOf("memory.list", [agent]) });
+export const memoriesOf = (agent: string): Next => ({ say: t("server.lookIn.memories"), run: commandOf("memory.list", [agent]) });
 
 /** An error's words, whatever its tag. */
 export const reasonOf = (e: ApiError): string =>

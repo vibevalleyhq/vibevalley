@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // WeChat, written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
-import { connectorWording } from "./words.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
@@ -236,7 +236,7 @@ export class WeixinClient implements WeixinApi {
       [code, show] = await this.qrCode(signal);
     } catch (e) {
       if (signal.aborted) throw e;
-      throw new Error(connectorWording().weixin.noQr(e instanceof Error ? e.message : String(e)), { cause: e });
+      throw new Error(t("server.connector.weixin.noQr", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
     }
     progress("waiting", show);
     const attempt = AbortSignal.any([signal, AbortSignal.timeout(8 * 60_000)]);
@@ -259,20 +259,20 @@ export class WeixinClient implements WeixinApi {
         case "expired":
         case "verify_code_blocked":
           if (++refreshes >= 3)
-            throw new Error(status.status === "expired" ? connectorWording().weixin.qrExpiredTimes : connectorWording().weixin.codeWrongTimes);
+            throw new Error(status.status === "expired" ? t("server.connector.weixin.qrExpiredTimes") : t("server.connector.weixin.codeWrongTimes"));
           try {
             [code, show] = await this.qrCode(attempt);
           } catch (e) {
             if (attempt.aborted) break;
-            throw new Error(connectorWording().weixin.noQr(e instanceof Error ? e.message : String(e)), { cause: e });
+            throw new Error(t("server.connector.weixin.noQr", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
           }
           progress("waiting", show);
           break;
         case "binded_redirect":
-          throw new Error(connectorWording().weixin.taken);
+          throw new Error(t("server.connector.weixin.taken"));
         case "confirmed": {
           const s = status;
-          if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error(connectorWording().weixin.incomplete);
+          if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error(t("server.connector.weixin.incomplete"));
           return {
             account: { baseUrl: s.baseurl || base, token: s.bot_token },
             botId: s.ilink_bot_id,
@@ -284,7 +284,7 @@ export class WeixinClient implements WeixinApi {
       }
     }
     if (signal.aborted) throw signal.reason ?? new Error("aborted");
-    throw new Error(connectorWording().weixin.tooLong);
+    throw new Error(t("server.connector.weixin.tooLong"));
   }
 
   async getUpdates(signal: AbortSignal, account: Account, buf: string, timeoutMs: number): Promise<Updates> {
@@ -348,16 +348,16 @@ export function text(m: Message): string {
         part = item.text_item?.text ?? "";
         break;
       case 3:
-        part = item.voice_item?.text || connectorWording().media.audio;
+        part = item.voice_item?.text || t("server.connector.media.audio");
         break;
       case 2:
-        part = connectorWording().media.image;
+        part = t("server.connector.media.image");
         break;
       case 4:
-        part = item.file_item?.file_name ? connectorWording().namedFile(item.file_item.file_name) : connectorWording().media.file;
+        part = item.file_item?.file_name ? t("server.connector.namedFile", { name: item.file_item.file_name }) : t("server.connector.media.file");
         break;
       case 5:
-        part = connectorWording().media.video;
+        part = t("server.connector.media.video");
         break;
       case undefined:
         break;

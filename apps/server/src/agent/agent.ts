@@ -1,8 +1,8 @@
+import { list, t } from "@vibevalley/i18n";
 // The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
-import { agentWording } from "./words.ts";
 import { join } from "node:path";
 import {
   type Agent,
@@ -121,17 +121,17 @@ const free = (want: string, taken: readonly string[], join: string) => {
 };
 
 /** A template made into a new profile beside these: its own id and name when free. */
-const installed = (t: AgentTemplate, beside: readonly Agent[], id?: string): Agent =>
+const installed = (template: AgentTemplate, beside: readonly Agent[], id?: string): Agent =>
   profileOf(
-    t,
+    template,
     id ??
       free(
-        t.id,
+        template.id,
         beside.map((a) => a.id),
         "-",
       ),
     free(
-      t.name,
+      template.name,
       beside.map((a) => a.name),
       " ",
     ),
@@ -148,12 +148,12 @@ export const make = Effect.gen(function* () {
   const disk = new FileWriter(file);
   const forkHere = yield* FiberSet.makeRuntime<never>();
   const builtIn = builtInTemplates();
-  const builtInOf = (id: string) => builtIn.find((t) => t.id === id);
+  const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
   const starters: Agent[] = [];
   for (const id of config.agent.starters) {
-    const t = builtInOf(id);
-    if (t) starters.push(installed(t, starters));
+    const builtIn = builtInOf(id);
+    if (builtIn) starters.push(installed(builtIn, starters));
     else yield* Effect.logWarning(`vibevalley: agent.starters names no built-in template: ${id}`);
   }
   const seed: Stored = { agents: starters, skills: [], settings: {} };
@@ -174,7 +174,7 @@ export const make = Effect.gen(function* () {
         disk.write(() => JSON.stringify(next));
         s = next;
       },
-      catch: (e) => refused(agentWording().notSaved(file, e instanceof Error ? e.message : String(e))),
+      catch: (e) => refused(t("server.agent.notSaved", { file, why: e instanceof Error ? e.message : String(e) })),
     });
 
   const all = () => structuredClone([...s.agents]);
@@ -183,36 +183,36 @@ export const make = Effect.gen(function* () {
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
    * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */
   const roleProblem = (a: Agent): string => {
-    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return agentWording().defaultStaysOrchestrator;
-    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return agentWording().orchestratorRuntime(orchestratorRuntime);
+    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return t("server.agent.defaultStaysOrchestrator");
+    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });
     return "";
   };
 
   // The delete and its dry run judge by these, so the dry run is refused exactly when the delete would be.
   const deletableAgent = (id: string) => {
-    if (id === defaultOrchestrator) return Effect.fail(refused(agentWording().orchestratorStays));
+    if (id === defaultOrchestrator) return Effect.fail(refused(t("server.agent.orchestratorStays")));
     const a = s.agents.find((x) => x.id === id);
-    return a ? Effect.succeed(a) : Effect.fail(missing(agentWording().noAgent(id), [lookIn.agent]));
+    return a ? Effect.succeed(a) : Effect.fail(missing(t("server.agent.noAgent", { id }), [lookIn.agent]));
   };
   const deletableSkill = (id: string) => {
     const k = s.skills.find((x) => x.id === id);
-    return k ? Effect.succeed(k) : Effect.fail(missing(agentWording().noSkill(id), [lookIn.skill]));
+    return k ? Effect.succeed(k) : Effect.fail(missing(t("server.agent.noSkill", { id }), [lookIn.skill]));
   };
 
   // Read again on every ask: an added template is a folder in the home, and copying one in or out changes the list.
   const templates = (): AgentTemplate[] => {
     const added = addedTemplates(config.home);
     for (const why of added.problems) void forkHere(Effect.logWarning(`vibevalley: an added template is left out: ${why}`));
-    return [...builtIn, ...added.templates].map((t) => ({
-      ...t,
-      installed: s.agents.filter((a) => a.from?.template === t.id).map((a) => a.id),
+    return [...builtIn, ...added.templates].map((item) => ({
+      ...item,
+      installed: s.agents.filter((a) => a.from?.template === item.id).map((a) => a.id),
     }));
   };
-  const templateOf = (id: string) => templates().find((t) => t.id === id);
+  const templateOf = (id: string) => templates().find((template) => template.id === id);
   const deletableTemplate = (id: string) => {
-    const t = templateOf(id);
-    if (!t) return Effect.fail(missing(agentWording().template.noTemplate(id), [lookIn.template]));
-    return t.source === "builtIn" ? Effect.fail(refused(agentWording().template.builtIn(id))) : Effect.succeed(t);
+    const item = templateOf(id);
+    if (!item) return Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
+    return item.source === "builtIn" ? Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : Effect.succeed(item);
   };
 
   const shape: AgentShape = {
@@ -235,7 +235,7 @@ export const make = Effect.gen(function* () {
       return cast;
     }),
     createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused(agentWording().newAgentId));
+      if (draft.id) return yield* Effect.fail(refused(t("server.agent.newAgentId")));
       const why = roleProblem(draft);
       if (why) return yield* Effect.fail(refused(why));
       let n = 1;
@@ -251,7 +251,7 @@ export const make = Effect.gen(function* () {
       ),
     previewDeleteAgent: (id) =>
       Effect.map(deletableAgent(id), (a) => ({
-        does: [agentWording().deleteAgent(a.name, a.id, a.runtime)],
+        does: [t("server.agent.deleteAgent", { name: a.name, id: a.id, runtime: a.runtime })],
       })),
     saveSkill: (skill) =>
       Effect.as(
@@ -259,7 +259,7 @@ export const make = Effect.gen(function* () {
         skill,
       ),
     createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused(agentWording().newSkillId));
+      if (draft.id) return yield* Effect.fail(refused(t("server.agent.newSkillId")));
       const stem =
         draft.name
           .toLowerCase()
@@ -284,7 +284,10 @@ export const make = Effect.gen(function* () {
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
         return {
-          does: [agentWording().deleteSkill(k.name), ...(holders.length > 0 ? [agentWording().unequip(holders)] : [])],
+          does: [
+            t("server.agent.deleteSkill", { name: k.name }),
+            ...(holders.length > 0 ? [t("server.agent.unequip", { holders: list(holders.map((name) => t("server.agent.quoted", { name }))) })] : []),
+          ],
         };
       }),
     saveSettings: (runtime, settings) =>
@@ -294,19 +297,19 @@ export const make = Effect.gen(function* () {
       ),
     templates,
     installTemplate: Effect.fn("Agents.installTemplate")(function* (id) {
-      const t = templateOf(id);
-      if (!t) return yield* Effect.fail(missing(agentWording().template.noTemplate(id), [lookIn.template]));
-      const made = withCast(installed(t, s.agents));
+      const item = templateOf(id);
+      if (!item) return yield* Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
+      const made = withCast(installed(item, s.agents));
       yield* change((x) => ({ ...x, agents: [...x.agents, made] }));
       return made;
     }),
     updateFromTemplate: Effect.fn("Agents.updateFromTemplate")(function* (agent) {
       const a = s.agents.find((x) => x.id === agent);
-      if (!a) return yield* Effect.fail(missing(agentWording().noAgent(agent), [lookIn.agent]));
-      if (!a.from) return yield* Effect.fail(refused(agentWording().template.notFrom(a.name)));
-      const t = templateOf(a.from.template);
-      if (!t) return yield* Effect.fail(refused(agentWording().template.gone(a.name, a.from.template)));
-      const next = withCast(updatedFrom(t, a));
+      if (!a) return yield* Effect.fail(missing(t("server.agent.noAgent", { id: agent }), [lookIn.agent]));
+      if (!a.from) return yield* Effect.fail(refused(t("server.agent.template.notFrom", { name: a.name })));
+      const item = templateOf(a.from.template);
+      if (!item) return yield* Effect.fail(refused(t("server.agent.template.gone", { name: a.name, template: a.from.template })));
+      const next = withCast(updatedFrom(item, a));
       yield* change((x) => ({ ...x, agents: upsert(x.agents, next) }));
       return next;
     }),
@@ -315,22 +318,29 @@ export const make = Effect.gen(function* () {
         try: () => readTemplate(path, "added"),
         catch: (e) => refused(e instanceof TemplateProblem ? e.message : String(e)),
       });
-      const t = yield* read;
-      if (templateOf(t.id)) return yield* Effect.fail(refused(agentWording().template.taken(t.id)));
+      const item = yield* read;
+      if (templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));
       yield* Effect.try({
-        try: () => copyTemplate(path, config.home, t.id),
-        catch: (e) => refused(agentWording().notSaved(path, e instanceof Error ? e.message : String(e))),
+        try: () => copyTemplate(path, config.home, item.id),
+        catch: (e) => refused(t("server.agent.notSaved", { file: path, why: e instanceof Error ? e.message : String(e) })),
       });
-      return { ...t, installed: [] };
+      return { ...item, installed: [] };
     }),
     deleteTemplate: (id) =>
-      Effect.flatMap(deletableTemplate(id), (t) =>
+      Effect.flatMap(deletableTemplate(id), (item) =>
         Effect.try({
-          try: () => removeTemplate(config.home, t.id),
-          catch: (e) => refused(agentWording().notSaved(id, e instanceof Error ? e.message : String(e))),
+          try: () => removeTemplate(config.home, item.id),
+          catch: (e) => refused(t("server.agent.notSaved", { file: id, why: e instanceof Error ? e.message : String(e) })),
         }),
       ),
-    previewDeleteTemplate: (id) => Effect.map(deletableTemplate(id), (t) => ({ does: [agentWording().template.delete(t.name, t.installed.length)] })),
+    previewDeleteTemplate: (id) =>
+      Effect.map(deletableTemplate(id), (item) => ({
+        does: [
+          item.installed.length > 0
+            ? t("server.agent.template.deleteKept", { name: item.name, installed: item.installed.length })
+            : t("server.agent.template.delete", { name: item.name }),
+        ],
+      })),
   };
   return shape;
 });

@@ -1,5 +1,5 @@
-import { issuesWording } from "./words";
-import { wording } from "@vibevalley/protocol/words";
+import { t } from "@vibevalley/i18n";
+
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -44,7 +44,7 @@ const criteriaList = (text: string) =>
 
 /** Moved to todo: it is either worked already, or waits there for room. */
 export const dispatchedNotice = (open: (id: string | undefined) => void) => (got: Issue) => {
-  if (got.status === "todo") toast(issuesWording().todo.queued);
+  if (got.status === "todo") toast(t("web.issue.todo.queued"));
   else open(got.id);
 };
 
@@ -117,12 +117,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const said = (): [string, string] => {
     const by = drafting();
     return by
-      ? [issuesWording().todo.refining(by.name), issuesWording().todo.refiningLine]
+      ? [t("web.issue.todo.refining", { who: by.name }), t("web.issue.todo.refiningLine")]
       : questions().length > 0
-        ? [issuesWording().todo.questions(questions().length), issuesWording().todo.questionsLine]
+        ? [t("web.issue.todo.questions", { n: questions().length }), t("web.issue.todo.questionsLine")]
         : refined()
-          ? [issuesWording().todo.drafted, issuesWording().todo.draftedLine]
-          : [issuesWording().todo.what, issuesWording().todo.whatLine];
+          ? [t("web.issue.todo.drafted"), t("web.issue.todo.draftedLine")]
+          : [t("web.issue.todo.what"), t("web.issue.todo.whatLine")];
   };
 
   const draft = () => {
@@ -167,8 +167,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <input
         value={d().title}
         onInput={(e) => edit({ title: e.currentTarget.value })}
-        placeholder={issuesWording().todo.titleHint}
-        aria-label={issuesWording().todo.title}
+        placeholder={t("web.issue.todo.titleHint")}
+        aria-label={t("web.issue.todo.title")}
         class="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-xl font-semibold outline-none placeholder:text-faint hover:border-line focus:border-focus"
       />
     </div>
@@ -180,27 +180,29 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         value={d().description}
         onInput={(e) => edit({ description: e.currentTarget.value })}
         rows={6}
-        placeholder={issuesWording().todo.descriptionHint}
-        aria-label={issuesWording().todo.description}
+        placeholder={t("web.issue.todo.descriptionHint")}
+        aria-label={t("web.issue.todo.description")}
         class="w-full resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-faint hover:border-line focus:border-focus"
       />
       <div class="mt-3 border-t border-line">
         <Fold
-          label={issuesWording().todo.criteria}
-          summary={criteria().length === 0 ? issuesWording().todo.noCriteria : issuesWording().todo.criteriaSummary(criteria().length, criteria()[0] ?? "")}
+          label={t("web.issue.todo.criteria")}
+          summary={
+            criteria().length === 0 ? t("web.issue.todo.noCriteria") : t("web.issue.todo.criteriaSummary", { n: criteria().length, first: criteria()[0] ?? "" })
+          }
           open={criteria().length === 0}
         >
           <TextArea
             rows={3}
             value={d().criteria}
             onInput={(e) => edit({ criteria: e.currentTarget.value })}
-            placeholder={issuesWording().todo.criteriaHint}
-            aria-label={issuesWording().todo.criteria}
+            placeholder={t("web.issue.todo.criteriaHint")}
+            aria-label={t("web.issue.todo.criteria")}
           />
         </Fold>
       </div>
       <Show when={backlog()}>
-        <SheetLabel>{issuesWording().todo.talk}</SheetLabel>
+        <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
         <Note tone={drafting() ? "water" : "wheat"}>
           <div class="text-base font-semibold">{said()[0]}</div>
           <div class="mt-1">{said()[1]}</div>
@@ -209,7 +211,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
               <div class="mt-1.5">
                 <div>· {a.question}</div>
                 <Show when={a.options?.length}>
-                  <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={issuesWording().todo.answerTo(a.question)}>
+                  <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={t("web.issue.todo.answerTo", { question: a.question })}>
                     <For each={a.options}>
                       {(o) => (
                         <Button disabled={busy()} onClick={() => setWord(o)}>
@@ -234,12 +236,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
               void draft();
             }
           }}
-          placeholder={questions().length > 0 ? issuesWording().todo.answerHint : refined() ? issuesWording().todo.againHint : issuesWording().todo.whatHint}
-          aria-label={issuesWording().todo.whatLabel}
+          placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
+          aria-label={t("web.issue.todo.whatLabel")}
         />
         <div class="mt-2.5">
           <Button tone={refined() ? "plain" : "primary"} disabled={!canRefine()} onClick={() => void draft()}>
-            {refined() ? issuesWording().todo.redraft : issuesWording().todo.draft}
+            {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
           </Button>
         </div>
       </Show>
@@ -248,58 +250,58 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 
   const side = (
     <>
-      <Property label={issuesWording().todo.status}>
+      <Property label={t("web.issue.todo.status")}>
         <span class="flex items-center gap-2">
           <span class={["size-2 rounded-full", backlog() ? "bg-wheat" : "bg-water"]} />
-          {backlog() ? issuesWording().todo.draftStatus : issuesWording().todo.todoStatus}
+          {backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
         </span>
       </Property>
-      <Property label={issuesWording().detail.helper}>
+      <Property label={t("web.issue.detail.helper")}>
         <Pick
-          label={issuesWording().detail.helper}
+          label={t("web.issue.detail.helper")}
           value={d().agent}
-          placeholder={issuesWording().todo.pickForMe}
+          placeholder={t("web.issue.todo.pickForMe")}
           onChange={(v) => edit({ agent: v })}
           options={agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name }))}
         />
       </Property>
-      <Property label={issuesWording().task.project}>
+      <Property label={t("web.issue.task.project")}>
         <Pick
-          label={issuesWording().task.project}
+          label={t("web.issue.task.project")}
           value={d().project}
-          placeholder={issuesWording().todo.whichProject}
+          placeholder={t("web.issue.todo.whichProject")}
           onChange={(v) => edit({ project: v })}
           options={[...new Set([...projects(), ...(d().project ? [d().project] : [])])].map((p) => ({ value: p, label: p }))}
         />
       </Property>
       <button type="button" onClick={() => setNewProject(true)} class="mb-1 ml-[76px] cursor-pointer self-start text-xs text-water hover:underline">
-        {projects().length === 0 ? issuesWording().todo.firstProject : issuesWording().todo.newProjectLink}
+        {projects().length === 0 ? t("web.issue.todo.firstProject") : t("web.issue.todo.newProjectLink")}
       </button>
-      <Property label={issuesWording().todo.priority}>
+      <Property label={t("web.issue.todo.priority")}>
         <Pick
-          label={issuesWording().todo.priority}
+          label={t("web.issue.todo.priority")}
           value={d().priority}
           onChange={(v) => edit({ priority: v as Priority })}
-          options={PriorityValues.map((p) => ({ value: p, label: wording().priority[p] }))}
+          options={PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) }))}
         />
       </Property>
-      <Property label={issuesWording().detail.deliver}>
+      <Property label={t("web.issue.detail.deliver")}>
         <Pick
-          label={issuesWording().detail.deliver}
+          label={t("web.issue.detail.deliver")}
           value={d().deliver}
           onChange={(v) => edit({ deliver: v as Deliverable })}
-          options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
+          options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
         />
       </Property>
       <More>
-        <Property label={issuesWording().task.written}>{wallClockText(props.item.createdAt)}</Property>
+        <Property label={t("web.issue.task.written")}>{wallClockText(props.item.createdAt)}</Property>
       </More>
       <Show when={queued()}>
         {(at) => (
           <Note tone="water" class="mt-2 !p-2.5">
-            <div>{issuesWording().todo.inQueue(ago(at(), Date.now()))}</div>
+            <div>{t("web.issue.todo.inQueue", { ago: ago(at(), Date.now()) })}</div>
             <Button class="mt-1.5" disabled={busy()} onClick={() => void unqueue()}>
-              {issuesWording().todo.unqueue}
+              {t("web.issue.todo.unqueue")}
             </Button>
           </Note>
         )}
@@ -309,10 +311,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           <Button
             tone={refined() ? "primary" : "plain"}
             disabled={!startable()}
-            title={d().agent ? undefined : issuesWording().todo.pickHelper}
+            title={d().agent ? undefined : t("web.issue.todo.pickHelper")}
             onClick={() => void start()}
           >
-            {issuesWording().todo.start}
+            {t("web.issue.todo.start")}
           </Button>
         </Show>
         <Button
@@ -323,10 +325,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             if (edit) void busyWith(async () => saved(await api.issue.update({ id, ...edit })));
           }}
         >
-          {issuesWording().todo.save}
+          {t("web.issue.todo.save")}
         </Button>
         <Button tone="quiet" disabled={busy()} onClick={() => void remove()}>
-          {issuesWording().todo.remove}
+          {t("web.issue.todo.remove")}
         </Button>
       </div>
       <Show when={newProject()}>
@@ -353,19 +355,19 @@ function NewProjectDialog(props: { onClose: () => void; onMade: (name: string) =
     props.onMade(made.name);
   };
   return (
-    <Dialog open onClose={props.onClose} title={issuesWording().todo.newProject}>
+    <Dialog open onClose={props.onClose} title={t("web.issue.todo.newProject")}>
       <TextInput
         ref={autofocus()}
         value={name()}
         onInput={(e) => setName(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && name().trim() && void make()}
-        placeholder={issuesWording().todo.projectHint}
-        aria-label={issuesWording().todo.projectName}
+        placeholder={t("web.issue.todo.projectHint")}
+        aria-label={t("web.issue.todo.projectName")}
       />
       <div class="mt-5 flex justify-end gap-2">
-        <Button onClick={() => props.onClose()}>{issuesWording().never}</Button>
+        <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
         <Button tone="primary" disabled={!name().trim()} onClick={() => void make()}>
-          {issuesWording().todo.create}
+          {t("web.issue.todo.create")}
         </Button>
       </div>
     </Dialog>

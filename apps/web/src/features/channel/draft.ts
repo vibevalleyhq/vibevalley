@@ -1,9 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // What the owner is writing in each channel: the words, the message it answers and the files uploaded for it. Kept on
 // this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
 
 import { createSignal } from "solid-js";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
-import { appWording } from "../../base/words";
+
 import { reasonOf } from "../../base/api";
 
 export interface Draft {
@@ -83,7 +84,7 @@ const sending =
       xhr.upload.onprogress = (e) => e.lengthComputable && progress(e.loaded, e.total);
       xhr.onload = () =>
         resolve(new Response(xhr.responseText, { status: xhr.status, headers: { "content-type": xhr.getResponseHeader("content-type") ?? "" } }));
-      xhr.onerror = () => reject(new Error(appWording().unreachable));
+      xhr.onerror = () => reject(new Error(t("web.base.unreachable")));
       xhr.send(init?.body as XMLHttpRequestBodyInit | null | undefined);
     });
 

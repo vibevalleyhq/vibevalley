@@ -1,0 +1,55 @@
+{
+  "doc": "document {id}",
+  "untitled": "Untitled document",
+  "otherDoc": "This batch of changes ({batch}) belongs to another document",
+  "noBatch": "This batch of changes has no batchId",
+  "demoNotInserted": "The demo's block was not inserted: {status}",
+  "noWriter": "No helper can write: turn one on in the profiles first",
+  "demoRunning": "The demo is writing: try again when it is done",
+  "notApplied": "The block was not written",
+  "op": {
+    "deleted": "This block was deleted",
+    "noAttr": "There is no attribute {name}",
+    "noBlock": "There is no block {id}",
+    "noId": "The new block has no id",
+    "taken": "Block {id} already exists",
+    "unknownType": "Unknown block type {type}",
+    "badKey": "Not a valid order key: {key}",
+    "missing": "There is no such block",
+    "unknownOp": "Unknown change {op}",
+    "noText": "This block has no text",
+    "noRev": "There is no version {rev}",
+    "changed": "Someone else just changed this block",
+    "underSelf": "A block cannot move under itself",
+    "splitAtEnd": "Someone else just changed this block, so it was split at its end",
+    "splitOutside": "The split position {at} is outside the text ({length} characters)",
+    "intoSelf": "A block cannot merge into itself"
+  },
+  "demo": {
+    "0": {
+      "heading": "Background · demo",
+      "paragraphs": {
+        "0": "(Demo) A script wrote this section; no helper really thought of it. We have several helpers here, and an article used to be written by one of them from start to end while the others waited.",
+        "1": "Now a document is stored in blocks, each with its own version. Each helper writes its own section without fighting over a block, and the bar on the left shows at a glance who wrote which.",
+        "2": "This demo lets you see it for yourself: three helpers write at once, the words grow paragraph by paragraph, and in the end they make one whole article."
+      }
+    },
+    "1": {
+      "heading": "How · demo",
+      "paragraphs": {
+        "0": "(Demo) Each helper first inserts an empty paragraph at the end of its section, then replaces that paragraph about once a second, so it looks like a paragraph slowly growing.",
+        "1": "Every change goes through the same op pipeline as yours: inserting is insert_block, growing is update_text with the last version's number, and the server takes them in order, batch by batch.",
+        "2": "If you change the words in a paragraph a helper is writing, the helper's next write conflicts and does not go in; it leaves that paragraph to you and goes on to the next."
+      }
+    },
+    "2": {
+      "heading": "Next · demo",
+      "paragraphs": {
+        "0": "(Demo) Once broadcasting is done, the page will no longer ask the server every second: when a helper writes, you see it at once.",
+        "1": "Later, a helper that wants to change another section's words will not change them directly but leave a suggestion for you to approve; a finished section is marked in the outline as done and waiting for you.",
+        "2": "That is the end of the demo. Keep this document or delete it: it touches no ticket and no memory."
+      }
+    }
+  },
+  "badBlockType": "A block's type can only be {types}"
+}

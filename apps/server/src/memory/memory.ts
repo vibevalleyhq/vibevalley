@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // What the agents remember: every agent's rows and the outside sources (sources.ts), and the
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
-import { memoryWording } from "./words.ts";
 import { fromOwner } from "./prompts.ts";
 import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer } from "effect";
@@ -106,11 +106,11 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (agent: string, text: string) {
       const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
-      if (body === "") return yield* Effect.fail(refused(memoryWording().empty));
+      if (body === "") return yield* Effect.fail(refused(t("server.memory.empty")));
       const at = yield* Clock.currentTimeMillis;
       const written = yield* Effect.try({
         try: () => remember(homeOf(agent), fromOwner + body, new Date(at)),
-        catch: () => refused(memoryWording().fileFailed),
+        catch: () => refused(t("server.memory.fileFailed")),
       });
       return lineMemory(agent, written, at);
     });
@@ -138,7 +138,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       if (problem) return yield* Effect.fail(refused(problem));
       const listed = inFile(agent) ? yield* Effect.try({ try: () => orchestrator(agent), catch: fileRefused }) : yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
-      if (!m) return yield* Effect.fail(missing(memoryWording().noMemory(agent, id), [memoriesOf(agent)]));
+      if (!m) return yield* Effect.fail(missing(t("server.memory.noMemory", { agent, id }), [memoriesOf(agent)]));
       return m;
     });
 
@@ -152,9 +152,9 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         ),
       previewForgetOf: (agent, id) =>
         Effect.map(forgettable(agent, id), (m) => ({
-          does: [inFile(agent) ? memoryWording().forgetOrchestrator(m.text) : memoryWording().forget(agent, m.text)],
+          does: [inFile(agent) ? t("server.memory.forgetOrchestrator", { text: m.text }) : t("server.memory.forget", { agent, text: m.text })],
         })),
-      recallOf: (agent, project, text) => (inFile(agent) ? Effect.fail(refused(memoryWording().orchestratorRecall)) : preview(agent, project, text)),
+      recallOf: (agent, project, text) => (inFile(agent) ? Effect.fail(refused(t("server.memory.orchestratorRecall"))) : preview(agent, project, text)),
       recall: Effect.fn("Memories.recall")(function* (cue) {
         const told = mergeRecalled(yield* sources.prefetch(cue));
         const ids = told.map((l) => l.id).filter((id) => id !== "");
@@ -166,8 +166,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         const pages = yield* sources.search(query);
         const coverage = pages.flatMap((page) => {
           const notes = page.coverage ? [page.coverage] : [];
-          if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push(memoryWording().coverage.unconfirmed);
-          return notes.map((note) => memoryWording().coverage.note(sourceLabel(page.source), note));
+          if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push(t("server.memory.coverage.unconfirmed"));
+          return notes.map((note) => t("server.memory.coverage.note", { source: sourceLabel(page.source), note }));
         });
         const found = interleave(
           pages.map((page) => page.found),

@@ -1,5 +1,6 @@
+import { t } from "@vibevalley/i18n";
 import { actionIcon, type IconName } from "../../ui/icons";
-import { sessionWording } from "./words";
+
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { SessionEvent } from "@vibevalley/protocol";
@@ -50,7 +51,7 @@ export function TurnSteps(props: { session: string; run: string | undefined; orc
             <Icon name={open() ? "collapse" : "enlarge"} size={10} class="opacity-60" />
           </button>
           <Show when={open()}>
-            <WorkLog steps={steps()} now={now()} asked={sessionWording().log.heard} class="mt-1.5" />
+            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />
           </Show>
         </div>
       )}
@@ -66,7 +67,7 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
   return (
     <div
       class={["max-h-[352px] divide-y divide-line overflow-y-auto rounded-md border border-line bg-page", props.class]}
-      aria-label={sessionWording().log.process}
+      aria-label={t("web.session.log.process")}
     >
       <For each={rounds()} keyed={(r) => r.asked?.seq ?? -1}>
         {(r, i) => (
@@ -96,14 +97,14 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
       <button
         type="button"
         onClick={() => setToggled(!open())}
-        aria-label={open() ? sessionWording().log.fold : sessionWording().log.unfold}
+        aria-label={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
         class="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-hover"
       >
         <Icon name="expand" size={12} class={["transition-transform duration-150", { "rotate-90": open() }]} />
         <span class="text-sm font-semibold">{props.label}</span>
         <span class="min-w-0 flex-1 truncate text-xs text-muted">
-          {sessionWording().log.steps(props.round.steps.length, tookText(roundMs(props.round, end())))}
-          {props.live ? sessionWording().log.live : ""}
+          {t("web.session.log.steps", { n: props.round.steps.length, took: tookText(roundMs(props.round, end())) })}
+          {props.live ? t("web.session.log.live") : ""}
         </span>
         <Show when={props.round.asked}>{(asked) => <When at={asked().time} now={props.now} />}</Show>
       </button>
@@ -126,7 +127,7 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
       </For>
       <Show when={!open() && props.round.steps.length > shown().length}>
         <button type="button" onClick={() => setToggled(true)} class="cursor-pointer self-start pl-1.5 text-sm text-water hover:underline">
-          {sessionWording().log.see(props.round.steps.length)}
+          {t("web.session.log.see", { n: props.round.steps.length })}
         </button>
       </Show>
     </div>
@@ -173,7 +174,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
       </div>
       <Show when={long()}>
         <button type="button" onClick={() => setOpen(!open())} class="mt-1 cursor-pointer text-sm text-water hover:underline">
-          {open() ? sessionWording().log.less : sessionWording().log.all}
+          {open() ? t("web.session.log.less") : t("web.session.log.all")}
         </button>
       </Show>
     </div>
@@ -212,22 +213,22 @@ function Step(props: { step: SessionEvent; now: number }) {
   return (
     <Switch>
       <Match when={props.step.type === "user/message"}>
-        <Box fill="#e5a93c24" label={sub() ? sessionWording().log.subagentGot : sessionWording().log.told} step={props.step} now={props.now}>
+        <Box fill="#e5a93c24" label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={4} />
         </Box>
       </Match>
       <Match when={props.step.type === "memory/recalled"}>
-        <Box fill="#b4cb7c26" label={sessionWording().log.recalled} step={props.step} now={props.now}>
+        <Box fill="#b4cb7c26" label={t("web.session.log.recalled")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={3} />
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/thinking"}>
-        <Box edge faint label={sub() ? sessionWording().log.subagentThought : sessionWording().log.thought} step={props.step} now={props.now}>
+        <Box edge faint label={sub() ? t("web.session.log.subagentThought") : t("web.session.log.thought")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={2} />
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/message"}>
-        <Box fill="#2f1f130f" label={sub() ? sessionWording().log.subagentSaid : sessionWording().log.said} step={props.step} now={props.now}>
+        <Box fill="#2f1f130f" label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={8} markdown />
         </Box>
       </Match>
@@ -250,9 +251,9 @@ function Step(props: { step: SessionEvent; now: number }) {
 function ToolStep(props: { step: SessionEvent; now: number }) {
   const [open, setOpen] = createSignal(false);
   const farm = () => farmToolText(props.step.text);
-  const kind = () => (farm() ? sessionWording().log.farm : (props.step.actionText ?? ""));
+  const kind = () => (farm() ? t("web.session.log.farm") : (props.step.actionText ?? ""));
   const input = () => readableInput(props.step);
-  const state = () => (props.step.ok === undefined ? sessionWording().log.running : props.step.ok ? sessionWording().log.ok : sessionWording().log.failed);
+  const state = () => (props.step.ok === undefined ? t("web.session.log.running") : props.step.ok ? t("web.session.log.ok") : t("web.session.log.failed"));
   return (
     <div>
       <button
@@ -273,13 +274,13 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
       </button>
       <Show when={open()}>
         <div class="flex flex-col gap-1.5 pt-1 pr-2 pb-2 pl-8">
-          {props.step.tool && <span class="text-xs text-muted">{sessionWording().log.tool(props.step.tool)}</span>}
+          {props.step.tool && <span class="text-xs text-muted">{t("web.session.log.tool", { name: props.step.tool })}</span>}
           <Show when={input()}>
             {(text) => <pre class="max-h-40 overflow-auto rounded-md bg-ink px-2.5 py-2 font-mono text-xs whitespace-pre-wrap text-[#eedcb2]">{text()}</pre>}
           </Show>
           <Show
             when={props.step.output}
-            fallback={<span class="text-xs text-muted">{props.step.ok === undefined ? sessionWording().log.pending : sessionWording().log.noOutput}</span>}
+            fallback={<span class="text-xs text-muted">{props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}</span>}
           >
             {(out) => <pre class="max-h-56 overflow-auto rounded-md bg-hover px-2.5 py-2 font-mono text-xs whitespace-pre-wrap">{out()}</pre>}
           </Show>

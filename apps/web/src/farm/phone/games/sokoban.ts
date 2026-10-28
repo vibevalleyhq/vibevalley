@@ -1,4 +1,4 @@
-import { phoneWording } from "../words";
+import { t } from "@vibevalley/i18n";
 // 推箱子: push the crates of harvest onto the marks; every step can be taken back.
 
 export interface Warehouse {
@@ -8,11 +8,11 @@ export interface Warehouse {
 }
 
 export const warehouses: readonly Warehouse[] = [
-  { name: phoneWording().sokoban.levels[0]!, rows: ["######", "#    #", "#@$. #", "#    #", "######"] },
-  { name: phoneWording().sokoban.levels[1]!, rows: ["#######", "#     #", "# .$  #", "#  #@ #", "#     #", "#######"] },
-  { name: phoneWording().sokoban.levels[2]!, rows: ["#######", "# . . #", "# $ $ #", "#  @  #", "#     #", "#######"] },
-  { name: phoneWording().sokoban.levels[3]!, rows: ["#######", "# .   #", "# $   #", "#   $ #", "# # . #", "#  @  #", "#######"] },
-  { name: phoneWording().sokoban.levels[4]!, rows: ["########", "# . . .#", "# $ $ $#", "#      #", "#  @   #", "########"] },
+  { name: t("web.farm.phone.sokoban.levels.0"), rows: ["######", "#    #", "#@$. #", "#    #", "######"] },
+  { name: t("web.farm.phone.sokoban.levels.1"), rows: ["#######", "#     #", "# .$  #", "#  #@ #", "#     #", "#######"] },
+  { name: t("web.farm.phone.sokoban.levels.2"), rows: ["#######", "# . . #", "# $ $ #", "#  @  #", "#     #", "#######"] },
+  { name: t("web.farm.phone.sokoban.levels.3"), rows: ["#######", "# .   #", "# $   #", "#   $ #", "# # . #", "#  @  #", "#######"] },
+  { name: t("web.farm.phone.sokoban.levels.4"), rows: ["########", "# . . .#", "# $ $ $#", "#      #", "#  @   #", "########"] },
 ];
 
 export type WarehouseDirection = "left" | "right" | "up" | "down";

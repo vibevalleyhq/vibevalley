@@ -1,0 +1,31 @@
+{
+  "docs": {
+    "memoryItem": "Memory",
+    "list": "Documents",
+    "title": "Documents",
+    "newTitle": "The new document's title",
+    "new": "New document",
+    "none": "No documents yet. Write a title and press New document.",
+    "all": "All documents",
+    "saving": "Saving…",
+    "saved": "All saved",
+    "blocks": "{n, plural, one {# block} other {# blocks}}",
+    "helpersWriting": "helpers writing",
+    "doc": "Document",
+    "demo": "Demo: several helpers writing at once",
+    "append": "Write a paragraph at the end",
+    "owner": "Owner",
+    "done": "Done",
+    "notDone": "Not done",
+    "writing": "{who} is writing",
+    "wrote": "{who} wrote it",
+    "issue": "Ticket {id}",
+    "unknown": "This block is a \"{type}\", which this version cannot draw yet: it can be read, not changed",
+    "block": "Block {id}",
+    "heading": "Heading",
+    "notSaved": "Not saved: {why}",
+    "changed": "Someone else just changed this block",
+    "conflict": "{why}: what you wrote was not saved and stays in the revision",
+    "image": "Image: {alt} {src}"
+  }
+}

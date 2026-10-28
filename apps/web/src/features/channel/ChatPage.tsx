@@ -1,5 +1,5 @@
+import { t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
-import { chatWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
@@ -93,9 +93,9 @@ function Chat() {
         </Keyed>
       </Show>
       <Show when={thread()}>
-        {(t) => (
+        {(shown) => (
           <div class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 ease-out starting:translate-x-full lg:static lg:z-auto lg:w-[416px] lg:shrink-0">
-            <Keyed key={t().id}>{() => <ThreadPane thread={t()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
+            <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
           </div>
         )}
       </Show>
@@ -108,9 +108,9 @@ function Chat() {
 type Tab = "chat" | "jobs" | "recurrences";
 
 const tabs: { tab: Tab; icon: IconName; label: string }[] = [
-  { tab: "chat", icon: "chat", label: chatWording().tab.chat },
-  { tab: "jobs", icon: "issues", label: chatWording().tab.jobs },
-  { tab: "recurrences", icon: "clock", label: chatWording().tab.recurrences },
+  { tab: "chat", icon: "chat", label: t("web.channel.tab.chat") },
+  { tab: "jobs", icon: "issues", label: t("web.channel.tab.jobs") },
+  { tab: "recurrences", icon: "clock", label: t("web.channel.tab.recurrences") },
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
@@ -124,16 +124,16 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
   const [membersOpen, setMembersOpen] = createSignal(false);
   const name = () => channelName(props.channel);
   const about = () =>
-    [props.channel?.description, props.channel?.project ? chatWording().defaultProject(props.channel.project) : ""].filter(Boolean).join(" · ");
+    [props.channel?.description, props.channel?.project ? t("web.channel.defaultProject", { project: props.channel.project }) : ""].filter(Boolean).join(" · ");
   return (
     <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
       <header class={[head, "gap-3 px-4"]}>
-        <button type="button" class={[iconButton, "md:hidden"]} aria-label={chatWording().channels} onClick={() => props.onDrawer()}>
+        <button type="button" class={[iconButton, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={18} />
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.default ? chatWording().defaultHint : undefined}>
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.default ? t("web.channel.defaultHint") : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
@@ -148,8 +148,8 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               value={search() ?? ""}
               onInput={(e) => setSearch(e.currentTarget.value)}
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
-              placeholder={chatWording().findHint}
-              aria-label={chatWording().find}
+              placeholder={t("web.channel.findHint")}
+              aria-label={t("web.channel.find")}
               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
@@ -157,9 +157,9 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <button
           type="button"
           class={[iconButton, { "bg-selected": search() !== undefined }]}
-          aria-label={chatWording().findMessages}
+          aria-label={t("web.channel.findMessages")}
           aria-pressed={aria(search() !== undefined)}
-          title={chatWording().findMessages}
+          title={t("web.channel.findMessages")}
           onClick={() => {
             setSearch(search() === undefined ? "" : undefined);
             setTab("chat");
@@ -173,9 +173,9 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               <button
                 type="button"
                 class={[iconButton, { "bg-selected": threadsOpen() }]}
-                aria-label={chatWording().threadList.title}
+                aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
-                title={chatWording().threadList.title}
+                title={t("web.channel.threadList.title")}
                 onClick={() => setThreadsOpen(!threadsOpen())}
               >
                 <Icon name="thread" size={18} />
@@ -190,9 +190,9 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           <button
             type="button"
             class={[iconButton, { "bg-selected": pinsOpen() }]}
-            aria-label={chatWording().pins.open}
+            aria-label={t("web.channel.pins.open")}
             aria-expanded={aria(pinsOpen())}
-            title={chatWording().pins.open}
+            title={t("web.channel.pins.open")}
             disabled={!props.channel}
             onClick={() => setPinsOpen(!pinsOpen())}
           >
@@ -208,34 +208,34 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           disabled={!props.channel}
           onClick={() => setMembersOpen(!membersOpen())}
         >
-          {chatWording().members.open}
+          {t("web.channel.members.open")}
         </button>
         <button
           type="button"
           class={iconButton}
-          aria-label={chatWording().settings}
-          title={chatWording().settings}
+          aria-label={t("web.channel.settings")}
+          title={t("web.channel.settings")}
           disabled={!props.channel}
           onClick={() => setSettings(true)}
         >
           <Icon name="settings" size={18} />
         </button>
       </header>
-      <div role="tablist" aria-label={chatWording().inChannel} class="flex shrink-0 gap-1 border-b border-line px-3">
-        <For each={props.channel?.type === "direct" ? tabs.filter((t) => t.tab === "chat") : tabs}>
-          {(t) => (
+      <div role="tablist" aria-label={t("web.channel.inChannel")} class="flex shrink-0 gap-1 border-b border-line px-3">
+        <For each={props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs}>
+          {(entry) => (
             <button
               type="button"
               role="tab"
-              aria-selected={aria(tab() === t.tab)}
-              onClick={() => setTab(t.tab)}
+              aria-selected={aria(tab() === entry.tab)}
+              onClick={() => setTab(entry.tab)}
               class={[
                 "group -mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-2 pt-2 pb-1.5 text-sm",
-                tab() === t.tab ? "border-ink font-semibold" : "border-transparent text-muted hover:text-ink",
+                tab() === entry.tab ? "border-ink font-semibold" : "border-transparent text-muted hover:text-ink",
               ]}
             >
-              <Icon name={t.icon} size={16} class={tab() === t.tab ? "" : "opacity-70 group-hover:opacity-100"} />
-              {t.label}
+              <Icon name={entry.icon} size={16} class={tab() === entry.tab ? "" : "opacity-70 group-hover:opacity-100"} />
+              {entry.label}
             </button>
           )}
         </For>
@@ -243,8 +243,13 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
       <Show when={tab() === "chat"}>
         <div class="flex min-h-0 flex-1">
           <FileDrop channel={props.channel}>
-            <MessageList channel={props.channel} filter={search()} point={props.point} emptyText={chatWording().empty(channelLabel(props.channel))} />
-            <Composer channel={props.channel} placeholder={chatWording().sendTo(channelLabel(props.channel))} />
+            <MessageList
+              channel={props.channel}
+              filter={search()}
+              point={props.point}
+              emptyText={t("web.channel.empty", { label: channelLabel(props.channel) })}
+            />
+            <Composer channel={props.channel} placeholder={t("web.channel.sendTo", { label: channelLabel(props.channel) })} />
           </FileDrop>
           <Show when={membersOpen() ? props.channel : undefined}>{(c) => <Members channel={c()} />}</Show>
         </div>
@@ -299,14 +304,14 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
     />
   );
   return (
-    <aside aria-label={chatWording().side} class="flex w-full flex-col border-r border-line bg-side">
+    <aside aria-label={t("web.channel.side")} class="flex w-full flex-col border-r border-line bg-side">
       <div class={[head, "gap-2 px-5"]}>
-        <span class="flex-1 text-xl font-semibold">{chatWording().tab.chat}</span>
+        <span class="flex-1 text-xl font-semibold">{t("web.channel.tab.chat")}</span>
         <button
           type="button"
           class={iconButton}
-          aria-label={chatWording().farmSearch.open}
-          title={chatWording().farmSearch.open}
+          aria-label={t("web.channel.farmSearch.open")}
+          title={t("web.channel.farmSearch.open")}
           onClick={() => props.onSearch()}
         >
           <Icon name="search" size={16} />
@@ -318,18 +323,18 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           onClick={() => switcher.show()}
           class="mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2.5 text-left text-sm text-muted hover:bg-hover"
         >
-          <span class="flex-1">{chatWording().switcher.open}</span>
-          <span class="text-xs text-faint">{chatWording().switcher.keys(/Mac|iPhone|iPad/.test(navigator.userAgent))}</span>
+          <span class="flex-1">{t("web.channel.switcher.open")}</span>
+          <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/.test(navigator.userAgent) })}</span>
         </button>
         <Section
-          title={chatWording().channelsTitle}
+          title={t("web.channel.channelsTitle")}
           count={Math.max(1, channels().length)}
           action={
             <button
               type="button"
               class={[iconButton, "size-6"]}
-              aria-label={chatWording().newChannel}
-              title={chatWording().newChannel}
+              aria-label={t("web.channel.newChannel")}
+              title={t("web.channel.newChannel")}
               onClick={() => props.onNew()}
             >
               <Icon name="add" size={14} />
@@ -349,15 +354,15 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           </For>
         </Section>
         <Section
-          title={chatWording().directsTitle}
+          title={t("web.channel.directsTitle")}
           count={directsOf(chat()).length}
           action={
             <div class="relative">
               <button
                 type="button"
                 class={[iconButton, "size-6"]}
-                aria-label={chatWording().direct.add}
-                title={chatWording().direct.add}
+                aria-label={t("web.channel.direct.add")}
+                title={t("web.channel.direct.add")}
                 aria-expanded={aria(picking())}
                 onClick={() => setPicking(!picking())}
               >
@@ -377,14 +382,14 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
         >
           <For each={directsOf(chat())}>{row}</For>
         </Section>
-        <Section title={chatWording().helpers} count={sessions().length}>
+        <Section title={t("web.channel.helpers")} count={sessions().length}>
           <Show when={sessions().length === 0}>
-            <p class="px-3 text-xs text-muted">{chatWording().noHelpers}</p>
+            <p class="px-3 text-xs text-muted">{t("web.channel.noHelpers")}</p>
           </Show>
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
         <Show when={archived().length > 0}>
-          <Section title={chatWording().manage.archivedTitle} count={archived().length} closed>
+          <Section title={t("web.channel.manage.archivedTitle")} count={archived().length} closed>
             <For each={archived()}>{row}</For>
           </Section>
         </Show>
@@ -407,12 +412,12 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
   return (
     <div
       role="menu"
-      aria-label={chatWording().direct.pick}
+      aria-label={t("web.channel.direct.pick")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
     >
-      <p class="px-2 py-1 text-xs font-semibold text-muted">{chatWording().direct.pick}</p>
+      <p class="px-2 py-1 text-xs font-semibold text-muted">{t("web.channel.direct.pick")}</p>
       <Show when={!all.isPending && agents().length === 0}>
-        <p class="px-2 py-1 text-sm text-muted">{chatWording().direct.none}</p>
+        <p class="px-2 py-1 text-sm text-muted">{t("web.channel.direct.none")}</p>
       </Show>
       <For each={agents()} keyed={(a) => a.id}>
         {(a) => (
@@ -472,7 +477,7 @@ function ChannelRow(props: {
       onClick={() => props.onClick?.()}
       aria-current={props.here ? "page" : undefined}
       draggable={props.movable ? "true" : "false"}
-      title={props.movable ? chatWording().manage.drag : undefined}
+      title={props.movable ? t("web.channel.manage.drag") : undefined}
       onDragStart={(e) => {
         e.dataTransfer?.setData("text/plain", props.channel.id);
         untrack(() => props.onDragStart)?.();
@@ -501,7 +506,7 @@ function ChannelRow(props: {
         {channelName(props.channel)}
       </span>
       <Show when={props.channel.notify && props.channel.notify !== "all"}>
-        <span class="text-xs text-faint">{props.channel.notify === "none" ? chatWording().manage.muted : chatWording().manage.mentionsOnly}</span>
+        <span class="text-xs text-faint">{props.channel.notify === "none" ? t("web.channel.manage.muted") : t("web.channel.manage.mentionsOnly")}</span>
       </Show>
       <Show when={props.unread > 0}>
         <Count n={props.unread} />
@@ -515,8 +520,8 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) =
   const now = useNow();
   const thread = () => jobThreadOf(core()?.chat, props.h);
   const unread = () => {
-    const t = thread();
-    return t ? unreadIn(t) : 0;
+    const current = thread();
+    return current ? unreadIn(current) : 0;
   };
   const phase = () => phaseText(props.h, now());
   return (
@@ -524,8 +529,8 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) =
       type="button"
       disabled={!thread()}
       onClick={() => {
-        const t = thread();
-        if (t) props.onShow(t);
+        const current = thread();
+        if (current) props.onShow(current);
       }}
       title={phase()}
       class={["flex items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm enabled:cursor-pointer", props.active ? "bg-selected" : "hover:bg-hover"]}
@@ -545,10 +550,10 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) =
 }
 
 const mood: Record<OrchestratorState, string> = {
-  idle: chatWording().mood.idle,
-  listening: chatWording().mood.listening,
-  thinking: chatWording().mood.thinking,
-  speaking: chatWording().mood.speaking,
+  idle: t("web.channel.mood.idle"),
+  listening: t("web.channel.mood.listening"),
+  thinking: t("web.channel.mood.thinking"),
+  speaking: t("web.channel.mood.speaking"),
 };
 
 /** Newest pinned first. */
@@ -563,12 +568,12 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
   return (
     <div
       role="dialog"
-      aria-label={chatWording().pins.title}
+      aria-label={t("web.channel.pins.title")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
-      <p class="px-1 text-xs font-semibold text-muted">{chatWording().pins.title}</p>
+      <p class="px-1 text-xs font-semibold text-muted">{t("web.channel.pins.title")}</p>
       <Show when={pinned()?.length === 0}>
-        <p class="px-1 py-2 text-sm text-muted">{chatWording().pins.none}</p>
+        <p class="px-1 py-2 text-sm text-muted">{t("web.channel.pins.none")}</p>
       </Show>
       <For each={pinned() ?? []} keyed={(m) => m.id}>
         {(m) => (
@@ -581,7 +586,7 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
             }}
           >
             <span class="flex items-baseline gap-2 text-xs">
-              <span class="font-semibold">{m().from === ownerId ? chatWording().messages.owner : m().name}</span>
+              <span class="font-semibold">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
               <span class="text-muted">{workbenchClock(m().at)}</span>
             </span>
             <span class="line-clamp-3 block text-sm">{m().text}</span>
@@ -598,24 +603,24 @@ function Members(props: { channel: Channel }) {
   const now = useNow();
   const orchestrators = useOrchestrators();
   const here = () => props.channel.orchestrator ?? defaultOrchestrator;
-  const nameOf = (id: string) => orchestrators().find((a) => a.id === id)?.name || chatWording().orchestrator;
+  const nameOf = (id: string) => orchestrators().find((a) => a.id === id)?.name || t("web.channel.orchestrator");
   const helpers = () => {
     if (props.channel.type === "direct") return [];
     const fallback = defaultOf(core()?.chat)?.id;
     return (core()?.sessions ?? []).filter((h) => (h.channel ?? fallback) === props.channel.id);
   };
   return (
-    <aside aria-label={chatWording().members.title} class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex">
-      <p class="px-1 pb-1 text-xs font-semibold text-muted">{chatWording().members.title}</p>
+    <aside aria-label={t("web.channel.members.title")} class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex">
+      <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
-        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{chatWording().members.owner.slice(0, 1)}</span>
-        {chatWording().members.owner}
+        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{t("web.channel.members.owner").slice(0, 1)}</span>
+        {t("web.channel.members.owner")}
       </div>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
         <OrchestratorFace size={28} agent={here()} />
         <span class="flex min-w-0 flex-1 flex-col">
           <span class="truncate">{nameOf(here())}</span>
-          <span class="truncate text-xs text-muted">{chatWording().members.looksAfter}</span>
+          <span class="truncate text-xs text-muted">{t("web.channel.members.looksAfter")}</span>
         </span>
         <span class="text-xs text-muted">{mood[orchestratorMood(core(), here())]}</span>
       </div>
@@ -631,8 +636,8 @@ function Members(props: { channel: Channel }) {
             <button
               type="button"
               class={[iconButton, "size-6"]}
-              aria-label={chatWording().direct.open(h().name)}
-              title={chatWording().direct.open(h().name)}
+              aria-label={t("web.channel.direct.open", { name: h().name })}
+              title={t("web.channel.direct.open", { name: h().name })}
               onClick={() =>
                 void api.channel.direct
                   .create({ agent: h().agent })
@@ -646,7 +651,7 @@ function Members(props: { channel: Channel }) {
         )}
       </For>
       <Show when={props.channel.type !== "direct" && helpers().length === 0}>
-        <p class="px-1 pt-1 text-xs text-muted">{chatWording().members.none}</p>
+        <p class="px-1 pt-1 text-xs text-muted">{t("web.channel.members.none")}</p>
       </Show>
     </aside>
   );
@@ -658,9 +663,9 @@ function OrchestratorLine(props: { agent: string }) {
   const profile = useAgent(() => props.agent);
   const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
   return (
-    <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={chatWording().orchestrator}>
+    <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={t("web.channel.orchestrator")}>
       <OrchestratorFace size={32} agent={props.agent} />
-      {profile()?.name || chatWording().orchestrator}
+      {profile()?.name || t("web.channel.orchestrator")}
       <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
       <span class="text-xs text-muted">{mood[now()]}</span>
       <Show when={now() === "thinking"}>
@@ -680,11 +685,11 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
     return s
       ? `@${s.id} · ${phaseText(s, now())}`
       : props.thread.subjectKind === "issue"
-        ? chatWording().nobodyOnIt
-        : chatWording().replies(props.thread.replies);
+        ? t("web.channel.nobodyOnIt")
+        : t("web.channel.replies", { n: props.thread.replies });
   };
   return (
-    <section aria-label={chatWording().thread} class="flex min-w-0 flex-1 flex-col">
+    <section aria-label={t("web.channel.thread")} class="flex min-w-0 flex-1 flex-col">
       <header class={[head, "gap-2.5 px-4"]}>
         <span class="flex size-8 shrink-0 items-center justify-center">
           <Show when={session()} fallback={<Icon name="thread" size={16} />}>
@@ -699,7 +704,7 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
           </span>
         </div>
         <Select
-          label={chatWording().threadList.notify}
+          label={t("web.channel.threadList.notify")}
           value={props.thread.notify ?? "all"}
           options={notifyOptions()}
           class="w-28 text-xs"
@@ -708,13 +713,13 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
               api.channel.notify.set({ id: props.thread.id, notify: v }).catch((e) => toast(reasonOf(e), "bad"));
           }}
         />
-        <button type="button" class={iconButton} aria-label={chatWording().closeThread} title={chatWording().closeThread} onClick={() => props.onClose()}>
+        <button type="button" class={iconButton} aria-label={t("web.channel.closeThread")} title={t("web.channel.closeThread")} onClick={() => props.onClose()}>
           <Icon name="close" size={16} />
         </button>
       </header>
       <FileDrop channel={props.thread}>
-        <MessageList channel={props.thread} point={props.point} emptyText={chatWording().threadEmpty} />
-        <Composer channel={props.thread} placeholder={session() ? chatWording().sayInThread(session()!.name) : chatWording().reply} />
+        <MessageList channel={props.thread} point={props.point} emptyText={t("web.channel.threadEmpty")} />
+        <Composer channel={props.thread} placeholder={session() ? t("web.channel.sayInThread", { name: session()!.name }) : t("web.channel.reply")} />
       </FileDrop>
     </section>
   );
@@ -727,17 +732,19 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
   const [showArchived, setShowArchived] = createSignal(false);
   const live = () => threadsIn(core()?.chat, props.channel);
   const archived = () => threadsIn(core()?.chat, props.channel, true);
-  const title = (t: Channel) => threadTitle(t, core()?.issues ?? [], core()?.sessions ?? []);
-  const item = (t: Channel) => <ThreadItem thread={t} title={title(t)} onOpen={() => (router.navigate(chatPath(t)), untrack(() => props.onPick)())} />;
+  const title = (channel: Channel) => threadTitle(channel, core()?.issues ?? [], core()?.sessions ?? []);
+  const item = (channel: Channel) => (
+    <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
+  );
   return (
     <div
       role="dialog"
-      aria-label={chatWording().threadList.title}
+      aria-label={t("web.channel.threadList.title")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
-      <p class="px-1 pb-1 text-xs font-semibold text-muted">{chatWording().threadList.title}</p>
+      <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
-        <p class="px-1 py-2 text-sm text-muted">{chatWording().threadList.none}</p>
+        <p class="px-1 py-2 text-sm text-muted">{t("web.channel.threadList.none")}</p>
       </Show>
       <For each={live()}>{item}</For>
       <Show when={archived().length > 0}>
@@ -748,7 +755,7 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
           onClick={() => setShowArchived(!showArchived())}
         >
           <Icon name="expand" size={10} class={["opacity-60 transition-transform", { "rotate-90": showArchived() }]} />
-          {chatWording().threadList.archived(archived().length)}
+          {t("web.channel.threadList.archived", { n: archived().length })}
         </button>
         <Show when={showArchived()}>
           <For each={archived()}>{item}</For>
@@ -777,12 +784,12 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             <span class="flex items-center gap-1.5 text-sm">
               <Icon name="thread" size={14} />
               <span class="min-w-0 flex-1 truncate font-medium">{props.title}</span>
-              <span class="shrink-0 text-xs text-muted">{chatWording().replies(props.thread.replies)}</span>
+              <span class="shrink-0 text-xs text-muted">{t("web.channel.replies", { n: props.thread.replies })}</span>
             </span>
             <Show when={props.thread.last}>
               {(m) => (
                 <span class="truncate text-xs text-muted">
-                  {m().from === ownerId ? chatWording().messages.owner : m().name}：{m().text}
+                  {m().from === ownerId ? t("web.channel.messages.owner") : m().name}：{m().text}
                 </span>
               )}
             </Show>
@@ -792,7 +799,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
         <input
           ref={autofocus()}
           value={name()}
-          aria-label={chatWording().threadList.rename(props.title)}
+          aria-label={t("web.channel.threadList.rename", { title: props.title })}
           onInput={(e) => setName(e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.isComposing) return;
@@ -809,8 +816,8 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <button
         type="button"
         class={[iconButton, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
-        aria-label={chatWording().threadList.rename(props.title)}
-        title={chatWording().threadList.rename(props.title)}
+        aria-label={t("web.channel.threadList.rename", { title: props.title })}
+        title={t("web.channel.threadList.rename", { title: props.title })}
         onClick={() => {
           setName(props.thread.name ?? props.title);
           setRenaming(true);
@@ -821,8 +828,16 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <button
         type="button"
         class={[iconButton, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
-        aria-label={props.thread.archived !== undefined ? chatWording().threadList.unarchive(props.title) : chatWording().threadList.archive(props.title)}
-        title={props.thread.archived !== undefined ? chatWording().threadList.unarchive(props.title) : chatWording().threadList.archive(props.title)}
+        aria-label={
+          props.thread.archived !== undefined
+            ? t("web.channel.threadList.unarchive", { title: props.title })
+            : t("web.channel.threadList.archive", { title: props.title })
+        }
+        title={
+          props.thread.archived !== undefined
+            ? t("web.channel.threadList.unarchive", { title: props.title })
+            : t("web.channel.threadList.archive", { title: props.title })
+        }
         onClick={() => run(() => api.channel.archive.toggle({ id: props.thread.id }))}
       >
         <Icon name="archive" size={14} />
@@ -834,7 +849,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
 /** Every channel and thread searched at once, the server reading the filters; a hit opens where it is. */
 function FarmSearch(props: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={chatWording().farmSearch.title} wide>
+    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.farmSearch.title")} wide>
       <FarmSearchBody onClose={() => props.onClose()} />
     </Dialog>
   );
@@ -862,19 +877,19 @@ function FarmSearchBody(props: { onClose: () => void }) {
           ref={autofocus()}
           value={text()}
           onInput={(e) => setText(e.currentTarget.value)}
-          placeholder={chatWording().farmSearch.hint}
-          aria-label={chatWording().farmSearch.title}
+          placeholder={t("web.channel.farmSearch.hint")}
+          aria-label={t("web.channel.farmSearch.title")}
           class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
         />
       </label>
-      <p class="text-xs text-faint">{chatWording().farmSearch.filters}</p>
+      <p class="text-xs text-faint">{t("web.channel.farmSearch.filters")}</p>
       <Show when={hits() === undefined}>
-        <p class="text-sm text-muted">{chatWording().farmSearch.searching}</p>
+        <p class="text-sm text-muted">{t("web.channel.farmSearch.searching")}</p>
       </Show>
       <Show when={hits()?.length === 0 && text().trim() !== ""}>
-        <p class="text-sm text-muted">{chatWording().farmSearch.none}</p>
+        <p class="text-sm text-muted">{t("web.channel.farmSearch.none")}</p>
       </Show>
-      <div role="list" aria-label={chatWording().messages.label} class="flex flex-col gap-0.5">
+      <div role="list" aria-label={t("web.channel.messages.label")} class="flex flex-col gap-0.5">
         <For each={hits() ?? []} keyed={(h) => h.message.id}>
           {(h) => (
             <button
@@ -888,7 +903,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
             >
               <span class="flex items-baseline gap-2 text-xs">
                 <span class="font-semibold text-accent">{h().address}</span>
-                <span class="font-semibold">{h().message.from === ownerId ? chatWording().messages.owner : h().message.name}</span>
+                <span class="font-semibold">{h().message.from === ownerId ? t("web.channel.messages.owner") : h().message.name}</span>
                 <span class="text-muted">{workbenchClock(h().message.at)}</span>
               </span>
               <span class="line-clamp-2 text-sm">{h().message.text}</span>

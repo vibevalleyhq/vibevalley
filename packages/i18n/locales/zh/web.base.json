@@ -1,0 +1,154 @@
+{
+  "place": {
+    "chat": {
+      "label": "聊天",
+      "hint": "频道和串"
+    },
+    "issues": {
+      "label": "工单",
+      "hint": "每张工单从写下到关上"
+    },
+    "docs": {
+      "label": "文档",
+      "hint": "主人和帮工一起写的文档"
+    },
+    "agents": {
+      "label": "档案",
+      "hint": "档案：管家和帮工"
+    },
+    "runtimes": {
+      "label": "农具",
+      "hint": "机器上的编码 agent"
+    },
+    "projects": {
+      "label": "项目",
+      "hint": "每个项目一座岛"
+    },
+    "catalog": {
+      "label": "图鉴",
+      "hint": "素材：农场用的每张图、每个指针、每个声音"
+    },
+    "settings": {
+      "label": "设置",
+      "hint": "钥匙、语言、记性、连接器、技能、声音、连接到本机"
+    }
+  },
+  "link": {
+    "connecting": "连接中",
+    "open": "已连上",
+    "lost": "断了，重连中"
+  },
+  "rail": "工作台",
+  "farm": "回农场",
+  "working": "开工中 · {n} 个在干活",
+  "off": "没开工",
+  "chips": {
+    "drop": "去掉 {v}",
+    "valueOf": "{k} 的值",
+    "removeKey": "删除 {k}",
+    "remove": "删除",
+    "name": "变量名",
+    "value": "变量的值",
+    "valueHint": "值",
+    "add": "添加"
+  },
+  "toasts": "提示",
+  "runtime": "运行工具：{name}",
+  "owner": "主",
+  "orchestrator": "管家",
+  "unreachable": "暂时连不上服务端，请等它恢复后重试。",
+  "form": {
+    "asking": "在问服务端……",
+    "unreachable": "问不到服务端：{why}",
+    "none": "还没有",
+    "unset": "还没设",
+    "removeOnSave": "保存后移除",
+    "removeKey": "移除 {label}",
+    "keepKey": "不移除 {label}",
+    "undo": "撤销",
+    "storedIn": "存在 {file}",
+    "keepEmpty": "不改就空着",
+    "save": "保存",
+    "reset": "恢复默认",
+    "never": "算了",
+    "remove": "删除",
+    "from": {
+      "settings": "存在设置里",
+      "config": "来自配置（vibevalley.yaml 或环境变量）"
+    },
+    "inUse": "在用 {hint}（{from}）",
+    "fromOnly": "在用（{from}）"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "secondsAgo": "{s} 秒前",
+    "minutesAgo": "{m} 分钟前",
+    "hoursAgo": "{h} 小时前",
+    "daysAgo": "{d} 天前",
+    "monthsAgo": "{m} 个月前",
+    "yearsAgo": "{y} 年前",
+    "seconds": "{s} 秒",
+    "minutes": "{m} 分 {s} 秒",
+    "hours": "{h} 小时 {m} 分",
+    "round": {
+      "underMinute": "不到 1 分钟",
+      "minutes": "{m} 分钟",
+      "hours": "{h} 小时",
+      "days": "{d} 天"
+    },
+    "tenths": "{s} 秒",
+    "today": "今天",
+    "yesterday": "昨天",
+    "clock": "{am, select, true {上午{hh}:{mm}} other {下午{hh}:{mm}}}",
+    "weekdays": {
+      "0": "日",
+      "1": "一",
+      "2": "二",
+      "3": "三",
+      "4": "四",
+      "5": "五",
+      "6": "六"
+    },
+    "monthDay": "{month}月{day}日",
+    "month": "{month}月",
+    "date": "{y} 年 {m} 月 {d} 日",
+    "day": "{m} 月 {d} 日 星期{weekday}"
+  },
+  "money": {
+    "underCent": "不到 ¥0.01",
+    "about": "约 {yuan}",
+    "spent": "花了 {yuan}"
+  },
+  "cast": {
+    "species": {
+      "bear": "熊",
+      "rabbit": "兔子",
+      "fox": "小狐狸",
+      "cat": "猫",
+      "owl": "猫头鹰",
+      "hedgehog": "刺猬",
+      "raccoon": "浣熊"
+    },
+    "outfit": {
+      "farmer": "农夫",
+      "gardener": "园丁",
+      "rain": "雨衣",
+      "winter": "冬装"
+    },
+    "pose": {
+      "idle": "待命",
+      "walk": "走过来",
+      "think": "琢磨",
+      "work": "干活",
+      "cheer": "做完",
+      "worry": "长虫了"
+    }
+  },
+  "reading": "在读……",
+  "write": "记下",
+  "secret": {
+    "hide": "藏起来",
+    "peek": "看一眼"
+  },
+  "big": "{n} 万"
+}

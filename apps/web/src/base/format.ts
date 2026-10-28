@@ -1,22 +1,22 @@
-import { appWording } from "./words";
+import { currentLocale, t } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
 // Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
 
 export function ago(at: number, now: number) {
   const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 5) return appWording().time.justNow;
-  if (s < 60) return appWording().time.secondsAgo(s);
-  if (s < 3600) return appWording().time.minutesAgo(Math.round(s / 60));
-  if (s < 86400) return appWording().time.hoursAgo(Math.floor(s / 3600));
-  return appWording().time.daysAgo(Math.floor(s / 86400));
+  if (s < 5) return t("web.base.time.justNow");
+  if (s < 60) return t("web.base.time.secondsAgo", { s });
+  if (s < 3600) return t("web.base.time.minutesAgo", { m: Math.round(s / 60) });
+  if (s < 86400) return t("web.base.time.hoursAgo", { h: Math.floor(s / 3600) });
+  return t("web.base.time.daysAgo", { d: Math.floor(s / 86400) });
 }
 
 export function tookText(ms: number) {
   const s = Math.round(ms / 1000);
-  if (s < 60) return appWording().time.seconds(s);
+  if (s < 60) return t("web.base.time.seconds", { s });
   const m = Math.floor(s / 60);
-  if (m < 60) return appWording().time.minutes(m, s % 60);
-  return appWording().time.hours(Math.floor(m / 60), m % 60);
+  if (m < 60) return t("web.base.time.minutes", { m, s: s % 60 });
+  return t("web.base.time.hours", { h: Math.floor(m / 60), m: m % 60 });
 }
 
 const two = (n: number) => String(n).padStart(2, "0");
@@ -36,9 +36,12 @@ export function momentText(at: number) {
 }
 
 // The server says money the same way (protocol.Yuan, SpentText) in what it writes to the chat.
-export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? appWording().money.underCent : `¥${cny.toFixed(2)}`);
+export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("web.base.money.underCent") : `¥${cny.toFixed(2)}`);
 
-const wan = (n: number) => (n >= 10000 ? appWording().big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
+const wan = (n: number) => (n >= 10000 ? big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
+
+/** A large count: ten thousands in Chinese (1.2 万), thousands in English (12k). */
+export const big = (n: number, digits: number) => t("web.base.big", { n: currentLocale() === "zh" ? (n / 10000).toFixed(digits) : Math.round(n / 1000) });
 
 export const spentText = (spent: Spent) =>
-  [...(spent.cny !== undefined ? [appWording().money.about(yuan(spent.cny))] : []), `${wan(spent.tokens)} token`].join(" · ");
+  [...(spent.cny !== undefined ? [t("web.base.money.about", { yuan: yuan(spent.cny) })] : []), `${wan(spent.tokens)} token`].join(" · ");

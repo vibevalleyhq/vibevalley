@@ -1,8 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The phone's current farm: one choice owns its pending pairing, durable key and published page. Native keychain writes
 // cannot be aborted, so they are serialized and a superseded write restores the last committed choice before the next one.
 
 import { pathOf } from "@vibevalley/protocol";
-import { mobileWording } from "./words";
+
 import * as SecureStore from "expo-secure-store";
 import type { LanPaired } from "@vibevalley/protocol";
 import { type PairLink, parsePairLink } from "./rules";
@@ -98,7 +99,7 @@ export class FarmConnection {
       });
       if (this.owns(revision)) this.publish(this.committed ? { kind: "farm", farm: this.committed } : this.pairing());
     } catch (e) {
-      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: mobileWording().cannotRead(reason(e)) });
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: t("mobile.cannotRead", { why: reason(e) }) });
     }
   }
 
@@ -141,7 +142,7 @@ export class FarmConnection {
           signal: request.signal,
         });
       } catch {
-        throw new Error(mobileWording().unreachable);
+        throw new Error(t("mobile.unreachable"));
       }
       const text = await response.text();
       if (!this.owns(revision)) return;
@@ -152,7 +153,7 @@ export class FarmConnection {
         } catch {
           // Not the farm's refusal: its text as it is.
         }
-        throw new Error(problem || mobileWording().answered(response.status));
+        throw new Error(problem || t("mobile.answered", { status: response.status }));
       }
       const paired = JSON.parse(text) as LanPaired;
       const farm: Farm = { url: choice.link.url, key: paired.key, hostName: paired.hostName };
@@ -161,13 +162,13 @@ export class FarmConnection {
         try {
           await writeFarm(farm);
         } catch (e) {
-          throw new Error(mobileWording().cannotSave(reason(e)), { cause: e });
+          throw new Error(t("mobile.cannotSave", { why: reason(e) }), { cause: e });
         }
         if (!this.owns(revision)) {
           try {
             await writeFarm(this.committed);
           } catch (e) {
-            if (this.choice.kind === "pairing") this.publish({ ...this.choice, problem: mobileWording().cannotRestore(reason(e)) });
+            if (this.choice.kind === "pairing") this.publish({ ...this.choice, problem: t("mobile.cannotRestore", { why: reason(e) }) });
           }
           return;
         }
@@ -191,7 +192,7 @@ export class FarmConnection {
         if (this.owns(revision)) this.publish(this.committed ? { kind: "farm", farm: this.committed } : this.pairing());
       });
     } catch (e) {
-      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: mobileWording().cannotRestore(reason(e)) });
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: t("mobile.cannotRestore", { why: reason(e) }) });
     }
   }
 
@@ -204,7 +205,7 @@ export class FarmConnection {
         this.committed = undefined;
       });
     } catch (e) {
-      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: mobileWording().cannotForget(reason(e)) });
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: t("mobile.cannotForget", { why: reason(e) }) });
     }
   }
 }

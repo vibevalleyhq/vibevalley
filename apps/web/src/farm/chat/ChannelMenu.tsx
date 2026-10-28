@@ -1,8 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, the
 // owner's direct channels, a new channel, the current one's settings, and the way to its full page (its recurrences are there).
 
 import { farmChannelLabel } from "./text";
-import { farmWording } from "../words";
+
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
 import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "../../features/channel";
@@ -31,7 +32,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
     <div ref={box} class="relative min-w-0">
       <button
         type="button"
-        aria-label={farmWording().chat.channel(farmChannelLabel(props.current))}
+        aria-label={t("web.farm.chat.channel", { channel: farmChannelLabel(props.current) })}
         aria-expanded={aria(open())}
         onClick={() => {
           if (!open()) playSound("open");
@@ -47,29 +48,29 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         <SpriteIcon name="button-next" size={10} class="rotate-90" />
       </button>
       <Show when={open()}>
-        <div class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px" role="dialog" aria-label={farmWording().chat.channels}>
+        <div class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px" role="dialog" aria-label={t("web.farm.chat.channels")}>
           <Switch>
             <Match when={mode() === "list"}>
               <div class="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
                 <For each={channels()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
                 <Show when={directs().length > 0}>
-                  <p class="px-2 pt-1.5 text-[12px] text-bark-500">{farmWording().chat.directs}</p>
+                  <p class="px-2 pt-1.5 text-[12px] text-bark-500">{t("web.farm.chat.directs")}</p>
                   <For each={directs()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
                 </Show>
               </div>
               <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-cream-200 pt-1.5 text-[12px] text-leaf-700">
                 <button type="button" onClick={() => setMode("create")} class="flex cursor-pointer items-center gap-1 hover:underline">
                   <SpriteIcon name="button-add" size={12} />
-                  {farmWording().chat.newChannel}
+                  {t("web.farm.chat.newChannel")}
                 </button>
                 <button type="button" onClick={() => router.navigate(chatPath(props.current))} class="flex cursor-pointer items-center gap-1 hover:underline">
                   <SpriteIcon name="button-open" size={12} />
-                  {farmWording().chat.pageAndSchedules}
+                  {t("web.farm.chat.pageAndSchedules")}
                 </button>
                 <Show when={props.current?.type === "channel"}>
                   <button type="button" onClick={() => setMode("settings")} class="flex cursor-pointer items-center gap-1 hover:underline">
                     <SpriteIcon name="button-settings" size={12} />
-                    {farmWording().chat.settingsLink}
+                    {t("web.farm.chat.settingsLink")}
                   </button>
                 </Show>
               </div>
@@ -91,7 +92,7 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
   const core = useCore();
   const c = () => props.channel;
   const unread = () => unreadUnder(core()?.chat, c());
-  const line = () => [c().description, c().project ? farmWording().chat.projectTag(c().project!) : undefined].filter(Boolean).join(" · ");
+  const line = () => [c().description, c().project ? t("web.farm.chat.projectTag", { project: c().project! }) : undefined].filter(Boolean).join(" · ");
   const here = () => c().id === props.current?.id;
   return (
     <button
@@ -120,7 +121,7 @@ function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: () 
   return (
     <div class="mt-2 flex items-center justify-end gap-2">
       <button type="button" onClick={() => props.onBack()} class="cursor-pointer text-[12px] text-leaf-700 hover:underline">
-        {farmWording().chat.back2}
+        {t("web.farm.chat.back2")}
       </button>
       <PxButton tone="primary" size="sm" disabled={!props.onSubmit} onClick={props.onSubmit && (() => props.onSubmit?.())}>
         {props.submit}
@@ -142,26 +143,26 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
   };
   return (
     <div class="flex flex-col gap-1.5">
-      <p class="text-[13px]">{farmWording().chat.newChannel}</p>
-      <p class="text-[12px] text-bark-500">{farmWording().chat.newChannelLine}</p>
-      <PxTextInput value={form.name()} onChange={form.setName} placeholder={farmWording().chat.nameHint} label={farmWording().chat.name} autoFocus />
+      <p class="text-[13px]">{t("web.farm.chat.newChannel")}</p>
+      <p class="text-[12px] text-bark-500">{t("web.farm.chat.newChannelLine")}</p>
+      <PxTextInput value={form.name()} onChange={form.setName} placeholder={t("web.farm.chat.nameHint")} label={t("web.farm.chat.name")} autoFocus />
       <PxTextInput
         value={form.description()}
         onChange={form.setDescription}
-        placeholder={farmWording().chat.descriptionHint}
-        label={farmWording().chat.description}
+        placeholder={t("web.farm.chat.descriptionHint")}
+        label={t("web.farm.chat.description")}
       />
       <PxTextInput
         value={form.project()}
         onChange={form.setProject}
-        placeholder={farmWording().chat.projectHint}
-        label={farmWording().chat.project}
+        placeholder={t("web.farm.chat.projectHint")}
+        label={t("web.farm.chat.project")}
         suggestions={names()}
       />
       <Show when={form.error()}>
         <p class="text-[12px] text-berry">{form.error()}</p>
       </Show>
-      <FormButtons onBack={() => props.onBack()} submit={farmWording().chat.open} onSubmit={form.ready() ? () => void submit() : undefined} />
+      <FormButtons onBack={() => props.onBack()} submit={t("web.farm.chat.open")} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
   );
 }
@@ -176,19 +177,19 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
   };
   return (
     <div class="flex flex-col gap-1.5">
-      <p class="text-[13px]">{farmWording().chat.settingsOf(farmChannelLabel(props.channel))}</p>
-      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={farmWording().chat.what} label={farmWording().chat.description} />
+      <p class="text-[13px]">{t("web.farm.chat.settingsOf", { channel: farmChannelLabel(props.channel) })}</p>
+      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={t("web.farm.chat.what")} label={t("web.farm.chat.description")} />
       <PxTextInput
         value={form.project()}
         onChange={form.setProject}
-        placeholder={farmWording().chat.projectNone}
-        label={farmWording().chat.project}
+        placeholder={t("web.farm.chat.projectNone")}
+        label={t("web.farm.chat.project")}
         suggestions={names()}
       />
       <Show when={form.error()}>
         <p class="text-[12px] text-berry">{form.error()}</p>
       </Show>
-      <FormButtons onBack={() => props.onBack()} submit={farmWording().chat.save} onSubmit={form.ready() ? () => void submit() : undefined} />
+      <FormButtons onBack={() => props.onBack()} submit={t("web.farm.chat.save")} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
   );
 }

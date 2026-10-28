@@ -1,4 +1,5 @@
-import { issuesWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { maxRunning } from "@vibevalley/protocol";
@@ -31,8 +32,8 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
       value={text()}
       onInput={(e) => setText(e.currentTarget.value)}
       onKeyDown={submit}
-      placeholder={issuesWording().board.add}
-      aria-label={issuesWording().board.addLabel}
+      placeholder={t("web.issue.board.add")}
+      aria-label={t("web.issue.board.addLabel")}
       class="h-8 w-full rounded-md border border-dashed border-line bg-page/70 px-2.5 text-sm outline-none placeholder:text-faint hover:border-faint focus:border-solid focus:border-focus focus:bg-page"
     />
   );
@@ -42,16 +43,16 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
 export function OlderLink(props: { hidden: number; onClick: () => void }) {
   return (
     <button type="button" onClick={() => props.onClick()} class="mx-auto block cursor-pointer py-1 text-sm text-water hover:underline">
-      {props.hidden > 0 ? issuesWording().board.earlier(props.hidden) : issuesWording().board.recent}
+      {props.hidden > 0 ? t("web.issue.board.earlier", { n: props.hidden }) : t("web.issue.board.recent")}
     </button>
   );
 }
 
 const emptyText: Record<Lane, string> = {
-  todo: issuesWording().board.empty.todo,
-  working: issuesWording().board.empty.working,
-  waiting: issuesWording().board.empty.waiting,
-  closed: issuesWording().board.empty.closed,
+  todo: t("web.issue.board.empty.todo"),
+  working: t("web.issue.board.empty.working"),
+  waiting: t("web.issue.board.empty.waiting"),
+  closed: t("web.issue.board.empty.closed"),
 };
 
 export interface BoardProps {
@@ -80,7 +81,7 @@ export function IssueBoard(props: BoardProps) {
     <div class="@container flex min-h-0 flex-1 flex-col px-3 pb-3">
       <div class="mb-2 @min-[700px]:hidden">
         <Segmented
-          label={issuesWording().board.whichLane}
+          label={t("web.issue.board.whichLane")}
           block
           value={lane()}
           onChange={setLane}
@@ -123,7 +124,9 @@ function LaneView(props: {
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
   const accepts = (c: BoardCard | null) => c !== null && (cardMove(c, props.lane) !== undefined || (props.lane === "todo" && c.kind === "todo"));
   const head = () =>
-    props.lane === "working" ? issuesWording().board.spots(props.cards.filter((c) => c.kind === "issue").length, maxRunning) : `${props.cards.length}`;
+    props.lane === "working"
+      ? t("web.issue.board.spots", { taken: props.cards.filter((c) => c.kind === "issue").length, of: maxRunning })
+      : `${props.cards.length}`;
   return (
     <section
       aria-label={laneLabel[props.lane]}
@@ -154,8 +157,8 @@ function LaneView(props: {
         <span class="text-xs text-muted">{head()}</span>
         <Show when={props.lane === "todo"}>
           <span class="ml-auto flex">
-            <IconButton icon="add" label={issuesWording().board.write} onClick={props.focusAdd} />
-            <IconButton icon="edit" label={issuesWording().board.writeFull} onClick={p().onWrite} />
+            <IconButton icon="add" label={t("web.issue.board.write")} onClick={props.focusAdd} />
+            <IconButton icon="edit" label={t("web.issue.board.writeFull")} onClick={p().onWrite} />
           </span>
         </Show>
       </header>
@@ -187,7 +190,7 @@ function LaneView(props: {
           }
         >
           <Match when={p().loading}>
-            <p class="px-1 text-xs text-faint">{issuesWording().reading}</p>
+            <p class="px-1 text-xs text-faint">{t("web.issue.reading")}</p>
           </Match>
           <Match when={props.cards.length === 0}>
             <p class="px-1 text-xs leading-relaxed text-faint">{emptyText[props.lane]}</p>

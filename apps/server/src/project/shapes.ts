@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // What the projects hand to the modules that use them (a workplace, what a merge did or why it did not): shapes and
 // errors only, so a rule elsewhere can name them without the git and processes behind project.ts.
 
-import { projectWording } from "./words.ts";
 import type { PullRequest } from "@vibevalley/protocol";
 import { Data } from "effect";
 
@@ -46,7 +46,7 @@ export class MergeFailure extends Data.TaggedError("MergeFailure")<{
       reasonText: "",
       base,
       files,
-      message: projectWording().conflict(base),
+      message: t("server.project.conflict", { base }),
     });
   }
   static check(why: string) {

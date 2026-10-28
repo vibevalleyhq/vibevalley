@@ -1,10 +1,10 @@
+import { list, t } from "@vibevalley/i18n";
 // 种植计划: the task graphs, a new one split by a helper, and the one shown: its state and actions, its steps in batches
 // (each with who does it, what it waits on, what it concluded, and retry, skip, edit, remove, its history), its
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
 import { spentText } from "../../base/format";
-import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
@@ -60,7 +60,7 @@ export function TaskBoard() {
     >
       {(g) => (
         <div class="flex flex-col">
-          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label={farmWording().graph.name}>
+          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("web.farm.graph.name")}>
             <For each={list()}>
               {(item) => (
                 <button
@@ -81,7 +81,7 @@ export function TaskBoard() {
               class="flex cursor-pointer items-center gap-1 bg-cream-200 px-3 py-1 text-[12px] text-leaf-700 hover:bg-cream-300"
             >
               <SpriteIcon name="button-add" size={12} />
-              {farmWording().graph.new}
+              {t("web.farm.graph.new")}
             </button>
           </div>
           <div class="mt-3">
@@ -123,33 +123,33 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
   };
   return (
     <div class="flex flex-col gap-3">
-      <p class="text-[13px] text-bark-900">{farmWording().graph.intro}</p>
-      <PxField label={farmWording().graph.goal}>
-        <PxTextArea value={goal()} onChange={setGoal} rows={4} placeholder={farmWording().graph.goalExample} />
+      <p class="text-[13px] text-bark-900">{t("web.farm.graph.intro")}</p>
+      <PxField label={t("web.farm.graph.goal")}>
+        <PxTextArea value={goal()} onChange={setGoal} rows={4} placeholder={t("web.farm.graph.goalExample")} />
       </PxField>
       <div class="flex gap-3">
         <div class="flex-1">
-          <PxField label={farmWording().graph.project}>
+          <PxField label={t("web.farm.graph.project")}>
             <PxTextInput value={where()} onChange={setProject} placeholder="clock-in" suggestions={known()} />
           </PxField>
         </div>
         <div class="flex-1">
-          <PxField label={farmWording().graph.splitter}>
+          <PxField label={t("web.farm.graph.splitter")}>
             <PxPick
               value={splitter()}
-              placeholder={farmWording().graph.byRule}
+              placeholder={t("web.farm.graph.byRule")}
               onChange={setSplitter}
-              options={[{ value: "auto", label: farmWording().graph.byRule }, ...agents().map((a) => ({ value: a.id, label: a.name }))]}
+              options={[{ value: "auto", label: t("web.farm.graph.byRule") }, ...agents().map((a) => ({ value: a.id, label: a.name }))]}
             />
           </PxField>
         </div>
       </div>
       <div class="flex justify-end gap-2">
         <Show when={props.onCancel}>
-          <PxButton onClick={() => props.onCancel?.()}>{farmWording().never}</PxButton>
+          <PxButton onClick={() => props.onCancel?.()}>{t("web.farm.never")}</PxButton>
         </Show>
         <PxButton tone="primary" disabled={!ok()} onClick={() => void submit()}>
-          {farmWording().graph.split}
+          {t("web.farm.graph.split")}
         </PxButton>
       </div>
       <Said answer={said()} />
@@ -172,18 +172,18 @@ function TaskView(props: { graph: TaskGraph }) {
           <span class="text-[13px]">{props.graph.title}</span>
           <StateTag g={props.graph} />
           <Show when={props.graph.tasks.length > 0}>
-            <span class={xs}>{farmWording().graph.steps(settled(), props.graph.tasks.length)}</span>
+            <span class={xs}>{t("web.farm.graph.steps", { done: settled(), of: props.graph.tasks.length })}</span>
           </Show>
-          <Show when={props.graph.spent}>{(spent) => <span class={xs}>{farmWording().graph.spent(spentText(spent()))}</span>}</Show>
+          <Show when={props.graph.spent}>{(spent) => <span class={xs}>{t("web.farm.graph.spent", { spent: spentText(spent()) })}</span>}</Show>
         </div>
         <p class="mt-1 text-[13px] text-bark-800">{props.graph.goal}</p>
         <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <FarmTag text={farmWording().graph.projectTag(props.graph.project)} fill="#a5743f" ink="#f7e8c4" />
+          <FarmTag text={t("web.farm.graph.projectTag", { project: props.graph.project })} fill="#a5743f" ink="#f7e8c4" />
           <Show when={props.graph.branch}>
             <FarmTag text={props.graph.branch!} />
           </Show>
           <Show when={props.graph.state === "running"}>
-            <span class="text-[12px] text-bark-500">{farmWording().graph.running}</span>
+            <span class="text-[12px] text-bark-500">{t("web.farm.graph.running")}</span>
           </Show>
         </div>
         <Show when={props.graph.note}>
@@ -198,7 +198,7 @@ function TaskView(props: { graph: TaskGraph }) {
                 {actionText(props.graph, "start")}
               </PxButton>
               <PxButton icon="button-add" onClick={() => setAdding(true)}>
-                {farmWording().graph.addStep}
+                {t("web.farm.graph.addStep")}
               </PxButton>
             </Show>
             <Show when={props.graph.actions?.includes("pause")}>
@@ -211,13 +211,13 @@ function TaskView(props: { graph: TaskGraph }) {
             </Show>
             <Show when={props.graph.state === "ready"}>
               <PxButton tone="primary" onClick={() => setReviewing(true)}>
-                {farmWording().graph.review(actionText(props.graph, "merge"))}
+                {t("web.farm.graph.review", { merge: actionText(props.graph, "merge") })}
               </PxButton>
             </Show>
             <Show when={props.graph.actions?.includes("abandon")}>
               <Confirm
-                label={farmWording().graph.abandon(actionText(props.graph, "abandon"))}
-                sure={farmWording().graph.abandonSure}
+                label={t("web.farm.graph.abandon", { abandon: actionText(props.graph, "abandon") })}
+                sure={t("web.farm.graph.abandonSure")}
                 onConfirm={() => void act("abandon")}
               />
             </Show>
@@ -237,7 +237,7 @@ function TaskView(props: { graph: TaskGraph }) {
             />
           </Match>
           <Match when={props.graph.state === "splitting"}>
-            <FarmEmpty text={farmWording().graph.splitting} />
+            <FarmEmpty text={t("web.farm.graph.splitting")} />
           </Match>
         </Switch>
       </div>
@@ -254,7 +254,7 @@ function Confirm(props: { label: string; sure: string; onConfirm: () => void }) 
         <PxButton tone="danger" onClick={() => props.onConfirm()}>
           {props.sure}
         </PxButton>
-        <PxButton onClick={() => setAsking(false)}>{farmWording().graph.no}</PxButton>
+        <PxButton onClick={() => setAsking(false)}>{t("web.farm.graph.no")}</PxButton>
       </span>
     </Show>
   );
@@ -263,17 +263,17 @@ function Confirm(props: { label: string; sure: string; onConfirm: () => void }) 
 function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) {
   const changes = useGraphChanges(() => props.graph.id);
   return (
-    <Switch fallback={<p class="py-10 text-center text-[13px] text-bark-600">{farmWording().graph.readingChanges}</p>}>
+    <Switch fallback={<p class="py-10 text-center text-[13px] text-bark-600">{t("web.farm.graph.readingChanges")}</p>}>
       <Match when={changes.error}>
         {(error) => (
           <div class="flex flex-col items-start gap-3">
             <Tinted color={tint("#c84a3a", 0.12)}>
               <p class="text-[13px] text-berry">
-                {farmWording().graph.unreadable}
+                {t("web.farm.graph.unreadable")}
                 {reasonOf(error())}
               </p>
             </Tinted>
-            <PxButton onClick={() => props.onDone()}>{farmWording().notNow}</PxButton>
+            <PxButton onClick={() => props.onDone()}>{t("web.farm.notNow")}</PxButton>
           </div>
         )}
       </Match>
@@ -284,19 +284,25 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) 
           return (
             <div class="flex flex-col">
               <p class="text-[13px]">
-                {farmWording().graph.summary(c().branch ?? "", c().project, c().base, c().commits.length, c().files.length)}
+                {t("web.farm.graph.summary", {
+                  branch: c().branch ?? "",
+                  project: c().project,
+                  base: c().base,
+                  commits: c().commits.length,
+                  files: c().files.length,
+                })}
                 <span class="text-leaf-700">+{counts()[0]}</span>
                 <span class="text-berry"> -{counts()[1]}</span>
                 <Show when={c().behind > 0}>
-                  <span class="text-bark-600">{farmWording().graph.behind(c().base, Math.round(c().behind))}</span>
+                  <span class="text-bark-600">{t("web.farm.graph.behind", { base: c().base, n: Math.round(c().behind) })}</span>
                 </Show>
               </p>
               <Show when={conflicts().size > 0}>
                 <Tinted color={tint("#c84a3a", 0.12)} class="mt-1">
-                  <p class="text-[13px] text-berry">{farmWording().graph.conflict(c().base, c().conflicts)}</p>
+                  <p class="text-[13px] text-berry">{t("web.farm.graph.conflict", { base: c().base, files: list(c().conflicts) })}</p>
                 </Tinted>
               </Show>
-              <FarmSection title={farmWording().graph.commits}>
+              <FarmSection title={t("web.farm.graph.commits")}>
                 <For each={c().commits}>
                   {(x) => (
                     <div class="flex items-center gap-2">
@@ -306,15 +312,15 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) 
                   )}
                 </For>
               </FarmSection>
-              <FarmSection title={farmWording().graph.files}>
+              <FarmSection title={t("web.farm.graph.files")}>
                 <div class="flex flex-col gap-1">
                   <For each={c().files}>{(f) => <FileRow file={f} conflict={conflicts().has(f.path)} />}</For>
                 </div>
               </FarmSection>
               <div class="mt-3 flex justify-end gap-2">
-                <PxButton onClick={() => props.onDone()}>{farmWording().notNow}</PxButton>
+                <PxButton onClick={() => props.onDone()}>{t("web.farm.notNow")}</PxButton>
                 <PxButton tone="primary" disabled={conflicts().size > 0} onClick={() => void graphs.act(props.graph.id, "merge").then((a) => props.onDone(a))}>
-                  {farmWording().graph.harvest(c().base)}
+                  {t("web.farm.graph.harvest", { base: c().base })}
                 </PxButton>
               </div>
             </div>
@@ -352,7 +358,7 @@ function SmallBtn(props: { label: string; onClick?: () => void; primary?: boolea
 function Steps(props: { graph: TaskGraph; adding: boolean; onSaid: (a: Answer) => void; onAdded: () => void; onHistory: (id: string) => void }) {
   const [editing, setEditing] = createSignal<string>();
   return (
-    <Show when={props.graph.tasks.length > 0 || props.adding} fallback={<FarmEmpty text={farmWording().graph.noSteps} />}>
+    <Show when={props.graph.tasks.length > 0 || props.adding} fallback={<FarmEmpty text={t("web.farm.graph.noSteps")} />}>
       <div class="flex items-start overflow-x-auto pb-2">
         <For each={props.graph.layers ?? []} keyed={false}>
           {(ids, i) => (
@@ -362,8 +368,12 @@ function Steps(props: { graph: TaskGraph; adding: boolean; onSaid: (a: Answer) =
                   →
                 </span>
               </Show>
-              <div class="flex w-60 shrink-0 flex-col gap-2" role="group" aria-label={i === 0 ? farmWording().graph.first : farmWording().graph.batch(i + 1)}>
-                <span class="px-1 text-[12px] text-bark-500">{i === 0 ? farmWording().graph.first : farmWording().graph.batch(i + 1)}</span>
+              <div
+                class="flex w-60 shrink-0 flex-col gap-2"
+                role="group"
+                aria-label={i === 0 ? t("web.farm.graph.first") : t("web.farm.graph.batch", { n: i + 1 })}
+              >
+                <span class="px-1 text-[12px] text-bark-500">{i === 0 ? t("web.farm.graph.first") : t("web.farm.graph.batch", { n: i + 1 })}</span>
                 <For each={ids()}>
                   {(id) => (
                     <Show when={taskOf(props.graph, id)}>
@@ -432,8 +442,8 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.title}
         </span>
         <Show when={props.node.acceptance}>
-          <span title={props.node.frozen?.length ? farmWording().graph.frozen(props.node.frozen) : farmWording().graph.acceptanceHint}>
-            <FarmTag text={farmWording().plot.review} fill="#5c7a3a" ink="#f7e8c4" />
+          <span title={props.node.frozen?.length ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
+            <FarmTag text={t("web.farm.plot.review")} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
         <FarmTag text={props.node.stateText ?? ""} fill={tone().tag} ink={tone().ink} />
@@ -443,22 +453,29 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
       </p>
       <div class="mt-1.5 flex items-center gap-1">
         <Show when={agent()}>{(a) => <AgentFace agentId={a().id} runtime={session()?.runtime ?? a().runtime} look={a().look} size={18} />}</Show>
-        <span class="text-[12px] text-bark-600">{agent()?.name ?? farmWording().graph.byRule}</span>
+        <span class="text-[12px] text-bark-600">{agent()?.name ?? t("web.farm.graph.byRule")}</span>
         <Show when={props.node.check}>
-          <span title={farmWording().graph.checkHint(props.node.check ?? "")} class="ml-auto truncate bg-cream-50/80 px-1 font-mono text-[10px] text-bark-900">
+          <span
+            title={t("web.farm.graph.checkHint", { check: props.node.check ?? "" })}
+            class="ml-auto truncate bg-cream-50/80 px-1 font-mono text-[10px] text-bark-900"
+          >
             {props.node.check}
           </span>
         </Show>
       </div>
       <Show when={props.node.needs.length > 0}>
         <p class="mt-1 text-[12px] text-bark-600">
-          {waits().length ? farmWording().graph.waits(waits().map(titleOf)) : farmWording().graph.after(props.node.needs.map(titleOf))}
+          {waits().length
+            ? t("web.farm.graph.waits", { titles: list(waits().map(titleOf)) })
+            : t("web.farm.graph.after", { titles: list(props.node.needs.map(titleOf)) })}
         </p>
       </Show>
       <Show when={session()}>
         {(s) => (
           <p class="mt-1.5 bg-cream-50/70 px-1.5 py-1 text-[12px] text-bark-800">
-            {farmWording().graph.onPlot(s().name, stationOfSession(s()) + 1, doing() && doing()!.action !== "none" ? (doing()!.actionText ?? "") : undefined)}
+            {doing() && doing()!.action !== "none"
+              ? t("web.farm.graph.onPlotDoing", { name: s().name, plot: stationOfSession(s()) + 1, doing: doing()!.actionText ?? "" })
+              : t("web.farm.graph.onPlot", { name: s().name, plot: stationOfSession(s()) + 1 })}
           </p>
         )}
       </Show>
@@ -479,12 +496,12 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           <SmallBtn label={props.node.actionText?.skip ?? ""} onClick={() => void nodeAct("skip")} />
         </Show>
         <Show when={props.node.canEdit}>
-          <SmallBtn label={farmWording().graph.edit} onClick={() => props.onEdit()} />
+          <SmallBtn label={t("web.farm.graph.edit")} onClick={() => props.onEdit()} />
         </Show>
         <Show when={props.node.canRemove}>
-          <SmallBtn label={farmWording().graph.remove} onClick={() => void graphs.removeTask(props.graph.id, props.node.id).then((a) => props.onSaid(a))} />
+          <SmallBtn label={t("web.farm.graph.remove")} onClick={() => void graphs.removeTask(props.graph.id, props.node.id).then((a) => props.onSaid(a))} />
         </Show>
-        <SmallBtn label={farmWording().graph.story} onClick={() => props.onHistory()} />
+        <SmallBtn label={t("web.farm.graph.story")} onClick={() => props.onHistory()} />
       </div>
     </div>
   );
@@ -512,21 +529,21 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
   return (
     <div class="flex flex-col gap-1.5 border-[1.5px] border-leaf-500 bg-cream-100 p-2.5">
       <Show when={!props.node}>
-        <PxTextInput value={id()} onChange={setId} placeholder={farmWording().graph.stepIdHint} label={farmWording().graph.stepId} mono />
+        <PxTextInput value={id()} onChange={setId} placeholder={t("web.farm.graph.stepIdHint")} label={t("web.farm.graph.stepId")} mono />
       </Show>
-      <PxTextInput value={title()} onChange={setTitle} placeholder={farmWording().graph.title} label={farmWording().graph.title} />
-      <PxTextArea value={brief()} onChange={setBrief} rows={5} placeholder={farmWording().graph.briefHint} label={farmWording().graph.brief} />
+      <PxTextInput value={title()} onChange={setTitle} placeholder={t("web.farm.graph.title")} label={t("web.farm.graph.title")} />
+      <PxTextArea value={brief()} onChange={setBrief} rows={5} placeholder={t("web.farm.graph.briefHint")} label={t("web.farm.graph.brief")} />
       <PxPick
         value={agent()}
-        placeholder={farmWording().graph.whoHint}
+        placeholder={t("web.farm.graph.whoHint")}
         clearable
-        label={farmWording().graph.who}
+        label={t("web.farm.graph.who")}
         onChange={setAgent}
         options={agents().map((a) => ({ value: a.id, label: a.name }))}
       />
-      <PxTextInput value={check()} onChange={setCheck} placeholder={farmWording().graph.checkExample} label={farmWording().graph.check} mono />
+      <PxTextInput value={check()} onChange={setCheck} placeholder={t("web.farm.graph.checkExample")} label={t("web.farm.graph.check")} mono />
       <Show when={others().length > 0}>
-        <span class="text-[12px] text-bark-600">{farmWording().graph.waitFor}</span>
+        <span class="text-[12px] text-bark-600">{t("web.farm.graph.waitFor")}</span>
         <div class="flex flex-wrap gap-1">
           <For each={others()}>
             {(n) => {
@@ -549,8 +566,8 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
         <p class="text-[12px] text-berry">{problem()}</p>
       </Show>
       <div class="flex justify-end gap-1">
-        <SmallBtn label={farmWording().never} onClick={() => props.onDone()} />
-        <SmallBtn label={props.node ? farmWording().graph.done : farmWording().graph.add} primary onClick={isReady() ? () => void save() : undefined} />
+        <SmallBtn label={t("web.farm.never")} onClick={() => props.onDone()} />
+        <SmallBtn label={props.node ? t("web.farm.graph.done") : t("web.farm.graph.add")} primary onClick={isReady() ? () => void save() : undefined} />
       </div>
     </div>
   );
@@ -580,19 +597,19 @@ function TaskLog(props: { graph: TaskGraph; only?: string; onAll: () => void }) 
       .filter((e) => !props.only || e.task === props.only)
       .reverse();
   return (
-    <FarmSection title={props.only ? farmWording().graph.storyOf(titleOf(props.only)) : farmWording().graph.story}>
+    <FarmSection title={props.only ? t("web.farm.graph.storyOf", { title: titleOf(props.only) }) : t("web.farm.graph.story")}>
       <Show when={props.only}>
         <button
           type="button"
           onClick={() => props.onAll()}
           class="mb-2 cursor-pointer self-start bg-cream-200 px-2.5 py-0.5 text-[12px] text-bark-800 hover:bg-cream-300"
         >
-          {farmWording().graph.wholeStory}
+          {t("web.farm.graph.wholeStory")}
         </button>
       </Show>
       <Show
         when={shown().length > 0}
-        fallback={<p class="text-[13px] text-bark-600">{events.isSuccess ? farmWording().graph.nothing : farmWording().graph.readingStory}</p>}
+        fallback={<p class="text-[13px] text-bark-600">{events.isSuccess ? t("web.farm.graph.nothing") : t("web.farm.graph.readingStory")}</p>}
       >
         <div class="flex max-h-72 flex-col gap-1.5 overflow-y-auto pr-1">
           <For each={shown()} keyed={(e) => e.id}>
@@ -617,7 +634,7 @@ function LogRow(props: { e: GraphEvent }) {
         <p class="text-[12px] text-bark-800">{props.e.text ?? ""}</p>
         <Show when={changes().length > 0}>
           <button type="button" onClick={() => setOpen(!open())} class="mt-0.5 cursor-pointer text-[12px] text-bark-600">
-            {farmWording().graph.beforeAfter}
+            {t("web.farm.graph.beforeAfter")}
           </button>
           <Show when={open()}>
             <For each={changes()}>
@@ -625,8 +642,8 @@ function LogRow(props: { e: GraphEvent }) {
                 <div class="mt-1 text-[12px] text-bark-600">
                   <p>{c.field}</p>
                   <p>
-                    <span class="text-berry line-through">{c.from || farmWording().graph.empty}</span> →{" "}
-                    <span class="text-leaf-700">{c.to || farmWording().graph.empty}</span>
+                    <span class="text-berry line-through">{c.from || t("web.farm.graph.empty")}</span> →{" "}
+                    <span class="text-leaf-700">{c.to || t("web.farm.graph.empty")}</span>
                   </p>
                 </div>
               )}

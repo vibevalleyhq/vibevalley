@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The projects under the work root and their git: making and listing them, a session's
 // worktree on its own branch, what a branch changed, merging it into the main branch, a graph's branch, the project's
 // own check (.vibevalley/check), GitHub pull requests through gh, and what the code is written in.
@@ -7,7 +8,6 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { projectWording } from "./words.ts";
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
@@ -59,8 +59,8 @@ export function githubRepository(input: string): { name: string; url: string } |
 }
 
 export function projectProblem(req: NewProject): string {
-  if (!projectName.test(req.name)) return projectWording().badName;
-  if (req.github !== undefined && !githubRepository(req.github)) return projectWording().badGithub;
+  if (!projectName.test(req.name)) return t("server.project.badName");
+  if (req.github !== undefined && !githubRepository(req.github)) return t("server.project.badGithub");
   return "";
 }
 
@@ -70,15 +70,15 @@ const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.D
 const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
-  if ((yield* repository(path).tip(branch)) !== checked) return yield* Effect.fail(MergeFailure.check(projectWording().branchMoved));
+  if ((yield* repository(path).tip(branch)) !== checked) return yield* Effect.fail(MergeFailure.check(t("server.project.branchMoved")));
 });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
 const cleanupMerged = Effect.fnUntraced(function* (place: Workplace, path: string) {
   const removed = yield* repository(path).removeWorktree(place.cwd, true);
-  if (removed) return projectWording().mergedWorktreeLeft(place.cwd, place.branch, removed);
+  if (removed) return t("server.project.mergedWorktreeLeft", { cwd: place.cwd, branch: place.branch ?? "", why: removed });
   const deleted = yield* repository(path).deleteBranch(place.branch!);
-  if (deleted) return projectWording().mergedBranchLeft(place.branch, deleted);
+  if (deleted) return t("server.project.mergedBranchLeft", { branch: place.branch!, why: deleted });
   return "";
 });
 
@@ -115,7 +115,7 @@ const leftOut = [
 
 export const tokeiArgs = (path: string) => ["--output", "json", ...leftOut.flatMap((p) => ["--exclude", p]), path];
 
-const noTokei = () => projectWording().noTokei;
+const noTokei = () => t("server.project.noTokei");
 
 /** 53 weeks, so a whole year of weeks shows whatever day it is. */
 const yearDays = 53 * 7;
@@ -173,7 +173,7 @@ export function activityOf(log: string, dayOf: (ms: number) => string = localDay
     if (!Number.isFinite(seconds) || seconds <= 0 || line.slice(0, tab).trim() === "") continue;
     const day = dayOf(Math.trunc(seconds * 1000));
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
-    const name = line.slice(tab + 1).trim() || projectWording().noName;
+    const name = line.slice(tab + 1).trim() || t("server.project.noName");
     byAuthor.set(name, (byAuthor.get(name) ?? 0) + 1);
   }
   const days = [...byDay].map(([day, commits]) => ({ day, commits })).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
@@ -213,13 +213,13 @@ const runGitHub: GitHubRun = (...args) =>
 export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitHubRun) {
   const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false };
   const version = yield* gh("--version");
-  if (!version.ok) return { ...s, reason: version.missing ? projectWording().gh.missing : projectWording().gh.failed };
+  if (!version.ok) return { ...s, reason: version.missing ? t("server.project.gh.missing") : t("server.project.gh.failed") };
   const v = ghVersion.exec(version.out)?.[1];
   const installed: GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
   const auth = yield* gh("auth", "status", "--hostname", "github.com", "--active");
-  if (!auth.ok) return { ...installed, reason: projectWording().gh.signedOut };
+  if (!auth.ok) return { ...installed, reason: t("server.project.gh.signedOut") };
   const account = ghAccount.exec(auth.out)?.[1];
-  if (!account) return { ...installed, reason: projectWording().gh.noAccount };
+  if (!account) return { ...installed, reason: t("server.project.gh.noAccount") };
   return { ...installed, loggedIn: true, account };
 });
 
@@ -298,11 +298,11 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const ensure = Effect.fn("Projects.ensure")(
       function* (name: string) {
-        if (!projectName.test(name)) return yield* fail(projectWording().notProjectName(name));
+        if (!projectName.test(name)) return yield* fail(t("server.project.notProjectName", { name }));
         yield* Effect.orDie(fs.makeDirectory(join(root, name), { recursive: true }));
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
         const path = yield* Effect.orDie(fs.realPath(join(root, name)));
-        if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail(projectWording().outside);
+        if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail(t("server.project.outside"));
         // A folder is a repository's top when it holds .git (a folder, or a file in a worktree): read, not asked of git,
         // which would cost a process each time a project is used.
         if (!(yield* exists(join(path, ".git")))) {
@@ -311,10 +311,10 @@ export const make = (hooks: ProjectHooks = {}) =>
           if ((yield* Effect.orDie(fs.readDirectory(path))).filter((e) => e !== ".git").length <= 1)
             yield* Effect.orDie(fs.writeFileString(join(path, "README.md"), `# ${name}\n`));
           yield* git(path, "add", "-A");
-          yield* repository(path).commit(projectWording().commit.initial);
+          yield* repository(path).commit(t("server.project.commit.initial"));
         } else if (!(yield* gitOk(path, "rev-parse", "--verify", "HEAD"))) {
-          yield* git(path, "commit", "-q", "--allow-empty", "-m", projectWording().commit.initialShort).pipe(
-            Effect.catch(() => repository(path).commit(projectWording().commit.initialShort)),
+          yield* git(path, "commit", "-q", "--allow-empty", "-m", t("server.project.commit.initialShort")).pipe(
+            Effect.catch(() => repository(path).commit(t("server.project.commit.initialShort"))),
           );
         }
         return path;
@@ -345,7 +345,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const find = (name: string) => Effect.map(list(), (all) => all.find((p) => p.name === name));
 
     const capability = (name: string): PullRequestCapability =>
-      capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: projectWording().notChecked });
+      capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: t("server.project.notChecked") });
 
     const maxSessions = () => (perProject <= 0 || perProject > maxRunning ? maxRunning : perProject);
 
@@ -408,10 +408,10 @@ export const make = (hooks: ProjectHooks = {}) =>
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code === 0) return;
       const why = r.timedOut
-        ? projectWording().check.timedOut(checkTimeoutMs / 1000)
+        ? t("server.project.check.timedOut", { seconds: checkTimeoutMs / 1000 })
         : r.code < 0
-          ? projectWording().check.failed(reason(r.stderr))
-          : projectWording().check.exited(r.code);
+          ? t("server.project.check.failed", { why: reason(r.stderr) })
+          : t("server.project.check.exited", { code: r.code });
       const lines = (r.stdout + r.stderr)
         .slice(-64 * 1024)
         .trim()
@@ -422,7 +422,7 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
     const checkMerge = Effect.fn("Projects.checkMerge")(function* (place: Workplace, target: string) {
-      yield* repository(place.cwd).commitLeft(projectWording().commit.leftOver);
+      yield* repository(place.cwd).commitLeft(t("server.project.commit.leftOver"));
       const path = join(root, place.project);
       const into = target || (yield* repository(path).main);
       const checked = yield* repository(path).tip(place.branch!);
@@ -433,7 +433,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     });
 
     const checkLocalMerge = Effect.fn("Projects.checkLocalMerge")(function* (place: Workplace) {
-      yield* repository(place.cwd).commitLeft(projectWording().commit.leftOver);
+      yield* repository(place.cwd).commitLeft(t("server.project.commit.leftOver"));
       const path = join(root, place.project);
       const main = yield* serially(
         place.project,
@@ -459,8 +459,8 @@ export const make = (hooks: ProjectHooks = {}) =>
         const merged = yield* gitRun(path, "merge", "--no-edit", branch);
         if (merged.code !== 0) {
           const aborted = yield* gitRun(path, "merge", "--abort");
-          if (aborted.code !== 0) return yield* fail(projectWording().mergeStuck(main, kept, reason(merged.stderr), reason(aborted.stderr)));
-          return yield* fail(projectWording().mergeFailed(main, kept, reason(merged.stderr)));
+          if (aborted.code !== 0) return yield* fail(t("server.project.mergeStuck", { main, kept, why: reason(merged.stderr), abort: reason(aborted.stderr) }));
+          return yield* fail(t("server.project.mergeFailed", { main, kept, why: reason(merged.stderr) }));
         }
       }
       return { main, ahead };
@@ -486,21 +486,21 @@ export const make = (hooks: ProjectHooks = {}) =>
             // Exclusive creation also refuses existing empty folders and symlinks.
             const madeDir = yield* Effect.result(fs.makeDirectory(path));
             if (madeDir._tag === "Failure")
-              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? projectWording().exists(req.name) : reason(madeDir.failure));
+              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? t("server.project.exists", { name: req.name }) : reason(madeDir.failure));
             pending.add(req.name);
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
                 const { url } = githubRepository(req.github)!;
                 const known = status?.checkedAt ? status : yield* probeGitHub(gh);
                 if (known.loggedIn) {
-                  if (!(yield* gh("repo", "clone", githubOrigin(url), path)).ok) return yield* fail(projectWording().cloneFailedGh);
+                  if (!(yield* gh("repo", "clone", githubOrigin(url), path)).ok) return yield* fail(t("server.project.cloneFailedGh"));
                 } else {
                   const cloned = yield* run("git", ["-c", "credential.helper=", "-c", "core.askPass=", "clone", "--", url, path], {
                     cwd: root,
                     env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_LFS_SKIP_SMUDGE: "1" },
                     timeoutMs: cloneTimeoutMs,
                   });
-                  if (cloned.code !== 0) return yield* fail(projectWording().cloneFailed);
+                  if (cloned.code !== 0) return yield* fail(t("server.project.cloneFailed"));
                 }
               } else yield* ensure(req.name);
               return { name: req.name, path, git: true };
@@ -528,9 +528,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         if (!p) return undefined;
         const r = yield* run(tokei, tokeiArgs(p.path), { timeoutMs: 60_000 });
         if (r.missing) return yield* fail(noTokei());
-        if (r.code !== 0) return yield* fail(projectWording().tokeiFailed(reason(r.stderr)));
+        if (r.code !== 0) return yield* fail(t("server.project.tokeiFailed", { why: reason(r.stderr) }));
         const languages = countsOf(r.stdout);
-        if (!languages) return yield* fail(projectWording().tokeiUnread);
+        if (!languages) return yield* fail(t("server.project.tokeiUnread"));
         return { project: name, at: yield* Clock.currentTimeMillis, languages };
       }),
       activity: Effect.fn("Projects.activity")(function* (name) {
@@ -610,7 +610,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         if (!project) return undefined;
         const path = join(root, project);
         const present = yield* Effect.result(repository(path).hasBranch(branch));
-        if (present._tag === "Failure") return yield* fail(projectWording().noBranchRead(branch, reason(present.failure)));
+        if (present._tag === "Failure") return yield* fail(t("server.project.noBranchRead", { branch, why: reason(present.failure) }));
         if (!present.success) return undefined;
         return yield* describe(project, "", branch);
       }),
@@ -636,7 +636,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       merge: (place) =>
         toMergeFailure(
           Effect.gen(function* () {
-            if (!place.branch) return { text: projectWording().inProjectNoBranch, commits: 0 };
+            if (!place.branch) return { text: t("server.project.inProjectNoBranch"), commits: 0 };
             const path = join(root, place.project);
             const checked = yield* checkLocalMerge(place);
             return yield* serially(
@@ -644,11 +644,11 @@ export const make = (hooks: ProjectHooks = {}) =>
               Effect.gen(function* () {
                 yield* unchangedBranch(path, place.branch!, checked);
                 const head = yield* repository(path).main;
-                if (!(yield* repository(path).isAncestor(head, checked))) return yield* Effect.fail(MergeFailure.check(projectWording().mainMoved));
-                const { main, ahead } = yield* mergeMain(path, place.branch!, projectWording().keptBoth(place.branch), head);
+                if (!(yield* repository(path).isAncestor(head, checked))) return yield* Effect.fail(MergeFailure.check(t("server.project.mainMoved")));
+                const { main, ahead } = yield* mergeMain(path, place.branch!, t("server.project.keptBoth", { branch: place.branch! }), head);
                 const warning = yield* cleanupMerged(place, path);
                 return {
-                  text: ahead > 0 ? projectWording().merged(ahead, place.project, main) : projectWording().nothingNew,
+                  text: ahead > 0 ? t("server.project.merged", { ahead, project: place.project, main }) : t("server.project.nothingNew"),
                   commits: ahead,
                   ...(warning ? { warning } : {}),
                 };
@@ -660,7 +660,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         toMergeFailure(
           Effect.gen(function* () {
             const path = join(root, place.project);
-            if (!place.branch) return yield* Effect.fail(MergeFailure.error(projectWording().inProjectNothing));
+            if (!place.branch) return yield* Effect.fail(MergeFailure.error(t("server.project.inProjectNothing")));
             const checked = yield* checkMerge(place, target);
             return yield* serially(
               place.project,
@@ -674,7 +674,7 @@ export const make = (hooks: ProjectHooks = {}) =>
                   const theirs = yield* git(path, "rev-parse", place.branch!);
                   const next = (yield* repository(path).isAncestor(ours, theirs))
                     ? theirs
-                    : yield* repository(path).mergeCommit(ours, theirs, projectWording().commit.merge(place.branch));
+                    : yield* repository(path).mergeCommit(ours, theirs, t("server.project.commit.merge", { branch: place.branch! }));
                   // Only from where it was: a target moved meanwhile is not written over.
                   yield* git(path, "update-ref", "refs/heads/" + target, next, ours);
                 }
@@ -695,10 +695,10 @@ export const make = (hooks: ProjectHooks = {}) =>
             project,
             Effect.gen(function* () {
               const path = join(root, project);
-              const { main, ahead } = yield* mergeMain(path, branch, projectWording().keptBranch(branch));
-              let said = ahead > 0 ? projectWording().merged(ahead, project, main) : projectWording().nothingNewInPlan;
+              const { main, ahead } = yield* mergeMain(path, branch, t("server.project.keptBranch", { branch }));
+              let said = ahead > 0 ? t("server.project.merged", { ahead, project, main }) : t("server.project.nothingNewInPlan");
               const deleted = yield* repository(path).deleteBranch(branch);
-              if (deleted) said += projectWording().branchLeft(branch, deleted);
+              if (deleted) said += t("server.project.branchLeft", { branch, why: deleted });
               return said;
             }),
           ),
@@ -713,7 +713,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (yield* repository(path).removeWorktree(place.cwd, false))
               return {
                 kept: true,
-                reason: projectWording().clear.uncommitted(place.branch, place.cwd),
+                reason: t("server.project.clear.uncommitted", { branch: place.branch, cwd: place.cwd }),
               };
             // A branch with nothing new on it is clutter; one with commits is kept, so nothing is lost.
             const main = (yield* repository(path).mainOrNone) || "main";
@@ -723,16 +723,16 @@ export const make = (hooks: ProjectHooks = {}) =>
               .pipe(Effect.orElseSucceed(() => 1));
             if (ahead === 0) {
               const removed = yield* repository(path).deleteBranch(place.branch);
-              return removed ? { kept: true, reason: projectWording().clear.branchLeft(place.branch, removed) } : { kept: false };
+              return removed ? { kept: true, reason: t("server.project.clear.branchLeft", { branch: place.branch, why: removed }) } : { kept: false };
             }
             return {
               kept: true,
-              reason: projectWording().clear.unmerged(place.branch, ahead),
+              reason: t("server.project.clear.unmerged", { branch: place.branch, ahead }),
             };
           }),
         ),
       reset: Effect.fn("Projects.reset")(function* (place) {
-        if (!place.branch) return yield* fail(projectWording().clear.notWorktree(place.cwd));
+        if (!place.branch) return yield* fail(t("server.project.clear.notWorktree", { cwd: place.cwd }));
         yield* serially(
           place.project,
           Effect.gen(function* () {
@@ -753,7 +753,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               if (removed)
                 return {
                   kept: true,
-                  reason: projectWording().clear.worktreeLeft(place.cwd, removed),
+                  reason: t("server.project.clear.worktreeLeft", { cwd: place.cwd, why: removed }),
                 };
             }
             const branch = yield* Effect.result(repository(path).hasBranch(place.branch!));
@@ -761,7 +761,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               if (!(yield* exists(path))) return { kept: false };
               return {
                 kept: true,
-                reason: projectWording().clear.unconfirmed(place.branch!, reason(branch.failure)),
+                reason: t("server.project.clear.unconfirmed", { branch: place.branch!, why: reason(branch.failure) }),
               };
             }
             if (!branch.success) return { kept: false };
@@ -769,9 +769,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             const ahead = yield* repository(path)
               .ahead(main, place.branch!)
               .pipe(Effect.orElseSucceed(() => 1));
-            if (ahead !== 0) return { kept: true, reason: projectWording().clear.unmergedKept(place.branch!) };
+            if (ahead !== 0) return { kept: true, reason: t("server.project.clear.unmergedKept", { branch: place.branch! }) };
             const removed = yield* repository(path).deleteBranch(place.branch!);
-            return removed ? { kept: true, reason: projectWording().clear.branchLeft(place.branch, removed) } : { kept: false };
+            return removed ? { kept: true, reason: t("server.project.clear.branchLeft", { branch: place.branch!, why: removed }) } : { kept: false };
           }),
         ),
       openBranch: (project, branch, from = "") =>
@@ -796,7 +796,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               checkedAt: 0,
               installed: false,
               loggedIn: false,
-              reason: projectWording().github.unchecked,
+              reason: t("server.project.github.unchecked"),
             } satisfies GitHubStatus),
       refreshGitHub: Effect.fn("Projects.refreshGitHub")(function* () {
         const probed = yield* probeGitHub(gh);
@@ -805,7 +805,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           let c: PullRequestCapability = { available: false, reason: probed.reason ?? "" };
           if (probed.loggedIn) {
             const repo = githubOrigin(yield* repository(p.path).origin);
-            if (!p.git || repo === "") c = { available: false, reason: projectWording().github.notGithub };
+            if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
             else {
               const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
               let permission: string | null | undefined;
@@ -816,10 +816,10 @@ export const make = (hooks: ProjectHooks = {}) =>
               }
               c =
                 permission === undefined
-                  ? { available: false, reason: projectWording().github.noPermission }
+                  ? { available: false, reason: t("server.project.github.noPermission") }
                   : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
                     ? { available: true, reason: "" }
-                    : { available: false, reason: projectWording().github.readOnly };
+                    : { available: false, reason: t("server.project.github.readOnly") };
             }
           }
           next.set(p.name, c);
@@ -830,7 +830,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       }),
       usesPullRequests,
       submitPullRequest: Effect.fn("Projects.submitPullRequest")(function* (place, issue, conclusion) {
-        if (place.branch !== issueBranch(issue.number)) return yield* fail(projectWording().github.wrongBranch);
+        if (place.branch !== issueBranch(issue.number)) return yield* fail(t("server.project.github.wrongBranch"));
         const checked = yield* toMergeFailure(checkMerge(place, ""));
         return yield* serially(
           place.project,
@@ -838,7 +838,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const path = join(root, place.project);
             yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
             const repo = githubOrigin(yield* repository(path).origin);
-            if (repo === "") return yield* fail(projectWording().github.notGithub);
+            if (repo === "") return yield* fail(t("server.project.github.notGithub"));
             const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
             const files = yield* repository(path)
               .conflicts(main, checked)
@@ -850,19 +850,19 @@ export const make = (hooks: ProjectHooks = {}) =>
                   cwd: place.cwd,
                   timeoutMs: cloneTimeoutMs,
                 })).code === 0;
-            if (!pushed) return yield* fail(projectWording().github.pushFailed);
+            if (!pushed) return yield* fail(t("server.project.github.pushFailed"));
             if (issue.pullRequest?.state === "open") return issue.pullRequest;
             // Recover a creation whose receipt was lost before it was saved.
             const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
-            if (!listed.ok) return yield* fail(projectWording().github.listFailed);
+            if (!listed.ok) return yield* fail(t("server.project.github.listFailed"));
             let existing: readonly { url: string; number: number }[];
             try {
               existing = openPullRequests(listed.out);
             } catch {
-              return yield* fail(projectWording().github.listUnread);
+              return yield* fail(t("server.project.github.listUnread"));
             }
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
-            const check = lexists(join(place.cwd, ".vibevalley/check")) ? projectWording().github.checked : projectWording().github.noCheck;
+            const check = lexists(join(place.cwd, ".vibevalley/check")) ? t("server.project.github.checked") : t("server.project.github.noCheck");
             const created = yield* gh(
               "pr",
               "create",
@@ -875,32 +875,32 @@ export const make = (hooks: ProjectHooks = {}) =>
               "--title",
               issue.title,
               "--body",
-              projectWording().github.body(issue.number, conclusion, check),
+              t("server.project.github.body", { n: issue.number, conclusion, check }),
             );
-            if (!created.ok) return yield* fail(projectWording().github.createFailed);
+            if (!created.ok) return yield* fail(t("server.project.github.createFailed"));
             const url = created.out.trim();
             const prefix = `https://github.com/${repo}/pull/`;
             const number = Number(url.slice(prefix.length));
-            if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail(projectWording().github.urlUnread);
+            if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail(t("server.project.github.urlUnread"));
             return { url, number, state: "open" as const };
           }),
         );
       }),
       pullRequestState: Effect.fn("Projects.pullRequestState")(function* (name, n) {
         const repo = githubOrigin(yield* repository(join(root, name)).origin);
-        if (repo === "") return yield* fail(projectWording().github.notGithub);
+        if (repo === "") return yield* fail(t("server.project.github.notGithub"));
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
-        if (!viewed.ok) return yield* fail(projectWording().github.viewFailed(n));
+        if (!viewed.ok) return yield* fail(t("server.project.github.viewFailed", { n }));
         let result: { readonly state: string; readonly mergedAt?: string | null | undefined };
         try {
           result = pullRequestView(viewed.out);
         } catch {
-          return yield* fail(projectWording().github.stateUnread(n));
+          return yield* fail(t("server.project.github.stateUnread", { n }));
         }
         if (result.mergedAt || result.state === "MERGED") return "merged" as const;
         if (result.state === "OPEN") return "open" as const;
         if (result.state === "CLOSED") return "closed" as const;
-        return yield* fail(projectWording().github.stateUnknown(n));
+        return yield* fail(t("server.project.github.stateUnknown", { n }));
       }),
       finishPullRequest: (name, n) =>
         serially(
@@ -911,7 +911,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const path = join(root, name);
             if (yield* exists(place.cwd)) {
               const removed = yield* repository(path).removeWorktree(place.cwd, true);
-              if (removed) return yield* fail(projectWording().github.worktreeLeft(removed));
+              if (removed) return yield* fail(t("server.project.github.worktreeLeft", { why: removed }));
             }
             if (
               yield* repository(path)
@@ -919,7 +919,7 @@ export const make = (hooks: ProjectHooks = {}) =>
                 .pipe(Effect.orElseSucceed(() => false))
             ) {
               const deleted = yield* repository(path).deleteBranch(place.branch!);
-              if (deleted) return yield* fail(projectWording().github.branchLeft(deleted));
+              if (deleted) return yield* fail(t("server.project.github.branchLeft", { why: deleted }));
             }
             return { text: "", commits: 0 };
           }),

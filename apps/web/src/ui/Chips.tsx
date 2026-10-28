@@ -1,4 +1,5 @@
-import { appWording } from "../base/words";
+import { t } from "@vibevalley/i18n";
+
 import { createSignal, For } from "solid-js";
 
 const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";
@@ -20,7 +21,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
             <button
               type="button"
               disabled={props.disabled}
-              aria-label={appWording().chips.drop(v)}
+              aria-label={t("web.base.chips.drop", { v })}
               onClick={() => props.onChange(props.value.filter((x) => x !== v))}
               class="cursor-pointer rounded px-1 text-muted hover:bg-selected hover:text-berry"
             >
@@ -65,7 +66,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
             <div class="flex items-center gap-1.5">
               <span class="w-40 truncate font-mono text-sm">{k()}</span>
               <input
-                aria-label={appWording().chips.valueOf(k())}
+                aria-label={t("web.base.chips.valueOf", { k: k() })}
                 disabled={props.disabled}
                 class={[field, "flex-1"]}
                 value={row()[1]}
@@ -74,11 +75,11 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
               <button
                 type="button"
                 disabled={props.disabled}
-                aria-label={appWording().chips.removeKey(k())}
+                aria-label={t("web.base.chips.removeKey", { k: k() })}
                 onClick={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
                 class="cursor-pointer rounded px-1.5 text-xs text-muted hover:text-berry"
               >
-                {appWording().chips.remove}
+                {t("web.base.chips.remove")}
               </button>
             </div>
           );
@@ -95,7 +96,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         }}
       >
         <input
-          aria-label={appWording().chips.name}
+          aria-label={t("web.base.chips.name")}
           disabled={props.disabled}
           placeholder="NAME"
           class={[field, "w-40"]}
@@ -103,9 +104,9 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           onInput={(e) => setKey(e.currentTarget.value)}
         />
         <input
-          aria-label={appWording().chips.value}
+          aria-label={t("web.base.chips.value")}
           disabled={props.disabled}
-          placeholder={appWording().chips.valueHint}
+          placeholder={t("web.base.chips.valueHint")}
           class={[field, "flex-1"]}
           value={val()}
           onInput={(e) => setVal(e.currentTarget.value)}
@@ -115,7 +116,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           disabled={props.disabled || !key().trim()}
           class="h-7 cursor-pointer rounded-md border border-line px-2.5 text-sm hover:bg-hover disabled:opacity-50"
         >
-          {appWording().chips.add}
+          {t("web.base.chips.add")}
         </button>
       </form>
     </div>

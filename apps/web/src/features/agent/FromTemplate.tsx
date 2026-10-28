@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // Where a saved profile came from: its template and version, and, when the template has a newer one, the update. The
 // update is asked twice: it replaces what the owner may have changed in what came from the template.
 
-import { agentsWording } from "./words";
 import { createSignal, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { Agent } from "@vibevalley/protocol";
@@ -27,7 +27,7 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
       await client.invalidateQueries({ queryKey: ["agents"] });
       setSure(false);
       props.onUpdated(got);
-      toast(agentsWording().templates.updated);
+      toast(t("web.agent.templates.updated"));
     } catch (e) {
       toast(reasonOf(e), "bad");
     }
@@ -36,22 +36,22 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
     <Show when={from()}>
       {(f) => (
         <p class="flex flex-wrap items-center gap-2 text-xs text-muted">
-          {agentsWording().templates.from(template()?.name ?? f().template, f().version)}
+          {t("web.agent.templates.from", { name: template()?.name ?? f().template, version: f().version })}
           <Show when={newer()}>
             {(v) => (
               <Show
                 when={sure()}
                 fallback={
-                  <Button title={agentsWording().templates.updateHint} onClick={() => setSure(true)}>
-                    {agentsWording().templates.update(v())}
+                  <Button title={t("web.agent.templates.updateHint")} onClick={() => setSure(true)}>
+                    {t("web.agent.templates.update", { version: v() })}
                   </Button>
                 }
               >
-                <span>{agentsWording().templates.updateHint}</span>
+                <span>{t("web.agent.templates.updateHint")}</span>
                 <Button tone="primary" onClick={() => void update()}>
-                  {agentsWording().templates.update(v())}
+                  {t("web.agent.templates.update", { version: v() })}
                 </Button>
-                <Button onClick={() => setSure(false)}>{agentsWording().never}</Button>
+                <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>
               </Show>
             )}
           </Show>

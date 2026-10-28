@@ -1,9 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The island at the notch (apps/island): a native helper this process starts and feeds. The farm at a glance comes from
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
 
-import { desktopWording } from "./words";
-import { wording } from "@vibevalley/protocol/words";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -51,7 +50,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     const tone = toneOf[state];
     if (!tone) continue;
     const head = frame.state.sessions.find((h) => h.id === issue.sessions.at(-1));
-    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? wording().stuck[stuck] : wording().attention[state];
+    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? t(`shared.stuck.${stuck}`) : t(`shared.attention.${state}`);
     rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
   }
   rows.sort((a, b) => Number(b.first) - Number(a.first) || a.number - b.number);
@@ -60,7 +59,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
   return {
     working,
     waiting,
-    strip: { working: desktopWording().working(working), waiting: desktopWording().waiting(waiting) },
+    strip: { working: working > 0 ? t("desktop.working", { n: working }) : t("desktop.idle"), waiting: t("desktop.waiting", { n: waiting }) },
     rows: rows.map(({ first: _, ...row }) => row),
   };
 }

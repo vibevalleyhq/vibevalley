@@ -1,10 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // A session's log of events: kept in memory as it grows, pushed to
 // the pages a little after each change, and written to events/<id>.json. A step that grows (text still streaming in, a
 // tool that has not returned) is pushed again under the same number. What is written is never rewritten: later steps
 // only follow it, and the step still being written (the draft) is on disk only once it is sealed.
 
-import { sessionWording } from "./words.ts";
-import { wording } from "@vibevalley/protocol/words";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
@@ -30,7 +29,7 @@ const decodeEvents = Schema.decodeUnknownSync(Schema.Array(SessionEventSchema));
 export function clipOutput(text: string): string {
   const n = text.length;
   if (n <= outputHead + outputTail + 40) return text;
-  return `${text.slice(0, outputHead)}\n${sessionWording().log.clipped(n - outputHead - outputTail)}\n${text.slice(n - outputTail)}`;
+  return `${text.slice(0, outputHead)}\n${t("server.session.log.clipped", { n: n - outputHead - outputTail })}\n${text.slice(n - outputTail)}`;
 }
 
 export function readJournal(file: string): SessionEvent[] | undefined {
@@ -215,7 +214,7 @@ export class Journal {
       type: "tool/call",
       text: start.text,
       action: start.action,
-      actionText: wording().action[start.action],
+      actionText: t(`shared.action.${start.action}`),
       tool: start.tool,
       ...(start.input ? { input: cut(start.input, inputMax) } : {}),
     };

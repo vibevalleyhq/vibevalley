@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The layers over the farm a click or a key opens, from the store's overlays: the harvest, the sowing and watering
 // forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
 // (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
 
-import { farmWording } from "../words";
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
@@ -28,12 +28,12 @@ import { ready, useAgents } from "../../base/query";
 import { toast } from "../../ui/toasts";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
-  shop: [farmWording().panel.shop, "icon-shop", "sm"],
-  warehouse: [farmWording().panel.warehouse, "icon-crate", "lg"],
-  graphs: [farmWording().panel.graphs, "icon-tasks", "lg"],
-  log: [farmWording().panel.log, "icon-log", "lg"],
-  orchestrator: [farmWording().panel.orchestrator, "manager-face", "wide"],
-  taskBoard: [farmWording().panel.taskBoard, "machine-seeder", "lg"],
+  shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],
+  warehouse: [t("web.farm.panel.warehouse"), "icon-crate", "lg"],
+  graphs: [t("web.farm.panel.graphs"), "icon-tasks", "lg"],
+  log: [t("web.farm.panel.log"), "icon-log", "lg"],
+  orchestrator: [t("web.farm.panel.orchestrator"), "manager-face", "wide"],
+  taskBoard: [t("web.farm.panel.taskBoard"), "machine-seeder", "lg"],
 };
 
 /** Each layer is drawn by its kind; one of a kind replaced by another (another plot, another panel) is built anew. */
@@ -68,21 +68,21 @@ function Layer(props: { o: FarmOverlay }) {
     <Switch>
       <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={farmWording().panel.harvest(s().name)} icon="icon-harvest" size="lg" onClose={() => farm.review(null)}>
+          <FarmDialog title={t("web.farm.panel.harvest", { name: s().name })} icon="icon-harvest" size="lg" onClose={() => farm.review(null)}>
             <Keyed key={s().id}>{() => <HarvestReview session={s()} onDone={() => farm.review(null)} />}</Keyed>
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "sow" ? props.o : undefined}>
         {(o) => (
-          <FarmDialog title={farmWording().panel.sow(o().station + 1)} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
+          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
             <SowForm station={o().station} onDone={() => farm.sow(null)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={farmWording().panel.water(s().name)} icon="icon-water" size="sm" onClose={() => farm.water(null)}>
+          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" onClose={() => farm.water(null)}>
             <WaterForm session={s()} onDone={() => farm.water(null)} />
           </FarmDialog>
         )}
@@ -111,7 +111,7 @@ function Layer(props: { o: FarmOverlay }) {
         )}
       </Match>
       <Match when={props.o.kind === "menu"}>
-        <FarmDialog title={farmWording().panel.menu} icon="icon-wrench" size="md" onClose={() => farm.menu(false)}>
+        <FarmDialog title={t("web.farm.panel.menu")} icon="icon-wrench" size="md" onClose={() => farm.menu(false)}>
           <Menu />
         </FarmDialog>
       </Match>
@@ -160,7 +160,7 @@ function OrchestratorLooks() {
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
     <div class="flex flex-col">
-      <p class="text-[13px] text-bark-900">{farmWording().panel.pickLook}</p>
+      <p class="text-[13px] text-bark-900">{t("web.farm.panel.pickLook")}</p>
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <For each={orchestratorLooks}>
           {(look) => (
@@ -171,12 +171,12 @@ function OrchestratorLooks() {
                 </Show>
               </span>
               <span class="mt-1.5 text-[13px]">{look.name}</span>
-              <span class="text-center text-[12px] text-bark-600">{lookReady(look.id, has) ? look.blurb : farmWording().panel.drawing}</span>
+              <span class="text-center text-[12px] text-bark-600">{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
             </Tile>
           )}
         </For>
       </div>
-      <p class="mt-2 text-[13px]">{farmWording().panel.pets}</p>
+      <p class="mt-2 text-[13px]">{t("web.farm.panel.pets")}</p>
       <div class="mt-2 flex gap-2.5">
         <For each={pets}>
           {(p) => (
@@ -189,7 +189,7 @@ function OrchestratorLooks() {
                 </span>
                 <span class="mt-1.5 text-[13px]">{petName[p]}</span>
                 <Show when={!has(`${p}-awake`)}>
-                  <span class="text-[12px] text-bark-600">{farmWording().panel.drawing}</span>
+                  <span class="text-[12px] text-bark-600">{t("web.farm.panel.drawing")}</span>
                 </Show>
               </Tile>
             </div>
@@ -201,17 +201,17 @@ function OrchestratorLooks() {
 }
 
 const shop = [
-  { ...farmWording().panel.shopItems.scarecrow, price: 200, icon: "icon-scarecrow" },
-  { ...farmWording().panel.shopItems.seeds, price: 300, icon: "icon-seeds" },
-  { ...farmWording().panel.shopItems.bunting, price: 400, icon: "icon-bunting" },
-  { ...farmWording().panel.shopItems.doghouse, price: 600, icon: "icon-doghouse" },
+  { name: t("web.farm.panel.shopItems.scarecrow.name"), note: t("web.farm.panel.shopItems.scarecrow.note"), price: 200, icon: "icon-scarecrow" },
+  { name: t("web.farm.panel.shopItems.seeds.name"), note: t("web.farm.panel.shopItems.seeds.note"), price: 300, icon: "icon-seeds" },
+  { name: t("web.farm.panel.shopItems.bunting.name"), note: t("web.farm.panel.shopItems.bunting.note"), price: 400, icon: "icon-bunting" },
+  { name: t("web.farm.panel.shopItems.doghouse.name"), note: t("web.farm.panel.shopItems.doghouse.note"), price: 600, icon: "icon-doghouse" },
 ];
 
 function Shop() {
   const core = useCore();
   return (
     <div class="flex flex-col">
-      <p class="text-[13px] text-bark-800">{farmWording().panel.shopClosed(Math.round(core()?.progress?.coins ?? 0))}</p>
+      <p class="text-[13px] text-bark-800">{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <For each={shop}>
           {(item) => (

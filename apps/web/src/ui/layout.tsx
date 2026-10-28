@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
 // and the few controls their forms use.
 
-import { appWording } from "../base/words";
 import { createSignal, omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "./A";
@@ -125,8 +125,8 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
       <button
         type="button"
         class="absolute inset-y-0 right-1 my-auto inline-flex size-7 cursor-pointer items-center justify-center rounded text-faint hover:bg-hover hover:text-ink"
-        aria-label={shown() ? appWording().secret.hide : appWording().secret.peek}
-        title={shown() ? appWording().secret.hide : appWording().secret.peek}
+        aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
+        title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         onClick={() => setShown(!shown())}
       >
         <Icon name={shown() ? "hide" : "show"} size={16} />

@@ -1,10 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The run of an in-process agent (the orchestrator's) and its log. One agent loop
 // (agent_start to agent_end) is one run: it starts when the loop takes its first input and ends with the loop; a loop
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
-import { sessionWording } from "./words.ts";
-import { agentWording } from "../agent/words.ts";
 import type { CoreEvent } from "../agent/brain/agent.ts";
 import { messageText } from "../agent/brain/messages.ts";
 import type { Outcome, RunTrigger } from "@vibevalley/protocol";
@@ -116,7 +115,7 @@ export class AgentExecution {
           self.summary = text;
           if (m.stopReason === "error") {
             self.outcome = "failed";
-            self.summary = m.errorMessage || agentWording().modelFailed;
+            self.summary = m.errorMessage || t("server.agent.modelFailed");
             self.journal.note("run/error", self.summary);
           } else if (m.stopReason === "aborted") self.outcome = "interrupted";
           return;
@@ -162,7 +161,7 @@ export class AgentExecution {
       this.closed = true;
       if (this.run && !this.ending) {
         this.outcome = "interrupted";
-        this.summary = sessionWording().log.stopped;
+        this.summary = t("server.session.log.stopped");
       }
       return this.finish();
     });

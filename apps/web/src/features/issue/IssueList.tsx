@@ -1,4 +1,5 @@
-import { issuesWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useOrchestrators } from "../../base/agents";
@@ -49,7 +50,7 @@ export function IssueList(props: {
     });
 
   return (
-    <Show when={!props.loading} fallback={<EmptyNote>{issuesWording().reading}</EmptyNote>}>
+    <Show when={!props.loading} fallback={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
       <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <For each={groupRows(props.cards, props.grouping, rowFacts)} keyed={(g) => g.key}>
           {(g) => {
@@ -62,12 +63,12 @@ export function IssueList(props: {
               props.grouping === "status"
                 ? laneLabel[g().lane!]
                 : props.grouping === "project"
-                  ? g().key || issuesWording().list.noProject
+                  ? g().key || t("web.issue.list.noProject")
                   : props.grouping === "agent"
                     ? g().key
                       ? nameOf()(g().key)
-                      : issuesWording().noHelper
-                    : issuesWording().list.all;
+                      : t("web.issue.noHelper")
+                    : t("web.issue.list.all");
             const icon = (): JSX.Element => {
               const key = g().key;
               switch (props.grouping) {
@@ -93,7 +94,7 @@ export function IssueList(props: {
                   <button
                     type="button"
                     onClick={() => fold(g().key)}
-                    aria-label={isFolded() ? issuesWording().list.unfold(label()) : issuesWording().list.fold(label())}
+                    aria-label={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
                     class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
                   >
                     <Icon name="expand" size={10} class={{ "rotate-90": !isFolded() }} />
@@ -102,7 +103,11 @@ export function IssueList(props: {
                     <span class="text-xs text-muted">{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
-                    <IconButton icon="add" label={issuesWording().list.writeIn(label())} onClick={() => setAdding(adding() === g().key ? null : g().key)} />
+                    <IconButton
+                      icon="add"
+                      label={t("web.issue.list.writeIn", { group: label() })}
+                      onClick={() => setAdding(adding() === g().key ? null : g().key)}
+                    />
                   </Show>
                 </header>
                 <Show when={!isFolded()}>
@@ -120,7 +125,7 @@ export function IssueList(props: {
                     <OlderLink hidden={hidden()} onClick={props.onOlder} />
                   </Show>
                   <Show when={g().rows.length === 0 && adding() !== g().key}>
-                    <p class="py-1.5 pr-3 pl-9 text-xs text-faint">{issuesWording().list.none}</p>
+                    <p class="py-1.5 pr-3 pl-9 text-xs text-faint">{t("web.issue.list.none")}</p>
                   </Show>
                 </Show>
               </section>

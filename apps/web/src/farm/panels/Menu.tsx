@@ -1,6 +1,6 @@
+import { t } from "@vibevalley/i18n";
 // The Esc menu: go on, back to the title, sounds on or off, the other places, and what can be clicked in the yard.
 
-import { farmWording } from "../words";
 import { For } from "solid-js";
 import { farm } from "../store";
 import { webRoutes, yardPlaces } from "../world/places";
@@ -9,13 +9,13 @@ import { FarmSection, PxButton } from "../../ui/pixel";
 import { muted } from "../support";
 
 const elsewhere = [
-  { label: farmWording().menu.chat, to: "/chat" },
-  { label: farmWording().menu.agents, to: "/agents" },
-  { label: farmWording().menu.runtimes, to: "/runtimes" },
-  { label: farmWording().menu.skills, to: "/settings/skills" },
-  { label: farmWording().menu.connectors, to: "/settings/connectors" },
-  { label: farmWording().menu.projects, to: "/projects" },
-  { label: farmWording().menu.catalog, to: "/catalog" },
+  { label: t("web.farm.menu.chat"), to: "/chat" },
+  { label: t("web.farm.menu.agents"), to: "/agents" },
+  { label: t("web.farm.menu.runtimes"), to: "/runtimes" },
+  { label: t("web.farm.menu.skills"), to: "/settings/skills" },
+  { label: t("web.farm.menu.connectors"), to: "/settings/connectors" },
+  { label: t("web.farm.menu.projects"), to: "/projects" },
+  { label: t("web.farm.menu.catalog"), to: "/catalog" },
 ];
 
 export function Menu() {
@@ -29,7 +29,7 @@ export function Menu() {
   return (
     <div class="flex flex-col gap-2">
       <PxButton tone="primary" onClick={close}>
-        {farmWording().menu.resume}
+        {t("web.farm.menu.resume")}
       </PxButton>
       <PxButton
         onClick={() => {
@@ -37,16 +37,16 @@ export function Menu() {
           farm.showTitle();
         }}
       >
-        {farmWording().menu.home}
+        {t("web.farm.menu.home")}
       </PxButton>
-      <PxButton onClick={() => setMuted(!isMuted())}>{isMuted() ? farmWording().menu.soundOn : farmWording().menu.soundOff}</PxButton>
-      <FarmSection title={farmWording().menu.elsewhere}>
+      <PxButton onClick={() => setMuted(!isMuted())}>{isMuted() ? t("web.farm.menu.soundOn") : t("web.farm.menu.soundOff")}</PxButton>
+      <FarmSection title={t("web.farm.menu.elsewhere")}>
         <div class="flex flex-wrap gap-2">
           <For each={elsewhere.filter((p) => webRoutes.includes(p.to))}>{(p) => <PxButton onClick={() => go(p.to)}>{p.label}</PxButton>}</For>
-          <PxButton onClick={() => go("/issues")}>{farmWording().menu.issues}</PxButton>
+          <PxButton onClick={() => go("/issues")}>{t("web.farm.menu.issues")}</PxButton>
         </div>
       </FarmSection>
-      <FarmSection title={farmWording().menu.yard}>
+      <FarmSection title={t("web.farm.menu.yard")}>
         <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-bark-800">
           <For each={yardPlaces}>
             {(p) => (

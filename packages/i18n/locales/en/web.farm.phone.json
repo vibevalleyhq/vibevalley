@@ -1,0 +1,136 @@
+{
+  "ringing": "Incoming…",
+  "decline": "Decline",
+  "answer": "Answer",
+  "callOrchestrator": "Call the manager",
+  "missed": "Missed {n}",
+  "log": "Log",
+  "noCalls": "No calls yet.",
+  "answered": "answered",
+  "declined": "declined",
+  "noMissed": "No missed calls. All is well in the field.",
+  "phase": {
+    "connecting": "Connecting…",
+    "live": "On the call: go ahead, the manager is listening",
+    "coming": "On the call: the manager is on the way",
+    "ending": "Hanging up…",
+    "failed": "Not connected: {why}",
+    "idle": "Just say it. When a ticket comes back or gets stuck, the manager calls you too."
+  },
+  "manager": "Manager",
+  "hangUp": "Hang up",
+  "app": {
+    "missed": "Missed",
+    "channels": "Chat",
+    "graphs": "Plans",
+    "games": "Games"
+  },
+  "game": {
+    "blocks": "Blocks",
+    "sokoban": "Sokoban",
+    "dino": "Dino",
+    "bugs": "Bug snake",
+    "merge": "Farm 2048"
+  },
+  "phone": "Phone",
+  "phoneRinging": "Phone: incoming call",
+  "phoneMissed": "Phone, {n} missed calls",
+  "phoneUnread": "Phone, {n} new in the farm chat",
+  "ring": "Call",
+  "new": "new",
+  "label": "Farm phone",
+  "home": "Home",
+  "homeHint": "Back to the home screen",
+  "brand": "FarmTel",
+  "openChat": "Open the farm chat",
+  "openChatUnread": "Open the farm chat, {n} new",
+  "key": {
+    "up": "Up",
+    "left": "Left",
+    "right": "Right",
+    "down": "Down"
+  },
+  "pressA": "Press A to {what}",
+  "again": "play again",
+  "start": "start",
+  "resume": "resume",
+  "paused": "Paused",
+  "sokoban": {
+    "levels": {
+      "0": "First crate of seeds",
+      "1": "Round the back",
+      "2": "Two crates of harvest",
+      "3": "Warehouse corner",
+      "4": "Harvest home"
+    },
+    "title": "Sokoban {level}/{of}",
+    "moves": "{moves} moves · {pushes} pushes",
+    "board": "Warehouse board, {placed}/{of} crates in place",
+    "allIn": "The whole harvest is in!",
+    "done": "This store is tidied!",
+    "goal": "Push the crates onto ◆",
+    "undo": "B undo",
+    "again": "Play again",
+    "next": "Next level",
+    "restart": "Restart",
+    "help": "Arrows walk · crates can only be pushed"
+  },
+  "dino": {
+    "road": "The dino's road",
+    "crashed": "Crashed",
+    "help": "A or ↑ jumps, ↓ or B ducks",
+    "help2": "The further it runs the faster it goes; birds come later"
+  },
+  "merge": {
+    "start": "Press A to start",
+    "restartAsk": "Replant this plot?",
+    "restartKeys": "A restart · B keep planting",
+    "harvest": "Bumper harvest!",
+    "goOn": "Press A to keep planting",
+    "full": "The plot is full · {score} points",
+    "overKeys": "A again · B take back a move",
+    "reached": "Grew {stage}",
+    "field": "In the field: {n} plants, best {top}",
+    "stages": "Harvest catalog",
+    "help": "Arrows or a swipe: two of a kind grow into the next",
+    "help2": "B take back · A restart",
+    "stage": {
+      "0": "Seed",
+      "1": "Sprout",
+      "2": "Leaf",
+      "3": "Flower",
+      "4": "Wheat",
+      "5": "Carrot",
+      "6": "Sheaf",
+      "7": "Basket",
+      "8": "Cart",
+      "9": "Granary",
+      "10": "Harvest"
+    },
+    "past": "Harvest {n}"
+  },
+  "bugs": {
+    "ended": {
+      "wall": "Hit the ridge",
+      "self": "Bit itself",
+      "full": "The field is full"
+    },
+    "tally": "Seeds {seeds} · bugs {bugs}",
+    "field": "The bug snake's field",
+    "help": "Arrows turn, B pauses",
+    "help2": "Seeds add a segment; eat a bug before it flies off for more points"
+  },
+  "blocks": {
+    "well": "The blocks' well",
+    "noRoom": "No room left",
+    "score": "Score",
+    "lines": "Lines",
+    "level": "Level",
+    "best": "Best",
+    "help": "←→ move ↑ turn",
+    "help2": "↓ drop A to the bottom",
+    "help3": "B pause",
+    "next": "Next"
+  },
+  "chatTab": "CHAT"
+}

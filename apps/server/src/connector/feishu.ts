@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // Feishu and Lark. Logging in is Feishu's scan-to-create flow: Feishu creates a personal bot app for
 // the owner and hands back its app id and secret (the device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/
 // registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
 // API to the owner's open_id, with no reply window.
 
-import { connectorWording } from "./words.ts";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { wallTime } from "../base/time.ts";
 
@@ -56,8 +56,8 @@ async function form(domain: Domain, body: Record<string, string>, signal: AbortS
     });
     return (await res.json()) as Record<string, unknown>;
   } catch (e) {
-    if (timed.aborted && !signal.aborted) throw new Error(connectorWording().feishu.registerTimeout, { cause: e });
-    throw new Error(connectorWording().feishu.register(e instanceof Error ? e.message : String(e)), { cause: e });
+    if (timed.aborted && !signal.aborted) throw new Error(t("server.connector.feishu.registerTimeout"), { cause: e });
+    throw new Error(t("server.connector.feishu.register", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
   }
 }
 
@@ -70,7 +70,7 @@ export class FeishuClient implements FeishuApi {
   private async register(signal: AbortSignal) {
     const init = await form("feishu", { action: "init" }, signal);
     const methods = Array.isArray(init.supported_auth_methods) ? init.supported_auth_methods : [];
-    if (!methods.includes("client_secret")) throw new Error(connectorWording().feishu.noQr);
+    if (!methods.includes("client_secret")) throw new Error(t("server.connector.feishu.noQr"));
     const begin = await form(
       "feishu",
       {
@@ -83,7 +83,7 @@ export class FeishuClient implements FeishuApi {
     );
     const deviceCode = str(begin, "device_code");
     let link = str(begin, "verification_uri_complete");
-    if (!deviceCode || !link) throw new Error(connectorWording().feishu.noLink);
+    if (!deviceCode || !link) throw new Error(t("server.connector.feishu.noLink"));
     // Personal-agent codes land on /page/cli (as nanobot does it); keep the query as it is.
     try {
       const parsed = new URL(link);
@@ -119,8 +119,8 @@ export class FeishuClient implements FeishuApi {
         app: { appId: res.client_id, appSecret: res.client_secret, domain: where },
         owner: str(user, "open_id"),
       };
-    if (res.error === "access_denied") return { status: "failed" as const, reason: connectorWording().feishu.denied };
-    if (res.error === "expired_token") return { status: "failed" as const, reason: connectorWording().feishu.qrExpired };
+    if (res.error === "access_denied") return { status: "failed" as const, reason: t("server.connector.feishu.denied") };
+    if (res.error === "expired_token") return { status: "failed" as const, reason: t("server.connector.feishu.qrExpired") };
     return { status: "pending" as const, domain: where };
   }
 
@@ -139,14 +139,14 @@ export class FeishuClient implements FeishuApi {
       const p = await this.poll(reg.deviceCode, domain, attempt);
       if (attempt.aborted) break;
       if (p.status === "succeeded") {
-        if (!p.app.appId.trim() || !p.app.appSecret.trim()) throw new Error(connectorWording().feishu.incomplete);
+        if (!p.app.appId.trim() || !p.app.appSecret.trim()) throw new Error(t("server.connector.feishu.incomplete"));
         return { app: p.app, owner: p.owner };
       }
       if (p.status === "failed") throw new Error(p.reason);
       domain = p.domain;
     }
     if (signal.aborted) throw signal.reason ?? new Error("aborted");
-    throw new Error(connectorWording().feishu.tooLong);
+    throw new Error(t("server.connector.feishu.tooLong"));
   }
 
   listen(signal: AbortSignal, app: App, got: (m: Message) => Promise<void>): Promise<void> {
@@ -159,7 +159,7 @@ export class FeishuClient implements FeishuApi {
         done = true;
         signal.removeEventListener("abort", abort);
         client.close({ force: true });
-        if (e && !signal.aborted) reject(new Error(connectorWording().feishu.disconnected(e.message)));
+        if (e && !signal.aborted) reject(new Error(t("server.connector.feishu.disconnected", { why: e.message })));
         else resolve();
       };
       const client = new Lark.WSClient({
@@ -203,10 +203,10 @@ export class FeishuClient implements FeishuApi {
         data: { receive_id: openId, msg_type: "text", content: JSON.stringify({ text }) },
       });
     } catch (e) {
-      throw new Error(connectorWording().feishu.send(e instanceof Error ? e.message : String(e)), { cause: e });
+      throw new Error(t("server.connector.feishu.send", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
     }
-    if (res.code !== undefined && res.code !== 0) throw new Error(connectorWording().feishu.send(`${res.code} ${res.msg ?? ""}`));
-    if (!res.data?.message_id) throw new Error(connectorWording().feishu.noId);
+    if (res.code !== undefined && res.code !== 0) throw new Error(t("server.connector.feishu.send", { why: `${res.code} ${res.msg ?? ""}` }));
+    if (!res.data?.message_id) throw new Error(t("server.connector.feishu.noId"));
     return res.data.message_id;
   }
 }
@@ -216,13 +216,13 @@ export function text(m: Message): string {
     return (
       (
         {
-          image: connectorWording().media.image,
-          file: connectorWording().media.file,
-          audio: connectorWording().media.audio,
-          media: connectorWording().media.video,
-          sticker: connectorWording().media.sticker,
+          image: t("server.connector.media.image"),
+          file: t("server.connector.media.file"),
+          audio: t("server.connector.media.audio"),
+          media: t("server.connector.media.video"),
+          sticker: t("server.connector.media.sticker"),
         } as Record<string, string>
-      )[m.messageType] ?? connectorWording().media.message
+      )[m.messageType] ?? t("server.connector.media.message")
     );
   try {
     return ((JSON.parse(m.content) as { text?: string }).text ?? "").trim();

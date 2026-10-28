@@ -1,3 +1,4 @@
+import { list, t } from "@vibevalley/i18n";
 // Task graphs: a job split into steps, each worked by its own session on a branch of the graph's,
 // merged back into the graph's branch when it is verified, and the whole graph merged into the main branch once every
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
@@ -78,7 +79,6 @@ import {
   startNeedsOwner,
   taskBrief,
 } from "./prompts.ts";
-import { taskWording } from "./words.ts";
 import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, type SessionShape, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
@@ -93,12 +93,12 @@ const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schem
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
 const graphNext = (graph: TaskGraph): Next[] =>
-  graphActions(graph).map((action) => ({ say: taskWording().graphAction[action], run: commandOf("graph.act", [graph.id], { action }) }));
+  graphActions(graph).map((action) => ({ say: t(`server.task.graphAction.${action}`), run: commandOf("graph.act", [graph.id], { action }) }));
 
 /** What the step allows now, as commands. */
 const stepNext = (graph: TaskGraph, task: Task): Next[] =>
   taskActions(graph, task).map((action) => ({
-    say: taskWording().act.stepAct(taskWording().taskAction[action], task.title),
+    say: t("server.task.act.stepAct", { action: t(`server.task.taskAction.${action}`), title: task.title }),
     run: commandOf("graph.task.act", [graph.id, task.id], { action }),
   }));
 
@@ -204,7 +204,7 @@ export const make = (options: TaskOptions = {}) =>
     const get = (id: string) => graphOf(core.state(), id);
     const need = (id: string) => {
       const g = get(id);
-      return g ? Effect.succeed(g) : Effect.fail(missing(taskWording().noGraph(id), [lookIn.graph]));
+      return g ? Effect.succeed(g) : Effect.fail(missing(t("server.task.noGraph", { id }), [lookIn.graph]));
     };
 
     /** The history must never stop the graph itself: what cannot be written is logged. */
@@ -240,7 +240,11 @@ export const make = (options: TaskOptions = {}) =>
       const before = get(graph.id);
       yield* issues
         .putTask(graph)
-        .pipe(Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(taskWording().notSaved(graph.title, causeMessage(d)))) : Effect.die(d))));
+        .pipe(
+          Effect.catchDefect((d) =>
+            SqlError.isSqlError(d) ? Effect.fail(refused(t("server.task.notSaved", { title: graph.title, why: causeMessage(d) }))) : Effect.die(d),
+          ),
+        );
       yield* record(before, graph, by.kind, why);
     });
 
@@ -251,23 +255,23 @@ export const make = (options: TaskOptions = {}) =>
       yield* putSystem(withNote({ ...graph, state: "abandoned" }, why));
       splitters.delete(graph.id);
       if (splitter) yield* dismiss(splitter);
-      yield* notice("warn", taskWording().notice.notSplit(graph.title, why));
+      yield* notice("warn", t("server.task.notice.notSplit", { title: graph.title, why }));
       yield* tellOrchestrator(graphNews.notSplit(graph.id, graph.title, why));
     });
 
     const split = Effect.fn("Tasks.split")(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
       if (graph.state !== "splitting") return;
       const tries = splitterTries.get(graph.id) ?? 0;
-      if (outcome === "interrupted") return yield* giveUp(graph, taskWording().notice.splitStopped);
+      if (outcome === "interrupted") return yield* giveUp(graph, t("server.task.notice.splitStopped"));
       if (outcome === "failed") {
-        if (tries >= 1) return yield* giveUp(graph, taskWording().notice.plannerFailed(summary));
+        if (tries >= 1) return yield* giveUp(graph, t("server.task.notice.plannerFailed", { summary }));
         splitterTries.set(graph.id, tries + 1);
         yield* tell(session.id, graphTell.retrySplit);
         return;
       }
       const parsed = parseSplit(work.find(session.id)?.lastText ?? "");
       if (!parsed.ok) {
-        if (tries >= 1) return yield* giveUp(graph, taskWording().notice.noGraph(parsed.problems[0] ?? ""));
+        if (tries >= 1) return yield* giveUp(graph, t("server.task.notice.noGraph", { problem: parsed.problems[0] ?? "" }));
         splitterTries.set(graph.id, tries + 1);
         yield* tell(session.id, graphTell.fixGraph(parsed.problems));
         return;
@@ -277,7 +281,7 @@ export const make = (options: TaskOptions = {}) =>
       splitters.delete(graph.id);
       splitterTries.delete(graph.id);
       yield* dismiss(session.id);
-      yield* notice("info", taskWording().notice.drafted(draft.title, draft.tasks.length));
+      yield* notice("info", t("server.task.notice.drafted", { title: draft.title, steps: draft.tasks.length }));
       yield* tellOrchestrator(graphNews.drafted(draft.id, graphText(draft)));
     });
 
@@ -286,7 +290,7 @@ export const make = (options: TaskOptions = {}) =>
       if (!graph || graph.state !== "running") return;
       for (const task of startable(graph)) {
         const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
-        let refusal = taskWording().notice.noHelper;
+        let refusal = t("server.task.notice.noHelper");
         let hired: Session | undefined;
         if (agent) {
           const tag: SessionGraph = { id: graph.id, task: task.id };
@@ -302,7 +306,7 @@ export const make = (options: TaskOptions = {}) =>
         }
         if (!hired) {
           // Not now: it waits, and is tried again when a session finishes or leaves.
-          const note = taskWording().notice.waits(task.title, refusal);
+          const note = t("server.task.notice.waits", { title: task.title, why: refusal });
           if (graph.note !== note) yield* putSystem(withNote(graph, note));
           return;
         }
@@ -323,7 +327,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
-      yield* notice("warn", taskWording().notice.stepFailed(graph.title, task.title, why));
+      yield* notice("warn", t("server.task.notice.stepFailed", { graph: graph.title, step: task.title, why }));
       yield* tellOrchestrator(graphNews.stepFailed(graph.id, graph.title, task.title, task.id, why));
     });
 
@@ -343,25 +347,26 @@ export const make = (options: TaskOptions = {}) =>
       let changed: string[] = [];
       if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
         const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
-        if (files._tag === "Failure") return rejected(taskWording().notice.unknownFiles(files.failure.message));
+        if (files._tag === "Failure") return rejected(t("server.task.notice.unknownFiles", { why: files.failure.message }));
         changed = files.success;
       }
       if (isAcceptance(task) && task.check) {
-        if ((yield* projects.run(cwd, task.check)).ok) return rejected(taskWording().notice.acceptancePassed(task.check), acceptancePassedText(task.check));
+        if ((yield* projects.run(cwd, task.check)).ok)
+          return rejected(t("server.task.notice.acceptancePassed", { check: task.check }), acceptancePassedText(task.check));
         return { frozen: changed };
       }
       const touched = frozenTouched(graph, task, changed);
-      if (touched.length > 0) return rejected(taskWording().notice.frozenTouched(touched), frozenTouchedText(touched));
+      if (touched.length > 0) return rejected(t("server.task.notice.frozenTouched", { files: list(touched) }), frozenTouchedText(touched));
       for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
         const ran = yield* projects.run(cwd, check);
-        if (!ran.ok) return rejected(taskWording().notice.checkFailed(check), checkFailedText(check, ran.output));
+        if (!ran.ok) return rejected(t("server.task.notice.checkFailed", { check }), checkFailedText(check, ran.output));
       }
       return { frozen: [] };
     });
 
     const taskDone = Effect.fn("Tasks.taskDone")(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
       const session = live.sessionOf(sessionId);
-      if (!graph.branch) return yield* taskFailed(graph, task, taskWording().notice.noBranch);
+      if (!graph.branch) return yield* taskFailed(graph, task, t("server.task.notice.noBranch"));
       const target = graph.branch;
       let verification: Verification | undefined;
       const merged = yield* Effect.result(
@@ -398,9 +403,9 @@ export const make = (options: TaskOptions = {}) =>
         ...(session?.spent ? { spent: { ...session.spent } } : {}),
       }));
       if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
-      yield* putSystem(next).pipe(Effect.mapError((e) => refused(taskWording().notice.stepNotSaved(task.title, reasonOf(e)))));
+      yield* putSystem(next).pipe(Effect.mapError((e) => refused(t("server.task.notice.stepNotSaved", { title: task.title, why: reasonOf(e) }))));
       if (next.state === "ready") {
-        yield* notice("info", taskWording().notice.ready(next.title));
+        yield* notice("info", t("server.task.notice.ready", { title: next.title }));
         yield* tellOrchestrator(graphNews.ready(next.id, next.title, graphText(next)));
       }
     });
@@ -409,7 +414,7 @@ export const make = (options: TaskOptions = {}) =>
       if (outcome === "completed") return yield* taskDone(graph, task, session.id, summary);
       if (outcome === "failed") return yield* sendBack(graph, task, session.id, retryText(task), summary);
       if (graph.state !== "running") return;
-      yield* putSystem(withNote({ ...graph, state: "paused" }, taskWording().notice.stepStopped(task.title)));
+      yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.stepStopped", { title: task.title })));
     });
 
     const follow = (n: SessionNews) =>
@@ -437,9 +442,9 @@ export const make = (options: TaskOptions = {}) =>
             // Sent home from outside the graph (a full farm, the person): its step did not get done.
             for (const graph of graphsOf(core.state())) {
               if (!isOpen(graph)) continue;
-              if (splitters.get(graph.id) === f.id && graph.state === "splitting") yield* giveUp(graph, taskWording().notice.plannerGone);
+              if (splitters.get(graph.id) === f.id && graph.state === "splitting") yield* giveUp(graph, t("server.task.notice.plannerGone"));
               const task = graph.tasks.find((n) => n.session === f.id && n.state === "working");
-              if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, taskWording().notice.helperGone);
+              if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, t("server.task.notice.helperGone"));
             }
           } else return;
           for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
@@ -457,7 +462,7 @@ export const make = (options: TaskOptions = {}) =>
           continue;
         }
         if (isBusy(session)) continue;
-        if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? taskWording().notice.done);
+        if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? t("server.task.notice.done"));
         else yield* tell(session.id, graphTell.carryOn(task.title));
       }
     });
@@ -472,7 +477,7 @@ export const make = (options: TaskOptions = {}) =>
       const result = change(yield* need(id));
       if (!result.ok) return yield* Effect.fail(refused(result.problem));
       yield* put(result.graph, by);
-      return taskWording().act.edited;
+      return t("server.task.act.edited");
     }, lock.withPermits(1));
 
     // Run by the startup, after the sessions came back and marked the runs that stopped with the server.
@@ -480,10 +485,10 @@ export const make = (options: TaskOptions = {}) =>
       Effect.gen(function* () {
         for (const graph of graphsOf(core.state())) {
           if (graph.state === "splitting") {
-            yield* putSystem(withNote({ ...graph, state: "abandoned" }, taskWording().notice.restartedSplitting));
+            yield* putSystem(withNote({ ...graph, state: "abandoned" }, t("server.task.notice.restartedSplitting")));
             for (const h of live.presentSessions()) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
           } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
-            yield* putSystem(withNote({ ...graph, state: "paused" }, taskWording().notice.restarted));
+            yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.restarted")));
           }
         }
         for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
@@ -493,17 +498,17 @@ export const make = (options: TaskOptions = {}) =>
 
     const shape: TaskShape = {
       splitIssueOf: (issue, title, steps) =>
-        Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((t) => t.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
+        Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((item) => item.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
       graphs: () => graphsOf(core.state()),
       graph: need,
       comeBack,
       split: Effect.fn("Tasks.split")(function* (goal, project, agent, by) {
         const where = project.trim();
-        if (!goal.trim()) return yield* Effect.fail(refused(taskWording().act.noGoal));
-        if (!where) return yield* Effect.fail(refused(taskWording().act.noProject));
+        if (!goal.trim()) return yield* Effect.fail(refused(t("server.task.act.noGoal")));
+        if (!where) return yield* Effect.fail(refused(t("server.task.act.noProject")));
         const all = yield* candidates;
         const chosen = chooseAgent(all, graphMatch(goal), agent, "");
-        if (!chosen) return yield* Effect.fail(refused(taskWording().act.noSplitter, [lookIn.agent]));
+        if (!chosen) return yield* Effect.fail(refused(t("server.task.act.noSplitter"), [lookIn.agent]));
         const id = yield* issues.nextTaskId();
         const graph: TaskGraph = {
           id,
@@ -527,22 +532,22 @@ export const make = (options: TaskOptions = {}) =>
           { worktree: true, taskGraph: { id: graph.id }, issue: graph.id, trigger: { kind: "task" } },
         );
         if (!hired.session) {
-          const reason = hired.refused || taskWording().act.notSent;
-          yield* put(withNote({ ...graph, state: "abandoned" }, taskWording().act.plannerNotSent(reason)), by);
+          const reason = hired.refused || t("server.task.act.notSent");
+          yield* put(withNote({ ...graph, state: "abandoned" }, t("server.task.act.plannerNotSent", { why: reason })), by);
           return yield* Effect.fail(refused(reason));
         }
         splitters.set(graph.id, hired.session.id);
-        return taskWording().act.splittingBy(hired.session.name, graph.id);
+        return t("server.task.act.splittingBy", { name: hired.session.name, id: graph.id });
       }, lock.withPermits(1)),
       splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
         const state = core.state();
         const session = sessionOf(state, sessionId);
-        const issue = session?.issue ? (state.issues ?? []).find((t) => t.id === session.issue) : undefined;
+        const issue = session?.issue ? (state.issues ?? []).find((item) => item.id === session.issue) : undefined;
         const why = issueSplitRefusal(session, issue, store.isOrchestrator);
         if (why) return yield* Effect.fail(refused(why));
         const tasks = steps.map(freshTask);
         const problems = graphProblems(tasks);
-        if (problems.length > 0) return yield* Effect.fail(refused(taskWording().act.stepsWrong(problems)));
+        if (problems.length > 0) return yield* Effect.fail(refused(t("server.task.act.stepsWrong", { problems: problems.join("\n- ") })));
         let graph: TaskGraph = {
           id: issue!.id,
           title: title.trim() || issue!.title,
@@ -555,11 +560,11 @@ export const make = (options: TaskOptions = {}) =>
         };
         const branch = yield* openBranch(graph, session!.branch ?? "");
         graph = { ...graph, branch };
-        yield* put(graph, sessionActor(session!.id), taskWording().notice.splitBy(session!.name)).pipe(
-          Effect.mapError((e) => refused(taskWording().notice.splitNotSaved(branch, reasonOf(e)))),
+        yield* put(graph, sessionActor(session!.id), t("server.task.notice.splitBy", { name: session!.name })).pipe(
+          Effect.mapError((e) => refused(t("server.task.notice.splitNotSaved", { branch, why: reasonOf(e) }))),
         );
         yield* recurrence(graph.id);
-        yield* notice("info", taskWording().notice.split(session!.name, graph.title, tasks.length));
+        yield* notice("info", t("server.task.notice.split", { name: session!.name, title: graph.title, n: tasks.length }));
         yield* tellOrchestrator(graphNews.split(session!.name, graph.id, tasks.length, graphText(graph)));
         return graphTell.split(graph.title, tasks.length, branch);
       }, lock.withPermits(1)),
@@ -567,7 +572,14 @@ export const make = (options: TaskOptions = {}) =>
         const graph = yield* need(id);
         const not = () =>
           Effect.fail(
-            refused(taskWording().act.cannot(graph.title, taskWording().graphState[graph.state], taskWording().graphAction[action]), graphNext(graph)),
+            refused(
+              t("server.task.act.cannot", {
+                title: graph.title,
+                state: t(`server.task.graphState.${graph.state}`),
+                action: t(`server.task.graphAction.${action}`).toLowerCase(),
+              }),
+              graphNext(graph),
+            ),
           );
         switch (action) {
           case "start": {
@@ -577,21 +589,21 @@ export const make = (options: TaskOptions = {}) =>
             if (problems.length > 0) return yield* Effect.fail(refused(problems[0]!));
             const branch = yield* openBranch(graph);
             yield* put(withNote({ ...graph, state: "running", branch }, ""), by).pipe(
-              Effect.mapError((e) => refused(taskWording().act.startNotSaved(branch, reasonOf(e)))),
+              Effect.mapError((e) => refused(t("server.task.act.startNotSaved", { branch, why: reasonOf(e) }))),
             );
             yield* recurrence(graph.id);
-            return taskWording().act.started(graph.title, branch);
+            return t("server.task.act.started", { title: graph.title, branch });
           }
           case "pause":
             if (graph.state !== "running") return yield* not();
-            yield* put(withNote({ ...graph, state: "paused" }, taskWording().act.pausedNote), by);
-            return taskWording().act.paused(graph.title);
+            yield* put(withNote({ ...graph, state: "paused" }, t("server.task.act.pausedNote")), by);
+            return t("server.task.act.paused", { title: graph.title });
           case "resume":
             if (graph.state !== "paused") return yield* not();
             yield* put(withNote({ ...graph, state: "running" }, ""), by);
             yield* resumeWorking(graph.id);
             yield* recurrence(graph.id);
-            return taskWording().act.resumed(graph.title);
+            return t("server.task.act.resumed", { title: graph.title });
           case "abandon": {
             if (!isOpen(graph)) return yield* not();
             const next = {
@@ -599,13 +611,15 @@ export const make = (options: TaskOptions = {}) =>
               state: "abandoned" as const,
               tasks: graph.tasks.map((n) => (n.state === "working" ? { ...unmanned(n), state: "waiting" as const } : n)),
             };
-            const kept = graph.branch ? taskWording().act.branchKeptNote(graph.branch) : "";
-            yield* put(withNote(next, taskWording().act.abandonedNote(kept)), by);
+            const kept = graph.branch ? t("server.task.act.branchKeptNote", { branch: graph.branch }) : "";
+            yield* put(withNote(next, t("server.task.act.abandonedNote", { kept })), by);
             const splitter = splitters.get(graph.id);
             splitters.delete(graph.id);
             if (splitter) yield* dismiss(splitter);
             for (const n of graph.tasks) if (n.state === "working" && n.session) yield* dismiss(n.session);
-            return taskWording().act.abandoned(graph.title, graph.branch);
+            return graph.branch
+              ? t("server.task.act.abandonedKept", { title: graph.title, branch: graph.branch })
+              : t("server.task.act.abandoned", { title: graph.title });
           }
           case "merge": {
             if (!actsForOwner(by)) return yield* Effect.fail(refused(mergeNeedsOwner));
@@ -613,26 +627,28 @@ export const make = (options: TaskOptions = {}) =>
             const merged = yield* Effect.result(projects.mergeBranch(graph.project, graph.branch));
             if (merged._tag === "Failure") {
               const f = merged.failure;
-              const why = f.kind === "conflict" ? taskWording().act.conflict(f.base, f.files) : f.reasonText || f.message;
-              yield* put(withNote(graph, taskWording().act.notMergedNote(why)), by);
-              return yield* Effect.fail(refused(taskWording().act.notMerged(why, graph.branch)));
+              const why = f.kind === "conflict" ? t("server.task.act.conflict", { base: f.base, files: list(f.files) }) : f.reasonText || f.message;
+              yield* put(withNote(graph, t("server.task.act.notMergedNote", { why })), by);
+              return yield* Effect.fail(refused(t("server.task.act.notMerged", { why, branch: graph.branch })));
             }
-            yield* put(withNote({ ...graph, state: "done" }, ""), by).pipe(Effect.mapError((e) => refused(taskWording().act.mergeNotSaved(reasonOf(e)))));
-            yield* notice("info", taskWording().act.merged(graph.title, merged.success));
-            return taskWording().act.merged(graph.title, merged.success);
+            yield* put(withNote({ ...graph, state: "done" }, ""), by).pipe(
+              Effect.mapError((e) => refused(t("server.task.act.mergeNotSaved", { why: reasonOf(e) }))),
+            );
+            yield* notice("info", t("server.task.act.merged", { title: graph.title, text: merged.success }));
+            return t("server.task.act.merged", { title: graph.title, text: merged.success });
           }
         }
-        return yield* Effect.fail(refused(taskWording().act.unknownAction(String(action satisfies never))));
+        return yield* Effect.fail(refused(t("server.task.act.unknownAction", { action: String(action satisfies never) })));
       }, lock.withPermits(1)),
       taskAct: Effect.fn("Tasks.taskAct")(function* (id, taskId, action, by) {
         const graph = yield* need(id);
         const task = taskOf(graph, taskId);
-        if (!task) return yield* Effect.fail(missing(taskWording().act.noStep(taskId), [lookIn.graph]));
+        if (!task) return yield* Effect.fail(missing(t("server.task.act.noStep", { id: taskId }), [lookIn.graph]));
         if (graph.state !== "running" && graph.state !== "paused")
-          return yield* Effect.fail(refused(taskWording().act.graphIs(taskWording().graphState[graph.state]), graphNext(graph)));
+          return yield* Effect.fail(refused(t("server.task.act.graphIs", { state: t(`server.task.graphState.${graph.state}`) }), graphNext(graph)));
         switch (action) {
           case "retry": {
-            if (task.state !== "failed") return yield* Effect.fail(refused(taskWording().act.notFailed(task.title), stepNext(graph, task)));
+            if (task.state !== "failed") return yield* Effect.fail(refused(t("server.task.act.notFailed", { title: task.title }), stepNext(graph, task)));
             const session = task.session ? live.sessionOf(task.session) : undefined;
             if (session && !isBusy(session)) {
               // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
@@ -641,29 +657,32 @@ export const make = (options: TaskOptions = {}) =>
                 by,
               );
               yield* tell(session.id, graphTell.retry(retryText(task), task.brief));
-              return taskWording().act.retried(session.name, task.title);
+              return t("server.task.act.retried", { name: session.name, title: task.title });
             }
             yield* put(
               withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting", tries: 0 })),
               by,
             );
             yield* recurrence(graph.id);
-            return taskWording().act.requeued(task.title);
+            return t("server.task.act.requeued", { title: task.title });
           }
           case "skip": {
             if (task.state !== "waiting" && task.state !== "failed")
               return yield* Effect.fail(
-                refused(task.state === "working" ? taskWording().act.working(task.title) : taskWording().act.finished(task.title), stepNext(graph, task)),
+                refused(
+                  task.state === "working" ? t("server.task.act.working", { title: task.title }) : t("server.task.act.finished", { title: task.title }),
+                  stepNext(graph, task),
+                ),
               );
             let next = withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "skipped" }));
             if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
             yield* put(next, by);
             if (task.session) yield* dismiss(task.session);
             yield* recurrence(graph.id);
-            return taskWording().act.skipped(task.title);
+            return t("server.task.act.skipped", { title: task.title });
           }
         }
-        return yield* Effect.fail(refused(taskWording().act.unknownAction(String(action satisfies never))));
+        return yield* Effect.fail(refused(t("server.task.act.unknownAction", { action: String(action satisfies never) })));
       }, lock.withPermits(1)),
       editTask: (id, task, edit, by) => edited(id, (g) => editTask(g, task, edit), by),
       removeTask: (id, task, by) => edited(id, (g) => removeTask(g, task), by),
@@ -672,9 +691,12 @@ export const make = (options: TaskOptions = {}) =>
         const result = removeTask(graph, task);
         if (!result.ok) return yield* Effect.fail(refused(result.problem));
         const gone = taskOf(graph, task)!;
-        const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => taskWording().event.step(n.title));
+        const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => t("server.task.event.step", { title: n.title }));
         return {
-          does: [taskWording().edit.remove(graph.title, gone.title), ...(waiting.length > 0 ? [taskWording().edit.stopWaiting(waiting)] : [])],
+          does: [
+            t("server.task.edit.remove", { graph: graph.title, step: gone.title }),
+            ...(waiting.length > 0 ? [t("server.task.edit.stopWaiting", { steps: list(waiting) })] : []),
+          ],
         };
       }),
       events: Effect.fn("Tasks.events")(function* (id) {
@@ -702,16 +724,16 @@ export const make = (options: TaskOptions = {}) =>
               ...e,
               ...(e.changes ? { changes: renderedChanges(e.changes) } : {}),
               text: graphEventText(changeOf(e), titleOf),
-              actorText: taskWording().actor[e.actor],
+              actorText: t(`server.task.actor.${e.actor}`),
             },
           ];
         });
       }),
       changes: Effect.fn("Tasks.changes")(function* (id) {
         const graph = yield* need(id);
-        if (!graph.branch) return yield* Effect.fail(refused(taskWording().act.notStarted(graph.title)));
+        if (!graph.branch) return yield* Effect.fail(refused(t("server.task.act.notStarted", { title: graph.title })));
         const changes = yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
-        if (!changes) return yield* Effect.fail(refused(taskWording().act.branchGone(graph.title)));
+        if (!changes) return yield* Effect.fail(refused(t("server.task.act.branchGone", { title: graph.title })));
         return changes;
       }),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
@@ -722,4 +744,4 @@ export const make = (options: TaskOptions = {}) =>
 export const layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
 
 /** Issues' startup: the task graphs come back. */
-export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (t) => t.comeBack));
+export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (item) => item.comeBack));

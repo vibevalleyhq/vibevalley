@@ -1,10 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // /tree: the farm's memory tree, every helper's and every project's memories summed up for the owner, showing only how
 // the farm grows (.agents/notes/proposed/feature/2026-10-22-memory-tree.md). Full-bleed like the farm, outside the
 // workbench's shell; the farm's HUD has its button. One canvas (Scene.tsx) draws the tree grown from the memories and,
 // looking up, the same memories as a sky; the panel to the right. The memories are made up (mock.ts) until the server
 // sums them up.
 
-import { treeWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "../ui/pixel";
@@ -18,14 +18,14 @@ import { allOf, counts, kept, newest, stageName, type Ties, tiesOf, type TreeFil
 import { type SceneArea, type SceneHover, Scene } from "./Scene";
 
 const kindIcon: Record<MemoryKind, string> = { leaf: "icon-leaf", fruit: "icon-fruit", seed: "icon-seed" };
-const kindName: Record<MemoryKind, string> = treeWording().kind;
+const kindName = (kind: MemoryKind) => t(`web.tree.kind.${kind}`);
 
 /** A tie's words, by the kind of memory it is about: what it grew from, what grew from it, what it is used with. */
 function tieWords(kind: MemoryKind, ties: Ties): string[] {
   const words: string[] = [];
-  if (ties.from.length > 0) words.push(kind === "seed" ? treeWording().distilled(ties.from.length) : treeWording().noted(ties.from.length));
-  if (ties.grew.length > 0) words.push(kind === "fruit" ? treeWording().seeds(ties.grew.length) : treeWording().grew(ties.grew.length));
-  if (ties.together.length > 0) words.push(treeWording().together(ties.together.length));
+  if (ties.from.length > 0) words.push(kind === "seed" ? t("web.tree.distilled", { n: ties.from.length }) : t("web.tree.noted", { n: ties.from.length }));
+  if (ties.grew.length > 0) words.push(kind === "fruit" ? t("web.tree.seeds", { n: ties.grew.length }) : t("web.tree.grew", { n: ties.grew.length }));
+  if (ties.together.length > 0) words.push(t("web.tree.together", { n: ties.together.length }));
   return words;
 }
 
@@ -59,7 +59,7 @@ export function TreePage() {
   const sow = (seed: MemoryItem) => {
     playSound("open");
     setSown((s) => new Set([...s, seed.id]));
-    toast(treeWording().sown(seed.body));
+    toast(t("web.tree.sown", { body: seed.body }));
   };
   const lookUp = (up: boolean) => {
     playSound("open");
@@ -112,18 +112,18 @@ export function TreePage() {
         }
       >
         <PxWindow class="absolute top-3 left-3 px-3 py-2">
-          <div class={pxText.sm}>{treeWording().sky}</div>
-          <div class={[pxText.xs, "text-bark-500"]}>{treeWording().skyHint}</div>
+          <div class={pxText.sm}>{t("web.tree.sky")}</div>
+          <div class={[pxText.xs, "text-bark-500"]}>{t("web.tree.skyHint")}</div>
         </PxWindow>
         <div class="absolute top-3 right-3">
           <PxButton icon="icon-tree" onClick={() => lookUp(false)}>
-            {treeWording().back}
+            {t("web.tree.back")}
           </PxButton>
         </div>
       </Show>
       <div class={["absolute top-3 left-3", { hidden: sky() }]}>
         <PxButton icon="icon-map" onClick={home}>
-          {treeWording().farm}
+          {t("web.tree.farm")}
         </PxButton>
       </div>
       <PxWindow
@@ -137,18 +137,18 @@ export function TreePage() {
           <Filters tree={tree} filter={filter()} setFilter={setFilter} class="min-w-[220px] flex-1" />
         </Show>
         <label class="flex min-w-[220px] flex-1 items-center gap-2">
-          <span class={pxText.xs}>{treeWording().earliest}</span>
+          <span class={pxText.xs}>{t("web.tree.earliest")}</span>
           <input
             type="range"
             min="0"
             max="1"
             step="0.005"
             value={until()}
-            aria-label={treeWording().past}
+            aria-label={t("web.tree.past")}
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
             class="flex-1 accent-[var(--color-leaf-500)]"
           />
-          <span class={[pxText.xs, "w-[64px] text-right"]}>{until() >= 1 ? treeWording().now : treeWording().day(day())}</span>
+          <span class={[pxText.xs, "w-[64px] text-right"]}>{until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}</span>
         </label>
       </PxWindow>
       <Show when={hover()}>{(h) => <Tip hover={h()} tree={tree} agentName={agentName} now={now()} />}</Show>
@@ -160,16 +160,16 @@ function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: T
   return (
     <div class={["flex gap-2", props.class]}>
       <PxPick
-        label={treeWording().byHelper}
-        placeholder={treeWording().allHelpers}
+        label={t("web.tree.byHelper")}
+        placeholder={t("web.tree.allHelpers")}
         clearable
         value={props.filter.agent}
         options={props.tree.agents.map((a) => ({ value: a.id, label: a.name }))}
         onChange={(agent) => props.setFilter({ ...props.filter, agent })}
       />
       <PxPick
-        label={treeWording().byProject}
-        placeholder={treeWording().allProjects}
+        label={t("web.tree.byProject")}
+        placeholder={t("web.tree.allProjects")}
         clearable
         value={props.filter.project}
         options={props.tree.projects.map((p) => ({ value: p, label: p }))}
@@ -204,57 +204,57 @@ function Panel(props: {
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
       <header class="text-center">
-        <h1 class={pxText.lg}>{treeWording().title}</h1>
-        <p class={[pxText.xs, "text-bark-500"]}>{treeWording().stats(days(), props.tree.rounds, props.tree.recalls)}</p>
+        <h1 class={pxText.lg}>{t("web.tree.title")}</h1>
+        <p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.stats", { days: days(), rounds: props.tree.rounds, recalls: props.tree.recalls })}</p>
       </header>
       <div class="flex items-center gap-2 border-2 border-cream-300 bg-cream-100 px-2 py-1.5">
         <SpriteIcon name="icon-rings" size={20} />
-        <span class={pxText.sm}>{stageName[props.tree.stage]}</span>
+        <span class={pxText.sm}>{stageName(props.tree.stage)}</span>
         <span class={[pxText.xs, "ml-auto text-bark-500"]}>
           {props.tree.nextStageIn !== undefined
-            ? treeWording().nextStage(props.tree.nextStageIn, stageName[(props.tree.stage + 1) as TreeStage])
-            : treeWording().grown}
+            ? t("web.tree.nextStage", { rounds: props.tree.nextStageIn, stage: stageName((props.tree.stage + 1) as TreeStage) })
+            : t("web.tree.grown")}
         </span>
       </div>
       <div class="grid grid-cols-3 gap-2" data-testid="memory-counts">
-        <Count icon="icon-leaf" label={treeWording().kind.leaf} n={props.tally.leaf} />
-        <Count icon="icon-fruit" label={treeWording().kind.fruit} n={props.tally.fruit} />
-        <Count icon="icon-seed" label={treeWording().kind.seed} n={props.tally.seed} />
+        <Count icon="icon-leaf" label={t("web.tree.kind.leaf")} n={props.tally.leaf} />
+        <Count icon="icon-fruit" label={t("web.tree.kind.fruit")} n={props.tally.fruit} />
+        <Count icon="icon-seed" label={t("web.tree.kind.seed")} n={props.tally.seed} />
       </div>
       <Filters tree={props.tree} filter={props.filter} setFilter={props.setFilter} />
       <Show when={props.picked}>
         {(m) => (
           <Section
-            title={m().kind === "fruit" ? treeWording().experience : kindName[m().kind]}
+            title={m().kind === "fruit" ? t("web.tree.experience") : kindName(m().kind)}
             icon={kindIcon[m().kind]}
-            aside={<PxButton size="sm" label={treeWording().fold} icon="button-close" onClick={props.unpick} />}
+            aside={<PxButton size="sm" label={t("web.tree.fold")} icon="button-close" onClick={props.unpick} />}
           >
             <p class={[pxText.xs, "text-bark-500"]}>
-              {props.agentName(m().agent)} · {m().project ?? treeWording().everyProject} · {ago(m().at, props.now)}
+              {props.agentName(m().agent)} · {m().project ?? t("web.tree.everyProject")} · {ago(m().at, props.now)}
             </p>
             <Show when={m().case} fallback={<p class={pxText.sm}>{m().body}</p>}>
               {(c) => (
                 <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                  <dt class={[pxText.xs, "text-bark-500"]}>{treeWording().intent}</dt>
+                  <dt class={[pxText.xs, "text-bark-500"]}>{t("web.tree.intent")}</dt>
                   <dd class={pxText.sm}>{c().intent}</dd>
-                  <dt class={[pxText.xs, "text-bark-500"]}>{treeWording().approach}</dt>
+                  <dt class={[pxText.xs, "text-bark-500"]}>{t("web.tree.approach")}</dt>
                   <dd class={pxText.sm}>{c().approach}</dd>
-                  <dt class={[pxText.xs, "text-bark-500"]}>{treeWording().insight}</dt>
+                  <dt class={[pxText.xs, "text-bark-500"]}>{t("web.tree.insight")}</dt>
                   <dd class={pxText.sm}>{c().insight}</dd>
                 </dl>
               )}
             </Show>
-            <p class={[pxText.xs, "text-bark-500"]}>{treeWording().recalled(m().recalled)}</p>
+            <p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.recalled", { n: m().recalled })}</p>
             <TieList tree={props.tree} item={m()} pick={props.pick} />
           </Section>
         )}
       </Show>
-      <Section title={treeWording().recent}>
+      <Section title={t("web.tree.recent")}>
         <ul class="flex flex-col gap-1">
           <For each={props.recent}>
             {(m) => (
               <li class="flex items-center gap-2">
-                <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName[m.kind]} />
+                <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName(m.kind)} />
                 <span class={[pxText.sm, "min-w-0 flex-1 truncate"]} title={m.body}>
                   {m.body}
                 </span>
@@ -265,17 +265,17 @@ function Panel(props: {
         </ul>
       </Section>
       <Section
-        title={treeWording().fading(props.fading.length)}
+        title={t("web.tree.fading", { n: props.fading.length })}
         icon="icon-leaf-fall"
         aside={
           <Show when={props.fading.length > 0}>
             <PxButton size="sm" onClick={() => setShowFading((v) => !v)}>
-              {showFading() ? treeWording().fold : treeWording().look}
+              {showFading() ? t("web.tree.fold") : t("web.tree.look")}
             </PxButton>
           </Show>
         }
       >
-        <Show when={showFading()} fallback={<p class={[pxText.xs, "text-bark-500"]}>{treeWording().fadingNote}</p>}>
+        <Show when={showFading()} fallback={<p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.fadingNote")}</p>}>
           <ul class="flex flex-col gap-1">
             <For each={props.fading}>
               {(m) => (
@@ -287,8 +287,8 @@ function Panel(props: {
           </ul>
         </Show>
       </Section>
-      <Section title={treeWording().waiting} icon="icon-seed-gold">
-        <Show when={props.waiting.length > 0} fallback={<p class={[pxText.xs, "text-bark-500"]}>{treeWording().noSeeds}</p>}>
+      <Section title={t("web.tree.waiting")} icon="icon-seed-gold">
+        <Show when={props.waiting.length > 0} fallback={<p class={[pxText.xs, "text-bark-500"]}>{t("web.tree.noSeeds")}</p>}>
           <ul class="flex flex-col gap-2">
             <For each={props.waiting}>
               {(seed) => (
@@ -296,7 +296,7 @@ function Panel(props: {
                   <SpriteIcon name="icon-seed" size={20} />
                   <span class={[pxText.sm, "min-w-0 flex-1"]}>{seed.body}</span>
                   <PxButton size="sm" tone="primary" onClick={() => props.onSow(seed)}>
-                    {treeWording().sow}
+                    {t("web.tree.sow")}
                   </PxButton>
                 </li>
               )}
@@ -305,7 +305,7 @@ function Panel(props: {
         </Show>
       </Section>
       <PxButton tone="accent" icon="icon-stars" class="mt-auto w-full" onClick={props.onLookUp}>
-        {treeWording().lookUp}
+        {t("web.tree.lookUp")}
       </PxButton>
     </PxWindow>
   );
@@ -317,10 +317,10 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
   const find = (id: string) => props.tree.items.find((m) => m.id === id);
   const groups = () =>
     [
-      { title: props.item.kind === "seed" ? treeWording().from : treeWording().notedBy, ids: ties().from },
-      { title: props.item.kind === "fruit" ? treeWording().grewInto : treeWording().grewTo, ids: ties().grew },
+      { title: props.item.kind === "seed" ? t("web.tree.from") : t("web.tree.notedBy"), ids: ties().from },
+      { title: props.item.kind === "fruit" ? t("web.tree.grewInto") : t("web.tree.grewTo"), ids: ties().grew },
       {
-        title: treeWording().often,
+        title: t("web.tree.often"),
         ids: ties()
           .together.slice(0, 4)
           .map((t) => t.id),
@@ -382,13 +382,13 @@ function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id: strin
       <div class="flex items-center gap-1.5">
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
         <span class={pxText.xs}>
-          {props.agentName(m().agent)} · {m().project ?? treeWording().everyProject}
+          {props.agentName(m().agent)} · {m().project ?? t("web.tree.everyProject")}
         </span>
       </div>
       <p class={[pxText.sm, "mt-1"]}>{m().body}</p>
       <p class={[pxText.xs, "mt-1 text-bark-500"]}>
-        {ago(m().at, props.now)} · {treeWording().recalled(m().recalled)}
-        {m().fading ? treeWording().aboutToFall : ""}
+        {ago(m().at, props.now)} · {t("web.tree.recalled", { n: m().recalled })}
+        {m().fading ? t("web.tree.aboutToFall") : ""}
       </p>
       <Show when={ties().length > 0}>
         <p class={[pxText.xs, "mt-0.5 text-leaf-700"]}>{ties().join(" · ")}</p>

@@ -1,5 +1,5 @@
-import { issueWording } from "./words.ts";
-import { wording } from "@vibevalley/protocol/words";
+import { maybe, t } from "@vibevalley/i18n";
+
 import { reportVerdict } from "../session/rules.ts";
 import type {
   Deliverable,
@@ -26,15 +26,15 @@ import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 
 /** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's job ends with the block parseAnswer reads. */
-export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
-  let job = t.title;
-  if (t.description) job += "\n\n" + t.description;
-  if (t.criteria && t.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + t.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
-  return t.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
+export function issueJob(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
+  let job = pick.title;
+  if (pick.description) job += "\n\n" + pick.description;
+  if (pick.criteria && pick.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  return pick.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
 }
 
 /** 接着修 for an answer that could not be read; cureWords is the one for a failed round. */
-export const answerCureWords = (problem: string) => issueWording().job.answerUnread(problem) + "\n" + answerFormat;
+export const answerCureWords = (problem: string) => t("server.issue.job.answerUnread", { problem }) + "\n" + answerFormat;
 
 /** The first line with words is the title, the rest the description; a first line too long for a title gives its
  * short title (shortTitle) and the whole job is the description. */
@@ -86,13 +86,13 @@ function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v];
   if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
-  throw new Error(issueWording().draft.lines(field));
+  throw new Error(t("server.issue.refinement.lines", { field }));
 }
 
 function textOf(v: unknown, field: string): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v;
-  throw new Error(issueWording().draft.text(field));
+  throw new Error(t("server.issue.refinement.text", { field }));
 }
 
 const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
@@ -100,13 +100,13 @@ const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
   const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: issueWording().draft.noBlock };
+  if (blocks.length === 0) return { problem: t("server.issue.refinement.noBlock") };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let d: IssueRefinement;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(issueWording().draft.notObject);
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.issue.refinement.notObject"));
       d = {
         title: textOf(raw.title, "title"),
         why: textOf(raw.why, "why"),
@@ -116,12 +116,12 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
         files: linesOf(raw.files, "files"),
       };
     } catch (e) {
-      problem = issueWording().draft.unreadable(e instanceof Error ? e.message : String(e));
+      problem = t("server.issue.refinement.unreadable", { why: e instanceof Error ? e.message : String(e) });
       continue;
     }
     const title = clip(d.title, 80);
     if (!title) {
-      problem = issueWording().draft.noTitle;
+      problem = t("server.issue.refinement.noTitle");
       continue;
     }
     return { draft: { ...d, title }, problem: "" };
@@ -130,14 +130,13 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
 }
 
 export function refinementDescription(d: IssueRefinement): string {
-  const w = issueWording().draft;
   const parts: string[] = [];
   const why = d.why.trim();
-  if (why) parts.push(w.why + "\n" + why);
+  if (why) parts.push(t("server.issue.refinement.why") + "\n" + why);
   for (const [head, lines] of [
-    [w.todo, kept(d.todo)],
-    [w.notDoing, kept(d.notDoing)],
-    [w.files, kept(d.files)],
+    [t("server.issue.refinement.todo"), kept(d.todo)],
+    [t("server.issue.refinement.notDoing"), kept(d.notDoing)],
+    [t("server.issue.refinement.files"), kept(d.files)],
   ] as const)
     if (lines.length > 0) parts.push(head + "\n- " + lines.join("\n- "));
   return parts.join("\n\n");
@@ -177,16 +176,16 @@ const commandHoles = /\s?\{(test|lint|build)\}\s?/g;
 export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): IssueTemplate {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
   const done = s.done.replace(commandHoles, (hole, name: string) =>
-    commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : issueWording().template.commands[name]!,
+    commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : (maybe(`server.issue.template.commands.${name}`) ?? hole),
   );
-  const text = issueWording().template.done(s.title, done);
+  const text = t("server.issue.template.done", { title: s.title, done });
   const blank = firstBlank(text);
   const { blank: _, ...rest } = s;
   return { ...rest, done, text, ...(blank ? { blank } : {}) };
 }
 
 export const filledKinds = (kinds: readonly TemplateKind[], stack: Partial<ProjectStack>): TemplateKind[] =>
-  kinds.map((k) => ({ ...k, templates: k.templates.map((t) => filledTemplate(t, stack)) }));
+  kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): TemplateBlank | undefined {
   const start = text.indexOf("〔");
@@ -195,29 +194,27 @@ function firstBlank(text: string): TemplateBlank | undefined {
   return end < 0 ? undefined : { start, end: end + 1 };
 }
 
-function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
-  const w = issueWording().timeline;
-  switch (t.kind) {
+function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {
+  switch (trigger.kind) {
     case "refine":
-      return ["started", w.refine];
+      return ["started", t("server.issue.timeline.refine")];
     case "comment":
-      return ["told", w.told];
+      return ["told", t("server.issue.timeline.told")];
     case "issue":
-      return ["started", first ? w.start : w.restart];
+      return ["started", first ? t("server.issue.timeline.start") : t("server.issue.timeline.restart")];
     case "task":
-      return ["started", w.graph];
+      return ["started", t("server.issue.timeline.graph")];
     case "recurrence":
-      return ["started", w.recurrence(t.missed ?? false)];
+      return ["started", t("server.issue.timeline.recurrence", { missed: trigger.missed ?? false })];
     case "runtime":
-      return ["started", w.runtime];
+      return ["started", t("server.issue.timeline.runtime")];
   }
 }
 
 /** runs oldest first; names: a session's name by its id. The milestones come newest first, the questions it waits on now
  * with its last run. */
-export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
-  const w = issueWording().timeline;
-  const out: Milestone[] = [{ at: t.createdAt, kind: "opened", text: w.opened }];
+export function milestonesOf(issue: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
+  const out: Milestone[] = [{ at: issue.createdAt, kind: "opened", text: t("server.issue.timeline.opened") }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
   runs.forEach((r, i) => {
     const who = names.get(r.session);
@@ -226,25 +223,38 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
     const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "refine"));
     out.push({ at: r.startedAt, kind, ...by, text });
     if (r.endedAt === undefined || r.outcome === undefined) return;
-    const said = r.summary ? w.said(r.summary) : "";
+    const said = r.summary ? t("server.issue.timeline.said", { summary: r.summary }) : "";
     switch (r.outcome) {
       case "completed":
-        if (i === lastDone && t.questions.length > 0) out.push({ at: r.endedAt, kind: "asked", ...by, text: w.asked(t.questions.map((a) => a.question)) });
-        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? w.refined : w.reported) + said });
+        if (i === lastDone && issue.questions.length > 0)
+          out.push({
+            at: r.endedAt,
+            kind: "asked",
+            ...by,
+            text: t("server.issue.timeline.asked", { questions: issue.questions.map((a) => a.question).join(" / ") }),
+          });
+        else
+          out.push({
+            at: r.endedAt,
+            kind: draft ? "refined" : "reported",
+            ...by,
+            text: (draft ? t("server.issue.timeline.refined") : t("server.issue.timeline.reported")) + said,
+          });
         break;
       case "failed":
-        out.push({ at: r.endedAt, kind: "failed", ...by, text: wording().outcome.failed + said });
+        out.push({ at: r.endedAt, kind: "failed", ...by, text: t("shared.outcome.failed") + said });
         break;
       case "interrupted":
-        out.push({ at: r.endedAt, kind: "stopped", ...by, text: wording().outcome.interrupted + said });
+        out.push({ at: r.endedAt, kind: "stopped", ...by, text: t("shared.outcome.interrupted") + said });
         break;
     }
   });
   const sentBack = new Map<number, string[]>();
-  for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
-  for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: w.rejected(lines) });
-  if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: w.accepted });
-  if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: closedText(t) });
+  for (const f of issue.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
+  for (const [at, lines] of sentBack)
+    out.push({ at, kind: "rejected", text: t("server.issue.timeline.rejected", { lines: lines.join(t("server.issue.timeline.rejectedSeparator")) }) });
+  if (issue.reviewedAt !== undefined) out.push({ at: issue.reviewedAt, kind: "accepted", text: t("server.issue.timeline.accepted") });
+  if (issue.closedAt !== undefined) out.push({ at: issue.closedAt, kind: "closed", text: closedText(issue) });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
     .map((m, i) => [m, i] as const)
@@ -258,15 +268,14 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   return { milestones, ...(spent ? { spent } : {}) };
 }
 
-export const resumeWords = () => issueWording().job.resume;
+export const resumeWords = () => t("server.issue.job.resume");
 
 /** Calling it twice gives the same job: a 接着修 told before is taken off first. */
 export function cureWords(job: string): string {
-  const w = issueWording().job;
   let original = job;
-  if (original.startsWith(w.cureHead)) original = original.slice(w.cureHead.length);
-  if (original.endsWith(w.cureTail)) original = original.slice(0, -w.cureTail.length);
-  return w.cure(original);
+  if (original.startsWith(t("server.issue.job.cureHead"))) original = original.slice(t("server.issue.job.cureHead").length);
+  if (original.endsWith(t("server.issue.job.cureTail"))) original = original.slice(0, -t("server.issue.job.cureTail").length);
+  return t("server.issue.job.cure", { job: original });
 }
 
 export const findingsOf = (text: string) =>
@@ -279,8 +288,8 @@ export const findingsOf = (text: string) =>
 export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
 
 export const nullText = (s: string | undefined) => {
-  const t = (s ?? "").trim();
-  return t === "" ? null : t;
+  const text = (s ?? "").trim();
+  return text === "" ? null : text;
 };
 
 export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);
@@ -293,11 +302,11 @@ export function pickIssues(all: readonly Issue[], f: IssueFilter, now: number): 
   const words = (f.text ?? "").split(spaces).filter(Boolean);
   const project = (f.project ?? "").trim();
   let found = all.filter(
-    (t) =>
-      (f.status ? t.status === f.status : f.closed || (t.status !== "done" && t.status !== "canceled")) &&
-      (!f.wantsOwner || attentionWantsOwner(t.attention.state)) &&
-      (!project || t.project === project) &&
-      words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
+    (item) =>
+      (f.status ? item.status === f.status : f.closed || (item.status !== "done" && item.status !== "canceled")) &&
+      (!f.wantsOwner || attentionWantsOwner(item.attention.state)) &&
+      (!project || item.project === project) &&
+      words.every((w) => (item.title + "\n" + (item.description ?? "")).includes(w)),
   );
   if (f.wantsOwner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
   return f.limit && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;

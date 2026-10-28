@@ -1,0 +1,12 @@
+{
+  "open": "Open the farm",
+  "quit": "Quit",
+  "cannotStart": "VibeValley cannot start",
+  "seeLog": "{reason}; the log is at {log}",
+  "noAddress": "The server gave no ready address within {seconds} seconds",
+  "failed": "The server failed to start: {why}",
+  "exited": "The server exited ({code})",
+  "waiting": "{n} for you",
+  "working": "{n} working",
+  "idle": "idle"
+}

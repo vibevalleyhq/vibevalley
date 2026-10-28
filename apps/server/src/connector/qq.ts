@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
-import { connectorWording } from "./words.ts";
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
 
@@ -82,10 +82,10 @@ export class QQClient implements QQApi {
       });
       body = decodeTokenResponse(await res.json());
     } catch (e) {
-      if (timed.aborted && !signal.aborted) throw new Error(connectorWording().qq.authTimeout, { cause: e });
-      throw new Error(connectorWording().qq.auth(e instanceof Error ? e.message : String(e)), { cause: e });
+      if (timed.aborted && !signal.aborted) throw new Error(t("server.connector.qq.authTimeout"), { cause: e });
+      throw new Error(t("server.connector.qq.auth", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
     }
-    if (!body.access_token) throw new Error(connectorWording().qq.auth(body.message || connectorWording().qq.badKeys));
+    if (!body.access_token) throw new Error(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
     const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(String(body.expires_in ?? "")) || 7200;
     this.tokens.set(key, { token: body.access_token, until: wallTime.now() + (seconds - 60) * 1000 });
     return body.access_token;
@@ -111,9 +111,9 @@ export class QQClient implements QQApi {
       gateway = decodeGatewayResponse(await (await fetch(this.api + "/gateway", { headers: this.headers(app, token), signal })).json());
     } catch (e) {
       if (signal.aborted) return;
-      throw new Error(connectorWording().qq.gateway(e instanceof Error ? e.message : String(e)), { cause: e });
+      throw new Error(t("server.connector.qq.gateway", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
     }
-    if (!gateway.url) throw new Error(connectorWording().qq.noGateway);
+    if (!gateway.url) throw new Error(t("server.connector.qq.noGateway"));
     if (signal.aborted) return;
     const ws = new WebSocket(gateway.url);
     return new Promise((resolve, reject) => {
@@ -149,7 +149,7 @@ export class QQClient implements QQApi {
             try {
               msg = decodeGatewayEvent(String(event.data));
             } catch {
-              return end(new Error(connectorWording().qq.gatewayError));
+              return end(new Error(t("server.connector.qq.gatewayError")));
             }
             if (typeof msg.s === "number") seq = msg.s;
             switch (msg.op) {
@@ -192,15 +192,15 @@ export class QQClient implements QQApi {
                 return;
               }
               case 7:
-                return end(new Error(connectorWording().qq.reconnect));
+                return end(new Error(t("server.connector.qq.reconnect")));
               case 9:
-                return end(new Error(connectorWording().qq.invalid));
+                return end(new Error(t("server.connector.qq.invalid")));
             }
           })
           .catch((e: unknown) => end(e instanceof Error ? e : new Error(String(e))));
       });
-      ws.addEventListener("close", (event) => end(new Error(connectorWording().qq.closed(event.code))));
-      ws.addEventListener("error", () => end(new Error(connectorWording().qq.gatewayError)));
+      ws.addEventListener("close", (event) => end(new Error(t("server.connector.qq.closed", { code: event.code }))));
+      ws.addEventListener("error", () => end(new Error(t("server.connector.qq.gatewayError"))));
     });
   }
 
@@ -227,7 +227,7 @@ export class QQClient implements QQApi {
         signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
       });
     } catch (e) {
-      throw new SendError(connectorWording().qq.send(e instanceof Error ? e.message : String(e)));
+      throw new SendError(t("server.connector.qq.send", { why: e instanceof Error ? e.message : String(e) }));
     }
     let body: { id?: string; message?: string; code?: number } | undefined;
     let decodeError = "";
@@ -237,9 +237,9 @@ export class QQClient implements QQApi {
       decodeError = e instanceof Error ? e.message : String(e);
     }
     if (res.status < 200 || res.status > 299)
-      throw new SendError(connectorWording().qq.send(`${body?.code ?? res.status} ${body?.message ?? ""}`.trim()), res.status);
-    if (decodeError) throw new SendError(connectorWording().qq.unread(decodeError));
-    if (!body?.id || (body.code !== undefined && body.code !== 0)) throw new SendError(connectorWording().qq.noId(body?.message ?? ""));
+      throw new SendError(t("server.connector.qq.send", { why: `${body?.code ?? res.status} ${body?.message ?? ""}`.trim() }), res.status);
+    if (decodeError) throw new SendError(t("server.connector.qq.unread", { why: decodeError }));
+    if (!body?.id || (body.code !== undefined && body.code !== 0)) throw new SendError(t("server.connector.qq.noId", { why: body?.message ?? "" }));
     return body.id;
   }
 }

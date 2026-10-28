@@ -1,0 +1,36 @@
+{
+  "template": {
+    "unreadable": "模板读不通：{file}（{why}）",
+    "noFile": "不是模板：没有 {file}",
+    "badId": "模板的 id「{id}」不行（{file}）：只能用小写字母、数字和 -，最多 32 个字",
+    "badVersion": "模板的 version 要是 1 以上的整数（{file}）",
+    "noRuntime": "帮工的模板要写推荐的农机 runtime（{file}）",
+    "noTemplate": "没有 {id} 这个模板",
+    "taken": "已经有叫 {id} 的模板了",
+    "builtIn": "{id} 是内置的模板，删不了",
+    "notFrom": "「{name}」不是从模板装的",
+    "gone": "「{name}」的模板 {template} 不在了",
+    "delete": "删掉模板「{name}」",
+    "deleteKept": "删掉模板「{name}」：从它装的 {installed} 份档案留着"
+  },
+  "notSaved": "没存下来：{file} 写不进去（{why}）",
+  "orchestratorStays": "默认管家删不了：每个农场至少有一个管家",
+  "defaultStaysOrchestrator": "默认管家只能是管家：每个农场至少有一个管家",
+  "noAgent": "没有 {id} 这个档案",
+  "noSkill": "没有 {id} 这个技能",
+  "orchestratorRuntime": "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
+  "newAgentId": "新档案的 id 要留空；指定 id 请用保存",
+  "newSkillId": "新技能的 id 要留空；指定 id 请用保存",
+  "deleteAgent": "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
+  "deleteSkill": "删掉技能「{name}」",
+  "modelFailed": "模型出错了",
+  "noDeepSeekKey": "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
+  "refused": {
+    "launchArgs": "VibeValley 跑在 server 进程里，没有命令行参数",
+    "serviceTier": "DeepSeek 没有服务档位"
+  },
+  "unequip": "从 {holders} 的档案里摘掉它",
+  "quoted": "「{name}」",
+  "efforts": "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
+  "effortsAnd": "、"
+}

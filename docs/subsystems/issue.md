@@ -4,7 +4,7 @@
 
 ## 状态和用语
 
-工单的真实状态分下面几层，每层一个字段、一张词表。词表在 `packages/protocol/src/words`（`wording()` 的 `status`、`priority`、`deliverable`、`delivered`、`canceled`、`attention`、`stuck`、`act`、`outcome`，帮工到哪了的 `phase`；`rules/issues.ts` 的 `closedText`、`rules/phase.ts` 的 `phaseWords` 用它们拼句子），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)），服务端（工具、管家的提示、拒绝、提醒、连接器）和页面都从这里取，不另写一份；`scripts/stale-names.ts` 查别处有没有 `Record<Outcome, string>` 这样的词表（皮自己的叫法用 `Partial<…>` 盖过，如农场的「收获」）。
+工单的真实状态分下面几层，每层一个字段、一组词条。词条在词典的 `shared` 命名空间（`packages/i18n/locales/{zh,en}/shared.json` 的 `status`、`priority`、`deliverable`、`delivered`、`canceled`、`attention`、`stuck`、`act`、`outcome`，帮工到哪了的 `phase`；`rules/issues.ts` 的 `closedText`、`rules/phase.ts` 的 `phaseWords` 用它们拼句子），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)），服务端（工具、管家的提示、拒绝、提醒、连接器）和页面都从这里取，不另写一份；`scripts/stale-names.ts` 查别处有没有 `Record<Outcome, string>` 这样的词表（皮自己的叫法用 `Partial<…>` 盖过，如农场的「收获」）。
 
 | 层 | 字段 | 取值和叫法 | 怎么来的 |
 |---|---|---|---|

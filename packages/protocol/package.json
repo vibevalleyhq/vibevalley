@@ -8,10 +8,10 @@
     "./schema": "./src/schema.ts",
     "./api": "./src/api.ts",
     "./rpc": "./src/rpc.ts",
-    "./words": "./src/words/index.ts",
     "./host": "./src/host.ts"
   },
   "dependencies": {
+    "@vibevalley/i18n": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

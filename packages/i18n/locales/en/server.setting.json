@@ -1,0 +1,33 @@
+{
+  "deepseekKey": "The DeepSeek API Key does not look right: a string with no spaces, usually starting with sk-",
+  "agoraId": "Agora's App ID is 32 hexadecimal digits: find it in your project on Agora's console",
+  "agoraCertificate": "Agora's App Certificate is 32 hexadecimal digits: find it in your project on Agora's console",
+  "voiceKeySpace": "A voice service's key should have no spaces",
+  "dictationUrl": "The dictation address is a full address starting with http(s), up to /v1, such as http://127.0.0.1:8080/v1 on this machine",
+  "dictationModel": "Dictation needs a model name, such as qwen3 for a local speech-server, or OpenAI's gpt-4o-mini-transcribe",
+  "memory": {
+    "unknown": "Unknown memory source: {kind}",
+    "twice": "Only one memory source of each kind: {kind}",
+    "noUrl": "To connect a memory source, fill in its address first",
+    "url": "A memory source's address is a full address starting with http(s), such as http://127.0.0.1:14242/mcp/ for Nowledge Mem",
+    "keySpace": "A memory source's key should have no spaces"
+  },
+  "voice": {
+    "label": {
+      "silenceMs": "How long a pause ends a turn (ms)",
+      "interruptMs": "How long you speak to interrupt (ms)",
+      "idleSeconds": "How long before it leaves an empty call (s)"
+    },
+    "range": "{label} must be between {min} and {max}",
+    "region": "Microsoft recognition needs a region, such as eastasia",
+    "model": "The model needs a name",
+    "url": "The model's address is a full address starting with http(s), such as https://api.openai.com/v1/chat/completions",
+    "voiceId": "The voice cannot be empty: pick one or fill in a MiniMax voice id",
+    "microsoft": "Microsoft speech needs a region and a voice name",
+    "persona": "The manager's persona cannot be empty"
+  },
+  "defaults": {
+    "failureMessage": "I got stuck for a moment. Could you say that again?"
+  },
+  "notSaved": "Could not save {file}: {why}"
+}

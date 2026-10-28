@@ -1,10 +1,10 @@
+import { spanText } from "@vibevalley/protocol/rules";
+import { t } from "@vibevalley/i18n";
 // The chat's words: channels and threads, feeds and unread counts, names to @, the clocks and a helper's
 // phase. Nothing here folds facts: it only reads the chat the server sent.
 
 import { actionIcon, type IconName } from "../../ui/icons";
-import { chatWording } from "./words";
-import { appWording } from "../../base/words";
-import { wording } from "@vibevalley/protocol/words";
+
 import {
   type Agent,
   type Chat,
@@ -126,17 +126,17 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
   switch (thread.subjectKind) {
     case "issue": {
       const issue = issues.find((i) => i.id === thread.subjectId);
-      return issue ? head(issue.title) : chatWording().names.issueThread;
+      return issue ? head(issue.title) : t("web.channel.names.issueThread");
     }
     case "graph":
-      return chatWording().names.planThread(thread.subjectId ?? "");
+      return t("web.channel.names.planThread", { id: thread.subjectId ?? "" });
     case "talk":
     case undefined: {
       if (thread.subjectKind === "talk" && thread.subjectId) {
         const session = sessions.find((h) => h.id === thread.subjectId);
-        return chatWording().names.talkThread(session?.name ?? thread.title ?? thread.subjectId);
+        return t("web.channel.names.talkThread", { who: session?.name ?? thread.title ?? thread.subjectId });
       }
-      return thread.title || chatWording().names.thread;
+      return thread.title || t("web.channel.names.thread");
     }
   }
 }
@@ -224,21 +224,21 @@ const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.g
 
 function dayLabel(at: number, now = new Date()) {
   const d = new Date(Math.round(at));
-  if (sameDay(d, now)) return appWording().time.today;
+  if (sameDay(d, now)) return t("web.base.time.today");
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (sameDay(d, yesterday)) return appWording().time.yesterday;
-  return appWording().time.monthDay(d.getMonth() + 1, d.getDate());
+  if (sameDay(d, yesterday)) return t("web.base.time.yesterday");
+  return t("web.base.time.monthDay", { month: d.getMonth() + 1, day: d.getDate() });
 }
 
 /** 12-hour, two digits: 下午03:07, 03:07 PM. */
 export function workbenchClock(at: number) {
   const d = new Date(Math.round(at));
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
-  return appWording().time.clock(d.getHours() < 12, String(h12).padStart(2, "0"), String(d.getMinutes()).padStart(2, "0"));
+  return t("web.base.time.clock", { am: d.getHours() < 12, hh: String(h12).padStart(2, "0"), mm: String(d.getMinutes()).padStart(2, "0") });
 }
 
-const span = (ms: number) => wording().span(ms);
+const span = spanText;
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
 export function phaseText(h: Session, now: number) {
@@ -289,9 +289,9 @@ export function dutyShort(duty: string) {
 }
 
 export const mentionOf: Record<string, string> = {
-  [defaultOrchestrator]: chatWording().names.mention.orchestrator,
-  [ownerId]: chatWording().names.mention.owner,
-  [everyone]: chatWording().names.mention.everyone,
+  [defaultOrchestrator]: t("web.channel.names.mention.orchestrator"),
+  [ownerId]: t("web.channel.names.mention.owner"),
+  [everyone]: t("web.channel.names.mention.everyone"),
 };
 
 export interface Nameable {
@@ -311,14 +311,14 @@ export const nameables = (sessions: Session[], orchestrators: readonly Agent[], 
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
   {
     token: mentionOf[defaultOrchestrator]!,
-    name: orchestrators.find((a) => a.id === here)?.name || appWording().orchestrator,
-    note: chatWording().names.orchestratorNote,
+    name: orchestrators.find((a) => a.id === here)?.name || t("web.base.orchestrator"),
+    note: t("web.channel.names.orchestratorNote"),
     orchestrator: here,
   },
   ...orchestrators
     .filter((a) => a.id !== here)
-    .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || chatWording().names.orchestratorNote, orchestrator: a.id })),
-  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: chatWording().names.everyone, note: chatWording().names.everyoneNote }] : []),
+    .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || t("web.channel.names.orchestratorNote"), orchestrator: a.id })),
+  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }] : []),
 ];
 
 const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;
@@ -378,7 +378,7 @@ export function switchTargets(
         case "channel":
           return { kind: "channel", id: c.id, label: `#${channelName(c)}`, hint: c.category ?? "", unread: unreadUnder(chat, c), at: at(c) };
         case "direct":
-          return { kind: "direct", id: c.id, label: `@${channelName(c)}`, hint: chatWording().switcher.direct, unread: unreadIn(c), at: at(c) };
+          return { kind: "direct", id: c.id, label: `@${channelName(c)}`, hint: t("web.channel.switcher.direct"), unread: unreadIn(c), at: at(c) };
         case "thread":
           return {
             kind: "thread",
@@ -392,17 +392,17 @@ export function switchTargets(
     }),
     ...(named.profiles ?? [])
       .filter((p) => !peers.has(`profile:${p.id}`))
-      .map((p): SwitchTarget => ({ kind: "profile", id: p.id, label: `@${p.name}`, hint: chatWording().switcher.newDirect, unread: 0, at: 0 })),
+      .map((p): SwitchTarget => ({ kind: "profile", id: p.id, label: `@${p.name}`, hint: t("web.channel.switcher.newDirect"), unread: 0, at: 0 })),
   ];
   const typed = query.trim().toLowerCase();
   const only = typed.startsWith("#") ? "hash" : typed.startsWith("@") ? "at" : undefined;
   const words = only ? typed.slice(1) : typed;
-  const kept = targets.filter((t) => {
-    if (only === "hash" && t.kind !== "channel" && t.kind !== "thread") return false;
-    if (only === "at" && t.kind !== "direct" && t.kind !== "profile") return false;
-    return t.label.toLowerCase().includes(words);
+  const kept = targets.filter((target) => {
+    if (only === "hash" && target.kind !== "channel" && target.kind !== "thread") return false;
+    if (only === "at" && target.kind !== "direct" && target.kind !== "profile") return false;
+    return target.label.toLowerCase().includes(words);
   });
-  const starts = (t: SwitchTarget) => (words !== "" && t.label.toLowerCase().replace(/^[#@]/, "").startsWith(words) ? 0 : 1);
+  const starts = (target: SwitchTarget) => (words !== "" && target.label.toLowerCase().replace(/^[#@]/, "").startsWith(words) ? 0 : 1);
   return kept.sort((a, b) => starts(a) - starts(b) || b.unread - a.unread || b.at - a.at || compareIds(a.id, b.id)).slice(0, switchMax);
 }
 

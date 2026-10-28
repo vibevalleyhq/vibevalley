@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The pixel skins' sounds, synthesized from recipes (no audio files); when the farm plays them is farm/cues.ts.
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
 
-import { pixelWording } from "./words";
 import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 
 function grains(
@@ -183,44 +183,44 @@ export const SOUNDS = {
 export type SoundName = keyof typeof SOUNDS;
 
 export const SOUND_GROUPS: readonly { title: string; names: readonly SoundName[] }[] = [
-  { title: pixelWording().sound.group.ui, names: ["tap", "nope", "pick", "open", "close"] },
-  { title: pixelWording().sound.group.tools, names: ["water", "spray", "weed", "harvest", "shovel"] },
-  { title: pixelWording().sound.group.field, names: ["plant", "arrive", "ripe", "bug"] },
-  { title: pixelWording().sound.group.yard, names: ["rustle", "splash", "thud", "woof", "yip", "pant", "meow", "mew", "purr"] },
-  { title: pixelWording().sound.group.reward, names: ["coin", "levelUp", "achievement"] },
-  { title: pixelWording().sound.group.voice, names: ["voiceOn", "voiceOff", "ring"] },
+  { title: t("web.ui.pixel.sound.group.ui"), names: ["tap", "nope", "pick", "open", "close"] },
+  { title: t("web.ui.pixel.sound.group.tools"), names: ["water", "spray", "weed", "harvest", "shovel"] },
+  { title: t("web.ui.pixel.sound.group.field"), names: ["plant", "arrive", "ripe", "bug"] },
+  { title: t("web.ui.pixel.sound.group.yard"), names: ["rustle", "splash", "thud", "woof", "yip", "pant", "meow", "mew", "purr"] },
+  { title: t("web.ui.pixel.sound.group.reward"), names: ["coin", "levelUp", "achievement"] },
+  { title: t("web.ui.pixel.sound.group.voice"), names: ["voiceOn", "voiceOff", "ring"] },
 ];
 
 export const SOUND_LABEL: Readonly<Record<SoundName, string>> = {
-  tap: pixelWording().sound.label.tap,
-  nope: pixelWording().sound.label.nope,
-  pick: pixelWording().sound.label.pick,
-  open: pixelWording().sound.label.open,
-  close: pixelWording().sound.label.close,
-  water: pixelWording().sound.label.water,
-  spray: pixelWording().sound.label.spray,
-  weed: pixelWording().sound.label.weed,
-  harvest: pixelWording().sound.label.harvest,
-  shovel: pixelWording().sound.label.shovel,
-  plant: pixelWording().sound.label.plant,
-  ripe: pixelWording().sound.label.ripe,
-  bug: pixelWording().sound.label.bug,
-  coin: pixelWording().sound.label.coin,
-  levelUp: pixelWording().sound.label.levelUp,
-  achievement: pixelWording().sound.label.achievement,
-  arrive: pixelWording().sound.label.arrive,
-  rustle: pixelWording().sound.label.rustle,
-  splash: pixelWording().sound.label.splash,
-  thud: pixelWording().sound.label.thud,
-  woof: pixelWording().sound.label.woof,
-  meow: pixelWording().sound.label.meow,
-  mew: pixelWording().sound.label.mew,
-  purr: pixelWording().sound.label.purr,
-  yip: pixelWording().sound.label.yip,
-  pant: pixelWording().sound.label.pant,
-  voiceOn: pixelWording().sound.label.voiceOn,
-  voiceOff: pixelWording().sound.label.voiceOff,
-  ring: pixelWording().sound.label.ring,
+  tap: t("web.ui.pixel.sound.label.tap"),
+  nope: t("web.ui.pixel.sound.label.nope"),
+  pick: t("web.ui.pixel.sound.label.pick"),
+  open: t("web.ui.pixel.sound.label.open"),
+  close: t("web.ui.pixel.sound.label.close"),
+  water: t("web.ui.pixel.sound.label.water"),
+  spray: t("web.ui.pixel.sound.label.spray"),
+  weed: t("web.ui.pixel.sound.label.weed"),
+  harvest: t("web.ui.pixel.sound.label.harvest"),
+  shovel: t("web.ui.pixel.sound.label.shovel"),
+  plant: t("web.ui.pixel.sound.label.plant"),
+  ripe: t("web.ui.pixel.sound.label.ripe"),
+  bug: t("web.ui.pixel.sound.label.bug"),
+  coin: t("web.ui.pixel.sound.label.coin"),
+  levelUp: t("web.ui.pixel.sound.label.levelUp"),
+  achievement: t("web.ui.pixel.sound.label.achievement"),
+  arrive: t("web.ui.pixel.sound.label.arrive"),
+  rustle: t("web.ui.pixel.sound.label.rustle"),
+  splash: t("web.ui.pixel.sound.label.splash"),
+  thud: t("web.ui.pixel.sound.label.thud"),
+  woof: t("web.ui.pixel.sound.label.woof"),
+  meow: t("web.ui.pixel.sound.label.meow"),
+  mew: t("web.ui.pixel.sound.label.mew"),
+  purr: t("web.ui.pixel.sound.label.purr"),
+  yip: t("web.ui.pixel.sound.label.yip"),
+  pant: t("web.ui.pixel.sound.label.pant"),
+  voiceOn: t("web.ui.pixel.sound.label.voiceOn"),
+  voiceOff: t("web.ui.pixel.sound.label.voiceOff"),
+  ring: t("web.ui.pixel.sound.label.ring"),
 };
 
 /** Offline, for measuring levels. Needs OfflineAudioContext. */

@@ -1,0 +1,58 @@
+{
+  "flag": {
+    "prompt": "Ask once and leave, without a conversation",
+    "runtime": "claude, codex, kimi, pi…; vibevalley is VibeValley's own agent",
+    "model": "The model",
+    "effort": "How hard to think",
+    "resume": "Go on with this session",
+    "cwd": "Which folder; the current one when empty",
+    "ownCwd": "Which folder the own agent works in; the current one when empty",
+    "name": "The own agent's name (its home is ~/.vibevalley/agent/<name>)",
+    "ownModel": "The model; the configuration's when empty",
+    "mcp": "The MCP configuration file; mcp.json in the home when empty",
+    "server": "The server's address; VIBEVALLEY_SERVER when empty, else {fallback}",
+    "dryRun": "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
+    "json": "The request body: JSON text, - to read stdin, @file to read a file",
+    "watch": "Keep watching: one JSON line per frame"
+  },
+  "command": {
+    "runtimeChat": "Talk to a machine directly, not through VibeValley: no trajectory, no spending",
+    "root": "With no command, talk to VibeValley's own agent; every other command calls one of VibeValley's endpoints and answers JSON",
+    "state": "The core state (GET {path})",
+    "events": "Side effects, one per line (GET {path})",
+    "issueWork": "Move a backlog ticket to To do, wait for it to come back and print its changes; each status passed goes to stderr",
+    "group": "The {group} endpoints"
+  },
+  "next": {
+    "help": "See how this command is written",
+    "whatItDoes": "See what this command does",
+    "startServer": "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs"
+  },
+  "and": "; ",
+  "failure": {
+    "unreachable": "Cannot reach {base}: {why}",
+    "shape": "The answer does not fit its Schema: {why}",
+    "stdin": "Cannot read stdin: {why}",
+    "file": "Cannot read {file}: {why}",
+    "notJson": "--json is not JSON: {why}",
+    "body": "--json does not fit {op}'s request body: {why}",
+    "dryRun": "{op} changes things, but has no dry run: drop --dry-run to do it",
+    "retry": "The server asked the stream to reconnect; the command line does not",
+    "stream": "The stream cannot be read: {why}",
+    "gone": "Ticket #{n} is gone: it was deleted"
+  },
+  "chat": {
+    "error": "\nSomething went wrong: {why}",
+    "compacted": "(the conversation so far was compacted into a summary; the original is in {archive})",
+    "usage": "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
+    "hello": "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
+    "forgot": "Forgotten.",
+    "noRuntime": "There is no machine {id}",
+    "unknownInstall": "Cannot tell whether {id} is installed",
+    "unusable": "{id} cannot be used: {kind}",
+    "resumed": " (resumed)",
+    "direct": "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
+    "rejected": "Not taken: {why}",
+    "notSent": "Not delivered: {why}"
+  }
+}

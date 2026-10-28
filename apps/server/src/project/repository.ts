@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // A git repository as the projects use it: what it can say (its main branch, whether a branch is there and where it
 // points, how far one is ahead) and what it does (commit what a session left, merge without checking out, describe a
 // branch, clear a worktree away). The git spelling is here; what is done with the answers (the merge rules, pull
 // requests, the project's check, what a release keeps) stays in project.ts.
 
-import { projectWording } from "./words.ts";
 import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
@@ -38,7 +38,7 @@ export const repository = (path: string) => {
   const conflicts = Effect.fnUntraced(function* (base: string, branch: string) {
     const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
     if (r.code === 0) return [] as string[];
-    if (r.code !== 1) return yield* Effect.fail(GitError.of(r.code, r.code < 0 ? r.stderr : projectWording().mergeTree(r.code)));
+    if (r.code !== 1) return yield* Effect.fail(GitError.of(r.code, r.code < 0 ? r.stderr : t("server.project.mergeTree", { code: r.code })));
     // First line: the tree it would write; then each conflicted file.
     return [
       ...new Set(
@@ -157,7 +157,8 @@ export const repository = (path: string) => {
             // A chunk cut out of the middle of the diff lost its trailing newline to the split.
             let chunk = i < chunks.length - 1 ? chunks[i]! + "\n" : chunks[i]!;
             const lines = chunk.split("\n");
-            if (lines.length > patchLines) chunk = lines.slice(0, patchLines).join("\n") + "\n" + projectWording().moreLines(lines.length - patchLines);
+            if (lines.length > patchLines)
+              chunk = lines.slice(0, patchLines).join("\n") + "\n" + t("server.project.moreLines", { n: lines.length - patchLines });
             if (chunk.length <= budget) {
               budget -= chunk.length;
               changed.patch = chunk;

@@ -1,3 +1,4 @@
+import { list, t } from "@vibevalley/i18n";
 // The chat: the channels, the default one among them, the owner's direct channel with the orchestrator, and a thread
 // under any message of a channel; every
 // session's work is talked about in its issue's thread. Every message is written to the database first, in one
@@ -6,7 +7,6 @@
 // than lost. Everything that changes the chat runs one at a time.
 
 import { busyNotice, wakeInput } from "./prompts.ts";
-import { channelWording } from "./words.ts";
 import {
   type Chat,
   type ChatMessage,
@@ -267,8 +267,8 @@ const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" 
 });
 
 const optional = (s: string | undefined) => {
-  const t = (s ?? "").trim();
-  return t === "" ? null : t;
+  const text = (s ?? "").trim();
+  return text === "" ? null : text;
 };
 
 interface ThreadSubject {
@@ -520,13 +520,13 @@ export const make = Effect.gen(function* () {
     );
 
   for (const [id, kind, name] of [
-    [ownerId, "owner", channelWording().name.owner],
+    [ownerId, "owner", t("server.channel.name.owner")],
     ["system", "system", "VibeValley"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
   /** An orchestrator is a participant by its profile id, under its profile's name as it is when it speaks. */
   const seat = Effect.fnUntraced(function* (id: string) {
-    const name = agents.agent(id)?.name.trim() || channelWording().name.orchestrator;
+    const name = agents.agent(id)?.name.trim() || t("server.channel.name.orchestrator");
     if (model.participant(id)?.name === name && model.participant(id)?.kind === "orchestrator") return;
     const joined = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
     yield* db(qp.upsertParticipant(joined));
@@ -1006,7 +1006,7 @@ export const make = Effect.gen(function* () {
   });
 
   const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
-    helpers ? helpers.deliver(recipient, text, { kind: "comment", message }) : Effect.succeed({ kind: "refused", reason: channelWording().notBack });
+    helpers ? helpers.deliver(recipient, text, { kind: "comment", message }) : Effect.succeed({ kind: "refused", reason: t("server.channel.notBack") });
 
   const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
     const rows = open.of(recipient);
@@ -1083,7 +1083,7 @@ export const make = Effect.gen(function* () {
                 channel: where,
                 from: "system",
                 kind: "notice",
-                text: channelWording().breaker(name, failed),
+                text: t("server.channel.breaker", { name, failed }),
                 meta: { code: "wake_breaker" },
               });
             }
@@ -1130,13 +1130,12 @@ export const make = Effect.gen(function* () {
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ channel_id: channel }))).n ?? 0;
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
-    const d = channelWording().dispatch;
     const what = h.graph?.task
-      ? d.step(h.graph.id, h.graph.task)
+      ? t("server.channel.dispatch.step", { graph: h.graph.id, task: h.graph.task })
       : h.graph
-        ? d.split(h.graph.id)
+        ? t("server.channel.dispatch.split", { graph: h.graph.id })
         : h.refining
-          ? d.draft
+          ? t("server.channel.dispatch.draft")
           : head(h.brief.replace(/\s+/g, " "), 80);
     // The dispatch note is the farm's, under the name of the orchestrator that looks after the channel.
     const by = orchestratorOfRow(model.channel(channel));
@@ -1145,7 +1144,7 @@ export const make = Effect.gen(function* () {
       channel: channel,
       from: by,
       kind: "dispatch",
-      text: d.sent(h.id, h.name, h.project ?? d.project, what),
+      text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, project: h.project ?? t("server.channel.dispatch.project"), what }),
       meta: { session: h.id },
       thread: job,
     });
@@ -1165,7 +1164,9 @@ export const make = Effect.gen(function* () {
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ channel_id: thread }))).n ?? 0) + 2;
-    const text = h.refining ? channelWording().dispatch.redraft(h.id, h.name) : channelWording().dispatch.handedOn(h.id, h.name, nth);
+    const text = h.refining
+      ? t("server.channel.dispatch.redraft", { id: h.id, name: h.name })
+      : t("server.channel.dispatch.handedOn", { id: h.id, name: h.name, nth });
     const by = orchestratorOfRow(model.channel(thread));
     yield* seat(by);
     yield* write({ channel: thread, from: by, kind: "dispatch", text, meta: { session: h.id }, follow: h.id });
@@ -1253,22 +1254,22 @@ export const make = Effect.gen(function* () {
       return defaultId;
     }
     const parsed = parseChatTarget(target);
-    if (!parsed) return yield* Effect.fail(refused(channelWording().badTarget(target)));
+    if (!parsed) return yield* Effect.fail(refused(t("server.channel.badTarget", { target })));
     if (parsed.kind === "direct") {
       const direct = directWith(who, parsed.peer);
-      if (!direct) return yield* Effect.fail(refused(channelWording().noDirect(target.trim())));
+      if (!direct) return yield* Effect.fail(refused(t("server.channel.noDirect", { target: target.trim() })));
       return direct.id;
     }
     let channel = defaultId;
     const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
     if (name) {
       const found = model.channelByName(name);
-      if (!found) return yield* Effect.fail(missing(channelWording().noChannelNamed(name, channelTags()), [lookIn.channel]));
+      if (!found) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]));
       channel = found.id;
     }
     if (parsed.kind === "channel") return channel;
     const root = yield* one(qm.messageByNumber({ channel_id: channel, number: parsed.root }));
-    if (!root) return yield* Effect.fail(refused(channelWording().noMessage(parsed.root)));
+    if (!root) return yield* Effect.fail(refused(t("server.channel.noMessage", { n: parsed.root })));
     const thread = yield* tx(threadFor({ id: root.id, number: root.number, channel: root.channel_id }, { kind: "talk", id: "", owner: "" }));
     yield* publishChannel(thread);
     return thread;
@@ -1289,14 +1290,14 @@ export const make = Effect.gen(function* () {
 
   const answered = Effect.fnUntraced(function* (channel: string, number: number | undefined) {
     if (number === undefined) return;
-    if (!(yield* one(qm.messageByNumber({ channel_id: channel, number })))) return yield* Effect.fail(refused(channelWording().noMessage(number)));
+    if (!(yield* one(qm.messageByNumber({ channel_id: channel, number })))) return yield* Effect.fail(refused(t("server.channel.noMessage", { n: number })));
   });
 
   const attachmentsOf = Effect.fnUntraced(function* (ids: readonly string[]) {
     const out: Attachment[] = [];
     for (const id of new Set(ids)) {
       const a = yield* one(qa.attachmentByID({ id }));
-      if (!a) return yield* Effect.fail(missing(channelWording().noAttachment(id), [lookIn.channel]));
+      if (!a) return yield* Effect.fail(missing(t("server.channel.noAttachment", { id }), [lookIn.channel]));
       out.push(a);
     }
     return out;
@@ -1304,7 +1305,7 @@ export const make = Effect.gen(function* () {
 
   const messageOf = Effect.fnUntraced(function* (id: string) {
     const row = yield* one(qm.messageByID({ id }));
-    if (!row) return yield* Effect.fail(missing(channelWording().noMessageId(id), [lookIn.channel]));
+    if (!row) return yield* Effect.fail(missing(t("server.channel.noMessageId", { id }), [lookIn.channel]));
     return row;
   });
 
@@ -1327,9 +1328,9 @@ export const make = Effect.gen(function* () {
   /** add only adds: a reaction already there is then kept. */
   const reacting = Effect.fnUntraced(function* (id: string, who: string, emoji: string, add: boolean) {
     const e = emoji.trim();
-    if (!emojiPattern.test(e)) return yield* Effect.fail(refused(channelWording().badEmoji));
+    if (!emojiPattern.test(e)) return yield* Effect.fail(refused(t("server.channel.badEmoji")));
     const row = yield* messageOf(id);
-    if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+    if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
     const r = reactionsOf(row.reactions);
     const by = r[e] ?? [];
     if (by.includes(who)) {
@@ -1345,19 +1346,20 @@ export const make = Effect.gen(function* () {
   /** A channel nothing points at any more; refused with what still does. */
   const removable = Effect.fnUntraced(function* (id: string) {
     const row = model.channel(id);
-    if (!row || row.type !== "channel") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
-    if (row.is_default) return yield* Effect.fail(refused(channelWording().defaultStays));
-    if (presentSessions().some((h) => channelOfSession(h) === id)) return yield* Effect.fail(refused(channelWording().inUse(channelWording().helpersThere)));
+    if (!row || row.type !== "channel") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
+    if (row.is_default) return yield* Effect.fail(refused(t("server.channel.defaultStays")));
+    if (presentSessions().some((h) => channelOfSession(h) === id))
+      return yield* Effect.fail(refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") })));
     const used = yield* db(qc.channelInUse({ id }));
     const why = [
-      used.recurrences ? channelWording().recurrencesThere(used.recurrences) : "",
-      used.connectors ? channelWording().connectorsThere : "",
-      used.queued ? channelWording().queuedThere(used.queued) : "",
-      used.issue_threads ? channelWording().issuesThere(used.issue_threads) : "",
+      used.recurrences ? t("server.channel.recurrencesThere", { n: used.recurrences }) : "",
+      used.connectors ? t("server.channel.connectorsThere") : "",
+      used.queued ? t("server.channel.queuedThere", { n: used.queued }) : "",
+      used.issue_threads ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
     ].filter(Boolean);
-    if (why.length > 0) return yield* Effect.fail(refused(channelWording().inUse(why.join("、"))));
+    if (why.length > 0) return yield* Effect.fail(refused(t("server.channel.inUse", { why: why.join("、") })));
     const threads = model.threadsOf(id);
-    const said = (row.last_number ?? 0) + threads.reduce((n, t) => n + t.reply_count, 0);
+    const said = (row.last_number ?? 0) + threads.reduce((n, thread) => n + thread.reply_count, 0);
     return { target: targetOfChannel(row), threads: threads.length, said };
   });
 
@@ -1366,7 +1368,7 @@ export const make = Effect.gen(function* () {
     follow: (channel, after) =>
       Stream.unwrap(
         Effect.gen(function* () {
-          if (!model.channel(channel)) return yield* Effect.fail(refused(channelWording().channelGone));
+          if (!model.channel(channel)) return yield* Effect.fail(refused(t("server.channel.channelGone")));
           // Subscribed before the missed ones are read: nothing changed in between falls through, and what both have is
           // dropped by its revision.
           const live = yield* PubSub.subscribe(said);
@@ -1400,10 +1402,10 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const files = yield* attachmentsOf(more.attachments ?? []);
-          if (!text.trim() && files.length === 0) return yield* Effect.fail(refused(channelWording().empty));
-          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
+          if (!text.trim() && files.length === 0) return yield* Effect.fail(refused(t("server.channel.empty")));
+          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
           const where = channel ?? defaultId;
-          if (!model.channel(where)) return yield* Effect.fail(missing(channelWording().noChannel(where), [lookIn.channel]));
+          if (!model.channel(where)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]));
           yield* answered(where, more.replyTo);
           const written = yield* write({
             channel: where,
@@ -1416,7 +1418,8 @@ export const make = Effect.gen(function* () {
             ...(files.length > 0 ? { meta: { attachments: files } } : {}),
           });
           if (written.again) return { message: toMessage(written.row), again: true };
-          if (written.absent.length > 0) yield* core.notice("warn", channelWording().absent(written.absent.map((m) => mentionOf(m) ?? "@" + m)));
+          if (written.absent.length > 0)
+            yield* core.notice("warn", t("server.channel.absent", { who: list(written.absent.map((m) => mentionOf(m) ?? "@" + m)), n: written.absent.length }));
           return { message: toMessage(written.row), again: false };
         }),
       ),
@@ -1424,11 +1427,11 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = yield* messageOf(id);
-          if (row.sender_id !== ownerId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().notYours));
+          if (row.sender_id !== ownerId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.notYours")));
           const meta = metaOf(row.meta);
           const files = keep === undefined ? (meta.attachments ?? []) : (meta.attachments ?? []).filter((a) => keep.includes(a.id));
           const words = text.trim();
-          if (!words && files.length === 0) return yield* Effect.fail(refused(channelWording().empty));
+          if (!words && files.length === 0) return yield* Effect.fail(refused(t("server.channel.empty")));
           if (words === row.body && files.length === (meta.attachments ?? []).length) return toMessage(row);
           const changed = yield* change(row, (revision, now) =>
             Effect.gen(function* () {
@@ -1444,7 +1447,7 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = yield* messageOf(id);
-          if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+          if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
           yield* change(row, (revision, now) =>
             Effect.gen(function* () {
               yield* db(qm.deleteMessage({ at: now, revision, id }));
@@ -1456,13 +1459,13 @@ export const make = Effect.gen(function* () {
     previewRemove: (id) =>
       Effect.gen(function* () {
         const row = yield* messageOf(id);
-        if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+        if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
         const ch = model.channel(row.channel_id);
         const waiting = (yield* db(qd.waitingOn({ message_id: id }))).length;
         return {
           does: [
-            channelWording().deletes(ch ? targetOfChannel(ch) : "", row.number, row.sender_name, oneLine(row.body, lastMax)),
-            ...(waiting > 0 ? [channelWording().deletesDeliveries(waiting)] : []),
+            t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: oneLine(row.body, lastMax) }),
+            ...(waiting > 0 ? [t("server.channel.deletesDeliveries", { n: waiting })] : []),
           ],
         };
       }),
@@ -1471,20 +1474,20 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = yield* messageOf(id);
-          if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+          if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
           return yield* change(row, (revision, now) => db(qm.setPinned({ pinned_at: row.pinned_at === null ? now : null, revision, id })));
         }),
       ),
     pins: (channel) =>
       Effect.gen(function* () {
-        if (!model.channel(channel)) return yield* Effect.fail(missing(channelWording().noChannel(channel), [lookIn.channel]));
+        if (!model.channel(channel)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]));
         return (yield* db(qm.pinnedIn({ channel_id: channel }))).map(toMessage);
       }),
     threadUnder: (id) =>
       locked(
         Effect.gen(function* () {
           const row = yield* messageOf(id);
-          if (model.channel(row.channel_id)?.type !== "channel") return yield* Effect.fail(refused(channelWording().threadOnlyInChannel));
+          if (model.channel(row.channel_id)?.type !== "channel") return yield* Effect.fail(refused(t("server.channel.threadOnlyInChannel")));
           const thread = yield* tx(threadFor({ id: row.id, number: row.number, channel: row.channel_id }, { kind: "talk", id: "", owner: "" }));
           yield* publishChannel(thread);
           return thread;
@@ -1494,11 +1497,11 @@ export const make = Effect.gen(function* () {
       Effect.gen(function* () {
         const q = parseSearch(text);
         if (!q.words && !q.from && !q.in && q.has.length === 0 && q.before === undefined && q.after === undefined)
-          return yield* Effect.fail(refused(channelWording().empty));
+          return yield* Effect.fail(refused(t("server.channel.empty")));
         let scope = channel ?? "";
         if (q.in) {
           const named = model.channelByName(q.in);
-          if (!named) return yield* Effect.fail(missing(channelWording().noChannelNamed(q.in, channelTags()), [lookIn.channel]));
+          if (!named) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name: q.in, tags: list(channelTags()) }), [lookIn.channel]));
           scope = named.id;
         }
         const rows = yield* db(
@@ -1524,8 +1527,8 @@ export const make = Effect.gen(function* () {
       Effect.gen(function* () {
         const name = upload.name.trim() || "file";
         const bytes = Buffer.from(upload.data, "base64");
-        if (bytes.length === 0) return yield* Effect.fail(refused(channelWording().emptyFile));
-        if (bytes.length > attachmentMax) return yield* Effect.fail(refused(channelWording().fileTooBig(attachmentMax)));
+        if (bytes.length === 0) return yield* Effect.fail(refused(t("server.channel.emptyFile")));
+        if (bytes.length > attachmentMax) return yield* Effect.fail(refused(t("server.channel.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) })));
         const id = createHash("sha256").update(bytes).digest("hex");
         yield* Effect.tryPromise(async () => {
           await mkdir(filesDir, { recursive: true });
@@ -1545,7 +1548,7 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!helpers?.present(session)) return yield* Effect.fail(missing(channelWording().noHelper(session), [lookIn.session]));
+            if (!helpers?.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
             yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
@@ -1566,10 +1569,10 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const words = text.trim();
-          if (!words) return yield* Effect.fail(refused(channelWording().empty));
+          if (!words) return yield* Effect.fail(refused(t("server.channel.empty")));
           const channel = yield* resolveTarget(from, opt.target ?? "");
           const row = model.channel(channel);
-          if (!row) return yield* Effect.fail(refused(channelWording().channelGone));
+          if (!row) return yield* Effect.fail(refused(t("server.channel.channelGone")));
           const target = targetOfChannel(row);
           // A retry of the same words is the same message.
           const again = yield* one(
@@ -1620,7 +1623,7 @@ export const make = Effect.gen(function* () {
     spoken: (from, text, sendKey) =>
       locked(
         Effect.gen(function* () {
-          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
+          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
           if (!text.trim()) return false;
           const written = yield* write({
             channel: defaultId,
@@ -1647,7 +1650,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const channel = yield* resolveTarget(who, opt.target ?? "");
           const row = model.channel(channel);
-          if (!row) return yield* Effect.fail(refused(channelWording().channelGone));
+          if (!row) return yield* Effect.fail(refused(t("server.channel.channelGone")));
           const target = targetOfChannel(row);
           const limit = opt.limit ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
           const cursor = (yield* one(qr.readCursor({ participant_id: who, channel_id: channel })))?.read_number ?? 0;
@@ -1675,7 +1678,7 @@ export const make = Effect.gen(function* () {
     markRead: (channel, seq) =>
       locked(
         Effect.gen(function* () {
-          if (!model.channel(channel)) return yield* Effect.fail(missing(channelWording().noChannel(channel), [lookIn.channel]));
+          if (!model.channel(channel)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]));
           yield* readThrough(ownerId, channel, seq);
           yield* publishChannel(channel);
         }),
@@ -1746,14 +1749,14 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = model.channel(id);
-          if (!row || row.type === "direct") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          if (!row || row.type === "direct") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
           const onlyName =
             upd.description === undefined &&
             upd.project === undefined &&
             upd.category === undefined &&
             upd.before === undefined &&
             upd.orchestrator === undefined;
-          if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(channelWording().threadOnlyTitle));
+          if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(t("server.channel.threadOnlyTitle")));
           let name = row.name;
           if (upd.name !== undefined) {
             const clean = upd.name.trim().replace(/^#/, "");
@@ -1772,7 +1775,7 @@ export const make = Effect.gen(function* () {
           const category = upd.category !== undefined ? optional(upd.category) : row.category;
           // The default orchestrator is kept as none, so a channel follows whichever is the default.
           const wanted = upd.orchestrator?.trim();
-          if (wanted && !agents.isOrchestrator(wanted)) return yield* Effect.fail(refused(channelWording().notOrchestrator(wanted)));
+          if (wanted && !agents.isOrchestrator(wanted)) return yield* Effect.fail(refused(t("server.channel.notOrchestrator", { id: wanted })));
           const orchestrator = wanted === undefined ? row.orchestrator : wanted && wanted !== defaultOrchestrator ? wanted : null;
           // Placed before another channel: every channel but the default gets its place again, in order.
           const order =
@@ -1801,22 +1804,23 @@ export const make = Effect.gen(function* () {
           for (const [position, each] of (order ?? []).entries()) model.patched(each, { position });
           for (const each of order ?? [id]) yield* publishChannel(each);
           // Its threads are looked after by the same orchestrator: they show the new one too.
-          if (orchestrator !== row.orchestrator) for (const t of model.threadsOf(id)) yield* publishChannel(t.id);
+          if (orchestrator !== row.orchestrator) for (const item of model.threadsOf(id)) yield* publishChannel(item.id);
         }),
       ),
     archive: (id) =>
       locked(
         Effect.gen(function* () {
           const row = model.channel(id);
-          if (!row || row.type === "direct") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
-          if (row.is_default) return yield* Effect.fail(refused(channelWording().defaultStays));
+          if (!row || row.type === "direct") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
+          if (row.is_default) return yield* Effect.fail(refused(t("server.channel.defaultStays")));
           const archived_at = row.archived_at === null ? yield* Clock.currentTimeMillis : null;
           yield* db(qc.setArchived({ archived_at, id }));
           model.patched(id, { archived_at });
           yield* publishChannel(id);
         }),
       ),
-    previewRemoveChannel: (id) => Effect.map(removable(id), (r) => ({ does: [channelWording().deletesChannel(r.target, r.threads, r.said)] })),
+    previewRemoveChannel: (id) =>
+      Effect.map(removable(id), (r) => ({ does: [t("server.channel.deletesChannel", { target: r.target, threads: r.threads, said: r.said })] })),
     removeChannel: (id) =>
       locked(
         Effect.gen(function* () {
@@ -1837,7 +1841,7 @@ export const make = Effect.gen(function* () {
     setNotify: (id, notify) =>
       locked(
         Effect.gen(function* () {
-          if (!model.channel(id)) return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          if (!model.channel(id)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
           yield* db(qc.setNotify({ notify, id }));
           model.patched(id, { notify });
           yield* publishChannel(id);
@@ -1891,7 +1895,7 @@ export const make = Effect.gen(function* () {
     markUnread: (channel, number) =>
       locked(
         Effect.gen(function* () {
-          if (!model.channel(channel)) return yield* Effect.fail(missing(channelWording().noChannel(channel), [lookIn.channel]));
+          if (!model.channel(channel)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]));
           const upto = Math.max(0, number - 1);
           yield* db(qr.markUnread({ channel_id: channel, read_number: upto, updated_at: yield* Clock.currentTimeMillis }));
           model.ownerReadBack(channel, upto);
@@ -1903,8 +1907,8 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = model.channel(id);
-          if (!row) return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
-          if (row.type !== "channel") return yield* Effect.fail(refused(channelWording().defaultIsChannel));
+          if (!row) return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
+          if (row.type !== "channel") return yield* Effect.fail(refused(t("server.channel.defaultIsChannel")));
           if (id === defaultId) return;
           const was = defaultId;
           yield* tx(Effect.andThen(db(qc.clearDefault()), db(qc.makeDefault({ id }))));

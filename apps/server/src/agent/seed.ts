@@ -2,7 +2,7 @@
 // templates, in the farm's language (a profile's templates are folders, template.ts). The .en files say the same as the Chinese but for their words (seed.test.ts).
 
 import type { AchievementDef, RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
-import { currentLocale } from "@vibevalley/protocol/words";
+import { currentLocale } from "@vibevalley/i18n";
 import seedsZh from "./seeds.json";
 import seedsEn from "./seeds.en.json";
 import catalogZh from "./template_catalog.json";

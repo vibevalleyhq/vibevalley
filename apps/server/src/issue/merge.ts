@@ -1,4 +1,5 @@
-import { issueWording } from "./words.ts";
+import { t } from "@vibevalley/i18n";
+
 import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@vibevalley/protocol";
 import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
@@ -38,7 +39,10 @@ export function merging(d: MergeDeps) {
     if (n.fix) {
       const told = yield* Effect.result(chat.tellSession(ownerId, id, n.fix, ""));
       if (told._tag === "Failure")
-        [owner, line] = [owner + issueWording().merge.tellFailed(reasonOf(told.failure)), line + issueWording().merge.tellFailed(reasonOf(told.failure))];
+        [owner, line] = [
+          owner + t("server.issue.merge.tellFailed", { why: reasonOf(told.failure) }),
+          line + t("server.issue.merge.tellFailed", { why: reasonOf(told.failure) }),
+        ];
     }
     yield* core.notice("warn", line);
     return refused(owner);
@@ -48,9 +52,9 @@ export function merging(d: MergeDeps) {
 
   const mergeSession = Effect.fn("Issues.mergeSession")(function* (id: string) {
     const session = sessions.sessionOf(id);
-    if (!session) return yield* Effect.fail(missing(issueWording().helperRef(id), [lookIn.session]));
+    if (!session) return yield* Effect.fail(missing(t("server.issue.helperRef", { id }), [lookIn.session]));
     const merged = yield* handedOver(id, (place) => projects.merge(place));
-    yield* core.notice("info", issueWording().merge.merged(session.name, merged.text));
+    yield* core.notice("info", t("server.issue.merge.merged", { name: session.name, text: merged.text }));
     return merged.text;
   });
 

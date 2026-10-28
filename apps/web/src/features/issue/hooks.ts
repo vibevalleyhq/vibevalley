@@ -1,4 +1,5 @@
-import { issuesWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createMemo } from "solid-js";
 import { defaultOrchestrator, type TaskGraph } from "@vibevalley/protocol";
 import { reasonOf } from "../../base/api";
@@ -18,7 +19,7 @@ export function useNameOf(): () => (id: string) => string {
   const agents = useAgents();
   return createMemo(() => {
     const all = ready(agents, []);
-    return (id: string) => all.find((a) => a.id === id)?.name || (id === defaultOrchestrator ? issuesWording().orchestrator : id);
+    return (id: string) => all.find((a) => a.id === id)?.name || (id === defaultOrchestrator ? t("web.issue.orchestrator") : id);
   });
 }
 

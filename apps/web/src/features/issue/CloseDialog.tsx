@@ -1,4 +1,5 @@
-import { issuesWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
@@ -28,28 +29,28 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
     if (await pressed(live(), "close")) props.onClose();
   };
   return (
-    <Dialog open onClose={props.onClose} title={issuesWording().close.title(issueTitle(props.issue))} wide={reviewing()}>
+    <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()}>
       <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} onDone={props.onClose} />}>
         <div>
           <p class="text-base">
             {working()
-              ? issuesWording().close.working(props.session.name)
+              ? t("web.issue.close.working", { who: props.session.name })
               : acts().includes("complete")
-                ? issuesWording().close.completable(props.session.name)
-                : issuesWording().close.notCompletable(props.session.name)}
+                ? t("web.issue.close.completable", { who: props.session.name })
+                : t("web.issue.close.notCompletable", { who: props.session.name })}
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <Show when={acts().includes("complete")}>
               <Button tone="primary" onClick={() => setReviewing(true)}>
-                {issuesWording().close.review}
+                {t("web.issue.close.review")}
               </Button>
             </Show>
             <Show when={acts().includes("close")}>
               <Button tone="danger" onClick={() => void cancel()}>
-                {working() ? issuesWording().close.stopAndCancel : issuesWording().close.cancel}
+                {working() ? t("web.issue.close.stopAndCancel") : t("web.issue.close.cancel")}
               </Button>
             </Show>
-            <Button onClick={() => props.onClose()}>{issuesWording().never}</Button>
+            <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
           </div>
         </div>
       </Show>
@@ -78,19 +79,19 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
   return (
     <Switch>
       <Match when={changes.isPending}>
-        <p class="py-10 text-center text-sm text-muted">{issuesWording().changes.reading}</p>
+        <p class="py-10 text-center text-sm text-muted">{t("web.issue.changes.reading")}</p>
       </Match>
       <Match when={changes.error}>
         {(error) => (
           <div>
             <Note tone="berry">
               <span class="text-berry">
-                {issuesWording().changes.unreadable}
+                {t("web.issue.changes.unreadable")}
                 {reasonOf(error())}
               </span>
             </Note>
             <Button class="mt-4" onClick={() => props.onDone()}>
-              {issuesWording().later}
+              {t("web.issue.later")}
             </Button>
           </div>
         )}
@@ -106,25 +107,25 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
                 fallback={
                   <Show when={empty()}>
                     <Note>
-                      <span class="text-muted">{issuesWording().changes.none}</span>
+                      <span class="text-muted">{t("web.issue.changes.none")}</span>
                     </Note>
                   </Show>
                 }
               >
                 <Note tone="berry">
-                  <div class="font-semibold text-berry">{issuesWording().changes.conflict(c().base)}</div>
+                  <div class="font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</div>
                   <div class="mt-1.5 flex flex-wrap gap-1">
                     <For each={c().conflicts}>{(f) => <span class="rounded bg-page px-1.5 font-mono text-xs text-berry">{f}</span>}</For>
                   </div>
-                  <div class="mt-1.5 text-xs text-muted">{issuesWording().changes.resolveHow(c().base)}</div>
+                  <div class="mt-1.5 text-xs text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</div>
                 </Note>
               </Show>
               <Show when={c().behind > 0 && c().conflicts.length === 0}>
-                <p class="text-xs text-muted">{issuesWording().changes.behind(c().base, c().behind)}</p>
+                <p class="text-xs text-muted">{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</p>
               </Show>
               <Show when={c().uncommitted.length > 0}>
                 <Note tone="wheat">
-                  <div>{issuesWording().changes.uncommitted(c().uncommitted.length)}</div>
+                  <div>{t("web.issue.changes.uncommitted", { n: c().uncommitted.length })}</div>
                   <div class="mt-1.5 flex flex-wrap gap-1">
                     <For each={c().uncommitted}>
                       {(f) => (
@@ -139,18 +140,18 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
               <div class="flex flex-wrap gap-2">
                 <Show when={acts().includes("complete")}>
                   <Button tone="primary" onClick={() => void take()}>
-                    {empty() ? issuesWording().changes.letGo : issuesWording().changes.merge(c().base)}
+                    {empty() ? t("web.issue.changes.letGo") : t("web.issue.changes.merge", { base: c().base })}
                   </Button>
                 </Show>
                 <Show when={acts().includes("resolve")}>
                   <Button tone="danger" onClick={() => void resolve()}>
-                    {issuesWording().changes.resolve}
+                    {t("web.issue.changes.resolve")}
                   </Button>
                 </Show>
-                <Button onClick={() => props.onDone()}>{issuesWording().later}</Button>
+                <Button onClick={() => props.onDone()}>{t("web.issue.later")}</Button>
               </div>
               <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-                <p class="text-xs text-muted">{issuesWording().changes.moved}</p>
+                <p class="text-xs text-muted">{t("web.issue.changes.moved")}</p>
               </Show>
               <ChangesBody changes={c()} />
             </div>
@@ -166,14 +167,14 @@ export function ChangesHead(props: { changes: Changes }) {
   return (
     <div class="flex flex-wrap items-center gap-2 text-sm">
       <span class="rounded bg-selected px-1.5 text-xs">
-        {issuesWording().task.project} {props.changes.project}
+        {t("web.issue.task.project")} {props.changes.project}
       </span>
       <Show when={props.changes.branch}>
         <span class="font-mono text-xs">
           {props.changes.branch} → {props.changes.base}
         </span>
       </Show>
-      <span class="text-xs text-muted">{issuesWording().changes.counts(props.changes.commits.length, props.changes.files.length)}</span>
+      <span class="text-xs text-muted">{t("web.issue.changes.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}</span>
       <Show when={props.changes.files.length > 0}>
         <PlusMinus added={counts()[0]} removed={counts()[1]} />
       </Show>
@@ -188,7 +189,7 @@ export function ChangesBody(props: { changes: Changes }) {
     <>
       <Show when={props.changes.commits.length > 0}>
         <section>
-          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{issuesWording().changes.commits(props.changes.commits.length)}</h3>
+          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{t("web.issue.changes.commits", { n: props.changes.commits.length })}</h3>
           <For each={props.changes.commits}>
             {(m) => (
               <div class="flex items-center gap-2.5 py-0.5">
@@ -202,7 +203,7 @@ export function ChangesBody(props: { changes: Changes }) {
       </Show>
       <Show when={props.changes.files.length > 0}>
         <section>
-          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{issuesWording().changes.files(props.changes.files.length)}</h3>
+          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{t("web.issue.changes.files", { n: props.changes.files.length })}</h3>
           <div class="divide-y divide-line overflow-hidden rounded-md border border-line">
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={props.changes.conflicts.includes(f.path)} />}</For>
           </div>
@@ -245,9 +246,9 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
           {props.file.path}
         </span>
         <Show when={props.conflict}>
-          <span class="rounded bg-berry/15 px-1.5 text-xs text-berry">{issuesWording().changes.conflictMark}</span>
+          <span class="rounded bg-berry/15 px-1.5 text-xs text-berry">{t("web.issue.changes.conflictMark")}</span>
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-xs text-muted">{issuesWording().changes.binary}</span>}>
+        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-xs text-muted">{t("web.issue.changes.binary")}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>
@@ -277,21 +278,21 @@ export function ReopenDialog(props: { issue: Issue; onClose: () => void; onReope
     if (got) props.onReopened();
   };
   return (
-    <Dialog open onClose={props.onClose} title={issuesWording().reopen.title}>
-      <p class="text-base">{issuesWording().reopen.line(issueTitle(props.issue))}</p>
+    <Dialog open onClose={props.onClose} title={t("web.issue.reopen.title")}>
+      <p class="text-base">{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</p>
       <TextArea
         ref={autofocus()}
         class="mt-4"
         rows={3}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
-        placeholder={issuesWording().reopen.what}
-        aria-label={issuesWording().reopen.whatLabel}
+        placeholder={t("web.issue.reopen.what")}
+        aria-label={t("web.issue.reopen.whatLabel")}
       />
       <div class="mt-5 flex justify-end gap-2">
-        <Button onClick={() => props.onClose()}>{issuesWording().never}</Button>
+        <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
         <Button tone="primary" onClick={() => void reopen()}>
-          {issuesWording().reopen.reopen}
+          {t("web.issue.reopen.reopen")}
         </Button>
       </div>
     </Dialog>

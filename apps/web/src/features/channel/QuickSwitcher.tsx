@@ -1,4 +1,5 @@
-import { chatWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { api, reasonOf } from "../../base/api";
 import { useCore } from "../../base/frame";
@@ -18,7 +19,7 @@ export const switcher = { show: () => setShown(true), toggle: () => setShown((s)
 /** Ctrl+K: a channel, thread or direct channel by its name; a profile not yet talked with gets its direct channel. */
 export function QuickSwitcher() {
   return (
-    <Dialog open={shown()} onClose={() => setShown(false)} title={chatWording().switcher.title}>
+    <Dialog open={shown()} onClose={() => setShown(false)} title={t("web.channel.switcher.title")}>
       <SwitcherBody onClose={() => setShown(false)} />
     </Dialog>
   );
@@ -49,8 +50,8 @@ function SwitcherBody(props: { onClose: () => void }) {
         role="combobox"
         aria-expanded="true"
         aria-controls="switcher-list"
-        aria-label={chatWording().switcher.title}
-        placeholder={chatWording().switcher.hint}
+        aria-label={t("web.channel.switcher.title")}
+        placeholder={t("web.channel.switcher.hint")}
         onInput={(e) => {
           setQuery(e.currentTarget.value);
           setActive(0);
@@ -69,9 +70,9 @@ function SwitcherBody(props: { onClose: () => void }) {
         }}
         class="h-10 rounded-md border border-line bg-page px-3 text-base outline-none focus:border-focus"
       />
-      <div id="switcher-list" role="listbox" aria-label={chatWording().switcher.title} class="flex flex-col gap-0.5">
+      <div id="switcher-list" role="listbox" aria-label={t("web.channel.switcher.title")} class="flex flex-col gap-0.5">
         <Show when={targets().length === 0}>
-          <p class="px-2 py-2 text-sm text-muted">{chatWording().switcher.none}</p>
+          <p class="px-2 py-2 text-sm text-muted">{t("web.channel.switcher.none")}</p>
         </Show>
         <For each={targets()} keyed={(t) => `${t.kind}:${t.id}`}>
           {(t, i) => (
