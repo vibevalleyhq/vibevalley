@@ -1,5 +1,6 @@
 import { t } from "@vibevalley/i18n";
-import { createEffect, Show } from "solid-js";
+import { Show } from "solid-js";
+import { createModal } from "./modal";
 import { IconButton } from "./IconButton";
 import { Icon } from "./Icon";
 
@@ -14,13 +15,9 @@ export interface Picture {
  * at: the one shown, or none while closed.
  */
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
-  let dialog!: HTMLDialogElement;
-  createEffect(
+  const m = createModal(
     () => props.at !== undefined,
-    (open) => {
-      if (open && !dialog.open) dialog.showModal();
-      if (!open && dialog.open) dialog.close();
-    },
+    () => props.onAt(undefined),
   );
   const count = () => props.pictures.length;
   const go = (step: number) => {
@@ -30,10 +27,11 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
   const shown = () => (props.at === undefined ? undefined : props.pictures[props.at]);
   return (
     <dialog
-      ref={(el) => (dialog = el)}
+      ref={m.ref}
       aria-label={shown()?.name ?? t("web.base.lightbox.label")}
-      onClose={() => props.onAt(undefined)}
-      onClick={(e) => e.target === dialog && props.onAt(undefined)}
+      onCancel={m.onCancel}
+      onClose={m.onClose}
+      onClick={m.onClick}
       onKeyDown={(e) => {
         if (e.key === "ArrowLeft") go(-1);
         if (e.key === "ArrowRight") go(1);

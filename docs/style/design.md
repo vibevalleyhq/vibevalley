@@ -155,7 +155,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - **按钮**（`ui/Button.tsx`）：`primary` 一个区域只有一个，是那里最要紧的一步；`plain` 是其余的；`quiet` 放在工具条和行里；`danger` 是字变莓色的 `plain`，不填满。只有图标的用 `IconButton`，它的名字就是悬停的提示和读屏的话。
 - **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `bg-hover`，页面色加 `shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
 - **状态点**（`ui/Dot.tsx` 的 `Dot`，`features/channel/bits.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
-- **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
+- **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/modal.ts` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
 - **标签和计数**：`Tag`（`ui/Tag.tsx`）只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`rounded-full`、`text-xs`）。
 - **附件**（`ui/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `max-h-64`，一圈 `line`、`rounded-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
 - **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `text-xs text-faint`；悬停的工具条在右上，`z-10`。

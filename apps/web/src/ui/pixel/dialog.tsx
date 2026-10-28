@@ -1,14 +1,13 @@
 import { t } from "@vibevalley/i18n";
 
-import { createEffect, Show } from "solid-js";
+import { Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createModal } from "../modal";
 import { pxFocus, pxText, pxWindow } from "./style";
 import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
 
-// The native modal dialog: the top layer, a focus trap and inert page behind. Escape and a click on the backdrop ask
-// onClose; the dialog stays open until `open` turns false, so the caller owns it.
 function Modal(props: {
   open: boolean;
   onClose: () => void;
@@ -18,25 +17,17 @@ function Modal(props: {
   style?: JSX.CSSProperties;
   children: JSX.Element;
 }) {
-  let dialog!: HTMLDialogElement;
-  createEffect(
+  const m = createModal(
     () => props.open,
-    (open) => {
-      if (open && !dialog.open) dialog.showModal();
-      if (!open && dialog.open) dialog.close();
-    },
+    () => props.onClose(),
   );
   return (
     <dialog
-      ref={(el) => (dialog = el)}
+      ref={m.ref}
       aria-label={props.label}
-      onCancel={(e) => {
-        e.preventDefault();
-        props.onClose();
-      }}
-      // A browser may close it without a cancel (Escape pressed twice): the caller still hears of it.
-      onClose={() => props.open && props.onClose()}
-      onClick={(e) => e.target === dialog && props.onClose()}
+      onCancel={m.onCancel}
+      onClose={m.onClose}
+      onClick={m.onClick}
       style={props.style}
       class={[
         "m-auto max-h-none max-w-none overflow-visible bg-cream-50 p-0 text-bark-900",
