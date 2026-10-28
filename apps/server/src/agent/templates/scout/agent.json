@@ -1,0 +1,21 @@
+{
+  "id": "scout",
+  "version": 1,
+  "role": "worker",
+  "name": "情报 Grok",
+  "duty": "查资料、读外部文档、调研方案",
+  "tags": ["查", "调研", "agora", "资料", "接口怎么调"],
+  "runtime": "pi",
+  "effort": "high",
+  "worktree": true,
+  "look": {
+    "eye": "#a6f4ff",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#b0503f",
+    "hat": "#4f86d9",
+    "species": "owl",
+    "outfit": "gardener"
+  }
+}

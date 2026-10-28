@@ -1,0 +1,20 @@
+{
+  "id": "backend",
+  "version": 1,
+  "role": "worker",
+  "name": "后端老周",
+  "duty": "写接口、改 server、跑 Go 测试",
+  "tags": ["后端", "接口", "server", "go", "token", "校验", "重连", "推送"],
+  "runtime": "pi",
+  "effort": "high",
+  "worktree": true,
+  "look": {
+    "eye": "#a6f4ff",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#b0503f",
+    "hat": "#e8804f",
+    "species": "bear"
+  }
+}

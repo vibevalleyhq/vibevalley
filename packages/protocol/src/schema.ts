@@ -84,6 +84,8 @@ export const Look: Codec<T.Look> = Schema.Struct({
   eye: Schema.String,
 });
 
+export const AgentFrom: Codec<T.AgentFrom> = Schema.Struct({ template: Schema.String, version: Schema.Number });
+
 export const Agent: Codec<T.Agent> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -103,6 +105,25 @@ export const Agent: Codec<T.Agent> = Schema.Struct({
   worktree: Schema.Boolean,
   tags: Schema.mutable(Schema.Array(Schema.String)),
   look: Look,
+  from: Schema.optionalKey(AgentFrom),
+});
+
+export const AgentTemplate: Codec<T.AgentTemplate> = Schema.Struct({
+  id: Schema.String,
+  version: Schema.Number,
+  role: Schema.Literals(T.AgentRoleValues),
+  name: Schema.String,
+  duty: Schema.String,
+  tags: Schema.mutable(Schema.Array(Schema.String)),
+  runtime: Schema.String,
+  model: Schema.String,
+  effort: Schema.String,
+  personaMode: PersonaMode,
+  worktree: Schema.Boolean,
+  look: Look,
+  persona: Schema.String,
+  source: Schema.Literals(T.AgentTemplateSourceValues),
+  installed: Schema.mutable(Schema.Array(Schema.String)),
 });
 
 export const AgentCheckRequest: Codec<T.AgentCheckRequest> = Schema.Struct({

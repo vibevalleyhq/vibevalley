@@ -6,7 +6,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber } from "effect";
 import { Agents } from "../agent/agent.ts";
-import { seedAgents } from "../agent/seed.ts";
+import { starter } from "../testing/layers.ts";
 import { Issues } from "../issue/issue.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -35,7 +35,7 @@ describe("a task's workplace", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const tasks = yield* Tasks;
-      const agent = seedAgents().find((a) => a.id === "lab")!;
+      const agent = starter("lab");
       yield* (yield* Agents).saveAgent({ ...agent, effort: "" });
       yield* issues.putTask({
         id: "p1",
@@ -80,7 +80,7 @@ describe("a task's workplace", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const tasks = yield* Tasks;
-      const agent = seedAgents().find((a) => a.id === "lab")!;
+      const agent = starter("lab");
       yield* (yield* Agents).saveAgent({ ...agent, effort: "" });
       const other = (yield* issues.hire({ ...agent, effort: "" }, "other session", "other")).session!;
       yield* until(() => sessions.sessionOf(other.id)?.phase._tag === "done", "the other session's first report");

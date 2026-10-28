@@ -1,0 +1,5 @@
+{
+  "name": "Codex the Craftsman",
+  "duty": "Builds the feature as the ticket says, until the tests pass",
+  "tags": ["implement", "feature", "fix", "until it passes", "codex"]
+}

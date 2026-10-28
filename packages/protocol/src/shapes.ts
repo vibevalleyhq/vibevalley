@@ -12,6 +12,9 @@ export type SessionId = string & Brand.Brand<"SessionId">;
  * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
 export const defaultOrchestrator = "orchestrator";
 
+/** The runtime of VibeValley's own agent: the only one an orchestrator runs on. */
+export const orchestratorRuntime = "vibevalley";
+
 /** The owner's participant id: who @主人 is. */
 export const ownerId = "owner";
 
@@ -1094,6 +1097,41 @@ export interface Agent {
   worktree: boolean;
   tags: string[];
   look: Look;
+  /** The template it was installed from, at that template's version; none for one made by hand. */
+  from?: AgentFrom;
+}
+
+/** Where a profile came from: a template's id and the version it had then. */
+export interface AgentFrom {
+  template: string;
+  version: number;
+}
+
+/** Built in: shipped with VibeValley; added: copied in from a folder on this machine. */
+export const AgentTemplateSourceValues = ["builtIn", "added"] as const;
+export type AgentTemplateSource = (typeof AgentTemplateSourceValues)[number];
+
+/** A recipe for a profile (agent.json and persona.md in a folder), in the farm's language: installing it makes a profile.
+ * An orchestrator's always runs on VibeValley's own agent. */
+export interface AgentTemplate {
+  id: string;
+  /** Raised when the template changes: a profile installed at a lower one has an update. */
+  version: number;
+  role: AgentRole;
+  name: string;
+  duty: string;
+  tags: string[];
+  /** The runtime it is written for. */
+  runtime: string;
+  model: string;
+  effort: string;
+  personaMode: PersonaMode;
+  worktree: boolean;
+  look: Look;
+  persona: string;
+  source: AgentTemplateSource;
+  /** The profiles installed from it, by id. */
+  installed: string[];
 }
 
 export interface Look {

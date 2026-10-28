@@ -3,7 +3,7 @@
 
 import { test as base, expect, type Page } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -20,6 +20,13 @@ interface Server {
 // own logins (~/.pi, ~/.claude, …) stay out of reach.
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_/;
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
+
+/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
+ * starts with, as a farm whose agent.starters names them. */
+const starters = () =>
+  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
+    .filter((id) => id !== "orchestrator")
+    .join(",");
 
 export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: string }>({
   // Files that set their own (test.use({ farm: "…" })) run in workers of their own, on a server no other file has used.
@@ -43,6 +50,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
         // This machine's coding agents are not asked: pi is the scripted helper, doing what the words of its job say
         // (apps/server/src/testing/helper.ts), and no other runtime is installed.
         VIBEVALLEY_TEST_RUNTIMES: "1",
+        VIBEVALLEY_AGENT_STARTERS: starters(),
       };
       const args = ["--ready-json", "--web", join(out, "dist")];
       const child: ChildProcess = spawn("node", ["--import", "tsx", "src/main.ts", ...args], {

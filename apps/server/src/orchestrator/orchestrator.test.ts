@@ -5,7 +5,7 @@ import type { Message } from "../ai/messages.ts";
 import { type Answer, answer, toolCall } from "../ai/testing.ts";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Said } from "../testing/said.ts";
-import { seedAgents } from "../agent/seed.ts";
+import { starter } from "../testing/layers.ts";
 import { Effect, Layer } from "effect";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -98,7 +98,7 @@ const marked = (f: { readonly requests: readonly Request[] }) =>
 
 const enableLab = Effect.gen(function* () {
   const agents = yield* Agents;
-  const lab = seedAgents().find((a) => a.id === "lab")!;
+  const lab = starter("lab");
   yield* agents.saveAgent({ ...lab, enabled: true, effort: "" });
   return lab;
 });

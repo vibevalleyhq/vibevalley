@@ -1,0 +1,5 @@
+{
+  "name": "Backend Zhou",
+  "duty": "Writes endpoints, changes the server, runs the Go tests",
+  "tags": ["backend", "endpoint", "server", "go", "token", "validation", "reconnect", "push"]
+}

@@ -3,9 +3,21 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { Layer } from "effect";
+import { withCast } from "../agent/agent.ts";
+import { builtInDir, builtInIds, profileOf, readTemplate } from "../agent/template.ts";
 import { defaults, Settings, type Config } from "../base/config.ts";
 import { Database } from "../base/db.ts";
+
+/** A built-in template as a farm whose agent.starters names it has it: under the template's own id. */
+export const starter = (id: string): Agent => {
+  const t = readTemplate(join(builtInDir, id), "builtIn");
+  return withCast(profileOf(t, t.id, t.name));
+};
+
+/** Every built-in template's profile but the default orchestrator's, in their order: what a test farm starts with. */
+const starters = () => builtInIds().filter((id) => id !== defaultOrchestrator);
 
 export function testConfig(change: Partial<Config> = {}): Config {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-test-"));
@@ -19,6 +31,7 @@ export function testConfig(change: Partial<Config> = {}): Config {
     port: 0,
     voice: { ...config.voice, line: { ...config.voice.line, port: 0 } },
     lan: { ...config.lan, port: 0 },
+    agent: { ...config.agent, starters: starters() },
     ...change,
   };
 }

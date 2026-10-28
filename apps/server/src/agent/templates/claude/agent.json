@@ -1,0 +1,20 @@
+{
+  "id": "claude",
+  "version": 1,
+  "role": "worker",
+  "name": "Claude 师傅",
+  "duty": "读大代码库、重构、查难缠的 bug",
+  "tags": ["重构", "难", "bug", "排查", "根因", "架构", "claude"],
+  "runtime": "claude",
+  "worktree": true,
+  "look": {
+    "eye": "#a6f4ff",
+    "build": "biped",
+    "head": "rounded",
+    "body": "#f3e9da",
+    "trim": "#d9774f",
+    "hat": "#e8804f",
+    "species": "bear",
+    "outfit": "winter"
+  }
+}
