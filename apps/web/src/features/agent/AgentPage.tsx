@@ -26,6 +26,7 @@ import {
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../ui/cast";
+import { ConfirmButton } from "../../ui/ConfirmButton";
 import { runtimeName } from "../../ui/runtimes";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
@@ -255,7 +256,6 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
 }
 
 function DeleteButton(props: { agent: Agent }) {
-  const [sure, setSure] = createSignal(false);
   const router = useRouter();
   const client = useQueryClient();
   const remove = async () => {
@@ -268,17 +268,7 @@ function DeleteButton(props: { agent: Agent }) {
       toast(reasonOf(e));
     }
   };
-  return (
-    <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.agent.remove")}</Button>}>
-      <span class="flex items-center gap-2">
-        <span class="text-sm text-muted">{t("web.agent.removeWhich", { name: props.agent.name })}</span>
-        <Button tone="danger" onClick={() => void remove()}>
-          {t("web.agent.remove")}
-        </Button>
-        <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>
-      </span>
-    </Show>
-  );
+  return <ConfirmButton label={t("web.agent.remove")} question={t("web.agent.removeWhich", { name: props.agent.name })} onConfirm={remove} />;
 }
 
 function Problems(props: { problems: AgentProblem[] }) {

@@ -10,6 +10,7 @@ import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { ready, useAgentTemplates, useRuntimes } from "../../base/query";
 import { toast } from "../../ui/toasts";
+import { ConfirmButton } from "../../ui/ConfirmButton";
 import { A } from "../../ui/A";
 import { Button } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
@@ -78,7 +79,6 @@ export function TemplatesPage() {
 
 function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; runtimes: readonly RuntimeInfo[] }) {
   const [open, setOpen] = createSignal(false);
-  const [sure, setSure] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const router = useRouter();
   const client = useQueryClient();
@@ -151,11 +151,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
           {open() ? t("web.agent.templates.fold") : t("web.agent.templates.look")}
         </Button>
         <Show when={template().source === "added"}>
-          <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.agent.remove")}</Button>}>
-            <Button tone="danger" onClick={() => void remove()}>
-              {t("web.agent.templates.removeSure")}
-            </Button>
-          </Show>
+          <ConfirmButton label={t("web.agent.remove")} confirm={t("web.agent.templates.removeSure")} onConfirm={remove} />
         </Show>
         <Button tone="primary" disabled={busy()} onClick={() => void install()}>
           {t("web.agent.templates.install")}

@@ -8,6 +8,7 @@ import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { type InstalledSkill, installedSkills, matches } from "./skills";
 import { runtimeName } from "../../ui/runtimes";
+import { ConfirmButton } from "../../ui/ConfirmButton";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
@@ -152,7 +153,6 @@ function SkillEditor(props: { skill?: Skill }) {
   // Keyed by the skill: the draft starts from the one it was opened on.
   const skill = untrack(() => props.skill);
   const [draft, setDraft] = createSignal(skill ?? empty);
-  const [sure, setSure] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const router = useRouter();
   const client = useQueryClient();
@@ -195,15 +195,12 @@ function SkillEditor(props: { skill?: Skill }) {
         <div class="flex flex-wrap items-center gap-2">
           <Show when={skill}>
             {(s) => (
-              <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.base.form.remove")}</Button>}>
-                <span class="text-xs text-muted">
-                  {agents().length > 0 ? t("web.runtime.library.inUse", { n: agents().length }) : t("web.runtime.library.removeIt")}
-                </span>
-                <Button tone="danger" disabled={busy()} onClick={() => void remove(s())}>
-                  {t("web.base.form.remove")}
-                </Button>
-                <Button onClick={() => setSure(false)}>{t("web.base.form.never")}</Button>
-              </Show>
+              <ConfirmButton
+                label={t("web.base.form.remove")}
+                question={agents().length > 0 ? t("web.runtime.library.inUse", { n: agents().length }) : t("web.runtime.library.removeIt")}
+                disabled={busy()}
+                onConfirm={() => remove(s())}
+              />
             )}
           </Show>
           <Button tone="primary" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
