@@ -126,13 +126,16 @@ const checkedInput = Effect.fnUntraced(function* (e: Endpoint, given: string, ar
 function endpointCommand(e: Endpoint) {
   const path = e.op.split(".").map(kebab);
   const config: Record<string, Argument.Argument<unknown> | Flag.Flag<unknown>> = {};
-  for (const name of e.about) config[name] = Argument.String(name);
-  // Only an input with more than what it is about takes --json.
-  if (fieldsOf(e).some((f) => !e.about.includes(f))) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.json")));
+  // Optional, so what it is about can come in --json too; a field missing from both is named by the input's Schema.
+  for (const name of e.about) config[name] = Argument.String(name).pipe(Argument.optional);
+  // Any input takes --json, what it is about included: a script writes the whole input in one place.
+  if (e.input) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.json")));
   return Command.make(path.at(-1)!, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
-      const args = Object.fromEntries(e.about.map((name) => [name, given[name]]));
+      const args = Object.fromEntries(
+        e.about.flatMap((name) => Option.match(given[name] as Option.Option<string>, { onNone: () => [], onSome: (v) => [[name, v] as const] })),
+      );
       const body = e.input
         ? yield* checkedInput(
             e,
