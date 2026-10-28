@@ -40,6 +40,19 @@
   --wb-float: #2f1f1326;
   /* What lies on the surface it is on, a hair above it: a segmented control's thumb, a card under the pointer. */
   --wb-raise: #2f1f131a;
+  /* Code's colours (ui/code: Shiki's tokens name these), drawn from the farm's: keywords berry, strings leaf, numbers
+     and constants water, functions bark, comments faint. */
+  --shiki-foreground: var(--wb-ink);
+  --shiki-background: transparent;
+  --shiki-token-keyword: #a8452f;
+  --shiki-token-string: #4c7a2d;
+  --shiki-token-string-expression: #4c7a2d;
+  --shiki-token-constant: #3a76a3;
+  --shiki-token-function: #8a5a1c;
+  --shiki-token-parameter: var(--wb-ink);
+  --shiki-token-punctuation: var(--wb-muted);
+  --shiki-token-comment: var(--wb-faint);
+  --shiki-token-link: var(--wb-water);
 }
 
 [data-theme="dark"] {
@@ -71,6 +84,11 @@
   --wb-code-ink: #eedcb2;
   --wb-float: #00000066;
   --wb-raise: #00000059;
+  --shiki-token-keyword: #e8907a;
+  --shiki-token-string: #a9d17f;
+  --shiki-token-string-expression: #a9d17f;
+  --shiki-token-constant: #7fb6e0;
+  --shiki-token-function: #e2b46a;
 }
 
 @theme inline static {
