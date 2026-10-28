@@ -14,11 +14,20 @@ import { api } from "./api.ts";
 import { mcpRoute } from "./mcp.ts";
 import { page } from "./page.ts";
 import { subscriptions } from "./rpc.ts";
+import { mossLine } from "./moss.ts";
 import { streams } from "./streams.ts";
 import { attachments } from "./attachment.ts";
 
 const routes = (config: Config) =>
-  Layer.mergeAll(Layer.unwrap(Effect.map(handlers, (h) => api(h))), streams, attachments, subscriptions, mcpRoute, config.web ? page(config.web) : Layer.empty);
+  Layer.mergeAll(
+    Layer.unwrap(Effect.map(handlers, (h) => api(h))),
+    streams,
+    attachments,
+    subscriptions,
+    mossLine,
+    mcpRoute,
+    config.web ? page(config.web) : Layer.empty,
+  );
 
 /** The address it listens on, once it does; told to who needs it, then to listening. */
 const ready = (listening: (address: string) => Effect.Effect<void>) =>

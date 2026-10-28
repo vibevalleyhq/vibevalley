@@ -2,7 +2,7 @@ import { list, t } from "@vibevalley/i18n";
 // 设置: its parts in a menu on the left, each its own address so a link lands on it; the
 // first four are the server's settings in a card, the rest whole pages of their own.
 
-import { VoiceForm } from "../voice";
+import { MossPlayground, VoiceForm } from "../voice";
 import { SkillsPage } from "../runtime";
 import { LanPage } from "../lan";
 import { ConnectorsPage } from "../connector";
@@ -21,6 +21,7 @@ export const sections = [
   { id: "connectors", label: t("web.connector.connectors.section.label"), line: t("web.connector.connectors.section.line") },
   { id: "skills", label: t("web.runtime.library.section.label"), line: t("web.runtime.library.section.line") },
   { id: "voice", label: t("web.voice.voice.section.label"), line: t("web.voice.voice.section.line") },
+  { id: "moss", label: "MOSS Live", line: t("web.voice.moss.section") },
   { id: "lan", label: t("web.lan.lan.section.label"), line: t("web.lan.lan.section.line") },
 ] as const;
 
@@ -63,6 +64,9 @@ export function SettingsPage(props: { rest: string }) {
               </Match>
               <Match when={section().id === "voice"}>
                 <VoiceForm part="line" />
+              </Match>
+              <Match when={section().id === "moss"}>
+                <MossPlayground />
               </Match>
               <Match when={section().id === "lan"}>
                 <LanPage />

@@ -3329,6 +3329,49 @@ export const catalogs = {
         nothing: "没录上",
       },
       call: { renew: "令牌续期失败：{why}", noMic: "没有麦克风权限", cannotHear: "声网：听不到对面：{why}", agora: "声网：{code} {msg}" },
+      moss: {
+        section: "试着跟它说话",
+        intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
+        keyAt: "API Key 在「声音」里",
+        persona: "人设（不填用 MOSS 默认的）",
+        personaHint: "比如：你是我的管家，说话简短。",
+        instructions: "规则",
+        defaultInstructions: "用简短的中文回答。",
+        talk: "开始说话",
+        connecting: "在接通…",
+        hangUp: "挂断",
+        mute: "静音",
+        unmute: "取消静音",
+        you: "你",
+        said: "对话",
+        nothingSaid: "接通后直接说话，这里显示双方说的。",
+        events: "线路上的消息",
+        eventsHint: "发出的动作和收到的事件，原样的 JSON；正在变的字和音频的通告不列。",
+        up: "发",
+        down: "收",
+        closed: "MOSS Live 断开了",
+        qos: {
+          title: "线路质量",
+          hint: "每秒算一次，只算这次通话。",
+          reply: "应答",
+          ms: "{last} ms · 平均 {mean}",
+          replyTip: "从你说完（MOSS 判断你停了）到它的第一段声音到这里；已经算了 {n} 轮。超过 2.5 秒标红。",
+          up: "上行",
+          upTip: "这一秒发出去的：麦克风的声音和发的消息。16 kHz 的声音约 256 kbps。",
+          down: "下行",
+          downTip: "这一秒收到的：回答的声音和事件。48 kHz 的声音在说话时约 768 kbps。",
+          frames: "麦克风帧",
+          framesTip: "这一秒发出的 20 ms 声音帧，正常是 50；少了说明录音或页面跟不上。",
+          backlog: "发送积压",
+          backlogTip: "还在本机等着发出去的字节；一直涨说明上行太慢。",
+          ahead: "播放缓冲",
+          aheadTip: "已经收到、还没放完的回答，毫秒。",
+          gaps: "断音",
+          gapsTip: "同一个回答里，上一段放完了下一段还没到的次数。",
+          stopsTip: "MOSS 自己停下回答的次数，悬停看原因（比如 playback_timeout：没及时报告播放进度）。",
+          stops: "被停",
+        },
+      },
     },
   },
   en: {
@@ -6844,6 +6887,50 @@ export const catalogs = {
         cannotHear: "Agora: cannot hear the other side: {why}",
         agora: "Agora: {code} {msg}",
       },
+      moss: {
+        section: "Try talking to it",
+        intro:
+          "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
+        keyAt: "The API key is in Voice",
+        persona: "Persona (MOSS's own when empty)",
+        personaHint: "E.g.: You are my steward; keep it short.",
+        instructions: "Rules",
+        defaultInstructions: "Answer briefly, in English.",
+        talk: "Start talking",
+        connecting: "Connecting…",
+        hangUp: "Hang up",
+        mute: "Mute",
+        unmute: "Unmute",
+        you: "You",
+        said: "Conversation",
+        nothingSaid: "Once connected, just talk; both sides' words show here.",
+        events: "Messages on the line",
+        eventsHint: "Actions sent and events received, as raw JSON; growing words and audio announcements are left out.",
+        up: "out",
+        down: "in",
+        closed: "MOSS Live hung up",
+        qos: {
+          title: "Line quality",
+          hint: "Worked out every second, for this call only.",
+          reply: "Reply",
+          ms: "{last} ms · mean {mean}",
+          replyTip: "From the end of your words (as MOSS judged it) to its first sound arriving here; {n} turns so far. Red past 2.5 s.",
+          up: "Up",
+          upTip: "Sent in the last second: the microphone and the messages. 16 kHz audio is about 256 kbps.",
+          down: "Down",
+          downTip: "Received in the last second: the answer's audio and the events. 48 kHz audio is about 768 kbps while it speaks.",
+          frames: "Mic frames",
+          framesTip: "20 ms audio frames sent in the last second; 50 is right, fewer means recording or the page cannot keep up.",
+          backlog: "Send backlog",
+          backlogTip: "Bytes still waiting on this machine to go out; growing means the way up is too slow.",
+          ahead: "Play buffer",
+          aheadTip: "Answer audio received and not yet played, ms.",
+          gaps: "Gaps",
+          gapsTip: "Times, within one answer, a piece finished playing before the next arrived.",
+          stopsTip: "Answers MOSS stopped itself; hover for the reasons (playback_timeout: playback was not reported in time).",
+          stops: "Stopped",
+        },
+      },
     },
   },
 };
@@ -10165,6 +10252,45 @@ export interface Messages {
   "web.voice.dictation.stop": undefined;
   "web.voice.dictation.transcribing": undefined;
   "web.voice.dictation.unset": undefined;
+  "web.voice.moss.closed": undefined;
+  "web.voice.moss.connecting": undefined;
+  "web.voice.moss.defaultInstructions": undefined;
+  "web.voice.moss.down": undefined;
+  "web.voice.moss.events": undefined;
+  "web.voice.moss.eventsHint": undefined;
+  "web.voice.moss.hangUp": undefined;
+  "web.voice.moss.instructions": undefined;
+  "web.voice.moss.intro": undefined;
+  "web.voice.moss.keyAt": undefined;
+  "web.voice.moss.mute": undefined;
+  "web.voice.moss.nothingSaid": undefined;
+  "web.voice.moss.persona": undefined;
+  "web.voice.moss.personaHint": undefined;
+  "web.voice.moss.qos.ahead": undefined;
+  "web.voice.moss.qos.aheadTip": undefined;
+  "web.voice.moss.qos.backlog": undefined;
+  "web.voice.moss.qos.backlogTip": undefined;
+  "web.voice.moss.qos.down": undefined;
+  "web.voice.moss.qos.downTip": undefined;
+  "web.voice.moss.qos.frames": undefined;
+  "web.voice.moss.qos.framesTip": undefined;
+  "web.voice.moss.qos.gaps": undefined;
+  "web.voice.moss.qos.gapsTip": undefined;
+  "web.voice.moss.qos.hint": undefined;
+  "web.voice.moss.qos.ms": { readonly last: string | number; readonly mean: string | number };
+  "web.voice.moss.qos.reply": undefined;
+  "web.voice.moss.qos.replyTip": { readonly n: string | number };
+  "web.voice.moss.qos.stops": undefined;
+  "web.voice.moss.qos.stopsTip": undefined;
+  "web.voice.moss.qos.title": undefined;
+  "web.voice.moss.qos.up": undefined;
+  "web.voice.moss.qos.upTip": undefined;
+  "web.voice.moss.said": undefined;
+  "web.voice.moss.section": undefined;
+  "web.voice.moss.talk": undefined;
+  "web.voice.moss.unmute": undefined;
+  "web.voice.moss.up": undefined;
+  "web.voice.moss.you": undefined;
   "web.voice.voice.address": undefined;
   "web.voice.voice.answer.agora": undefined;
   "web.voice.voice.answer.deepseek": { readonly from: string | number };

@@ -45,6 +45,11 @@ export const eventsPath = "/api/v1/events";
 
 export const livePath = "/api/v1/live";
 
+/** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. The
+ * page speaks MOSS's protocol: JSON actions, and binary frames whose first byte is 0x00 for audio (16 kHz mono PCM up,
+ * 48 kHz down). */
+export const mossLinePath = "/api/v1/voice/moss/line";
+
 /** The cookie a paired browser keeps its lan key in; the lan listener takes it as it takes the Bearer header. */
 export const lanKeyCookie = "vibevalley_lan_key";
 
