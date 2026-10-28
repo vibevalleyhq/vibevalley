@@ -5,7 +5,6 @@ import { t } from "@vibevalley/i18n";
 // the phone large.
 
 import { farmChannelLabel } from "./text";
-import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../base/api";
@@ -43,7 +42,7 @@ import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
-const suggestions = farmWording().chat.suggestions;
+const suggestions = ([0, 1, 2, 3] as const).map((i) => t(`web.farm.chat.suggestions.${i}`));
 
 const greeting = t("web.farm.chat.greeting");
 

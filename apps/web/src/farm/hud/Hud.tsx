@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
 
-import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { clockText, thousands } from "./rules";
@@ -119,7 +118,9 @@ function TopLeft() {
               <span class="block h-full" style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%`, background: CardColors.barFill }} />
             </span>
             <span class="text-[12px] leading-[14px]" style={{ color: CardColors.muted }}>
-              {farmWording().hud.toLevel(Math.round(lv().xp), need(), next())}
+              {next() !== undefined
+                ? t("web.farm.hud.toLevelNext", { xp: Math.round(lv().xp), need: need(), next: next()! })
+                : t("web.farm.hud.toLevel", { xp: Math.round(lv().xp), need: need() })}
             </span>
           </span>
         </span>

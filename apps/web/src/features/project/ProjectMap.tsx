@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
 // plot its issue, an empty plot a seed for the project.
 
-import { projectsWording } from "./words";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
@@ -511,7 +510,9 @@ export function IslandDetail(props: { island: Island }) {
         <p class="text-sm text-muted">
           {!props.island.summary
             ? t("web.project.map.gone")
-            : projectsWording().map.growth(growth().label, last() !== undefined ? since(last()!, now()) : undefined)}
+            : last() !== undefined
+              ? t("web.project.map.growthSince", { label: growth().label, since: since(last()!, now()) })
+              : t("web.project.map.growth", { label: growth().label })}
         </p>
       </div>
       <div class="flex flex-col gap-1.5">

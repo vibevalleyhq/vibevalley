@@ -62,7 +62,8 @@
     },
     "ticked": "看过了",
     "noRuns": "还没有干过。",
-    "runCount": "{n} 次"
+    "runCount": "{n} 次",
+    "conflict": "合进 {base} 会冲突：{files}"
   },
   "graph": {
     "name": "种植计划",
@@ -95,7 +96,6 @@
     "first": "先做",
     "batch": "第 {n} 批",
     "acceptanceHint": "验收：写好时要不通过，最后一步让它通过",
-    "acceptance": "验收",
     "checkHint": "做完跑 {check}",
     "edit": "改",
     "remove": "删",
@@ -117,7 +117,13 @@
     "nothing": "还没有记下什么。",
     "readingStory": "正在读…",
     "beforeAfter": "改前改后",
-    "empty": "（空）"
+    "empty": "（空）",
+    "conflict": "合进 {base} 会冲突：{files}。先不收，等 {base} 上的改动处理好。",
+    "frozen": "验收，冻结了：{files}",
+    "waits": "等 {titles}",
+    "after": "接在 {titles} 后面",
+    "onPlot": "{name} · 第 {plot} 块地",
+    "onPlotDoing": "{name} · 第 {plot} 块地 · 在{doing}"
   },
   "achievements": {
     "tier": {
@@ -152,7 +158,10 @@
     "tiers": "{tier}/{of} 档",
     "toTier": "到{tier}档",
     "secrets": "还有 {n} 个彩蛋",
-    "secretsLine": "碰上了才知道是什么。"
+    "secretsLine": "碰上了才知道是什么。",
+    "day": "{month}月{day}日",
+    "earned": "{day}拿到",
+    "earnedTier": "{day}拿到{tier}牌"
   },
   "sow": {
     "notDrafted": "先没起草",
@@ -177,6 +186,12 @@
     "start": "开始"
   },
   "water": {
+    "drops": {
+      "0": "改动小一点",
+      "1": "先别动测试",
+      "2": "做完跟我说一声",
+      "3": "顺便补个测试"
+    },
     "working": "它正在干活，这句话会在下一步之前收到。",
     "idle": "它现在没在干活，这句话会让它接着干一轮。",
     "thread": "这句话记在它的工单串里，它回的话也在那儿。",
@@ -186,7 +201,6 @@
     "moved": "工单状态变了，先回到地块看看要你做的事。"
   },
   "harvest": {
-    "unreadable": "看不了改动：",
     "reading": "正在看它改了什么…",
     "project": "项目 {project}",
     "counts": "{commits} 个提交 · {files} 个文件",
@@ -198,8 +212,6 @@
     "letGo": "请它收工",
     "take": "确认收获，合进 {base}",
     "resolve": "让它解决冲突",
-    "moved": "工单状态变了，先回到地块看看要你做的事。",
-    "commits": "提交",
     "files": "改了的文件",
     "empty": "仓库还空着。收获进主分支的活会放在这里。",
     "graph": "种植计划",
@@ -280,6 +292,12 @@
     },
     "edited": "（已编辑）",
     "deleted": "这条消息已删除",
+    "suggestions": {
+      "0": "让阿郑做字幕面板",
+      "1": "让小吴跑测试",
+      "2": "进度怎么样？",
+      "3": "大家收工"
+    },
     "greeting": "这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每个活下面挂着它的工单串。",
     "phase": {
       "off": "打字或者按麦克风，就开工",
@@ -346,7 +364,9 @@
     "foldDispatch": "收起派活",
     "unfoldDispatch": "展开派活",
     "spent": "这一轮花了 {spent}",
-    "newCount": "{n} 新"
+    "newCount": "{n} 新",
+    "replyTo": "回复 {name}",
+    "replyToText": "回复 {name}：{text}"
   },
   "tool": {
     "hand": {
@@ -354,7 +374,6 @@
       "hint": "点一块地看详情，点空地播种"
     },
     "water": {
-      "label": "浇水",
       "hint": "给帮工带句话，正在干活的会中途收到"
     },
     "bug": {
@@ -391,7 +410,8 @@
     "nothingToHarvest": "空地没有东西可收",
     "shovelStop": "铲除：叫停",
     "shovelDismiss": "铲除：请它收工",
-    "noShovel": "空地不用铲"
+    "noShovel": "空地不用铲",
+    "unavailable": "这张工单{state}，先打开地块看看"
   },
   "command": {
     "cannot": "这张工单现在不能「{act}」",
@@ -406,18 +426,17 @@
   "hud": {
     "label": "农场的 HUD",
     "look": "换管家的样子",
-    "graphs": "任务与成就",
     "workbenchHint": "工单、聊天……管活的页面",
     "workbench": "工作台",
     "treeHint": "记忆树：农场学会了什么",
     "tree": "记忆树",
     "mapHint": "地图：每个项目一座岛",
     "map": "地图",
-    "channels": "频道",
     "channelsUnread": "频道，{n} 条没读",
     "menuHint": "菜单（Esc）",
-    "menu": "菜单",
-    "tools": "农具"
+    "tools": "农具",
+    "toLevel": "{xp}/{need} commit",
+    "toLevelNext": "{xp}/{need} commit · Lv.{next} 开垦"
   },
   "quota": {
     "unreported": "不报额度",
@@ -429,7 +448,9 @@
     "quota": "额度",
     "left": "剩余额度",
     "refresh": "现在读一次额度",
-    "note": "从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。"
+    "note": "从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。",
+    "spentToday": "今天花了约 {spent}",
+    "spentTodayBudget": "今天花了约 {spent} / 预算 {budget}"
   },
   "friends": {
     "status": {
@@ -475,7 +496,6 @@
     "leafy": "长叶",
     "flowering": "开花",
     "wheat": "成熟",
-    "carrot": "成熟",
     "withered": "枯萎",
     "weeds": "长草",
     "dry": "干旱",
@@ -484,19 +504,15 @@
   },
   "yard": {
     "shop": {
-      "label": "商店",
       "hint": "种子、装饰、开垦新地"
     },
     "warehouse": {
-      "label": "仓库",
       "hint": "收进来的成果"
     },
     "tasks": {
-      "label": "任务与成就",
       "hint": "新手任务、开垦、成就墙"
     },
     "log": {
-      "label": "农场日志",
       "hint": "说过的话和收成，按时间倒着排"
     },
     "taskBoard": {
@@ -504,11 +520,9 @@
       "hint": "一件长活拆成几步，交给几个帮工"
     },
     "agents": {
-      "label": "帮工名册",
       "hint": "每个帮工用哪台农机、带什么人设和技能、长什么样"
     },
     "manager": {
-      "label": "管家",
       "hint": "跟管家说话"
     },
     "runtimes": {
@@ -528,16 +542,13 @@
     "lights": "点灯……",
     "entering": "进村"
   },
-  "harvestAct": "收获",
   "title": {
     "start": "开始游戏",
     "continue": "继续游戏",
-    "settings": "设置",
     "keyFirst": "先填钥匙：管家要 DeepSeek 的 API Key 才能干活，在设置里填上。",
     "label": "码农场物语 首页",
     "name": "码农场物语",
     "tagline": "一群写代码的小动物，等你来派活",
-    "menu": "开始",
     "nothingToContinue": "还没有农场可以继续：先开始游戏。"
   },
   "debug": {
@@ -554,7 +565,6 @@
     "achievement": "弹一个成就",
     "helpers": "帮工 · {n}",
     "nobody": "地里没人。",
-    "harvest": "收获",
     "halt": "叫停",
     "all": "全部",
     "haltAll": "全部叫停",

@@ -1,11 +1,10 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // 种植计划: the task graphs, a new one split by a helper, and the one shown: its state and actions, its steps in batches
 // (each with who does it, what it waits on, what it concluded, and retry, skip, edit, remove, its history), its
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
 import { spentText } from "../../base/format";
-import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
@@ -300,7 +299,7 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) 
               </p>
               <Show when={conflicts().size > 0}>
                 <Tinted color={tint("#c84a3a", 0.12)} class="mt-1">
-                  <p class="text-[13px] text-berry">{farmWording().graph.conflict(c().base, c().conflicts)}</p>
+                  <p class="text-[13px] text-berry">{t("web.farm.graph.conflict", { base: c().base, files: list(c().conflicts) })}</p>
                 </Tinted>
               </Show>
               <FarmSection title={t("web.farm.graph.commits")}>
@@ -443,7 +442,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.title}
         </span>
         <Show when={props.node.acceptance}>
-          <span title={props.node.frozen?.length ? farmWording().graph.frozen(props.node.frozen) : t("web.farm.graph.acceptanceHint")}>
+          <span title={props.node.frozen?.length ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
             <FarmTag text={t("web.farm.plot.review")} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
@@ -466,13 +465,17 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
       </div>
       <Show when={props.node.needs.length > 0}>
         <p class="mt-1 text-[12px] text-bark-600">
-          {waits().length ? farmWording().graph.waits(waits().map(titleOf)) : farmWording().graph.after(props.node.needs.map(titleOf))}
+          {waits().length
+            ? t("web.farm.graph.waits", { titles: list(waits().map(titleOf)) })
+            : t("web.farm.graph.after", { titles: list(props.node.needs.map(titleOf)) })}
         </p>
       </Show>
       <Show when={session()}>
         {(s) => (
           <p class="mt-1.5 bg-cream-50/70 px-1.5 py-1 text-[12px] text-bark-800">
-            {farmWording().graph.onPlot(s().name, stationOfSession(s()) + 1, doing() && doing()!.action !== "none" ? (doing()!.actionText ?? "") : undefined)}
+            {doing() && doing()!.action !== "none"
+              ? t("web.farm.graph.onPlotDoing", { name: s().name, plot: stationOfSession(s()) + 1, doing: doing()!.actionText ?? "" })
+              : t("web.farm.graph.onPlot", { name: s().name, plot: stationOfSession(s()) + 1 })}
           </p>
         )}
       </Show>

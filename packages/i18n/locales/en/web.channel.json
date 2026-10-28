@@ -15,7 +15,6 @@
   "empty": "Nobody has spoken in {label} yet. Tell the manager something to do, such as \"have the tester run the tests\".",
   "sendTo": "Message {label}",
   "side": "Channels and helpers",
-  "chat": "Chat",
   "channelsTitle": "Channels",
   "directsTitle": "Direct messages",
   "newChannel": "Create a channel",
@@ -82,12 +81,10 @@
     "owner": "Owner",
     "dispatch": "Sent work",
     "spent": "This round spent {spent}",
-    "thread": "Ticket thread",
     "unread": "{n} new",
     "edited": "(edited)",
     "deleted": "This message was deleted",
     "replyGone": "The original message was deleted",
-    "replyTo": "Replying to {name}",
     "pinned": "Pinned",
     "newMessages": "New messages",
     "searching": "Searching…",
@@ -107,8 +104,6 @@
     "remove": "Delete",
     "sure": "Press again to delete",
     "pick": "Pick a reaction",
-    "save": "Save",
-    "cancel": "Cancel",
     "editHint": "Enter saves · Esc cancels"
   },
   "pins": {
@@ -120,7 +115,6 @@
     "open": "Members",
     "title": "Members",
     "owner": "Owner",
-    "here": "Here",
     "none": "No helpers here yet",
     "looksAfter": "The manager looking after this"
   },
@@ -136,13 +130,10 @@
     "cancelReply": "Cancel the reply",
     "attach": "Attach a file",
     "removeFile": "Remove {name}",
-    "uploading": "Uploading…",
     "uploadFailed": "Not uploaded: {why}"
   },
   "manage": {
     "name": "Name",
-    "title": "Title",
-    "titleHint": "Empty takes the message it hangs under",
     "category": "Group (optional)",
     "categoryHint": "The sidebar lists channels by group",
     "orchestrator": "Looked after by",
@@ -232,7 +223,6 @@
       "owner": "@owner",
       "everyone": "@everyone"
     },
-    "orchestrator": "Manager",
     "orchestratorNote": "sends work, splits plans, answers how it goes",
     "everyone": "Everyone",
     "everyoneNote": "wakes every helper here"

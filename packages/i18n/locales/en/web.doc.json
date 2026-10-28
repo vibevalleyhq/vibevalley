@@ -15,7 +15,6 @@
     "demo": "Demo: several helpers writing at once",
     "append": "Write a paragraph at the end",
     "owner": "Owner",
-    "memory": "Memory",
     "done": "Done",
     "notDone": "Not done",
     "writing": "{who} is writing",
@@ -26,6 +25,7 @@
     "heading": "Heading",
     "notSaved": "Not saved: {why}",
     "changed": "Someone else just changed this block",
-    "conflict": "{why}: what you wrote was not saved and stays in the revision"
+    "conflict": "{why}: what you wrote was not saved and stays in the revision",
+    "image": "Image: {alt} {src}"
   }
 }

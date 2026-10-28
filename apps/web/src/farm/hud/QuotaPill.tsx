@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // runtime's machine, usage windows, today's spend and a stop it is under.
 
 import { yuan } from "../../base/format";
-import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../features/runtime";
@@ -79,10 +78,9 @@ function Machine(props: { info: RuntimeInfo }) {
         <UsageLines usage={usage()} />
         <Show when={props.info.spentToday !== undefined}>
           <p class="mt-0.5 text-[12px] text-bark-500">
-            {farmWording().quota.spentToday(
-              yuan(props.info.spentToday!),
-              (props.info.settings.dailyBudget ?? 0) > 0 ? yuan(props.info.settings.dailyBudget!) : undefined,
-            )}
+            {(props.info.settings.dailyBudget ?? 0) > 0
+              ? t("web.farm.quota.spentTodayBudget", { spent: yuan(props.info.spentToday!), budget: yuan(props.info.settings.dailyBudget!) })
+              : t("web.farm.quota.spentToday", { spent: yuan(props.info.spentToday!) })}
           </p>
         </Show>
         <Show when={props.info.stop}>

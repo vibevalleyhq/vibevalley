@@ -54,7 +54,8 @@
     "allHelpers": "All helpers",
     "shown": "{shown} / {of}",
     "clear": "Clear the filter",
-    "view": "View"
+    "view": "View",
+    "missing": "The run's record is missing: {what}. Its acts are not available."
   },
   "marks": {
     "priority": "Priority: {word}"
@@ -92,7 +93,6 @@
     "merge": "Complete, merge into {base}",
     "resolve": "Have it resolve the conflict",
     "moved": "The ticket's status changed: go back to the ticket and see what it asks of you.",
-    "project": "Project {name}",
     "counts": "{commits} commits · {files} files",
     "commits": "Commits {n}",
     "files": "Changed files {n}",
@@ -125,7 +125,6 @@
     "rejected": "Sent back last time",
     "made": "What it made",
     "nothingToSee": "No changes to see.",
-    "closed": "{text}.",
     "noAnswer": "No answer yet.",
     "noChanges": "No changes yet.",
     "changedFiles": "Changed files",
@@ -183,7 +182,8 @@
     "answered": "In its channel",
     "evidence": "Evidence",
     "unsure": "Not sure about",
-    "next": "Suggested next"
+    "next": "Suggested next",
+    "conflict": "Merging into {base} would conflict: {files}"
   },
   "task": {
     "label": "Plan",
@@ -194,7 +194,6 @@
     "ok": "Done.",
     "check": "Check",
     "scope": "Where it changes",
-    "and": ", ",
     "conclusion": "Conclusion",
     "spent": "Spent",
     "tried": "Tried",
@@ -205,7 +204,6 @@
     "project": "Project",
     "progress": "Progress",
     "progressLine": "{done} / {of} steps",
-    "branch": "Branch",
     "parallel": "At once",
     "atMost": "at most {n} steps",
     "written": "Written",
@@ -213,10 +211,14 @@
     "abandonTitle": "{abandon} this plan?",
     "abandonLine": "The steps not done yet are not sent out; the plan's branch stays, with every commit made so far.",
     "abandon": "Abandon it",
-    "unreadable": "The changes cannot be read: ",
     "reading": "Looking at what the plan's branch changed…",
     "behind": "Meanwhile {base} got {n} more commits",
-    "merge": "Merge into {base}"
+    "merge": "Merge into {base}",
+    "layer": "Batch {n}",
+    "layerTogether": "Batch {n} · these {size} steps can run at once",
+    "waitsOn": "waiting for \"{steps}\"",
+    "stepSeparator": "\", \"",
+    "conflict": "Merging into {base} would conflict: {files}. Not merging until the changes on {base} are sorted out."
   },
   "todo": {
     "queued": "Queued: every spot is taken, and it starts by itself when one frees up.",
@@ -247,9 +249,7 @@
     "status": "Status",
     "draftStatus": "Draft",
     "todoStatus": "To do",
-    "helper": "Helper",
     "pickForMe": "Picked for you when drafting",
-    "project": "Project",
     "whichProject": "Which project",
     "firstProject": "No project yet: make one",
     "newProjectLink": "+ New project",
@@ -337,7 +337,8 @@
     "turns": "{n, plural, one {# round} other {# rounds}}",
     "orchestratorWorking": "the manager is on it",
     "missingFlag": "Record missing",
-    "graph": "Plan: {title}"
+    "graph": "Plan: {title}",
+    "missing": "The run's record is missing: {what}"
   },
   "issue": {
     "asking": "{n, plural, one {{who} has a question for you} other {{who} has # questions for you}}",
@@ -378,6 +379,12 @@
         "label": "Deleted"
       }
     },
-    "and": ", "
+    "and": ", ",
+    "doing": "{action}",
+    "doingLabel": "{action}: {label}",
+    "who": "{name}",
+    "whoRuntime": "{name} ({runtime})",
+    "changes": "{branch} → {base} · {commits} commits · +{added} -{removed}",
+    "changesUncommitted": "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted"
   }
 }

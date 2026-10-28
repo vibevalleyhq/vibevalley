@@ -2,13 +2,12 @@ import { t } from "@vibevalley/i18n";
 // 合成: 2048 with crops. Slide the field; two of a stage grow into the next; a seed is sown
 // on an empty cell after every slide that moves something. One slide back can be taken.
 
-import { phoneWording } from "../words";
 import { nextRandom } from "./random";
 
 export const mergeSize = 4;
 
 /** A stage is worth 2^stage, as the tiles of 2048 are. Past the last, the last stage counts on. */
-export const mergeStages = phoneWording().merge.stage;
+export const mergeStages = ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((i) => t(`web.farm.phone.merge.stage.${i}`));
 
 export const mergeGoal = 11;
 

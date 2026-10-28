@@ -6,13 +6,29 @@
     },
     "label": {
       "weixin": "WeChat",
-      "feishu": "Feishu",
-      "qq": "QQ"
+      "feishu": "Feishu"
     },
     "how": {
       "weixin": "Scan to sign in, message the bot",
       "feishu": "Scan to make a bot",
       "qq": "Fill in the QQ bot's AppID"
+    },
+    "notes": {
+      "weixin": {
+        "0": "Only the WeChat that scanned counts: what others send this bot does not come in.",
+        "1": "When a helper finishes, its report goes to WeChat at once, without waiting for you to speak first. When WeChat sometimes refuses, reports wait and are retried later (further apart each time, at most half an hour), and also come with your next message (several joined in one).",
+        "2": "It uses Tencent's official interface for bots (the same as OpenClaw's WeChat plugin)."
+      },
+      "feishu": {
+        "0": "After the scan, Feishu makes a bot app that is yours alone; nothing to set up by hand on the open platform.",
+        "1": "Then find the bot in Feishu and send it the pairing code in a direct message: whoever sends the code is the owner, and only the owner's words come in. Direct messages only, not groups.",
+        "2": "A Feishu bot can message you any time, so reports do not wait for you to speak first."
+      },
+      "qq": {
+        "0": "QQ cannot make a bot by scanning: make one on the QQ open platform (q.qq.com) first, turn on direct messages, and fill in its AppID and AppSecret here.",
+        "1": "Add the bot with your own QQ and send it the pairing code in a direct message: whoever sends the code is the owner. Direct messages only.",
+        "2": "QQ lets a bot reply only for a short while after you speak. Reports after that wait, are retried later, and come with your next message."
+      }
     },
     "always": "Helpers can run commands on this computer, so only the owner counts; reply quoting a report and your words go to that job's ticket thread. VibeValley only connects out and opens no port.",
     "state": {
@@ -24,7 +40,6 @@
       "connected": "Connected",
       "paused": "Paused"
     },
-    "title": "Connectors",
     "list": "Connectors",
     "intro": "Talk to the manager in a chat app: send work, ask how it goes, get reports.",
     "know": "Good to know",

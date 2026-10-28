@@ -1,5 +1,4 @@
-import { t } from "@vibevalley/i18n";
-import { appWording } from "./words";
+import { currentLocale, t } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
 // Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
 
@@ -39,7 +38,10 @@ export function momentText(at: number) {
 // The server says money the same way (protocol.Yuan, SpentText) in what it writes to the chat.
 export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("web.base.money.underCent") : `¥${cny.toFixed(2)}`);
 
-const wan = (n: number) => (n >= 10000 ? appWording().big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
+const wan = (n: number) => (n >= 10000 ? big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
+
+/** A large count: ten thousands in Chinese (1.2 万), thousands in English (12k). */
+export const big = (n: number, digits: number) => t("web.base.big", { n: currentLocale() === "zh" ? (n / 10000).toFixed(digits) : Math.round(n / 1000) });
 
 export const spentText = (spent: Spent) =>
   [...(spent.cny !== undefined ? [t("web.base.money.about", { yuan: yuan(spent.cny) })] : []), `${wan(spent.tokens)} token`].join(" · ");

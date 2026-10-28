@@ -5,7 +5,6 @@ import { t } from "@vibevalley/i18n";
 // looking up, the same memories as a sky; the panel to the right. The memories are made up (mock.ts) until the server
 // sums them up.
 
-import { treeWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "../ui/pixel";
@@ -19,7 +18,7 @@ import { allOf, counts, kept, newest, stageName, type Ties, tiesOf, type TreeFil
 import { type SceneArea, type SceneHover, Scene } from "./Scene";
 
 const kindIcon: Record<MemoryKind, string> = { leaf: "icon-leaf", fruit: "icon-fruit", seed: "icon-seed" };
-const kindName: Record<MemoryKind, string> = treeWording().kind;
+const kindName = (kind: MemoryKind) => t(`web.tree.kind.${kind}`);
 
 /** A tie's words, by the kind of memory it is about: what it grew from, what grew from it, what it is used with. */
 function tieWords(kind: MemoryKind, ties: Ties): string[] {
@@ -210,10 +209,10 @@ function Panel(props: {
       </header>
       <div class="flex items-center gap-2 border-2 border-cream-300 bg-cream-100 px-2 py-1.5">
         <SpriteIcon name="icon-rings" size={20} />
-        <span class={pxText.sm}>{stageName[props.tree.stage]}</span>
+        <span class={pxText.sm}>{stageName(props.tree.stage)}</span>
         <span class={[pxText.xs, "ml-auto text-bark-500"]}>
           {props.tree.nextStageIn !== undefined
-            ? t("web.tree.nextStage", { rounds: props.tree.nextStageIn, stage: stageName[(props.tree.stage + 1) as TreeStage] })
+            ? t("web.tree.nextStage", { rounds: props.tree.nextStageIn, stage: stageName((props.tree.stage + 1) as TreeStage) })
             : t("web.tree.grown")}
         </span>
       </div>
@@ -226,7 +225,7 @@ function Panel(props: {
       <Show when={props.picked}>
         {(m) => (
           <Section
-            title={m().kind === "fruit" ? t("web.tree.experience") : kindName[m().kind]}
+            title={m().kind === "fruit" ? t("web.tree.experience") : kindName(m().kind)}
             icon={kindIcon[m().kind]}
             aside={<PxButton size="sm" label={t("web.tree.fold")} icon="button-close" onClick={props.unpick} />}
           >
@@ -255,7 +254,7 @@ function Panel(props: {
           <For each={props.recent}>
             {(m) => (
               <li class="flex items-center gap-2">
-                <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName[m.kind]} />
+                <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName(m.kind)} />
                 <span class={[pxText.sm, "min-w-0 flex-1 truncate"]} title={m.body}>
                   {m.body}
                 </span>

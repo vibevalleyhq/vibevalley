@@ -55,6 +55,8 @@
     "projectHint": "Project (optional)",
     "noteHint": "A sentence that is clear at a glance next time.",
     "noteHintProject": "A sentence that is clear at a glance next time. With no project it holds for every project.",
-    "forget": "Forget"
+    "forget": "Forget",
+    "recalled": "recalled {n} times",
+    "recalledLast": "recalled {n} times, last {last}"
   }
 }

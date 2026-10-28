@@ -53,7 +53,6 @@
       "hint": "Seven animals, four outfits: stand, walk, work, cheer, worry; sit, read, type and fix by the buildings"
     },
     "orchestrator": {
-      "label": "Manager",
       "hint": "Six looks, each with talking, listening and a portrait"
     },
     "dog": {
@@ -89,7 +88,6 @@
       "hint": "Medals, badge emblems, stamps, coins"
     },
     "logos": {
-      "label": "Logos",
       "hint": "The agents on the machines, the chat apps, the web and desktop icons"
     },
     "langs": {

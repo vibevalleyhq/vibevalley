@@ -55,6 +55,8 @@
     "projectHint": "项目（可以不填）",
     "noteHint": "写成下次一看就懂的一句话。",
     "noteHintProject": "写成下次一看就懂的一句话。项目留空就是所有项目都用得上。",
-    "forget": "忘掉"
+    "forget": "忘掉",
+    "recalled": "想起过 {n} 次",
+    "recalledLast": "想起过 {n} 次，上次 {last}"
   }
 }

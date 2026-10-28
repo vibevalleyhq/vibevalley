@@ -62,7 +62,8 @@
     },
     "ticked": "Checked",
     "noRuns": "No work yet.",
-    "runCount": "{n, plural, one {# round} other {# rounds}}"
+    "runCount": "{n, plural, one {# round} other {# rounds}}",
+    "conflict": "Merging into {base} would conflict: {files}"
   },
   "graph": {
     "name": "Planting plans",
@@ -95,7 +96,6 @@
     "first": "First",
     "batch": "Batch {n}",
     "acceptanceHint": "Acceptance: must fail when written; the last step makes it pass",
-    "acceptance": "Acceptance",
     "checkHint": "Runs {check} when done",
     "edit": "Edit",
     "remove": "Delete",
@@ -117,7 +117,13 @@
     "nothing": "Nothing recorded yet.",
     "readingStory": "Reading…",
     "beforeAfter": "Before and after",
-    "empty": "(empty)"
+    "empty": "(empty)",
+    "conflict": "Merging into {base} would conflict: {files}. Not bringing it in until the changes on {base} are sorted out.",
+    "frozen": "Acceptance, frozen: {files}",
+    "waits": "Waiting for {titles}",
+    "after": "After {titles}",
+    "onPlot": "{name} · plot {plot}",
+    "onPlotDoing": "{name} · plot {plot} · {doing}"
   },
   "achievements": {
     "tier": {
@@ -152,7 +158,10 @@
     "tiers": "tier {tier}/{of}",
     "toTier": "To {tier}",
     "secrets": "{n} secrets left",
-    "secretsLine": "You find out what they are when you come across them."
+    "secretsLine": "You find out what they are when you come across them.",
+    "day": "{month, select, 1 {Jan} 2 {Feb} 3 {Mar} 4 {Apr} 5 {May} 6 {Jun} 7 {Jul} 8 {Aug} 9 {Sep} 10 {Oct} 11 {Nov} other {Dec}} {day}",
+    "earned": "earned {day}",
+    "earnedTier": "{tier} earned {day}"
   },
   "sow": {
     "notDrafted": "Not drafted",
@@ -177,6 +186,12 @@
     "start": "Start"
   },
   "water": {
+    "drops": {
+      "0": "Keep the change small",
+      "1": "Leave the tests alone for now",
+      "2": "Tell me when done",
+      "3": "Add a test while at it"
+    },
     "working": "It is working: it hears this before its next step.",
     "idle": "It is not working: this has it work another round.",
     "thread": "This is kept in its ticket thread, with its replies.",
@@ -186,7 +201,6 @@
     "moved": "The ticket's status changed: go back to the plot and see what it asks of you."
   },
   "harvest": {
-    "unreadable": "The changes cannot be read: ",
     "reading": "Looking at what it changed…",
     "project": "Project {project}",
     "counts": "{commits} commits · {files} files",
@@ -198,8 +212,6 @@
     "letGo": "Let it go",
     "take": "Harvest, merge into {base}",
     "resolve": "Have it resolve the conflict",
-    "moved": "The ticket's status changed: go back to the plot and see what it asks of you.",
-    "commits": "Commits",
     "files": "Changed files",
     "empty": "The warehouse is empty. Work harvested into main is kept here.",
     "graph": "Planting plan",
@@ -280,6 +292,12 @@
     },
     "edited": "(edited)",
     "deleted": "This message was deleted",
+    "suggestions": {
+      "0": "Have the writer make the captions panel",
+      "1": "Have the tester run the tests",
+      "2": "How is it going?",
+      "3": "Everyone, call it a day"
+    },
     "greeting": "This is the farm chat, where you, the manager and the helpers talk. Tell me a job to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each job has its ticket thread under it.",
     "phase": {
       "off": "Type or press the mic to open",
@@ -346,7 +364,9 @@
     "foldDispatch": "Fold the dispatch",
     "unfoldDispatch": "Unfold the dispatch",
     "spent": "This round spent {spent}",
-    "newCount": "{n} new"
+    "newCount": "{n} new",
+    "replyTo": "Replying to {name}",
+    "replyToText": "Replying to {name}: {text}"
   },
   "tool": {
     "hand": {
@@ -354,7 +374,6 @@
       "hint": "Click a plot for its details, an empty one to sow"
     },
     "water": {
-      "label": "Water",
       "hint": "Pass a helper a word; one at work hears it on the way"
     },
     "bug": {
@@ -391,7 +410,8 @@
     "nothingToHarvest": "Nothing to harvest on an empty plot",
     "shovelStop": "Shovel: stop it",
     "shovelDismiss": "Shovel: let it go",
-    "noShovel": "Nothing to shovel on an empty plot"
+    "noShovel": "Nothing to shovel on an empty plot",
+    "unavailable": "This ticket is {state}: open the plot to see"
   },
   "command": {
     "cannot": "This ticket cannot \"{act}\" now",
@@ -406,18 +426,17 @@
   "hud": {
     "label": "The farm's HUD",
     "look": "Change the manager's look",
-    "graphs": "Tasks and achievements",
     "workbenchHint": "Tickets, chat… the pages for managing work",
     "workbench": "Workbench",
     "treeHint": "Memory tree: what the farm has learned",
     "tree": "Memory tree",
     "mapHint": "Map: an island for each project",
     "map": "Map",
-    "channels": "Channels",
     "channelsUnread": "Channels, {n} unread",
     "menuHint": "Menu (Esc)",
-    "menu": "Menu",
-    "tools": "Tools"
+    "tools": "Tools",
+    "toLevel": "{xp}/{need} commits",
+    "toLevelNext": "{xp}/{need} commits · Lv.{next} clears a plot"
   },
   "quota": {
     "unreported": "reports no allowance",
@@ -429,7 +448,9 @@
     "quota": "Allowance",
     "left": "Allowance left",
     "refresh": "Read the allowance now",
-    "note": "Read from each account every few minutes, and after each round a helper works."
+    "note": "Read from each account every few minutes, and after each round a helper works.",
+    "spentToday": "About {spent} spent today",
+    "spentTodayBudget": "About {spent} spent today / budget {budget}"
   },
   "friends": {
     "status": {
@@ -475,7 +496,6 @@
     "leafy": "leafy",
     "flowering": "flowering",
     "wheat": "ripe",
-    "carrot": "ripe",
     "withered": "withered",
     "weeds": "weedy",
     "dry": "dry",
@@ -484,19 +504,15 @@
   },
   "yard": {
     "shop": {
-      "label": "Shop",
       "hint": "Seeds, decorations, clearing new plots"
     },
     "warehouse": {
-      "label": "Warehouse",
       "hint": "What was harvested"
     },
     "tasks": {
-      "label": "Tasks and achievements",
       "hint": "Starter tasks, clearing, the wall of achievements"
     },
     "log": {
-      "label": "Farm log",
       "hint": "What was said and harvested, newest first"
     },
     "taskBoard": {
@@ -504,11 +520,9 @@
       "hint": "A long job split into steps for several helpers"
     },
     "agents": {
-      "label": "Helper roster",
       "hint": "Which machine each helper uses, its persona and skills, how it looks"
     },
     "manager": {
-      "label": "Manager",
       "hint": "Talk to the manager"
     },
     "runtimes": {
@@ -528,16 +542,13 @@
     "lights": "Lighting up…",
     "entering": "Entering the village"
   },
-  "harvestAct": "Harvest",
   "title": {
     "start": "New game",
     "continue": "Continue",
-    "settings": "Settings",
     "keyFirst": "Fill in the key first: the manager needs a DeepSeek API key to work. Fill it in under Settings.",
     "label": "VibeValley title screen",
     "name": "VibeValley",
     "tagline": "A crew of little animals who write code, waiting for your jobs",
-    "menu": "Start",
     "nothingToContinue": "No farm to continue yet: start a new game first."
   },
   "debug": {
@@ -554,7 +565,6 @@
     "achievement": "Pop an achievement",
     "helpers": "Helpers · {n}",
     "nobody": "Nobody in the field.",
-    "harvest": "Harvest",
     "halt": "Stop",
     "all": "All",
     "haltAll": "Stop all",

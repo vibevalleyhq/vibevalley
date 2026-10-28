@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // The tools the owner holds over the plots, and what a click with one means. aimTool is the
 // rule: the screen shows it while pointing and follows it on a click.
 
-import { farmWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
 import { type Bed, isRipe } from "./world/plots";
@@ -70,7 +69,7 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
     tool,
     (issue?.attention.acts ?? []).map((a) => a.act),
   );
-  const unavailable = issue ? farmWording().aim.unavailable(wording().attention[issue.attention.state]) : t("web.farm.aim.unread");
+  const unavailable = issue ? t("web.farm.aim.unavailable", { state: wording().attention[issue.attention.state].toLowerCase() }) : t("web.farm.aim.unread");
   switch (tool) {
     case "hand":
       return { ok: true, text: session ? t("web.farm.aim.look") : t("web.farm.aim.sow") };

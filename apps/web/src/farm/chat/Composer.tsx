@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 // the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
-import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -82,7 +81,9 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
       <Show when={replying()}>
         {(m) => (
           <div class="mb-1 flex items-center gap-1.5 bg-cream-100 px-2 py-1">
-            <span class="min-w-0 flex-1 truncate font-pixel text-[12px] text-bark-500">{farmWording().chat.replyTo(m().name, m().text)}</span>
+            <span class="min-w-0 flex-1 truncate font-pixel text-[12px] text-bark-500">
+              {m().text ? t("web.farm.chat.replyToText", { name: m().name, text: m().text }) : t("web.farm.chat.replyTo", { name: m().name })}
+            </span>
             <button
               type="button"
               aria-label={t("web.farm.chat.actions.cancelReply")}

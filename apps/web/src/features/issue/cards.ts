@@ -1,8 +1,7 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
-import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./display";
@@ -215,7 +214,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
         status: c.issue.status,
         priority: c.issue.priority,
         flags,
-        detail: issuesWording().card.missing(c.missing),
+        detail: t("web.issue.card.missing", { what: list(c.missing) }),
       };
     case "task":
       return {

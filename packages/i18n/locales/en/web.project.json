@@ -6,7 +6,6 @@
   "all": "All",
   "allLine": "The whole map: an island for each project",
   "notGit": "Not a git repository yet",
-  "growthSince": "{growth} · {since}",
   "finding": "Looking…",
   "none": "No projects in the work folder yet. Press New project to break new ground, or download one from GitHub.",
   "copied": "Copied: {path}",
@@ -34,6 +33,13 @@
   "install": "Install it in a terminal: ",
   "or": " (or ",
   "thenRecount": "), then press Count again above.",
+  "level": {
+    "0": "bare",
+    "1": "seeded",
+    "2": "sprouted",
+    "3": "leafy",
+    "4": "flowering"
+  },
   "year": "The past year · a cell a day, taller with more commits",
   "dayCommits": "{n} commits, {level}",
   "untouched": "untouched",
@@ -46,6 +52,15 @@
   "current": "Current streak",
   "yearLabel": "{commits} commits in the past year, on {days} days",
   "readingCommits": "Reading commits",
+  "rows": {
+    "0": "",
+    "1": "Mon",
+    "2": "",
+    "3": "Wed",
+    "4": "",
+    "5": "Fri",
+    "6": ""
+  },
   "fewer": "Less",
   "more": "More",
   "who": "Who worked here",
@@ -98,7 +113,9 @@
     "shut": "{n} tickets are already being worked on: new work queues.",
     "full": "Full: all {n} helpers are working, so new work queues.",
     "queue": "Queued · {n}",
-    "see": "See this ticket"
+    "see": "See this ticket",
+    "growth": "Growth · {label}",
+    "growthSince": "Growth · {label} · last commit {since}"
   },
   "project": {
     "otherLang": "Other",

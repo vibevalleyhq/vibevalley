@@ -99,7 +99,20 @@
     "tenths": "{s} 秒",
     "today": "今天",
     "yesterday": "昨天",
-    "clock": "{am, select, true {上午{hh}:{mm}} other {下午{hh}:{mm}}}"
+    "clock": "{am, select, true {上午{hh}:{mm}} other {下午{hh}:{mm}}}",
+    "weekdays": {
+      "0": "日",
+      "1": "一",
+      "2": "二",
+      "3": "三",
+      "4": "四",
+      "5": "五",
+      "6": "六"
+    },
+    "monthDay": "{month}月{day}日",
+    "month": "{month}月",
+    "date": "{y} 年 {m} 月 {d} 日",
+    "day": "{m} 月 {d} 日 星期{weekday}"
   },
   "money": {
     "underCent": "不到 ¥0.01",
@@ -136,5 +149,6 @@
   "secret": {
     "hide": "藏起来",
     "peek": "看一眼"
-  }
+  },
+  "big": "{n} 万"
 }

@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 
 import { actionIcon, type IconName } from "../../ui/icons";
 
-import { appWording } from "../../base/words";
 import { wording } from "@vibevalley/protocol/words";
 import {
   type Agent,
@@ -229,7 +228,7 @@ function dayLabel(at: number, now = new Date()) {
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (sameDay(d, yesterday)) return t("web.base.time.yesterday");
-  return appWording().time.monthDay(d.getMonth() + 1, d.getDate());
+  return t("web.base.time.monthDay", { month: d.getMonth() + 1, day: d.getDate() });
 }
 
 /** 12-hour, two digits: 下午03:07, 03:07 PM. */

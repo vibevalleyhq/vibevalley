@@ -14,7 +14,6 @@
       "noDeepseek": "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
       "openai": "任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……"
     },
-    "title": "声音",
     "intro": "管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。管家的人设、开场白和音色在",
     "orchestratorPage": "管家页",
     "period": "。",
@@ -58,7 +57,6 @@
     "dictationKey": "凭据（本机可以空着）",
     "persona": {
       "intro": "打电话时管家怎么开口、用什么声音。凭据、怎么听、谁接电话在",
-      "voicePage": "声音",
       "page": "页。",
       "open": "开口",
       "openParts": "人设 · 开场白",
@@ -102,19 +100,11 @@
     },
     "asr": {
       "ares": "声网 ARES",
-      "deepgram": "Deepgram",
       "microsoft": "微软"
     },
     "answer": {
-      "orchestrator": "管家",
       "agora": "声网托管",
-      "deepseek": "DeepSeek",
       "openai": "自己的接口"
-    },
-    "tts": {
-      "minimax": "MiniMax",
-      "openai": "OpenAI",
-      "microsoft": "微软"
     },
     "minimax": {
       "gentle": "温润青年",

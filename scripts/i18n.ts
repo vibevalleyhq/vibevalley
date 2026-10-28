@@ -60,7 +60,8 @@ function generated(): string {
   const zh = messages("zh");
   const all = locales.map(messages);
   const lines = ["// Written by `vpx scripts/i18n.ts gen` from packages/i18n/locales: do not edit.", ""];
-  for (const locale of locales) for (const ns of namespaces(locale)) lines.push(`import ${ident(locale, ns)} from "../locales/${locale}/${ns}.json";`);
+  for (const locale of locales)
+    for (const ns of namespaces(locale)) lines.push(`import ${ident(locale, ns)} from "../locales/${locale}/${ns}.json" with { type: "json" };`);
   lines.push("", "/** Each language's catalogs by namespace. */", "export const catalogs = {");
   for (const locale of locales)
     lines.push(
@@ -74,9 +75,11 @@ function generated(): string {
     const kinds = new Map<string, string>();
     for (const one of [text, ...all.map((m) => m.get(key) ?? "")])
       for (const [n, kind] of placeholderKinds(one)) if (kinds.get(n) === undefined || kind !== "value") kinds.set(n, kind);
-    const typeOf = (kind: string | undefined) => (kind === "plural" ? "number" : kind === "select" ? "boolean" : "string | number");
+    // A select on true is a flag; one on other values (a month's number) takes the value.
+    const flag = (n: string) => [text, ...all.map((m) => m.get(key) ?? "")].some((one) => new RegExp(`\\{${n}, select, true \\{`).test(one));
+    const typeOf = (n: string, kind: string | undefined) => (kind === "plural" ? "number" : kind === "select" && flag(n) ? "boolean" : "string | number");
     const names = [...kinds.keys()].sort();
-    lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(kinds.get(n))}`).join("; ")} }` : "undefined"};`);
+    lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
   }
   lines.push("}", "");
   return lines.join("\n");
@@ -105,7 +108,7 @@ function scan(): Use[] {
     const text = readFileSync(join(root, file), "utf8");
     if (!text.includes("t(")) continue;
     const lineOf = (i: number) => text.slice(0, i).split("\n").length;
-    for (const m of text.matchAll(/\bt\(\s*"([a-z][\w.-]*\.[\w.$-]+)"/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
+    for (const m of text.matchAll(/\bt\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
     for (const m of text.matchAll(/\bt\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
   }
   return uses;
@@ -291,6 +294,10 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
           eo[k] = et;
           params.set(at.join("."), zn);
         } else skipped.push(at.join("."));
+      } else if (Array.isArray(zv) && Array.isArray(ev) && zv.length === ev.length && [...zv, ...ev].every((x) => typeof x === "string")) {
+        // A list of sentences or names is kept by index: weekdays.0 … weekdays.6.
+        zo[k] = Object.fromEntries(zv.map((x, i) => [String(i), x]));
+        eo[k] = Object.fromEntries(ev.map((x, i) => [String(i), x as string]));
       } else if (zv && typeof zv === "object" && !Array.isArray(zv)) {
         zo[k] = {};
         eo[k] = {};

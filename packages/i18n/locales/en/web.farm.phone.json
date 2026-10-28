@@ -21,8 +21,6 @@
   "hangUp": "Hang up",
   "app": {
     "missed": "Missed",
-    "log": "Log",
-    "manager": "Manager",
     "channels": "Chat",
     "graphs": "Plans",
     "games": "Games"
@@ -52,13 +50,19 @@
     "right": "Right",
     "down": "Down"
   },
-  "best": "Best {score}",
   "pressA": "Press A to {what}",
   "again": "play again",
   "start": "start",
   "resume": "resume",
   "paused": "Paused",
   "sokoban": {
+    "levels": {
+      "0": "First crate of seeds",
+      "1": "Round the back",
+      "2": "Two crates of harvest",
+      "3": "Warehouse corner",
+      "4": "Harvest home"
+    },
     "title": "Sokoban {level}/{of}",
     "moves": "{moves} moves · {pushes} pushes",
     "board": "Warehouse board, {placed}/{of} crates in place",
@@ -85,12 +89,24 @@
     "goOn": "Press A to keep planting",
     "full": "The plot is full · {score} points",
     "overKeys": "A again · B take back a move",
-    "score": "Score {score}",
     "reached": "Grew {stage}",
     "field": "In the field: {n} plants, best {top}",
     "stages": "Harvest catalog",
     "help": "Arrows or a swipe: two of a kind grow into the next",
     "help2": "B take back · A restart",
+    "stage": {
+      "0": "Seed",
+      "1": "Sprout",
+      "2": "Leaf",
+      "3": "Flower",
+      "4": "Wheat",
+      "5": "Carrot",
+      "6": "Sheaf",
+      "7": "Basket",
+      "8": "Cart",
+      "9": "Granary",
+      "10": "Harvest"
+    },
     "past": "Harvest {n}"
   },
   "bugs": {
@@ -115,5 +131,6 @@
     "help2": "↓ drop A to the bottom",
     "help3": "B pause",
     "next": "Next"
-  }
+  },
+  "chatTab": "CHAT"
 }

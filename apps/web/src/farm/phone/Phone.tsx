@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 // there is something new; unfolded, its right screen is the chat (ChatWindow), and on a narrow screen only the chat
 // shows. Esc folds it, then puts it away; put away, it comes out folded.
 
-import { phoneWording } from "./words";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
@@ -270,7 +269,7 @@ function UnfoldTab(props: { unread: number }) {
       class="absolute top-16 left-full flex w-8 cursor-pointer flex-col items-center gap-0.5 py-2.5 text-[13px] leading-[15px] text-[#f7e8c4] active:translate-x-px"
       style={{ background: body, "box-shadow": `${outline}, inset -3px -3px 0 0 #4a321e, 3px 4px 0 0 #1e140a73` }}
     >
-      <For each={phoneWording().chatTab}>{(c) => <span>{c}</span>}</For>
+      <For each={[...t("web.farm.phone.chatTab")]}>{(c) => <span>{c}</span>}</For>
       <Show when={props.unread > 0}>
         <span class="block size-2.5 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />
       </Show>

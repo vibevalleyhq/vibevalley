@@ -15,7 +15,6 @@
   "empty": "{label} 里还没人说话。跟管家说一件要做的事，比如「让测试小吴跑一遍测试」。",
   "sendTo": "发送消息至 {label}",
   "side": "频道和帮工",
-  "chat": "聊天",
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
@@ -82,12 +81,10 @@
     "owner": "主人",
     "dispatch": "派活",
     "spent": "这一轮花了 {spent}",
-    "thread": "工单串",
     "unread": "{n} 条新",
     "edited": "（已编辑）",
     "deleted": "这条消息已删除",
     "replyGone": "原消息已删除",
-    "replyTo": "回复 {name}",
     "pinned": "已置顶",
     "newMessages": "新消息",
     "searching": "在找…",
@@ -107,8 +104,6 @@
     "remove": "删掉",
     "sure": "再点一次删掉",
     "pick": "选一个回应",
-    "save": "存下",
-    "cancel": "不改了",
     "editHint": "回车存下 · Esc 不改了"
   },
   "pins": {
@@ -120,7 +115,6 @@
     "open": "成员",
     "title": "成员",
     "owner": "主人",
-    "here": "在这里",
     "none": "这里还没有帮工",
     "looksAfter": "照看这里的管家"
   },
@@ -136,13 +130,10 @@
     "cancelReply": "不回复了",
     "attach": "附上文件",
     "removeFile": "去掉 {name}",
-    "uploading": "在上传…",
     "uploadFailed": "没传上去：{why}"
   },
   "manage": {
     "name": "名称",
-    "title": "标题",
-    "titleHint": "空着就照它挂在下面的那条消息",
     "category": "分组（可不填）",
     "categoryHint": "侧栏里按分组列频道",
     "orchestrator": "照看的管家",
@@ -232,7 +223,6 @@
       "owner": "@主人",
       "everyone": "@所有人"
     },
-    "orchestrator": "管家",
     "orchestratorNote": "派活、拆计划、问进度",
     "everyone": "所有人",
     "everyoneNote": "叫醒在场的每个帮工"

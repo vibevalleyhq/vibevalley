@@ -2,8 +2,6 @@ import { t } from "@vibevalley/i18n";
 // The voice form's choices: what each stage offers, the limits on the numbers
 // and what 恢复默认 on one part touches. Why settings cannot be saved is the server's answer (setting.check).
 
-import { voiceWording } from "./words";
-
 import {
   type Area,
   type Language,
@@ -27,12 +25,12 @@ export const areaLabel: Record<Area, string> = {
   CN: t("web.voice.choices.area.CN"),
 };
 export const languageLabel: Record<Language, string> = {
-  "zh-CN": voiceWording().choices.language["zh-CN"],
-  "zh-HK": voiceWording().choices.language["zh-HK"],
-  "zh-TW": voiceWording().choices.language["zh-TW"],
-  "en-US": voiceWording().choices.language["en-US"],
-  "ja-JP": voiceWording().choices.language["ja-JP"],
-  "ko-KR": voiceWording().choices.language["ko-KR"],
+  "zh-CN": t("web.voice.choices.language.zh-CN"),
+  "zh-HK": t("web.voice.choices.language.zh-HK"),
+  "zh-TW": t("web.voice.choices.language.zh-TW"),
+  "en-US": t("web.voice.choices.language.en-US"),
+  "ja-JP": t("web.voice.choices.language.ja-JP"),
+  "ko-KR": t("web.voice.choices.language.ko-KR"),
 };
 
 export const asrLabel: Record<VoiceASR["vendor"], string> = {

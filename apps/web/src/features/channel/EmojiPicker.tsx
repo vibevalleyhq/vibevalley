@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-import { chatWording } from "./words";
 import { For, onSettled, untrack } from "solid-js";
 import { Portal } from "@solidjs/web";
 import { emojiGroups, quickReactions } from "./emoji";
@@ -20,6 +19,10 @@ function placeBy(anchor: HTMLElement | undefined) {
 
 /** Every emoji the farm offers, the usual ones first; a press outside or Esc closes it. On the body, so no transformed
  * ancestor (the farm's phone) moves where fixed is. */
+
+const groupKeys = ["frequent", "faces", "hands", "things", "nature", "signs"] as const;
+/** A group of the picker by its id; an id with no name is shown as it is. */
+const groupName = (id: string) => ((groupKeys as readonly string[]).includes(id) ? t(`web.channel.emoji.groups.${id as (typeof groupKeys)[number]}`) : id);
 export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (emoji: string) => void; onClose: () => void }) {
   let box: HTMLDivElement | undefined;
   const at = untrack(() => placeBy(props.anchor));
@@ -53,8 +56,8 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
       >
         <For each={groups}>
           {(g) => (
-            <section aria-label={chatWording().emoji.groups[g.id] ?? g.id}>
-              <p class="px-1 pb-1 text-xs font-semibold text-muted">{chatWording().emoji.groups[g.id]}</p>
+            <section aria-label={groupName(g.id)}>
+              <p class="px-1 pb-1 text-xs font-semibold text-muted">{groupName(g.id)}</p>
               <div class="grid grid-cols-8 gap-0.5">
                 <For each={g.emoji}>
                   {(e) => (

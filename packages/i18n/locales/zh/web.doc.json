@@ -15,7 +15,6 @@
     "demo": "演示：几个帮工一起写",
     "append": "在末尾写一段",
     "owner": "主人",
-    "memory": "记性",
     "done": "做完了",
     "notDone": "没做完",
     "writing": "{who} 在写",
@@ -26,6 +25,7 @@
     "heading": "标题",
     "notSaved": "没存上：{why}",
     "changed": "这一块刚被别人改过",
-    "conflict": "{why}：你写的没存上，留在修订里了"
+    "conflict": "{why}：你写的没存上，留在修订里了",
+    "image": "图片：{alt} {src}"
   }
 }

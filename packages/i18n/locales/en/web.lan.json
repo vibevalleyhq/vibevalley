@@ -4,7 +4,6 @@
       "label": "Connect to this machine",
       "line": "Phones and other computers"
     },
-    "title": "Connect to this machine",
     "open": "On",
     "closed": "Off",
     "intro": "Once on, a phone or another computer on the same local network can scan to pair, then use VibeValley on this computer: see helpers, send work, talk in the farm chat.",
@@ -26,7 +25,15 @@
     "stop": "Stop adding",
     "asking": "\"{name}\" wants to connect to this computer. Let in, it can use VibeValley on this computer as you do.",
     "letIn": "Let it in",
-    "refuse": "Refuse"
+    "refuse": "Refuse",
+    "paired": "Paired {at} · last seen {seen}",
+    "pairedNever": "Paired {at} · never seen",
+    "notes": {
+      "0": "Helpers can run commands on this computer, so only paired devices may connect; pairing needs your approval here.",
+      "1": "A paired device uses VibeValley on this computer as you do. The switch and the devices are managed only on this computer.",
+      "2": "The connection is plain HTTP: people on the same network may see what goes over it. Turn it on only on networks you trust, such as your home Wi-Fi or your own hotspot.",
+      "3": "When the computer's address changes (another network), devices cannot connect; add the device here and scan again, without approving again."
+    }
   },
   "devices": {
     "android": "Android phone",

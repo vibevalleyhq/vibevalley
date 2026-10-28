@@ -105,7 +105,6 @@
   "removeNamed": "删除 {name}",
   "mcpKind": "MCP 的种类",
   "mcpName": "MCP 名字",
-  "mcpNameHint": "名字",
   "mcpTarget": "MCP 命令或地址",
   "add": "添加",
   "disallowed": "禁用的工具",
@@ -165,7 +164,6 @@
     "make": "捏一个新帮工",
     "makeOrchestrator": "添一个管家",
     "orchestratorLine": "不当帮工：派活、盯进度、转告结果。",
-    "memory": "记性",
     "ledger": "旧账",
     "voice": "声音",
     "disable": "停用",
@@ -175,5 +173,9 @@
     "tallyHint": "从这份档案派出去的帮工，干的活收进主分支的次数（服务端的账本）",
     "hired": "雇过",
     "merged": "合进"
-  }
+  },
+  "runtimeDefault": "runtime 默认",
+  "runtimeDefaultModel": "runtime 默认（{model}）",
+  "noEffort": "这个模型没有推理强度可选。",
+  "noEffortModel": "{model}没有推理强度可选。"
 }

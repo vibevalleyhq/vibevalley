@@ -2,9 +2,8 @@ import { t } from "@vibevalley/i18n";
 // A session's log by round (shownEvents, roundsOf, spansOf, roundMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
-import { appWording } from "../../base/words";
 import type { SessionEvent } from "@vibevalley/protocol";
-import { tookText } from "../../base/format";
+import { big, tookText } from "../../base/format";
 
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;
@@ -330,7 +329,7 @@ export const cacheHit = (s: TrajectorySummary) => (s.input + s.cacheRead > 0 ? s
 /** Under ten seconds to a tenth. */
 export const secondsText = (ms: number) => (ms < 10000 ? t("web.base.time.tenths", { s: (ms / 1000).toFixed(1) }) : tookText(ms));
 
-export const tokensText = (n: number) => (n < 10000 ? `${n}` : appWording().big(n, 1));
+export const tokensText = (n: number) => (n < 10000 ? `${n}` : big(n, 1));
 
 /** The part after an MCP server's prefix: `mcp__vibevalley__channel_message_send` is channel_message_send. */
 export function toolName(tool: string) {

@@ -54,7 +54,8 @@
     "allHelpers": "所有帮工",
     "shown": "{shown} / {of} 张",
     "clear": "清掉筛选",
-    "view": "看法"
+    "view": "看法",
+    "missing": "执行记录缺失：{what}。执行动作暂不可用。"
   },
   "marks": {
     "priority": "优先级：{word}"
@@ -92,7 +93,6 @@
     "merge": "完成，合进 {base}",
     "resolve": "让它解决冲突",
     "moved": "工单状态变了，先回到工单看看要你做的事。",
-    "project": "项目 {name}",
     "counts": "{commits} 个提交 · {files} 个文件",
     "commits": "提交 {n}",
     "files": "改了的文件 {n}",
@@ -125,7 +125,6 @@
     "rejected": "上次打回的",
     "made": "做出了什么",
     "nothingToSee": "没有可看的改动。",
-    "closed": "{text}。",
     "noAnswer": "还没有结论。",
     "noChanges": "还没有改动。",
     "changedFiles": "改了哪些文件",
@@ -183,7 +182,8 @@
     "answered": "在它的频道里",
     "evidence": "依据",
     "unsure": "拿不准的",
-    "next": "建议接着做"
+    "next": "建议接着做",
+    "conflict": "合进 {base} 会冲突：{files}"
   },
   "task": {
     "label": "计划",
@@ -194,7 +194,6 @@
     "ok": "好了。",
     "check": "检查",
     "scope": "改哪里",
-    "and": "、",
     "conclusion": "结论",
     "spent": "花了",
     "tried": "试了",
@@ -205,7 +204,6 @@
     "project": "项目",
     "progress": "进度",
     "progressLine": "{done} / {of} 步",
-    "branch": "分支",
     "parallel": "同时做",
     "atMost": "至多 {n} 步",
     "written": "写于",
@@ -213,10 +211,14 @@
     "abandonTitle": "{abandon}这个计划？",
     "abandonLine": "还没做完的步骤不再派出去；计划分支留着，做好的提交都还在。",
     "abandon": "确定放弃",
-    "unreadable": "看不了改动：",
     "reading": "正在看计划分支改了什么…",
     "behind": "这期间 {base} 多了 {n} 个提交",
-    "merge": "合进 {base}"
+    "merge": "合进 {base}",
+    "layer": "第 {n} 批",
+    "layerTogether": "第 {n} 批 · 这 {size} 步可以同时做",
+    "waitsOn": "等「{steps}」",
+    "stepSeparator": "」「",
+    "conflict": "合进 {base} 会冲突：{files}。先不合，等 {base} 上的改动处理好。"
   },
   "todo": {
     "queued": "排上队了：空位都满了，有空位就自动开工。",
@@ -247,9 +249,7 @@
     "status": "状态",
     "draftStatus": "草稿",
     "todoStatus": "待办",
-    "helper": "帮工",
     "pickForMe": "起草时替你挑",
-    "project": "项目",
     "whichProject": "在哪个项目里做",
     "firstProject": "还没有项目：新建一个",
     "newProjectLink": "＋ 新建项目",
@@ -337,7 +337,8 @@
     "turns": "{n} 轮",
     "orchestratorWorking": "管家在做",
     "missingFlag": "记录缺失",
-    "graph": "计划：{title}"
+    "graph": "计划：{title}",
+    "missing": "执行记录缺失：{what}"
   },
   "issue": {
     "asking": "{who}有 {n} 个问题要问你",
@@ -378,6 +379,12 @@
         "label": "删除"
       }
     },
-    "and": "、"
+    "and": "、",
+    "doing": "正在{action}",
+    "doingLabel": "正在{action}：{label}",
+    "who": "{name}",
+    "whoRuntime": "{name}（{runtime}）",
+    "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
+    "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交"
   }
 }

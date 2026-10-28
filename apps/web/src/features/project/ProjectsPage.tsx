@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // 项目: the codebases in the work root; 全部 is the whole map, a project its island, its
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
-import { projectsWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
@@ -342,7 +341,7 @@ function NotCounted(props: { reason: string }) {
   );
 }
 
-const levelName = projectsWording().level;
+const levelName = (level: number) => (level >= 0 && level <= 4 ? t(`web.project.level.${level as 0 | 1 | 2 | 3 | 4}`) : "");
 const tile = 12;
 const tileGap = 3;
 
@@ -356,7 +355,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
     const p = pointed();
     const busiest = streaks().busiest;
     return p && !p.future
-      ? `${dayText(p.at)} · ${p.commits > 0 ? t("web.project.dayCommits", { n: p.commits, level: levelName[p.level] ?? "" }) : t("web.project.untouched")}`
+      ? `${dayText(p.at)} · ${p.commits > 0 ? t("web.project.dayCommits", { n: p.commits, level: levelName(p.level) }) : t("web.project.untouched")}`
       : busiest
         ? t("web.project.busiest", { day: dayText(new Date(`${busiest.day}T12:00`)), n: busiest.commits })
         : " ";
@@ -395,7 +394,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
               onMouseLeave={() => setPointed(undefined)}
             >
               <div class="flex w-5 flex-col" style={{ gap: `${tileGap}px` }}>
-                <For each={projectsWording().rows}>
+                <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.project.rows.${i}`))}>
                   {(d) => (
                     <span class="flex items-center text-[10px] leading-none text-muted" style={{ height: `${tile}px` }}>
                       {d}
@@ -423,10 +422,10 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
           <span class="text-xs text-muted">{line()}</span>
           <span class="flex items-center gap-1 text-xs text-muted">
             {t("web.project.fewer")}
-            <For each={levelName}>
-              {(n, l) => (
-                <span title={n}>
-                  <SpriteIcon name={`day-${l()}`} size={tile} />
+            <For each={[0, 1, 2, 3, 4]}>
+              {(l) => (
+                <span title={levelName(l)}>
+                  <SpriteIcon name={`day-${l}`} size={tile} />
                 </span>
               )}
             </For>

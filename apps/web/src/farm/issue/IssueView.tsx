@@ -1,11 +1,9 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
 // workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
 
-import { appWording } from "../../base/words";
-import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -27,7 +25,7 @@ import {
 } from "../../features/issue";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
-import { castPrefix } from "../../ui/cast";
+import { castPrefix, outfitLabel, speciesLabel } from "../../ui/cast";
 import { issueThreadOf } from "../../features/channel";
 import { tookText, wallClockText } from "../../base/format";
 import { aria, useNow } from "../../base/util";
@@ -45,9 +43,6 @@ import { useAgent } from "../../base/agents";
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
-
-const speciesLabel: Record<string, string> = appWording().cast.species;
-const outfitLabel: Record<string, string> = appWording().cast.outfit;
 
 /** The plot's issue while the store says so (the inspect layer). */
 export function IssueView() {
@@ -316,7 +311,7 @@ function IssueBody(props: {
                   <div class="flex flex-col">
                     <p class={body}>{changesLine(c())}</p>
                     <Show when={c().conflicts.length > 0}>
-                      <p class={[body, "text-berry"]}>{farmWording().plot.conflict(c().base, c().conflicts)}</p>
+                      <p class={[body, "text-berry"]}>{t("web.farm.plot.conflict", { base: c().base, files: list(c().conflicts) })}</p>
                     </Show>
                     <div class="mt-1.5">
                       <For each={c().files.slice(0, 12)}>
@@ -486,7 +481,7 @@ function Aside(props: { session: Session; agent?: Agent }) {
       </div>
       <p class="mt-2 text-[13px]">{cropLabel[plot().crop]}</p>
       <p class={["text-center", xs]}>
-        {speciesLabel[kind()[0] ?? ""] ?? kind()[0]} · {outfitLabel[kind()[1] ?? ""] ?? kind()[1]}
+        {(speciesLabel as Record<string, string>)[kind()[0] ?? ""] ?? kind()[0]} · {(outfitLabel as Record<string, string>)[kind()[1] ?? ""] ?? kind()[1]}
       </p>
       <p class={xs}>{t("web.farm.plot.where", { plot: stationOfSession(props.session) + 1, round: Math.round(props.session.runs) })}</p>
     </div>

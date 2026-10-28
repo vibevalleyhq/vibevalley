@@ -2,8 +2,6 @@ import { t } from "@vibevalley/i18n";
 // What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
 // folded away.
 
-import { memoryWording } from "./words";
-
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -161,7 +159,9 @@ export function MemoryPanel(props: { agent: string }) {
                         whose(m()),
                         ago(m().at, now()),
                         m().recalled > 0
-                          ? memoryWording().memory.recalled(Math.round(m().recalled), m().recalledAt ? ago(m().recalledAt!, now()) : undefined)
+                          ? m().recalledAt
+                            ? t("web.memory.memory.recalledLast", { n: Math.round(m().recalled), last: ago(m().recalledAt!, now()) })
+                            : t("web.memory.memory.recalled", { n: Math.round(m().recalled) })
                           : t("web.memory.memory.neverRecalled"),
                       ]}
                       warning={m().fading ? t("web.memory.memory.fading", { keep: memoryKeep }) : undefined}

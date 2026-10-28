@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // 模板: every template a profile installs from, the orchestrators' first; a card shows its whole recipe before it is
 // installed, and a folder on this machine can be added beside the built-in ones. /agents/templates.
 
-import { agentsWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
@@ -118,7 +117,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
         <span class="flex min-w-0 flex-1 flex-col gap-0.5">
           <span class="flex items-center gap-2">
             <span class="truncate text-base font-semibold">{template().name}</span>
-            <span class="shrink-0 rounded bg-hover px-1.5 text-xs text-muted">{agentsWording().role[template().role]}</span>
+            <span class="shrink-0 rounded bg-hover px-1.5 text-xs text-muted">{t(`web.agent.role.${template().role}`)}</span>
           </span>
           <span class="line-clamp-2 text-sm text-muted">{template().duty}</span>
           <span class={["text-xs", here() ? "text-[#3f6427]" : "text-[#b8682a]"]}>

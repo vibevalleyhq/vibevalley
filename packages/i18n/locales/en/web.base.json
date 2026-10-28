@@ -99,7 +99,20 @@
     "tenths": "{s}s",
     "today": "Today",
     "yesterday": "Yesterday",
-    "clock": "{am, select, true {{hh}:{mm} AM} other {{hh}:{mm} PM}}"
+    "clock": "{am, select, true {{hh}:{mm} AM} other {{hh}:{mm} PM}}",
+    "weekdays": {
+      "0": "Sun",
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat"
+    },
+    "monthDay": "{month, select, 1 {Jan} 2 {Feb} 3 {Mar} 4 {Apr} 5 {May} 6 {Jun} 7 {Jul} 8 {Aug} 9 {Sep} 10 {Oct} 11 {Nov} other {Dec}} {day}",
+    "month": "{month, select, 1 {Jan} 2 {Feb} 3 {Mar} 4 {Apr} 5 {May} 6 {Jun} 7 {Jul} 8 {Aug} 9 {Sep} 10 {Oct} 11 {Nov} other {Dec}}",
+    "date": "{m, select, 1 {Jan} 2 {Feb} 3 {Mar} 4 {Apr} 5 {May} 6 {Jun} 7 {Jul} 8 {Aug} 9 {Sep} 10 {Oct} 11 {Nov} other {Dec}} {d}, {y}",
+    "day": "{weekday}, {m, select, 1 {Jan} 2 {Feb} 3 {Mar} 4 {Apr} 5 {May} 6 {Jun} 7 {Jul} 8 {Aug} 9 {Sep} 10 {Oct} 11 {Nov} other {Dec}} {d}"
   },
   "money": {
     "underCent": "under ¥0.01",
@@ -136,5 +149,6 @@
   "secret": {
     "hide": "Hide",
     "peek": "Peek"
-  }
+  },
+  "big": "{n}k"
 }

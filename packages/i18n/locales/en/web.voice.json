@@ -14,7 +14,6 @@
       "noDeepseek": "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",
       "openai": "Any OpenAI-compatible endpoint: Qwen, Kimi, your own deployment…"
     },
-    "title": "Voice",
     "intro": "The manager hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The manager's persona, greeting and voice are on the",
     "orchestratorPage": "manager page",
     "period": ".",
@@ -58,7 +57,6 @@
     "dictationKey": "Credentials (may be empty locally)",
     "persona": {
       "intro": "How the manager opens a call and what voice it uses. The credentials, how it listens and who answers are on the",
-      "voicePage": "Voice",
       "page": "page.",
       "open": "Opening",
       "openParts": "Persona · greeting",
@@ -102,19 +100,11 @@
     },
     "asr": {
       "ares": "Agora ARES",
-      "deepgram": "Deepgram",
       "microsoft": "Microsoft"
     },
     "answer": {
-      "orchestrator": "Manager",
       "agora": "Agora hosted",
-      "deepseek": "DeepSeek",
       "openai": "Your own endpoint"
-    },
-    "tts": {
-      "minimax": "MiniMax",
-      "openai": "OpenAI",
-      "microsoft": "Microsoft"
     },
     "minimax": {
       "gentle": "Gentle youth",

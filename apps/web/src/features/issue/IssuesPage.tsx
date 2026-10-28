@@ -1,5 +1,4 @@
-import { t } from "@vibevalley/i18n";
-import { issuesWording } from "./words";
+import { list, t } from "@vibevalley/i18n";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Issue, Session } from "@vibevalley/protocol";
@@ -229,7 +228,7 @@ function Detail(props: {
         {() => (
           <div>
             <h1 class="text-xl font-semibold">{as("missing").issue.title}</h1>
-            <p class="mt-3 text-sm">{issuesWording().page.missing(as("missing").missing)}</p>
+            <p class="mt-3 text-sm">{t("web.issue.page.missing", { what: list(as("missing").missing) })}</p>
           </div>
         )}
       </Match>

@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // mast), offers its seeds (its templates and recent words) and who sows; the watering form takes a
 // few words to the helper.
 
-import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -244,7 +243,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   );
 }
 
-const dropsOfAdvice = farmWording().water.drops;
+const dropsOfAdvice = ([0, 1, 2, 3] as const).map((i) => t(`web.farm.water.drops.${i}`));
 
 export function WaterForm(props: { session: Session; onDone: () => void }) {
   const core = useCore();

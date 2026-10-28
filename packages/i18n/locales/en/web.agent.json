@@ -105,7 +105,6 @@
   "removeNamed": "Delete {name}",
   "mcpKind": "MCP kind",
   "mcpName": "MCP name",
-  "mcpNameHint": "Name",
   "mcpTarget": "MCP command or address",
   "add": "Add",
   "disallowed": "Disallowed tools",
@@ -165,7 +164,6 @@
     "make": "Make a new helper",
     "makeOrchestrator": "Add a manager",
     "orchestratorLine": "Not a helper: sends work, watches progress, passes on results.",
-    "memory": "Memory",
     "ledger": "Ledger",
     "voice": "Voice",
     "disable": "Disable",
@@ -175,5 +173,9 @@
     "tallyHint": "How many times helpers sent from this profile got work merged into main (the server's ledger)",
     "hired": "Hired",
     "merged": "Merged"
-  }
+  },
+  "runtimeDefault": "The runtime's default",
+  "runtimeDefaultModel": "The runtime's default ({model})",
+  "noEffort": "This model has no effort levels.",
+  "noEffortModel": "{model} has no effort levels."
 }

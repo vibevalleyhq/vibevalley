@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
 
-import { runtimesWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -276,10 +275,9 @@ function Usage(props: { info: RuntimeInfo }) {
                           {t("web.runtime.balance", { provider: u().provider, enough: u().available })}
                         </p>
                         <p class="text-sm text-muted">
-                          {runtimesWording().spentToday(
-                            yuan(props.info.spentToday ?? 0),
-                            (props.info.settings.dailyBudget ?? 0) > 0 ? yuan(props.info.settings.dailyBudget!) : undefined,
-                          )}
+                          {(props.info.settings.dailyBudget ?? 0) > 0
+                            ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget!) })
+                            : t("web.runtime.spentToday", { spent: yuan(props.info.spentToday ?? 0) })}
                         </p>
                       </>
                     )}

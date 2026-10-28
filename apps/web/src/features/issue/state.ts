@@ -3,8 +3,6 @@ import { t } from "@vibevalley/i18n";
 // it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
-import { issuesWording } from "./words";
-
 import { wording } from "@vibevalley/protocol/words";
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
@@ -12,6 +10,8 @@ import { endedAt, issueInTask, issueTitle } from "./rules";
 import { tookText } from "../../base/format";
 import type { Tone } from "./cards";
 
+/** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
+const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export const attentionTone: Record<Attention, Tone> = {
   draft: "faint",
   queued: "faint",
@@ -132,7 +132,12 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     others: attention.acts.map((a) => a.act).filter((a) => a !== attention.lead),
     criteria: rows,
     met: rows.filter((r) => r.result === "met").length,
-    doing: attention.state === "working" && current.action !== "none" ? issuesWording().issue.doing(current.actionText ?? "", current.label) : undefined,
+    doing:
+      attention.state === "working" && current.action !== "none"
+        ? current.label
+          ? t("web.issue.issue.doingLabel", { action: capitalized(current.actionText ?? ""), label: current.label })
+          : t("web.issue.issue.doing", { action: capitalized(current.actionText ?? "") })
+        : undefined,
     openFindings: issue.findings.filter((f) => !f.resolved),
     resolvedFindings: issue.findings.filter((f) => f.resolved),
     crewLine:
@@ -140,7 +145,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
         ? undefined
         : // One plot, one worktree: only the session on it now changes the code.
           [crew.map((c) => c.name).join(t("web.issue.issue.and")), ...(hand ? [t("web.issue.issue.editing", { who: hand.name })] : [])].join(" · "),
-    whoLine: issuesWording().issue.who(head.name, head.runtime),
+    whoLine: head.runtime ? t("web.issue.issue.whoRuntime", { name: head.name, runtime: head.runtime }) : t("web.issue.issue.who", { name: head.name }),
     historyLine: t("web.issue.issue.history", {
       n: sessions.length,
       line: sessions.map((r) => t("web.issue.issue.historyItem", { name: r.name, id: r.id })).join(" → "),
@@ -184,7 +189,10 @@ export const lineCounts = (c: Changes): [number, number] => [
 /** The one line over an issue's changes. */
 export function changesLine(c: Changes) {
   const [added, removed] = lineCounts(c);
-  return issuesWording().issue.changes(c.branch ?? "", c.base, c.commits.length, added, removed, c.uncommitted.length);
+  const counts = { branch: c.branch ?? "", base: c.base, commits: c.commits.length, added, removed };
+  return c.uncommitted.length
+    ? t("web.issue.issue.changesUncommitted", { ...counts, uncommitted: c.uncommitted.length })
+    : t("web.issue.issue.changes", counts);
 }
 
 /** The empty 干活过程 says why. */

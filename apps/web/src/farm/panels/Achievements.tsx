@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // achievements with its medals and how far along it is, and the secrets found. The catalogue is the server's
 // (game.achievements), the standings come with the frame (view.achievements).
 
-import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
@@ -20,7 +19,8 @@ import { tint, Tinted } from "./bits";
 
 const walls: AchievementCategory[] = ["harvest", "craft", "thrift", "team"];
 
-const tierText = farmWording().achievements.tier;
+/** A tier's metal: bronze, silver, gold. */
+const tierText = (tier: number) => (tier >= 1 && tier <= 3 ? t(`web.farm.achievements.tier.${tier as 1 | 2 | 3}`) : "");
 
 const categoryText: Record<AchievementCategory, string> = {
   starter: t("web.farm.achievements.category.starter"),
@@ -37,7 +37,7 @@ const emptyProgress: Progress = { coins: 0, streak: 0, bestStreak: 0, counts: {}
 
 const day = (at: number) => {
   const d = new Date(Math.round(at));
-  return farmWording().achievements.day(d.getMonth() + 1, d.getDate());
+  return t("web.farm.achievements.day", { month: d.getMonth() + 1, day: d.getDate() });
 };
 
 /** The tier's name; the achievement's own before the first. */
@@ -350,7 +350,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
               <For each={props.a.tiers}>
                 {(t, i) => (
                   <span
-                    title={`${tierText[i() + 1]}：${numberText(t.need)} ${unit()}`}
+                    title={`${tierText(i() + 1)}：${numberText(t.need)} ${unit()}`}
                     class="ml-1 h-2 w-2"
                     style={{ background: i() < standing().tier ? pip[i() + 1] : "#c8a46e" }}
                   />
@@ -368,7 +368,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
                   value={Math.min(standing().count, next())}
                   max={next()}
                   height={6}
-                  label={t("web.farm.achievements.toTier", { tier: tierText[standing().tier + 1] ?? "" })}
+                  label={t("web.farm.achievements.toTier", { tier: tierText(standing().tier + 1) })}
                 />
               </span>
               <span class="text-[12px] text-bark-600">
@@ -380,7 +380,9 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
         <Show when={at()}>
           {(when) => (
             <p class="mt-1 text-[12px] text-bark-400">
-              {farmWording().achievements.earned(day(when()), props.a.tiers.length > 1 ? (tierText[standing().tier] ?? "") : "")}
+              {props.a.tiers.length > 1 && tierText(standing().tier)
+                ? t("web.farm.achievements.earnedTier", { day: day(when()), tier: tierText(standing().tier) })
+                : t("web.farm.achievements.earned", { day: day(when()) })}
             </p>
           )}
         </Show>

@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
-import { chatWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
@@ -614,7 +613,7 @@ function Members(props: { channel: Channel }) {
     <aside aria-label={t("web.channel.members.title")} class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex">
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
-        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{chatWording().members.owner.slice(0, 1)}</span>
+        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{t("web.channel.members.owner").slice(0, 1)}</span>
         {t("web.channel.members.owner")}
       </div>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">

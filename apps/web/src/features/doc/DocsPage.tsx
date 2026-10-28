@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // helpers. A block shows its marks until it is clicked into; then it is a plain field (marks are kept through the edit),
 // and Enter splits it, Backspace at its start joins it to the one before, Up and Down at its ends move between blocks.
 
-import { docWording } from "./words";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -294,7 +293,7 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
               <Placeholder
                 text={
                   kind() === "image"
-                    ? docWording().docs.image(r().attrs.alt ?? "", r().attrs.src ?? "")
+                    ? t("web.doc.docs.image", { alt: r().attrs.alt ?? "", src: r().attrs.src ?? "" }).trim()
                     : kind() === "issue"
                       ? t("web.doc.docs.issue", { id: r().attrs.issueId ?? "" })
                       : t("web.doc.docs.unknown", { type: r().type })

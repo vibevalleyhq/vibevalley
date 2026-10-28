@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 // helpers' worktrees. The room on an island is roomLeft, the rule the server refuses a start by: an open plot is one
 // more that may start now, a shut one waits for the farm to free up.
 
-import { appWording } from "../../base/words";
 import { type Crop, dayMs, type Issue, type LanguageCount, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
 import type { Pose } from "../../ui/cast";
@@ -147,7 +146,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
       column.push({ day, at, commits: n, level: level(n), future: at > today });
       // A month's name over the week its first day is in; the first week names the month it shows.
       if ((at.getDate() === 1 || (w === 0 && d === 0)) && (months.length === 0 || months.at(-1)!.week !== w))
-        months.push({ week: w, label: appWording().time.month(at.getMonth() + 1) });
+        months.push({ week: w, label: t("web.base.time.month", { month: at.getMonth() + 1 }) });
     }
     grid.push(column);
   }
@@ -224,10 +223,14 @@ export function since(at: number, now: number) {
 
 export const dateText = (at: number) => {
   const d = new Date(Math.round(at));
-  return appWording().time.date(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  return t("web.base.time.date", { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() });
 };
 
-export const dayText = (d: Date) => appWording().time.day(d.getMonth() + 1, d.getDate(), appWording().time.weekdays[d.getDay()]!);
+export const dayText = (d: Date) =>
+  t("web.base.time.day", { m: d.getMonth() + 1, d: d.getDate(), weekday: t(`web.base.time.weekdays.${d.getDay() as Weekday}`) });
+
+/** A day of the week as Date.getDay counts it, Sunday first. */
+type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /** As toLocaleString('zh-CN') writes it: 「12,345」. */
 export const number = (n: number) => (n < 0 ? "-" : "") + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");

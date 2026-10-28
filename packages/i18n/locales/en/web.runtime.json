@@ -19,7 +19,6 @@
   "intro": "The coding agents on this computer",
   "usedBy": " · {n} agents",
   "reading": "Reading…",
-  "availableVersion": "available {version}",
   "bundled": "installed with oar",
   "commandLine": "command line",
   "unsupportedWhy": "Unsupported: {why}",
@@ -116,11 +115,22 @@
     "weekly": "This week's allowance",
     "week": "This week ({models})",
     "oneWeek": "· a week",
+    "weekdays": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
     "now": "resets now",
     "minutes": "resets in {m} min",
     "hours": "{h, plural, one {resets in an hour} other {resets in # hours}}",
     "on": "resets {weekday}",
     "unreported": "reports no allowance",
     "signedOut": "Not signed in"
-  }
+  },
+  "spentToday": "Helpers spent about {spent} today, with no daily budget.",
+  "spentTodayBudget": "Helpers spent about {spent} today, against a daily budget of {budget}."
 }

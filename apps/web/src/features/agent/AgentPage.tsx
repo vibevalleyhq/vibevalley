@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
 // orchestrator from sending it, the server's answer (agent.check), under them.
 
-import { agentsWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -612,7 +611,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo; patch: Pat
         <Select
           label={t("web.agent.model")}
           value={props.draft.model}
-          placeholder={agentsWording().runtimeDefault(fallback() ?? "")}
+          placeholder={fallback() ? t("web.agent.runtimeDefaultModel", { model: fallback() }) : t("web.agent.runtimeDefault")}
           options={models().map((m) => ({
             value: m.id,
             label: m.effortLevels.length > 0 ? t("web.agent.modelLevels", { name: m.name, n: m.effortLevels.length }) : m.name,
@@ -622,7 +621,14 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo; patch: Pat
       </Labeled>
       <Labeled
         label={t("web.agent.effort")}
-        hint={refusedEffort() ?? (levels().length === 0 ? agentsWording().noEffort(model()?.name) : t("web.agent.effortDefault"))}
+        hint={
+          refusedEffort() ??
+          (levels().length === 0
+            ? model()?.name
+              ? t("web.agent.noEffortModel", { model: model()!.name })
+              : t("web.agent.noEffort")
+            : t("web.agent.effortDefault"))
+        }
       >
         <div>
           <Segmented

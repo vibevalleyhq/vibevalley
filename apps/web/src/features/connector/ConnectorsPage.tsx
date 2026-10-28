@@ -2,8 +2,6 @@ import { t } from "@vibevalley/i18n";
 // 连接器: the chat apps the owner talks to the farm from. Polled while open: a scan on the
 // phone moves a login on without a reload.
 
-import { connectorWording } from "./words";
-
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
@@ -32,9 +30,9 @@ const connectorHow: Record<ConnectorID, string> = {
 };
 
 const connectorNotes: Record<ConnectorID, string[]> = {
-  weixin: connectorWording().connectors.notes.weixin,
-  feishu: connectorWording().connectors.notes.feishu,
-  qq: connectorWording().connectors.notes.qq,
+  weixin: ([0, 1, 2] as const).map((i) => t(`web.connector.connectors.notes.weixin.${i}`)),
+  feishu: ([0, 1, 2] as const).map((i) => t(`web.connector.connectors.notes.feishu.${i}`)),
+  qq: ([0, 1, 2] as const).map((i) => t(`web.connector.connectors.notes.qq.${i}`)),
 };
 
 const connectorsAlways = t("web.connector.connectors.always");

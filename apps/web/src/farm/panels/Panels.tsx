@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
 // (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
 
-import { farmWording } from "../words";
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
@@ -202,10 +201,10 @@ function OrchestratorLooks() {
 }
 
 const shop = [
-  { ...farmWording().panel.shopItems.scarecrow, price: 200, icon: "icon-scarecrow" },
-  { ...farmWording().panel.shopItems.seeds, price: 300, icon: "icon-seeds" },
-  { ...farmWording().panel.shopItems.bunting, price: 400, icon: "icon-bunting" },
-  { ...farmWording().panel.shopItems.doghouse, price: 600, icon: "icon-doghouse" },
+  { name: t("web.farm.panel.shopItems.scarecrow.name"), note: t("web.farm.panel.shopItems.scarecrow.note"), price: 200, icon: "icon-scarecrow" },
+  { name: t("web.farm.panel.shopItems.seeds.name"), note: t("web.farm.panel.shopItems.seeds.note"), price: 300, icon: "icon-seeds" },
+  { name: t("web.farm.panel.shopItems.bunting.name"), note: t("web.farm.panel.shopItems.bunting.note"), price: 400, icon: "icon-bunting" },
+  { name: t("web.farm.panel.shopItems.doghouse.name"), note: t("web.farm.panel.shopItems.doghouse.note"), price: 600, icon: "icon-doghouse" },
 ];
 
 function Shop() {

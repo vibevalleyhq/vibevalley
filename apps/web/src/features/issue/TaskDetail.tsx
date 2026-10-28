@@ -1,5 +1,4 @@
-import { t } from "@vibevalley/i18n";
-import { issuesWording } from "./words";
+import { list, t } from "@vibevalley/i18n";
 import { createSignal, For, Show } from "solid-js";
 
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
@@ -106,19 +105,23 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
           {(layer, i) => (
             <div>
               <Show when={layers().length > 1}>
-                <div class="mt-3 mb-1 text-xs font-semibold text-muted">{issuesWording().task.layer(i() + 1, layer().length)}</div>
+                <div class="mt-3 mb-1 text-xs font-semibold text-muted">
+                  {layer().length > 1 ? t("web.issue.task.layerTogether", { n: i() + 1, size: layer().length }) : t("web.issue.task.layer", { n: i() + 1 })}
+                </div>
               </Show>
               <For each={layer()}>
                 {(id) => (
                   <Show when={byId().get(id)}>
                     {(task) => {
                       const summary = () => {
-                        const t = task();
-                        const waitsOn = (t.blockedBy ?? []).map((b) => byId().get(b)?.title ?? b);
+                        const step = task();
+                        const waitsOn = (step.blockedBy ?? []).map((b) => byId().get(b)?.title ?? b);
                         return [
-                          t.stateText ?? t.state,
-                          ...(t.agent ? [nameOf()(t.agent)] : []),
-                          ...(t.state === "waiting" && waitsOn.length ? [issuesWording().task.waitsOn(waitsOn)] : []),
+                          step.stateText ?? step.state,
+                          ...(step.agent ? [nameOf()(step.agent)] : []),
+                          ...(step.state === "waiting" && waitsOn.length
+                            ? [t("web.issue.task.waitsOn", { steps: waitsOn.join(t("web.issue.task.stepSeparator")) })]
+                            : []),
                         ].join(" · ");
                       };
                       const issue = () => props.stepIssues[task().id];
@@ -276,7 +279,7 @@ function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => 
                 <p class="text-xs text-muted">{t("web.issue.task.behind", { base: c().base, n: c().behind })}</p>
               </Show>
               <Show when={c().conflicts.length > 0}>
-                <Note tone="berry">{issuesWording().task.conflict(c().base, c().conflicts)}</Note>
+                <Note tone="berry">{t("web.issue.task.conflict", { base: c().base, files: list(c().conflicts) })}</Note>
               </Show>
               <ChangesBody changes={c()} />
               <div class="mt-2 flex justify-end gap-2">

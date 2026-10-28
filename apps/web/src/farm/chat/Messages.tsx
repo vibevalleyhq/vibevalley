@@ -1,9 +1,10 @@
 import { t } from "@vibevalley/i18n";
+
+const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyToText", { name, text }) : t("web.farm.chat.replyTo", { name }));
 // The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
 import { spentText } from "../../base/format";
-import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -334,7 +335,7 @@ function Answers(props: { channel: string; number: number }) {
   const m = useMessage(() => ({ channel: props.channel, number: props.number }));
   return (
     <p class={["mb-0.5 truncate", small]}>
-      {farmWording().chat.replyTo(m()?.name ?? `#${props.number}`, m()?.deleted === undefined ? (m()?.text ?? "") : t("web.farm.chat.deleted"))}
+      {replyTo(m()?.name ?? `#${props.number}`, m()?.deleted === undefined ? (m()?.text ?? "") : t("web.farm.chat.deleted"))}
     </p>
   );
 }

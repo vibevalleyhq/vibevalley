@@ -1,6 +1,5 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
-import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
@@ -246,7 +245,7 @@ export function IssueDetail(props: {
                 <div class="flex flex-col gap-2">
                   <div class="text-sm">{changesLine(c())}</div>
                   <Show when={c().conflicts.length > 0}>
-                    <div class="text-sm text-berry">{issuesWording().detail.conflict(c().base, c().conflicts)}</div>
+                    <div class="text-sm text-berry">{t("web.issue.detail.conflict", { base: c().base, files: list(c().conflicts) })}</div>
                   </Show>
                   <Fold label={t("web.issue.detail.changedFiles")} summary={t("web.issue.detail.fileCount", { n: c().files.length })}>
                     <ChangesHead changes={c()} />
@@ -502,15 +501,15 @@ const stepsLine = (steps: SessionEvent[]) => {
 };
 
 const stepWord: Partial<Record<SessionEvent["type"], string>> = {
-  "run/start": issuesWording().detail.step["run/start"],
-  "user/message": issuesWording().detail.step["user/message"],
-  "memory/recalled": issuesWording().detail.step["memory/recalled"],
-  "assistant/thinking": issuesWording().detail.step["assistant/thinking"],
-  "assistant/message": issuesWording().detail.step["assistant/message"],
-  "tool/call": issuesWording().detail.step["tool/call"],
-  "llm/retry": issuesWording().detail.step["llm/retry"],
-  "run/error": issuesWording().detail.step["run/error"],
-  "run/end": issuesWording().detail.step["run/end"],
+  "run/start": t("web.issue.detail.step.run/start"),
+  "user/message": t("web.issue.detail.step.user/message"),
+  "memory/recalled": t("web.issue.detail.step.memory/recalled"),
+  "assistant/thinking": t("web.issue.detail.step.assistant/thinking"),
+  "assistant/message": t("web.issue.detail.step.assistant/message"),
+  "tool/call": t("web.issue.detail.step.tool/call"),
+  "llm/retry": t("web.issue.detail.step.llm/retry"),
+  "run/error": t("web.issue.detail.step.run/error"),
+  "run/end": t("web.issue.detail.step.run/end"),
 };
 
 /** The session's steps, newest last; tool results and usage are left to the farm's fuller log. */
