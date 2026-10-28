@@ -54,7 +54,8 @@ export function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agen
   return {
     id: "",
     name: agentsWording().newName(runtimeName(catalog, runtime)),
-    role: "",
+    role: "worker",
+    duty: "",
     enabled: true,
     runtime,
     model: "",
@@ -383,8 +384,8 @@ function Stage(props: { draft: Agent; pose: Pose }) {
       </div>
       <div class="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1">
         <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || agentsWording().unnamedAgent}</span>
-        <Show when={props.draft.role}>
-          <span class="max-w-96 rounded bg-paper/75 px-2 py-px text-center text-xs">{props.draft.role}</span>
+        <Show when={props.draft.duty}>
+          <span class="max-w-96 rounded bg-paper/75 px-2 py-px text-center text-xs">{props.draft.duty}</span>
         </Show>
       </div>
       <span class="pointer-events-none absolute top-3 right-4 rounded bg-paper/75 px-2 py-px text-xs">
@@ -438,12 +439,12 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
             <Labeled label={agentsWording().name} tip={agentsWording().nameTip} error={props.nameTaken ? agentsWording().nameTaken : undefined}>
               <TextInput aria-label={agentsWording().name} value={draft().name} onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })} />
             </Labeled>
-            <Labeled label={agentsWording().role} tip={agentsWording().roleTip}>
+            <Labeled label={agentsWording().duty} tip={agentsWording().dutyTip}>
               <TextInput
-                aria-label={agentsWording().role}
+                aria-label={agentsWording().duty}
                 placeholder={agentsWording().roleHint}
-                value={draft().role}
-                onInput={(e) => props.patch({ ...draft(), role: e.currentTarget.value })}
+                value={draft().duty}
+                onInput={(e) => props.patch({ ...draft(), duty: e.currentTarget.value })}
               />
             </Labeled>
             <Labeled label={agentsWording().tags} tip={agentsWording().tagsTip}>

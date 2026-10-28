@@ -2,7 +2,7 @@
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
-import { type Agent, DeliverableValues, type Issue, IssueStatusValues, orchestratorAgent, type RecurrenceWhen, type TaskEdit } from "@vibevalley/protocol";
+import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type RecurrenceWhen, type TaskEdit } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
@@ -56,7 +56,7 @@ type IssueTool = "issue.get" | "issue.diff.get" | "session.stop";
 
 /** Who is calling, at the moment of the call. */
 export interface Caller {
-  /** The profile: orchestratorAgent for the orchestrator. */
+  /** The profile: defaultOrchestrator for the orchestrator. */
   readonly agent: string;
   /** The session working as agent, and the project it works in; both empty for the orchestrator. */
   readonly session: string;
@@ -176,7 +176,7 @@ export const make = Effect.gen(function* () {
   };
   const whoOf = (t: Issue) =>
     workerOf(t)?.session.name ??
-    (t.assignee === orchestratorAgent ? ownerAgentWord : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
+    (t.assignee === defaultOrchestrator ? ownerAgentWord : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
   const nobodyOn = (t: Issue) => answers.nobodyOn(t.number);
   const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((t) => t.id === w.session.issue)?.number : undefined);
 
@@ -196,7 +196,7 @@ export const make = Effect.gen(function* () {
   // The orchestrator may say a profile's name or id.
   const profile = (key: string): Effect.Effect<string, ToolRefusal> => {
     const k = key.trim();
-    if (k === orchestratorAgent || k === ownerAgentWord) return refuse(answers.rememberOwnNote);
+    if (k === defaultOrchestrator || k === ownerAgentWord) return refuse(answers.rememberOwnNote);
     const a = agents.named(k);
     return a ? Effect.succeed(a.id) : refuse(answers.noProfileNamed(k));
   };

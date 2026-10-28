@@ -4,7 +4,7 @@
 
 import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
-import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { bottleSprite, quotaOf } from "../../features/runtime";
 import { statusOf, type FriendStatus } from "./friendStatus";
 import { farm } from "../store";
@@ -96,7 +96,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
               </p>
             </div>
           </div>
-          <p class="mt-2 text-[13px] text-bark-800">{props.agent.role}</p>
+          <p class="mt-2 text-[13px] text-bark-800">{props.agent.duty}</p>
           <div class="mt-3 flex items-center gap-2">
             <div class="flex-1">
               <Show when={props.agent.enabled} fallback={<span class="text-[13px] text-bark-600">{farmWording().friends.disabled}</span>}>
@@ -127,7 +127,7 @@ export function Friends(props: { height: number }) {
   const frames = useFrames();
   const open = useFarm((s) => s.friendsOpen);
   const sorted = () => {
-    const work = ready(agents, []).filter((a) => a.id !== orchestratorAgent);
+    const work = ready(agents, []).filter((a) => a.id !== defaultOrchestrator);
     return [...work.filter((a) => a.enabled), ...work.filter((a) => !a.enabled)];
   };
   const statuses = () => {

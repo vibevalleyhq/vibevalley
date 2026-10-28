@@ -1,7 +1,7 @@
 import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { For, Match, Show, Switch } from "solid-js";
-import { type IssueStatus, orchestratorAgent, type Priority } from "@vibevalley/protocol";
+import { type IssueStatus, defaultOrchestrator, type Priority } from "@vibevalley/protocol";
 import type { BoardCard, Tone } from "./cards";
 import { cardAgent } from "./cards";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
@@ -180,7 +180,7 @@ export function FlagChip(props: { text: string; tone: Tone }) {
 export function AgentFaceOf(props: { agent: string; runtime?: string; size?: number }) {
   const found = useAgent(() => props.agent);
   return (
-    <Show when={props.agent !== orchestratorAgent} fallback={<OrchestratorFace size={props.size ?? 18} />}>
+    <Show when={props.agent !== defaultOrchestrator} fallback={<OrchestratorFace size={props.size ?? 18} />}>
       <span title={found()?.name ?? props.agent} class="inline-flex">
         <AgentFace agentId={props.agent} runtime={props.runtime ?? found()?.runtime} look={found()?.look} size={props.size ?? 18} />
       </span>

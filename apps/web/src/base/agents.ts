@@ -1,5 +1,5 @@
 import { keepPreviousData } from "@tanstack/solid-query";
-import { type Agent, type AgentProblem, orchestratorAgent } from "@vibevalley/protocol";
+import { type Agent, type AgentProblem, defaultOrchestrator } from "@vibevalley/protocol";
 import { api } from "./api";
 import { createSettled } from "./util";
 import { ready, useAgents, useQuery } from "./query";
@@ -7,7 +7,7 @@ import { ready, useAgents, useQuery } from "./query";
 /** The profiles work is sent to: the orchestrator's is apart; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
   const all = useAgents();
-  return (): Agent[] => ready(all, []).filter((a) => a.id !== orchestratorAgent && (!enabled || a.enabled));
+  return (): Agent[] => ready(all, []).filter((a) => a.id !== defaultOrchestrator && (!enabled || a.enabled));
 }
 
 /** A profile by its id, once the profiles are read; undefined for none or one gone. */

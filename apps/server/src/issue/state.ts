@@ -1,4 +1,4 @@
-import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus, orchestratorAgent } from "@vibevalley/protocol";
+import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus, defaultOrchestrator } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
@@ -101,4 +101,4 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
 /** The findings still open: a failed acceptance's, until the next acceptance passes. */
 export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.resolved).length;
 
-export const isForOrchestrator = (t: Issue) => t.assignee === orchestratorAgent;
+export const isForOrchestrator = (t: Issue) => t.assignee === defaultOrchestrator;

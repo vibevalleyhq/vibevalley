@@ -130,7 +130,8 @@ test("the island follows the issues in flight and opens one", async () => {
 const scripted = {
   id: "",
   name: "阿狐",
-  role: "",
+  role: "worker" as const,
+  duty: "",
   enabled: true,
   runtime: "pi",
   model: "",

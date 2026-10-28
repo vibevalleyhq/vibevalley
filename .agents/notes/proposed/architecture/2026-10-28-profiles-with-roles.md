@@ -36,7 +36,7 @@ Status: proposed
 
 ### 3. 每个管家一份
 
-- **家目录**：`$VIBEVALLEY_HOME/orchestrators/<档案 id>/`：对话、`MEMORY.md`、旧账 `archive/`、评测 `evals/`。原来的 `$VIBEVALLEY_HOME/orchestrator/` 不再读（照「内部不留兼容」）。
+- **家目录是档案的**：每份档案一个 `$VIBEVALLEY_HOME/agent/<档案 id>/`（`agentHome`），管家的对话、`MEMORY.md`、旧账 `archive/`、评测 `evals/` 都在它自己的这里；帮工档案的家目录是同一个位置，以后它的记性也放进来（这一篇只挪管家的）。原来的 `$VIBEVALLEY_HOME/orchestrator/` 不再读（照「内部不留兼容」）。
 - **大脑**：`Orchestrator` 服务按档案各起一个宿主（`Sessions.host`，第一句话到了才起来）；每个有自己的排队、自己的「上次给模型看的现状」。提示开头照旧，档案有名字和人设时接在后面（默认管家没有，开头不变）。
 - **心情**：核心状态的 `orchestrators`：每个管家的心情和它在想、在写的频道（替掉 `orchestrator`、`orchestratorChannel`）；事实 `orchestrator` 带上是哪个管家。
 - **接口**：`orchestrator.stop`、`orchestrator.archive.*`、`orchestrator.eval.create` 收 `agent`（不填是默认管家）；记性照旧走 `memory.*`，管家的记性是它家目录里的 `MEMORY.md`。
@@ -89,5 +89,5 @@ Status: proposed
 
 ## Risks
 
-- 原来管家的对话和 `MEMORY.md` 在 `$VIBEVALLEY_HOME/orchestrator/`，改了以后不再读：主人要留着它的记性，就把文件挪到 `orchestrators/orchestrator/`。
+- 原来管家的对话和 `MEMORY.md` 在 `$VIBEVALLEY_HOME/orchestrator/`，改了以后不再读：主人要留着它的记性，就把文件挪到 `agent/orchestrator/`。
 - 核心状态的形状变了（`orchestrators`）：页面和手机壳读它的地方都要跟着改。

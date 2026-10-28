@@ -8,7 +8,7 @@ import { voiceWording } from "./words.ts";
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
+import { type AgoraGrant, type Area, type Dictated, defaultOrchestrator, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
@@ -789,7 +789,7 @@ export const make = (options: VoiceOptions = {}) =>
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
-        if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(orchestratorAgent, text, ""));
+        if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""));
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();

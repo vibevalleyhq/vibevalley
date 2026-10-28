@@ -7,7 +7,7 @@ import { fromOwner } from "./prompts.ts";
 import { join } from "node:path";
 import {
   type ArchiveListing,
-  orchestratorAgent,
+  defaultOrchestrator,
   type Memory,
   type MemoryList,
   type MemorySourceInfo,
@@ -71,12 +71,12 @@ const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
   }
   return {
     id: line.id,
-    agent: orchestratorAgent,
+    agent: defaultOrchestrator,
     kind: "note",
     text: person ? line.text.slice(fromOwner.length).trim() : line.text,
     at,
     recalled: 0,
-    ...(person ? {} : { session: orchestratorAgent }),
+    ...(person ? {} : { session: defaultOrchestrator }),
   } as Memory;
 };
 
@@ -134,28 +134,28 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
     const fileRefused = (e: unknown) => refused(e instanceof Error ? e.message : String(e));
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
-      const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
+      const problem = agent === defaultOrchestrator ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
-      const listed = agent === orchestratorAgent ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* sources.list(agent);
+      const listed = agent === defaultOrchestrator ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
       if (!m) return yield* Effect.fail(missing(memoryWording().noMemory(agent, id), [memoriesOf(agent)]));
       return m;
     });
 
     const shape: MemoryShape = {
-      memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : sources.list(agent)),
-      remember: (n) => (n.agent === orchestratorAgent ? writeOrchestrator(n.text) : write(n)),
+      memoriesOf: (agent) => (agent === defaultOrchestrator ? Effect.sync(orchestrator) : sources.list(agent)),
+      remember: (n) => (n.agent === defaultOrchestrator ? writeOrchestrator(n.text) : write(n)),
       forgetOf: (agent, id) =>
         Effect.andThen(
           forgettable(agent, id),
-          agent === orchestratorAgent ? Effect.try({ try: () => forgetLine(home, id), catch: fileRefused }) : forget(agent, id),
+          agent === defaultOrchestrator ? Effect.try({ try: () => forgetLine(home, id), catch: fileRefused }) : forget(agent, id),
         ),
       previewForgetOf: (agent, id) =>
         Effect.map(forgettable(agent, id), (m) => ({
-          does: [agent === orchestratorAgent ? memoryWording().forgetOrchestrator(m.text) : memoryWording().forget(agent, m.text)],
+          does: [agent === defaultOrchestrator ? memoryWording().forgetOrchestrator(m.text) : memoryWording().forget(agent, m.text)],
         })),
       recallOf: (agent, project, text) =>
-        agent === orchestratorAgent ? Effect.fail(refused(memoryWording().orchestratorRecall)) : preview(agent, project, text),
+        agent === defaultOrchestrator ? Effect.fail(refused(memoryWording().orchestratorRecall)) : preview(agent, project, text),
       recall: Effect.fn("Memories.recall")(function* (cue) {
         const told = mergeRecalled(yield* sources.prefetch(cue));
         const ids = told.map((l) => l.id).filter((id) => id !== "");

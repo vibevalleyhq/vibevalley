@@ -16,7 +16,7 @@ import {
   everyone,
   type FactLeft,
   type FactReport,
-  orchestratorAgent,
+  defaultOrchestrator,
   firstChannelName,
   ownerId,
   type ActorKind,
@@ -513,7 +513,7 @@ export const make = Effect.gen(function* () {
 
   for (const [id, kind, name] of [
     [ownerId, "owner", channelWording().name.owner],
-    [orchestratorAgent, "orchestrator", channelWording().name.orchestrator],
+    [defaultOrchestrator, "orchestrator", channelWording().name.orchestrator],
     ["system", "system", "VibeValley"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
@@ -531,7 +531,7 @@ export const make = Effect.gen(function* () {
       }),
     );
   }
-  yield* db(qc.createDirect({ id: newId(), peer_id: orchestratorAgent, created_at: yield* Clock.currentTimeMillis }));
+  yield* db(qc.createDirect({ id: newId(), peer_id: defaultOrchestrator, created_at: yield* Clock.currentTimeMillis }));
   yield* reload;
 
   /** A channel's name; none for a thread or what is not there. */
@@ -741,7 +741,7 @@ export const make = Effect.gen(function* () {
     const known = new Set(model.participants().map((p) => p.id));
     const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
     for (const m of mentions) {
-      const how = m === orchestratorAgent || m === ownerId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
+      const how = m === defaultOrchestrator || m === ownerId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
       named.push({ id: m, how });
       yield* db(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
     }
@@ -754,7 +754,7 @@ export const make = Effect.gen(function* () {
       // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
       if (row.sender_id !== "system" && row.kind !== "dispatch") yield* follow(ch.id, row.sender_id, "replied", row.number);
       for (const m of named)
-        if (m.how === "delivered" && (m.id === orchestratorAgent || present.includes(m.id))) yield* follow(ch.id, m.id, "mentioned", row.number - 1);
+        if (m.how === "delivered" && (m.id === defaultOrchestrator || present.includes(m.id))) yield* follow(ch.id, m.id, "mentioned", row.number - 1);
       followers = reach.followers(ch.id);
     }
     const hops = reach.hops(ch.id);
@@ -980,16 +980,16 @@ export const make = Effect.gen(function* () {
   const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
     const rows = open.of(recipient);
     const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
-    if (recipient === orchestratorAgent) {
+    if (recipient === defaultOrchestrator) {
       const byChannel = Map.groupBy(waking, (r) => r.channel_id);
       const now = yield* Clock.currentTimeMillis;
       for (const [channel, rs] of byChannel) {
         const messages = rs.map(asInbox);
         PubSub.publishUnsafe(orchestratorHub, { channel, type: channelType(rs[0]!.channel_type), target: messages[0]!.target, messages });
         for (const r of rs) {
-          yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
-          open.seen(orchestratorAgent, r.message_id);
-          yield* received(orchestratorAgent, r.message_id);
+          yield* db(qd.seenOne({ seen_at: now, recipient_id: defaultOrchestrator, message_id: r.message_id }));
+          open.seen(defaultOrchestrator, r.message_id);
+          yield* received(defaultOrchestrator, r.message_id);
         }
       }
       return;
@@ -1109,7 +1109,7 @@ export const make = Effect.gen(function* () {
           : head(h.brief.replace(/\s+/g, " "), 80);
     yield* write({
       channel: channel,
-      from: orchestratorAgent,
+      from: defaultOrchestrator,
       kind: "dispatch",
       text: d.sent(h.id, h.name, h.project ?? d.project, what),
       meta: { session: h.id },
@@ -1132,7 +1132,7 @@ export const make = Effect.gen(function* () {
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ channel_id: thread }))).n ?? 0) + 2;
     const text = h.refining ? channelWording().dispatch.redraft(h.id, h.name) : channelWording().dispatch.handedOn(h.id, h.name, nth);
-    yield* write({ channel: thread, from: orchestratorAgent, kind: "dispatch", text, meta: { session: h.id }, follow: h.id });
+    yield* write({ channel: thread, from: defaultOrchestrator, kind: "dispatch", text, meta: { session: h.id }, follow: h.id });
   });
 
   const sessionsLeft = Effect.gen(function* () {
@@ -1210,7 +1210,7 @@ export const make = Effect.gen(function* () {
   /** A target as who would mean it: empty is a session's own thread (or the default channel), a channel by name, or a thread by its parent's number. */
   const resolveTarget = Effect.fnUntraced(function* (who: string, target: string): Effect.fn.Return<string, ApiError> {
     if (!target.trim()) {
-      if (who !== orchestratorAgent && who !== ownerId) {
+      if (who !== defaultOrchestrator && who !== ownerId) {
         const own = yield* threadOfSession(who);
         if (own) return own;
       }
@@ -1563,7 +1563,7 @@ export const make = Effect.gen(function* () {
             return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length };
           }
           // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
-          const caller = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
+          const caller = from !== defaultOrchestrator ? (yield* one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
           const answers = caller === undefined ? undefined : sessionId(caller);
           const run = helpers?.currentRun(from);
           yield* answered(channel, opt.reply);
@@ -1599,7 +1599,7 @@ export const make = Effect.gen(function* () {
       ),
     orchestratorSays: (channel, text, run) =>
       text.trim()
-        ? locked(write({ channel, from: orchestratorAgent, kind: "chat", text, meta: run ? { run } : {} })).pipe(
+        ? locked(write({ channel, from: defaultOrchestrator, kind: "chat", text, meta: run ? { run } : {} })).pipe(
             Effect.asVoid,
             logged("the orchestrator's words"),
           )
@@ -1657,7 +1657,7 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.sync(() =>
           open
-            .of(orchestratorAgent)
+            .of(defaultOrchestrator)
             .filter((r) => !(r.wakes && r.held_by === null))
             .map(asInbox),
         ),
@@ -1810,7 +1810,7 @@ export const make = Effect.gen(function* () {
           return id;
         }),
       ),
-    orchestratorDirect: () => model.channels("direct").find((c) => c.peer_id === orchestratorAgent)?.id ?? "",
+    orchestratorDirect: () => model.channels("direct").find((c) => c.peer_id === defaultOrchestrator)?.id ?? "",
     linkTalk: (channel, issue) =>
       locked(
         Effect.gen(function* () {

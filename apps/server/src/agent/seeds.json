@@ -15,7 +15,8 @@
       "tags": ["后端", "接口", "server", "go", "token", "校验", "重连", "推送"],
       "id": "backend",
       "name": "后端老周",
-      "role": "写接口、改 server、跑 Go 测试",
+      "role": "worker",
+      "duty": "写接口、改 server、跑 Go 测试",
       "runtime": "pi",
       "look": {
         "eye": "#a6f4ff",
@@ -42,7 +43,8 @@
       "tags": ["测试", "test", "ci", "跑一遍", "挂"],
       "id": "tester",
       "name": "测试小吴",
-      "role": "跑测试、修测试、盯 CI",
+      "role": "worker",
+      "duty": "跑测试、修测试、盯 CI",
       "runtime": "pi",
       "look": {
         "eye": "#9dffb0",
@@ -70,7 +72,8 @@
       "tags": ["前端", "页面", "面板", "字幕", "动画", "机器人", "夜间模式", "ui"],
       "id": "frontend",
       "name": "前端阿郑",
-      "role": "页面、3D 场景、交互动画",
+      "role": "worker",
+      "duty": "页面、3D 场景、交互动画",
       "runtime": "pi",
       "look": {
         "eye": "#a6f4ff",
@@ -97,7 +100,8 @@
       "tags": ["文档", "readme", "通读", "说明", "docs"],
       "id": "docs",
       "name": "文档员 Kimi",
-      "role": "通读文档、写 README、整理说明",
+      "role": "worker",
+      "duty": "通读文档、写 README、整理说明",
       "runtime": "pi",
       "look": {
         "eye": "#ffd25e",
@@ -125,7 +129,8 @@
       "tags": ["查", "调研", "agora", "资料", "接口怎么调"],
       "id": "scout",
       "name": "情报 Grok",
-      "role": "查资料、读外部文档、调研方案",
+      "role": "worker",
+      "duty": "查资料、读外部文档、调研方案",
       "runtime": "pi",
       "look": {
         "eye": "#a6f4ff",
@@ -153,7 +158,8 @@
       "tags": ["杂活", "小改", "补"],
       "id": "night",
       "name": "夜班反重力",
-      "role": "杂活、小改动、夜里补班",
+      "role": "worker",
+      "duty": "杂活、小改动、夜里补班",
       "runtime": "pi",
       "look": {
         "eye": "#9dffb0",
@@ -181,7 +187,8 @@
       "tags": ["重构", "难", "bug", "排查", "根因", "架构", "claude"],
       "id": "claude",
       "name": "Claude 师傅",
-      "role": "读大代码库、重构、查难缠的 bug",
+      "role": "worker",
+      "duty": "读大代码库、重构、查难缠的 bug",
       "runtime": "claude",
       "look": {
         "eye": "#a6f4ff",
@@ -209,7 +216,8 @@
       "tags": ["实现", "功能", "修复", "改到通过", "codex"],
       "id": "codex",
       "name": "Codex 老匠",
-      "role": "照工单把功能做出来，改到测试通过",
+      "role": "worker",
+      "duty": "照工单把功能做出来，改到测试通过",
       "runtime": "codex",
       "look": {
         "eye": "#a6f4ff",
@@ -237,7 +245,8 @@
       "tags": ["原型", "试试", "实验", "脚本"],
       "id": "lab",
       "name": "Pi 实验员",
-      "role": "写原型、试新做法",
+      "role": "worker",
+      "duty": "写原型、试新做法",
       "runtime": "pi",
       "look": {
         "eye": "#ff9de2",

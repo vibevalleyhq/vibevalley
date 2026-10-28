@@ -6,7 +6,7 @@ import { appWording } from "../../base/words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import { type Memory, type MemorySourceInfo, orchestratorAgent, memoryKeep } from "@vibevalley/protocol";
+import { type Memory, type MemorySourceInfo, defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { ago } from "../../base/format";
 import { toast } from "../../ui/toasts";
@@ -252,9 +252,9 @@ function RecallPreview(props: { agent: string }) {
 }
 
 export function OrchestratorMemoryPanel() {
-  const viewQuery = useMemory(() => orchestratorAgent);
+  const viewQuery = useMemory(() => defaultOrchestrator);
   const view = () => ready(viewQuery, undefined);
-  const act = memoryActions(orchestratorAgent);
+  const act = memoryActions(defaultOrchestrator);
   const now = useNow();
   return (
     <Show when={view()} fallback={<Quiet>{memoryWording().memory.orchestratorReading}</Quiet>}>
@@ -272,7 +272,7 @@ export function OrchestratorMemoryPanel() {
                       memory={m()}
                       faded={i() >= carried()}
                       onForget={() => void act.forget(m().id)}
-                      meta={[m().session === orchestratorAgent ? memoryWording().memory.orchestratorOwn : memoryWording().memory.told, ago(m().at, now())]}
+                      meta={[m().session === defaultOrchestrator ? memoryWording().memory.orchestratorOwn : memoryWording().memory.told, ago(m().at, now())]}
                       warning={i() >= carried() ? memoryWording().memory.tooOld : undefined}
                     />
                   )}

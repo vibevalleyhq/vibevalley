@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { rmSync } from "node:fs";
-import { type ConnectorID, type ConnectorState, type ConnectorStatus, orchestratorAgent } from "@vibevalley/protocol";
+import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
@@ -535,7 +535,7 @@ describe("the chat apps", () => {
         const chat = yield* Channels;
         yield* weixinConnected(first);
         const parent = (yield* chat.say("这个话题", undefined, "")).message;
-        const written = yield* chat.speak(orchestratorAgent, "旧的答复", {
+        const written = yield* chat.speak(defaultOrchestrator, "旧的答复", {
           target: `#general:${parent.number}`,
           anyway: true,
         });
@@ -563,7 +563,7 @@ describe("the chat apps", () => {
         const linked = yield* chat.openChannel("linked", "", "");
         yield* c.setChannel("weixin", "linked");
         const parent = (yield* chat.say("旧话题", linked.id, "")).message;
-        thread = (yield* chat.speak(orchestratorAgent, "旧的答复", {
+        thread = (yield* chat.speak(defaultOrchestrator, "旧的答复", {
           target: `#linked:${parent.number}`,
           anyway: true,
         })).message!.channel;
@@ -572,7 +572,7 @@ describe("the chat apps", () => {
         yield* status((s) => s.pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
           const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-          const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", {
+          const fresh = (yield* chat.speak(defaultOrchestrator, "其他答复", {
             target: `#general:${other.number}`,
             anyway: true,
           })).message!.channel;

@@ -1,7 +1,7 @@
 import { chmodSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { Cause, Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -14,7 +14,8 @@ const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
 const draft = (change: Partial<Agent> = {}): Agent => ({
   id: "",
   name: "同名",
-  role: "",
+  role: "worker",
+  duty: "",
   enabled: true,
   runtime: "pi",
   model: "",
@@ -47,10 +48,10 @@ describe("profiles", () => {
           body: "old",
         });
         profile = (yield* s.createAgent(draft({ skills: [skill.id, "other"] }))).id;
-        yield* s.saveAgent({ ...s.agent(orchestratorAgent)!, skills: [skill.id] });
+        yield* s.saveAgent({ ...s.agent(defaultOrchestrator)!, skills: [skill.id] });
         yield* s.deleteSkill(skill.id);
         expect(s.agent(profile)?.skills).toEqual(["other"]);
-        expect(s.agent(orchestratorAgent)?.skills).toEqual([]);
+        expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
         const recreated = yield* s.createSkill({
           id: "",
           name: skill.name,
@@ -67,7 +68,7 @@ describe("profiles", () => {
           Effect.gen(function* () {
             const s = yield* Agents;
             expect(s.agent(profile)?.skills).toEqual(["other"]);
-            expect(s.agent(orchestratorAgent)?.skills).toEqual([]);
+            expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
           }),
         ),
       ),
@@ -156,11 +157,11 @@ describe("profiles", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        const orchestrator = s.agent(orchestratorAgent)!;
+        const orchestrator = s.agent(defaultOrchestrator)!;
         expect([orchestrator.runtime, orchestrator.enabled]).toEqual([orchestratorRuntime, true]);
-        expect(s.agents().some((a) => a.id === orchestratorAgent)).toBe(false);
-        expect(s.all().some((a) => a.id === orchestratorAgent)).toBe(true);
-        expect((yield* Effect.flip(s.deleteAgent(orchestratorAgent)))._tag).toBe("Refused");
+        expect(s.agents().some((a) => a.id === defaultOrchestrator)).toBe(false);
+        expect(s.all().some((a) => a.id === defaultOrchestrator)).toBe(true);
+        expect((yield* Effect.flip(s.deleteAgent(defaultOrchestrator)))._tag).toBe("Refused");
         expect((yield* Effect.flip(s.saveAgent({ ...orchestrator, runtime: "claude" })))._tag).toBe("Refused");
         yield* s.saveAgent({ ...orchestrator, model: "deepseek-pro" });
       }),
@@ -168,11 +169,31 @@ describe("profiles", () => {
       Effect.andThen(
         run(
           config,
-          Effect.map(Agents, (again) => expect(again.agent(orchestratorAgent)?.model).toBe("deepseek-pro")),
+          Effect.map(Agents, (again) => expect(again.agent(defaultOrchestrator)?.model).toBe("deepseek-pro")),
         ),
       ),
     );
   });
+
+  // A profile is an orchestrator or a worker; there may be several orchestrators, each on VibeValley's own agent, and the
+  // default one stays one.
+  it.effect("a profile's role: several orchestrators, each on VibeValley's own agent, and work goes only to workers", () =>
+    run(
+      testConfig(),
+      Effect.gen(function* () {
+        const s = yield* Agents;
+        expect((yield* Effect.flip(s.createAgent(draft({ name: "外头的管家", role: "orchestrator", runtime: "claude" }))))._tag).toBe("Refused");
+        const lead = yield* s.createAgent(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
+        expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
+        expect([s.isOrchestrator(lead.id), s.isOrchestrator("backend")]).toEqual([true, false]);
+        expect(s.agents().some((a) => a.role === "orchestrator")).toBe(false);
+        expect((yield* Effect.flip(s.saveAgent({ ...s.agent(defaultOrchestrator)!, role: "worker" })))._tag).toBe("Refused");
+        yield* s.saveAgent({ ...lead, role: "worker" });
+        expect(s.agents().some((a) => a.id === lead.id)).toBe(true);
+        yield* s.deleteAgent(lead.id);
+      }),
+    ),
+  );
 
   it.effect("creation gives distinct ids; a draft with an id is refused", () =>
     run(

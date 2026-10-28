@@ -24,7 +24,7 @@ import {
   type IssueFilter,
   type IssueUpdate,
   type Preview,
-  orchestratorAgent,
+  defaultOrchestrator,
   ownerId,
   type Priority,
   type ProjectTemplates,
@@ -369,7 +369,7 @@ export const make = (options: IssueOptions = {}) =>
           created_at: yield* Clock.currentTimeMillis,
           recurrence: recurrence ?? null,
           // The orchestrator never changes code: what it is given is answered.
-          deliver: req.deliver ?? (req.assignee === orchestratorAgent ? "answer" : "change"),
+          deliver: req.deliver ?? (req.assignee === defaultOrchestrator ? "answer" : "change"),
           talk: talk ?? null,
         }),
       );
@@ -484,7 +484,7 @@ export const make = (options: IssueOptions = {}) =>
     });
 
     const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
-      if (agent.id === orchestratorAgent) return { refused: issueWording().orchestratorNotHelper };
+      if (agent.id === defaultOrchestrator) return { refused: issueWording().orchestratorNotHelper };
       if (!agent.enabled) return { refused: issueWording().disabled(agent.name) };
       for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: issueWording().cannotSend(agent.name, i.text) };
       const where = project.trim() || (agent.workdir ?? "").trim();
@@ -620,7 +620,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!issue) {
         const project = s.project ?? (channel.project || undefined);
         const made = yield* Effect.result(
-          add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? orchestratorAgent }, s.id),
+          add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? defaultOrchestrator }, s.id),
         );
         if (made._tag === "Failure")
           return yield* chat.notice(channel.id, issueWording().recurrenceNoIssue(s.name, reasonOf(made.failure)), "recurrence_refused");
@@ -910,7 +910,7 @@ export const make = (options: IssueOptions = {}) =>
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) });
     // An in-process run on its issues stopped with the server: one still going is lost; one that ended still waits on the owner.
-    for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) {
+    for (const r of yield* db(q.openOf({ assignee: defaultOrchestrator }))) {
       const run = column.run(r.last_run);
       if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
     }
@@ -1162,7 +1162,7 @@ export const make = (options: IssueOptions = {}) =>
       talkWith: Effect.fn("Issues.talkWith")(function* (ref) {
         const agent = store.named(ref.trim()) ?? store.agent(ref);
         if (!agent) return yield* Effect.fail(missing(issueWording().noProfileNamed(ref), [lookIn.agent]));
-        if (agent.id === orchestratorAgent) return chat.orchestratorDirect();
+        if (agent.id === defaultOrchestrator) return chat.orchestratorDirect();
         const channel = yield* chat.openDirect({ id: agent.id, name: agent.name });
         if (!(yield* one(q.talkOf({ talk: channel })))) {
           const made = yield* add({ title: issueWording().talkTitle(agent.name), assignee: agent.id, deliver: "answer" }, undefined, channel);

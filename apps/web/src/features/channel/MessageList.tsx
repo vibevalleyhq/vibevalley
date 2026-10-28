@@ -3,7 +3,7 @@ import { chatWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ChatMessage, type Channel, type MessageHit, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import {
@@ -14,7 +14,7 @@ import {
   parentAt,
   phaseDot,
   phaseText,
-  roleShort,
+  dutyShort,
   runtimeLabel,
   threadOwnerOf,
   unreadIn,
@@ -280,7 +280,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
   const nameOf = (who: string) =>
     who === ownerId
       ? chatWording().messages.owner
-      : who === orchestratorAgent
+      : who === defaultOrchestrator
         ? chatWording().orchestrator
         : ((core()?.sessions ?? []).find((h) => h.id === who)?.name ?? who);
   const meta = () =>
@@ -293,7 +293,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
     if (props.m.fromKind !== "session") return "";
     const agent = agentOf();
     const s = session();
-    return [`@${props.m.from}`, s ? (runtimeLabel[s.runtime] ?? s.runtime) : "", agent?.role ? roleShort(agent.role) : ""].filter(Boolean).join(" ");
+    return [`@${props.m.from}`, s ? (runtimeLabel[s.runtime] ?? s.runtime) : "", agent?.duty ? dutyShort(agent.duty) : ""].filter(Boolean).join(" ");
   };
   const outcome = () => outcomeTag[props.m.outcome ?? "completed"];
   return (
@@ -355,7 +355,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
         )}
       </Show>
       <Show when={props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
-        <TurnSteps session={orchestratorAgent} run={props.m.run} orchestrator />
+        <TurnSteps session={defaultOrchestrator} run={props.m.run} orchestrator />
       </Show>
       <Show when={props.m.fromKind === "session" && props.m.kind === "report"}>
         <TurnSteps session={props.m.from} run={props.m.run} />

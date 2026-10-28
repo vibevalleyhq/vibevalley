@@ -2,14 +2,14 @@
 // recorded cases (rules.test.ts).
 
 import { channelWording } from "./words.ts";
-import { type Channel, everyone, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
+import { type Channel, everyone, defaultOrchestrator, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 // The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English.
 const chatNamed: Readonly<Record<string, string>> = {
-  管家: orchestratorAgent,
+  管家: defaultOrchestrator,
   主人: ownerId,
   所有人: everyone,
-  manager: orchestratorAgent,
+  manager: defaultOrchestrator,
   owner: ownerId,
   everyone,
 };
@@ -102,10 +102,10 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   let hops = i.hops;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
     if (recipient === i.from || out.some((d) => d.recipient === recipient)) return;
-    if (recipient !== orchestratorAgent && !present.includes(recipient)) return;
+    if (recipient !== defaultOrchestrator && !present.includes(recipient)) return;
     let heldBy: HeldBy | undefined;
     if (wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
-    else if (wakes && byAgent && recipient !== orchestratorAgent && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
+    else if (wakes && byAgent && recipient !== defaultOrchestrator && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
     else if (wakes && i.fromKind !== "owner" && (i.broken ?? []).includes(recipient)) heldBy = "wake_breaker";
     if (wakes && byAgent && !heldBy) hops++;
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
@@ -114,12 +114,12 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   // With the orchestrator, the owner's words go to it; with a helper profile, to the session talking for it now (none
   // between its rounds: the talk's issue hears the words and sends one).
   if (i.channel.type === "direct") {
-    const to = i.channel.peer === orchestratorAgent ? orchestratorAgent : (i.threadOwner ?? "");
+    const to = i.channel.peer === defaultOrchestrator ? defaultOrchestrator : (i.threadOwner ?? "");
     if (i.fromKind === "owner" && to) add(to, "direct", true);
     return out;
   }
   if (i.kind === "report") {
-    if (!i.forTask) add(orchestratorAgent, "addressed", i.outcome === "failed");
+    if (!i.forTask) add(defaultOrchestrator, "addressed", i.outcome === "failed");
     return out;
   }
   const mentions = i.mentions ?? [];
@@ -134,7 +134,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     if (owner) add(owner, "own_thread", true);
     if (thread) for (const f of i.followers ?? []) add(f, "follower", true);
     else {
-      if (!mentions.some((m) => m !== ownerId)) add(orchestratorAgent, "addressed", true);
+      if (!mentions.some((m) => m !== ownerId)) add(defaultOrchestrator, "addressed", true);
       for (const h of i.sessions ?? []) add(h, "channel", false);
     }
   } else if (owner) add(owner, "own_thread", true);

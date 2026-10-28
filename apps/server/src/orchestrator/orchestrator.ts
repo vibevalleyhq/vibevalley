@@ -10,7 +10,7 @@ import { orchestratorWording } from "./words.ts";
 import { agentPrompt, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { orchestrator } from "../base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
-import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
@@ -139,13 +139,13 @@ export const make = (options: OrchestratorOptions = {}) =>
     const llmOf = (): LLM => {
       if (options.llm) return options.llm();
       // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-      return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
+      return deepseek(deepseekModel(store.agent(defaultOrchestrator)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
     };
 
     const toolsFor = (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: orchestratorAgent, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
+        return { agent: defaultOrchestrator, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
       });
 
     // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
@@ -153,12 +153,12 @@ export const make = (options: OrchestratorOptions = {}) =>
       const by = clock.currentTimeMillisUnsafe() + withinMs;
       return recurrence.list().some((s) => {
         const next = nextRun(s);
-        return next !== undefined && (!s.agent || s.agent === orchestratorAgent) && next <= by;
+        return next !== undefined && (!s.agent || s.agent === defaultOrchestrator) && next <= by;
       });
     };
 
     const host = run.host<Route>({
-      name: orchestratorAgent,
+      name: defaultOrchestrator,
       label: orchestratorWording().label,
       inputType: "orchestratorInput",
       home,
@@ -379,7 +379,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       try {
         return llmOf().model.id;
       } catch {
-        return store.agent(orchestratorAgent)?.model ?? "";
+        return store.agent(defaultOrchestrator)?.model ?? "";
       }
     };
 

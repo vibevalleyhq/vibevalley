@@ -159,14 +159,14 @@ const RULES: readonly Rule[] = [
   {
     name: "the orchestrator under the manager name",
     pattern: /\b(Manager|Manager[A-Z]\w*|manager[A-Z]\w*|\w+Manager\w*)\b/,
-    says: "Orchestrator, orchestratorAgent, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
+    says: "Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
     // The village map's entity is Manager (public/village.ldtk).
     except: /^apps\/web\/src\/farm\/world\/(level|world)\.ts$/,
   },
   {
     name: "the orchestrator under the assistant name",
     pattern: /\b(Assistant(?!Message)[A-Z]\w*|assistant(?!Message)[A-Z]\w*|\w+Assistant(?!Message)\w*)\b/,
-    says: 'Orchestrator, orchestratorAgent, OrchestratorShape, forOrchestrator; a model\'s message role stays assistant (AssistantMessage, role: "assistant")',
+    says: 'Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; a model\'s message role stays assistant (AssistantMessage, role: "assistant")',
   },
   {
     name: "an issue's state in farm words",

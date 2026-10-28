@@ -161,7 +161,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
               <span class="shrink-0 rounded bg-hat px-1.5 text-xs text-bark-900">{agentsWording().list.here(props.here)}</span>
             </Show>
           </span>
-          <span class="line-clamp-2 text-sm text-muted">{props.agent.role}</span>
+          <span class="line-clamp-2 text-sm text-muted">{props.agent.duty}</span>
           <span class="flex min-w-0 items-center gap-1.5 pt-1 text-xs text-muted">
             <span class={["size-[7px] shrink-0 rounded-full", available() ? "bg-leaf" : "bg-berry"]} aria-hidden="true" />
             <span class="truncate">

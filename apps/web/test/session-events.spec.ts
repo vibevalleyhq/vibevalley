@@ -4,7 +4,8 @@ import { expect, test } from "./fixtures";
 const profile: Agent = {
   id: "",
   name: "轨迹测试员",
-  role: "",
+  role: "worker",
+  duty: "",
   enabled: true,
   runtime: "pi",
   model: "",

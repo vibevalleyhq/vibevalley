@@ -7,7 +7,7 @@ import {
   type WorkspaceState,
   type Issue,
   type IssueStatus,
-  orchestratorAgent,
+  defaultOrchestrator,
   type Run,
   type RunTrigger,
   type Session,
@@ -37,7 +37,7 @@ export const tagOpen = (t: IssueTag) => t !== "closed";
 /** The tag in words: the status while open, what its close says after. */
 export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? wording().status[issue.status] : closedText(issue));
 
-export const isForOrchestrator = (issue: Issue) => issue.assignee === orchestratorAgent;
+export const isForOrchestrator = (issue: Issue) => issue.assignee === defaultOrchestrator;
 
 export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
   const job = issue.title.trim();

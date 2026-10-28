@@ -1,7 +1,7 @@
 import { chatWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Channel, type ChatMessage, type MessageHit, orchestratorAgent, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import {
   archivedOf,
@@ -395,7 +395,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
 /** The helper profiles the owner can talk with alone: picking one opens its direct channel, made the first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();
-  const agents = () => ready(all, []).filter((a) => a.id !== orchestratorAgent);
+  const agents = () => ready(all, []).filter((a) => a.id !== defaultOrchestrator);
   const open = (agent: string) =>
     api.channel.direct
       .create({ agent })

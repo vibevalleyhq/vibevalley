@@ -8,8 +8,9 @@ export type IssueId = string & Brand.Brand<"IssueId">;
 /** A session's id: w1, w2…, for the whole life of the farm. */
 export type SessionId = string & Brand.Brand<"SessionId">;
 
-/** The orchestrator's participant id, and the agent of an issue for it. No agent profile has this id. */
-export const orchestratorAgent = "orchestrator";
+/** The built-in orchestrator's profile id: it cannot be deleted or made a worker, so a farm always has an orchestrator, and
+ * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
+export const defaultOrchestrator = "orchestrator";
 
 /** The owner's participant id: who @主人 is. */
 export const ownerId = "owner";
@@ -1064,10 +1065,16 @@ export interface MemorySourceInfo {
   transcripts: boolean;
 }
 
+/** What a profile is: an orchestrator (管家) stays, leads and does no work itself; a worker (帮工) is sent on an issue. */
+export const AgentRoleValues = ["orchestrator", "worker"] as const;
+export type AgentRole = (typeof AgentRoleValues)[number];
+
 export interface Agent {
   id: string;
   name: string;
-  role: string;
+  role: AgentRole;
+  /** What it does, in a sentence (职责): orchestrators read it to pick who takes a job. */
+  duty: string;
   enabled: boolean;
   runtime: string;
   model: string;

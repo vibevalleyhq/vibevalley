@@ -9,7 +9,7 @@ import {
   everyone,
   type Fact,
   type LedgerEntry,
-  orchestratorAgent,
+  defaultOrchestrator,
   ownerId,
   type Progress,
   type ProgressNews,
@@ -240,7 +240,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions ?? []) {
-          const h = named !== orchestratorAgent && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
+          const h = named !== defaultOrchestrator && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }
       } else if (fact.message.fromKind === "session" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });

@@ -86,7 +86,8 @@ export const Look: Codec<T.Look> = Schema.Struct({
 export const Agent: Codec<T.Agent> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  role: Schema.String,
+  role: Schema.Literals(T.AgentRoleValues),
+  duty: Schema.String,
   enabled: Schema.Boolean,
   runtime: Schema.String,
   model: Schema.String,

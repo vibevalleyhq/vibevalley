@@ -10,7 +10,7 @@ import {
   type Channel,
   everyone,
   type Issue,
-  orchestratorAgent,
+  defaultOrchestrator,
   ownerId,
   type Phase,
   type Session,
@@ -275,14 +275,14 @@ export function phaseIcon(p: Phase): string | undefined {
 
 export const runtimeLabel: Record<string, string> = { claude: "Claude", codex: "Codex" };
 
-/** A profile's role up to its first stop, at most 18 characters. */
-export function roleShort(role: string) {
-  const first = role.split(/[，。,.]/)[0] ?? "";
+/** A profile's duty up to its first stop, at most 18 characters. */
+export function dutyShort(duty: string) {
+  const first = duty.split(/[，。,.]/)[0] ?? "";
   return first.length > 18 ? first.slice(0, 18) : first;
 }
 
 export const mentionOf: Record<string, string> = {
-  [orchestratorAgent]: chatWording().names.mention.orchestrator,
+  [defaultOrchestrator]: chatWording().names.mention.orchestrator,
   [ownerId]: chatWording().names.mention.owner,
   [everyone]: chatWording().names.mention.everyone,
 };
@@ -299,7 +299,7 @@ export const menuMax = 6;
 /** Everyone only when there is more than one helper. */
 export const nameables = (sessions: Session[], now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  { token: mentionOf[orchestratorAgent]!, name: appWording().orchestrator, note: chatWording().names.orchestratorNote },
+  { token: mentionOf[defaultOrchestrator]!, name: appWording().orchestrator, note: chatWording().names.orchestratorNote },
   ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: chatWording().names.everyone, note: chatWording().names.everyoneNote }] : []),
 ];
 

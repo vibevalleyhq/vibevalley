@@ -1,14 +1,14 @@
 // What the chat says to the owner: who the owner and the orchestrator are in it, how a mention of them is written, the
 // lines it posts when work is sent or handed on, its notices, and why a message or a channel is refused.
 
-import { everyone, orchestratorAgent, ownerId } from "@vibevalley/protocol";
+import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {
   /** The names the owner and the orchestrator speak under. */
   name: { owner: "主人", orchestrator: "管家" },
   /** How a mention of who is not a helper is written. */
-  mention: { [orchestratorAgent]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" } as Readonly<Record<string, string>>,
+  mention: { [defaultOrchestrator]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" } as Readonly<Record<string, string>>,
   list: (items: readonly string[]) => items.join("、"),
   channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
   channelTaken: (name: string) => "已经有叫 " + name + " 的频道了",
@@ -59,7 +59,7 @@ const zh = {
 
 const en: typeof zh = {
   name: { owner: "You", orchestrator: "Manager" },
-  mention: { [orchestratorAgent]: "@manager", [ownerId]: "@owner", [everyone]: "@everyone" },
+  mention: { [defaultOrchestrator]: "@manager", [ownerId]: "@owner", [everyone]: "@everyone" },
   list: (items) => items.join(", "),
   channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
   channelTaken: (name) => "There is already a channel called " + name,

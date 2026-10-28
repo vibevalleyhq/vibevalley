@@ -1,5 +1,5 @@
 import { mentionOf } from "./rules";
-import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
@@ -105,7 +105,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
                 }}
                 class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", { "bg-selected": i() === box.active() }]}
               >
-                <Show when={n().session} fallback={n().token === mentionOf[orchestratorAgent] ? <OrchestratorFace size={20} /> : <span class="size-5" />}>
+                <Show when={n().session} fallback={n().token === mentionOf[defaultOrchestrator] ? <OrchestratorFace size={20} /> : <span class="size-5" />}>
                   {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
                 <span class="font-mono text-xs">{n().token}</span>

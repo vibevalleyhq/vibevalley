@@ -3,7 +3,7 @@
 
 import { orchestratorWording } from "./words";
 import { For, Match, Switch } from "solid-js";
-import { orchestratorAgent } from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { orchestratorLooks } from "./looks";
 import { A } from "../../ui/A";
@@ -71,7 +71,7 @@ export function OrchestratorPage(props: { rest: string }) {
           {bar()}
           <div class="min-h-0 flex-1">
             <TrajectoryLog
-              id={orchestratorAgent}
+              id={defaultOrchestrator}
               asked={orchestratorWording().orchestrator.heard}
               empty={orchestratorWording().orchestrator.quiet}
               title={orchestratorWording().orchestrator.trajectory}
