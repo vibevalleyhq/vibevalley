@@ -77,7 +77,7 @@ export function CatalogPage(props: { rest: string }) {
             aria-selected={aria(t.id === shelf())}
             class={[
               "flex h-[26px] flex-1 items-center justify-center rounded-md text-sm",
-              t.id === shelf() ? "bg-page font-medium shadow-[0_1px_2px_#2f1f131a]" : "text-muted hover:bg-hover",
+              t.id === shelf() ? "bg-page font-medium shadow-raise" : "text-muted hover:bg-hover",
             ]}
           >
             {t.label}
@@ -238,12 +238,12 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
                                   <span class="relative flex size-20 items-center justify-center overflow-hidden rounded-md" style={groundStyle(ground())}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
-                                      <span class="absolute top-0.5 right-0.5 rounded-[3px] bg-bark-900/70 px-1 text-[10px] leading-[14px] text-paper">
+                                      <span class="absolute top-0.5 right-0.5 rounded-xs bg-bark-900/70 px-1 text-2xs leading-[14px] text-paper">
                                         {t("web.catalog.moves")}
                                       </span>
                                     </Show>
                                   </span>
-                                  <span class="w-full truncate text-center font-mono text-[11.5px] text-muted">{p.name}</span>
+                                  <span class="w-full truncate text-center font-mono text-2xs text-muted">{p.name}</span>
                                 </button>
                               )}
                             </For>
@@ -297,7 +297,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 function Code(props: { text: string }) {
   return (
     <>
-      <code title={props.text} class="min-w-0 truncate rounded bg-hover px-1.5 py-px font-mono text-[11.5px]">
+      <code title={props.text} class="min-w-0 truncate rounded bg-hover px-1.5 py-px font-mono text-2xs">
         {props.text}
       </code>
       <Copy text={props.text} />
@@ -531,8 +531,8 @@ function Sounds(props: { tabs: JSX.Element }) {
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.soundsFind")} />
       <Card>
         <p class="text-sm text-muted">
-          {t("web.catalog.soundsRecipes")} <code class="font-mono text-[12.5px]">apps/web/src/ui/pixel/sound.ts</code>
-          {t("web.catalog.soundsMusic")} <code class="font-mono text-[12.5px]">design/music/suno-prompts.md</code>
+          {t("web.catalog.soundsRecipes")} <code class="font-mono text-xs">apps/web/src/ui/pixel/sound.ts</code>
+          {t("web.catalog.soundsMusic")} <code class="font-mono text-xs">design/music/suno-prompts.md</code>
           {t("web.catalog.period")}
         </p>
       </Card>

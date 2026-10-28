@@ -2,18 +2,17 @@ import { t } from "@vibevalley/i18n";
 // Where a saved profile came from: its template and version, and, when the template has a newer one, the update. The
 // update is asked twice: it replaces what the owner may have changed in what came from the template.
 
-import { createSignal, Show } from "solid-js";
+import { Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { Agent } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { ready, useAgentTemplates } from "../../base/query";
 import { toast } from "../../ui/toasts";
-import { Button } from "../../ui/Button";
+import { ConfirmButton } from "../../ui/ConfirmButton";
 
 export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => void }) {
   const templates = useAgentTemplates();
   const client = useQueryClient();
-  const [sure, setSure] = createSignal(false);
   const from = () => props.agent.from;
   const template = () => ready(templates, []).find((t) => t.id === from()?.template);
   const newer = () => {
@@ -25,7 +24,6 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
     try {
       const got = await api.agent.template.update({ agent: props.agent.id });
       await client.invalidateQueries({ queryKey: ["agents"] });
-      setSure(false);
       props.onUpdated(got);
       toast(t("web.agent.templates.updated"));
     } catch (e) {
@@ -39,20 +37,14 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
           {t("web.agent.templates.from", { name: template()?.name ?? f().template, version: f().version })}
           <Show when={newer()}>
             {(v) => (
-              <Show
-                when={sure()}
-                fallback={
-                  <Button data-testid="template-update" title={t("web.agent.templates.updateHint")} onClick={() => setSure(true)}>
-                    {t("web.agent.templates.update", { version: v() })}
-                  </Button>
-                }
-              >
-                <span>{t("web.agent.templates.updateHint")}</span>
-                <Button tone="primary" data-testid="template-update-sure" onClick={() => void update()}>
-                  {t("web.agent.templates.update", { version: v() })}
-                </Button>
-                <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>
-              </Show>
+              <ConfirmButton
+                label={t("web.agent.templates.update", { version: v() })}
+                title={t("web.agent.templates.updateHint")}
+                question={t("web.agent.templates.updateHint")}
+                tone="primary"
+                testid="template-update"
+                onConfirm={update}
+              />
             )}
           </Show>
         </p>

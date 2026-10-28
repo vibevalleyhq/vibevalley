@@ -13,6 +13,8 @@ import { A } from "../ui/A";
 import { useRouter } from "../base/router";
 import { titleBar } from "../ui/TitleBar";
 import { QuickSwitcher, switcher } from "../features/channel";
+import { pressed } from "../base/shortcuts";
+import { ShortcutSheet } from "../ui/ShortcutSheet";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -31,7 +33,7 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
       title={props.label}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
-      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px] text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
+      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
       style={props.current ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
     >
       {props.children}
@@ -121,10 +123,10 @@ function Desk(props: { place?: Place }) {
 export function Shell(props: { children: JSX.Element }) {
   const router = useRouter();
   const here = () => placeOf(router.path().split("?")[0]!);
-  // Ctrl+K (⌘K on a Mac) anywhere in the workbench.
+  // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return;
+      if (!pressed(e, "switcher")) return;
       e.preventDefault();
       switcher.toggle();
     };
@@ -135,6 +137,7 @@ export function Shell(props: { children: JSX.Element }) {
     // The interface size (设置 › 外观) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
     <div class="flex h-full [zoom:var(--workbench-zoom,1)]">
       <QuickSwitcher />
+      <ShortcutSheet />
       <Rail here={here()} />
       <main class="flex min-w-0 flex-1 flex-col">
         <Show when={here()?.id !== "chat"}>

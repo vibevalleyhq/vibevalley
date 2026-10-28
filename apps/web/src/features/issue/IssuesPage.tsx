@@ -259,7 +259,7 @@ function Overlay(props: { onClose: () => void; children: JSX.Element }) {
         aria-modal="true"
         aria-label={t("web.issue.page.sheet")}
         data-testid="issue"
-        class="relative h-fit w-full max-w-[1080px] rounded-xl border border-line bg-page px-6 py-5 shadow-float"
+        class="relative h-fit w-full max-w-[1080px] animate-pop-in rounded-xl border border-line bg-page px-6 py-5 shadow-float"
       >
         <div class="absolute top-3 right-3">
           <IconButton icon="close" label={t("web.issue.page.close")} testid="issue-close" onClick={props.onClose} />

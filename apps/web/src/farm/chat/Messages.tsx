@@ -26,7 +26,7 @@ export function ChatText(props: { text: string; link?: string }) {
   return (
     <Show when={readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
       <div class="flex flex-col items-start">
-        <div class={open() ? "" : "max-h-[117px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]"}>
+        <div class={open() ? "" : "fold-fade max-h-[117px] overflow-hidden"}>
           <PxMarkdown text={props.text} mentions />
         </div>
         <button type="button" onClick={() => setOpen(!open())} class={["mt-1 cursor-pointer text-[12px] hover:underline", props.link ?? "text-leaf-700"]}>

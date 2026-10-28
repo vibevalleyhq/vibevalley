@@ -25,7 +25,7 @@ export function IconButton(props: {
         disabled={props.disabled}
         onClick={() => props.onClick()}
         class={[
-          "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-selected disabled:cursor-default disabled:opacity-40",
+          "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-[background-color,color,translate] duration-120 hover:bg-selected active:translate-y-px disabled:cursor-default disabled:opacity-50 disabled:active:translate-y-0",
           props.tone === "danger" ? "text-berry" : "text-muted hover:text-ink",
           { "bg-selected": props.pressed === true },
         ]}

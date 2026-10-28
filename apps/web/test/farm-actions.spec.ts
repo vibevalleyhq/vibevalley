@@ -31,11 +31,14 @@ const scripted: Agent = {
 async function handBack(api: VibeValleyApi, project: string) {
   const fox = await api.agent.create(scripted);
   await api.project.create({ name: project });
-  const issue = await api.issue.create({ title: "commit the clock-in page", assignee: fox.id, project });
+  const issue = await api.issue.create({ title: commits, assignee: fox.id, project });
   await api.issue.status.update({ id: issue.id, status: "todo" });
   await handedBack(api, issue.id, 20_000);
   return issue.id;
 }
+
+// The test helper commits a change on 提交 (apps/server/src/testing/helper.ts), so the review has files.
+const commits = "提交打卡页";
 
 // The test helper idles on 发呆 until it is told again (apps/server/src/testing/helper.ts): another round is being worked.
 const anotherRound = "发呆 then check it";
@@ -94,4 +97,14 @@ test("the workbench's closing offers only the issue's current acts, and complete
   await take.click();
   await completed;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("done");
+});
+
+test("a file's patch in the review is coloured in its language, on the palette", async ({ page, api }) => {
+  const id = await handBack(api, "review-colours");
+  await page.goto(`/issues/${id}`);
+  await page.getByTestId("issue").locator('[data-act="complete"]').click();
+  const review = page.getByTestId("close-issue");
+  await review.locator('[data-testid="changed-file"][data-key$=".ts"]').first().click();
+  // The keyword export comes back from the worker drawn in the palette's keyword colour.
+  await expect(review.locator('span[style*="--shiki-token-keyword"]').first()).toBeVisible();
 });

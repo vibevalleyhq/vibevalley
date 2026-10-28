@@ -197,6 +197,9 @@ export const isLongText = (text: string, lines: number) => text.length > lines *
 export function turnLabel(steps: SessionEvent[], orchestrator: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
   if (steps.length === 0 || (orchestrator && tools === 0)) return undefined;
+  // The orchestrator's round, folded: how long it thought and what it used.
+  const took = orchestrator && steps.length > 1 ? steps.at(-1)!.time - steps[0]!.time : undefined;
+  if (took !== undefined && took >= 1000) return t("web.session.rounds.thoughtFor", { took: tookText(took), n: tools });
   return tools > 0 ? t("web.session.rounds.usedTools", { n: tools }) : t("web.session.rounds.process");
 }
 

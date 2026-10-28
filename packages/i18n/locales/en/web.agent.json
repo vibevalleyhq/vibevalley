@@ -21,7 +21,6 @@
   "trajectories": "Trajectories",
   "remove": "Delete",
   "removeWhich": "Delete {name}?",
-  "never": "Never mind",
   "fine": "The configuration is fine: it can be sent work.",
   "problems": "Why it cannot be sent",
   "cannot": "Cannot be sent: ",

@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // link lands on it; the chosen one on the right, as groups of rows (ui/settings.tsx). The search keeps the sections
 // whose name or words hold it, and lights the rows that do.
 
+import { Splitter, usePaneWidth } from "../../ui/Splitter";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { IconName } from "../../ui/icons";
 import { SkillsPage } from "../runtime";
@@ -55,6 +56,7 @@ export function SettingsPage(props: { rest: string }) {
   const section = () => sections.find((s) => s.id === parts()[0]);
   const id = () => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined);
   const shown = (g: Group) => sections.filter((s) => s.group === g && matches(q(), [s.label, s.words]));
+  const navWidth = usePaneWidth("settingsNav", 224, 176, 360);
   return (
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
@@ -63,8 +65,12 @@ export function SettingsPage(props: { rest: string }) {
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              class="flex shrink-0 flex-col gap-4 border-line p-3 md:w-56 md:overflow-y-auto md:border-r"
+              class="relative flex shrink-0 flex-col gap-4 border-line p-3 md:w-(--pane-w) md:overflow-y-auto md:border-r"
+              style={{ "--pane-w": `${navWidth()}px` }}
             >
+              <div class="hidden md:block">
+                <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
+              </div>
               <TextInput
                 type="search"
                 data-testid="settings-search"
@@ -99,7 +105,7 @@ export function SettingsPage(props: { rest: string }) {
                 )}
               </For>
             </nav>
-            <div class="min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
+            <div class="scroll-fade-y min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />

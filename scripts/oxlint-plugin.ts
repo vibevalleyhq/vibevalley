@@ -29,12 +29,17 @@
  *   interface's words (getByText, getByRole's name, toHaveText…): words are the catalogs' to check, and a test that
  *   reads them breaks on every rewording. vite.config.ts says where it runs.
  *
+ *   design-tokens: the workbench's corners, type sizes, motion, layers, disabled look and shadows are on the ladders of
+ *   docs/style/design.md (scripts/design-tokens.ts says which classes are off them); the pixel skin and the avatars are
+ *   drawn and keep their own values.
+ *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
+import { hexClass, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
 
 const message = "time comes from Effect's Clock, or the Time a class was handed (apps/server/src/base/time.ts), so tests can move it";
 
@@ -135,9 +140,6 @@ const noCopySelector = defineRule({
   },
 });
 
-/** A colour written into a class (bg-[#e3efd2], text-[#3f6427]/50). */
-const hexClass = /-\[#[0-9a-fA-F]{3,8}\]/;
-
 const noHexColor = defineRule({
   meta: {
     messages: {
@@ -151,6 +153,25 @@ const noHexColor = defineRule({
       },
       TemplateLiteral(node) {
         if (node.quasis.some((q) => hexClass.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "hex" });
+      },
+    };
+  },
+});
+
+const designTokens = defineRule({
+  meta: {
+    messages: Object.fromEntries(
+      (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [kind, `off the workbench's ${kind} ladder (docs/style/design.md): use ${tokenAdvice[kind]}`]),
+    ),
+  },
+  create(context) {
+    return {
+      Literal(node) {
+        if (typeof node.value === "string") for (const kind of new Set(offTokens(node.value))) context.report({ node, messageId: kind });
+      },
+      TemplateLiteral(node) {
+        const text = node.quasis.map((q) => q.value.cooked ?? q.value.raw).join(" ");
+        for (const kind of new Set(offTokens(text))) context.report({ node, messageId: kind });
       },
     };
   },
@@ -251,6 +272,7 @@ export default definePlugin({
     "no-cjk-literal": noCjkLiteral,
     "no-hex-color": noHexColor,
     "no-copy-selector": noCopySelector,
+    "design-tokens": designTokens,
     "page-layers": pageLayersRule,
   },
 });

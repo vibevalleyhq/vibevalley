@@ -151,3 +151,19 @@ test("the voice line saves its own part and goes back to the defaults", async ({
   await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
   await expect(page.getByTestId("reset")).toBeDisabled();
 });
+
+test("the settings navigation is as wide as it was dragged, on this machine, until a double click puts it back", async ({ page }) => {
+  await page.goto("/settings/general");
+  const edge = page.locator('[data-testid="splitter"][data-key="settingsNav"]');
+  await expect(edge).toHaveAttribute("aria-valuenow", "224");
+  await edge.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(edge).toHaveAttribute("aria-valuenow", "256");
+  const nav = page.getByTestId("settings-nav");
+  expect(Math.round((await nav.boundingBox())!.width)).toBe(256);
+  await page.reload();
+  await expect(edge).toHaveAttribute("aria-valuenow", "256");
+  await edge.dblclick();
+  await expect(edge).toHaveAttribute("aria-valuenow", "224");
+});

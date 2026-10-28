@@ -2077,6 +2077,8 @@ export interface OrchestratorNow {
   state: OrchestratorState;
   /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
   channel?: string;
+  /** When its round began (it started thinking), kept while it thinks and writes; absent while it listens. */
+  since?: number;
 }
 
 export interface FactOrchestrator {

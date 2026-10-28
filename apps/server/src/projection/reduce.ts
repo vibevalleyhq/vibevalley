@@ -1,7 +1,7 @@
 // The farm's core state, in motion: reduce folds one fact into the state with each module's rules; the recorded runs of
 // facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 
-import type { WorkspaceState, Fact, Outcome, Phase, Session } from "@vibevalley/protocol";
+import type { WorkspaceState, Fact, OrchestratorState, Outcome, Phase, Session } from "@vibevalley/protocol";
 import { withChannel, withMessage, withOwnerMentions } from "../channel/state.ts";
 import { withIssue, withIssueStatuses } from "../issue/state.ts";
 import { farmOf, same } from "@vibevalley/protocol/rules";
@@ -28,7 +28,13 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       if ((was?.state ?? "idle") === f.state && was?.channel === f.channel) return [state, false];
       // At rest it leaves the map: idle is what an orchestrator not in it is.
       const { [f.agent]: _was, ...others } = state.orchestrators ?? {};
-      const now = f.state === "idle" && !f.channel ? others : { ...others, [f.agent]: { state: f.state, ...(f.channel ? { channel: f.channel } : {}) } };
+      // A round runs from its first thinking through its writing: its start stays while it goes on.
+      const busy = (s: OrchestratorState | undefined) => s === "thinking" || s === "speaking";
+      const since = busy(f.state) ? (busy(was?.state) ? was?.since : f.at) : undefined;
+      const now =
+        f.state === "idle" && !f.channel
+          ? others
+          : { ...others, [f.agent]: { state: f.state, ...(f.channel ? { channel: f.channel } : {}), ...(since !== undefined ? { since } : {}) } };
       const { orchestrators: _all, ...rest } = state;
       return [{ ...rest, ...(Object.keys(now).length > 0 ? { orchestrators: now } : {}) }, true];
     }

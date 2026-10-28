@@ -1177,7 +1177,6 @@ export const catalogs = {
       trajectories: "轨迹",
       remove: "删除",
       removeWhich: "删掉 {name}？",
-      never: "算了",
       fine: "配置没问题，可以派活。",
       problems: "派不出去的原因",
       cannot: "派不出去：",
@@ -1391,6 +1390,31 @@ export const catalogs = {
       write: "记下",
       secret: { hide: "藏起来", peek: "看一眼" },
       big: "{n} 万",
+      file: { pdf: "PDF · 在新标签页里看", remove: "去掉 {name}" },
+      lightbox: { label: "看图", prev: "上一张", next: "下一张", original: "打开原图", close: "关上" },
+      shortcuts: {
+        title: "快捷键",
+        place: { everywhere: "到处", composer: "输入框", lists: "菜单和名单", pictures: "看图", farm: "农场", desktop: "桌面版（系统全局）" },
+        say: {
+          switcher: "跳到频道、串、私聊",
+          sheet: "打开这张表",
+          close: "关掉对话框、菜单、浮层",
+          send: "发出去",
+          newline: "换行",
+          mention: "叫人",
+          editLast: "改自己上一条（输入框空着时）",
+          dropReply: "不回复那一条了",
+          move: "上下挑",
+          pick: "选中",
+          flip: "上一张、下一张",
+          tool: "拿起第几样农具",
+          names: "按住写出院子里每样东西的名字",
+          farmMenu: "放下农具，或打开菜单",
+          debug: "调试台",
+          voice: "跟管家说话（在设置里能换）",
+          command: "命令：记工单、让管家记住、叫停、私聊",
+        },
+      },
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -1533,6 +1557,9 @@ export const catalogs = {
         file: "文件 · {size}",
         reactedBy: "{names} 回应了 {emoji}",
         linked: "跳到 {where} 的第 {number} 条",
+        newBelow: "有 {n} 条新消息",
+        toLatest: "回到最新",
+        roundFor: "{what} · {took}",
       },
       tools: {
         label: "这条消息能做的",
@@ -1560,7 +1587,6 @@ export const catalogs = {
         replying: "回复 {name}",
         cancelReply: "不回复了",
         attach: "附上文件",
-        removeFile: "去掉 {name}",
         uploadFailed: "没传上去：{why}",
       },
       manage: {
@@ -1631,6 +1657,14 @@ export const catalogs = {
         orchestratorNote: "派活、拆计划、问进度",
         everyone: "所有人",
         everyoneNote: "叫醒在场的每个帮工",
+      },
+      threadWidth: "串的宽窄（拖动，双击回默认）",
+      commands: {
+        issue: { name: "记一张工单", note: "/issue 标题：记进备选，在这个频道的项目里", needs: "/issue 后面写工单的标题" },
+        remember: { name: "让管家记住", note: "/remember 一句话：记进照看这里的管家的记性", needs: "/remember 后面写要它记住的话" },
+        stop: { name: "叫停管家", note: "照看这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
+        dm: { name: "私聊", note: "/dm 名字：打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
+        done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了" },
       },
     },
     "web.connector": {
@@ -3045,6 +3079,7 @@ export const catalogs = {
         usedTools: "用了 {n} 个工具",
         process: "这一轮的干活过程",
         tag: { thought: "想了想", subagentThought: "帮手想了想", said: "它说", subagentSaid: "帮手说", usage: "用量" },
+        thoughtFor: "想了 {took} · 用了 {n} 个工具",
       },
       trajectory: {
         lane: { asked: "收到", model: "模型", tool: "工具" },
@@ -3132,6 +3167,7 @@ export const catalogs = {
         dictation: "听写",
         chat: "聊天软件",
         devices: "设备",
+        width: "导航的宽窄（拖动，双击回默认）",
       },
       groups: { options: "选项", helpers: "帮工", voice: "语音", connect: "连接" },
       words: {
@@ -4669,7 +4705,6 @@ export const catalogs = {
       trajectories: "Trajectories",
       remove: "Delete",
       removeWhich: "Delete {name}?",
-      never: "Never mind",
       fine: "The configuration is fine: it can be sent work.",
       problems: "Why it cannot be sent",
       cannot: "Cannot be sent: ",
@@ -4902,6 +4937,38 @@ export const catalogs = {
       write: "Remember it",
       secret: { hide: "Hide", peek: "Peek" },
       big: "{n}k",
+      file: { pdf: "PDF · opens in a new tab", remove: "Remove {name}" },
+      lightbox: { label: "Pictures", prev: "Previous", next: "Next", original: "Open the original", close: "Close" },
+      shortcuts: {
+        title: "Keyboard shortcuts",
+        place: {
+          everywhere: "Everywhere",
+          composer: "Message box",
+          lists: "Menus and lists",
+          pictures: "Pictures",
+          farm: "Farm",
+          desktop: "Desktop app (system-wide)",
+        },
+        say: {
+          switcher: "Jump to a channel, thread or direct message",
+          sheet: "Open this sheet",
+          close: "Close a dialog, menu or popover",
+          send: "Send",
+          newline: "New line",
+          mention: "Call someone",
+          editLast: "Edit your last message (box empty)",
+          dropReply: "Stop replying to that message",
+          move: "Move up and down",
+          pick: "Pick",
+          flip: "Previous, next",
+          tool: "Hold the nth tool",
+          names: "Hold to name everything in the yard",
+          farmMenu: "Put the tool down, or open the menu",
+          debug: "Debug console",
+          voice: "Talk to the manager (changeable in settings)",
+          command: "Commands: a ticket, remember, stop, a direct message",
+        },
+      },
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -5048,6 +5115,9 @@ export const catalogs = {
         file: "File · {size}",
         reactedBy: "{names} reacted with {emoji}",
         linked: "Go to message {number} in {where}",
+        newBelow: "{n} new below",
+        toLatest: "Back to the newest",
+        roundFor: "{what} · {took}",
       },
       tools: {
         label: "What this message offers",
@@ -5075,7 +5145,6 @@ export const catalogs = {
         replying: "Replying to {name}",
         cancelReply: "Cancel the reply",
         attach: "Attach a file",
-        removeFile: "Remove {name}",
         uploadFailed: "Not uploaded: {why}",
       },
       manage: {
@@ -5150,6 +5219,18 @@ export const catalogs = {
         orchestratorNote: "sends work, splits plans, answers how it goes",
         everyone: "Everyone",
         everyoneNote: "wakes every helper here",
+      },
+      threadWidth: "Thread width (drag; double-click for the default)",
+      commands: {
+        issue: { name: "Write a ticket", note: "/issue title: into the backlog, in this channel's project", needs: "Write the ticket's title after /issue" },
+        remember: {
+          name: "Have the manager remember",
+          note: "/remember a sentence: into the memory of the manager looking after this",
+          needs: "Write what it should remember after /remember",
+        },
+        stop: { name: "Stop the manager", note: "The manager looking after this stops its round; helpers it sent keep working", needs: "" },
+        dm: { name: "Direct message", note: "/dm name: open the direct channel with that profile", needs: "Write the profile's name or id after /dm" },
+        done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped" },
       },
     },
     "web.connector": {
@@ -6644,6 +6725,7 @@ export const catalogs = {
         usedTools: "{n, plural, one {used # tool} other {used # tools}}",
         process: "This round's work",
         tag: { thought: "Thought", subagentThought: "Subagent thought", said: "Said", subagentSaid: "Subagent said", usage: "Usage" },
+        thoughtFor: "Thought for {took} · {n} tools",
       },
       trajectory: {
         lane: { asked: "Heard", model: "Model", tool: "Tool" },
@@ -6731,6 +6813,7 @@ export const catalogs = {
         dictation: "Dictation",
         chat: "Chat apps",
         devices: "Devices",
+        width: "Navigation width (drag; double-click for the default)",
       },
       groups: { options: "Options", helpers: "Helpers", voice: "Voice", connect: "Connections" },
       words: {
@@ -8260,7 +8343,6 @@ export interface Messages {
   "web.agent.name": undefined;
   "web.agent.nameTaken": undefined;
   "web.agent.nameTip": undefined;
-  "web.agent.never": undefined;
   "web.agent.newName": { readonly runtime: string | number };
   "web.agent.noEffort": undefined;
   "web.agent.noEffortModel": { readonly model: string | number };
@@ -8387,6 +8469,8 @@ export interface Messages {
   "web.base.chips.valueHint": undefined;
   "web.base.chips.valueOf": { readonly k: string | number };
   "web.base.farm": undefined;
+  "web.base.file.pdf": undefined;
+  "web.base.file.remove": { readonly name: string | number };
   "web.base.form.asking": undefined;
   "web.base.form.from.config": undefined;
   "web.base.form.from.settings": undefined;
@@ -8405,6 +8489,11 @@ export interface Messages {
   "web.base.form.undo": undefined;
   "web.base.form.unreachable": { readonly why: string | number };
   "web.base.form.unset": undefined;
+  "web.base.lightbox.close": undefined;
+  "web.base.lightbox.label": undefined;
+  "web.base.lightbox.next": undefined;
+  "web.base.lightbox.original": undefined;
+  "web.base.lightbox.prev": undefined;
   "web.base.link.connecting": undefined;
   "web.base.link.lost": undefined;
   "web.base.link.open": undefined;
@@ -8435,6 +8524,30 @@ export interface Messages {
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
+  "web.base.shortcuts.place.composer": undefined;
+  "web.base.shortcuts.place.desktop": undefined;
+  "web.base.shortcuts.place.everywhere": undefined;
+  "web.base.shortcuts.place.farm": undefined;
+  "web.base.shortcuts.place.lists": undefined;
+  "web.base.shortcuts.place.pictures": undefined;
+  "web.base.shortcuts.say.close": undefined;
+  "web.base.shortcuts.say.command": undefined;
+  "web.base.shortcuts.say.debug": undefined;
+  "web.base.shortcuts.say.dropReply": undefined;
+  "web.base.shortcuts.say.editLast": undefined;
+  "web.base.shortcuts.say.farmMenu": undefined;
+  "web.base.shortcuts.say.flip": undefined;
+  "web.base.shortcuts.say.mention": undefined;
+  "web.base.shortcuts.say.move": undefined;
+  "web.base.shortcuts.say.names": undefined;
+  "web.base.shortcuts.say.newline": undefined;
+  "web.base.shortcuts.say.pick": undefined;
+  "web.base.shortcuts.say.send": undefined;
+  "web.base.shortcuts.say.sheet": undefined;
+  "web.base.shortcuts.say.switcher": undefined;
+  "web.base.shortcuts.say.tool": undefined;
+  "web.base.shortcuts.say.voice": undefined;
+  "web.base.shortcuts.title": undefined;
   "web.base.time.clock": { readonly am: boolean; readonly hh: string | number; readonly mm: string | number };
   "web.base.time.date": { readonly d: string | number; readonly m: string | number; readonly y: string | number };
   "web.base.time.day": { readonly d: string | number; readonly m: string | number; readonly weekday: string | number };
@@ -8541,11 +8654,25 @@ export interface Messages {
   "web.channel.channels": undefined;
   "web.channel.channelsTitle": undefined;
   "web.channel.closeThread": undefined;
+  "web.channel.commands.dm.name": undefined;
+  "web.channel.commands.dm.needs": undefined;
+  "web.channel.commands.dm.note": undefined;
+  "web.channel.commands.done.issue": { readonly n: string | number };
+  "web.channel.commands.done.remember": undefined;
+  "web.channel.commands.done.stop": undefined;
+  "web.channel.commands.issue.name": undefined;
+  "web.channel.commands.issue.needs": undefined;
+  "web.channel.commands.issue.note": undefined;
+  "web.channel.commands.remember.name": undefined;
+  "web.channel.commands.remember.needs": undefined;
+  "web.channel.commands.remember.note": undefined;
+  "web.channel.commands.stop.name": undefined;
+  "web.channel.commands.stop.needs": undefined;
+  "web.channel.commands.stop.note": undefined;
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
-  "web.channel.composer.removeFile": { readonly name: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.send": undefined;
   "web.channel.composer.sendHint": undefined;
@@ -8634,6 +8761,7 @@ export interface Messages {
   "web.channel.messages.inThread": { readonly address: string | number };
   "web.channel.messages.label": undefined;
   "web.channel.messages.linked": { readonly number: string | number; readonly where: string | number };
+  "web.channel.messages.newBelow": { readonly n: string | number };
   "web.channel.messages.newMessages": undefined;
   "web.channel.messages.notFound": undefined;
   "web.channel.messages.older": undefined;
@@ -8641,10 +8769,12 @@ export interface Messages {
   "web.channel.messages.pinned": undefined;
   "web.channel.messages.reactedBy": { readonly emoji: string | number; readonly names: string | number };
   "web.channel.messages.replyGone": undefined;
+  "web.channel.messages.roundFor": { readonly took: string | number; readonly what: string | number };
   "web.channel.messages.searching": undefined;
   "web.channel.messages.spent": { readonly spent: string | number };
   "web.channel.messages.start": undefined;
   "web.channel.messages.thinking": undefined;
+  "web.channel.messages.toLatest": undefined;
   "web.channel.messages.typing": undefined;
   "web.channel.messages.unfoldDispatch": undefined;
   "web.channel.messages.unread": { readonly n: string | number };
@@ -8713,6 +8843,7 @@ export interface Messages {
   "web.channel.threadList.rename": { readonly title: string | number };
   "web.channel.threadList.title": undefined;
   "web.channel.threadList.unarchive": { readonly title: string | number };
+  "web.channel.threadWidth": undefined;
   "web.channel.tools.edit": undefined;
   "web.channel.tools.editHint": undefined;
   "web.channel.tools.label": undefined;
@@ -10159,6 +10290,7 @@ export interface Messages {
   "web.session.rounds.tag.subagentThought": undefined;
   "web.session.rounds.tag.thought": undefined;
   "web.session.rounds.tag.usage": undefined;
+  "web.session.rounds.thoughtFor": { readonly n: string | number; readonly took: string | number };
   "web.session.rounds.told": undefined;
   "web.session.rounds.usedTools": { readonly n: number };
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
@@ -10251,6 +10383,7 @@ export interface Messages {
   "web.setting.nav.models": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
+  "web.setting.nav.width": undefined;
   "web.setting.scope.device": undefined;
   "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };

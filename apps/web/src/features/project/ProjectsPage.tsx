@@ -392,7 +392,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
               <div class="flex w-5 flex-col" style={{ gap: `${tileGap}px` }}>
                 <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.project.rows.${i}`))}>
                   {(d) => (
-                    <span class="flex items-center text-[10px] leading-none text-muted" style={{ height: `${tile}px` }}>
+                    <span class="flex items-center text-2xs leading-none text-muted" style={{ height: `${tile}px` }}>
                       {d}
                     </span>
                   )}

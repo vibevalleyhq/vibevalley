@@ -600,7 +600,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
                 disabled={!sample}
                 title={sample ? t("web.voice.voice.persona.sample", { greeting: t("shared.greeting") }) : t("web.voice.voice.persona.noSample")}
                 aria-label={playing() === v.id ? t("web.voice.voice.persona.stop", { name: v.label }) : t("web.voice.voice.persona.play", { name: v.label })}
-                class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-40"
+                class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-50"
                 onClick={() => sample && play(v.id, sample)}
               >
                 <Icon name={playing() === v.id ? "stop" : "play"} size={16} />

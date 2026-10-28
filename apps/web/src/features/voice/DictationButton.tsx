@@ -57,7 +57,7 @@ export function DictationButton(props: {
         })
       }
       class={[
-        "inline-flex shrink-0 cursor-pointer items-center justify-center p-1 disabled:cursor-default disabled:opacity-40",
+        "inline-flex shrink-0 cursor-pointer items-center justify-center p-1 disabled:cursor-default disabled:opacity-50",
         { "animate-pulse": phase() === "recording" },
         props.class,
       ]}

@@ -52,7 +52,8 @@
     "call": "Call line",
     "dictation": "Dictation",
     "chat": "Chat apps",
-    "devices": "Devices"
+    "devices": "Devices",
+    "width": "Navigation width (drag; double-click for the default)"
   },
   "groups": {
     "options": "Options",

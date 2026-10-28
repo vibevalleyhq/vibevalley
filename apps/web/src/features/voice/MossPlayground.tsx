@@ -16,7 +16,7 @@ function Level(props: { value: number; label: string }) {
     <span class="flex items-center gap-1.5 text-xs text-muted" title={props.label}>
       <span class="w-10 truncate">{props.label}</span>
       <span class="h-1.5 w-24 overflow-hidden rounded-full bg-hover">
-        <span class="block h-full rounded-full bg-leaf transition-[width] duration-75" style={{ width: `${props.value}%` }} />
+        <span class="block h-full rounded-full bg-leaf transition-[width] duration-120" style={{ width: `${props.value}%` }} />
       </span>
     </span>
   );

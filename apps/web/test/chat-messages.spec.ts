@@ -88,4 +88,11 @@ test("a picture picked for a message shows in it and opens at its own address", 
   expect(src).toBe(attachmentPath(said!.attachments![0]!.id));
   const res = await fetch(server.url + src);
   expect([res.status, res.headers.get("content-type")]).toEqual([200, "image/png"]);
+  // Clicked, it opens over the page with the original a tab away, and Escape closes it.
+  await page.getByTestId("messages").locator('[data-testid="attachment"][data-kind="image"]').click();
+  const shown = page.getByTestId("lightbox");
+  await expect(shown).toHaveAttribute("data-key", "shot.png");
+  await expect(shown.getByTestId("lightbox-original")).toHaveAttribute("href", src!);
+  await page.keyboard.press("Escape");
+  await expect(shown).toBeHidden();
 });

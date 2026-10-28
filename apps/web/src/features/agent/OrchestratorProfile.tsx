@@ -10,6 +10,7 @@ import { api, reasonOf } from "../../base/api";
 import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { toast } from "../../ui/toasts";
+import { ConfirmButton } from "../../ui/ConfirmButton";
 import { A } from "../../ui/A";
 import { Button } from "../../ui/Button";
 import { OrchestratorFace } from "../../ui/Face";
@@ -44,7 +45,6 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
   const isNew = untrack(() => !props.saved);
   const [draft, setDraft] = createSignal(untrack(() => props.start));
   const [saving, setSaving] = createSignal(false);
-  const [sure, setSure] = createSignal(false);
   const router = useRouter();
   const client = useQueryClient();
   const dirty = () => isNew || !same(props.saved, draft());
@@ -106,22 +106,12 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
               {(saved) => (
                 <>
                   <Show when={saved().id !== defaultOrchestrator}>
-                    <Show
-                      when={sure()}
-                      fallback={
-                        <Button data-testid="delete" onClick={() => setSure(true)}>
-                          {t("web.agent.remove")}
-                        </Button>
-                      }
-                    >
-                      <span class="flex items-center gap-2">
-                        <span class="text-sm text-muted">{t("web.agent.removeWhich", { name: saved().name })}</span>
-                        <Button tone="danger" data-testid="delete-sure" onClick={() => void remove()}>
-                          {t("web.agent.remove")}
-                        </Button>
-                        <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>
-                      </span>
-                    </Show>
+                    <ConfirmButton
+                      label={t("web.agent.remove")}
+                      question={t("web.agent.removeWhich", { name: saved().name })}
+                      testid="delete"
+                      onConfirm={remove}
+                    />
                   </Show>
                   <Button icon="thread" data-testid="talk" onClick={talk}>
                     {t("web.agent.talk")}

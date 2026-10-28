@@ -21,6 +21,7 @@
     "remark-gfm": "catalog:",
     "remark-parse": "catalog:",
     "remark-rehype": "catalog:",
+    "shiki": "catalog:",
     "solid-js": "catalog:",
     "unified": "catalog:",
     "uqr": "catalog:"

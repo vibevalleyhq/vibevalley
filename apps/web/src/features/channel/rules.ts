@@ -213,10 +213,11 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
 export function orchestratorTyping(
   state: WorkspaceState | undefined,
   channel: Channel | undefined,
-): { readonly agent: string; readonly mood: "thinking" | "speaking" } | undefined {
+): { readonly agent: string; readonly mood: "thinking" | "speaking"; readonly since?: number } | undefined {
   if (!channel) return undefined;
   for (const [agent, now] of Object.entries(state?.orchestrators ?? {}))
-    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking")) return { agent, mood: now.state };
+    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking"))
+      return { agent, mood: now.state, ...(now.since !== undefined ? { since: now.since } : {}) };
   return undefined;
 }
 

@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { tookText } from "../../base/format";
 import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
 
@@ -28,17 +29,17 @@ import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
+import { Dot, PhaseGlyph, SenderFace, Tag, type TagTone, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
 import { editingId, setEditingId } from "./draft";
 import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "../session";
 import { useAgent, useOrchestrators } from "../../base/agents";
 
-const outcomeTag: Record<Outcome, { label: string; fill: string; icon: IconName }> = {
-  completed: { label: t("shared.outcome.completed"), fill: "#b4cb7c", icon: "check" },
-  failed: { label: t("shared.outcome.failed"), fill: "#e9a092", icon: "cross" },
-  interrupted: { label: t("shared.outcome.interrupted"), fill: "#e2c995", icon: "stop" },
+const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
+  completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },
+  failed: { label: t("shared.outcome.failed"), tone: "bad", icon: "cross" },
+  interrupted: { label: t("shared.outcome.interrupted"), tone: "wait", icon: "stop" },
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
@@ -102,112 +103,148 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
   const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
   const typing = () => orchestratorTyping(core(), props.channel);
+  const clock = useNow();
+  // Thinking or writing, and for how long the round has gone on.
+  const roundText = (mood: "thinking" | "speaking", since: number | undefined) => {
+    const what = mood === "speaking" ? t("web.channel.messages.typing") : t("web.channel.messages.thinking");
+    return since === undefined ? what : t("web.channel.messages.roundFor", { what, took: tookText(Math.max(0, clock() - since)) });
+  };
   const orchestrators = useOrchestrators();
+  // Scrolled up from the newest: the number it was at then, so what came after is counted for the way back.
+  const [awayFrom, setAwayFrom] = createSignal<number>();
+  const newest = () => said().messages.at(-1)?.number ?? 0;
+  const unseen = () => {
+    const from = awayFrom();
+    return from === undefined ? 0 : said().messages.filter((m) => m.number > from && m.from !== ownerId).length;
+  };
+  // The log is reversed: at the newest its scrollTop is 0, and it goes negative upward.
+  const onScroll = () => {
+    const away = (log?.scrollTop ?? 0) < -awayPx;
+    if (away && awayFrom() === undefined) setAwayFrom(newest());
+    if (!away && awayFrom() !== undefined) setAwayFrom(undefined);
+  };
+  const toLatest = () => log?.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div
-      ref={(el) => (log = el)}
-      class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
-      role="log"
-      aria-label={t("web.channel.messages.label")}
-      data-testid="messages"
-    >
-      <div class="flex flex-col px-4 pt-3 pb-4">
-        <div class="flex justify-center pb-2">
-          <Show
-            when={hasOlder() && !searching()}
-            fallback={
-              <span class="text-xs text-muted">
-                {searching()
-                  ? hits() === undefined
-                    ? t("web.channel.messages.searching")
-                    : t("web.channel.messages.containing", { text: (props.filter ?? "").trim() })
-                  : t("web.channel.messages.start")}
-              </span>
-            }
-          >
-            <button type="button" onClick={() => void followed.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
-              {t("web.channel.messages.older")}
-            </button>
+    <div class="relative flex min-h-0 flex-1 flex-col">
+      <Show when={awayFrom() !== undefined}>
+        <button
+          type="button"
+          data-testid="to-latest"
+          onClick={toLatest}
+          class="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 animate-pop-in cursor-pointer items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 text-xs text-ink shadow-float transition-colors duration-120 hover:bg-hover"
+        >
+          <Icon name="expand" size={12} class="rotate-90" />
+          {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
+        </button>
+      </Show>
+      <div
+        ref={(el) => (log = el)}
+        onScroll={onScroll}
+        class="scroll-fade-y flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
+        role="log"
+        aria-label={t("web.channel.messages.label")}
+        data-testid="messages"
+      >
+        <div class="flex flex-col px-4 pt-3 pb-4">
+          <div class="flex justify-center pb-2">
+            <Show
+              when={hasOlder() && !searching()}
+              fallback={
+                <span class="text-xs text-muted">
+                  {searching()
+                    ? hits() === undefined
+                      ? t("web.channel.messages.searching")
+                      : t("web.channel.messages.containing", { text: (props.filter ?? "").trim() })
+                    : t("web.channel.messages.start")}
+                </span>
+              }
+            >
+              <button type="button" onClick={() => void followed.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
+                {t("web.channel.messages.older")}
+              </button>
+            </Show>
+          </div>
+          <Show when={parent()}>
+            {(m) => (
+              <div class="mb-2 border-b border-line pb-2">
+                <MessageRow m={m()} continues={false} />
+              </div>
+            )}
+          </Show>
+          <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
+            <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
+              {searching() ? t("web.channel.messages.notFound") : props.emptyText}
+            </p>
+          </Show>
+          <For each={items()} keyed={(item) => item.message.id}>
+            {(item) => (
+              <div
+                data-testid="message"
+                data-key={item().message.id}
+                data-from={item().message.from}
+                data-from-kind={item().message.fromKind}
+                data-edited={item().message.edited !== undefined ? "" : undefined}
+                data-deleted={item().message.deleted !== undefined ? "" : undefined}
+                data-pinned={item().message.pinned !== undefined ? "" : undefined}
+                data-kind={item().message.kind}
+                data-lit={lit() === item().message.number && item().message.channel === id() ? "" : undefined}
+                data-number={item().message.channel === id() ? item().message.number : undefined}
+                class={[
+                  "rounded-md transition-[opacity,translate,background-color] duration-280",
+                  {
+                    "starting:translate-y-2 starting:opacity-0": item().message.at > shownAt,
+                    "bg-wheat/25": lit() === item().message.number && item().message.channel === id(),
+                  },
+                ]}
+              >
+                <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
+                <Show when={item().message.id === firstNew()}>
+                  <DayLine label={t("web.channel.messages.newMessages")} tone="new" />
+                </Show>
+                <Show
+                  when={item().message.kind === "notice" || item().message.fromKind === "system"}
+                  fallback={
+                    <MessageRow
+                      m={item().message}
+                      continues={item().continues && item().message.id !== firstNew()}
+                      thread={item().thread}
+                      inChannel={props.channel?.type === "channel"}
+                      where={addressOf(item().message)}
+                      {...(searching()
+                        ? { onJump: () => router.navigate(messagePath(channelOf(core()?.chat, item().message.channel), item().message.number)) }
+                        : {})}
+                    />
+                  }
+                >
+                  <p class="px-6 py-2 text-center text-xs leading-relaxed text-muted">{item().message.text}</p>
+                </Show>
+              </div>
+            )}
+          </For>
+          <Show when={typing()}>
+            {(typer) => (
+              <Frame
+                face={<OrchestratorFace size={36} agent={typer().agent} />}
+                name={orchestrators().find((a) => a.id === typer().agent)?.name || t("web.channel.orchestrator")}
+                meta={roundText(typer().mood, typer().since)}
+              >
+                <div class="flex h-5 items-center">
+                  <ThinkingDots />
+                </div>
+              </Frame>
+            )}
           </Show>
         </div>
-        <Show when={parent()}>
-          {(m) => (
-            <div class="mb-2 border-b border-line pb-2">
-              <MessageRow m={m()} continues={false} />
-            </div>
-          )}
-        </Show>
-        <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
-          <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
-            {searching() ? t("web.channel.messages.notFound") : props.emptyText}
-          </p>
-        </Show>
-        <For each={items()} keyed={(item) => item.message.id}>
-          {(item) => (
-            <div
-              data-testid="message"
-              data-key={item().message.id}
-              data-from={item().message.from}
-              data-from-kind={item().message.fromKind}
-              data-edited={item().message.edited !== undefined ? "" : undefined}
-              data-deleted={item().message.deleted !== undefined ? "" : undefined}
-              data-pinned={item().message.pinned !== undefined ? "" : undefined}
-              data-kind={item().message.kind}
-              data-number={item().message.channel === id() ? item().message.number : undefined}
-              data-lit={lit() === item().message.number && item().message.channel === id() ? "" : undefined}
-              class={[
-                "rounded-md transition-[opacity,translate,background-color] duration-200 ease-out",
-                {
-                  "starting:translate-y-2 starting:opacity-0": item().message.at > shownAt,
-                  "bg-wheat/25": lit() === item().message.number && item().message.channel === id(),
-                },
-              ]}
-            >
-              <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
-              <Show when={item().message.id === firstNew()}>
-                <DayLine label={t("web.channel.messages.newMessages")} tone="new" />
-              </Show>
-              <Show
-                when={item().message.kind === "notice" || item().message.fromKind === "system"}
-                fallback={
-                  <MessageRow
-                    m={item().message}
-                    continues={item().continues && item().message.id !== firstNew()}
-                    thread={item().thread}
-                    inChannel={props.channel?.type === "channel"}
-                    where={addressOf(item().message)}
-                    {...(searching()
-                      ? { onJump: () => router.navigate(messagePath(channelOf(core()?.chat, item().message.channel), item().message.number)) }
-                      : {})}
-                  />
-                }
-              >
-                <p class="px-6 py-2 text-center text-xs leading-relaxed text-muted">{item().message.text}</p>
-              </Show>
-            </div>
-          )}
-        </For>
-        <Show when={typing()}>
-          {(typer) => (
-            <Frame
-              face={<OrchestratorFace size={36} agent={typer().agent} />}
-              name={orchestrators().find((a) => a.id === typer().agent)?.name || t("web.channel.orchestrator")}
-              meta={typer().mood === "speaking" ? t("web.channel.messages.typing") : t("web.channel.messages.thinking")}
-            >
-              <div class="flex h-5 items-center">
-                <ThinkingDots />
-              </div>
-            </Frame>
-          )}
-        </Show>
       </div>
     </div>
   );
 }
 
 const searchWaitMs = 200;
+/** Scrolled up this far from the newest, the way back shows. */
+const awayPx = 240;
 const litMs = 2500;
 
 function DayLine(props: { label: string; tone?: "new" }) {
@@ -343,12 +380,12 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
     >
       <Show when={props.m.kind === "dispatch"}>
         <div class="mb-1">
-          <Tag icon="send" label={t("web.channel.messages.dispatch")} fill="#f3d38a" />
+          <Tag icon="send" label={t("web.channel.messages.dispatch")} tone="wait" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
         <div class="mb-1">
-          <Tag icon={outcome().icon} label={outcome().label} fill={outcome().fill} />
+          <Tag icon={outcome().icon} label={outcome().label} tone={outcome().tone} />
         </div>
       </Show>
       <Show
@@ -414,7 +451,7 @@ function ThreadPreview(props: { thread: Channel }) {
               : t("web.channel.names.thread")}
         </span>
         <Show when={unread() > 0}>
-          <Tag label={t("web.channel.messages.unread", { n: unread() })} fill="#b4cb7c" />
+          <Tag label={t("web.channel.messages.unread", { n: unread() })} tone="ok" />
         </Show>
         <Show when={session()} fallback={<span class="flex-1" />}>
           {(s) => (

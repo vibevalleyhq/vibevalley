@@ -1,6 +1,8 @@
 import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
+import { Lightbox } from "../../ui/Lightbox";
+import { fileKind, sizeText } from "../../ui/AttachmentTile";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -16,9 +18,6 @@ import { EmojiPicker } from "./EmojiPicker";
 import { useCore } from "../../base/frame";
 import { markUnread } from "./data";
 import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePath, workbenchClock } from "./rules";
-
-const sizeText = (bytes: number) =>
-  bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
@@ -62,13 +61,15 @@ export function MessageBody(props: { m: ChatMessage }) {
   );
 }
 
-/** How a file shows in a message: a picture, a player, a PDF to open in a tab, or a file to save. */
-const shownAs = (type: string) =>
-  type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : type === "application/pdf" ? "pdf" : "file";
+const shownAs = fileKind;
 
 export function Attachments(props: { files: readonly Attachment[] }) {
+  // The message's pictures open over the page, one at a time, in their order here.
+  const pictures = () => props.files.filter((f) => shownAs(f.type) === "image").map((f) => ({ id: f.id, src: attachmentPath(f.id), name: f.name }));
+  const [open, setOpen] = createSignal<number>();
   return (
     <div class="mt-1 flex flex-wrap items-start gap-2">
+      <Lightbox pictures={pictures()} at={open()} onAt={setOpen} />
       <For each={props.files} keyed={(f) => f.id}>
         {(f) => {
           // Keyed by its id, which names its bytes: a file never changes.
@@ -77,9 +78,17 @@ export function Attachments(props: { files: readonly Attachment[] }) {
           switch (shownAs(file.type)) {
             case "image":
               return (
-                <a href={at()} target="_blank" rel="noreferrer" data-testid="attachment" data-key={file.id} data-kind="image" class="block">
+                <button
+                  type="button"
+                  data-testid="attachment"
+                  data-key={file.id}
+                  data-kind="image"
+                  aria-label={file.name}
+                  class="block cursor-zoom-in rounded-md transition-opacity duration-120 hover:opacity-90"
+                  onClick={() => setOpen(pictures().findIndex((p) => p.id === file.id))}
+                >
                   <img src={at()} alt={file.name} class="max-h-64 max-w-80 rounded-md border border-line object-contain" loading="lazy" />
-                </a>
+                </button>
               );
             case "video":
               return (
@@ -393,7 +402,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           <div
             role="menu"
             aria-label={t("web.channel.more.label")}
-            class="absolute right-0 bottom-full z-20 mb-1 flex w-44 flex-col rounded-md border border-line bg-page p-1 shadow-float"
+            class="absolute right-0 bottom-full z-30 mb-1 flex w-44 origin-bottom-right animate-pop-in flex-col rounded-md border border-line bg-page p-1 shadow-float"
           >
             <button
               type="button"

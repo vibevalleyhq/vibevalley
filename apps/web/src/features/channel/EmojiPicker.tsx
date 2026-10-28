@@ -53,7 +53,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
         data-testid="emoji-picker"
         aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
-        class="fixed z-50 flex flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
+        class="fixed z-30 flex animate-pop-in flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
       >
         <For each={groups}>
           {(g) => (

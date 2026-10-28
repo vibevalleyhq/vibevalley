@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { useRouter } from "../../base/router";
 import { ownerId } from "@vibevalley/protocol";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
@@ -14,6 +15,7 @@ import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
+import { AttachmentTile } from "../../ui/AttachmentTile";
 import { DictationButton } from "../voice";
 import { HelperFace } from "./bits";
 
@@ -28,6 +30,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const uploading = () => uploadsIn(props.channel?.id);
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
   const at = untrack(() => props.channel?.id);
+  const router = useRouter();
   const box = createComposer(core, () => input, {
     initial: at ? untrack(() => draftOf(at).text) : undefined,
     target: () => {
@@ -42,6 +45,8 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       setProblem(reason);
       toast(t("web.channel.composer.notSent", { why: reason }), "bad");
     },
+    told: (say) => toast(say),
+    opened: (path) => router.navigate(path),
     edited: (value) => {
       setProblem(undefined);
       if (at) drafts.text(at, value);
@@ -95,7 +100,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           role="listbox"
           aria-label={t("web.channel.composer.who")}
           data-testid="mentions"
-          class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float"
+          class="mb-1.5 flex origin-bottom animate-pop-in flex-col rounded-lg border border-line bg-page p-1 shadow-float"
         >
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
@@ -157,24 +162,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       <Show when={draft().files.length > 0 || uploading().length > 0}>
         <div class="mb-1.5 flex flex-wrap gap-1.5">
           <For each={draft().files} keyed={(f) => f.id}>
-            {(f) => (
-              <span
-                data-testid="pending-file"
-                data-key={f().name}
-                class="flex items-center gap-1.5 rounded-md border border-line bg-page py-1 pr-1 pl-2 text-xs"
-              >
-                <Icon name="attach" size={12} />
-                <span class="max-w-48 truncate">{f().name}</span>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded p-0.5 hover:bg-hover"
-                  aria-label={t("web.channel.composer.removeFile", { name: f().name })}
-                  onClick={() => drafts.drop(props.channel!.id, f().id)}
-                >
-                  <Icon name="close" size={10} />
-                </button>
-              </span>
-            )}
+            {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => drafts.drop(props.channel!.id, f().id)} />}
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (
@@ -184,7 +172,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
                 aria-valuenow={u().percent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                class="relative flex items-center overflow-hidden rounded-md border border-line bg-page px-2 py-1 text-xs text-muted"
+                class="relative flex h-10 items-center overflow-hidden rounded-md border border-line bg-page px-2 text-xs text-muted"
               >
                 <span class="absolute inset-y-0 left-0 bg-leaf/20" style={{ width: `${u().percent}%` }} />
                 <span class="relative max-w-48 truncate">{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
@@ -240,7 +228,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             disabled={!props.channel}
             aria-label={t("web.channel.composer.attach")}
             title={t("web.channel.composer.attach")}
-            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
+            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
           >
             <Icon name="attach" size={16} />
           </button>
@@ -254,7 +242,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               aria-label={t("web.channel.emoji.open")}
               aria-expanded={aria(emoji())}
               title={t("web.channel.emoji.open")}
-              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
+              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
             >
               <Icon name="react" size={16} />
             </button>

@@ -21,13 +21,20 @@ export interface Prefs {
   readonly theme: ThemeChoice;
   readonly scale: Scale;
   readonly start: Start;
+  /** A pane's width the owner dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
+  readonly widths: Readonly<Record<string, number>>;
 }
 
 const key = "vibevalley.prefs";
 
-const fallback: Prefs = { pick: "auto", pet: "dog", theme: "system", scale: 100, start: "workbench" };
+const fallback: Prefs = { pick: "auto", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} };
 
 const oneOf = <T>(values: readonly T[], v: unknown, d: T): T => (values.includes(v as T) ? (v as T) : d);
+
+const widthsOf = (v: unknown): Record<string, number> =>
+  typeof v === "object" && v !== null
+    ? Object.fromEntries(Object.entries(v).filter((e): e is [string, number] => typeof e[1] === "number" && Number.isFinite(e[1])))
+    : {};
 
 function load(): Prefs {
   try {
@@ -39,6 +46,7 @@ function load(): Prefs {
       theme: oneOf(ThemeChoiceValues, raw.theme, fallback.theme),
       scale: oneOf(ScaleValues, raw.scale, fallback.scale),
       start: oneOf(StartValues, raw.start, fallback.start),
+      widths: widthsOf(raw.widths),
     };
   } catch {
     return fallback;
@@ -72,6 +80,11 @@ export const setPet = (pet: string) => set({ pet });
 export const setTheme = (theme: ThemeChoice) => set({ theme });
 export const setScale = (scale: Scale) => set({ scale });
 export const setStart = (start: Start) => set({ start });
+/** A pane's width; none puts it back to its default. */
+export const setWidth = (pane: string, width: number | undefined) => {
+  const { [pane]: _was, ...rest } = prefs.widths;
+  set({ widths: width === undefined ? rest : { ...rest, [pane]: width } });
+};
 
 /** One of the choices, following it. */
 export function usePrefs<T>(select: (p: Prefs) => T): Accessor<T> {

@@ -55,7 +55,8 @@
       "said": "它说",
       "subagentSaid": "帮手说",
       "usage": "用量"
-    }
+    },
+    "thoughtFor": "想了 {took} · 用了 {n} 个工具"
   },
   "trajectory": {
     "lane": {

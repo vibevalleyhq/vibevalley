@@ -22,6 +22,8 @@ test("the orchestrator's dots show only in the channel it thinks or writes in", 
     orchestrators: { orchestrator: { state: "listening" }, lead: { state: "speaking", channel: "c2" } },
   };
   expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking" }]);
+  const since: WorkspaceState = { call: "idle", sessions: [], orchestrators: { lead: { state: "thinking", channel: "c2", since: 1_000 } } };
+  expect(orchestratorTyping(since, at("c2"))).toEqual({ agent: "lead", mood: "thinking", since: 1_000 });
 });
 
 test("the sidebar lists the default first, then by place, grouped in the order the groups first come", () => {

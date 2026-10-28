@@ -131,3 +131,39 @@ test("the recurrences tab turns a recurrence off and deletes it on the second pr
   await card.getByTestId("delete-sure").click();
   await expect(page.getByTestId("tab-empty")).toBeVisible();
 });
+
+test("scrolled up from the newest, a pill leads back down", async ({ page, api }) => {
+  const id = await newChannel(api, "long-talk");
+  for (let i = 0; i < 40; i++) await api.channel.message.send({ id, text: `line ${i}` });
+  const last = (await api.channel.message.list({ id })).find((m) => m.text === "line 39")!.id;
+  await page.goto(`/chat/${id}`);
+  const messages = page.getByTestId("messages");
+  const newest = messages.locator(`[data-testid="message"][data-key="${last}"]`);
+  await expect(newest).toBeVisible();
+  await expect(page.getByTestId("to-latest")).toHaveCount(0);
+  await messages.evaluate((el) => el.scrollTo({ top: -2000 }));
+  await page.getByTestId("to-latest").click();
+  await expect(newest).toBeInViewport();
+  await expect(page.getByTestId("to-latest")).toHaveCount(0);
+});
+
+test("/ offers the commands, and /issue writes an issue instead of saying the line", async ({ page, api }) => {
+  const id = await newChannel(api, "commands");
+  await page.goto(`/chat/${id}`);
+  const box = await composerOn(page, id);
+  await box.click();
+  await box.pressSequentially("/is");
+  await expect(page.getByTestId("mentions").locator('[data-key="/issue"]')).toBeVisible();
+  await box.press("Enter");
+  await expect(box).toHaveValue("/issue ");
+  await box.pressSequentially("add paging to clock-in");
+  await box.press("Enter");
+  await expect(page.getByTestId("toast").first()).toBeVisible();
+  await expect(box).toHaveValue("");
+  await expect.poll(async () => (await api.issue.list({})).some((i) => i.title === "add paging to clock-in")).toBe(true);
+  expect((await api.channel.message.list({ id })).some((m) => m.text.includes("/issue"))).toBe(false);
+  // A line that only looks like one is said.
+  await box.fill("where is /usr/bin");
+  await box.press("Enter");
+  await expect(page.getByTestId("messages").getByTestId("message").filter({ hasText: "where is /usr/bin" })).toBeVisible();
+});

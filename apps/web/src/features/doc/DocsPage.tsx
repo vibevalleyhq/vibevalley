@@ -261,7 +261,7 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
             aria-label={r().attrs.checked ? t("web.doc.docs.done") : t("web.doc.docs.notDone")}
             onClick={() => props.editor.toggle(r().block)}
             class={[
-              "mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-[3px] border-[1.5px]",
+              "mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-xs border-[1.5px]",
               r().attrs.checked ? "border-leaf-600 bg-leaf" : "border-bark-400 bg-paper",
             ]}
           >

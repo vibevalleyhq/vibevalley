@@ -26,3 +26,17 @@ test("every place opens under its own head, and the chat has none", async ({ pag
   await expect(rail.locator('[data-place="chat"]')).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("desk")).toHaveCount(0);
 });
+
+test("? off a text field opens every shortcut, by where it works; in a field it is a question mark", async ({ page }) => {
+  await page.goto("/issues");
+  await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
+  await page.keyboard.press("?");
+  const sheet = page.getByTestId("shortcuts");
+  await expect(sheet.locator('[data-testid="shortcut-place"][data-key="everywhere"]')).toBeVisible();
+  await expect(sheet.locator('[data-testid="shortcut-place"][data-key="farm"]')).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await page.getByRole("textbox").first().click();
+  await page.keyboard.press("?");
+  await expect(sheet).toBeHidden();
+});

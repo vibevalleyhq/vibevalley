@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
 
-import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+import { highlight, type Tokens } from "../../ui/code/highlight";
+import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -231,6 +232,8 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
     <div>
       <button
         type="button"
+        data-testid="changed-file"
+        data-key={props.file.path}
         disabled={!hasPatch()}
         aria-expanded={hasPatch() ? aria(open()) : undefined}
         onClick={() => setOpen(!open())}
@@ -252,17 +255,59 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>
-      <Show when={open() ? props.file.patch : undefined}>{(patch) => <Patch text={patch()} />}</Show>
+      <Show when={open() ? props.file.patch : undefined}>{(patch) => <Patch text={patch()} path={props.file.path} />}</Show>
     </div>
   );
 }
 
 const patchLook = { added: "bg-leaf/20 text-accent", removed: "bg-berry/10 text-berry", hunk: "text-water", plain: "" } as const;
 
-function Patch(props: { text: string }) {
+/** A file's patch: each line marked added or removed, its code coloured in the file's language once the colours come
+ * (ui/code: off the page's thread; until then, and for a language not coloured, plain). */
+function Patch(props: { text: string; path: string }) {
+  const lines = () => patchLines(props.text);
+  // The code without its +, - or space: coloured as one block, so a line reads in the context of those above it.
+  const code = () =>
+    lines()
+      .filter((l) => patchMarkOf(l) !== "hunk")
+      .map((l) => l.slice(1));
+  const [tokens, setTokens] = createSignal<Tokens>();
+  createEffect(
+    () => [code(), props.path] as const,
+    ([c, path]) => {
+      setTokens(undefined);
+      let live = true;
+      void highlight(c, path).then((got) => live && setTokens(got));
+      return () => {
+        live = false;
+      };
+    },
+  );
+  // Each line's place among the coloured ones: hunk headers are not in the block.
+  const row = (i: number) =>
+    lines()
+      .slice(0, i)
+      .filter((l) => patchMarkOf(l) !== "hunk").length;
   return (
-    <pre class="mx-2 mb-2 max-h-80 overflow-auto rounded-md border border-line bg-page py-1 font-mono text-xs leading-[1.4]">
-      <For each={patchLines(props.text)}>{(line) => <div class={["px-2", patchLook[patchMarkOf(line)]]}>{line || " "}</div>}</For>
+    <pre class="mx-2 mb-2 max-h-80 overflow-auto rounded-md bg-page py-1 font-mono text-xs leading-[1.4]">
+      <For each={lines()}>
+        {(line, i) => {
+          const mark = patchMarkOf(line);
+          const coloured = () => (mark === "hunk" ? undefined : tokens()?.[row(i())]);
+          return (
+            <div class={["px-2", patchLook[mark]]}>
+              <Show when={coloured()} fallback={line || " "}>
+                {(toks) => (
+                  <>
+                    {line.slice(0, 1)}
+                    <For each={toks()}>{(tok) => <span style={tok.color ? { color: tok.color } : undefined}>{tok.text}</span>}</For>
+                  </>
+                )}
+              </Show>
+            </div>
+          );
+        }}
+      </For>
     </pre>
   );
 }

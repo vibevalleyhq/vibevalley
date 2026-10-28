@@ -9,7 +9,7 @@ export function ToastHost() {
   const shown = createExternal(toasts.subscribe, toasts.get);
   return (
     <div
-      class="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2"
+      class="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex flex-col items-center gap-2"
       role="log"
       aria-label={t("web.base.toasts")}
       data-testid="toasts"
@@ -19,7 +19,7 @@ export function ToastHost() {
           <div
             data-testid="toast"
             data-tone={t.tone}
-            class={["rounded-md px-3 py-1.5 text-sm text-page shadow-float", t.tone === "bad" ? "bg-berry" : "bg-ink"]}
+            class={["animate-pop-in rounded-md px-3 py-1.5 text-sm text-page shadow-float", t.tone === "bad" ? "bg-berry" : "bg-ink"]}
           >
             {t.text}
           </div>
