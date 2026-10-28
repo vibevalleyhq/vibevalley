@@ -15,10 +15,11 @@
 
 ## 在哪
 
+- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接和对 key 的检查（`checkMoss`）；通话还没接它。
 - 服务端 `apps/server/src/voice/voice.ts`（`Voice`）：RTC 授予（签发、认领、续签、撤销）、通话（开始、停、`heard`、`said`）、把语音设置翻成声网的 vendors（`vendorsFor`、`agentFor`）、语音线路和隧道、听写。声网的令牌用 npm 的 `agora-token`，请 agent 进出用 `agora-agents`（声网的 ConvoAI SDK）。
 - 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `setting/rules.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/rules.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
-- 接口：`voice.session.create`、`voice.session.renew`、`voice.agent.start`、`voice.agent.stop`、`voice.agent.hear`、`voice.agent.say`、`voice.dictate`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
-- 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
+- 接口：`voice.session.create`、`voice.session.renew`、`voice.agent.start`、`voice.agent.stop`、`voice.agent.hear`、`voice.agent.say`、`voice.dictate`、`voice.moss.check`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
+- 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`mossKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
 - 页面：`apps/web/src/features/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`DictationButton.tsx` 的听写键，`createCall.ts` 的 `createCall`，各处读同一通电话）；打电话是农场手机的事（点「管家」就拨），田头和工作台的聊天输入框只有听写；设置页 `features/voice/VoiceForm.tsx`（`part` 是 `line` 或 `agent`），路由 `/settings/voice` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
 
@@ -37,6 +38,8 @@
 - **语音线路只有一个接口对外**：监听只听 127.0.0.1，只有 `POST /llm/<通话>/chat/completions`；请求要带这通电话的 `Authorization: Bearer <钥匙>`，钥匙随挂断作废。别的路径 404，没钥匙或钥匙不对 401。
 - **一段听写拥有它的目标**：开始时绑定起始输入框和录音；同一时间只有一段在录，在另一个输入框按停止不改变文字去向。输入框销毁时取消这一段，迟到的转写结果不写进别的草稿。
 - **语音设置一份，只存差异**：`settings.json` 的 `voice` 只存和默认不一样的字段（页面发整份，服务端去掉和默认一样的），`{}` 就是恢复默认、从文件里删掉。默认是 `defaultVoice` 再叠配置的 `voice.id`。每通电话开始时现取（设置和三段的 key 从同一版读出），存了下一通生效。
+
+- **试 MOSS Live 的 key 只接一个会话就关**（`voice.moss.check`，没给 key 用存下的）：服务端连 WebSocket、发 `attach_session`，收到 `session_attached` 就关掉（MOSS 从这一刻计费到关）。key 不对时握手直接断（关闭码 1006，和断网一样），所以握手失败再用同一个 key 发一次普通的 HTTPS：401、403 是 key 不认（带 MOSS 自己的话，比如「iam api key auth failed」），连不上是网络，别的说握手失败；8 秒（真实时间）没回话说没回应。key 只在服务端，页面只看到最后四个字，日志里的 `sk-…` 被抹掉。
 
 ## 怎么走
 
@@ -82,7 +85,7 @@
 3. 原样转给 `POST {url}/audio/transcriptions`（multipart，带 `model`、`response_format: json`，有 `dictationKey` 就带 `Authorization: Bearer`），不加提示、不改声音，时限 2 分钟（本机模型第一次要加载）。没配地址、地址不对、连不上、对方回非 2xx（带对方的错误，留头 200 字）、回的不是转写格式，都回 `VoiceUnavailable` 和原因。
 4. 回来的 `text` 插进输入框的光标处（没有光标就放末尾，只在拉丁词之间补空格），主人看过再发；发出去是一条普通的消息。
 
-**改设置**：「设置」的「声音」（`/settings/voice`）配线路：凭据和区域、识别、语言、断句、打断、没人时多久离开、谁接电话（`answer`），和「听写」的地址、模型、key。管家页的「声音」（`/orchestrator/voice`）配电话上的管家：人设（只对快嘴有用）、开场白、出错时说的话、音色。两处是同一个 `VoiceForm`，按 `part`（`line`、`agent`）分；每处只把自己那几项叠在当前最新的设置上存，「恢复默认」只动自己那几项，两页不会互相覆盖。页面一边改一边问 `POST /api/v1/setting/check`，显示的就是保存时会被拒的理由。自己服务的 key 页面只看到最后四个字。MiniMax 音色旁边的试听播的是仓库里预先生成的样音，不连网。
+**改设置**：「设置」的「声音」（`/settings/voice`）配线路：凭据和区域、识别、语言、断句、打断、没人时多久离开、谁接电话（`answer`），和「听写」的地址、模型、key，MOSS Live 的 API Key（旁边的插头试连一次：服务端接上一个会话马上关掉，回「接通了」或说不通的原因）。管家页的「声音」（`/orchestrator/voice`）配电话上的管家：人设（只对快嘴有用）、开场白、出错时说的话、音色。两处是同一个 `VoiceForm`，按 `part`（`line`、`agent`）分；每处只把自己那几项叠在当前最新的设置上存，「恢复默认」只动自己那几项，两页不会互相覆盖。页面一边改一边问 `POST /api/v1/setting/check`，显示的就是保存时会被拒的理由。自己服务的 key 页面只看到最后四个字。MiniMax 音色旁边的试听播的是仓库里预先生成的样音，不连网。
 
 听写的地址有两种用法：本机开着 [speech-swift](https://github.com/soniqo/speech-swift) 的 `speech-server`（`brew install speech`），填 `http://127.0.0.1:8080/v1`、模型 `qwen3`、key 空着，声音不出这台电脑；云上如 OpenAI 填 `https://api.openai.com/v1`、`gpt-4o-mini-transcribe` 和 key，声音送到那一家。
 

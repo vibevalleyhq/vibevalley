@@ -54,8 +54,9 @@ import { IconLink } from "../../ui/IconButton";
 import { KeyField, SaveBar } from "../../ui/KeyField";
 import { Hint } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
+import { MossCheck } from "./MossCheck";
 
-type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey";
+type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey" | "mossKey";
 
 const keyFrom: Record<KeySource, string> = { settings: t("web.base.form.from.settings"), config: t("web.base.form.from.config") };
 
@@ -243,6 +244,12 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
                   />
                 </Labeled>
               </Cols>
+            </Card>
+            <Card title="MOSS Live" action={<IconLink href="https://platform.mosi.cn/" label={t("web.voice.voice.moss.console")} />} class="max-w-4xl">
+              <div class="flex items-end gap-2">
+                <div class="min-w-0 flex-1">{secret("mossKey", "API Key", () => base().mossKey)}</div>
+                <MossCheck typed={() => secrets().mossKey ?? ""} />
+              </div>
             </Card>
             <Card title={t("web.voice.voice.listen")} action={<span class="text-sm text-muted">{t("web.voice.voice.listenParts")}</span>} class="max-w-4xl">
               <Cols>

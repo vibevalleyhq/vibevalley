@@ -1078,6 +1078,13 @@ export const catalogs = {
         status: "听写的地址回了 {status}：{detail}",
         shape: "听写的地址回的不是 OpenAI 的转写格式",
       },
+      moss: {
+        noKey: "还没填 MOSS Live 的 API Key",
+        refused: "MOSS Live 不认这个 Key：{why}",
+        unreachable: "连不上 MOSS Live：{why}",
+        failed: "MOSS Live 没接通：{why}",
+        silent: "MOSS Live 8 秒内没回应",
+      },
     },
     shared: {
       action: {
@@ -3285,6 +3292,7 @@ export const catalogs = {
           stop: "停下 {name}",
           play: "试听 {name}",
         },
+        moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了" },
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -4453,6 +4461,13 @@ export const catalogs = {
         cut: "The dictation answer broke off halfway: {why}",
         status: "The dictation address answered {status}: {detail}",
         shape: "The dictation address did not answer in OpenAI's transcription format",
+      },
+      moss: {
+        noKey: "No MOSS Live API key yet",
+        refused: "MOSS Live refused the key: {why}",
+        unreachable: "Cannot reach MOSS Live: {why}",
+        failed: "MOSS Live did not connect: {why}",
+        silent: "MOSS Live did not answer within 8 seconds",
       },
     },
     shared: {
@@ -6780,6 +6795,7 @@ export const catalogs = {
           stop: "Stop {name}",
           play: "Listen to {name}",
         },
+        moss: { console: "MOSS platform", check: "Check that it connects", checking: "Connecting…", ok: "Connected" },
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -7872,6 +7888,11 @@ export interface Messages {
   "server.voice.lineNotOpen": undefined;
   "server.voice.manyCalls": undefined;
   "server.voice.misheard": undefined;
+  "server.voice.moss.failed": { readonly why: string | number };
+  "server.voice.moss.noKey": undefined;
+  "server.voice.moss.refused": { readonly why: string | number };
+  "server.voice.moss.silent": undefined;
+  "server.voice.moss.unreachable": { readonly why: string | number };
   "server.voice.noAgora": undefined;
   "server.voice.noAsrKey": undefined;
   "server.voice.noCall": undefined;
@@ -10183,6 +10204,10 @@ export interface Messages {
   "web.voice.voice.microsoftKey": undefined;
   "web.voice.voice.missing": undefined;
   "web.voice.voice.model": undefined;
+  "web.voice.voice.moss.check": undefined;
+  "web.voice.voice.moss.checking": undefined;
+  "web.voice.voice.moss.console": undefined;
+  "web.voice.voice.moss.ok": undefined;
   "web.voice.voice.nextCall": undefined;
   "web.voice.voice.noSettings": { readonly why: string | number };
   "web.voice.voice.orchestratorPage": undefined;

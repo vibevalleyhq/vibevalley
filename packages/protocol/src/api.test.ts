@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vite-plus/test";
 import { endpoints, fieldsOf, pathOf } from "./api";
 
-// What a word may end in: s is a plural, the one word that ends so in the singular aside.
-const singular = (word: string) => !word.endsWith("s") || word === "status";
+// What a word may end in: s is a plural, the words that end so in the singular aside (status, and MOSS Live's name).
+const singular = (word: string) => !word.endsWith("s") || word === "status" || word === "moss";
 
 describe("the endpoint table", () => {
   test("names every op <module>[.<noun>].<verb>, in the singular, at its own path", () => {
