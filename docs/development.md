@@ -10,7 +10,7 @@
 vp install                                   # 根目录：装全部 workspace 的依赖
 vp run --filter @vibevalley/web build         # 页面，apps/web/dist
 vp run --filter @vibevalley/server start --web ../web/dist   # 只听 127.0.0.1:8787，读 $VIBEVALLEY_HOME/vibevalley.yaml，在 / 提供页面
-vp run desktop:dev                           # 或者桌面版：Electron 带着服务端起来，打开它的页面；改页面自己刷新，改服务端自己重启（同一个端口）
+vp run desktop:dev                           # 或者桌面版：Electron 带着服务端起来，打开它的页面；改页面自己刷新，改服务端自己重启（同一个端口；有帮工在干活就等它们干完再重启，免得把那一轮切断）
 ```
 
 - 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见[设置和配置](docs/subsystems/setting.md#模型和不变量)。
@@ -60,7 +60,7 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 ## 只用命令行派一个活
 
-先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/server cli`；下面写成 `vibevalley`。它默认连 `http://127.0.0.1:8787`，别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
+先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/server cli`；下面写成 `vibevalley`。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
 命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条命令，命令的词就是操作名（`issue.create` 是 `issue create`，`issue.status.update` 是 `issue status update <id>`，操作名里的大写写成 `-`：`issue preview-delete`），`about` 的字段（多是 `<id>`）是位置参数；`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status update --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
 
