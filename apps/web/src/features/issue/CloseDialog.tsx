@@ -30,7 +30,7 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
     if (await pressed(live(), "close")) props.onClose();
   };
   return (
-    <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()}>
+    <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
       <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} onDone={props.onClose} />}>
         <div>
           <p class="text-base">
@@ -42,12 +42,12 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <Show when={acts().includes("complete")}>
-              <Button tone="primary" onClick={() => setReviewing(true)}>
+              <Button tone="primary" data-testid="review-changes" onClick={() => setReviewing(true)}>
                 {t("web.issue.close.review")}
               </Button>
             </Show>
             <Show when={acts().includes("close")}>
-              <Button tone="danger" onClick={() => void cancel()}>
+              <Button tone="danger" data-act="close" onClick={() => void cancel()}>
                 {working() ? t("web.issue.close.stopAndCancel") : t("web.issue.close.cancel")}
               </Button>
             </Show>
@@ -140,12 +140,12 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
               </Show>
               <div class="flex flex-wrap gap-2">
                 <Show when={acts().includes("complete")}>
-                  <Button tone="primary" onClick={() => void take()}>
+                  <Button tone="primary" data-act="complete" onClick={() => void take()}>
                     {empty() ? t("web.issue.changes.letGo") : t("web.issue.changes.merge", { base: c().base })}
                   </Button>
                 </Show>
                 <Show when={acts().includes("resolve")}>
-                  <Button tone="danger" onClick={() => void resolve()}>
+                  <Button tone="danger" data-act="resolve" onClick={() => void resolve()}>
                     {t("web.issue.changes.resolve")}
                   </Button>
                 </Show>
@@ -232,6 +232,8 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
     <div>
       <button
         type="button"
+        data-testid="changed-file"
+        data-key={props.file.path}
         disabled={!hasPatch()}
         aria-expanded={hasPatch() ? aria(open()) : undefined}
         onClick={() => setOpen(!open())}

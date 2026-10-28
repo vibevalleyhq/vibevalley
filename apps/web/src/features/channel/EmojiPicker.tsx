@@ -50,6 +50,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
       <div
         ref={(el) => (box = el)}
         role="dialog"
+        data-testid="emoji-picker"
         aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
         class="fixed z-30 flex animate-pop-in flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
@@ -63,6 +64,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
                   {(e) => (
                     <button
                       type="button"
+                      data-key={e}
                       aria-label={e}
                       // Keeps the focus, and with it a box's caret, where it was.
                       onMouseDown={(ev) => ev.preventDefault()}

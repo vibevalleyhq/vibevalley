@@ -78,10 +78,11 @@ function Dots() {
   );
 }
 
-function HeadButton(props: { label: string; sprite: string; onClick: () => void }) {
+function HeadButton(props: { label: string; testid: string; sprite: string; onClick: () => void }) {
   return (
     <button
       type="button"
+      data-testid={props.testid}
       aria-label={props.label}
       title={props.label}
       onClick={() => props.onClick()}
@@ -172,7 +173,7 @@ export function ChatWindow() {
   const showSuggestions = () => !thread() && (core()?.call === "live" || (said().ready && said().messages.length === 0));
 
   return (
-    <section aria-label={t("web.farm.chat.label")} class="relative h-full w-full">
+    <section aria-label={t("web.farm.chat.label")} data-testid="farm-chat" class="relative h-full w-full">
       <div class="flex h-full flex-col overflow-hidden bg-cream-50 font-pixel text-[12px] leading-[1.625] text-bark-900">
         <Show
           when={thread()}
@@ -194,11 +195,12 @@ export function ChatWindow() {
                 </p>
               </div>
               <HeadButton
+                testid="chat-large"
                 label={large() ? t("web.farm.chat.restore") : t("web.farm.chat.enlarge")}
                 sprite={large() ? "button-shrink" : "button-enlarge"}
                 onClick={toggleLarge}
               />
-              <HeadButton label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={fold} />
+              <HeadButton testid="chat-fold" label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={fold} />
             </div>
           }
         >
@@ -209,6 +211,7 @@ export function ChatWindow() {
           class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto p-3"
           aria-label={thread() ? t("web.farm.chat.thread") : farmChannelLabel(shown())}
           role="log"
+          data-testid="messages"
         >
           <div class="flex flex-col gap-2">
             <Show when={hasOlder() && shown()}>
@@ -231,18 +234,28 @@ export function ChatWindow() {
             </Show>
             <For each={items()} keyed={(item) => item.message.id}>
               {(item, i) => (
-                <Item
-                  m={item().message}
-                  thread={item().thread}
-                  first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
-                  agents={agents()}
-                  chatUnread={(channel) => unreadIn(channel)}
-                />
+                <div
+                  data-testid="message"
+                  data-key={item().message.id}
+                  data-from={item().message.from}
+                  data-from-kind={item().message.fromKind}
+                  data-kind={item().message.kind}
+                  data-deleted={item().message.deleted !== undefined ? "" : undefined}
+                  data-edited={item().message.edited !== undefined ? "" : undefined}
+                >
+                  <Item
+                    m={item().message}
+                    thread={item().thread}
+                    first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
+                    agents={agents()}
+                    chatUnread={(channel) => unreadIn(channel)}
+                  />
+                </div>
               )}
             </For>
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
-                <div class="opacity-70" aria-label={t("web.farm.chat.sending")}>
+                <div class="opacity-70" aria-label={t("web.farm.chat.sending")} data-testid="message" data-from-kind="owner" data-state="sending">
                   <ChatRow mine first title={t("web.farm.chat.sending")}>
                     <span class="whitespace-pre-line">{p().text}</span>
                   </ChatRow>
@@ -277,7 +290,9 @@ export function ChatWindow() {
           </div>
         </div>
         <Show when={problem()}>
-          <p class="px-3 py-0.5 text-[12px] text-berry">{problem()}</p>
+          <p role="alert" data-testid="chat-problem" class="px-3 py-0.5 text-[12px] text-berry">
+            {problem()}
+          </p>
         </Show>
         <Show when={showSuggestions()}>
           <div class="flex shrink-0 gap-1.5 scroll-fade-x overflow-x-auto px-3 pb-2">
@@ -315,11 +330,11 @@ function CallProblem(props: { call: VoiceCall }) {
   const open = () => props.call.phase === "idle" && props.call.problem !== undefined;
   return (
     <Show when={open()}>
-      <div role="alert" class="shrink-0 border-b border-cream-200 bg-berry/10">
+      <div role="alert" data-testid="call-problem" class="shrink-0 border-b border-cream-200 bg-berry/10">
         <div class="flex flex-col gap-2 px-3 py-2.5 font-pixel text-[12px] leading-[1.625] text-bark-900">
           <div class="flex items-start gap-2">
             <span class="min-w-0 flex-1">{t("web.farm.chat.noVoice", { why: props.call.problem ?? "" })}</span>
-            <PxButton size="sm" icon="button-close" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
+            <PxButton size="sm" icon="button-close" data-testid="call-problem-dismiss" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
           </div>
           <Show when={props.call.problemAt}>
             {(at) => (
@@ -327,6 +342,7 @@ function CallProblem(props: { call: VoiceCall }) {
                 <PxButton
                   tone="primary"
                   size="sm"
+                  data-testid="call-problem-fix"
                   onClick={() => {
                     voiceCall.dismiss();
                     router.navigate(`/settings/${at()}`);
@@ -361,7 +377,12 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   };
   return (
     <div onDblClick={(e) => props.onDouble(e)} class="flex shrink-0 items-center gap-1 border-b border-cream-200 py-2 pr-2 pl-1">
-      <HeadButton label={t("web.farm.chat.back", { channel: farmChannelLabel(channel()) })} sprite="button-back" onClick={() => farm.showChat(backTo())} />
+      <HeadButton
+        testid="chat-back"
+        label={t("web.farm.chat.back", { channel: farmChannelLabel(channel()) })}
+        sprite="button-back"
+        onClick={() => farm.showChat(backTo())}
+      />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px]">{title()}</span>
@@ -371,11 +392,12 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
         <p class={["h-4 truncate", small]}>{status()}</p>
       </div>
       <HeadButton
+        testid="chat-large"
         label={props.large ? t("web.farm.chat.restore") : t("web.farm.chat.enlarge")}
         sprite={props.large ? "button-shrink" : "button-enlarge"}
         onClick={() => props.onLarge()}
       />
-      <HeadButton label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={() => props.onFold()} />
+      <HeadButton testid="chat-fold" label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={() => props.onFold()} />
     </div>
   );
 }

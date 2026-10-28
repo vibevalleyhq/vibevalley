@@ -104,5 +104,5 @@
 - `apps/server/src/doc/rules.test.ts`：拆分时留着 marks、接起来时合并一样的 marks；两键之间的键在两者之间；同键按 id 排；改过的块带着 rev 和写的人；协议里每种 op 都有分支；代码块没有 marks；Markdown → 块 → Markdown、块 → Markdown → 块不丢东西。
 - `doc/doc.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；同一批勾选后改字不误判冲突；导入导出；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。
 - `mcp/mcp.test.ts`：帮工经 `/mcp` 写文档。
-- 页面：`apps/web/src/features/doc/blocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/docs.spec.ts`（建一篇、一块一块写、写的留着；演示让帮工写；段首退格并段；整页的样子）。
-- `apps/web/test/doc-commands.spec.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，回读的文档、修订、作者和时间由服务端填入。
+- 页面：`apps/web/src/features/doc/blocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/docs.spec.ts`（建一篇、一块一块写、写的留着；段首退格并段）。
+- `apps/server/src/http/endpoints.test.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，回读的文档、修订、作者和时间由服务端填入。

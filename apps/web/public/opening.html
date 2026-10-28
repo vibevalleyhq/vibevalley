@@ -108,6 +108,7 @@
         document.querySelector("#opening .bar").remove();
         const words = document.querySelector("#opening .words");
         words.className = "problem";
+        words.setAttribute("role", "alert");
         words.textContent = said.cannotStart.replace("{why}", problem);
       }
     </script>

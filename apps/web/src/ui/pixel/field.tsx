@@ -86,6 +86,7 @@ export function PxTextInput(props: {
   id?: string;
   ref?: (el: HTMLInputElement) => void;
   class?: string;
+  testid?: string;
 }) {
   const listId = createUniqueId();
   const [open, setOpen] = createSignal(false);
@@ -116,6 +117,7 @@ export function PxTextInput(props: {
     >
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={14} />}</Show>
       <input
+        data-testid={props.testid}
         ref={(el) => {
           input = el;
           props.ref?.(el);

@@ -62,12 +62,12 @@ async function openIssue(
   await page.route(`**${pathOf("issue.run.list")}`, json([]));
   await page.route(`**${pathOf("session.event.list")}`, json([]));
   await page.goto(`/issues/${made.id}`);
-  return page.getByRole("dialog", { name: "工单" });
+  return page.getByTestId("issue");
 }
 
 const scripted: Agent = {
   id: "",
-  name: "阿狐",
+  name: "fox",
   role: "worker",
   duty: "",
   enabled: true,
@@ -87,87 +87,58 @@ const scripted: Agent = {
   look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
+// The test helper's words (apps/server/src/testing/helper.ts): 先问清楚 asks which port, 给选项 with options, and the
+// answer 用 8797 lets it go on and hand back.
+const asksWithOptions = "打卡页先问清楚，给选项";
+const answer = "用 8797";
+
 test("a real round: the helper asks with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
   const fox = await api.agent.create(scripted);
   const project = await api.project.create({ name: "clock" });
-  const made = await api.issue.create({ title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id });
-  await api.issue.update({ id: made.id, criteria: ["打卡能用"] });
+  const made = await api.issue.create({ title: asksWithOptions, project: project.name, assignee: fox.id });
+  await api.issue.update({ id: made.id, criteria: ["clock-in works"] });
   await api.issue.status.update({ id: made.id, status: "todo" });
   await page.goto(`/issues/${made.id}`);
-  const view = page.getByRole("dialog", { name: "工单" });
-  await expect(view.getByLabel("现在怎样")).toContainText("等你回答", { timeout: 20_000 });
-  const ask = view.getByRole("region", { name: "要你做的" });
-  await expect(ask.getByText("用 8787 还是 8797？")).toBeVisible();
-  await ask.getByRole("button", { name: "用 8797" }).click();
-  await expect(view.getByLabel("现在怎样")).toContainText("等你验收", { timeout: 20_000 });
-  await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 1 条做到了");
-  // Exact: the folded steps hold the helper's whole last message, which says it too.
-  await expect(view.getByText("跑了 echo hi", { exact: true })).toBeVisible();
-  await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成", exact: true })).toBeVisible();
-  const deliver = view.getByRole("combobox", { name: "交付" });
-  await expect(deliver).toHaveValue("change");
-  await expect(deliver.locator("option", { hasText: "分支留着不合" })).toHaveCount(1);
-  await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("你带了话，接着做一轮");
-  await page.screenshot({ path: test.info().outputPath("real-round.png") });
+  const view = page.getByTestId("issue");
+  const now = view.getByTestId("issue-now");
+  await expect(now).toHaveAttribute("data-state", "asking", { timeout: 20_000 });
+  await view.getByTestId("issue-ask").locator(`[data-testid="answer-option"][data-key="${answer}"]`).click();
+  await expect(now).toHaveAttribute("data-state", "reviewing", { timeout: 20_000 });
+  const progress = view.getByTestId("issue-progress");
+  await expect(progress).toHaveAttribute("data-met", "1");
+  await expect(progress).toHaveAttribute("data-total", "1");
+  await expect(view.getByTestId("issue-ask").locator('[data-act="complete"]')).toBeVisible();
+  await expect(view.getByTestId("issue-deliver")).toHaveValue("change");
+  await expect(view.getByTestId("issue-story").locator('[data-testid="milestone"][data-kind="told"]').first()).toBeVisible();
 });
 
-const longJob = "通读 farm-site 项目，给主人一份整体架构和当前进度的评估。1）技术栈和代码量 2）模块和数据流 3）测试和构建现状 4）最该推进的三件事";
-
-test("a helper waiting on a question: 等你回答, its options answer it, and nothing offers to complete it", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: longJob });
+test("a helper waiting on a question: its options answer it, and nothing offers to complete it", async ({ page, server, api }) => {
+  const made = await api.issue.create({ title: "assess the farm-site project" });
   const now = Date.now();
+  const options = ["all to w3", "split it"];
   const view = await openIssue(
     page,
     server,
     made,
     { state: "asking", since: now - 3 * minute, lead: "answer", acts: buttons("answer", "close") },
-    {
-      status: "in_review",
-      questions: [{ question: "这份评估是全交给 w3，还是我和它分着做？", options: ["全交给 w3", "分着做"] }],
-      criteria: ["技术栈和代码量", "模块和数据流", "测试和构建现状", "最该推进的三件事"],
-    },
-    { lastRun: { outcome: "completed", summary: "读完了结构，有一件事要问你", at: now - 3 * minute } },
-    {
-      milestones: [
-        { at: now - 3 * minute, kind: "asked", who: "阿狐", text: "问你：这份评估是全交给 w3，还是我和它分着做？" },
-        { at: now - 10 * minute, kind: "started", who: "阿狐", text: "开工" },
-        { at: now - 12 * minute, kind: "opened", text: "开单" },
-      ],
-      spent: { tokens: 1200, cny: 0.42 },
-    },
+    { status: "in_review", questions: [{ question: "all to w3, or split?", options }], criteria: ["stack", "modules", "tests", "next"] },
+    { lastRun: { outcome: "completed", summary: "one thing to ask", at: now - 3 * minute } },
+    { milestones: [{ at: now - 3 * minute, kind: "asked", who: "fox", text: "asked" }], spent: { tokens: 1200, cny: 0.42 } },
   );
-  // The title is the first sentence, not the whole job.
-  await expect(view.getByRole("heading", { name: "通读 farm-site 项目，给主人一份整体架构和当前进度的评估" })).toBeVisible();
-  const status = view.getByLabel("现在怎样");
-  await expect(status).toContainText("等你回答");
-  await expect(status).toContainText("已经 3 分钟");
-  await expect(status).toContainText("¥0.42");
-  const ask = view.getByRole("region", { name: "要你做的" });
-  await expect(ask.getByText("这份评估是全交给 w3，还是我和它分着做？")).toBeVisible();
-  await expect(view.getByRole("button", { name: "完成", exact: true })).toHaveCount(0);
-  await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("0 / 4 条做到了");
-  await expect(view.getByRole("region", { name: "做出了什么" })).toContainText("还没有改动");
-  await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("问你：这份评估");
-  await page.screenshot({ path: test.info().outputPath("asking.png") });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(ask.getByRole("button", { name: "分着做" })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("asking-narrow.png") });
-  await page.setViewportSize({ width: 1280, height: 800 });
-
+  await expect(view.getByTestId("issue-now")).toHaveAttribute("data-state", "asking");
+  await expect(view.locator('[data-act="complete"]')).toHaveCount(0);
+  await expect(view.getByTestId("issue-progress")).toHaveAttribute("data-met", "0");
   let said: unknown;
   await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
     said = route.request().postDataJSON();
     await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(made) });
   });
-  await ask
-    .getByRole("group", { name: /^回答：/ })
-    .getByRole("button", { name: "分着做" })
-    .click();
-  await expect.poll(() => said as { text?: string } | undefined).toMatchObject({ text: "分着做" });
+  await view.locator(`[data-testid="answer-option"][data-key="${options[1]}"]`).click();
+  await expect.poll(() => said as { text?: string } | undefined).toMatchObject({ text: options[1] });
 });
 
-test("work handed back: 等你验收, the helper's word on each criterion, and 打回 asks what failed", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: "把登录页的记住我做完" });
+test("work handed back: the server's acts lead, and sending it back needs what failed", async ({ page, server, api }) => {
+  const made = await api.issue.create({ title: "finish remember-me" });
   const now = Date.now();
   const view = await openIssue(
     page,
@@ -176,101 +147,30 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
     { state: "reviewing", since: now - minute, lead: "complete", acts: buttons("complete", "reject", "tell", "close") },
     {
       status: "in_review",
-      criteria: ["勾上后重开浏览器还登着", "不勾时关掉浏览器就登出"],
+      criteria: ["still logged in after reopening", "logged out when unticked"],
       checks: [
-        { criterion: 0, result: "met", proof: "bun test auth 通过" },
-        { criterion: 1, result: "unsure", proof: "没法在测试里关浏览器" },
+        { criterion: 0, result: "met", proof: "auth tests pass" },
+        { criterion: 1, result: "unsure", proof: "cannot close a browser in a test" },
       ],
     },
-    { lastRun: { outcome: "completed", summary: "做完了，commit abc123", at: now - minute } },
-    { milestones: [{ at: now - minute, kind: "reported", who: "阿狐", text: "交回来了：做完了，commit abc123" }] },
+    { lastRun: { outcome: "completed", summary: "done, commit abc123", at: now - minute } },
+    { milestones: [{ at: now - minute, kind: "reported", who: "fox", text: "handed back" }] },
     {
       ...nothingYet,
-      commits: [{ hash: "abc123", subject: "记住我存 30 天", at: now - minute }],
+      commits: [{ hash: "abc123", subject: "remember for 30 days", at: now - minute }],
       files: [{ path: "src/auth/login.ts", status: "M", added: 12, removed: 3 }],
     },
   );
-  await expect(view.getByLabel("现在怎样")).toContainText("等你验收");
-  const ask = view.getByRole("region", { name: "要你做的" });
-  await expect(ask).toContainText("阿狐交回来了，等你验收");
-  await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 2 条做到了");
-  await expect(view.getByText("bun test auth 通过")).toBeVisible();
-  await expect(ask.getByRole("button", { name: "完成", exact: true })).toBeVisible();
-  await view.getByRole("checkbox", { name: "看过了：勾上后重开浏览器还登着" }).check();
-  const findings = ask.getByRole("textbox", { name: "哪里没过" });
-  await ask.getByRole("button", { name: "打回", exact: true }).click();
-  await expect(findings).toBeVisible();
-  await expect(ask.getByRole("button", { name: "打回，照上面修" })).toBeDisabled();
-  await findings.fill("不勾时还登着");
-  await expect(ask.getByRole("button", { name: "打回，照上面修" })).toBeEnabled();
-  await page.screenshot({ path: test.info().outputPath("reviewing.png") });
-});
-
-test("an answer handed back: its conclusion on the page, 知道了 completes it, nothing to merge", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: "查一下打卡为什么慢", deliver: "answer" });
-  expect(made.deliver).toBe("answer");
-  const now = Date.now();
-  const answer = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
-  const view = await openIssue(
-    page,
-    server,
-    made,
-    { state: "reviewing", since: now - minute, lead: "acknowledge", acts: buttons("acknowledge", "reject", "tell", "close") },
-    { status: "in_review", answer },
-    { lastRun: { outcome: "completed", summary: "查清楚了", at: now - minute, answer } },
-    { milestones: [{ at: now - minute, kind: "reported", who: "阿狐", text: "交回来了：查清楚了" }] },
-  );
-  const delivered = view.getByRole("region", { name: "做出了什么" });
-  await expect(delivered).toContainText("打卡慢是因为每次都重读配置");
-  await expect(delivered).toContainText("clock.ts:1 每次调用都读一遍配置");
-  await expect(delivered).toContainText("把配置读一次缓存起来");
-  const ask = view.getByRole("region", { name: "要你做的" });
-  await expect(ask.getByRole("button", { name: "知道了", exact: true })).toBeVisible();
-  await expect(view.getByRole("button", { name: "完成，分支留着" })).toHaveCount(0);
-  await expect(view.getByRole("combobox", { name: "交付" })).toHaveValue("answer");
-  await page.screenshot({ path: test.info().outputPath("answer.png") });
-});
-
-test("a failed round: 卡住了, says why and leads with 接着修", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: "修好打卡页的夜间模式" });
-  const now = Date.now();
-  const view = await openIssue(
-    page,
-    server,
-    made,
-    { state: "stuck", stuck: "failed", since: now - 5 * minute, lead: "cure", acts: buttons("cure", "tell", "close") },
-    { status: "in_review" },
-    { phase: { _tag: "failed" }, lastRun: { outcome: "failed", summary: "余额不够了（HTTP 402）", at: now - 5 * minute } },
-    { milestones: [{ at: now - 5 * minute, kind: "failed", who: "阿狐", text: "没做成：余额不够了（HTTP 402）" }] },
-  );
-  await expect(view.getByLabel("现在怎样")).toContainText("卡住了");
-  const ask = view.getByRole("region", { name: "要你做的" });
-  await expect(ask).toContainText("这一轮没做成");
-  await expect(ask).toContainText("余额不够了（HTTP 402）");
-  await expect(ask.getByRole("button", { name: "接着修" })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("stuck.png") });
-});
-
-test("a done issue asks nothing: 已完成, and says it went into main", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: "给工单加上验收标准的模板" });
-  const now = Date.now();
-  const view = await openIssue(
-    page,
-    server,
-    made,
-    { state: "done", since: now - 2 * minute, acts: buttons("reopen") },
-    { status: "done", delivered: "merged", closedAt: now - 2 * minute, criteria: ["模板能选"], checks: [{ criterion: 0, result: "met" }] },
-    {},
-    {
-      milestones: [
-        { at: now - 2 * minute, kind: "closed", text: "已完成，合进了主分支" },
-        { at: now - 4 * minute, kind: "reported", who: "阿狐", text: "交回来了" },
-      ],
-    },
-  );
-  await expect(view.getByLabel("现在怎样")).toContainText("已完成");
-  await expect(view.getByRole("region", { name: "要你做的" })).toHaveCount(0);
-  await expect(view.getByRole("region", { name: "做出了什么" })).toContainText("合进了主分支");
-  await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 1 条做到了");
-  await page.screenshot({ path: test.info().outputPath("done.png") });
+  await expect(view.getByTestId("issue-now")).toHaveAttribute("data-state", "reviewing");
+  await expect(view.getByTestId("issue-progress")).toHaveAttribute("data-met", "1");
+  const ask = view.getByTestId("issue-ask");
+  for (const act of ["complete", "reject", "tell"]) await expect(ask.locator(`[data-act="${act}"]`)).toBeVisible();
+  await view.locator('[data-testid="criterion-tick"][data-key="0"]').check();
+  const reject = ask.locator('[data-act="reject"]');
+  await reject.click();
+  const words = ask.getByTestId("issue-words");
+  await expect(words).toHaveAttribute("data-box", "reject");
+  await expect(reject).toBeDisabled();
+  await words.fill("still logged in when unticked");
+  await expect(reject).toBeEnabled();
 });

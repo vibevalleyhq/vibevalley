@@ -5,7 +5,7 @@ import type { Channel, Recurrence } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { chatPath, jobThreadOf, phaseText } from "./rules";
 import { toast } from "../../ui/toasts";
-import { useNow } from "../../base/util";
+import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
 import { Button } from "../../ui/Button";
@@ -95,6 +95,8 @@ function RecurrenceCard(props: { s: Recurrence }) {
     ].join(" · ");
   return (
     <div
+      data-testid="recurrence"
+      data-key={props.s.id}
       class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]}
       aria-label={t("web.channel.recurrences.label", { name: props.s.name })}
     >
@@ -113,7 +115,12 @@ function RecurrenceCard(props: { s: Recurrence }) {
         when={props.s.pending}
         fallback={
           <div class="flex gap-2">
-            <Button tone={props.s.enabled ? "primary" : "plain"} onClick={() => void setEnabled(!props.s.enabled)}>
+            <Button
+              tone={props.s.enabled ? "primary" : "plain"}
+              data-testid="recurrence-toggle"
+              aria-pressed={aria(props.s.enabled)}
+              onClick={() => void setEnabled(!props.s.enabled)}
+            >
               {props.s.enabled ? t("web.channel.recurrences.on") : t("web.channel.recurrences.off")}
             </Button>
             <Show
@@ -121,13 +128,14 @@ function RecurrenceCard(props: { s: Recurrence }) {
               fallback={
                 <Button
                   icon="delete"
+                  data-testid="delete"
                   title={t("web.channel.recurrences.remove")}
                   aria-label={t("web.channel.recurrences.removeWhich", { name: props.s.name })}
                   onClick={() => setDeleting(true)}
                 />
               }
             >
-              <Button tone="danger" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
+              <Button tone="danger" data-testid="delete-sure" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
                 {t("web.channel.recurrences.sure")}
               </Button>
             </Show>

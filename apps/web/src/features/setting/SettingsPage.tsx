@@ -13,7 +13,8 @@ import { MossPlayground, VoiceForm } from "../voice";
 import { A, Navigate } from "../../ui/A";
 import { Icon } from "../../ui/Icon";
 import { TextInput } from "../../ui/Field";
-import { matches, SettingsPage as Page, SettingsSearch } from "../../ui/settings";
+import { matches } from "../../base/search";
+import { SettingsPage as Page, SettingsSearch } from "../../ui/settings";
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
@@ -54,7 +55,7 @@ export function SettingsPage(props: { rest: string }) {
   const parts = () => props.rest.split("/");
   const section = () => sections.find((s) => s.id === parts()[0]);
   const id = () => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined);
-  const shown = (g: Group) => sections.filter((s) => s.group === g && (q() === "" || matches(q(), s.label, s.words)));
+  const shown = (g: Group) => sections.filter((s) => s.group === g && matches(q(), [s.label, s.words]));
   const navWidth = usePaneWidth("settingsNav", 224, 176, 360);
   return (
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
@@ -63,6 +64,7 @@ export function SettingsPage(props: { rest: string }) {
           <div class="flex h-full min-h-0 flex-col md:flex-row">
             <nav
               aria-label={t("web.setting.nav.label")}
+              data-testid="settings-nav"
               class="relative flex shrink-0 flex-col gap-4 border-line p-3 md:w-(--pane-w) md:overflow-y-auto md:border-r"
               style={{ "--pane-w": `${navWidth()}px` }}
             >
@@ -71,6 +73,7 @@ export function SettingsPage(props: { rest: string }) {
               </div>
               <TextInput
                 type="search"
+                data-testid="settings-search"
                 aria-label={t("web.setting.nav.search")}
                 placeholder={t("web.setting.nav.search")}
                 value={query()}
@@ -85,6 +88,7 @@ export function SettingsPage(props: { rest: string }) {
                         {(s) => (
                           <A
                             href={`/settings/${s.id}`}
+                            data-key={s.id}
                             aria-current={s === section() ? "page" : undefined}
                             class={[
                               "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",

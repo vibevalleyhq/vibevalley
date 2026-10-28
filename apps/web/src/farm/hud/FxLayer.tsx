@@ -69,6 +69,8 @@ export function FxLayer() {
           <div
             class="pointer-events-none absolute inset-x-0 top-24 flex justify-center"
             role="status"
+            data-testid="level-up"
+            data-level={b.level}
             aria-label={t("web.farm.fx.levelUp", { level: b.level })}
           >
             <div class="flex flex-col items-center bg-cream-50 px-7 pt-0 pb-4 shadow-px motion-safe:animate-[level-up_3.4s_cubic-bezier(0.2,0.9,0.2,1)_forwards]">

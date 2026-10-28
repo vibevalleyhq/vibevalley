@@ -67,12 +67,13 @@ export function ConnectorsPage(props: { id?: string }) {
   return (
     <Split
       list={
-        <ListCard title={t("web.connector.connectors.section.label")} label={t("web.connector.connectors.list")}>
+        <ListCard title={t("web.connector.connectors.section.label")} label={t("web.connector.connectors.list")} testid="connectors">
           <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.connector.connectors.intro")}</li>
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
                 to={`/settings/chat/${c}`}
+                item={c}
                 active={c === selected()}
                 title={connectorLabel[c]}
                 line={of(c) && of(c)!.state !== "off" ? stateLabel[of(c)!.state] : connectorHow[c]}
@@ -160,7 +161,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
           <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => void login({ appId, secret })} />}>
             <p class="text-sm">{props.id === "weixin" ? t("web.connector.connectors.weixinIntro") : t("web.connector.connectors.feishuIntro")}</p>
             <div>
-              <Button tone="primary" disabled={busy()} onClick={() => void login()}>
+              <Button tone="primary" data-testid="connector-login" disabled={busy()} onClick={() => void login()}>
                 {t("web.connector.connectors.scan", { app: label() })}
               </Button>
             </div>
@@ -255,10 +256,18 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
         {t("web.connector.connectors.qqAfter")}
       </p>
       <Field label="AppID">
-        <TextInput aria-label="AppID" class="font-mono" placeholder="102xxxxxx" value={appId()} onInput={(e) => setAppId(e.currentTarget.value)} />
+        <TextInput
+          data-testid="qq-app-id"
+          aria-label="AppID"
+          class="font-mono"
+          placeholder="102xxxxxx"
+          value={appId()}
+          onInput={(e) => setAppId(e.currentTarget.value)}
+        />
       </Field>
       <Field label="AppSecret" hint={t("web.connector.connectors.secretHint")}>
         <SecretInput
+          data-testid="qq-secret"
           aria-label="AppSecret"
           placeholder={t("web.connector.connectors.secret")}
           value={secret()}
@@ -266,7 +275,7 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
         />
       </Field>
       <div>
-        <Button type="submit" tone="primary" disabled={!canLogin()}>
+        <Button type="submit" tone="primary" data-testid="connector-login" disabled={!canLogin()}>
           {t("web.connector.connectors.connectQq")}
         </Button>
       </div>

@@ -1,9 +1,12 @@
 import type { Agent, VibeValleyApi } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
+import { expect, tab, test } from "./fixtures";
+
+const first = "note the first round";
+const second = "second round written while away";
 
 const profile: Agent = {
   id: "",
-  name: "轨迹测试员",
+  name: "trajectory-tester",
   role: "worker",
   duty: "",
   enabled: true,
@@ -25,7 +28,7 @@ const profile: Agent = {
 async function finishedIssue(api: VibeValleyApi) {
   const agent = await api.agent.create(profile);
   const project = await api.project.create({ name: `log-${Date.now()}` });
-  const issue = await api.issue.create({ title: "先记下第一轮", project: project.name, assignee: agent.id });
+  const issue = await api.issue.create({ title: first, project: project.name, assignee: agent.id });
   await api.issue.status.update({ id: issue.id, status: "todo" });
   await expect.poll(async () => (await api.issue.get({ id: issue.id })).attention.state).toBe("reviewing");
   const session = (await api.issue.get({ id: issue.id })).sessions.at(-1)!;
@@ -44,15 +47,14 @@ test("a reconnected trajectory catches the steps completed while its live stream
     await route.fulfill({ contentType: "text/event-stream", body: ": connected\n\n" });
   });
   await page.goto(`/agents/${agent.id}`);
-  await page.getByRole("tab", { name: "轨迹", exact: true }).click();
-  await expect(page.getByRole("button", { name: "工单 先记下第一轮", exact: true })).toBeVisible();
+  await tab(page, "trajectories").click();
+  await expect(page.getByTestId("step").filter({ hasText: first }).first()).toBeVisible();
   await expect.poll(() => connections).toBeGreaterThan(1);
 
-  await api.issue.comment.create({ id: issue.id, text: "断线时写下第二轮" });
+  await api.issue.comment.create({ id: issue.id, text: second });
   await expect
-    .poll(async () => (await api.session.event.list({ id: session })).some((e) => e.type === "assistant/message" && e.text.includes("断线时写下第二轮")))
+    .poll(async () => (await api.session.event.list({ id: session })).some((e) => e.type === "assistant/message" && e.text.includes(second)))
     .toBe(true);
   reconnect!();
-  await expect(page.getByRole("button", { name: /带话 .*断线时写下第二轮/ })).toBeVisible({ timeout: 10_000 });
-  await page.screenshot({ path: test.info().outputPath("reconnected-trajectory.png") });
+  await expect(page.getByTestId("step").filter({ hasText: second }).first()).toBeVisible({ timeout: 10_000 });
 });

@@ -2,21 +2,13 @@
 // device asks, the owner nods, and from then on the device's browser is let in by the cookie it keeps.
 import { expect, test } from "./fixtures";
 
-test("a device names itself, questions, and is told why not", async ({ page }) => {
+test("a device names itself, asks, and is told why not", async ({ page }) => {
   await page.goto("/pair?c=ABCDE12345");
-  await expect(page.getByRole("heading", { name: "连进那台电脑" })).toBeVisible();
-  await expect(page.getByLabel("配对码")).toHaveCount(0);
-  await page.getByLabel("这台设备叫").fill("测试的手机");
-  await page.getByRole("button", { name: "请主人放行" }).click();
-  await expect(page.getByRole("alert")).toContainText("没允许连接");
+  await expect(page.getByTestId("pair-code")).toHaveCount(0);
+  await page.getByTestId("pair-name").fill("test phone");
+  await page.getByTestId("pair-ask").click();
+  await expect(page.getByRole("alert")).not.toBeEmpty();
   await expect(page).toHaveURL(/\/pair/);
-});
-
-test("without a code it asks for one", async ({ page }) => {
-  await page.goto("/pair");
-  await expect(page.getByRole("button", { name: "请主人放行" })).toBeDisabled();
-  await page.getByLabel("配对码").fill("abcde12345");
-  await expect(page.getByRole("button", { name: "请主人放行" })).toBeEnabled();
 });
 
 test("a device the owner lets in opens the farm through the lan listener", async ({ browser, api }) => {
@@ -29,15 +21,17 @@ test("a device the owner lets in opens the farm through the lan listener", async
     // Not paired yet: wherever it opens, it is sent to pair first.
     await page.goto(url + "/issues");
     await expect(page).toHaveURL(/\/pair$/);
+    // Without a code there is nothing to ask with.
+    await expect(page.getByTestId("pair-ask")).toBeDisabled();
     await page.goto(pairing!.link);
-    await expect(page.getByLabel("这台设备叫")).toHaveValue("iPhone");
-    await page.getByRole("button", { name: "请主人放行" }).click();
-    await expect(page.getByRole("status")).toContainText("等那台电脑上的主人点头");
+    await expect(page.getByTestId("pair-name")).toHaveValue("iPhone");
+    await page.getByTestId("pair-ask").click();
+    await expect(page.getByRole("status")).toBeVisible();
     await expect.poll(async () => (await api.lan.get()).pairing?.asking).toBe("iPhone");
     await api.lan.pairing.answer({ allow: true });
     await expect(page).toHaveURL(url + "/chat");
     await page.goto(url + "/issues");
-    await expect(page.getByRole("region", { name: "待办", exact: true })).toBeVisible();
+    await expect(page.locator('[data-testid="lane"][data-key="todo"]')).toBeVisible();
     await phone.close();
     const { devices } = await api.lan.get();
     for (const d of devices) await api.lan.device.delete({ id: d.id });

@@ -48,9 +48,9 @@ function memoryActions(agent: string) {
 }
 
 /** A titled part of a panel, its count beside the title. */
-export function Section(props: { title: string; count?: number; aside?: JSX.Element; children: JSX.Element }) {
+export function Section(props: { title: string; count?: number; aside?: JSX.Element; testid?: string; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} class="flex flex-col gap-2">
+    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} class="flex flex-col gap-2">
       <header class="flex items-center gap-2">
         <h3 class="text-sm font-semibold">{props.title}</h3>
         <Show when={props.count !== undefined}>
@@ -272,7 +272,7 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
           <div class="flex flex-col gap-4">
             <p class="text-sm text-muted">{t("web.memory.memory.orchestratorIntro")}</p>
             <WriteNote onWrite={(text) => act.write(text)} />
-            <Section title={t("web.memory.memory.notes")} count={v().memories.length}>
+            <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
               <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
                 <For each={v().memories} keyed={(m) => m.id}>
                   {(m, i) => (
@@ -350,7 +350,7 @@ export function ArchivePanel(props: { agent: string }) {
           </For>
         </Section>
       </Show>
-      <Section title={t("web.memory.memory.compacted")} count={data()?.files.length ?? 0}>
+      <Section title={t("web.memory.memory.compacted")} count={data()?.files.length ?? 0} testid="archive">
         <Show when={data()?.files} fallback={<Quiet>{listing.error ? reasonOf(listing.error) : t("web.base.reading")}</Quiet>}>
           {(files) => (
             <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
@@ -396,6 +396,7 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
     <div class="flex flex-col gap-1">
       <span class="text-xs font-medium text-muted">{t("web.memory.memory.note")}</span>
       <TextArea
+        data-testid="note-input"
         aria-label={t("web.memory.memory.note")}
         rows={2}
         placeholder={props.withProject ? t("web.memory.memory.noteProject") : t("web.memory.memory.noteOrchestrator")}
@@ -416,7 +417,7 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
             <For each={ready(projectsQuery, [])}>{(p) => <option value={p.name} />}</For>
           </datalist>
         </Show>
-        <Button tone="primary" disabled={!text().trim()} onClick={() => void write()}>
+        <Button tone="primary" data-testid="note-write" disabled={!text().trim()} onClick={() => void write()}>
           {t("web.base.write")}
         </Button>
       </div>
@@ -432,7 +433,7 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
 
 function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string[]; faded?: boolean; warning?: string }) {
   return (
-    <div class={[item, "group flex items-start gap-2 px-3 py-2", { "opacity-60": !!props.faded }]}>
+    <div data-testid="memory" data-key={props.memory.id} class={[item, "group flex items-start gap-2 px-3 py-2", { "opacity-60": !!props.faded }]}>
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="text-sm">{props.memory.text}</span>
         <span class="flex flex-wrap gap-x-2 text-xs text-muted">
@@ -445,6 +446,7 @@ function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string
       <Show when={props.onForget}>
         <button
           type="button"
+          data-testid="forget"
           onClick={() => props.onForget?.()}
           class="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-xs text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-berry focus-visible:opacity-100"
         >

@@ -19,7 +19,7 @@ export const switcher = { show: () => setShown(true), toggle: () => setShown((s)
 /** Ctrl+K: a channel, thread or direct channel by its name; a profile not yet talked with gets its direct channel. */
 export function QuickSwitcher() {
   return (
-    <Dialog open={shown()} onClose={() => setShown(false)} title={t("web.channel.switcher.title")}>
+    <Dialog open={shown()} onClose={() => setShown(false)} title={t("web.channel.switcher.title")} testid="switcher">
       <SwitcherBody onClose={() => setShown(false)} />
     </Dialog>
   );
@@ -46,6 +46,7 @@ function SwitcherBody(props: { onClose: () => void }) {
     <div class="flex flex-col gap-2">
       <input
         ref={autofocus()}
+        data-testid="switcher-input"
         value={query()}
         role="combobox"
         aria-expanded="true"
@@ -78,6 +79,8 @@ function SwitcherBody(props: { onClose: () => void }) {
           {(t, i) => (
             <div
               role="option"
+              data-key={t().id}
+              data-kind={t().kind}
               aria-selected={aria(i() === active())}
               onMouseEnter={() => setActive(i())}
               onClick={() => go(t())}

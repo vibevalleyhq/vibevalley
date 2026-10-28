@@ -20,28 +20,30 @@ async function openFarm(page: Page) {
 
 test("the phone opens over its button, a game takes the pad, and Esc puts it away", async ({ page }) => {
   await openFarm(page);
-  await page.getByRole("button", { name: "手机" }).click();
-  const phone = page.getByRole("region", { name: "农场手机" });
-  await expect(phone.getByText("农场通")).toBeVisible();
+  await page.getByTestId("phone-button").click();
+  const phone = page.getByTestId("phone");
+  await expect(phone).toHaveAttribute("data-screen", "home");
   // The pad shows only while a game takes it.
-  await expect(phone.getByRole("button", { name: "上" })).toHaveCount(0);
-  await phone.getByRole("button", { name: "游戏" }).click();
-  await phone.getByRole("button", { name: "方块" }).click();
-  await expect(phone.getByText("按 A 开始")).toBeVisible();
-  await expect(phone.getByRole("button", { name: "上" })).toBeVisible();
+  await expect(phone.getByTestId("pad")).toHaveCount(0);
+  await phone.locator('[data-key="games"]').click();
+  await phone.locator('[data-key="blocks"]').click();
+  const blocks = phone.getByTestId("blocks");
+  await expect(blocks).toHaveAttribute("data-state", "ready");
+  await expect(phone.getByTestId("pad")).toBeVisible();
   await page.keyboard.press("Space");
-  await expect(phone.getByText("按 A 开始")).toHaveCount(0);
+  await expect(blocks).toHaveAttribute("data-state", "playing");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("x");
-  await expect(phone.getByText("按 A 继续")).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("phone-blocks.png") });
-  await phone.getByRole("button", { name: "主屏" }).click();
-  await phone.getByRole("button", { name: "种田 2048" }).click();
+  await expect(blocks).toHaveAttribute("data-state", "paused");
+  // Home from a game is the games folder.
+  await phone.getByTestId("phone-home").click();
+  await expect(phone).toHaveAttribute("data-screen", "games");
+  await phone.locator('[data-key="merge"]').click();
   await page.keyboard.press("Enter");
-  await expect(phone.getByRole("img", { name: /^田里：2 株/ })).toBeVisible();
+  await expect(phone.getByTestId("merge-board")).toHaveAttribute("data-count", "2");
   await page.keyboard.press("Escape");
   await expect(phone).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "菜单" })).toHaveCount(0);
+  await expect(page.getByTestId("menu")).toHaveCount(0);
 });
 
 async function firstFrame(url: string): Promise<StateFrame> {
@@ -54,11 +56,11 @@ async function firstFrame(url: string): Promise<StateFrame> {
 }
 
 test("a new call rings the phone open; answering goes to the helper's plot and logs the call", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: "把登录页的记住我做完" });
+  const made = await api.issue.create({ title: "finish remember-me on the login page" });
   const frame = await firstFrame(server.url);
   const session: Session = {
     id: sessionId("w1"),
-    name: "阿狐",
+    name: "fox",
     agent: "fox",
     runtime: "nobody",
     brief: made.title,
@@ -66,18 +68,18 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     runs: 1,
     phase: { _tag: "done" },
     issue: made.id,
-    lastRun: { outcome: "completed", summary: "做完了，测试全过", at: Date.now() - 60_000 } as never,
+    lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   const call: InboxItem = {
     id: "merge-w1-1",
     kind: "review",
-    from: { kind: "session", id: "w1", name: "阿狐", agent: "fox" },
-    who: "阿狐",
-    text: "记住我做完了，看看能不能收",
+    from: { kind: "session", id: "w1", name: "fox", agent: "fox" },
+    who: "fox",
+    text: "remember-me is done, see if it can go in",
     at: Date.now(),
     target: { kind: "session", id: "w1" },
-    words: { label: "等你看", title: "阿狐 做完了", body: "记住我做完了，看看能不能合", tray: "阿狐 做完了，等你看" },
+    words: { label: "for you", title: "fox is done", body: "remember-me is done", tray: "fox is done" },
   };
   const base: StateFrame = {
     ...frame,
@@ -90,51 +92,55 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     return route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: `data: ${JSON.stringify(next)}\n\n` });
   });
   await openFarm(page);
-  const phone = page.getByRole("region", { name: "农场手机" });
-  await expect(phone.getByText("来电…")).toBeVisible({ timeout: 10_000 });
-  await expect(phone.getByText("阿狐")).toBeVisible();
-  await expect(phone.getByText("等你看")).toBeVisible();
-  await expect(page.getByRole("button", { name: "手机：来电" })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("phone-ringing.png") });
+  const phone = page.getByTestId("phone");
+  await expect(phone).toHaveAttribute("data-screen", "ringing", { timeout: 10_000 });
+  await expect(phone.getByTestId("ringing")).toHaveAttribute("data-key", call.id);
+  await expect(page.getByTestId("phone-button")).toHaveAttribute("data-state", "ringing");
   // Answering is the call to the orchestrator, the chat's call button's one.
   const calling = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
-  await phone.getByRole("button", { name: "接听" }).click();
+  await phone.getByTestId("answer").click();
   await calling;
-  // The call is on the phone, unfolded to 田头 where what is said shows; what called opens beside it.
-  await expect(page.getByRole("region", { name: "田头" })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "阿狐的地" })).toBeVisible();
+  // The call is on the phone, unfolded to the chat where what is said shows; what called opens beside it.
+  const chat = page.getByTestId("farm-chat");
+  await expect(chat).toBeVisible();
+  await expect(page.getByTestId("plot")).toBeVisible();
   // Esc closes what called first (the phone leaves an open dialog its Esc), then the phone goes away by its button.
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "阿狐的地" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "田头" })).toBeVisible();
-  await page.getByRole("button", { name: "手机" }).click();
+  await expect(page.getByTestId("plot")).toHaveCount(0);
+  await expect(chat).toBeVisible();
+  await page.getByTestId("phone-button").click();
   await expect(phone).toHaveCount(0);
-  await page.getByRole("button", { name: "手机" }).click();
-  await phone.getByRole("button", { name: "记录" }).click();
-  await expect(phone.getByText("阿狐 · 等你看")).toBeVisible();
-  await expect(phone.getByText("接了")).toBeVisible();
-  await phone.getByRole("button", { name: "未接 0" }).click();
-  await expect(phone.getByText("没有未接来电。地里都好好的。")).toBeVisible();
+  await page.getByTestId("phone-button").click();
+  await phone.locator('[data-key="log"]').click();
+  await expect(phone.locator(`[data-testid="call-log"][data-key="${call.id}"]`)).toHaveAttribute("data-answered", "");
+  await phone.locator('[data-key="missed"]').click();
+  await expect(phone.getByTestId("calls-empty")).toBeVisible();
 });
 
-// Tapping 管家 on the phone dials it: its line beside 田头, unfolded; a call started folded unfolds it, where what is said
-// shows.
+// Tapping the orchestrator on the phone dials it: its line beside the chat, unfolded; a call started folded unfolds it,
+// where what is said shows.
 test("calling the orchestrator on the phone is the chat's call: one call, the same answer", async ({ page }) => {
   await openFarm(page);
-  await page.getByRole("button", { name: "手机" }).click();
-  const phone = page.getByRole("region", { name: "农场手机" });
-  const chat = page.getByRole("region", { name: "田头" });
+  await page.getByTestId("phone-button").click();
+  const phone = page.getByTestId("phone");
+  const chat = page.getByTestId("farm-chat");
   const dialed = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
-  await phone.getByRole("button", { name: "管家" }).click();
+  await phone.locator('[data-key="orchestrator"]').click();
   await dialed;
   await expect(chat).toBeVisible();
-  await expect(phone.getByText(/^没接通：还没有 Agora 的凭据/)).toBeVisible();
+  // The test's server has no Agora credentials: the call does not get through, and both say why.
+  const line = phone.getByTestId("orchestrator-line");
+  await expect(line).toHaveAttribute("data-problem", "");
   await page.keyboard.press("Escape");
   await expect(chat).toHaveCount(0);
   // After a call that did not get through, the line's own key tries again, and unfolds the phone as it does.
-  await phone.getByRole("button", { name: "打给管家" }).click();
+  const again = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
+  await line.getByTestId("line-key").click();
+  await again;
   await expect(chat).toBeVisible();
-  // The test's server has no Agora credentials: the call does not get through, and both say why.
-  await expect(phone.getByText(/^没接通：还没有 Agora 的凭据/)).toBeVisible();
-  await expect(page.getByRole("region", { name: "田头" }).getByRole("alert")).toContainText("语音没接通：还没有 Agora 的凭据");
+  await expect(line).toHaveAttribute("data-state", "idle");
+  await expect(line).toHaveAttribute("data-problem", "");
+  // The chat says why too, with the way to the setting that fixes it.
+  await chat.getByTestId("call-problem").getByTestId("call-problem-fix").click();
+  await expect(page).toHaveURL(/\/settings\/call$/);
 });

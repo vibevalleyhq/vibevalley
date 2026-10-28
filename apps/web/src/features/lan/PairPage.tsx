@@ -41,16 +41,16 @@ export function PairPage() {
         <p class="text-sm text-muted">{t("web.lan.pair.intro")}</p>
         <Show when={!given}>
           <Field label={t("web.lan.pair.code")} hint={t("web.lan.pair.codeHint")}>
-            <TextInput value={code()} onInput={(e) => setCode(e.currentTarget.value)} autocapitalize="characters" autocomplete="off" />
+            <TextInput data-testid="pair-code" value={code()} onInput={(e) => setCode(e.currentTarget.value)} autocapitalize="characters" autocomplete="off" />
           </Field>
         </Show>
         <Field label={t("web.lan.pair.name")} hint={t("web.lan.pair.nameHint")}>
-          <TextInput value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength={40} />
+          <TextInput data-testid="pair-name" value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength={40} />
         </Field>
         <Show
           when={asking()}
           fallback={
-            <Button tone="primary" type="submit" disabled={!code().trim()} class="self-start">
+            <Button tone="primary" type="submit" data-testid="pair-ask" disabled={!code().trim()} class="self-start">
               {t("web.lan.pair.ask")}
             </Button>
           }

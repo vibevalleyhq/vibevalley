@@ -136,7 +136,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
     [props.channel?.description, props.channel?.project ? t("web.channel.defaultProject", { project: props.channel.project }) : ""].filter(Boolean).join(" · ");
   return (
     <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
-      <header class={[head, "gap-3 px-4"]}>
+      <header data-testid="channel-head" data-key={props.channel?.id} class={[head, "gap-3 px-4"]}>
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={18} />
         </button>
@@ -154,6 +154,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <Icon name="search" size={14} />
             <input
               ref={autofocus()}
+              data-testid="message-search"
               value={search() ?? ""}
               onInput={(e) => setSearch(e.currentTarget.value)}
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
@@ -166,6 +167,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <button
           type="button"
           class={[iconButton, { "bg-selected": search() !== undefined }]}
+          data-testid="message-search-toggle"
           aria-label={t("web.channel.findMessages")}
           aria-pressed={aria(search() !== undefined)}
           title={t("web.channel.findMessages")}
@@ -182,6 +184,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               <button
                 type="button"
                 class={[iconButton, { "bg-selected": threadsOpen() }]}
+                data-testid="threads-toggle"
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
                 title={t("web.channel.threadList.title")}
@@ -199,6 +202,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           <button
             type="button"
             class={[iconButton, { "bg-selected": pinsOpen() }]}
+            data-testid="pins-toggle"
             aria-label={t("web.channel.pins.open")}
             aria-expanded={aria(pinsOpen())}
             title={t("web.channel.pins.open")}
@@ -213,6 +217,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           type="button"
           // The members panel is beside the list, which a phone has no room for.
           class={[iconButton, "w-auto px-2 text-sm max-md:hidden", { "bg-selected": membersOpen() }]}
+          data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
           onClick={() => setMembersOpen(!membersOpen())}
@@ -222,6 +227,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <button
           type="button"
           class={iconButton}
+          data-testid="channel-settings-open"
           aria-label={t("web.channel.settings")}
           title={t("web.channel.settings")}
           disabled={!props.channel}
@@ -236,6 +242,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <button
               type="button"
               role="tab"
+              data-key={entry.tab}
               aria-selected={aria(tab() === entry.tab)}
               onClick={() => setTab(entry.tab)}
               class={[
@@ -313,12 +320,13 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
     />
   );
   return (
-    <aside aria-label={t("web.channel.side")} class="flex w-full flex-col border-r border-line bg-side">
+    <aside aria-label={t("web.channel.side")} data-testid="channels-side" class="flex w-full flex-col border-r border-line bg-side">
       <div class={[head, "gap-2 px-5"]}>
         <span class="flex-1 text-xl font-semibold">{t("web.channel.tab.chat")}</span>
         <button
           type="button"
           class={iconButton}
+          data-testid="farm-search-open"
           aria-label={t("web.channel.farmSearch.open")}
           title={t("web.channel.farmSearch.open")}
           onClick={() => props.onSearch()}
@@ -329,6 +337,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
       <div class="scroll-fade-y flex-1 overflow-y-auto p-3">
         <button
           type="button"
+          data-testid="switcher-open"
           onClick={() => switcher.show()}
           class="mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2.5 text-left text-sm text-muted hover:bg-hover"
         >
@@ -336,12 +345,14 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/.test(navigator.userAgent) })}</span>
         </button>
         <Section
+          item="channels"
           title={t("web.channel.channelsTitle")}
           count={Math.max(1, channels().length)}
           action={
             <button
               type="button"
               class={[iconButton, "size-6"]}
+              data-testid="new-channel"
               aria-label={t("web.channel.newChannel")}
               title={t("web.channel.newChannel")}
               onClick={() => props.onNew()}
@@ -354,7 +365,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
             {(g) => (
               <Show when={g.category} fallback={<For each={g.channels}>{row}</For>}>
                 {(name) => (
-                  <Section title={name()} count={g.channels.length} nested>
+                  <Section title={name()} item={`category:${name()}`} count={g.channels.length} nested>
                     <For each={g.channels}>{row}</For>
                   </Section>
                 )}
@@ -363,6 +374,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           </For>
         </Section>
         <Section
+          item="directs"
           title={t("web.channel.directsTitle")}
           count={directsOf(chat()).length}
           action={
@@ -370,6 +382,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
               <button
                 type="button"
                 class={[iconButton, "size-6"]}
+                data-testid="new-direct"
                 aria-label={t("web.channel.direct.add")}
                 title={t("web.channel.direct.add")}
                 aria-expanded={aria(picking())}
@@ -391,14 +404,14 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
         >
           <For each={directsOf(chat())}>{row}</For>
         </Section>
-        <Section title={t("web.channel.helpers")} count={sessions().length}>
+        <Section title={t("web.channel.helpers")} item="helpers" count={sessions().length}>
           <Show when={sessions().length === 0}>
             <p class="px-3 text-xs text-muted">{t("web.channel.noHelpers")}</p>
           </Show>
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
         <Show when={archived().length > 0}>
-          <Section title={t("web.channel.manage.archivedTitle")} count={archived().length} closed>
+          <Section title={t("web.channel.manage.archivedTitle")} item="archived" count={archived().length} closed>
             <For each={archived()}>{row}</For>
           </Section>
         </Show>
@@ -421,6 +434,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
   return (
     <div
       role="menu"
+      data-testid="direct-picker"
       aria-label={t("web.channel.direct.pick")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
     >
@@ -433,6 +447,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
           <button
             type="button"
             role="menuitem"
+            data-key={a().id}
             class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-hover"
             onClick={() => void open(a().id)}
           >
@@ -447,12 +462,18 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
   );
 }
 
-function Section(props: { title: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
+function Section(props: { title: string; item: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
   const [open, setOpen] = createSignal(untrack(() => !props.closed));
   return (
-    <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title}>
+    <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
       <div class="flex items-center px-1 pb-1">
-        <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} class="flex flex-1 cursor-pointer items-center gap-1 text-left">
+        <button
+          type="button"
+          data-testid="side-section-toggle"
+          aria-expanded={aria(open())}
+          onClick={() => setOpen(!open())}
+          class="flex flex-1 cursor-pointer items-center gap-1 text-left"
+        >
           <Icon name="expand" size={10} class={["opacity-60 transition-transform duration-120", { "rotate-90": open() }]} />
           <span class="text-xs font-semibold text-muted">{props.title}</span>
           <span class="text-xs text-faint">{props.count}</span>
@@ -483,6 +504,11 @@ function ChannelRow(props: {
   return (
     <button
       type="button"
+      data-testid="channel-row"
+      data-key={props.channel.id}
+      data-type={props.channel.type}
+      data-unread={props.unread}
+      data-notify={props.channel.notify ?? "all"}
       onClick={() => props.onClick?.()}
       aria-current={props.here ? "page" : undefined}
       draggable={props.movable ? "true" : "false"}
@@ -577,6 +603,7 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
   return (
     <div
       role="dialog"
+      data-testid="pins"
       aria-label={t("web.channel.pins.title")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 origin-top-right animate-pop-in flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
@@ -588,6 +615,8 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
         {(m) => (
           <button
             type="button"
+            data-testid="pin"
+            data-key={m().id}
             class="cursor-pointer rounded-md px-2 py-1.5 text-left hover:bg-hover"
             onClick={() => {
               router.navigate(messagePath(channelOf(core()?.chat, m().channel), m().number));
@@ -619,13 +648,17 @@ function Members(props: { channel: Channel }) {
     return (core()?.sessions ?? []).filter((h) => (h.channel ?? fallback) === props.channel.id);
   };
   return (
-    <aside aria-label={t("web.channel.members.title")} class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex">
+    <aside
+      aria-label={t("web.channel.members.title")}
+      data-testid="members"
+      class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex"
+    >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
         <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{t("web.channel.members.owner").slice(0, 1)}</span>
         {t("web.channel.members.owner")}
       </div>
-      <div class="flex items-center gap-2 px-1 py-1 text-sm">
+      <div data-testid="member-orchestrator" data-key={here()} class="flex items-center gap-2 px-1 py-1 text-sm">
         <OrchestratorFace size={28} agent={here()} />
         <span class="flex min-w-0 flex-1 flex-col">
           <span class="truncate">{nameOf(here())}</span>
@@ -674,7 +707,13 @@ function OrchestratorLine(props: { agent: string }) {
   const clock = useNow();
   const since = () => core()?.orchestrators?.[props.agent]?.since;
   return (
-    <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={t("web.channel.orchestrator")}>
+    <div
+      data-testid="channel-orchestrator-line"
+      data-key={props.agent}
+      data-state={now()}
+      class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm"
+      aria-label={t("web.channel.orchestrator")}
+    >
       <OrchestratorFace size={32} agent={props.agent} />
       {profile()?.name || t("web.channel.orchestrator")}
       <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
@@ -751,17 +790,21 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
   return (
     <div
       role="dialog"
+      data-testid="thread-list"
       aria-label={t("web.channel.threadList.title")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
-        <p class="px-1 py-2 text-sm text-muted">{t("web.channel.threadList.none")}</p>
+        <p data-testid="threads-empty" class="px-1 py-2 text-sm text-muted">
+          {t("web.channel.threadList.none")}
+        </p>
       </Show>
       <For each={live()}>{item}</For>
       <Show when={archived().length > 0}>
         <button
           type="button"
+          data-testid="threads-archived"
           aria-expanded={aria(showArchived())}
           class="mt-1 flex cursor-pointer items-center gap-1 px-1 text-left text-xs text-muted hover:text-ink"
           onClick={() => setShowArchived(!showArchived())}
@@ -788,7 +831,12 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
     if (next !== untrack(() => props.title)) run(() => api.channel.update({ id, name: next }));
   };
   return (
-    <div class="group/t flex items-center gap-1 rounded-md px-1 hover:bg-hover">
+    <div
+      data-testid="thread"
+      data-key={props.thread.id}
+      data-archived={props.thread.archived !== undefined ? "" : undefined}
+      class="group/t flex items-center gap-1 rounded-md px-1 hover:bg-hover"
+    >
       <Show
         when={renaming()}
         fallback={
@@ -810,6 +858,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       >
         <input
           ref={autofocus()}
+          data-testid="thread-name"
           value={name()}
           aria-label={t("web.channel.threadList.rename", { title: props.title })}
           onInput={(e) => setName(e.currentTarget.value)}
@@ -828,6 +877,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <button
         type="button"
         class={[iconButton, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        data-testid="thread-rename"
         aria-label={t("web.channel.threadList.rename", { title: props.title })}
         title={t("web.channel.threadList.rename", { title: props.title })}
         onClick={() => {
@@ -840,6 +890,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
       <button
         type="button"
         class={[iconButton, "size-7 opacity-0 group-hover/t:opacity-100 focus-visible:opacity-100"]}
+        data-testid="thread-archive"
         aria-label={
           props.thread.archived !== undefined
             ? t("web.channel.threadList.unarchive", { title: props.title })
@@ -861,7 +912,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
 /** Every channel and thread searched at once, the server reading the filters; a hit opens where it is. */
 function FarmSearch(props: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.farmSearch.title")} wide>
+    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.farmSearch.title")} wide testid="farm-search">
       <FarmSearchBody onClose={() => props.onClose()} />
     </Dialog>
   );
@@ -887,6 +938,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
         <Icon name="search" size={16} />
         <input
           ref={autofocus()}
+          data-testid="farm-search-input"
           value={text()}
           onInput={(e) => setText(e.currentTarget.value)}
           placeholder={t("web.channel.farmSearch.hint")}
@@ -907,6 +959,8 @@ function FarmSearchBody(props: { onClose: () => void }) {
             <button
               type="button"
               role="listitem"
+              data-testid="search-hit"
+              data-key={h().message.id}
               class="flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-hover"
               onClick={() => {
                 router.navigate(messagePath(channelOf(core()?.chat, h().message.channel), h().message.number));

@@ -31,6 +31,8 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
   return (
     <dialog
       ref={(el) => (dialog = el)}
+      data-testid="lightbox"
+      data-key={shown()?.name}
       aria-label={shown()?.name ?? t("web.base.lightbox.label")}
       onClose={() => props.onAt(undefined)}
       onClick={(e) => e.target === dialog && props.onAt(undefined)}
@@ -66,6 +68,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
                 href={p().src}
                 target="_blank"
                 rel="noreferrer"
+                data-testid="lightbox-original"
                 aria-label={t("web.base.lightbox.original")}
                 title={t("web.base.lightbox.original")}
                 class="inline-flex size-7 items-center justify-center rounded-md text-muted transition-colors duration-120 hover:bg-selected hover:text-ink"

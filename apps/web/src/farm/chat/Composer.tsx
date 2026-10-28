@@ -34,6 +34,7 @@ function PickChip(props: { named: boolean }) {
           </Show>
           <button
             type="button"
+            data-testid="unpick"
             aria-label={t("web.farm.chat.anyone")}
             onClick={() => setPick("auto")}
             class="flex h-6 w-6 cursor-pointer items-center justify-center hover:bg-cream-300"
@@ -83,15 +84,16 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
   const replying = () => draftOf(props.channel?.id).reply;
 
   return (
-    <div class="relative flex flex-col border-t border-cream-200 p-1.5">
+    <div data-testid="composer" data-key={props.channel?.id} class="relative flex flex-col border-t border-cream-200 p-1.5">
       <Show when={replying()}>
         {(m) => (
-          <div class="mb-1 flex items-center gap-1.5 bg-cream-100 px-2 py-1">
+          <div data-testid="replying" data-key={m().number} class="mb-1 flex items-center gap-1.5 bg-cream-100 px-2 py-1">
             <span class="min-w-0 flex-1 truncate font-pixel text-[12px] text-bark-500">
               {m().text ? t("web.farm.chat.replyToText", { name: m().name, text: m().text }) : t("web.farm.chat.replyTo", { name: m().name })}
             </span>
             <button
               type="button"
+              data-testid="cancel-reply"
               aria-label={t("web.farm.chat.actions.cancelReply")}
               onClick={() => drafts.reply(m().channel, undefined)}
               class="cursor-pointer p-0.5"
@@ -133,6 +135,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
             ref={(el) => (input = el)}
             rows={1}
             value={box.text()}
+            data-testid="composer-input"
             placeholder={placeholder()}
             aria-label={placeholder()}
             onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
@@ -144,6 +147,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
           <Show when={box.stoppable()}>
             <button
               type="button"
+              data-testid="stop"
               aria-label={t("web.farm.chat.stop")}
               title={t("web.farm.chat.stopHint")}
               onClick={() => void api.orchestrator.stop({ agent: box.here() }).catch(() => {})}
@@ -155,6 +159,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
           <DictationButton field={() => input} value={box.text()} onValue={box.edit} />
           <button
             type="button"
+            data-testid="send"
             aria-label={t("web.farm.chat.send")}
             disabled={!box.canSend()}
             onClick={() => void box.send()}

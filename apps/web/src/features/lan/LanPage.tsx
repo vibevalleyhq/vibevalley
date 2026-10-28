@@ -45,7 +45,7 @@ export function LanPage() {
                   <>
                     <p class="text-sm">{t("web.lan.lan.intro")}</p>
                     <div>
-                      <Button tone="primary" onClick={() => void act(() => api.lan.update({ open: true }))}>
+                      <Button tone="primary" data-testid="lan-allow" onClick={() => void act(() => api.lan.update({ open: true }))}>
                         {t("web.lan.lan.allow")}
                       </Button>
                     </div>
@@ -54,16 +54,20 @@ export function LanPage() {
               >
                 <div class="flex gap-3">
                   <span class="w-18 shrink-0 text-sm text-muted">{t("web.lan.lan.address")}</span>
-                  <span class="font-mono text-sm select-all">{s().url ?? "—"}</span>
+                  <span data-testid="lan-url" class="font-mono text-sm select-all">
+                    {s().url ?? "—"}
+                  </span>
                 </div>
                 <Show
                   when={s().pairing}
                   fallback={
                     <div class="flex flex-wrap gap-2">
-                      <Button tone="primary" disabled={!s().url} onClick={() => void act(() => api.lan.pairing.start())}>
+                      <Button tone="primary" data-testid="lan-add" disabled={!s().url} onClick={() => void act(() => api.lan.pairing.start())}>
                         {t("web.lan.lan.add")}
                       </Button>
-                      <Button onClick={() => void act(() => api.lan.update({ open: false }))}>{t("web.lan.lan.close")}</Button>
+                      <Button data-testid="lan-close" onClick={() => void act(() => api.lan.update({ open: false }))}>
+                        {t("web.lan.lan.close")}
+                      </Button>
                     </div>
                   }
                 >
@@ -134,20 +138,24 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
     <Show
       when={props.pairing.asking}
       fallback={
-        <div class="flex flex-wrap gap-5">
-          <div class="rounded-md border border-line bg-white p-2">
+        <div data-testid="pairing" data-left={left()} class="flex flex-wrap gap-5">
+          <div data-testid="pairing-qr" class="rounded-md border border-line bg-white p-2">
             <Qr text={props.pairing.link} label={t("web.lan.lan.qr")} />
           </div>
           <div class="flex max-w-md min-w-50 flex-col gap-2">
             <p class="text-sm">{t("web.lan.lan.scan")}</p>
-            <p class="font-mono text-2xs break-all select-all">{props.pairing.link}</p>
+            <p data-testid="pairing-link" class="font-mono text-2xs break-all select-all">
+              {props.pairing.link}
+            </p>
             <p class="text-xs text-muted">{t("web.lan.lan.left", { s: left() })}</p>
             <div class="flex flex-wrap gap-2 pt-1">
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
                 {t("web.lan.lan.copy")}
               </Button>
               <Button onClick={() => void props.act(() => api.lan.pairing.start())}>{t("web.lan.lan.newCode")}</Button>
-              <Button onClick={() => void props.act(() => api.lan.pairing.stop())}>{t("web.lan.lan.stop")}</Button>
+              <Button data-testid="pairing-stop" onClick={() => void props.act(() => api.lan.pairing.stop())}>
+                {t("web.lan.lan.stop")}
+              </Button>
             </div>
           </div>
         </div>

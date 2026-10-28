@@ -2,7 +2,7 @@ import { createEffect, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 /** A modal over the page (the native <dialog>: focus trap, Escape closes). Open while `open`. */
-export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean }) {
+export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {
   let dialog!: HTMLDialogElement;
   createEffect(
     () => props.open,
@@ -15,6 +15,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
     <dialog
       ref={(el) => (dialog = el)}
       aria-label={props.title}
+      data-testid={props.testid}
       onClose={() => props.onClose()}
       onClick={(e) => e.target === dialog && props.onClose()}
       class={[

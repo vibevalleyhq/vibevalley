@@ -43,6 +43,8 @@ function DispatchNote(props: { text: string }) {
   return (
     <button
       type="button"
+      data-testid="dispatch-note"
+      aria-expanded={aria(open())}
       aria-label={open() ? t("web.farm.chat.foldDispatch") : t("web.farm.chat.unfoldDispatch")}
       onClick={() => setOpen(!open())}
       class="group flex w-full cursor-pointer items-start gap-1.5 text-left"
@@ -139,6 +141,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
     <div class="relative self-center">
       <button
         type="button"
+        data-testid="message-menu-open"
         aria-label={t("web.farm.chat.actions.open")}
         title={t("web.farm.chat.actions.open")}
         aria-expanded={aria(open())}
@@ -153,6 +156,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
       <Show when={open()}>
         <div
           role="menu"
+          data-testid="message-menu"
           aria-label={t("web.farm.chat.actions.open")}
           class="absolute right-0 bottom-full z-30 mb-1 w-40 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
         >
@@ -161,6 +165,8 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               {(emoji) => (
                 <button
                   type="button"
+                  data-testid="quick-reaction"
+                  data-key={emoji}
                   aria-label={emoji}
                   class="cursor-pointer px-1 text-[14px] hover:bg-leaf-300/40"
                   onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji }))}
@@ -180,12 +186,13 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               <SpriteIcon name="button-add" size={12} />
             </button>
           </div>
-          <button type="button" role="menuitem" class={menuItem} onClick={() => run(async () => drafts.reply(props.m.channel, props.m))}>
+          <button type="button" role="menuitem" data-key="reply" class={menuItem} onClick={() => run(async () => drafts.reply(props.m.channel, props.m))}>
             {t("web.farm.chat.actions.reply")}
           </button>
           <button
             type="button"
             role="menuitem"
+            data-key="copy-link"
             class={menuItem}
             onClick={() =>
               run(async () => {
@@ -200,6 +207,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             <button
               type="button"
               role="menuitem"
+              data-key="edit"
               class={menuItem}
               onClick={() => {
                 setOpen(false);
@@ -212,6 +220,8 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
           <button
             type="button"
             role="menuitem"
+            data-key="delete"
+            data-sure={sure() ? "" : undefined}
             class={[menuItem, "text-berry"]}
             onClick={() => (sure() ? run(() => api.channel.message.delete({ id: props.m.id })) : setSure(true))}
           >
@@ -249,6 +259,7 @@ function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
     <div class="flex flex-col gap-1">
       <textarea
         ref={autofocus()}
+        data-testid="message-edit"
         value={text()}
         aria-label={t("web.farm.chat.actions.edit")}
         onInput={(e) => setText(e.currentTarget.value)}
@@ -319,7 +330,7 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
         <div class="mt-1 flex flex-wrap gap-1">
           <For each={props.m.reactions ?? []} keyed={(r) => r.emoji}>
             {(r) => (
-              <span class="bg-cream-200 px-1.5 text-[12px] text-bark-800">
+              <span data-testid="reaction" data-key={r().emoji} data-count={r().by.length} class="bg-cream-200 px-1.5 text-[12px] text-bark-800">
                 {r().emoji} {r().by.length}
               </span>
             )}

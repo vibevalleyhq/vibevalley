@@ -13,6 +13,7 @@ function Modal(props: {
   open: boolean;
   onClose: () => void;
   label: string;
+  testid?: string | undefined;
   backdrop: string;
   class: string;
   style?: JSX.CSSProperties;
@@ -30,6 +31,7 @@ function Modal(props: {
     <dialog
       ref={(el) => (dialog = el)}
       aria-label={props.label}
+      data-testid={props.testid}
       onCancel={(e) => {
         e.preventDefault();
         props.onClose();
@@ -61,9 +63,24 @@ const farmSizes = {
 export type FarmDialogSize = keyof typeof farmSizes;
 
 /** A farm panel's frame: whatever it holds, it keeps its size and scrolls inside. Shown while `open` (default) is true. */
-export function FarmDialog(props: { title: string; size: FarmDialogSize; icon?: string; open?: boolean; onClose: () => void; children?: JSX.Element }) {
+export function FarmDialog(props: {
+  title: string;
+  size: FarmDialogSize;
+  icon?: string;
+  open?: boolean;
+  testid?: string;
+  onClose: () => void;
+  children?: JSX.Element;
+}) {
   return (
-    <Modal open={props.open ?? true} onClose={() => props.onClose()} label={props.title} backdrop="backdrop:bg-bark-900/30" class={farmSizes[props.size]}>
+    <Modal
+      open={props.open ?? true}
+      onClose={() => props.onClose()}
+      label={props.title}
+      testid={props.testid}
+      backdrop="backdrop:bg-bark-900/30"
+      class={farmSizes[props.size]}
+    >
       <div class={[pxText.sm, "flex h-full flex-col overflow-hidden"]}>
         <div class="flex shrink-0 items-center gap-2 bg-cream-100 px-4 py-2.5">
           <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={32} />}</Show>
@@ -96,12 +113,13 @@ export function FarmSection(props: { title: string; children?: JSX.Element }) {
 }
 
 /** A settings dialog: at most 512 px wide, as tall as it needs up to 85 % of the screen. */
-export function PxDialog(props: { title: string; open?: boolean; onClose: () => void; children?: JSX.Element }) {
+export function PxDialog(props: { title: string; open?: boolean; testid?: string; onClose: () => void; children?: JSX.Element }) {
   return (
     <Modal
       open={props.open ?? true}
       onClose={() => props.onClose()}
       label={props.title}
+      testid={props.testid}
       backdrop="backdrop:bg-[#1e140a73]"
       class="w-[min(512px,calc(100vw-32px))] border-2 border-bark-500"
     >

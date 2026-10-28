@@ -122,17 +122,6 @@ export function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undef
 export const issueInTask = (issue: Issue, session: Session | undefined) =>
   issue.graph !== undefined || issue.parent !== undefined || session?.graph !== undefined || issue.delivered === "merged_into_parent";
 
-/** Every word of the query is somewhere in the fields, ignoring case. */
-export function matchesQuery(query: string, fields: (string | undefined)[]) {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return true;
-  const text = fields
-    .filter((f): f is string => f !== undefined)
-    .join("\n")
-    .toLowerCase();
-  return words.every((w) => text.includes(w));
-}
-
 export const closedShown = 15;
 
 function runTriggerText(trigger: RunTrigger) {

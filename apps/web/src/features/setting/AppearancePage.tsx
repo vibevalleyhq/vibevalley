@@ -15,6 +15,7 @@ export function AppearancePage() {
         <SettingRow label={t("web.setting.appearance.theme")} hint={t("web.setting.appearance.themeHint")}>
           <Segmented
             label={t("web.setting.appearance.theme")}
+            testid="theme"
             value={theme()}
             options={ThemeChoiceValues.map((v) => ({ value: v, label: t(`web.setting.appearance.themes.${v}`) }))}
             onChange={setTheme}
@@ -23,6 +24,7 @@ export function AppearancePage() {
         <SettingRow label={t("web.setting.appearance.scale")} hint={t("web.setting.appearance.scaleHint")}>
           <Segmented
             label={t("web.setting.appearance.scale")}
+            testid="scale"
             value={String(scale())}
             options={ScaleValues.map((v) => ({ value: String(v), label: `${v}%` }))}
             onChange={(v) => setScale(Number(v) as (typeof ScaleValues)[number])}

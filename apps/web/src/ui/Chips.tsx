@@ -66,6 +66,8 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
             <div class="flex items-center gap-1.5">
               <span class="w-40 truncate font-mono text-sm">{k()}</span>
               <input
+                data-testid="pair-value"
+                data-key={k()}
                 aria-label={t("web.base.chips.valueOf", { k: k() })}
                 disabled={props.disabled}
                 class={[field, "flex-1"]}
@@ -96,6 +98,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         }}
       >
         <input
+          data-testid="new-pair-name"
           aria-label={t("web.base.chips.name")}
           disabled={props.disabled}
           placeholder="NAME"
@@ -104,6 +107,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           onInput={(e) => setKey(e.currentTarget.value)}
         />
         <input
+          data-testid="new-pair-value"
           aria-label={t("web.base.chips.value")}
           disabled={props.disabled}
           placeholder={t("web.base.chips.valueHint")}
@@ -113,6 +117,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         />
         <button
           type="submit"
+          data-testid="new-pair-add"
           disabled={props.disabled || !key().trim()}
           class="h-7 cursor-pointer rounded-md border border-line px-2.5 text-sm hover:bg-hover disabled:opacity-50"
         >

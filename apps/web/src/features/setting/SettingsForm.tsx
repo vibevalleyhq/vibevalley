@@ -156,6 +156,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         <SettingsGroup title="DeepSeek">
           <KeyRow
             label="API Key"
+            testid="deepseek-key"
             hint={t("web.setting.models.deepseekHint")}
             status={status().deepseekApiKey}
             value={deepseek()}
@@ -197,7 +198,14 @@ function SourceMark(props: { draft: SourceDraft }) {
         : t("web.setting.source.closed");
   return (
     <Tip text={text()}>
-      <span role="img" aria-label={text()} tabindex={0} class="inline-flex p-1 outline-none focus-visible:outline-2 focus-visible:outline-focus">
+      <span
+        role="img"
+        data-testid="source-mark"
+        data-state={!props.draft.saved ? "unset" : props.draft.saved.enabled ? "on" : "off"}
+        aria-label={text()}
+        tabindex={0}
+        class="inline-flex p-1 outline-none focus-visible:outline-2 focus-visible:outline-focus"
+      >
         <span class={["block size-2 rounded-full", !props.draft.saved ? "border border-faint" : props.draft.saved.enabled ? "bg-leaf" : "bg-faint"]} />
       </span>
     </Tip>
@@ -207,7 +215,7 @@ function SourceMark(props: { draft: SourceDraft }) {
 function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDraft>, touched?: boolean) => void }) {
   const label = () => sourceLabels[props.draft.kind];
   return (
-    <div>
+    <div data-testid="source" data-key={props.draft.kind}>
       <div class="flex items-center gap-2 px-4 py-3">
         <span class="text-sm font-medium">{label()}</span>
         <SourceMark draft={props.draft} />
@@ -215,11 +223,13 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
         <Toggle
           label={t("web.setting.source.enabled")}
           ariaLabel={t("web.setting.source.enable", { label: label() })}
+          testid="source-enable"
           checked={props.draft.enabled}
           onChange={(enabled) => props.set({ enabled, open: props.draft.open || (enabled && !props.draft.url) })}
         />
         <IconButton
           icon="settings"
+          testid="source-configure"
           label={t("web.setting.source.configure", { label: label() })}
           pressed={props.draft.open}
           onClick={() => props.set({ open: !props.draft.open }, false)}
@@ -228,6 +238,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
       <Show when={props.draft.open}>
         <div class="flex flex-col gap-3 border-t border-line px-4 py-3">
           <TextInput
+            data-testid="source-address"
             aria-label={t("web.setting.source.address", { label: label() })}
             class="font-mono"
             placeholder={sourceAddress[props.draft.kind]}
@@ -311,7 +322,7 @@ export function GitHub() {
               <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason}>
                 <Icon name={s().installed ? "check" : "cross"} size={16} />
                 <span class="font-mono text-sm">{s().installed ? s().version : t("web.setting.github.noGh")}</span>
-                <IconButton icon="refresh" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
+                <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
               </SettingRow>
               <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")}>
                 <Icon name={s().loggedIn ? "check" : "warn"} size={16} />
@@ -350,6 +361,7 @@ export function LanguageChoice() {
       <Show when={error()}>{(e) => <Hint text={e()} />}</Show>
       <Segmented
         label={t("web.setting.language.label")}
+        testid="language"
         value={currentLocale()}
         options={LocaleValues.map((l) => ({ value: l, label: t(`web.setting.language.${l}`), disabled: busy() }))}
         onChange={(l) => void choose(l)}

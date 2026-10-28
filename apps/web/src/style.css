@@ -11,22 +11,22 @@
   --wb-side: #f1ebe0;
   --wb-ink: #2f1f13;
   --wb-muted: #7f5b3b;
-  --wb-faint: #9b7550;
+  --wb-faint: #846344;
   --wb-line: #2f1f131f;
   --wb-hover: #2f1f130f;
   --wb-selected: #2f1f131a;
   --wb-focus: #74a046;
-  --wb-accent: #5a8234;
+  --wb-accent: #567c31;
   --wb-leaf: #74a046;
   --wb-wheat: #e5a93c;
-  --wb-berry: #c84a3a;
-  --wb-water: #4f8fbd;
+  --wb-berry: #aa3f31;
+  --wb-water: #3b6b8e;
   --wb-bark: #7f5b3b;
   /* A mark that something is ready, missing or to be looked at: its tint and its words. */
   --wb-ok-soft: #e3efd2;
   --wb-ok-ink: #3f6427;
   --wb-bad-soft: #f6ddd8;
-  --wb-warn-ink: #b8682a;
+  --wb-warn-ink: #9c5824;
   /* Under a dialog. */
   --wb-scrim: #2f1f1340;
   /* The rail and what is on it: dark in both themes. */
@@ -61,7 +61,7 @@
   --wb-side: #262019;
   --wb-ink: #f1e7d6;
   --wb-muted: #bfa88c;
-  --wb-faint: #937c64;
+  --wb-faint: #9e8974;
   --wb-line: #f1e7d621;
   --wb-hover: #f1e7d610;
   --wb-selected: #f1e7d61c;
@@ -69,7 +69,7 @@
   --wb-accent: #7fae4f;
   --wb-leaf: #8dbb5c;
   --wb-wheat: #e5a93c;
-  --wb-berry: #e0705f;
+  --wb-berry: #e37e6f;
   --wb-water: #6fa8d4;
   --wb-bark: #bfa88c;
   --wb-ok-soft: #2f3f22;

@@ -185,7 +185,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       // 恢复默认 puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
         <Show when={props.part === "agent" || props.view === "call"}>
-          <Button tone="quiet" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
+          <Button tone="quiet" data-testid="reset" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
             {t("web.base.form.reset")}
           </Button>
         </Show>
@@ -249,6 +249,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Cols>
                   <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
                     <TextInput
+                      data-testid="agora-app-id"
                       aria-label="Agora App ID"
                       class="font-mono"
                       placeholder={t("web.voice.voice.hex")}
@@ -262,6 +263,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   <Labeled label={t("web.voice.voice.area")} hint={t("web.voice.voice.areaHint")}>
                     <Segmented
                       label={t("web.voice.voice.area")}
+                      testid="voice-area"
                       value={draft().area}
                       options={AreaValues.map((a) => ({ value: a, label: areaLabel[a] }))}
                       onChange={(area) => set({ ...draft(), area })}
@@ -274,6 +276,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
                     <Segmented
                       label={t("web.voice.voice.asr")}
+                      testid="voice-asr"
                       value={asr().vendor}
                       options={options(asrLabel)}
                       onChange={(v) => set({ ...draft(), asr: v === asr().vendor ? asr() : asrStart[v] })}
@@ -292,6 +295,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <Labeled label={t("web.voice.voice.deepgramModel")}>
                         <Segmented
                           label={t("web.voice.voice.deepgramModel")}
+                          testid="voice-deepgram-model"
                           value={a().model}
                           options={plain(ModelValues)}
                           onChange={(model) => set({ ...draft(), asr: { vendor: "deepgram", model } })}
@@ -323,6 +327,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
                   <Segmented
                     label={t("web.voice.voice.who")}
+                    testid="voice-answer"
                     value={answer().vendor}
                     options={options(answerLabel)}
                     onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
@@ -333,6 +338,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     <Labeled label={t("web.voice.voice.model")}>
                       <Segmented
                         label={t("web.voice.voice.model")}
+                        testid="voice-model"
                         value={a().model}
                         options={plain(VoiceAnswerAgoraModelValues)}
                         onChange={(model) => set({ ...draft(), answer: { vendor: "agora", model } })}
@@ -439,6 +445,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
           <Cols>
             <Labeled label={t("web.voice.voice.persona.greeting")} hint={t("web.voice.voice.persona.greetingHint")}>
               <TextInput
+                data-testid="greeting"
                 aria-label={t("web.voice.voice.persona.greeting")}
                 value={draft().greeting}
                 onInput={(e) => set({ ...draft(), greeting: e.currentTarget.value })}
@@ -461,6 +468,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             >
               <Segmented
                 label={t("web.voice.voice.persona.tts")}
+                testid="voice-tts"
                 value={tts().vendor}
                 options={options(ttsLabel)}
                 onChange={(v) => set({ ...draft(), tts: v === tts().vendor ? tts() : ttsStart[v] })}
@@ -471,6 +479,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Labeled label={t("web.voice.voice.persona.ttsModel")}>
                   <Segmented
                     label={t("web.voice.voice.persona.ttsModel")}
+                    testid="voice-tts-model"
                     value={narrowed().model}
                     options={plain(VoiceTTSMinimaxModelValues)}
                     onChange={(model) => set({ ...draft(), tts: { ...narrowed(), model } })}
@@ -483,6 +492,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.openaiVoice")}>
                   <Segmented
                     label={t("web.voice.voice.persona.voice")}
+                    testid="voice-voice"
                     value={narrowed().voice}
                     options={plain(VoiceValues)}
                     onChange={(voice) => set({ ...draft(), tts: { ...narrowed(), voice } })}

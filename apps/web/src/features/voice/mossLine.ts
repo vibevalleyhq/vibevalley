@@ -1,21 +1,15 @@
 import { t } from "@vibevalley/i18n";
 // A line to MOSS Live for the playground: the server relays it (mossLinePath) and adds the key; this side speaks MOSS's
 // protocol. Up: JSON actions, and the microphone as 20 ms frames of 16 kHz mono PCM, each behind a 0x00 byte. Down: JSON
-// events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. MOSS sends
-// only so far ahead of what was played: every piece played is reported (playback.chunk.completed), and a turn played to
-// its end or cut off is said too (playback.completed, playback.stopped).
+// events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
+// and the playback's account are moss.ts's; this wires them to the socket and the audio.
 
 import { mossLinePath } from "@vibevalley/protocol";
+import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackAction, type Queued } from "./moss";
+
+export type { MossTurn } from "./moss";
 
 export type MossPhase = "idle" | "connecting" | "live" | "ending";
-
-/** One side's words in a turn; done once MOSS has settled them. */
-export interface MossTurn {
-  readonly who: "owner" | "moss";
-  readonly key: string;
-  readonly text: string;
-  readonly done: boolean;
-}
 
 /** An action sent or an event received, as JSON; the noisy ones (words as they grow, audio announcements) are left out. */
 export interface MossEvent {
@@ -77,27 +71,8 @@ let captureUrl: string | undefined;
 
 const noisy = new Set(["input.transcript.updated", "output.transcript.updated", "response.audio.context", "playback.chunk.completed"]);
 
-interface Piece {
-  readonly chunk: string;
-  readonly run: string;
-  readonly turn: string;
-}
-
-interface Playing extends Piece {
-  readonly source: AudioBufferSourceNode;
-  readonly at: number;
-  readonly ms: number;
-}
-
 /** A field MOSS sends as a string; "" when it is anything else. */
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-
-/** 0..100 from a frame's loudness. */
-const levelOf = (pcm: Int16Array) => {
-  let sum = 0;
-  for (const s of pcm) sum += (s / 0x8000) ** 2;
-  return Math.min(100, Math.round(Math.sqrt(sum / pcm.length) * 300));
-};
 
 export class MossLine {
   phase: MossPhase = "idle";
@@ -117,15 +92,11 @@ export class MossLine {
   /** When the owner's words last ended, waiting for MOSS's first sound; performance.now(). */
   private heardAt?: number;
   private replyTotal = 0;
-  /** The answer the last piece belonged to, to tell running dry inside an answer from a new one starting. */
-  private lastRun = "";
   private mic?: { stream: MediaStream; context: AudioContext };
   private out?: AudioContext;
-  private nextAt = 0;
   private piece?: Piece;
-  private playing: Playing[] = [];
-  /** Per run: the ms played to the end, and whether MOSS has sent all of it. */
-  private played = new Map<string, { ms: number; sent: boolean; turn: string }>();
+  private playback = new Playback();
+  private sources = new Map<Queued, AudioBufferSourceNode>();
   private readonly listeners = new Set<() => void>();
 
   subscribe = (f: () => void) => {
@@ -142,11 +113,15 @@ export class MossLine {
     this.events = [...this.events.slice(-199), { up, text }];
   }
 
-  private send(action: Record<string, unknown>) {
+  private tell(actions: readonly PlaybackAction[]) {
+    for (const a of actions) this.send(a);
+  }
+
+  private send(action: { readonly action: string } & Record<string, unknown>) {
     const text = JSON.stringify(action);
     this.ws?.send(text);
     this.window.up += text.length;
-    if (!noisy.has(String(action.action))) this.log(true, text);
+    if (!noisy.has(action.action)) this.log(true, text);
     this.changed();
   }
 
@@ -222,7 +197,7 @@ export class MossLine {
         this.piece = { chunk: str(d.chunk_id), run: str(d.run_id), turn: str(d.turn_id) };
         break;
       case "response.audio.done":
-        this.sent(str(d.run_id), str(d.turn_id));
+        this.tell(this.playback.sent(str(d.run_id), str(d.turn_id)));
         break;
       case "input.speech.stopped":
         this.heardAt = performance.now();
@@ -247,15 +222,8 @@ export class MossLine {
     this.changed();
   }
 
-  /** The words of a turn so far (MOSS sends them whole each time); a new turn starts a new line. The owner's first
-   * updates come before MOSS has named the turn: the line takes the name when it comes. */
   private words(who: MossTurn["who"], key: string, text: string, done: boolean) {
-    if (text === "") return;
-    let last: MossTurn | undefined;
-    for (const x of this.turns) if (x.who === who && !x.done && (x.key === "" || key === "" || x.key === key)) last = x;
-    if (last) {
-      this.turns = this.turns.map((x) => (x === last ? { ...x, key: key || x.key, text, done } : x));
-    } else this.turns = [...this.turns, { who, key, text, done }];
+    this.turns = heard(this.turns, who, key, text, done);
   }
 
   private async open() {
@@ -313,62 +281,37 @@ export class MossLine {
       this.qos.replyMs = Math.round(ms);
       this.qos.replyMeanMs = Math.round(this.replyTotal / this.qos.replies);
     }
-    if (piece.run === this.lastRun && this.nextAt > 0 && out.currentTime > this.nextAt) this.qos.gaps++;
-    this.lastRun = piece.run;
     const buffer = out.createBuffer(1, pcm.length, outRate);
     const samples = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) samples[i] = pcm[i]! / 0x8000;
     const source = out.createBufferSource();
     source.buffer = buffer;
     source.connect(out.destination);
-    const at = Math.max(this.nextAt, out.currentTime);
-    source.start(at);
-    this.nextAt = at + buffer.duration;
-    const playing: Playing = { ...piece, source, at, ms: buffer.duration * 1000 };
-    this.playing.push(playing);
-    const run = this.played.get(piece.run) ?? { ms: 0, sent: false, turn: piece.turn };
-    this.played.set(piece.run, run);
+    const queued = this.playback.queue(piece, buffer.duration, out.currentTime);
+    this.qos.gaps = this.playback.gaps;
+    this.sources.set(queued, source);
+    source.start(queued.at);
     source.onended = () => {
-      if (!this.playing.includes(playing)) return;
-      this.playing = this.playing.filter((p) => p !== playing);
-      run.ms += playing.ms;
-      this.send({ action: "playback.chunk.completed", chunk_id: piece.chunk, run_id: piece.run, turn_id: piece.turn });
-      if (this.playing.length === 0) this.mossLevel = 0;
-      this.finished(piece.run);
+      this.sources.delete(queued);
+      this.tell(this.playback.ended(queued));
+      if (this.playback.playing.length === 0) this.mossLevel = 0;
     };
-  }
-
-  /** MOSS has sent all of a run: once it has all been played, say so. */
-  private sent(run: string, turn: string) {
-    const r = this.played.get(run) ?? { ms: 0, sent: false, turn };
-    r.sent = true;
-    this.played.set(run, r);
-    this.finished(run);
-  }
-
-  private finished(run: string) {
-    const r = this.played.get(run);
-    if (!r?.sent || this.playing.some((p) => p.run === run)) return;
-    this.played.delete(run);
-    this.send({ action: "playback.completed", run_id: run, turn_id: r.turn });
   }
 
   /** The owner talked over it, or MOSS stopped: what is still playing stops now, and how far it got is said. */
   private cut(run: string, turn: string) {
-    const out = this.out;
-    const mine = this.playing.filter((p) => p.run === run);
-    if (mine.length === 0 && !this.played.has(run)) return;
-    let ms = this.played.get(run)?.ms ?? 0;
-    for (const p of mine) {
-      if (out && out.currentTime > p.at) ms += Math.min(p.ms, (out.currentTime - p.at) * 1000);
-      p.source.onended = null;
-      p.source.stop();
-    }
-    this.playing = this.playing.filter((p) => p.run !== run);
-    this.nextAt = 0;
-    this.mossLevel = 0;
-    this.played.delete(run);
-    this.send({ action: "playback.stopped", run_id: run, turn_id: turn, played_audio_ms: Math.round(ms) });
+    const { stop, actions } = this.playback.cut(run, turn, this.out?.currentTime ?? 0);
+    for (const q of stop) this.silence(q);
+    if (actions.length > 0) this.mossLevel = 0;
+    this.tell(actions);
+  }
+
+  private silence(q: Queued) {
+    const source = this.sources.get(q);
+    this.sources.delete(q);
+    if (!source) return;
+    source.onended = null;
+    source.stop();
   }
 
   mute(on: boolean) {
@@ -392,7 +335,7 @@ export class MossLine {
       downKbps: Math.round((this.window.down * 8) / 1000),
       framesPerSecond: this.window.frames,
       backlog: this.ws?.bufferedAmount ?? 0,
-      aheadMs: out ? Math.max(0, Math.round((this.nextAt - out.currentTime) * 1000)) : 0,
+      aheadMs: out ? this.playback.aheadMs(out.currentTime) : 0,
     };
     this.window = { up: 0, down: 0, frames: 0 };
     this.changed();
@@ -402,22 +345,16 @@ export class MossLine {
     clearInterval(this.tick);
     this.tick = undefined;
     this.heardAt = undefined;
-    this.lastRun = "";
     const ws = this.ws;
     this.ws = undefined;
     if (ws && ws.readyState !== WebSocket.CLOSED) ws.close(1000);
     this.mic?.stream.getTracks().forEach((x) => x.stop());
     void this.mic?.context.close();
     this.mic = undefined;
-    for (const p of this.playing) {
-      p.source.onended = null;
-      p.source.stop();
-    }
-    this.playing = [];
-    this.played.clear();
+    for (const q of this.playback.playing) this.silence(q);
+    this.playback.clear();
     void this.out?.close();
     this.out = undefined;
-    this.nextAt = 0;
     this.piece = undefined;
     this.micLevel = 0;
     this.mossLevel = 0;

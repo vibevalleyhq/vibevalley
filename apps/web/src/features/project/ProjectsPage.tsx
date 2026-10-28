@@ -67,8 +67,9 @@ export function ProjectsPage(props: { rest: string }) {
         <ListCard
           title={t("web.project.title")}
           label={t("web.project.list")}
+          testid="projects"
           action={
-            <Button icon="add" onClick={() => setCreating(true)}>
+            <Button icon="add" data-testid="new-project" onClick={() => setCreating(true)}>
               {t("web.project.add")}
             </Button>
           }
@@ -77,7 +78,7 @@ export function ProjectsPage(props: { rest: string }) {
           <Switch
             fallback={
               <>
-                <ListRow to="/projects" active={!selected()} title={t("web.project.all")} line={t("web.project.allLine")} />
+                <ListRow to="/projects" item="" active={!selected()} title={t("web.project.all")} line={t("web.project.allLine")} />
                 <For each={sorted()}>
                   {(p) => {
                     const growth = () => growthOf(p.last, now());
@@ -86,6 +87,7 @@ export function ProjectsPage(props: { rest: string }) {
                     return (
                       <ListRow
                         to={`/projects/${encodeURIComponent(p.name)}`}
+                        item={p.name}
                         active={p.name === selected()?.name}
                         title={p.name}
                         line={line()}
@@ -113,7 +115,7 @@ export function ProjectsPage(props: { rest: string }) {
           {(name) => <ProjectPanel name={name} projects={sorted} now={now()} />}
         </Show>
       </div>
-      <Dialog open={creating()} onClose={() => setCreating(false)} title={t("web.project.add")}>
+      <Dialog open={creating()} onClose={() => setCreating(false)} title={t("web.project.add")} testid="new-project-dialog">
         <NewProjectForm
           onDone={(made) => {
             setCreating(false);
@@ -132,7 +134,7 @@ function ProjectPanel(props: { name: string; projects: () => ProjectSummary[]; n
   const project = createMemo<ProjectSummary | undefined>((last) => props.projects().find((p) => p.name === props.name) ?? last);
   const island = () => islands().find((i) => i.project === props.name);
   return (
-    <div class="flex max-w-4xl flex-col gap-3 md:overflow-y-auto">
+    <div data-testid="project" data-key={props.name} class="flex max-w-4xl flex-col gap-3 md:overflow-y-auto">
       <Show when={island()}>{(i) => <IslandDetail island={i()} />}</Show>
       <Show when={project()}>{(p) => <Details project={p()} now={props.now} />}</Show>
     </div>
@@ -521,6 +523,7 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
       <div>
         <Segmented
           label={t("web.project.how")}
+          testid="project-how"
           value={importing()}
           options={[
             { value: "new", label: t("web.project.fresh"), disabled: busy() },
@@ -536,6 +539,7 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
         <Field label={t("web.project.githubAddress")} hint={t("web.project.githubHint")}>
           <TextInput
             ref={autofocus()}
+            data-testid="project-github"
             aria-label={t("web.project.githubAddress")}
             disabled={busy()}
             placeholder="https://github.com/botiverse/raft-source"
@@ -551,6 +555,7 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
       </Show>
       <Field label={t("web.project.name")} hint={t("web.project.nameHint")}>
         <TextInput
+          data-testid="project-name"
           aria-label={t("web.project.name")}
           disabled={busy()}
           placeholder={t("web.project.nameExample")}
@@ -571,10 +576,10 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
         <p class="text-sm text-muted">{importing() === "github" ? t("web.project.downloading") : t("web.project.making")}</p>
       </Show>
       <div class="flex justify-end gap-2 pt-2">
-        <Button disabled={busy()} onClick={() => props.onDone()}>
+        <Button disabled={busy()} data-testid="cancel" onClick={() => props.onDone()}>
           {t("web.project.cancel")}
         </Button>
-        <Button type="submit" tone="primary" disabled={!canSubmit()}>
+        <Button type="submit" tone="primary" data-testid="submit" disabled={!canSubmit()}>
           {busy() ? t("web.project.busy") : importing() === "github" ? t("web.project.download") : t("web.project.create")}
         </Button>
       </div>

@@ -171,6 +171,7 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
       <div class="flex items-center gap-3 pb-2">
         <div class="min-w-0 flex-1">{props.head}</div>
         <TextInput
+          data-testid="trajectory-search"
           aria-label={t("web.session.trajectory.search")}
           placeholder={t("web.session.trajectory.searchHint")}
           class="w-36 sm:w-56"
@@ -187,7 +188,14 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
           atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
         }}
       >
-        <Show when={rows().length > 0} fallback={<p class="pt-2 text-sm text-muted">{t("web.session.trajectory.noMatch")}</p>}>
+        <Show
+          when={rows().length > 0}
+          fallback={
+            <p data-testid="steps-empty" class="pt-2 text-sm text-muted">
+              {t("web.session.trajectory.noMatch")}
+            </p>
+          }
+        >
           <For each={rows()} keyed={(r) => r.step.seq}>
             {(r) => {
               // The key, the same for the row's life; a ref reading the item's accessor while the row is made suspends it.
@@ -234,7 +242,12 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
   const failed = () => (tool() && step().ok === false) || step().type === "run/error";
   const sub = () => step().under !== undefined;
   return (
-    <div ref={(el) => props.refTo(el)} class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}>
+    <div
+      ref={(el) => props.refTo(el)}
+      data-testid="step"
+      data-type={step().type}
+      class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}
+    >
       <button
         type="button"
         aria-label={`${props.spec.tag} ${oneLine(step().text)}`}
@@ -416,11 +429,12 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
     }
   };
   return (
-    <div class="group relative">
+    <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} class="group relative">
       {props.children}
       <Show when={!props.file && !writing()}>
         <button
           type="button"
+          data-testid="mark-wrong"
           onClick={() => setWriting(true)}
           class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
         >
@@ -444,6 +458,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
         >
           <TextInput
             ref={autofocus()}
+            data-testid="mark-want"
             aria-label={t("web.session.trajectory.want")}
             disabled={busy()}
             placeholder={t("web.session.trajectory.wantHint")}
@@ -452,6 +467,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
           />
           <button
             type="submit"
+            data-testid="mark-submit"
             disabled={busy() || !want().trim()}
             class="h-7 shrink-0 cursor-pointer rounded-md bg-accent px-2.5 text-sm text-page disabled:opacity-50"
           >

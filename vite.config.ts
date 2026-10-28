@@ -233,6 +233,12 @@ export default defineConfig({
         rules: { "vibevalley/no-hex-color": "error", "vibevalley/design-tokens": "error" },
       },
       {
+        // Page tests find elements by data-testid and state attributes, not by the interface's words
+        // (scripts/oxlint-plugin.ts, no-copy-selector; docs/subsystems/foundation.md).
+        files: ["apps/web/test/**", "apps/desktop/test/**"],
+        rules: { "vibevalley/no-copy-selector": "error" },
+      },
+      {
         // The page's layers and its features' indexes (scripts/oxlint-plugin.ts, page-layers).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/page-layers": "error" },

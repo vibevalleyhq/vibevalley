@@ -28,7 +28,7 @@ export function Menu() {
   };
   return (
     <div class="flex flex-col gap-2">
-      <PxButton tone="primary" onClick={close}>
+      <PxButton tone="primary" data-testid="menu-resume" onClick={close}>
         {t("web.farm.menu.resume")}
       </PxButton>
       <PxButton
