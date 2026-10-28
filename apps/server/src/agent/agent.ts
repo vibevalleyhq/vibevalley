@@ -149,7 +149,6 @@ export const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
-  /** The profiles work is sent to: the workers. */
   const sendable = () => all().filter((a) => a.role === "worker");
 
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it

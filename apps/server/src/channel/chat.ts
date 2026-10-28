@@ -344,8 +344,7 @@ export interface ChannelShape {
   readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** The orchestrator's words, one whole message each: it shows once said in full. */
-  /** from: the orchestrator's profile id. */
+  /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
   readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
   readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
