@@ -169,3 +169,16 @@ test("the chat page as it looks", async ({ page, api }) => {
   await settled(page);
   await page.screenshot({ path: test.info().outputPath("chat-narrow.png") });
 });
+
+test("scrolled up from the newest, a pill leads back down", async ({ page, api }) => {
+  const id = await newChannel(api, "长聊");
+  for (let i = 0; i < 40; i++) await api.channel.message.send({ id, text: `第 ${i} 句` });
+  await page.goto(`/chat/${id}`);
+  const log = page.getByRole("log", { name: "消息" });
+  await expect(log.getByText("第 39 句")).toBeVisible();
+  await expect(page.getByRole("button", { name: "回到最新" })).toHaveCount(0);
+  await log.evaluate((el) => el.scrollTo({ top: -2000 }));
+  await page.getByRole("button", { name: "回到最新" }).click();
+  await expect(log.getByText("第 39 句")).toBeInViewport();
+  await expect(page.getByRole("button", { name: "回到最新" })).toHaveCount(0);
+});

@@ -91,7 +91,9 @@
     "inThread": "in {address}",
     "file": "File · {size}",
     "reactedBy": "{names} reacted with {emoji}",
-    "linked": "Go to message {number} in {where}"
+    "linked": "Go to message {number} in {where}",
+    "newBelow": "{n} new below",
+    "toLatest": "Back to the newest"
   },
   "tools": {
     "label": "What this message offers",

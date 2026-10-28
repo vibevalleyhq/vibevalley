@@ -1534,6 +1534,8 @@ export const catalogs = {
         file: "文件 · {size}",
         reactedBy: "{names} 回应了 {emoji}",
         linked: "跳到 {where} 的第 {number} 条",
+        newBelow: "有 {n} 条新消息",
+        toLatest: "回到最新",
       },
       tools: {
         label: "这条消息能做的",
@@ -5049,6 +5051,8 @@ export const catalogs = {
         file: "File · {size}",
         reactedBy: "{names} reacted with {emoji}",
         linked: "Go to message {number} in {where}",
+        newBelow: "{n} new below",
+        toLatest: "Back to the newest",
       },
       tools: {
         label: "What this message offers",
@@ -8639,6 +8643,7 @@ export interface Messages {
   "web.channel.messages.inThread": { readonly address: string | number };
   "web.channel.messages.label": undefined;
   "web.channel.messages.linked": { readonly number: string | number; readonly where: string | number };
+  "web.channel.messages.newBelow": { readonly n: string | number };
   "web.channel.messages.newMessages": undefined;
   "web.channel.messages.notFound": undefined;
   "web.channel.messages.older": undefined;
@@ -8650,6 +8655,7 @@ export interface Messages {
   "web.channel.messages.spent": { readonly spent: string | number };
   "web.channel.messages.start": undefined;
   "web.channel.messages.thinking": undefined;
+  "web.channel.messages.toLatest": undefined;
   "web.channel.messages.typing": undefined;
   "web.channel.messages.unfoldDispatch": undefined;
   "web.channel.messages.unread": { readonly n: string | number };

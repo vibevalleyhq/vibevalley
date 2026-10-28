@@ -167,7 +167,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   return (
     <div class="flex flex-col items-start">
       <div
-        class={["w-full overflow-hidden", { "text-base whitespace-pre-wrap": !props.markdown }]}
+        class={["w-full overflow-hidden", { "text-base whitespace-pre-wrap": !props.markdown, "fold-fade": clamp() }]}
         style={clamp() ? { "max-height": `${props.lines * 22}px` } : undefined}
       >
         {props.markdown ? <Markdown text={props.text} /> : props.text}

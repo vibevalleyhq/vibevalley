@@ -91,7 +91,9 @@
     "inThread": "在 {address}",
     "file": "文件 · {size}",
     "reactedBy": "{names} 回应了 {emoji}",
-    "linked": "跳到 {where} 的第 {number} 条"
+    "linked": "跳到 {where} 的第 {number} 条",
+    "newBelow": "有 {n} 条新消息",
+    "toLatest": "回到最新"
   },
   "tools": {
     "label": "这条消息能做的",
