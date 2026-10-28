@@ -41,6 +41,11 @@ export function t<K extends MessageKey>(key: K, ...args: MessageArgs<K>): string
   return args[0] ? format(text, args[0]) : text;
 }
 
+/** The message for a key built from a value that may not name one (a mention, a failure's kind), or undefined. */
+export function maybe(key: string): string | undefined {
+  return table(currentLocale()).get(key) ?? table("zh").get(key);
+}
+
 const separator: Record<Locale, string> = { zh: "、", en: ", " };
 
 /** Items as the language lists them in a sentence. */

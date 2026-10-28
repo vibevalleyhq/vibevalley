@@ -1,8 +1,7 @@
-import { t } from "@vibevalley/i18n";
+import { maybe, t } from "@vibevalley/i18n";
 // Who hears a message and how it is put to them: the chat's rules, held to their
 // recorded cases (rules.test.ts).
 
-import { channelWording } from "./words.ts";
 import { type Channel, everyone, defaultOrchestrator, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 // The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English. The
@@ -17,7 +16,7 @@ const chatNamed: Readonly<Record<string, string>> = {
 };
 
 /** How a mention of who is not a helper is written, in the owner's words. */
-export const mentionOf = (id: string): string | undefined => channelWording().mention[id];
+export const mentionOf = (id: string): string | undefined => maybe(`server.channel.mention.${id}`);
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;

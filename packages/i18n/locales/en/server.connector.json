@@ -14,7 +14,6 @@
   "unreadSecrets": "The saved login cannot be read: disconnect and connect again",
   "expired": "The login expired: try again in an hour, or disconnect and connect again.",
   "paired": "Paired: what you say here from now on is what you say in the default channel.",
-  "inboundMismatch": "The inbound record's id does not match",
   "stopped": "receiving stopped",
   "switched": "the account changed",
   "disconnected": "disconnected",
@@ -23,9 +22,10 @@
   "line": {
     "orchestrator": "Manager",
     "dispatch": "sent",
-    "thread": "in a ticket's thread"
+    "thread": "in a ticket's thread",
+    "head": "[{who}]",
+    "headWhat": "[{who} · {what}]"
   },
-  "pairWord": "pair",
   "feishu": {
     "register": "Feishu registration: {why}",
     "registerTimeout": "Feishu registration: timed out",
@@ -60,5 +60,6 @@
     "taken": "This WeChat is already connected: delete it in WeChat first, or scan with another WeChat.",
     "incomplete": "WeChat confirmed, but did not give the whole login: try again.",
     "tooLong": "Not scanned in time: the QR code expired."
-  }
+  },
+  "digest": "{n} messages while you were away:\n{lines}\n\nThe whole of them is in the default channel."
 }

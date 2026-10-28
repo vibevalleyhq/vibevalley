@@ -1,7 +1,6 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // A task graph's rules. Texts are measured as JavaScript does.
 
-import { taskWording } from "./words.ts";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "../base/dag.ts";
 
@@ -67,7 +66,7 @@ export function graphProblems(tasks: readonly Task[] | null | undefined): string
         problems.push(t("server.task.problem.missing", { id: p.id, other: p.other }));
         break;
       case "circle":
-        if (problems.length === 0) problems.push(taskWording().problem.circle(p.circle));
+        if (problems.length === 0) problems.push(t("server.task.problem.circle", { ids: list(p.circle) }));
         break;
       case "duplicate":
         // Said above, in the step's own place.

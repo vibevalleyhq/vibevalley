@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // A session's events read as facts and journal steps. Pure: it reads the session as
 // the core state has it and the session's own bookkeeping, and changes nothing.
 
-import { sessionWording } from "./words.ts";
 import { relative } from "node:path";
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
@@ -175,7 +174,12 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       doing("speaking_text", "");
       break;
     case "retry": {
-      const text = sessionWording().log.retry(event.attempt, event.maxAttempts, event.delayMs, event.reason ? clip(event.reason, 160) : "");
+      const text =
+        (event.maxAttempts
+          ? t("server.session.log.retryOf", { attempt: event.attempt, of: event.maxAttempts })
+          : t("server.session.log.retry", { attempt: event.attempt })) +
+        (event.delayMs ? t("server.session.log.retryIn", { s: Math.ceil(event.delayMs / 1000) }) : "") +
+        (event.reason ? t("server.session.log.retryWhy", { reason: clip(event.reason, 160) }) : "");
       journal.push({ type: "note", kind: "llm/retry", text });
       facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts ? { of: event.maxAttempts } : {}) });
       break;
@@ -208,7 +212,10 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       break;
     case "exited":
       if (session && isBusy(session)) {
-        const why = sessionWording().log.exited(ctx.runtime, event.code);
+        const why =
+          event.code !== null && event.code !== undefined
+            ? t("server.session.log.exitedCode", { runtime: ctx.runtime, code: event.code })
+            : t("server.session.log.exited", { runtime: ctx.runtime });
         facts.push({ type: "report", id, outcome: "failed", summary: why, runs: session.runs });
         warn = t("server.session.log.exitedNotice", { name: session.name, why });
       }

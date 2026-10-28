@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
 import { currentLocale, setLocale } from "@vibevalley/protocol/words";
-import { followSavedLocale } from "./words";
+import { followSavedLocale } from "./locale";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";

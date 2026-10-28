@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
-import { connectorWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
@@ -27,11 +27,16 @@ export function plainText(markdown: string): string {
 
 /** The owner sees one chat, the farm has many threads. */
 export function ownerLine(m: ChatMessage, where: Channel | undefined): string {
-  const w = connectorWording().line;
-  const who = m.fromKind === "orchestrator" ? w.orchestrator : m.name;
+  const who = m.fromKind === "orchestrator" ? t("server.connector.line.orchestrator") : m.name;
   const what =
-    m.kind === "report" ? wording().outcome[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? w.dispatch : where?.type === "thread" ? w.thread : "";
-  return w.head(who, what) + "\n" + plainText(m.text);
+    m.kind === "report"
+      ? wording().outcome[m.outcome ?? "interrupted"]
+      : m.kind === "dispatch"
+        ? t("server.connector.line.dispatch")
+        : where?.type === "thread"
+          ? t("server.connector.line.thread")
+          : "";
+  return (what ? t("server.connector.line.headWhat", { who, what }) : t("server.connector.line.head", { who })) + "\n" + plainText(m.text);
 }
 
 export function splitText(text: string, max: number): string[] {
@@ -54,7 +59,7 @@ export function flushText(lines: readonly string[]): string[] {
     const [head = "", body = ""] = l.split("\n", 2);
     return head + " " + slice(body, 0, 60) + (body.length > 60 ? "…" : "");
   });
-  return [connectorWording().digest(lines.length, firstLines)];
+  return [t("server.connector.digest", { n: lines.length, lines: firstLines.join("\n") })];
 }
 
 /** Spaces and the pairing word in front (配对, or pair) allowed, whatever the locale. */

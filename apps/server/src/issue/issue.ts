@@ -1,7 +1,6 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 import { needsOwner, talkJob } from "./prompts.ts";
 import { commandOf } from "@vibevalley/protocol/api";
-import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import {
   type Agent,
@@ -192,24 +191,25 @@ const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | 
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
 export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
-  const w = issueWording().job;
-  const how = handedOver ? w.handedOver(last.name, last.id) : w.reopened(last.name, last.id);
-  let out = (text.trim() || w.reopenDefault) + w.how(how);
-  out += w.original(cut(issueJob(issue), askedMax));
-  if (issue.answer) out += w.answer(cut(issue.answer.conclusion, askedMax));
-  if (issue.closedAt !== undefined) out += w.closed(closedText(issue));
-  if (last.lastRun) out += w.lastRun(wording().outcome[last.lastRun.outcome], cut(last.lastRun.summary.trim(), askedMax));
-  if (previous) out += w.previous;
-  return out + w.end;
+  const how = handedOver
+    ? t("server.issue.job.handedOver", { name: last.name, id: last.id })
+    : t("server.issue.job.reopened", { name: last.name, id: last.id });
+  let out = (text.trim() || t("server.issue.job.reopenDefault")) + t("server.issue.job.how", { how });
+  out += t("server.issue.job.original", { job: cut(issueJob(issue), askedMax) });
+  if (issue.answer) out += t("server.issue.job.answer", { conclusion: cut(issue.answer.conclusion, askedMax) });
+  if (issue.closedAt !== undefined) out += t("server.issue.job.closed", { closed: closedText(issue) });
+  if (last.lastRun)
+    out += t("server.issue.job.lastRun", { outcome: wording().outcome[last.lastRun.outcome], summary: cut(last.lastRun.summary.trim(), askedMax) });
+  if (previous) out += t("server.issue.job.previous");
+  return out + t("server.issue.job.end");
 }
 
 function failedText(findings: readonly Finding[], text: string): string {
-  const w = issueWording().job;
-  let out = w.failedHead;
+  let out = t("server.issue.job.failedHead");
   let n = 0;
   for (const f of findings) if (!f.resolved) out += `\n${++n}. ${f.text}`;
   if (text) out += "\n\n" + text;
-  return out + w.failedEnd;
+  return out + t("server.issue.job.failedEnd");
 }
 
 /** A talk's session stays this long with nothing said after its round. */
@@ -298,7 +298,7 @@ export const make = (options: IssueOptions = {}) =>
       return out;
     }
 
-    const list = Effect.gen(function* () {
+    const everyIssue = Effect.gen(function* () {
       const rows = yield* db(q.listIssues());
       return rows.map((r) => issueOf(r, worked.of(r.id))).sort(issueOrder);
     });
@@ -560,7 +560,7 @@ export const make = (options: IssueOptions = {}) =>
     /** In the board's order: one that cannot go any more leaves the queue. */
     const tryQueued = trying.withPermits(1)(
       Effect.gen(function* () {
-        for (const issue of yield* list) {
+        for (const issue of yield* everyIssue) {
           if (issue.status !== "todo") continue;
           const title = cut(issue.title, 40);
           const sent = yield* Effect.result(
@@ -656,7 +656,7 @@ export const make = (options: IssueOptions = {}) =>
       db,
       inTx,
       get,
-      list,
+      list: everyIssue,
       latest,
       liveSession,
       publish,
@@ -791,7 +791,10 @@ export const make = (options: IssueOptions = {}) =>
           return [t("server.issue.does.round", { helper, said: p.said })];
         }
         case "reopen":
-          return [issueWording().does.reopen(n, p.taker?.name), ...(p.said ? [t("server.issue.does.thisTime", { said: p.said })] : [])];
+          return [
+            p.taker ? t("server.issue.does.reopenBy", { n, taker: p.taker.name }) : t("server.issue.does.reopen", { n }),
+            ...(p.said ? [t("server.issue.does.thisTime", { said: p.said })] : []),
+          ];
         case "revive":
           return [t("server.issue.does.revive", { n })];
         case "complete": {
@@ -803,9 +806,14 @@ export const make = (options: IssueOptions = {}) =>
           const out: string[] = [];
           if (changes && changes.uncommitted.length > 0)
             out.push(t("server.issue.does.commitFirst", { helper: helperName(item), files: changes.uncommitted.length }));
-          if (changes && changes.conflicts.length > 0) return [...out, issueWording().does.conflicts(changes.base, changes.conflicts)];
+          if (changes && changes.conflicts.length > 0)
+            return [...out, t("server.issue.does.conflicts", { base: changes.base, files: list(changes.conflicts) })];
           out.push(t("server.issue.does.check"));
-          out.push(pr ? t("server.issue.does.pullRequest", { commits: p.commits }) : issueWording().does.merge(changes?.base, p.commits, helperName(item)));
+          out.push(
+            pr
+              ? t("server.issue.does.pullRequest", { commits: p.commits })
+              : t("server.issue.does.merge", { base: changes?.base ?? t("server.issue.does.mainBranch"), commits: p.commits, helper: helperName(item) }),
+          );
           return out;
         }
         case "cancel":
@@ -869,7 +877,7 @@ export const make = (options: IssueOptions = {}) =>
 
     /** Where a talk with a profile that has no folder of its own looks: the project worked in last, else the first one. */
     const lastProject = Effect.gen(function* () {
-      const worked = (yield* list).filter((i) => i.project && !i.talk).sort((a, b) => b.createdAt - a.createdAt)[0]?.project;
+      const worked = (yield* everyIssue).filter((i) => i.project && !i.talk).sort((a, b) => b.createdAt - a.createdAt)[0]?.project;
       return worked ?? (yield* projects.list())[0]?.name ?? "";
     });
 
@@ -964,7 +972,9 @@ export const make = (options: IssueOptions = {}) =>
 
     /** On the board before another unsent issue, or last; only unsent issues have a place. */
     const place = Effect.fn("Issues.place")(function* (id: string, before: string) {
-      const order: string[] = (yield* list).filter((item) => item.sessions.length === 0 && !item.graph && !item.task && item.id !== id).map((item) => item.id);
+      const order: string[] = (yield* everyIssue)
+        .filter((item) => item.sessions.length === 0 && !item.graph && !item.task && item.id !== id)
+        .map((item) => item.id);
       const at = order.indexOf(before);
       order.splice(at < 0 ? order.length : at, 0, id);
       yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));
@@ -984,10 +994,10 @@ export const make = (options: IssueOptions = {}) =>
 
     const shape: IssueShape = {
       onBoard: () => core.state().issues ?? [],
-      list: () => Effect.map(list, (all) => all.filter((item) => !item.talk)),
+      list: () => Effect.map(everyIssue, (all) => all.filter((item) => !item.talk)),
       query: (f) =>
         Effect.gen(function* () {
-          const all = (yield* list).filter((item) => !item.talk);
+          const all = (yield* everyIssue).filter((item) => !item.talk);
           return pickIssues(all, f, yield* Clock.currentTimeMillis);
         }),
       get,
@@ -1182,7 +1192,7 @@ export const make = (options: IssueOptions = {}) =>
       }),
       /** A session with no record is named as missing, not given a phase. */
       history: Effect.fn("Issues.history")(function* () {
-        const all = (yield* list).filter((item) => !item.talk);
+        const all = (yield* everyIssue).filter((item) => !item.talk);
         const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
         return all.map((issue) => ({
           issue,
@@ -1193,7 +1203,7 @@ export const make = (options: IssueOptions = {}) =>
       templates: Effect.fn("Issues.templates")(function* (name) {
         const stack = yield* projects.stack(name);
         if (!stack) return yield* Effect.fail(missing(t("server.issue.projectRef", { name }), [lookIn.project]));
-        return { project: name, stack, recent: sentTitles(yield* list, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
+        return { project: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
       }),
       hire,
       ran,

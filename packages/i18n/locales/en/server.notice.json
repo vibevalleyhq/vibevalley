@@ -1,5 +1,63 @@
 {
   "orchestrator": "The manager",
   "conflictFiles": "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
-  "step": "{plan}: {step}"
+  "step": "{plan}: {step}",
+  "item": {
+    "review": {
+      "label": "For you to see",
+      "title": "{who} is done",
+      "tray": "{who} is done, for you to see"
+    },
+    "ask": {
+      "label": "A question for you",
+      "title": "{who} has a question for you"
+    },
+    "fix": {
+      "label": "It failed",
+      "title": "{who} failed",
+      "tray": "{who} failed"
+    },
+    "interrupted": {
+      "title": "{who} stopped halfway"
+    },
+    "conflict": {
+      "label": "Won't merge",
+      "title": "{who}'s work would conflict with main",
+      "tray": "{who}'s work would conflict"
+    },
+    "quiet": {
+      "label": "Quiet for a while",
+      "title": "{who} has been quiet for a while",
+      "body": "It may be running a long command, or it may be stuck: look at what it has been doing.",
+      "tray": "{who} has gone quiet"
+    },
+    "graph-draft": {
+      "label": "Plan drafted",
+      "title": "The plan \"{text}\" is drafted",
+      "body": "Look it over before it starts",
+      "tray": "The plan \"{text}\" is for you to see"
+    },
+    "graph-ready": {
+      "label": "Plan done",
+      "title": "The plan \"{text}\" is all done",
+      "body": "Look over the changes and merge them into main",
+      "tray": "The plan \"{text}\" is ready to merge into main"
+    },
+    "task-failed": {
+      "label": "Plan stuck",
+      "title": "A plan is stuck: {text}",
+      "body": "Retry, edit the ticket, or skip it",
+      "tray": "The plan \"{text}\" failed"
+    },
+    "mention": {
+      "label": "Calling you",
+      "title": "{who} is calling you"
+    },
+    "recurrence-ask": {
+      "label": "A schedule to approve",
+      "title": "The manager wants to set a schedule",
+      "body": "\"{text}\": it starts once you approve",
+      "tray": "The schedule \"{text}\" waits for your approval"
+    }
+  }
 }

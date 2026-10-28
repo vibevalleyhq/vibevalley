@@ -77,7 +77,8 @@ function generated(): string {
       for (const [n, kind] of placeholderKinds(one)) if (kinds.get(n) === undefined || kind !== "value") kinds.set(n, kind);
     // A select on true is a flag; one on other values (a month's number) takes the value.
     const flag = (n: string) => [text, ...all.map((m) => m.get(key) ?? "")].some((one) => new RegExp(`\\{${n}, select, true \\{`).test(one));
-    const typeOf = (n: string, kind: string | undefined) => (kind === "plural" ? "number" : kind === "select" && flag(n) ? "boolean" : "string | number");
+    const typeOf = (n: string, kind: string | undefined) =>
+      kind === "plural" || kind === "selectordinal" ? "number" : kind === "select" && flag(n) ? "boolean" : "string | number";
     const names = [...kinds.keys()].sort();
     lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
   }
@@ -108,8 +109,8 @@ function scan(): Use[] {
     const text = readFileSync(join(root, file), "utf8");
     if (!text.includes("t(")) continue;
     const lineOf = (i: number) => text.slice(0, i).split("\n").length;
-    for (const m of text.matchAll(/\bt\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
-    for (const m of text.matchAll(/\bt\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
+    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
+    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
   }
   return uses;
 }
@@ -136,6 +137,9 @@ function check(): string[] {
   }
   const uses = scan();
   const used = new Set(uses.filter((u) => !u.prefix).map((u) => u.key));
+  // A key may also be picked before the call (t(ok ? "a" : "b")): a literal that names one counts as using it.
+  for (const file of sources())
+    for (const m of readFileSync(join(root, file), "utf8").matchAll(/"([a-z][\w.-]*\.[\w.$/-]+)"/g)) if (zh.has(m[1]!)) used.add(m[1]!);
   const prefixes = uses.filter((u) => u.prefix).map((u) => u.key);
   for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
   for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);

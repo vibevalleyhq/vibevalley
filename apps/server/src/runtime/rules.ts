@@ -1,9 +1,8 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // What a runtime's state says about dispatching to it: whether its money is
 // gone, what is left of its quota, and what stops a profile on it. agentProblems mirrors the checks oar makes when a session
 // opens, so a profile that would be refused is shown so before it is sent.
 
-import { runtimeWording } from "./words.ts";
 import type { AccountUsage, Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, runtimeLabel } from "../agent/seed.ts";
 import { yuan } from "./money.ts";
@@ -43,23 +42,23 @@ export function quotaLeft(usage: AccountUsage | null | undefined): number | unde
 const balanceText = (currency: string, amount: number) => (currency === "CNY" ? "¥" : currency === "USD" ? "$" : currency + " ") + amount.toFixed(2);
 
 export function quotaText(usage: AccountUsage | null | undefined): string {
-  const q = runtimeWording().quota;
-  if (!usage) return q.none;
+  if (!usage) return t("server.runtime.quota.none");
   switch (usage.status) {
     case "login_required":
-      return q.signedOut;
+      return t("server.runtime.quota.signedOut");
     case "unavailable":
-      return q.unread(usage.reason);
+      return t("server.runtime.quota.unread", { why: usage.reason });
     case "balance":
-      if (usage.balances.length === 0) return q.noBalance(usage.provider);
-      return q.balance(
-        usage.provider,
-        usage.balances.map((b) => balanceText(b.currency, b.amount)),
-        !usage.available,
-      );
+      if (usage.balances.length === 0) return t("server.runtime.quota.noBalance", { provider: usage.provider });
+      return t(usage.available ? "server.runtime.quota.balance" : "server.runtime.quota.balanceLow", {
+        provider: usage.provider,
+        balances: list(usage.balances.map((b) => balanceText(b.currency, b.amount))),
+      });
     case "ok":
-      if (usage.windows.length === 0) return usage.subscription ?? q.some;
-      return q.windows(usage.windows.map((w) => ({ label: w.label, left: 100 - w.usedPercent })));
+      if (usage.windows.length === 0) return usage.subscription ?? t("server.runtime.quota.some");
+      return usage.windows
+        .map((w) => t("server.runtime.quota.window", { label: w.label, left: 100 - w.usedPercent }))
+        .join(t("server.runtime.quota.windowSeparator"));
   }
 }
 
@@ -98,7 +97,7 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
     const model = models.find((m) => (options.model ? m.id === options.model : m.isDefault));
     if (model && model.effortLevels.length > 0 && !model.effortLevels.includes(options.effort)) {
       const name = agent.model && options.model ? model.name : t("server.runtime.runtimeDefault", { runtime: runtime.id, model: model.name });
-      add("effort", "error", runtimeWording().effort(name, options.effort, model.effortLevels));
+      add("effort", "error", t("server.runtime.effort", { model: name, effort: options.effort, levels: list(model.effortLevels) }));
     }
   }
   return { ...options, problems };

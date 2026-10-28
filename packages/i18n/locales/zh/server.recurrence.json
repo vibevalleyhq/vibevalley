@@ -17,7 +17,8 @@
     "weekend": "周末 {time}",
     "monthly": "每月 {day} 号 {time}",
     "hourly": "每小时第 {minute} 分",
-    "cron": "cron {expr}"
+    "cron": "cron {expr}",
+    "weekly": "每周{days} {time}"
   },
   "next": {
     "never": "不会再到点",
@@ -51,5 +52,7 @@
   "noRecurrence": "没有 {id} 号定时",
   "noChannel": "没有 {name} 这个频道",
   "noProfile": "没有叫 {name} 的档案",
-  "noProject": "#{channel} 没有默认项目：直接派给帮工的定时要写 project"
+  "noProject": "#{channel} 没有默认项目：直接派给帮工的定时要写 project",
+  "remove": "删掉定时「{name}」：以后不再到点开工，它开过的工单留着",
+  "removeWhen": "删掉定时「{name}」（{when}）：以后不再到点开工，它开过的工单留着"
 }

@@ -1,6 +1,6 @@
+import { list, maybe, t } from "@vibevalley/i18n";
 // What one request of an in-process agent cost, in words for its log.
 
-import { sessionWording } from "./words.ts";
 import type { EventTokens } from "@vibevalley/protocol";
 
 export const tokensOf = (u: { input: number; cacheRead: number; output: number }): EventTokens => ({
@@ -15,12 +15,16 @@ export const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, 
 /** changed is a prefix_changed's parts, none when the prompt's start was as before. */
 export function usageText(tokens: EventTokens, changed: readonly string[] = []): string {
   const prompt = tokens.cacheRead + tokens.input;
-  const w = sessionWording().usage;
   let text =
     prompt > 0
-      ? w.cached(Math.trunc((tokens.cacheRead * 100) / prompt), digits(tokens.cacheRead), digits(tokens.input), digits(tokens.output))
-      : w.unread(digits(tokens.output));
+      ? t("server.session.usage.cached", {
+          percent: Math.trunc((tokens.cacheRead * 100) / prompt),
+          read: digits(tokens.cacheRead),
+          missed: digits(tokens.input),
+          output: digits(tokens.output),
+        })
+      : t("server.session.usage.unread", { output: digits(tokens.output) });
   // As the brain's prefix_changed names the parts.
-  if (changed.length > 0) text += w.changed(changed.map((n) => w.parts[n] ?? n));
+  if (changed.length > 0) text += t("server.session.usage.changed", { parts: list(changed.map((n) => maybe(`server.session.usage.parts.${n}`) ?? n)) });
   return text;
 }

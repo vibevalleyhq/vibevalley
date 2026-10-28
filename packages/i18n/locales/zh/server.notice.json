@@ -1,5 +1,63 @@
 {
   "orchestrator": "管家",
   "conflictFiles": "{files} 个文件和主分支冲突",
-  "step": "{plan}：{step}"
+  "step": "{plan}：{step}",
+  "item": {
+    "review": {
+      "label": "等你看",
+      "title": "{who} 做完了",
+      "tray": "{who} 做完了，等你看"
+    },
+    "ask": {
+      "label": "有问题问你",
+      "title": "{who} 有问题问你"
+    },
+    "fix": {
+      "label": "活没做成",
+      "title": "{who} 没做成",
+      "tray": "{who} 没做成"
+    },
+    "interrupted": {
+      "title": "{who} 停在了半路"
+    },
+    "conflict": {
+      "label": "合不进去",
+      "title": "{who} 的活合进主分支会冲突",
+      "tray": "{who} 的活会冲突"
+    },
+    "quiet": {
+      "label": "好久没动静",
+      "title": "{who} 好一阵没动静了",
+      "body": "可能在跑很久的命令，也可能卡住了：看看它的干活过程。",
+      "tray": "{who} 好一阵没动静"
+    },
+    "graph-draft": {
+      "label": "计划拆好了",
+      "title": "计划「{text}」拆好了",
+      "body": "看过再开工",
+      "tray": "计划「{text}」等你看"
+    },
+    "graph-ready": {
+      "label": "计划做完了",
+      "title": "计划「{text}」都做完了",
+      "body": "看看改动，合进主分支",
+      "tray": "计划「{text}」等你合进主分支"
+    },
+    "task-failed": {
+      "label": "计划卡住了",
+      "title": "计划卡住了：{text}",
+      "body": "重试、改工单，或者跳过",
+      "tray": "计划「{text}」没做成"
+    },
+    "mention": {
+      "label": "找你",
+      "title": "{who} 叫你"
+    },
+    "recurrence-ask": {
+      "label": "定时等你同意",
+      "title": "管家想定一个定时",
+      "body": "「{text}」：同意了才开始",
+      "tray": "定时「{text}」等你同意"
+    }
+  }
 }

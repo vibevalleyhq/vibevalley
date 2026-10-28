@@ -54,7 +54,13 @@
     "clipped": "… 省略 {n} 个字 …",
     "quiet": "已经 {span}没动静了{last}。可能在跑很久的命令，也可能卡住了",
     "quietLast": "（最后在：{label}）",
-    "restarted": "VibeValley 重启了，这一轮停在了半路"
+    "restarted": "VibeValley 重启了，这一轮停在了半路",
+    "retry": "调用模型没成功，第 {attempt} 次重试",
+    "retryOf": "调用模型没成功，第 {attempt}/{of} 次重试",
+    "retryIn": "，{s} 秒后",
+    "retryWhy": "：{reason}",
+    "exited": "{runtime} 进程退出了",
+    "exitedCode": "{runtime} 进程退出了（退出码 {code}）"
   },
   "usage": {
     "parts": {
@@ -65,7 +71,8 @@
       "tools": "工具"
     },
     "cached": "缓存命中 {percent}%：读缓存 {read}，没命中 {missed}，输出 {output}",
-    "unread": "没报读了多少：输出 {output}"
+    "unread": "没报读了多少：输出 {output}",
+    "changed": "；开头变了：{parts}"
   },
   "host": {
     "stopped": "{label}已经停下",
@@ -107,6 +114,9 @@
     "started": "{woke, select, true {{name} 醒了，开始新的一轮} other {{name} 开始新的一轮}}",
     "notReset": "{name} 的工作目录没能重置：{why}",
     "left": "{name} 收工了：{why}",
-    "stillHasHelper": "这张工单还有帮工，不能清掉工作目录"
-  }
+    "stillHasHelper": "这张工单还有帮工，不能清掉工作目录",
+    "seconds": "{n} 秒",
+    "minutes": "{n} 分钟"
+  },
+  "conflictBrief": "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。"
 }

@@ -4,7 +4,6 @@ import { currentLocale, t } from "@vibevalley/i18n";
 
 import { wording } from "@vibevalley/protocol/words";
 import { voiceOrchestratorPersona } from "./prompts.ts";
-import { settingWording } from "./words.ts";
 import {
   MemorySourceKindValues,
   type MemorySourceUpdate,
@@ -111,7 +110,7 @@ export function voiceProblem(v: SettingsUpdateVoice): string {
   for (const key of ["silenceMs", "interruptMs", "idleSeconds"] as const) {
     const n = v[key];
     const [min, max] = limits[key];
-    if (n !== undefined && (n < min || n > max)) return t("server.setting.voice.range", { label: settingWording().voice.label[key], min, max });
+    if (n !== undefined && (n < min || n > max)) return t("server.setting.voice.range", { label: t(`server.setting.voice.label.${key}`), min, max });
   }
   return "";
 }

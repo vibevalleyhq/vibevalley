@@ -19,7 +19,8 @@
     "draft": "reading the code and drafting this ticket",
     "project": "the project",
     "sent": "Sent @{id} ({name}) to {project}: {what}",
-    "redraft": "This ticket goes to @{id} ({name}) for another draft"
+    "redraft": "This ticket goes to @{id} ({name}) for another draft",
+    "handedOn": "This ticket goes to @{id} ({name}) to carry on, sent for the {nth, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} time"
   },
   "badTarget": "Unknown place: {target} (write #<channel>, such as #general, or #<channel>:<message number>)",
   "noMessage": "The channel has no message {n}",
@@ -48,5 +49,8 @@
   "deletes": "Delete message {number} in {target} ({name}: {text}); its number stays",
   "deletesDeliveries": "{n} not yet handed are no longer sent",
   "defaultIsChannel": "Only a channel can be the default, not a direct channel or a thread",
-  "noDirect": "{target}: there is no direct channel between you"
+  "noDirect": "{target}: there is no direct channel between you",
+  "noChannelNamed": "There is no channel #{name}. There are: {tags}",
+  "absent": "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
+  "fileTooBig": "The file is too big: {mb} MB at most"
 }

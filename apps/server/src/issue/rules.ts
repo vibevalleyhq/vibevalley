@@ -1,5 +1,4 @@
-import { t } from "@vibevalley/i18n";
-import { issueWording } from "./words.ts";
+import { maybe, t } from "@vibevalley/i18n";
 import { wording } from "@vibevalley/protocol/words";
 import { reportVerdict } from "../session/rules.ts";
 import type {
@@ -131,14 +130,13 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
 }
 
 export function refinementDescription(d: IssueRefinement): string {
-  const w = issueWording().draft;
   const parts: string[] = [];
   const why = d.why.trim();
-  if (why) parts.push(w.why + "\n" + why);
+  if (why) parts.push(t("server.issue.draft.why") + "\n" + why);
   for (const [head, lines] of [
-    [w.todo, kept(d.todo)],
-    [w.notDoing, kept(d.notDoing)],
-    [w.files, kept(d.files)],
+    [t("server.issue.draft.todo"), kept(d.todo)],
+    [t("server.issue.draft.notDoing"), kept(d.notDoing)],
+    [t("server.issue.draft.files"), kept(d.files)],
   ] as const)
     if (lines.length > 0) parts.push(head + "\n- " + lines.join("\n- "));
   return parts.join("\n\n");
@@ -178,7 +176,7 @@ const commandHoles = /\s?\{(test|lint|build)\}\s?/g;
 export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): IssueTemplate {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
   const done = s.done.replace(commandHoles, (hole, name: string) =>
-    commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : issueWording().template.commands[name]!,
+    commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : (maybe(`server.issue.template.commands.${name}`) ?? hole),
   );
   const text = t("server.issue.template.done", { title: s.title, done });
   const blank = firstBlank(text);
@@ -197,28 +195,26 @@ function firstBlank(text: string): TemplateBlank | undefined {
 }
 
 function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {
-  const w = issueWording().timeline;
   switch (trigger.kind) {
     case "refine":
-      return ["started", w.refine];
+      return ["started", t("server.issue.timeline.refine")];
     case "comment":
-      return ["told", w.told];
+      return ["told", t("server.issue.timeline.told")];
     case "issue":
-      return ["started", first ? w.start : w.restart];
+      return ["started", first ? t("server.issue.timeline.start") : t("server.issue.timeline.restart")];
     case "task":
-      return ["started", w.graph];
+      return ["started", t("server.issue.timeline.graph")];
     case "recurrence":
-      return ["started", w.recurrence(trigger.missed ?? false)];
+      return ["started", t("server.issue.timeline.recurrence", { missed: trigger.missed ?? false })];
     case "runtime":
-      return ["started", w.runtime];
+      return ["started", t("server.issue.timeline.runtime")];
   }
 }
 
 /** runs oldest first; names: a session's name by its id. The milestones come newest first, the questions it waits on now
  * with its last run. */
 export function milestonesOf(issue: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
-  const w = issueWording().timeline;
-  const out: Milestone[] = [{ at: issue.createdAt, kind: "opened", text: w.opened }];
+  const out: Milestone[] = [{ at: issue.createdAt, kind: "opened", text: t("server.issue.timeline.opened") }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
   runs.forEach((r, i) => {
     const who = names.get(r.session);
@@ -227,12 +223,23 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
     const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "refine"));
     out.push({ at: r.startedAt, kind, ...by, text });
     if (r.endedAt === undefined || r.outcome === undefined) return;
-    const said = r.summary ? w.said(r.summary) : "";
+    const said = r.summary ? t("server.issue.timeline.said", { summary: r.summary }) : "";
     switch (r.outcome) {
       case "completed":
         if (i === lastDone && issue.questions.length > 0)
-          out.push({ at: r.endedAt, kind: "asked", ...by, text: w.asked(issue.questions.map((a) => a.question)) });
-        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? w.refined : w.reported) + said });
+          out.push({
+            at: r.endedAt,
+            kind: "asked",
+            ...by,
+            text: t("server.issue.timeline.asked", { questions: issue.questions.map((a) => a.question).join(" / ") }),
+          });
+        else
+          out.push({
+            at: r.endedAt,
+            kind: draft ? "refined" : "reported",
+            ...by,
+            text: (draft ? t("server.issue.timeline.refined") : t("server.issue.timeline.reported")) + said,
+          });
         break;
       case "failed":
         out.push({ at: r.endedAt, kind: "failed", ...by, text: wording().outcome.failed + said });
@@ -244,8 +251,9 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
   });
   const sentBack = new Map<number, string[]>();
   for (const f of issue.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
-  for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: w.rejected(lines) });
-  if (issue.reviewedAt !== undefined) out.push({ at: issue.reviewedAt, kind: "accepted", text: w.accepted });
+  for (const [at, lines] of sentBack)
+    out.push({ at, kind: "rejected", text: t("server.issue.timeline.rejected", { lines: lines.join(t("server.issue.timeline.rejectedSeparator")) }) });
+  if (issue.reviewedAt !== undefined) out.push({ at: issue.reviewedAt, kind: "accepted", text: t("server.issue.timeline.accepted") });
   if (issue.closedAt !== undefined) out.push({ at: issue.closedAt, kind: "closed", text: closedText(issue) });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
@@ -264,11 +272,10 @@ export const resumeWords = () => t("server.issue.job.resume");
 
 /** Calling it twice gives the same job: a 接着修 told before is taken off first. */
 export function cureWords(job: string): string {
-  const w = issueWording().job;
   let original = job;
-  if (original.startsWith(w.cureHead)) original = original.slice(w.cureHead.length);
-  if (original.endsWith(w.cureTail)) original = original.slice(0, -w.cureTail.length);
-  return w.cure(original);
+  if (original.startsWith(t("server.issue.job.cureHead"))) original = original.slice(t("server.issue.job.cureHead").length);
+  if (original.endsWith(t("server.issue.job.cureTail"))) original = original.slice(0, -t("server.issue.job.cureTail").length);
+  return t("server.issue.job.cure", { job: original });
 }
 
 export const findingsOf = (text: string) =>

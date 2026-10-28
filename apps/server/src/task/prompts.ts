@@ -2,14 +2,24 @@
 // back, the orchestrator's news of a task graph and the lines it reads one by, and the refusals of the tools only models call.
 // In Chinese whatever the owner's locale: the models answer in the owner's.
 
-import type { Agent, Issue, Session, Task, TaskGraph } from "@vibevalley/protocol";
+import type { Agent, Issue, Session, Task, TaskGraph, GraphState, TaskState } from "@vibevalley/protocol";
 import { traitsOf } from "../agent/prompts.ts";
 import { slice } from "../base/text.ts";
 import { isForOrchestrator } from "../issue/state.ts";
 import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf } from "./graph.ts";
 import { acceptanceChecks, frozenOf } from "./rules.ts";
-import { taskZh } from "./words.ts";
 
+/** A plan's and a step's state as the model reads them (only in Chinese: prompts are). */
+const graphStateText: Record<GraphState, string> = {
+  splitting: "在拆",
+  draft: "等你看过再开工",
+  running: "在做",
+  paused: "暂停了",
+  ready: "都做完了，等你合进主分支",
+  done: "合进了主分支",
+  abandoned: "放弃了",
+};
+const taskStateText: Record<TaskState, string> = { waiting: "等着", working: "在做", merged: "合进去了", failed: "没做成", skipped: "跳过了" };
 export const startNeedsOwner = "计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";
 export const mergeNeedsOwner = "合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
@@ -119,12 +129,12 @@ export function graphText(graph: TaskGraph): string {
   const merged = tasks.filter(isSettled).length;
   let head = "「" + graph.title + "」（" + graph.id + "，项目 " + graph.project;
   if (graph.branch) head += "，分支 " + graph.branch;
-  head += "）：" + taskZh.graphState[graph.state];
+  head += "）：" + graphStateText[graph.state];
   if (tasks.length > 0) head += `，${merged}/${tasks.length} 步做完`;
   if (graph.note) head += "。" + graph.note;
   const lines = [head];
   for (const n of tasks) {
-    let detail = taskZh.taskState[n.state];
+    let detail = taskStateText[n.state];
     if (n.state === "waiting") {
       const waits = blockedBy(graph, n);
       if (waits.length > 0) detail = "等 " + waits.join("、");

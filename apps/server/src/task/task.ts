@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // Task graphs: a job split into steps, each worked by its own session on a branch of the graph's,
 // merged back into the graph's branch when it is verified, and the whole graph merged into the main branch once every
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
@@ -79,7 +79,6 @@ import {
   startNeedsOwner,
   taskBrief,
 } from "./prompts.ts";
-import { taskWording } from "./words.ts";
 import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, type SessionShape, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
@@ -94,12 +93,12 @@ const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schem
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
 const graphNext = (graph: TaskGraph): Next[] =>
-  graphActions(graph).map((action) => ({ say: taskWording().graphAction[action], run: commandOf("graph.act", [graph.id], { action }) }));
+  graphActions(graph).map((action) => ({ say: t(`server.task.graphAction.${action}`), run: commandOf("graph.act", [graph.id], { action }) }));
 
 /** What the step allows now, as commands. */
 const stepNext = (graph: TaskGraph, task: Task): Next[] =>
   taskActions(graph, task).map((action) => ({
-    say: t("server.task.act.stepAct", { action: taskWording().taskAction[action], title: task.title }),
+    say: t("server.task.act.stepAct", { action: t(`server.task.taskAction.${action}`), title: task.title }),
     run: commandOf("graph.task.act", [graph.id, task.id], { action }),
   }));
 
@@ -357,7 +356,7 @@ export const make = (options: TaskOptions = {}) =>
         return { frozen: changed };
       }
       const touched = frozenTouched(graph, task, changed);
-      if (touched.length > 0) return rejected(taskWording().notice.frozenTouched(touched), frozenTouchedText(touched));
+      if (touched.length > 0) return rejected(t("server.task.notice.frozenTouched", { files: list(touched) }), frozenTouchedText(touched));
       for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
         const ran = yield* projects.run(cwd, check);
         if (!ran.ok) return rejected(t("server.task.notice.checkFailed", { check }), checkFailedText(check, ran.output));
@@ -548,7 +547,7 @@ export const make = (options: TaskOptions = {}) =>
         if (why) return yield* Effect.fail(refused(why));
         const tasks = steps.map(freshTask);
         const problems = graphProblems(tasks);
-        if (problems.length > 0) return yield* Effect.fail(refused(taskWording().act.stepsWrong(problems)));
+        if (problems.length > 0) return yield* Effect.fail(refused(t("server.task.act.stepsWrong", { problems: problems.join("\n- ") })));
         let graph: TaskGraph = {
           id: issue!.id,
           title: title.trim() || issue!.title,
@@ -573,7 +572,14 @@ export const make = (options: TaskOptions = {}) =>
         const graph = yield* need(id);
         const not = () =>
           Effect.fail(
-            refused(taskWording().act.cannot(graph.title, taskWording().graphState[graph.state], taskWording().graphAction[action]), graphNext(graph)),
+            refused(
+              t("server.task.act.cannot", {
+                title: graph.title,
+                state: t(`server.task.graphState.${graph.state}`),
+                action: t(`server.task.graphAction.${action}`).toLowerCase(),
+              }),
+              graphNext(graph),
+            ),
           );
         switch (action) {
           case "start": {
@@ -611,7 +617,9 @@ export const make = (options: TaskOptions = {}) =>
             splitters.delete(graph.id);
             if (splitter) yield* dismiss(splitter);
             for (const n of graph.tasks) if (n.state === "working" && n.session) yield* dismiss(n.session);
-            return taskWording().act.abandoned(graph.title, graph.branch);
+            return graph.branch
+              ? t("server.task.act.abandonedKept", { title: graph.title, branch: graph.branch })
+              : t("server.task.act.abandoned", { title: graph.title });
           }
           case "merge": {
             if (!actsForOwner(by)) return yield* Effect.fail(refused(mergeNeedsOwner));
@@ -619,7 +627,7 @@ export const make = (options: TaskOptions = {}) =>
             const merged = yield* Effect.result(projects.mergeBranch(graph.project, graph.branch));
             if (merged._tag === "Failure") {
               const f = merged.failure;
-              const why = f.kind === "conflict" ? taskWording().act.conflict(f.base, f.files) : f.reasonText || f.message;
+              const why = f.kind === "conflict" ? t("server.task.act.conflict", { base: f.base, files: list(f.files) }) : f.reasonText || f.message;
               yield* put(withNote(graph, t("server.task.act.notMergedNote", { why })), by);
               return yield* Effect.fail(refused(t("server.task.act.notMerged", { why, branch: graph.branch })));
             }
@@ -637,7 +645,7 @@ export const make = (options: TaskOptions = {}) =>
         const task = taskOf(graph, taskId);
         if (!task) return yield* Effect.fail(missing(t("server.task.act.noStep", { id: taskId }), [lookIn.graph]));
         if (graph.state !== "running" && graph.state !== "paused")
-          return yield* Effect.fail(refused(t("server.task.act.graphIs", { state: taskWording().graphState[graph.state] }), graphNext(graph)));
+          return yield* Effect.fail(refused(t("server.task.act.graphIs", { state: t(`server.task.graphState.${graph.state}`) }), graphNext(graph)));
         switch (action) {
           case "retry": {
             if (task.state !== "failed") return yield* Effect.fail(refused(t("server.task.act.notFailed", { title: task.title }), stepNext(graph, task)));
@@ -687,7 +695,7 @@ export const make = (options: TaskOptions = {}) =>
         return {
           does: [
             t("server.task.edit.remove", { graph: graph.title, step: gone.title }),
-            ...(waiting.length > 0 ? [taskWording().edit.stopWaiting(waiting)] : []),
+            ...(waiting.length > 0 ? [t("server.task.edit.stopWaiting", { steps: list(waiting) })] : []),
           ],
         };
       }),
@@ -716,7 +724,7 @@ export const make = (options: TaskOptions = {}) =>
               ...e,
               ...(e.changes ? { changes: renderedChanges(e.changes) } : {}),
               text: graphEventText(changeOf(e), titleOf),
-              actorText: taskWording().actor[e.actor],
+              actorText: t(`server.task.actor.${e.actor}`),
             },
           ];
         });

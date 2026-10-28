@@ -6,5 +6,7 @@
   "noAddress": "The server gave no ready address within {seconds} seconds",
   "failed": "The server failed to start: {why}",
   "exited": "The server exited ({code})",
-  "waiting": "{n} for you"
+  "waiting": "{n} for you",
+  "working": "{n} working",
+  "idle": "idle"
 }

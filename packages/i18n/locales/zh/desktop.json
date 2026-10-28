@@ -6,5 +6,7 @@
   "noAddress": "服务端 {seconds} 秒内没有发布就绪地址",
   "failed": "服务端启动失败：{why}",
   "exited": "服务端退出了（{code}）",
-  "waiting": "{n} 等你"
+  "waiting": "{n} 等你",
+  "working": "{n} 在干",
+  "idle": "没在干"
 }

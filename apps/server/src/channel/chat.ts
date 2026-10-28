@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // The chat: the channels, the default one among them, the owner's direct channel with the orchestrator, and a thread
 // under any message of a channel; every
 // session's work is talked about in its issue's thread. Every message is written to the database first, in one
@@ -7,7 +7,6 @@ import { t } from "@vibevalley/i18n";
 // than lost. Everything that changes the chat runs one at a time.
 
 import { busyNotice, wakeInput } from "./prompts.ts";
-import { channelWording } from "./words.ts";
 import {
   type Chat,
   type ChatMessage,
@@ -1131,13 +1130,12 @@ export const make = Effect.gen(function* () {
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ channel_id: channel }))).n ?? 0;
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
-    const d = channelWording().dispatch;
     const what = h.graph?.task
-      ? d.step(h.graph.id, h.graph.task)
+      ? t("server.channel.dispatch.step", { graph: h.graph.id, task: h.graph.task })
       : h.graph
-        ? d.split(h.graph.id)
+        ? t("server.channel.dispatch.split", { graph: h.graph.id })
         : h.refining
-          ? d.draft
+          ? t("server.channel.dispatch.draft")
           : head(h.brief.replace(/\s+/g, " "), 80);
     // The dispatch note is the farm's, under the name of the orchestrator that looks after the channel.
     const by = orchestratorOfRow(model.channel(channel));
@@ -1146,7 +1144,7 @@ export const make = Effect.gen(function* () {
       channel: channel,
       from: by,
       kind: "dispatch",
-      text: d.sent(h.id, h.name, h.project ?? d.project, what),
+      text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, project: h.project ?? t("server.channel.dispatch.project"), what }),
       meta: { session: h.id },
       thread: job,
     });
@@ -1166,7 +1164,9 @@ export const make = Effect.gen(function* () {
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ channel_id: thread }))).n ?? 0) + 2;
-    const text = h.refining ? t("server.channel.dispatch.redraft", { id: h.id, name: h.name }) : channelWording().dispatch.handedOn(h.id, h.name, nth);
+    const text = h.refining
+      ? t("server.channel.dispatch.redraft", { id: h.id, name: h.name })
+      : t("server.channel.dispatch.handedOn", { id: h.id, name: h.name, nth });
     const by = orchestratorOfRow(model.channel(thread));
     yield* seat(by);
     yield* write({ channel: thread, from: by, kind: "dispatch", text, meta: { session: h.id }, follow: h.id });
@@ -1264,7 +1264,7 @@ export const make = Effect.gen(function* () {
     const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
     if (name) {
       const found = model.channelByName(name);
-      if (!found) return yield* Effect.fail(missing(channelWording().noChannelNamed(name, channelTags()), [lookIn.channel]));
+      if (!found) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]));
       channel = found.id;
     }
     if (parsed.kind === "channel") return channel;
@@ -1418,7 +1418,8 @@ export const make = Effect.gen(function* () {
             ...(files.length > 0 ? { meta: { attachments: files } } : {}),
           });
           if (written.again) return { message: toMessage(written.row), again: true };
-          if (written.absent.length > 0) yield* core.notice("warn", channelWording().absent(written.absent.map((m) => mentionOf(m) ?? "@" + m)));
+          if (written.absent.length > 0)
+            yield* core.notice("warn", t("server.channel.absent", { who: list(written.absent.map((m) => mentionOf(m) ?? "@" + m)), n: written.absent.length }));
           return { message: toMessage(written.row), again: false };
         }),
       ),
@@ -1500,7 +1501,7 @@ export const make = Effect.gen(function* () {
         let scope = channel ?? "";
         if (q.in) {
           const named = model.channelByName(q.in);
-          if (!named) return yield* Effect.fail(missing(channelWording().noChannelNamed(q.in, channelTags()), [lookIn.channel]));
+          if (!named) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name: q.in, tags: list(channelTags()) }), [lookIn.channel]));
           scope = named.id;
         }
         const rows = yield* db(
@@ -1527,7 +1528,7 @@ export const make = Effect.gen(function* () {
         const name = upload.name.trim() || "file";
         const bytes = Buffer.from(upload.data, "base64");
         if (bytes.length === 0) return yield* Effect.fail(refused(t("server.channel.emptyFile")));
-        if (bytes.length > attachmentMax) return yield* Effect.fail(refused(channelWording().fileTooBig(attachmentMax)));
+        if (bytes.length > attachmentMax) return yield* Effect.fail(refused(t("server.channel.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) })));
         const id = createHash("sha256").update(bytes).digest("hex");
         yield* Effect.tryPromise(async () => {
           await mkdir(filesDir, { recursive: true });

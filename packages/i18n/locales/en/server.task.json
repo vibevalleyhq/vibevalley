@@ -66,7 +66,14 @@
     "taskRemoved": "Removed the step \"{title}\"",
     "step": "\"{title}\"",
     "by": " ({session})",
-    "why": ": {detail}"
+    "why": ": {detail}",
+    "drafted": "Split, waiting for you",
+    "draftedSteps": "Split into {steps} steps, waiting for you",
+    "started": "Started",
+    "startedOn": "Started on branch {branch}",
+    "taskMerged": "{step} merged into the plan's branch{why}",
+    "taskMergedCommits": "{step} merged into the plan's branch ({commits}){why}",
+    "taskEdited": "Changed {step}'s {fields}"
   },
   "problem": {
     "empty": "The plan has no steps",
@@ -76,7 +83,8 @@
     "noBrief": "\"{id}\" has no ticket",
     "noCheck": "The acceptance step \"{id}\" has no check command: the command is the acceptance",
     "self": "\"{id}\" cannot wait for itself",
-    "missing": "\"{id}\" waits for \"{other}\", which does not exist"
+    "missing": "\"{id}\" waits for \"{other}\", which does not exist",
+    "circle": "These steps wait for each other in a circle: {ids}"
   },
   "parse": {
     "object": "must be an object",
@@ -94,7 +102,8 @@
     "graphSettled": "The plan is {state}; no steps can be added now",
     "noStep": "The plan has no step \"{id}\"",
     "cannotRemove": "\"{title}\" is {state} and cannot be removed: you can skip it",
-    "remove": "Remove the step \"{step}\" from the plan \"{graph}\""
+    "remove": "Remove the step \"{step}\" from the plan \"{graph}\"",
+    "stopWaiting": "{steps} no longer wait for it"
   },
   "noGraph": "There is no plan {id}",
   "notSaved": "The plan \"{title}\" could not be saved: {why}",
@@ -121,7 +130,8 @@
     "restarted": "VibeValley restarted and the plan is paused; resume to carry on",
     "split": "{name} split the ticket \"{title}\" into {n} sub-tickets and started them",
     "splitBy": "split by {name}",
-    "splitNotSaved": "The plan's branch {branch} was made, but the split tickets could not be saved: {why}"
+    "splitNotSaved": "The plan's branch {branch} was made, but the split tickets could not be saved: {why}",
+    "frozenTouched": "it changed the frozen acceptance: {files}"
   },
   "act": {
     "noGoal": "Nothing was said to do",
@@ -153,6 +163,11 @@
     "stepAct": "{action} \"{title}\"",
     "edited": "Changed",
     "notStarted": "The plan \"{title}\" has not started and has no branch",
-    "branchGone": "The plan \"{title}\"'s branch is gone: check whether it was deleted"
+    "branchGone": "The plan \"{title}\"'s branch is gone: check whether it was deleted",
+    "stepsWrong": "The steps have problems; fix them and split again:\n- {problems}",
+    "cannot": "The plan \"{title}\" is {state}: it cannot {action}",
+    "abandoned": "The plan \"{title}\" is abandoned",
+    "abandonedKept": "The plan \"{title}\" is abandoned, the branch {branch} is kept",
+    "conflict": "Merging into {base} would conflict ({files}): {base} changed meanwhile"
   }
 }

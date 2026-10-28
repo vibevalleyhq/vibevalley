@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
 
-import { desktopWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -61,7 +60,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
   return {
     working,
     waiting,
-    strip: { working: desktopWording().working(working), waiting: t("desktop.waiting", { n: waiting }) },
+    strip: { working: working > 0 ? t("desktop.working", { n: working }) : t("desktop.idle"), waiting: t("desktop.waiting", { n: waiting }) },
     rows: rows.map(({ first: _, ...row }) => row),
   };
 }

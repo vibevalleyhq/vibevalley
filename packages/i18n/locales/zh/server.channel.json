@@ -19,7 +19,8 @@
     "draft": "看代码，起草这张工单",
     "project": "项目",
     "sent": "派 @{id}（{name}）去 {project}：{what}",
-    "redraft": "这张工单交给 @{id}（{name}）再起草一版"
+    "redraft": "这张工单交给 @{id}（{name}）再起草一版",
+    "handedOn": "这张工单交给 @{id}（{name}）接着做，第 {nth} 次派活"
   },
   "badTarget": "不认识这个地方：{target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）",
   "noMessage": "频道里没有 {n} 这条消息",
@@ -48,5 +49,8 @@
   "deletes": "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
   "deletesDeliveries": "还没交出去的 {n} 份不再送",
   "defaultIsChannel": "默认频道只能是一个频道，不能是私聊或串",
-  "noDirect": "{target}：你和对方之间没有私聊"
+  "noDirect": "{target}：你和对方之间没有私聊",
+  "noChannelNamed": "没有叫 #{name} 的频道。有：{tags}",
+  "absent": "{who} 不在场，没送到",
+  "fileTooBig": "文件太大了：至多 {mb} MB"
 }

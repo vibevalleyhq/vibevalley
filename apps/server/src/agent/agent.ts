@@ -1,9 +1,8 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
-import { agentWording } from "./words.ts";
 import { join } from "node:path";
 import {
   type Agent,
@@ -285,7 +284,10 @@ export const make = Effect.gen(function* () {
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
         return {
-          does: [t("server.agent.deleteSkill", { name: k.name }), ...(holders.length > 0 ? [agentWording().unequip(holders)] : [])],
+          does: [
+            t("server.agent.deleteSkill", { name: k.name }),
+            ...(holders.length > 0 ? [t("server.agent.unequip", { holders: list(holders.map((name) => t("server.agent.quoted", { name }))) })] : []),
+          ],
         };
       }),
     saveSettings: (runtime, settings) =>
@@ -331,7 +333,14 @@ export const make = Effect.gen(function* () {
           catch: (e) => refused(t("server.agent.notSaved", { file: id, why: e instanceof Error ? e.message : String(e) })),
         }),
       ),
-    previewDeleteTemplate: (id) => Effect.map(deletableTemplate(id), (item) => ({ does: [agentWording().template.delete(item.name, item.installed.length)] })),
+    previewDeleteTemplate: (id) =>
+      Effect.map(deletableTemplate(id), (item) => ({
+        does: [
+          item.installed.length > 0
+            ? t("server.agent.template.deleteKept", { name: item.name, installed: item.installed.length })
+            : t("server.agent.template.delete", { name: item.name }),
+        ],
+      })),
   };
   return shape;
 });

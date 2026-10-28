@@ -9,7 +9,11 @@
     "signedOut": "not signed in",
     "unread": "the quota cannot be read ({why})",
     "noBalance": "{provider}'s balance cannot be read",
-    "some": "has quota"
+    "some": "has quota",
+    "balance": "{provider} balance {balances}",
+    "balanceLow": "{provider} balance {balances}, not enough",
+    "window": "{label} {left}% left",
+    "windowSeparator": ", "
   },
   "lessThanCent": "less than ¥0.01",
   "persona": "{refused}. Change the persona to go at the start of the ticket.",
@@ -28,5 +32,6 @@
   "defaultModel": "{runtime} has no model {model}; {name} uses the default for now",
   "piNoBalance": "{provider} reports no balance",
   "piNoModel": "pi has no default model set",
-  "piUnread": "The DeepSeek balance could not be read"
+  "piUnread": "The DeepSeek balance could not be read",
+  "effort": "{model} has no {effort} effort; it has: {levels}"
 }

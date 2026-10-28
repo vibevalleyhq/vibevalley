@@ -66,7 +66,14 @@
     "taskRemoved": "删了一步「{title}」",
     "step": "「{title}」",
     "by": "（{session}）",
-    "why": "：{detail}"
+    "why": "：{detail}",
+    "drafted": "拆好了，等主人看",
+    "draftedSteps": "拆好了，{steps} 步，等主人看",
+    "started": "开工了",
+    "startedOn": "开工了，分支 {branch}",
+    "taskMerged": "{step}合进了计划分支{why}",
+    "taskMergedCommits": "{step}合进了计划分支（{commits}）{why}",
+    "taskEdited": "改了{step}的{fields}"
   },
   "problem": {
     "empty": "计划里一步都没有",
@@ -76,7 +83,8 @@
     "noBrief": "「{id}」没有工单",
     "noCheck": "验收步骤「{id}」没有检查命令：验收就是这条命令",
     "self": "「{id}」不能等自己",
-    "missing": "「{id}」要等的「{other}」不存在"
+    "missing": "「{id}」要等的「{other}」不存在",
+    "circle": "这几步互相等，成了一个圈：{ids}"
   },
   "parse": {
     "object": "要一个对象",
@@ -94,7 +102,8 @@
     "graphSettled": "计划{state}，不能加步骤了",
     "noStep": "计划里没有「{id}」这一步",
     "cannotRemove": "「{title}」{state}，不能删了：可以跳过它",
-    "remove": "从计划「{graph}」删掉「{step}」这一步"
+    "remove": "从计划「{graph}」删掉「{step}」这一步",
+    "stopWaiting": "{steps}不再等它"
   },
   "noGraph": "没有 {id} 这个计划",
   "notSaved": "计划「{title}」没能保存：{why}",
@@ -121,7 +130,8 @@
     "restarted": "VibeValley 重启过，计划先暂停了；点继续接着做",
     "split": "{name} 把工单「{title}」拆成了 {n} 张子工单，开工了",
     "splitBy": "{name} 拆的",
-    "splitNotSaved": "计划分支 {branch} 已创建，但拆好的工单没能保存：{why}"
+    "splitNotSaved": "计划分支 {branch} 已创建，但拆好的工单没能保存：{why}",
+    "frozenTouched": "改了冻结的验收：{files}"
   },
   "act": {
     "noGoal": "没说要做什么",
@@ -153,6 +163,11 @@
     "stepAct": "{action}「{title}」",
     "edited": "改好了",
     "notStarted": "计划「{title}」还没开工，没有分支",
-    "branchGone": "计划「{title}」的分支不在了：先确认它是不是被删掉了"
+    "branchGone": "计划「{title}」的分支不在了：先确认它是不是被删掉了",
+    "stepsWrong": "步骤有问题，改好再拆：\n- {problems}",
+    "cannot": "计划「{title}」{state}，不能{action}",
+    "abandoned": "计划「{title}」放弃了",
+    "abandonedKept": "计划「{title}」放弃了，分支 {branch} 留着",
+    "conflict": "合进 {base} 会冲突（{files}）：{base} 在这期间变了"
   }
 }

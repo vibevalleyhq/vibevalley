@@ -9,7 +9,9 @@
     "taken": "已经有叫 {id} 的模板了",
     "builtIn": "{id} 是内置的模板，删不了",
     "notFrom": "「{name}」不是从模板装的",
-    "gone": "「{name}」的模板 {template} 不在了"
+    "gone": "「{name}」的模板 {template} 不在了",
+    "delete": "删掉模板「{name}」",
+    "deleteKept": "删掉模板「{name}」：从它装的 {installed} 份档案留着"
   },
   "notSaved": "没存下来：{file} 写不进去（{why}）",
   "orchestratorStays": "默认管家删不了：每个农场至少有一个管家",
@@ -26,5 +28,9 @@
   "refused": {
     "launchArgs": "VibeValley 跑在 server 进程里，没有命令行参数",
     "serviceTier": "DeepSeek 没有服务档位"
-  }
+  },
+  "unequip": "从 {holders} 的档案里摘掉它",
+  "quoted": "「{name}」",
+  "efforts": "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
+  "effortsAnd": "、"
 }

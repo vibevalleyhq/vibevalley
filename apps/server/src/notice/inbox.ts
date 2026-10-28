@@ -4,13 +4,13 @@ import { t } from "@vibevalley/i18n";
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
 // questions in their place; a quiet one still questions.
 
-import type { Question, WorkspaceState, InboxFrom, InboxItem, Session } from "@vibevalley/protocol";
+import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
+import { wording } from "@vibevalley/protocol/words";
 import { defaultOf } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
 import { patrolBrief, patrolWho } from "./prompts.ts";
-import { noticeWording } from "./words.ts";
 
 /** channel undefined: the general channel; since undefined: from when the reader first saw it. brief is for the orchestrator, {ago} filled with how long it has waited. */
 export interface InboxEntry {
@@ -238,5 +238,73 @@ function clipLine(text: string, max = 140) {
 
 function worded(item: Omit<InboxItem, "who" | "words">): InboxItem {
   const who = item.from.kind === "session" ? item.from.name : t("server.notice.orchestrator");
-  return { ...item, who, words: noticeWording().item[item.kind](who, clipLine(item.text)) };
+  return { ...item, who, words: inboxWords(item.kind, who, clipLine(item.text)) };
+}
+
+/** What the inbox says of an item: its label, its title, its body (the item's text unless the kind has its own) and the tray's line. */
+function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
+  switch (kind) {
+    case "review":
+      return {
+        label: t("server.notice.item.review.label"),
+        title: t("server.notice.item.review.title", { who }),
+        body: text,
+        tray: t("server.notice.item.review.tray", { who }),
+      };
+    case "ask":
+      return { label: t("server.notice.item.ask.label"), title: t("server.notice.item.ask.title", { who }), body: text };
+    case "fix":
+      return {
+        label: t("server.notice.item.fix.label"),
+        title: t("server.notice.item.fix.title", { who }),
+        body: text,
+        tray: t("server.notice.item.fix.tray", { who }),
+      };
+    case "interrupted":
+      return { label: wording().stuck.interrupted, title: t("server.notice.item.interrupted.title", { who }), body: text };
+    case "conflict":
+      return {
+        label: t("server.notice.item.conflict.label"),
+        title: t("server.notice.item.conflict.title", { who }),
+        body: text,
+        tray: t("server.notice.item.conflict.tray", { who }),
+      };
+    case "quiet":
+      return {
+        label: t("server.notice.item.quiet.label"),
+        title: t("server.notice.item.quiet.title", { who }),
+        body: t("server.notice.item.quiet.body"),
+        tray: t("server.notice.item.quiet.tray", { who }),
+      };
+    case "graph-draft":
+      return {
+        label: t("server.notice.item.graph-draft.label"),
+        title: t("server.notice.item.graph-draft.title", { text }),
+        body: t("server.notice.item.graph-draft.body"),
+        tray: t("server.notice.item.graph-draft.tray", { text }),
+      };
+    case "graph-ready":
+      return {
+        label: t("server.notice.item.graph-ready.label"),
+        title: t("server.notice.item.graph-ready.title", { text }),
+        body: t("server.notice.item.graph-ready.body"),
+        tray: t("server.notice.item.graph-ready.tray", { text }),
+      };
+    case "task-failed":
+      return {
+        label: t("server.notice.item.task-failed.label"),
+        title: t("server.notice.item.task-failed.title", { text }),
+        body: t("server.notice.item.task-failed.body"),
+        tray: t("server.notice.item.task-failed.tray", { text }),
+      };
+    case "mention":
+      return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text };
+    case "recurrence-ask":
+      return {
+        label: t("server.notice.item.recurrence-ask.label"),
+        title: t("server.notice.item.recurrence-ask.title"),
+        body: t("server.notice.item.recurrence-ask.body", { text }),
+        tray: t("server.notice.item.recurrence-ask.tray", { text }),
+      };
+  }
 }

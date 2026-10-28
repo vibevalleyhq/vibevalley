@@ -54,7 +54,13 @@
     "clipped": "… {n} characters left out …",
     "quiet": "Quiet for {span}{last}. It may be running a long command, or it may be stuck",
     "quietLast": " (last: {label})",
-    "restarted": "VibeValley restarted, and this round stopped halfway"
+    "restarted": "VibeValley restarted, and this round stopped halfway",
+    "retry": "The model call failed, retry {attempt}",
+    "retryOf": "The model call failed, retry {attempt}/{of}",
+    "retryIn": " in {s} s",
+    "retryWhy": ": {reason}",
+    "exited": "{runtime} exited",
+    "exitedCode": "{runtime} exited (exit code {code})"
   },
   "usage": {
     "parts": {
@@ -65,7 +71,8 @@
       "tools": "tools"
     },
     "cached": "cache hit {percent}%: read from cache {read}, missed {missed}, output {output}",
-    "unread": "how much was read was not reported: output {output}"
+    "unread": "how much was read was not reported: output {output}",
+    "changed": "; the start changed: {parts}"
   },
   "host": {
     "stopped": "{label} has stopped",
@@ -107,6 +114,9 @@
     "started": "{woke, select, true {{name} woke up and starts a new round} other {{name} starts a new round}}",
     "notReset": "{name}'s working folder could not be reset: {why}",
     "left": "{name} has left: {why}",
-    "stillHasHelper": "This ticket still has a helper; its working folder cannot be cleared"
-  }
+    "stillHasHelper": "This ticket still has a helper; its working folder cannot be cleared",
+    "seconds": "{n} s",
+    "minutes": "{n} min"
+  },
+  "conflictBrief": "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled."
 }

@@ -11,7 +11,6 @@ import { t } from "@vibevalley/i18n";
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
 import { restartedNote, workplaceRules } from "./prompts.ts";
-import { sessionWording } from "./words.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -644,11 +643,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       if (session?.phase._tag !== "working") return;
       h.tracking = { ...h.tracking, quiet: true };
       apply({ type: "quiet", id: h.id, since: at - silentForMs });
-      const w = sessionWording();
-      const quiet = w.life.span(silentForMs);
-      const last = session.phase.doing.label ? w.log.quietLast(session.phase.doing.label) : "";
-      h.journal.note("run/error", w.log.quiet(quiet, last));
-      notice("warn", w.life.quietNotice(session.name, quiet, last));
+      const quiet =
+        silentForMs < 60_000
+          ? t("server.session.life.seconds", { n: Math.round(silentForMs / 1000) })
+          : t("server.session.life.minutes", { n: Math.round(silentForMs / 60_000) });
+      const last = session.phase.doing.label ? t("server.session.log.quietLast", { label: session.phase.doing.label }) : "";
+      h.journal.note("run/error", t("server.session.log.quiet", { span: quiet, last }));
+      notice("warn", t("server.session.life.quietNotice", { name: session.name, span: quiet, last }));
     };
 
     const release = (h: Hand) => {

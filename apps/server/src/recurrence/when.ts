@@ -1,12 +1,13 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // When a recurrence runs and how it is said. The next run is
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
-import { recurrenceWording } from "./words.ts";
 import { Cron, DateTime, Option } from "effect";
 import type { Recurrence, RecurrenceWhen } from "@vibevalley/protocol";
 
+/** A day of the week by its number, Sunday 0. */
+const weekday = (d: number) => t(`server.recurrence.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
 export const minEveryMinutes = 1;
 
 export const recurrenceTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
@@ -85,10 +86,7 @@ export function whenText(when: RecurrenceWhen, tz: string): string {
       return t("server.recurrence.when.daily", { time: when.time });
     case "weekly": {
       const days = [...new Set(when.days ?? [])].sort((a, b) => a - b);
-      return recurrenceWording().when.weekly(
-        days.map((d) => (d >= 0 && d < 7 ? recurrenceWording().weekdays[d]! : String(d))),
-        when.time,
-      );
+      return t("server.recurrence.when.weekly", { days: list(days.map((d) => (d >= 0 && d < 7 ? weekday(d) : String(d)))), time: when.time });
     }
     case "cron":
       return cronText(when.expr);
@@ -99,11 +97,10 @@ export function whenText(when: RecurrenceWhen, tz: string): string {
 export function nextText(s: Recurrence): string {
   const next = nextRun(s);
   if (next !== undefined) return clock(next, s.tz);
-  const w = recurrenceWording().next;
-  if (s.enabled) return w.never;
-  if (s.pending) return w.pending;
-  if (s.when.kind === "once" && s.lastRun !== undefined) return w.done;
-  return w.off;
+  if (s.enabled) return t("server.recurrence.next.never");
+  if (s.pending) return t("server.recurrence.next.pending");
+  if (s.when.kind === "once" && s.lastRun !== undefined) return t("server.recurrence.next.done");
+  return t("server.recurrence.next.off");
 }
 
 /** The fields as sets; the day fields are both due (and) when either starts with *, else either one is. */
@@ -116,7 +113,7 @@ interface CronSpec {
   readonly and: boolean;
 }
 
-/** The bounds of the five fields; recurrenceWording().cron.fields names them, in this order. */
+/** The bounds of the five fields; server.recurrence.cron.fields names them, in this order. */
 const cronFields = [
   { min: 0, max: 59 },
   { min: 0, max: 23 },
@@ -137,7 +134,7 @@ export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u20
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi } = cronFields[i]!;
-  const bad = t("server.recurrence.cron.badField", { name: recurrenceWording().cron.fields[i]!, field });
+  const bad = t("server.recurrence.cron.badField", { name: t(`server.recurrence.cron.fields.${i as 0 | 1 | 2 | 3 | 4}`), field });
   const bits = new Set<number>();
   for (const item of field.split(",")) {
     const slash = item.indexOf("/");
@@ -191,41 +188,37 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
 /** The common shapes in words, the rest as the expression itself. */
 export function cronText(expr: string): string {
   const f = fields(expr);
-  const w = recurrenceWording().when;
-  if (typeof parseCron(expr) === "string") return w.cron(expr);
+  if (typeof parseCron(expr) === "string") return t("server.recurrence.when.cron", { expr });
   const mi = atoi(f[0]!);
   const h = atoi(f[1]!);
   const clock = mi !== undefined && h !== undefined ? String(100 + h).slice(1) + ":" + String(100 + mi).slice(1) : "";
   if (clock !== "" && f[2] === "*" && f[3] === "*") {
     switch (f[4]) {
       case "*":
-        return w.daily(clock);
+        return t("server.recurrence.when.daily", { time: clock });
       case "1-5":
-        return w.weekdays(clock);
+        return t("server.recurrence.when.weekdays", { time: clock });
       case "0,6":
       case "6,0":
       case "6,7":
       case "6-7":
-        return w.weekend(clock);
+        return t("server.recurrence.when.weekend", { time: clock });
       case undefined:
         break;
     }
     const days: number[] = [];
     for (const d of f[4]!.split(",")) {
       const n = atoi(d);
-      if (n === undefined) return w.cron(expr);
+      if (n === undefined) return t("server.recurrence.when.cron", { expr });
       days.push(n % 7);
     }
     const sorted = [...new Set(days)].sort((a, b) => a - b);
-    return w.weekly(
-      sorted.map((d) => recurrenceWording().weekdays[d]!),
-      clock,
-    );
+    return t("server.recurrence.when.weekly", { days: list(sorted.map(weekday)), time: clock });
   }
   if (clock !== "" && f[3] === "*" && f[4] === "*") {
     const d = atoi(f[2]!);
-    return d !== undefined ? w.monthly(d, clock) : w.cron(expr);
+    return d !== undefined ? t("server.recurrence.when.monthly", { day: d, time: clock }) : t("server.recurrence.when.cron", { expr });
   }
-  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return w.hourly(mi);
-  return w.cron(expr);
+  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return t("server.recurrence.when.hourly", { minute: mi });
+  return t("server.recurrence.when.cron", { expr });
 }

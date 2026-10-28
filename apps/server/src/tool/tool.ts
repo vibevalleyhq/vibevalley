@@ -1,3 +1,4 @@
+import { maybe, t } from "@vibevalley/i18n";
 // The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
@@ -46,7 +47,6 @@ import {
   statusOf,
 } from "./prompts.ts";
 import { type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";
-import { toolWording } from "./words.ts";
 
 /** A tool's arguments as its Schema reads them. */
 type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
@@ -97,10 +97,14 @@ export function toolStart(name: string, args: unknown): ToolStart {
       break;
     }
   }
-  const w = toolWording();
-  const label = w.labels[name] ?? name;
+  const label = maybe(`server.tool.labels.${name}`) ?? name;
   if (about.length > 40) about = head(about, 40) + "…";
-  return { text: about ? w.about(label, about) : label, action: "other", tool: name, input: args === undefined || args === null ? "{}" : JSON.stringify(args) };
+  return {
+    text: about ? t("server.tool.about", { label, about }) : label,
+    action: "other",
+    tool: name,
+    input: args === undefined || args === null ? "{}" : JSON.stringify(args),
+  };
 }
 
 const spaces = /\s+/g;

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, DocOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
@@ -8,7 +9,6 @@ import { testConfig } from "../testing/layers.ts";
 import { waitFor, whenTrue } from "../testing/until.ts";
 import { make } from "./doc.ts";
 import { demoPieces } from "./demo.ts";
-import { docWording } from "./words.ts";
 import { plain } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
@@ -151,7 +151,7 @@ describe("doc", () => {
             continue;
           }
           expect(b.updatedBy).toBe(writers[section]);
-          expect(docWording().demo[section]!.paragraphs).toContain(plain(b.text));
+          expect(([0, 1, 2] as const).map((p) => t(`server.doc.demo.${section as 0 | 1 | 2}.paragraphs.${p}`))).toContain(plain(b.text));
           expect(b.rev).toBe(demoPieces + 1);
         }
         expect([section, snap.blocks.length]).toEqual([2, 1 + 3 * 4]);

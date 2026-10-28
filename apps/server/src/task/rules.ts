@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
-import { taskWording } from "./words.ts";
 import {
   type WorkspaceState,
   type GraphEvent,
@@ -169,8 +168,8 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
     return {
       ok: false,
       problem: task
-        ? t("server.task.edit.taskSettled", { title: task.title, state: taskWording().taskState[task.state] })
-        : t("server.task.edit.graphSettled", { state: taskWording().graphState[graph.state] }),
+        ? t("server.task.edit.taskSettled", { title: task.title, state: t(`server.task.taskState.${task.state}`) })
+        : t("server.task.edit.graphSettled", { state: t(`server.task.graphState.${graph.state}`) }),
     };
   const base: Task = task ?? { id, title: id, brief: "", needs: [], state: "waiting", tries: 0 };
   const agent = edit.agent !== undefined ? edit.agent.trim() : base.agent;
@@ -194,7 +193,7 @@ export function removeTask(graph: TaskGraph, id: string): EditResult {
   const task = taskOf(graph, id);
   if (!task) return { ok: false, problem: t("server.task.edit.noStep", { id }) };
   if (!canRemoveTask(graph, task))
-    return { ok: false, problem: t("server.task.edit.cannotRemove", { title: task.title, state: taskWording().taskState[task.state] }) };
+    return { ok: false, problem: t("server.task.edit.cannotRemove", { title: task.title, state: t(`server.task.taskState.${task.state}`) }) };
   return checked({ ...graph, tasks: graph.tasks.filter((n) => n.id !== id).map((n) => ({ ...n, needs: n.needs.filter((x) => x !== id) })) });
 }
 

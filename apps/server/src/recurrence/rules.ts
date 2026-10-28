@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // When a recurrence runs: what is due, whether it was missed, what a run leaves, and
 // whether a recurrence waits for the owner's yes.
 
-import { recurrenceWording } from "./words.ts";
 import type { Recurrence, RecurrenceRequest } from "@vibevalley/protocol";
 import { actsForOwner, type Actor } from "../base/actor.ts";
 import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, recurrenceTime } from "./when.ts";
@@ -33,27 +32,26 @@ export function needsOK(req: RecurrenceRequest, by: Actor): boolean {
 }
 
 export function recurrenceProblem(req: RecurrenceRequest, now: number): string {
-  const p = recurrenceWording().problem;
-  if (req.name.trim() === "") return p.noName;
-  if (req.text.trim() === "") return p.noText;
-  if (req.tz !== undefined && !givenZone(req.tz)) return p.zone(req.tz);
+  if (req.name.trim() === "") return t("server.recurrence.problem.noName");
+  if (req.text.trim() === "") return t("server.recurrence.problem.noText");
+  if (req.tz !== undefined && !givenZone(req.tz)) return t("server.recurrence.problem.zone", { tz: req.tz });
   const w = req.when;
   switch (w.kind) {
     case "once":
-      return w.at > now ? "" : p.past;
+      return w.at > now ? "" : t("server.recurrence.problem.past");
     case "every":
-      return w.minutes >= minEveryMinutes ? "" : p.every(minEveryMinutes);
+      return w.minutes >= minEveryMinutes ? "" : t("server.recurrence.problem.every", { min: minEveryMinutes });
     case "daily":
-      return recurrenceTime.test(w.time) ? "" : p.time(w.time);
+      return recurrenceTime.test(w.time) ? "" : t("server.recurrence.problem.time", { time: w.time });
     case "weekly": {
-      if (!recurrenceTime.test(w.time)) return p.time(w.time);
+      if (!recurrenceTime.test(w.time)) return t("server.recurrence.problem.time", { time: w.time });
       const days = w.days ?? [];
-      return days.length > 0 && !days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? "" : p.days;
+      return days.length > 0 && !days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? "" : t("server.recurrence.problem.days");
     }
     case "cron":
       return cronProblem(w.expr, now, req.tz);
   }
-  return p.kind;
+  return t("server.recurrence.problem.kind");
 }
 
 export function dueText(s: Recurrence, missed: boolean): string {

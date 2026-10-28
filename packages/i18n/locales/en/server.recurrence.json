@@ -17,7 +17,8 @@
     "weekend": "weekends at {time}",
     "monthly": "on day {day} of every month at {time}",
     "hourly": "every hour at minute {minute}",
-    "cron": "cron {expr}"
+    "cron": "cron {expr}",
+    "weekly": "every {days} at {time}"
   },
   "next": {
     "never": "never again",
@@ -51,5 +52,7 @@
   "noRecurrence": "There is no schedule {id}",
   "noChannel": "There is no channel {name}",
   "noProfile": "There is no profile called {name}",
-  "noProject": "#{channel} has no default project: a schedule sent straight to a helper needs a project"
+  "noProject": "#{channel} has no default project: a schedule sent straight to a helper needs a project",
+  "remove": "Delete the schedule \"{name}\": it no longer starts work when due; the tickets it opened stay",
+  "removeWhen": "Delete the schedule \"{name}\" ({when}): it no longer starts work when due; the tickets it opened stay"
 }

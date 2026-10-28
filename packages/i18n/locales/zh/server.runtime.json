@@ -9,7 +9,11 @@
     "signedOut": "没登录",
     "unread": "读不到额度（{why}）",
     "noBalance": "{provider} 读不到余额",
-    "some": "有额度"
+    "some": "有额度",
+    "balance": "{provider} 余额 {balances}",
+    "balanceLow": "{provider} 余额 {balances}，不够用了",
+    "window": "{label} 剩 {left}%",
+    "windowSeparator": "，"
   },
   "lessThanCent": "不到 ¥0.01",
   "persona": "{refused}。把人设改成「写进工单开头」。",
@@ -28,5 +32,6 @@
   "defaultModel": "{runtime} 没有 {model} 这个模型，{name} 先用默认模型",
   "piNoBalance": "{provider} 不报余额",
   "piNoModel": "pi 没有设默认模型",
-  "piUnread": "没读到 DeepSeek 余额"
+  "piUnread": "没读到 DeepSeek 余额",
+  "effort": "{model} 没有 {effort} 这一档，可选：{levels}"
 }

@@ -3,7 +3,6 @@ import { t } from "@vibevalley/i18n";
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
-import { recurrenceWording } from "./words.ts";
 import type { Preview, Recurrence, RecurrenceRequest } from "@vibevalley/protocol";
 import type { Actor } from "../base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
@@ -190,7 +189,7 @@ export const make = Effect.gen(function* () {
     }, lock.withPermits(1)),
     previewRemove: (id) =>
       Effect.map(find(id), (was) => ({
-        does: [recurrenceWording().remove(was.name, was.whenText ?? "")],
+        does: [was.whenText ? t("server.recurrence.removeWhen", { name: was.name, when: was.whenText }) : t("server.recurrence.remove", { name: was.name })],
       })),
     tick,
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),

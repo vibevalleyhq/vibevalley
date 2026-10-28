@@ -14,7 +14,6 @@
   "unreadSecrets": "存着的登录信息读不出来，断开重新连一次",
   "expired": "登录过期了，一小时后再试；也可以断开重新连。",
   "paired": "配对好了：以后在这里说的话，就是你在默认频道里说的。",
-  "inboundMismatch": "收件记录的编号不一致",
   "stopped": "收消息停了",
   "switched": "换了账号",
   "disconnected": "断开了",
@@ -23,9 +22,10 @@
   "line": {
     "orchestrator": "管家",
     "dispatch": "派活",
-    "thread": "在工单串里"
+    "thread": "在工单串里",
+    "head": "【{who}】",
+    "headWhat": "【{who} · {what}】"
   },
-  "pairWord": "配对",
   "feishu": {
     "register": "飞书注册：{why}",
     "registerTimeout": "飞书注册：超时了",
@@ -60,5 +60,6 @@
     "taken": "这个微信已经连过了：先在微信里删掉它，或者换一个微信扫。",
     "incomplete": "微信确认了，但没给齐登录信息，请重试。",
     "tooLong": "等太久没扫，二维码过期了。"
-  }
+  },
+  "digest": "你不在的时候有 {n} 条消息：\n{lines}\n\n完整的在默认频道里。"
 }

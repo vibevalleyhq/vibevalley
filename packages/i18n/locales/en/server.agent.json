@@ -9,7 +9,9 @@
     "taken": "There is a template {id} already",
     "builtIn": "{id} is built in and cannot be deleted",
     "notFrom": "\"{name}\" was not installed from a template",
-    "gone": "\"{name}\"'s template {template} is gone"
+    "gone": "\"{name}\"'s template {template} is gone",
+    "delete": "Delete the template \"{name}\"",
+    "deleteKept": "Delete the template \"{name}\": the {installed} profiles installed from it stay"
   },
   "notSaved": "Not saved: could not write {file} ({why})",
   "orchestratorStays": "The default manager cannot be deleted: every farm has at least one manager",
@@ -26,5 +28,9 @@
   "refused": {
     "launchArgs": "VibeValley runs inside the server process and takes no command-line arguments",
     "serviceTier": "DeepSeek has no service tiers"
-  }
+  },
+  "unequip": "Take it off the profiles of {holders}",
+  "quoted": "\"{name}\"",
+  "efforts": "{runtime} has only the {efforts} thinking efforts, not \"{asked}\"",
+  "effortsAnd": " and "
 }

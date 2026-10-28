@@ -1,3 +1,5 @@
+import { GraphActionValues, type GraphAction } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
 // What the client gets. The words for people (a session's phaseText, a recurrence's
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
@@ -9,20 +11,21 @@ import { phaseWords } from "@vibevalley/protocol/rules";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { graphsOf } from "../task/issues.ts";
 import { canEditTask, canRemoveTask, graphActions, taskActions } from "../task/graph.ts";
-import { taskWording } from "../task/words.ts";
 import { viewOf } from "../game/view.ts";
 
+/** Every plan action in words, for the page to say any of them. */
+const graphActionText = () => Object.fromEntries(GraphActionValues.map((a) => [a, t(`server.task.graphAction.${a}`)])) as Record<GraphAction, string>;
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): StateFrame {
   const graphs = graphsOf(state).map((g) => {
-    const graph = { ...g, stateTag: taskWording().graphTag[g.state], actionText: { ...taskWording().graphAction }, actions: graphActions(g) };
+    const graph = { ...g, stateTag: t(`server.task.graphTag.${g.state}`), actionText: graphActionText(), actions: graphActions(g) };
     if (graph.tasks.length === 0) return graph;
     graph.tasks = graph.tasks.map((n) => {
       const actions = taskActions(graph, n);
       return {
         ...n,
-        stateText: taskWording().taskState[n.state],
+        stateText: t(`server.task.taskState.${n.state}`),
         actions,
-        actionText: Object.fromEntries(actions.map((a) => [a, taskWording().taskAction[a]])),
+        actionText: Object.fromEntries(actions.map((a) => [a, t(`server.task.taskAction.${a}`)])),
         canEdit: canEditTask(graph, n),
         canRemove: canRemoveTask(graph, n),
       };
