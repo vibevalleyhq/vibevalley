@@ -2,7 +2,7 @@
 
 计划（`TaskGraph`）把一件很长的编码活拆成有先后的几件（`Task`），每件一个帮工，按 DAG 推进：等的都合进去了才开工，互不依赖的同时做。计划是带 `graph` 的父工单，每一件是带 `task` 的子工单；它有自己的计划分支，每一件做完由农场跑检查、合进计划分支，全部做完主人一次合进主分支。农场里叫种植计划，是院子里的图纸桌（计划板）。
 
-VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`）是另一回事，在 `agent/brain`，和计划只共用 `apps/server/src/base/dag.ts` 的边的规则（见[agent 自己的任务](docs/subsystems/agent.md#自己的任务)）。
+VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`）是另一回事，在 `packages/agent`，和计划只共用 `packages/agent/src/dag.ts` 的边的规则（见[agent 自己的任务](docs/subsystems/agent.md#自己的任务)）。
 
 ## 管什么，不管什么
 
@@ -19,7 +19,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 ## 在哪
 
 - 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；`rules.ts` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）。
-- 规则：只有服务端跑的，都在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）、`graph.ts`（出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`）；边的规则在 `apps/server/src/base/dag.ts`，和 `agent/brain` 自己的任务共用。工单状态怎么从计划算在 `issue/state.ts` 的 `issueStatusOf`。
+- 规则：只有服务端跑的，都在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）、`graph.ts`（出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`）；边的规则在 `packages/agent/src/dag.ts`，和 `packages/agent` 自己的任务共用。工单状态怎么从计划算在 `issue/state.ts` 的 `issueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`graph.split`、`graph.list`、`graph.get`、`graph.task.update`、`graph.task.delete`、`graph.act`、`graph.task.act`、`graph.diff.get`、`graph.event.list`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graph_list`、`graph_get`、`graph_task_update`、`graph_task_delete`、`graph_act`、`graph_task_act`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。

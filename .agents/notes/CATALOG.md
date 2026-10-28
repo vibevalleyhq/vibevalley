@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（23 篇）
 
 ### feature
 
@@ -20,7 +20,6 @@
 ### architecture
 
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），主人用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
-- 2026-10-28 [VibeValley 自己的 agent 拆成 packages/ai 和 packages/agent，server 只组装](.agents/notes/proposed/architecture/2026-10-28-agent-packages.md)
 - 2026-10-27 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-22 [收回派活、工作区、配置、日志与手机线路的使用约束](.agents/notes/proposed/architecture/2026-10-22-close-ownership-gaps.md)

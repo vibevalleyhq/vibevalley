@@ -6,7 +6,7 @@ Status: proposed
 
 农场里有两张按先后推进的图，规则只共用了一半：
 
-- **agent 自己的任务**（`apps/server/src/agent/brain/agentTask.ts`，[VibeValley 自己的 agent](docs/subsystems/brain.md#自己带的东西)）：纯函数的图，状态 `waiting`、`working`、`done`、`failed`、`skipped`，帮手是执行者，存在表 `agent_task`。
+- **agent 自己的任务**（`packages/agent/src/agentTask.ts`，[VibeValley 自己的 agent](docs/subsystems/brain.md#自己带的东西)）：纯函数的图，状态 `waiting`、`working`、`done`、`failed`、`skipped`，帮手是执行者，存在表 `agent_task`。
 - **种植计划**（`apps/server/src/task`，[种植计划](docs/subsystems/task.md)）：每件是一张子工单、一个帮工。图不单独存，每次由 `task/issues.ts` 的 `graphFrom` 从父子工单拼回 `TaskGraph`；调度、状态、重试和跳过写在 `task/task.ts` 和 `task/rules.ts`，和 agent 自己的任务各写一份。
 
 两边共用的只有边的规则（`apps/server/src/base/dag.ts` 的 `dagProblems`、`dagLayers`、`dagIDValid`）。一件活什么时候能做、失败重来几次、叫停时在做的退回哪里，两处各写一遍，改一处另一处不跟。

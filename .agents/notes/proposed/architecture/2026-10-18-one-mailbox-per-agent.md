@@ -66,7 +66,7 @@ Status: proposed
 | `patrol`、`task` | `digest` | — |
 
 - 照 Hermes 的保护：收件人手上有正在跑的子活（管家或领班派出去、还没交回的），`interrupt` 降成 `queue`，一句追问不该打断整串活。
-- 插话的落点照 Hermes 的 `steer`：不是随时塞进去，而是在这一批工具调用结束、下一次请求模型之前，作为补充交出；VibeValley 自己的 agent（`apps/server/src/agent/brain`）按这个时机做，外部农机能插话的交给 oar 的 `steer`，不能的退成 `queue`。
+- 插话的落点照 Hermes 的 `steer`：不是随时塞进去，而是在这一批工具调用结束、下一次请求模型之前，作为补充交出；VibeValley 自己的 agent（`packages/agent`）按这个时机做，外部农机能插话的交给 oar 的 `steer`，不能的退成 `queue`。
 
 ### 4. 交出去：每个 agent 一个泵
 
@@ -90,7 +90,7 @@ Status: proposed
 - 「谁该听到」（`chatAudience`：@、工单串、跟着的串、频道）留在 `channel`：这是频道的规则。
 - 同时干活的上限（工作区、农机、项目三层）留在 `session`：这是开工的规则。
 - 排队的工单找空地（`issue` 每 5 秒）留在 `issue`：那是派活，不是交话。
-- agent 自己的 Task 里帮手做完了交回结果，是 `apps/server/src/agent/brain` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
+- agent 自己的 Task 里帮手做完了交回结果，是 `packages/agent` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
 - 定时的时钟（`recurrence` 每 20 秒）留在 `recurrence`：到点只是投一封信。
 - 巡查留着它的「过了宽限期才报」的规则，只把报的方式换成投信；以后可以只是一种 `digest`。
 

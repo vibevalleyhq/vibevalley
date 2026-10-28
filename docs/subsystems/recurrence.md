@@ -10,7 +10,7 @@
 | 谁定的、要不要等主人同意 | 管家怎么接住到点的那句话、答完等主人点头（`orchestrator`，[管家](docs/subsystems/orchestrator.md)） |
 | 每隔一阵看一遍、到点先存再说再发布、错过的补一次 | 巡查：不调模型地看 Inbox、有事叫醒管家（`orchestrator/orchestrator.ts`，[管家](docs/subsystems/orchestrator.md)） |
 | 定时在核心状态里的一份（`WorkspaceState.Recurrences`） | 频道、频道的默认项目、提示怎么投递（[频道](docs/subsystems/channel.md)） |
-| | VibeValley 自己的 agent 自带的提醒（`agent/brain/reminders.ts` 的 `reminders.json`，工具 `reminder`、`list_reminders`、`cancel_reminder`）：只有命令行的对话开着，当管家、当帮工时关掉（`reminders: false`） |
+| | VibeValley 自己的 agent 自带的提醒（`packages/agent/src/reminders.ts` 的 `reminders.json`，工具 `reminder`、`list_reminders`、`cancel_reminder`）：只有命令行的对话开着，当管家、当帮工时关掉（`reminders: false`） |
 
 ## 在哪
 
