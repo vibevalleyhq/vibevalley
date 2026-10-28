@@ -597,7 +597,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     // Each orchestrator talks and listens in its own look; the pet wakes up for a call.
     const pose = (sprite: Sprite, id: string) => {
       const mood = orchestratorMood(state, id);
-      const chosen = agents.get(id)?.look.manager ?? "farmer";
+      const chosen = agents.get(id)?.look.orchestrator ?? "farmer";
       const lookId = chosen !== "farmer" && has(`manager-${chosen}`) ? chosen : "farmer";
       const base = lookId === "farmer" ? "manager" : `manager-${lookId}`;
       const named = mood === "speaking" ? orchestratorSprite(lookId, "-talk", has) : mood === "listening" ? orchestratorSprite(lookId, "-listen", has) : base;

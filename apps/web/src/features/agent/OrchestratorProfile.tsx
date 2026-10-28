@@ -4,7 +4,7 @@
 import { agentsWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
-import { type Agent, defaultOrchestrator, type ManagerLook } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { useRouter } from "../../base/router";
@@ -38,7 +38,7 @@ export function newOrchestrator(): Agent {
     workdir: "",
     worktree: false,
     tags: [],
-    look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", manager: "foreman" },
+    look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", orchestrator: "foreman" },
   };
 }
 
@@ -52,7 +52,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
   const dirty = () => isNew || !same(props.saved, draft());
   const nameTaken = () => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim());
   const patch = (p: Partial<Agent>) => setDraft({ ...draft(), ...p });
-  const setLook = (manager: ManagerLook) => patch({ look: { ...draft().look, manager } });
+  const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator } });
 
   const save = async () => {
     setSaving(true);
@@ -140,18 +140,24 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
         </p>
         <div class="grid gap-4 sm:grid-cols-2">
           <Field label={agentsWording().name} hint={nameTaken() ? agentsWording().nameTaken : agentsWording().orchestrator.nameTip}>
-            <TextInput value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
+            <TextInput aria-label={agentsWording().name} value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
           </Field>
           <Field label={agentsWording().orchestrator.model} hint={agentsWording().orchestrator.modelTip}>
-            <TextInput value={draft().model} placeholder={agentsWording().orchestrator.modelHint} onInput={(e) => patch({ model: e.currentTarget.value })} />
+            <TextInput
+              aria-label={agentsWording().orchestrator.model}
+              value={draft().model}
+              placeholder={agentsWording().orchestrator.modelHint}
+              onInput={(e) => patch({ model: e.currentTarget.value })}
+            />
           </Field>
         </div>
         <Field label={agentsWording().duty} hint={agentsWording().orchestrator.dutyTip}>
-          <TextInput value={draft().duty} onInput={(e) => patch({ duty: e.currentTarget.value })} />
+          <TextInput aria-label={agentsWording().duty} value={draft().duty} onInput={(e) => patch({ duty: e.currentTarget.value })} />
         </Field>
         <Field label={agentsWording().personaLabel} hint={agentsWording().orchestrator.personaTip}>
           <TextArea
             rows={5}
+            aria-label={agentsWording().personaLabel}
             value={draft().persona}
             placeholder={agentsWording().orchestrator.personaHint}
             onInput={(e) => patch({ persona: e.currentTarget.value })}
@@ -165,12 +171,12 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
                 <button
                   type="button"
                   role="radio"
-                  aria-checked={aria((draft().look.manager ?? "farmer") === look.id)}
+                  aria-checked={aria((draft().look.orchestrator ?? "farmer") === look.id)}
                   title={look.blurb}
                   onClick={() => setLook(look.id)}
                   class={[
                     "flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-xs",
-                    (draft().look.manager ?? "farmer") === look.id ? "border-leaf bg-selected" : "border-line hover:bg-hover",
+                    (draft().look.orchestrator ?? "farmer") === look.id ? "border-leaf bg-selected" : "border-line hover:bg-hover",
                   ]}
                 >
                   <OrchestratorFace size={48} look={look.id} />

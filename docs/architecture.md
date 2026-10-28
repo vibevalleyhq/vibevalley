@@ -96,14 +96,14 @@ flowchart LR
 | 文件 | 内容 |
 |---|---|
 | `.vibevalley.lock` | 家目录的租约：里面是在用它的服务端的 pid；同一目录只允许一个服务端，那个进程没了就接过来 |
-| `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`apps/server/src/agent/seeds.json`） |
+| `config.json` | 档案（管家和帮工）、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`apps/server/src/agent/seeds.json`） |
 | `settings.json` | 「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
 | `state.json` | 核心状态，频道、进度、定时和工单除外：帮工、commit 数 |
 | `db/` | PGlite 的库：频道、工单和它们的帮工、文档、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、「连接到本机」的设备；新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `apps/server/db/migrations/0001_schema.up.sql`，一个基线，改表直接改它，旧库删掉重建）。查询都在 `db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
-| `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `orchestrator.json` |
+| `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；每个管家的是 `<档案 id>.json` |
 | `helpers/<oar 会话 id>.jsonl` | VibeValley 自己的帮工的对话，每个 oar 会话一份 |
 | `spend.json` | 今天每台农机花了多少 |
-| `orchestrator/` | 管家（VibeValley 自己的 agent）：对话 `orchestrator.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
+| `agent/<档案 id>/` | 每个管家（VibeValley 自己的 agent）一份：对话 `<档案 id>.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
 | `logs/` | 每个帮工会话的原始记录 |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 

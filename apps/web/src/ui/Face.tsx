@@ -4,7 +4,7 @@ import { appWording } from "../base/words";
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
 import { castPrefix } from "./cast";
-import { managerLook } from "../base/agents";
+import { orchestratorLookOf } from "../base/agents";
 import { ready, useAgents, useSprites } from "../base/query";
 import { RuntimeBadge } from "./RuntimeBadge";
 
@@ -51,7 +51,7 @@ export function OrchestratorFace(props: { size?: number; agent?: string; look?: 
   const cut = () => {
     const all = ready(sprites, undefined);
     if (!all) return undefined;
-    const look = props.look ?? managerLook(ready(agents, []), props.agent);
+    const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
     const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
     const sp = all[name]!;
     const k = size() / (sp.w * 0.86);

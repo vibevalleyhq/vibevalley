@@ -1100,7 +1100,7 @@ export interface Look {
   species?: Species;
   outfit?: Outfit;
   /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A worker has none. */
-  manager?: ManagerLook;
+  orchestrator?: OrchestratorLook;
   build: Build;
   head: Head;
   body: string;
@@ -1115,8 +1115,8 @@ export type Head = (typeof HeadValues)[number];
 export const BuildValues = ["biped", "treads", "wheel", "hopper", "hover"] as const;
 export type Build = (typeof BuildValues)[number];
 
-export const ManagerLookValues = ["farmer", "foreman", "auntie", "grandpa", "gardener", "robot"] as const;
-export type ManagerLook = (typeof ManagerLookValues)[number];
+export const OrchestratorLookValues = ["farmer", "foreman", "auntie", "grandpa", "gardener", "robot"] as const;
+export type OrchestratorLook = (typeof OrchestratorLookValues)[number];
 
 export const OutfitValues = ["farmer", "gardener", "rain", "winter"] as const;
 export type Outfit = (typeof OutfitValues)[number];

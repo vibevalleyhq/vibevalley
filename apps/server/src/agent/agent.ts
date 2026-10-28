@@ -66,7 +66,7 @@ const orchestratorProfile = (): Agent => ({
   workdir: "",
   worktree: false,
   tags: [],
-  look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", manager: "farmer" },
+  look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", orchestrator: "farmer" },
 });
 
 /** Over each code point's first UTF-16 unit, wrapping at 32 bits, as the client counts. */
@@ -87,8 +87,8 @@ export function withCast(a: Agent): Agent {
   look.head ||= "rounded";
   look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length]!;
   look.outfit ??= "farmer";
-  if (a.role === "orchestrator") look.manager ??= "farmer";
-  else delete look.manager;
+  if (a.role === "orchestrator") look.orchestrator ??= "farmer";
+  else delete look.orchestrator;
   return { ...a, look };
 }
 

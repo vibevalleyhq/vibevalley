@@ -52,7 +52,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   // Only the default orchestrator is on the phone: the voice is its.
   const shown = () => tabs.filter((t) => t.id !== "voice" || props.agent === defaultOrchestrator);
   const at = () => (shown().some((t) => t.id === props.tab) ? props.tab : "memory");
-  const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.manager ?? "farmer"));
+  const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.orchestrator ?? "farmer"));
   const head = () => (
     <div class="flex items-center gap-4 pt-4">
       <span class="flex size-18 shrink-0 items-center justify-center rounded-lg bg-hover">

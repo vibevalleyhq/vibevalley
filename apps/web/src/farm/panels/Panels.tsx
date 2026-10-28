@@ -21,8 +21,8 @@ import { TaskBoard } from "./TaskBoard";
 import { tint } from "./bits";
 import { setPet, usePrefs } from "../../base/prefs";
 import { useQueryClient } from "@tanstack/solid-query";
-import { defaultOrchestrator, type ManagerLook } from "@vibevalley/protocol";
-import { managerLook } from "../../base/agents";
+import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+import { orchestratorLookOf } from "../../base/agents";
 import { api, reasonOf } from "../../base/api";
 import { ready, useAgents } from "../../base/query";
 import { toast } from "../../ui/toasts";
@@ -145,12 +145,12 @@ function OrchestratorLooks() {
   const loaded = useVillage();
   const agents = useAgents();
   const client = useQueryClient();
-  const current = () => managerLook(ready(agents, []));
-  const choose = async (look: ManagerLook) => {
+  const current = () => orchestratorLookOf(ready(agents, []));
+  const choose = async (look: OrchestratorLook) => {
     const me = ready(agents, []).find((a) => a.id === defaultOrchestrator);
     if (!me) return;
     try {
-      await api.agent.update({ ...me, look: { ...me.look, manager: look } });
+      await api.agent.update({ ...me, look: { ...me.look, orchestrator: look } });
       await client.invalidateQueries({ queryKey: ["agents"] });
     } catch (e) {
       toast(reasonOf(e));

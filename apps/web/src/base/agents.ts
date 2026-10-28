@@ -1,5 +1,5 @@
 import { keepPreviousData } from "@tanstack/solid-query";
-import { type Agent, type AgentProblem, defaultOrchestrator, type ManagerLook } from "@vibevalley/protocol";
+import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 import { api } from "./api";
 import { createSettled } from "./util";
 import { ready, useAgents, useQuery } from "./query";
@@ -20,7 +20,8 @@ export function useOrchestrators() {
 }
 
 /** An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. */
-export const managerLook = (agents: readonly Agent[], id = defaultOrchestrator): ManagerLook => agents.find((a) => a.id === id)?.look.manager ?? "farmer";
+export const orchestratorLookOf = (agents: readonly Agent[], id = defaultOrchestrator): OrchestratorLook =>
+  agents.find((a) => a.id === id)?.look.orchestrator ?? "farmer";
 
 /** A profile by its id, once the profiles are read; undefined for none or one gone. */
 export function useAgent(id: () => string | undefined) {

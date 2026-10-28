@@ -204,6 +204,19 @@ const RULES: readonly Rule[] = [
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//,
   },
   {
+    name: "the one orchestrator under its old names",
+    pattern: /\b(orchestratorAgent|orchestratorHome|orchestratorLook|setOrchestratorLook|orchestratorChannel)\b/,
+    says: "a profile's role (isOrchestrator, role: \"orchestrator\"); defaultOrchestrator only for what names none; agentHome; the profile's look.manager; WorkspaceState.orchestrators[id].channel",
+  },
+  {
+    name: "a profile called a helper's where the owner reads it",
+    pattern: /帮工档案/,
+    says: "档案 (a profile): its role is 管家 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
+    dirs: ["apps/web/src", "apps/server/src"],
+    // On the server only the word tables are the owner's; prompts.ts is a model's.
+    except: /^apps\/server\/src\/(?!.*\/words\.ts$)/,
+  },
+  {
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/,
     says: "Channel (channel_id, Channels): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",

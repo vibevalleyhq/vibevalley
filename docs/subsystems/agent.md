@@ -1,12 +1,12 @@
 # 档案、农机和技能书
 
-帮工档案（`Agent`）是一份配置：用哪台农机、哪个模型、思考强度、人设、技能、MCP、禁用的工具、环境变量、默认项目、适合什么活、长什么样；派活派的是档案，一个档案可以同时派出好几个帮工。农机（runtime）是机器上的一种编码 agent 程序，农场经 oar 探测它装没装、有哪些模型、额度和清单，派活前照它能接受什么查档案。技能书（`Skill`）分两份：各农机自己装的，只读地列出来；VibeValley 自己的技能库，档案勾上的跟人设一起交给帮工。农场里档案是小动物的长相和名字，农机是「农具」，技能书在「设置」里。
+档案（profile，代码里是 `Agent`）是一份 agent 的配置：用哪台农机、哪个模型、思考强度、人设、技能、MCP、禁用的工具、环境变量、默认项目、适合什么活、长什么样。档案有角色（`role`）：管家（`orchestrator`）常驻、带队、自己不干活，可以有好几个（[管家](docs/subsystems/orchestrator.md)）；帮工（`worker`）是派活派的那种，一个帮工的档案可以同时派出好几个帮工。农机（runtime）是机器上的一种编码 agent 程序，农场经 oar 探测它装没装、有哪些模型、额度和清单，派活前照它能接受什么查档案。技能书（`Skill`）分两份：各农机自己装的，只读地列出来；VibeValley 自己的技能库，档案勾上的跟人设一起交给帮工。农场里档案是小动物的长相和名字，农机是「农具」，技能书在「设置」里。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 档案、技能库、农机设置的存取：`config.json`、事务、种子、内置的管家档案、新建时的 id | 管家怎么用它的档案（模型、只接 DeepSeek，[管家](docs/subsystems/orchestrator.md)） |
+| 档案、技能库、农机设置的存取：`config.json`、事务、种子、内置的默认管家档案、角色的规则、新建时的 id | 管家怎么用它的档案（模型、只接 DeepSeek，[管家](docs/subsystems/orchestrator.md)） |
 | 档案没填的外观补齐（`withCast`），和页面的 `castOf` 挑同一只动物 | 长相怎么画、动物和衣服的贴图（[农场的皮](docs/subsystems/farm.md)） |
 | 农机的注册表（`registry`）、探测、模型列表、清单（技能、MCP、工具）、缓存和推给页面 | 额度怎么读成字、钱的那条「派不出去」、价目和今天的花费（[帮工](docs/subsystems/session.md)「额度、花费和上限」） |
 | 农机接受哪些开会话的选项（`runtimeFacts` 和适配器的 `refusedSessionOptions`） | 选项怎么交给 oar、人设和技能怎么拼进会话、安装身份怎么用（[帮工](docs/subsystems/session.md)） |
@@ -17,25 +17,26 @@
 
 ## 在哪
 
-- **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、内置的管家档案（`orchestratorProfile`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`agent/brain` 是 VibeValley 自己的 agent，归[管家](docs/subsystems/orchestrator.md)。
+- **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、内置的默认管家档案（`orchestratorProfile`）、角色的规则（`roleProblem`，`orchestrators`、`isOrchestrator`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`agent/brain` 是 VibeValley 自己的 agent，归[管家](docs/subsystems/orchestrator.md)。
 - **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时读取、今天的花费、`assess`、`resolve`、`check`；`rules.ts` 的 `agentProblems`、`moneyStop`、额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
 - **种子**：`apps/server/src/agent/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seed.ts` 读它（`seedAgents`、`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
 - **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.update`、`agent.delete`，`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.setting.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
-- **页面**：`apps/web/src/features/agent/`（帮工列表 `AgentsPage.tsx`、捏帮工和档案页 `AgentPage.tsx`）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `base/query.ts`（`useAgents`、`useRuntimes`）、`base/agents.ts`（`useWorkAgents`、`useAgentProblems` 问 `agent.check`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
+- **页面**：`apps/web/src/features/agent/`（档案列表 `AgentsPage.tsx`，管家在上、帮工在下；捏帮工和帮工的档案页 `AgentPage.tsx`；管家的档案页 `OrchestratorProfile.tsx`，`/agents/new?role=orchestrator` 新建）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `base/query.ts`（`useAgents`、`useRuntimes`）、`base/agents.ts`（`useWorkAgents` 是帮工、`useOrchestrators` 是管家、`orchestratorLookOf`、`useAgentProblems` 问 `agent.check`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
 
 ## 模型和不变量
 
-- **职责（`role`）和适合的活（`tags`）是两个字段，用法不同。**
-  - `role` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Role>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Role>；适合的活：<Tags>」（`session/rules.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
+- **角色（`role`）是封闭的两种**（`AgentRoleValues`）：`orchestrator`、`worker`，新建默认是帮工。派活用的档案（`agents()`、`named`、`chooseAgent`）只有帮工；全部档案（`all()`）和按 id 取的含管家。管家只在 `vibevalley` 上跑：保存、新建一份管家档案时农机不是它就拒绝（`roleProblem`）；默认管家（`defaultOrchestrator`）改成帮工拒绝。
+- **职责（`duty`）和适合的活（`tags`）是两个字段，用法不同。**
+  - `duty` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Duty>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Duty>；适合的活：<Tags>」（`session/rules.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
   - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
 - **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了或不符合形状的 `config.json` 不覆盖**：文件按档案、技能和农机设置的 Schema 读回；读取、解析或形状校验失败就改名成 `config.json.unreadable-<毫秒>` 留着，从种子起；改不了名就不开机。文件不在才从种子起。
 - **删技能同时解除档案引用**：`deleteSkill` 在同一次 `change` 中删除技能和所有档案（包括管家）的对应技能 id，写盘失败两边都不变；再建同名技能不会让旧档案自动带上它。
 - **种子只用一次**：没有 `config.json` 时用 `seeds.json` 的 `agents`，技能库空、农机设置空；之后删掉的种子档案不再补回。农机设置没存过的取 `defaultSettings`（启用、命令路径空、默认模型和思考强度空、无环境变量）。
-- **管家档案每个农场都有**：开机时没有 `orchestrator`（`orchestratorAgent`）就补上（名字「管家」、职责「替主人派活、转告结果」、农机 `vibevalley`）；删它回「管家是每个农场都有的，删不了」；保存时把农机换掉拒绝。派活用的档案不含管家；全部档案和按 id 取的含。页面也把 `agent.list` 里的管家分开放。
+- **默认管家的档案每个农场都有**：开机时没有 `orchestrator`（`defaultOrchestrator`）就补上（名字「管家」、职责「替主人派活、转告结果」、农机 `vibevalley`），有了也把它的角色定成管家；删它回「默认管家删不了：每个农场至少有一个管家」。别的管家能删。
 - **新建由服务端分 id**：`agent.create`、`skill.create` 的 `id` 要留空（填了回「新档案的 id 要留空；指定 id 请用保存」）。档案取下一个没占用的 `agent-N`；技能取名字转小写、非 `a-z0-9` 换成 `-` 的 slug，空了用 `skill`，重名加 `-2`、`-3`。分配在 `change` 的锁里，两台设备同时建不会撞。编辑和导入指定 id 走 `agent.update`、`skill.update`，路径里的 id 和请求里的不一样就拒绝。
-- **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `speciesValues` 取模。页面 `ui/cast.ts` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
+- **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，管家的长相（`look.orchestrator`，`OrchestratorLookValues`，画成 `manager-<长相>`）`farmer`，帮工的去掉；动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `speciesValues` 取模。页面 `ui/cast.ts` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
 - **帮工头像右下角标出运行工具**：档案读 `Agent.runtime`，执行读 `Session.runtime`；现成的像素 logo 放在头像外框上，悬停和辅助阅读给出农机清单里的全名。没有专用 logo 用扳手图标，不按档案 id 猜农机；主人、管家和导航的示意头像不加帮工的标识。
 - **农场认的农机是 `runtimeIds` 的十个**：`claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`runtime.list` 照这个顺序给，农具页和捏帮工的农机列表也照它列。每台都有一份 `runtimePresets`，顺序一样。注册表（`registryOf`）是 oar 的内置农机（`defaultRuntimes`）加 VibeValley 自己的 agent（`agent/brain/runtime.ts`，每次开会话现取 DeepSeek 的钥匙；种植计划存在农场的库里）加 DeepSeek Harness（`dsh`）。注册表里没有的报「不支持」：cursor 写明要单独装它的 SDK（`@cursor/sdk`），其余写「oar 不认识这个 runtime」。不认识的 id，`runtime.refresh`、`runtime.setting.update` 回 404。
 - **四种已接通的农机这样承载**：VibeValley 和 pi 在服务端进程里，claude 走命令行，codex 走 app-server。真实项目的验证范围见[其他农机的提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
@@ -144,7 +145,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/agent/agent.test.ts`：读不了的 `config.json` 挪到一边、用种子开始；挪不开就不开机、不碰它；没有动物的档案补上页面画的那只；管家是内置的（不派活、删不了、只在 VibeValley 自己的农机上）；新建的 id 各不相同、带 id 的草稿被拒；给出去的是副本。
+- `apps/server/src/agent/agent.test.ts`：读不了的 `config.json` 挪到一边、用种子开始；挪不开就不开机、不碰它；没有动物的档案补上页面画的那只；管家是有角色的档案：好几个管家各只在 VibeValley 自己的农机上，默认的删不了、改不成帮工，派活只派帮工；新建的 id 各不相同、带 id 的草稿被拒；给出去的是副本。
 - `runtime/runtime.test.ts`：接受的探测拥有读用量的安装、慢的不覆盖新的；完整探测和额度更新交错时，两种完成顺序都保留新完整探测；适配器的拒绝挡住档案和继承的选项、农场的说法盖在上面；有效思考强度按实际模型或回退模型检查；设置已存而探测未完成时预检和解析一致；预检通过后改成不兼容设置，开会话仍拒绝；已有 Session 的解析不重套启停与预算；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；存不上的设置被拒、不探测；`resolve` 管默认、覆盖和模型的退回；价目。`runtime/rules.test.ts`：`agentProblems`、`moneyStop`、额度的字照黄金数据。
 - `session/rules.test.ts`：挑档案（按名字、按农机、选定的、按适合的活）。
 - 页面：`apps/web/test/agents.spec.ts`（捏一个帮工、改、停用、删；不存在的档案说清楚；整页的样子）、`runtime-avatars.spec.ts`（两种农机的头像角标、全名、辅助阅读、16 px 小头像、桌面和手机截图）、`runtimes.spec.ts`（照 oar 找到的列、存设置再改回去）、`settings.spec.ts`（VibeValley 自己的技能写、列、删）。
