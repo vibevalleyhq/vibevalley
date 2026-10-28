@@ -32,6 +32,8 @@ for (const theme of ["light", "dark"] as const)
       await page.goto(path);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
+      // The opening bar is gone once the page is up; measured before that, its fading words read as low contrast.
+      await expect(page.locator("#opening")).toHaveCount(0);
       // Measured once things have moved in (a dialog fading in reads as low contrast); a pulse that never ends is not waited for.
       await page.evaluate(() =>
         Promise.all(
