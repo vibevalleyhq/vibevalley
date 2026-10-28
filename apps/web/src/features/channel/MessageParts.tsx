@@ -11,12 +11,11 @@ import { toast } from "../../ui/toasts";
 import { aria, autofocus } from "../../base/util";
 import { drafts } from "./draft";
 import { useMessage } from "./follow";
+import { quickReactions } from "./emoji";
+import { EmojiPicker } from "./EmojiPicker";
 import { useCore } from "../../base/frame";
 import { markUnread } from "./data";
-import { channelOf, messagePath } from "./rules";
-
-// What a press offers; an agent can still react with any other.
-export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];
+import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePath, workbenchClock } from "./rules";
 
 const sizeText = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -170,7 +169,40 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
           );
         }}
       </For>
+      <AddReaction id={props.m.id} />
     </div>
+  );
+}
+
+/** A reaction picked from every emoji, for a message that has some already. */
+function AddReaction(props: { id: string }) {
+  const [open, setOpen] = createSignal(false);
+  let button: HTMLButtonElement | undefined;
+  return (
+    <>
+      <button
+        type="button"
+        ref={(el) => (button = el)}
+        aria-label={chatWording().emoji.more}
+        title={chatWording().emoji.more}
+        aria-expanded={aria(open())}
+        onClick={() => setOpen(!open())}
+        class="flex cursor-pointer items-center rounded-full border border-line bg-page px-2 py-0.5 text-xs hover:bg-hover"
+      >
+        <Icon name="button-add" size={12} />
+      </button>
+      <Show when={open()}>
+        <EmojiPicker
+          anchor={button}
+          onClose={() => setOpen(false)}
+          onPick={(emoji) => {
+            setOpen(false);
+            const id = untrack(() => props.id);
+            run(() => api.channel.reaction.toggle({ id, emoji }));
+          }}
+        />
+      </Show>
+    </>
   );
 }
 
@@ -180,6 +212,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   const router = useRouter();
   const core = useCore();
   const [picking, setPicking] = createSignal(false);
+  const [everyEmoji, setEveryEmoji] = createSignal(false);
+  let moreEmoji: HTMLButtonElement | undefined;
   const [sure, setSure] = createSignal(false);
   const [more, setMore] = createSignal(false);
   const copyLink = () => {
@@ -195,7 +229,11 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
     <div
       role="toolbar"
       aria-label={chatWording().tools.label}
-      class="absolute -top-3 right-2 z-10 hidden items-center gap-0.5 rounded-md border border-line bg-page p-0.5 shadow-float group-focus-within/m:flex group-hover/m:flex"
+      // Shown while hovered, and while something it opened is: the picker is outside the row.
+      class={[
+        "absolute -top-3 right-2 z-10 items-center gap-0.5 rounded-md border border-line bg-page p-0.5 shadow-float",
+        everyEmoji() || more() ? "flex" : "hidden group-focus-within/m:flex group-hover/m:flex",
+      ]}
     >
       <Show when={picking()}>
         <div role="group" aria-label={chatWording().tools.pick} class="flex items-center gap-0.5 border-r border-line pr-0.5">
@@ -214,7 +252,30 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
               </button>
             )}
           </For>
+          <button
+            type="button"
+            ref={(el) => (moreEmoji = el)}
+            class={tool}
+            aria-label={chatWording().emoji.more}
+            title={chatWording().emoji.more}
+            aria-expanded={aria(everyEmoji())}
+            onClick={() => setEveryEmoji(!everyEmoji())}
+          >
+            <Icon name="button-add" size={14} />
+          </button>
         </div>
+      </Show>
+      <Show when={everyEmoji()}>
+        <EmojiPicker
+          anchor={moreEmoji}
+          onClose={() => setEveryEmoji(false)}
+          onPick={(emoji) => {
+            setEveryEmoji(false);
+            setPicking(false);
+            const id = untrack(() => props.m.id);
+            run(() => api.channel.reaction.toggle({ id, emoji }));
+          }}
+        />
       </Show>
       <button type="button" class={tool} aria-label={chatWording().tools.react} title={chatWording().tools.react} onClick={() => setPicking(!picking())}>
         <Icon name="icon-hand" size={16} />
@@ -374,5 +435,53 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
       </Show>
       <p class="mt-1 text-xs text-muted">{chatWording().tools.editHint}</p>
     </div>
+  );
+}
+
+/** The farm's messages a message links to, each as it is now; a press goes there. */
+export function LinkedMessages(props: { text: string }) {
+  const core = useCore();
+  const links = () => linkedMessages(props.text, core()?.chat, location.host);
+  return (
+    <Show when={links().length > 0}>
+      <div class="mt-1 flex flex-col gap-1.5">
+        <For each={links()} keyed={(l) => `${l.channel}:${l.number}`}>
+          {(l) => <LinkedCard at={l()} />}
+        </For>
+      </div>
+    </Show>
+  );
+}
+
+function LinkedCard(props: { at: LinkedMessage }) {
+  const core = useCore();
+  const router = useRouter();
+  const m = useMessage(() => props.at);
+  const where = () => channelOf(core()?.chat, props.at.channel);
+  return (
+    <button
+      type="button"
+      aria-label={chatWording().messages.linked(channelLabel(where()), props.at.number)}
+      onClick={() => router.navigate(messagePath(where(), props.at.number))}
+      class="flex max-w-lg cursor-pointer flex-col gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 text-left hover:bg-hover"
+    >
+      <span class="flex items-baseline gap-2 text-xs text-muted">
+        <span class="font-semibold text-ink">{m() ? nameOf(m()!) : `#${props.at.number}`}</span>
+        <span>{channelLabel(where())}</span>
+        <Show when={m()}>{(said) => <span>{workbenchClock(said().at)}</span>}</Show>
+      </span>
+      <Show when={m()}>
+        {(said) => (
+          <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{chatWording().messages.replyGone}</span>}>
+            <span class="line-clamp-3 text-sm">
+              {said().text ||
+                said()
+                  .attachments?.map((a) => a.name)
+                  .join("、")}
+            </span>
+          </Show>
+        )}
+      </Show>
+    </button>
   );
 }

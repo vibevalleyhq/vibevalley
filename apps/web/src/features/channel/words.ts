@@ -90,6 +90,7 @@ const zh = {
     inThread: (address: string) => `在 ${address}`,
     file: (size: string) => `文件 · ${size}`,
     reactedBy: (emoji: string, names: string) => `${names} 回应了 ${emoji}`,
+    linked: (where: string, number: number) => `跳到 ${where} 的第 ${number} 条`,
   },
   tools: {
     label: "这条消息能做的",
@@ -162,6 +163,15 @@ const zh = {
     markUnread: "从这里标成未读",
     jump: "跳到这条",
   },
+  switcher: {
+    open: "跳到…",
+    title: "跳到频道、串或私聊",
+    hint: "输入名字；# 只找频道和串，@ 只找私聊",
+    none: "没有找到",
+    direct: "私聊",
+    newDirect: "开一个私聊",
+    keys: (mac: boolean) => (mac ? "⌘K" : "Ctrl K"),
+  },
   farmSearch: {
     open: "搜全农场",
     title: "搜全农场",
@@ -178,7 +188,8 @@ const zh = {
   },
   emoji: {
     open: "表情",
-    groups: { faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" } as Record<string, string>,
+    groups: { frequent: "常用", faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" } as Record<string, string>,
+    more: "更多表情",
   },
   media: {
     pdf: "PDF · 在新标签页里看",
@@ -288,6 +299,7 @@ const en: typeof zh = {
     searching: "Searching…",
     inThread: (address) => `in ${address}`,
     file: (size) => `File · ${size}`,
+    linked: (where, number) => `Go to message ${number} in ${where}`,
     reactedBy: (emoji, names) => `${names} reacted with ${emoji}`,
   },
   tools: {
@@ -361,6 +373,15 @@ const en: typeof zh = {
     markUnread: "Mark unread from here",
     jump: "Jump to it",
   },
+  switcher: {
+    open: "Jump to…",
+    title: "Jump to a channel, thread or direct message",
+    hint: "Type a name; # finds channels and threads, @ direct messages",
+    none: "Nothing found",
+    direct: "Direct message",
+    newDirect: "New direct message",
+    keys: (mac) => (mac ? "⌘K" : "Ctrl K"),
+  },
   farmSearch: {
     open: "Search the farm",
     title: "Search the farm",
@@ -377,7 +398,8 @@ const en: typeof zh = {
   },
   emoji: {
     open: "Emoji",
-    groups: { faces: "Faces", hands: "Hands", things: "Things", nature: "Nature", signs: "Signs" },
+    groups: { frequent: "Frequent", faces: "Faces", hands: "Hands", things: "Things", nature: "Nature", signs: "Signs" },
+    more: "More emoji",
   },
   media: {
     pdf: "PDF · opens in a new tab",

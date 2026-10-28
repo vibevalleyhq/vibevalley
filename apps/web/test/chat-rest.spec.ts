@@ -122,11 +122,11 @@ test("the box keeps its draft across a reload; ↑ edits the last message, Esc l
   await expect(page.getByText("回复 主人：改过的话")).toHaveCount(0);
 
   await box.fill("还没写完");
-  await page.getByRole("button", { name: "表情" }).click();
-  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🎉" }).click();
-  await expect(box).toHaveValue("还没写完🎉");
+  await page.getByRole("button", { name: "表情", exact: true }).click();
+  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🌾" }).click();
+  await expect(box).toHaveValue("还没写完🌾");
   await page.reload();
-  await expect(page.getByRole("textbox", { name: "发送消息至 #输入" })).toHaveValue("还没写完🎉");
+  await expect(page.getByRole("textbox", { name: "发送消息至 #输入" })).toHaveValue("还没写完🌾");
 });
 
 test("a file dropped on the channel goes up; a video plays in place and a PDF opens in its own tab", async ({ page, api }) => {
@@ -199,4 +199,64 @@ test("the owner talks with a helper profile alone, and its answer can be marked 
   await side(page).getByRole("region", { name: "频道" }).locator("button[draggable]").first().click();
   await expect(directs.getByRole("button", { name: /阿狐/ })).toContainText(/\d/);
   await page.screenshot({ path: test.info().outputPath("chat-direct.png") });
+});
+
+test("a reaction can be any emoji, picked from the toolbar or beside the reactions a message has", async ({ page, api }) => {
+  const id = await api.channel.create({ name: "表情" });
+  await api.channel.message.send({ id, text: "种了向日葵" });
+  await page.goto(`/chat/${id}`);
+  const log = page.getByRole("log", { name: "消息" });
+  const said = log.locator("p", { hasText: "种了向日葵" });
+  await said.hover();
+  const tools = page.getByRole("toolbar", { name: "这条消息能做的" });
+  await tools.getByRole("button", { name: "回应" }).click();
+  await tools.getByRole("button", { name: "更多表情" }).click();
+  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🌻" }).click();
+  await expect(log.getByRole("button", { name: /🌻\s*1/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("dialog", { name: "表情" })).toHaveCount(0);
+
+  await log.getByRole("button", { name: "更多表情" }).click();
+  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🍀" }).click();
+  await expect(log.getByRole("button", { name: /🍀\s*1/ })).toBeVisible();
+});
+
+test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with a profile", async ({ page, api }) => {
+  const id = await api.channel.create({ name: "前台" });
+  await api.agent.create({ ...helper, name: "小獾" });
+  await page.goto("/issues");
+  await page.keyboard.press("Control+k");
+  const dialog = page.getByRole("dialog", { name: "跳到频道、串或私聊" });
+  const box = dialog.getByRole("combobox", { name: "跳到频道、串或私聊" });
+  await box.fill("#前");
+  await expect(dialog.getByRole("option").first()).toContainText("#前台");
+  await box.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`/chat/${id}$`));
+  await expect(dialog).toHaveCount(0);
+
+  await side(page)
+    .getByRole("button", { name: /跳到…/ })
+    .click();
+  await box.fill("@小獾");
+  await expect(dialog.getByRole("option").first()).toContainText("开一个私聊");
+  await page.screenshot({ path: test.info().outputPath("switcher.png") });
+  await box.press("Enter");
+  await expect(page.getByRole("heading", { name: "小獾" })).toBeVisible();
+});
+
+test("a link to a farm message shows that message under it, and a press goes there", async ({ page, api, server }) => {
+  const from = await api.channel.create({ name: "原处" });
+  await api.channel.message.send({ id: from, text: "南坡的苹果熟了" });
+  const [said] = (await api.channel.message.list({ id: from })).filter((m) => m.text === "南坡的苹果熟了");
+  const to = await api.channel.create({ name: "转述" });
+  await api.channel.message.send({ id: to, text: `看这条 ${server.url}/chat/${from}?m=${said!.number}` });
+  await page.goto(`/chat/${to}`);
+  const card = page.getByRole("log", { name: "消息" }).getByRole("button", { name: `跳到 #原处 的第 ${said!.number} 条` });
+  await expect(card).toContainText("南坡的苹果熟了");
+  await expect(card).toContainText("主人");
+  await page.screenshot({ path: test.info().outputPath("linked.png") });
+  await card.click();
+  await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`));
+  // The server reads no preview of the farm's own address.
+  const [linking] = (await api.channel.message.list({ id: to })).filter((m) => m.text.startsWith("看这条"));
+  expect(linking!.embeds ?? []).toEqual([]);
 });

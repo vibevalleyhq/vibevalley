@@ -1,5 +1,8 @@
 // The words name the groups (words.ts emoji.groups); any other emoji is still said by typing it.
 
+/** What a reaction offers first; an agent can still react with any other. */
+export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];
+
 export const emojiGroups: readonly { readonly id: string; readonly emoji: readonly string[] }[] = [
   {
     id: "faces",

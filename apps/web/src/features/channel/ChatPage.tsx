@@ -33,6 +33,7 @@ import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer, FileDrop } from "./Composer";
+import { switcher } from "./QuickSwitcher";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
 import { useWorkAgents } from "../../base/agents";
 import { toast } from "../../ui/toasts";
@@ -310,6 +311,14 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
         </button>
       </div>
       <div class="flex-1 overflow-y-auto p-3">
+        <button
+          type="button"
+          onClick={() => switcher.show()}
+          class="mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2.5 text-left text-sm text-muted hover:bg-hover"
+        >
+          <span class="flex-1">{chatWording().switcher.open}</span>
+          <span class="text-xs text-faint">{chatWording().switcher.keys(/Mac|iPhone|iPad/.test(navigator.userAgent))}</span>
+        </button>
         <Section
           title={chatWording().channelsTitle}
           count={Math.max(1, channels().length)}

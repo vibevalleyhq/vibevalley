@@ -1,7 +1,7 @@
 import { mentionOf } from "./rules";
 import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
-import { emojiGroups } from "./emoji";
+import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { chatWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
@@ -23,6 +23,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
   const [emoji, setEmoji] = createSignal(false);
+  let emojiButton: HTMLButtonElement | undefined;
   const draft = () => draftOf(props.channel?.id);
   const uploading = () => uploadsIn(props.channel?.id);
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
@@ -221,9 +222,10 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           >
             <Icon name="button-folder" size={16} />
           </button>
-          <div class="relative">
+          <div>
             <button
               type="button"
+              ref={(el) => (emojiButton = el)}
               onClick={() => setEmoji(!emoji())}
               disabled={!props.channel}
               aria-label={chatWording().emoji.open}
@@ -235,6 +237,8 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             </button>
             <Show when={emoji()}>
               <EmojiPicker
+                anchor={emojiButton}
+                onClose={() => setEmoji(false)}
                 onPick={(e) => {
                   setEmoji(false);
                   insert(e);
@@ -269,40 +273,6 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function EmojiPicker(props: { onPick: (emoji: string) => void }) {
-  return (
-    <div
-      role="dialog"
-      aria-label={chatWording().emoji.open}
-      class="absolute right-0 bottom-full z-30 mb-1 flex max-h-72 w-80 flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
-    >
-      <For each={emojiGroups}>
-        {(g) => (
-          <section aria-label={chatWording().emoji.groups[g.id] ?? g.id}>
-            <p class="px-1 pb-1 text-xs font-semibold text-muted">{chatWording().emoji.groups[g.id]}</p>
-            <div class="grid grid-cols-8 gap-0.5">
-              <For each={g.emoji}>
-                {(e) => (
-                  <button
-                    type="button"
-                    aria-label={e}
-                    // Keeps the focus, and with it the caret, in the box.
-                    onMouseDown={(ev) => ev.preventDefault()}
-                    onClick={() => props.onPick(e)}
-                    class="inline-flex size-8 cursor-pointer items-center justify-center rounded text-lg hover:bg-hover"
-                  >
-                    {e}
-                  </button>
-                )}
-              </For>
-            </div>
-          </section>
-        )}
-      </For>
     </div>
   );
 }

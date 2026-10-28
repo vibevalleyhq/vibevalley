@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { Channel, WorkspaceState } from "@vibevalley/protocol";
-import { archivedOf, groupsOf, messagePath, orchestratorTyping, pointedAt, threadsIn, topsOf } from "./rules";
+import { archivedOf, groupsOf, linkedMessages, messagePath, orchestratorTyping, pointedAt, switchTargets, threadsIn, topsOf } from "./rules";
 
 const at = (id: string): Channel => ({ id, type: "channel", replies: 0, at: 0 });
 const state = (orchestrator: WorkspaceState["orchestrator"], where?: string): WorkspaceState => ({
@@ -45,4 +45,37 @@ test("a message's address names its number, which the page reads back", () => {
   expect(messagePath({ ...at("g"), default: true }, 3)).toBe("/chat?m=3");
   expect(pointedAt("/chat/c1?m=7")).toBe(7);
   expect(pointedAt("/chat/c1")).toBeUndefined();
+});
+
+test("Ctrl+K lists places by what is typed: a name starting with it first, then the unread, then the newest", () => {
+  const chat = {
+    channels: [
+      { ...at("g"), default: true, name: "general", at: 1 },
+      { ...at("f"), name: "frontend", category: "dev", at: 5 },
+      { ...at("b"), name: "backend", unread: 2, at: 2 },
+      { ...at("old"), name: "front-old", archived: 9, at: 9 },
+      { ...at("d"), type: "direct" as const, peer: "profile:lab", title: "Lab", at: 3 },
+      { ...at("t"), type: "thread" as const, parent: "f", title: "the front page", at: 4 },
+    ],
+  };
+  const profiles = [
+    { id: "lab", name: "Lab" },
+    { id: "docs", name: "Docs" },
+  ];
+  const ids = (q: string) => switchTargets(chat, q, { profiles }).map((t) => t.id);
+  expect(ids("")).toEqual(["b", "f", "t", "d", "g", "docs"]);
+  expect(ids("front")).toEqual(["f", "t"]);
+  expect(ids("#end")).toEqual(["b", "f"]);
+  expect(ids("@")).toEqual(["d", "docs"]);
+  expect(switchTargets(chat, "front", { profiles })[1]).toMatchObject({ kind: "thread", hint: "#frontend" });
+});
+
+test("a message's links to farm messages are read from any host for a known channel, the default's only from this one", () => {
+  const chat = { channels: [{ ...at("01a17e65-9647-7222-9a7d-06132e9d4dae") }, { ...at("g"), default: true }] };
+  const known = "01a17e65-9647-7222-9a7d-06132e9d4dae";
+  const text = `看这条 http://127.0.0.1:8787/chat/${known}?m=7 还有 http://192.168.1.5:8787/chat/${known}?m=7 和 http://127.0.0.1:8787/chat?m=3、http://other:1/chat?m=4 http://x/chat/01a17e65-0000-7222-9a7d-06132e9d4dae?m=1`;
+  expect(linkedMessages(text, chat, "127.0.0.1:8787")).toEqual([
+    { channel: known, number: 7 },
+    { channel: "g", number: 3 },
+  ]);
 });
