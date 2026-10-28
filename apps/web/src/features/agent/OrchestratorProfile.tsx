@@ -4,7 +4,7 @@
 import { agentsWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
-import { type Agent, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { useRouter } from "../../base/router";
@@ -15,9 +15,7 @@ import { Button } from "../../ui/Button";
 import { OrchestratorFace } from "../../ui/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
 import { orchestratorHref, orchestratorLooks } from "../orchestrator";
-
-/** The runtime every orchestrator runs on: the server refuses an orchestrator on any other. */
-const orchestratorRuntime = "vibevalley";
+import { FromTemplate } from "./FromTemplate";
 
 export function newOrchestrator(): Agent {
   return {
@@ -128,6 +126,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
             </Button>
           </span>
         </div>
+        <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
         <p class="text-sm text-muted">
           {agentsWording().orchestrator.intro}{" "}
           <Show when={props.saved}>

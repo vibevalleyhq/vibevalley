@@ -90,7 +90,7 @@ type Caller struct {
 
 ### 做到哪了
 
-档案那半边 2026-10-17 做了：档案 `orchestrator` 在加载时补上（`agent/agent.ts` 的 `orchestratorProfile`），`Agents()` 是派活用的档案（不含管家），`All()` 是全部，`agent.list` 返回全部；删管家、把它的农机换掉被拒绝；`Issue.Hire` 拒绝派给管家；管家的模型从档案读（`orchestrator/orchestrator.ts` 的 `modelOf`），配置的 `orchestrator` 段、`protocol.Runtime` 枚举和 `OrchestratorMemory.Runtime` 删了。页面的 `DeskConfig` 把管家的档案单放在 `orchestrator`，各处的档案列表里没有它。记忆合成 `memory.list`、`recall`、`create`、`delete`（`/api/v1/memories/{agent}`，管家是 `orchestrator`）。帮工的 `memory_search`、`memory_add` 经 `/mcp` 也有了（7ddb14d），和管家的是两份实现。
+档案那半边 2026-10-17 做了：档案 `orchestrator` 在加载时补上（从内置的模板 `agent/templates/orchestrator` 装），`Agents()` 是派活用的档案（不含管家），`All()` 是全部，`agent.list` 返回全部；删管家、把它的农机换掉被拒绝；`Issue.Hire` 拒绝派给管家；管家的模型从档案读（`orchestrator/orchestrator.ts` 的 `modelOf`），配置的 `orchestrator` 段、`protocol.Runtime` 枚举和 `OrchestratorMemory.Runtime` 删了。页面的 `DeskConfig` 把管家的档案单放在 `orchestrator`，各处的档案列表里没有它。记忆合成 `memory.list`、`recall`、`create`、`delete`（`/api/v1/memories/{agent}`，管家是 `orchestrator`）。帮工的 `memory_search`、`memory_add` 经 `/mcp` 也有了（7ddb14d），和管家的是两份实现。
 
 工具表（第 2 节的目录）2026-10-18 做了：`apps/server/src/tool` 排在 `task` 之后、`orchestrator` 之前，按事情分文件（`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`），管家的 23 个工具和帮工的 6 个都搬了进去；`tool/tool.ts`、`tool/schemas.ts` 删了，管家经 `tool.Service.Orchestrator` 拿工具，调用者从它正在回答的输入取；`apps/server/src/mcp` 只剩认证和把 `tool.Service.Session` 的工具注册到 `/mcp`。读频道合成一个 `read_chat`（帮工原来叫 `channel_read`，管家的多了 `unread`、`before`、`limit`）；记性的两个工具各一个函数，按调用者选写法。哪些工具给谁现在还是两张写死的表（`Orchestrator`、`Session`），没有 `Can`。
 

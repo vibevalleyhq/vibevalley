@@ -3,7 +3,7 @@
 // the host interface reaches the main process. Which calls ring is apps/web/src/features/notice/tray.ts's (its own tests).
 
 import { _electron as electron, expect, test } from "@playwright/test";
-import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
@@ -13,6 +13,12 @@ import type { Notice } from "@vibevalley/protocol/host";
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
 // own logins (~/.pi, ~/.claude, …) stay out of reach.
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_/;
+/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
+ * starts with, as a farm whose agent.starters names them. */
+const starters = () =>
+  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
+    .filter((id) => id !== "orchestrator")
+    .join(",");
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
 test("the desktop app shows the live board and sends a notice", async () => {
@@ -94,7 +100,14 @@ test("the island follows the issues in flight and opens one", async () => {
   const app = await electron.launch({
     args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
     // The server's pi is the scripted helper (apps/server src/testing/helper.ts): an issue can really be worked.
-    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work"), VIBEVALLEY_TEST_RUNTIMES: "1" },
+    env: {
+      ...cleanEnv(),
+      HOME: dir,
+      VIBEVALLEY_HOME: join(dir, "home"),
+      VIBEVALLEY_WORK_ROOT: join(dir, "work"),
+      VIBEVALLEY_TEST_RUNTIMES: "1",
+      VIBEVALLEY_AGENT_STARTERS: starters(),
+    },
   });
   type Probe = {
     glance?: { working: number; waiting: number; strip: { working: string; waiting: string }; rows: { issue: string; tone: string; doing: string }[] };

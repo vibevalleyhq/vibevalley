@@ -1,12 +1,13 @@
-import { chmodSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { Cause, Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Agents, layer, orchestratorRuntime, withCast } from "./agent.ts";
-import { defaultSettings, seedAgents } from "./seed.ts";
+import { Agents, layer, withCast } from "./agent.ts";
+import { defaultSettings } from "./seed.ts";
+import { starter } from "../testing/layers.ts";
 
 const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
@@ -106,7 +107,7 @@ describe("profiles", () => {
 
   it.effect("a profile whose look lacks a build and a head is filled in, and nothing is set aside", () => {
     const config = testConfig();
-    const mine = { ...seedAgents().find((a) => a.id === "lab")!, id: "mine", name: "我的" };
+    const mine = { ...starter("lab"), id: "mine", name: "我的" };
     const { build: _, head: __, ...look } = mine.look;
     const raw = JSON.stringify({
       agents: [{ ...mine, look }],
@@ -194,6 +195,73 @@ describe("profiles", () => {
       }),
     ),
   );
+
+  it.effect("a new farm has only the default orchestrator, and the starters the configuration names", () =>
+    run(
+      testConfig({ agent: { model: "", starters: [] } }),
+      Effect.gen(function* () {
+        const s = yield* Agents;
+        expect(s.all().map((a) => [a.id, a.from?.template])).toEqual([[defaultOrchestrator, defaultOrchestrator]]);
+      }),
+    ).pipe(
+      Effect.andThen(
+        run(
+          testConfig({ agent: { model: "", starters: ["docs", "nobody", "lab"] } }),
+          Effect.map(Agents, (s) => expect(s.all().map((a) => a.id)).toEqual([defaultOrchestrator, "docs", "lab"])),
+        ),
+      ),
+    ),
+  );
+
+  it.effect("a template installs as many profiles as asked, and an update is taken only when asked", () =>
+    run(
+      testConfig(),
+      Effect.gen(function* () {
+        const s = yield* Agents;
+        const second = yield* s.installTemplate("backend");
+        expect([second.id, second.name, second.from]).toEqual(["backend-2", "后端老周 2", { template: "backend", version: 1 }]);
+        expect(s.templates().find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
+        expect((yield* Effect.flip(s.installTemplate("nobody")))._tag).toBe("Missing");
+        // The owner's changes stay until the profile is made again from the template; the machine's stay after it too.
+        yield* s.saveAgent({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
+        const again = yield* s.updateFromTemplate("backend-2");
+        expect([again.name, again.persona, again.env, again.from?.version]).toEqual(["后端二号", starter("backend").persona, { CI: "1" }, 1]);
+        const hand = yield* s.createAgent(draft({ name: "手捏的" }));
+        expect((yield* Effect.flip(s.updateFromTemplate(hand.id)))._tag).toBe("Refused");
+      }),
+    ),
+  );
+
+  it.effect("a template folder on this machine is added beside the built-in ones, installed, and deleted", () => {
+    const config = testConfig();
+    const folder = join(config.home, "lead-template");
+    mkdirSync(folder);
+    writeFileSync(join(folder, "agent.json"), JSON.stringify({ id: "lead", version: 2, role: "orchestrator", name: "组长", duty: "专管前端" }));
+    writeFileSync(join(folder, "persona.md"), "你专管前端的工单。\n");
+    writeFileSync(join(folder, "notes.txt"), "not a template's");
+    const broken = join(config.home, "broken-template");
+    mkdirSync(broken);
+    writeFileSync(join(broken, "agent.json"), JSON.stringify({ id: "Bad Id", version: 1, role: "worker", name: "坏的", runtime: "pi" }));
+    return run(
+      config,
+      Effect.gen(function* () {
+        const s = yield* Agents;
+        expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/) });
+        expect((yield* Effect.flip(s.addTemplate(join(config.home, "nowhere"))))._tag).toBe("Refused");
+        const added = yield* s.addTemplate(folder);
+        expect([added.source, added.runtime, added.persona]).toEqual(["added", orchestratorRuntime, "你专管前端的工单。"]);
+        expect(readdirSync(join(config.home, "agent-templates", "lead")).sort()).toEqual(["agent.json", "persona.md"]);
+        expect((yield* Effect.flip(s.addTemplate(folder)))._tag).toBe("Refused");
+        const lead = yield* s.installTemplate("lead");
+        expect([lead.role, s.isOrchestrator(lead.id)]).toEqual(["orchestrator", true]);
+        expect((yield* s.previewDeleteTemplate("lead")).does[0]).toContain("1 份档案留着");
+        expect((yield* Effect.flip(s.deleteTemplate("backend")))._tag).toBe("Refused");
+        yield* s.deleteTemplate("lead");
+        expect(s.templates().some((t) => t.id === "lead")).toBe(false);
+        expect(s.agent(lead.id)?.from).toEqual({ template: "lead", version: 2 });
+      }),
+    );
+  });
 
   it.effect("creation gives distinct ids; a draft with an id is refused", () =>
     run(

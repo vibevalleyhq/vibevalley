@@ -1,10 +1,22 @@
 // What the profiles, the skills and VibeValley's own agent say to the owner: refusals, what a delete would do, the
-// orchestrator's profile as it is made, and the errors of its own agent that reach the owner.
+// templates, and the errors of its own agent that reach the owner.
 
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {
-  orchestrator: { name: "管家", duty: "替主人派活、转告结果" },
+  template: {
+    unreadable: (file: string, why: string) => `模板读不通：${file}（${why}）`,
+    noFile: (file: string) => `不是模板：没有 ${file}`,
+    badId: (file: string, id: string) => `模板的 id「${id}」不行（${file}）：只能用小写字母、数字和 -，最多 32 个字`,
+    badVersion: (file: string) => `模板的 version 要是 1 以上的整数（${file}）`,
+    noRuntime: (file: string) => `帮工的模板要写推荐的农机 runtime（${file}）`,
+    noTemplate: (id: string) => `没有 ${id} 这个模板`,
+    taken: (id: string) => `已经有叫 ${id} 的模板了`,
+    builtIn: (id: string) => `${id} 是内置的模板，删不了`,
+    notFrom: (name: string) => `「${name}」不是从模板装的`,
+    gone: (name: string, template: string) => `「${name}」的模板 ${template} 不在了`,
+    delete: (name: string, installed: number) => `删掉模板「${name}」` + (installed > 0 ? `：从它装的 ${installed} 份档案留着` : ""),
+  },
   notSaved: (file: string, why: string) => `没存下来：${file} 写不进去（${why}）`,
   orchestratorStays: "默认管家删不了：每个农场至少有一个管家",
   defaultStaysOrchestrator: "默认管家只能是管家：每个农场至少有一个管家",
@@ -25,7 +37,19 @@ const zh = {
 };
 
 const en: typeof zh = {
-  orchestrator: { name: "Manager", duty: "Hands out the owner's work and reports back" },
+  template: {
+    unreadable: (file, why) => `The template does not read: ${file} (${why})`,
+    noFile: (file) => `Not a template: there is no ${file}`,
+    badId: (file, id) => `The template id "${id}" will not do (${file}): lowercase letters, digits and - only, up to 32`,
+    badVersion: (file) => `A template's version is a whole number from 1 (${file})`,
+    noRuntime: (file) => `A helper's template names the machine it is for, runtime (${file})`,
+    noTemplate: (id) => `There is no template ${id}`,
+    taken: (id) => `There is a template ${id} already`,
+    builtIn: (id) => `${id} is built in and cannot be deleted`,
+    notFrom: (name) => `"${name}" was not installed from a template`,
+    gone: (name, template) => `"${name}"'s template ${template} is gone`,
+    delete: (name, installed) => `Delete the template "${name}"` + (installed > 0 ? `: the ${installed} profiles installed from it stay` : ""),
+  },
   notSaved: (file, why) => `Not saved: could not write ${file} (${why})`,
   orchestratorStays: "The default manager cannot be deleted: every farm has at least one manager",
   defaultStaysOrchestrator: "The default manager stays a manager: every farm has at least one",

@@ -277,10 +277,25 @@ export class VibeValleyApi {
     delete: (a: { id: string }): Promise<void> => this.call("/api/v1/agent/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/agent/previewDelete", a) as Promise<T.Preview>,
+    template: {
+      /** The templates a profile can be installed from: the built-in ones, then those added on this machine. */
+      list: (): Promise<T.AgentTemplate[]> => this.call("/api/v1/agent/template/list", undefined) as Promise<T.AgentTemplate[]>,
+      /** A new profile from a template; installing one again makes another. */
+      install: (a: { id: string }): Promise<T.Agent> => this.call("/api/v1/agent/template/install", a) as Promise<T.Agent>,
+      /** A profile made again from its template's version now: what came from the template is replaced, what is the
+       * machine's (environment, default project, on or off) stays. */
+      update: (a: { agent: string }): Promise<T.Agent> => this.call("/api/v1/agent/template/update", a) as Promise<T.Agent>,
+      /** A template folder on this machine copied in beside the built-in ones; nothing is installed. */
+      add: (a: { path: string }): Promise<T.AgentTemplate> => this.call("/api/v1/agent/template/add", a) as Promise<T.AgentTemplate>,
+      /** An added template gone; the profiles installed from it stay. */
+      delete: (a: { id: string }): Promise<void> => this.call("/api/v1/agent/template/delete", a) as Promise<void>,
+      /** What deleting the template would do, refused as it would be; nothing changes. */
+      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/agent/template/previewDelete", a) as Promise<T.Preview>,
+    },
   };
 
   readonly memory = {
-    /** An agent's memories: the orchestrator's (agent orchestrator) are the lines of its MEMORY.md, with the file and how many of the newest
+    /** An agent's memories: an orchestrator's are the lines of its MEMORY.md, with the file and how many of the newest
      * its prompt carries; every other agent's are rows. */
     list: (a: { agent: string }): Promise<T.MemoryList> => this.call("/api/v1/memory/list", a) as Promise<T.MemoryList>,
     /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */

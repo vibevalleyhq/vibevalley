@@ -28,6 +28,7 @@ export const lookIn = {
   doc: listed("doc", commandOf("doc.list")),
   agent: listed("agent", commandOf("agent.list")),
   skill: listed("skill", commandOf("skill.list")),
+  template: listed("template", commandOf("agent.template.list")),
   recurrence: listed("recurrence", commandOf("recurrence.list")),
   device: listed("device", commandOf("lan.get")),
   archive: listed("archive", commandOf("orchestrator.archive.list")),

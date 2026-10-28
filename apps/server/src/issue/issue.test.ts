@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
-import { seedAgents } from "../agent/seed.ts";
+import { starter } from "../testing/layers.ts";
 import { Cause, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -20,7 +20,7 @@ import { Issues } from "./issue.ts";
 import { until } from "../testing/until.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
+const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())) });
 

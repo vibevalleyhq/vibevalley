@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,6 +11,13 @@ export interface VerificationResult {
   evidence: string;
   address: string;
 }
+
+/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
+ * starts with, as a farm whose agent.starters names them. */
+const starters = () =>
+  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "apps", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
+    .filter((id) => id !== "orchestrator")
+    .join(",");
 
 function isolatedEnvironment(home: string, work: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -30,6 +37,7 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
     VIBEVALLEY_PORT: "0",
     VIBEVALLEY_VOICE_LINE_PORT: "0",
     VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
+    VIBEVALLEY_AGENT_STARTERS: starters(),
   };
 }
 

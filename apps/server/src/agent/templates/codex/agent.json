@@ -1,0 +1,20 @@
+{
+  "id": "codex",
+  "version": 1,
+  "role": "worker",
+  "name": "Codex 老匠",
+  "duty": "照工单把功能做出来，改到测试通过",
+  "tags": ["实现", "功能", "修复", "改到通过", "codex"],
+  "runtime": "codex",
+  "worktree": true,
+  "look": {
+    "eye": "#a6f4ff",
+    "build": "treads",
+    "head": "terminal",
+    "body": "#3d434a",
+    "trim": "#d8dadc",
+    "hat": "#f4f3ee",
+    "species": "fox",
+    "outfit": "rain"
+  }
+}

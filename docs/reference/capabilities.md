@@ -163,6 +163,12 @@
 | `agent.update` | `/api/v1/agent/update` | ✓ |   |   |   |
 | `agent.delete` | `/api/v1/agent/delete` | ✓ |   |   |   |
 | `agent.previewDelete` | `/api/v1/agent/previewDelete` | ✓ |   |   |   |
+| `agent.template.list` | `/api/v1/agent/template/list` | ✓ | ✓ |   |   |
+| `agent.template.install` | `/api/v1/agent/template/install` | ✓ |   |   |   |
+| `agent.template.update` | `/api/v1/agent/template/update` | ✓ |   |   |   |
+| `agent.template.add` | `/api/v1/agent/template/add` | ✓ |   |   |   |
+| `agent.template.delete` | `/api/v1/agent/template/delete` | ✓ |   |   |   |
+| `agent.template.previewDelete` | `/api/v1/agent/template/previewDelete` | ✓ |   |   |   |
 
 ## memory
 

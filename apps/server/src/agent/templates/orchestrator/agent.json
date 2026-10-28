@@ -1,0 +1,11 @@
+{
+  "id": "orchestrator",
+  "version": 1,
+  "role": "orchestrator",
+  "name": "管家",
+  "duty": "替主人派活、转告结果",
+  "tags": [],
+  "look": {
+    "orchestrator": "farmer"
+  }
+}

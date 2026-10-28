@@ -216,7 +216,20 @@ export interface Handlers<R = never> {
   readonly "agent.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "agent.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  /** An agent's memories: the orchestrator's (agent orchestrator) are the lines of its MEMORY.md, with the file and how many of the newest
+  /** The templates a profile can be installed from: the built-in ones, then those added on this machine. */
+  readonly "agent.template.list": () => Effect.Effect<T.AgentTemplate[], ApiError, R>;
+  /** A new profile from a template; installing one again makes another. */
+  readonly "agent.template.install": (a: { readonly id: string }) => Effect.Effect<T.Agent, ApiError, R>;
+  /** A profile made again from its template's version now: what came from the template is replaced, what is the
+   * machine's (environment, default project, on or off) stays. */
+  readonly "agent.template.update": (a: { readonly agent: string }) => Effect.Effect<T.Agent, ApiError, R>;
+  /** A template folder on this machine copied in beside the built-in ones; nothing is installed. */
+  readonly "agent.template.add": (a: { readonly path: string }) => Effect.Effect<T.AgentTemplate, ApiError, R>;
+  /** An added template gone; the profiles installed from it stay. */
+  readonly "agent.template.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What deleting the template would do, refused as it would be; nothing changes. */
+  readonly "agent.template.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  /** An agent's memories: an orchestrator's are the lines of its MEMORY.md, with the file and how many of the newest
    * its prompt carries; every other agent's are rows. */
   readonly "memory.list": (a: { readonly agent: string }) => Effect.Effect<T.MemoryList, ApiError, R>;
   /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
@@ -882,6 +895,49 @@ export const endpoints: readonly Endpoint[] = [
   },
   {
     op: "agent.previewDelete",
+    about: ["id"],
+    input: agentDeleteInput,
+    result: S.Preview,
+    can: ["owner"],
+  },
+  {
+    op: "agent.template.list",
+    about: [],
+    input: undefined,
+    result: Schema.mutable(Schema.Array(S.AgentTemplate)),
+    can: ["owner", "remote"],
+  },
+  {
+    op: "agent.template.install",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.Agent,
+    can: ["owner"],
+  },
+  {
+    op: "agent.template.update",
+    about: ["agent"],
+    input: input({ agent: Schema.String }),
+    result: S.Agent,
+    can: ["owner"],
+  },
+  {
+    op: "agent.template.add",
+    about: ["path"],
+    input: input({ path: Schema.String }),
+    result: S.AgentTemplate,
+    can: ["owner"],
+  },
+  {
+    op: "agent.template.delete",
+    about: ["id"],
+    input: agentDeleteInput,
+    result: undefined,
+    can: ["owner"],
+    dryRun: "agent.template.previewDelete",
+  },
+  {
+    op: "agent.template.previewDelete",
     about: ["id"],
     input: agentDeleteInput,
     result: S.Preview,

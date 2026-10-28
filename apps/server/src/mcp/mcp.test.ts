@@ -3,7 +3,7 @@ import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
 import { Said } from "../testing/said.ts";
-import { seedAgents } from "../agent/seed.ts";
+import { starter } from "../testing/layers.ts";
 import { Effect } from "effect";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -15,7 +15,7 @@ import { Mcp } from "./mcp.ts";
 import { until, waitFor } from "../testing/until.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
+const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 interface Answer {
   readonly result?: { readonly content?: { readonly text: string }[]; readonly tools?: { readonly name: string }[] };

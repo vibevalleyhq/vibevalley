@@ -6,7 +6,7 @@ import type { Session as RuntimeSession } from "@botiverse/oar";
 import { describe, expect, it } from "@effect/vitest";
 import { TestClock } from "effect/testing";
 import type { Agent, Session } from "@vibevalley/protocol";
-import { seedAgents } from "../agent/seed.ts";
+import { starter } from "../testing/layers.ts";
 import { Agents } from "../agent/agent.ts";
 import { Cause, Clock, Effect, Exit, Fiber, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -20,7 +20,7 @@ import { Sessions, type SessionsInside, watchStalls } from "./session.ts";
 import { until, waitFor } from "../testing/until.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
+const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
 const worker = (turns: ScriptedTurn[]) =>

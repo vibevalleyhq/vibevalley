@@ -19,7 +19,9 @@ export interface Config {
   readonly port: number;
   /** The built page (apps/web/dist), served at / beside the API. Empty: no page. */
   readonly web: string;
-  readonly agent: { readonly model: string };
+  /** starters: the built-in templates a new farm installs beside its default orchestrator, by id, in order; in the
+   * environment, comma-separated. */
+  readonly agent: { readonly model: string; readonly starters: readonly string[] };
   /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
   readonly deepseek: { readonly apiKey: string };
   readonly agora: { readonly appId: string; readonly appCertificate: string };
@@ -53,7 +55,7 @@ export function defaults(home = homedir()): Config {
     db: "",
     port: 8787,
     web: "",
-    agent: { model: "" },
+    agent: { model: "", starters: [] },
     deepseek: { apiKey: "" },
     agora: { appId: "", appCertificate: "" },
     voice: { id: "", line: { port: 8788, url: "" } },
@@ -91,7 +93,7 @@ const keys = (d: Config) =>
     db: text("db", d.db),
     port: port("port", d.port),
     web: text("web", d.web),
-    agent: Keys.nested(Keys.all({ model: text("model", d.agent.model) }), "agent"),
+    agent: Keys.nested(Keys.all({ model: text("model", d.agent.model), starters: list("starters") }), "agent"),
     deepseek: Keys.nested(Keys.all({ apiKey: text("api_key", d.deepseek.apiKey) }), "deepseek"),
     agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: text("app_certificate", d.agora.appCertificate) }), "agora"),
     voice: Keys.nested(

@@ -1,7 +1,7 @@
-// The seeds (seeds.json, template_catalog.json): the first profiles, the achievements, the runtimes' presets and the
-// templates, in the farm's language. The .en files say the same as the Chinese but for their words (seed.test.ts).
+// The seeds (seeds.json, template_catalog.json): the achievements, the runtimes' presets and settings, and the issue
+// templates, in the farm's language (a profile's templates are folders, template.ts). The .en files say the same as the Chinese but for their words (seed.test.ts).
 
-import type { AchievementDef, Agent, RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
+import type { AchievementDef, RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
 import { currentLocale } from "@vibevalley/protocol/words";
 import seedsZh from "./seeds.json";
 import seedsEn from "./seeds.en.json";
@@ -13,9 +13,6 @@ const catalog = () => (currentLocale() === "en" ? catalogEn : catalogZh);
 
 /** In the order the page shows them. */
 export const achievements = () => seeds().achievements as AchievementDef[];
-
-/** The profiles a new farm starts with: a copy each call. */
-export const seedAgents = (): Agent[] => structuredClone(seeds().agents) as Agent[];
 
 export const defaultSettings = (): RuntimeSettings => ({
   ...(seeds().defaultSettings as RuntimeSettings),
