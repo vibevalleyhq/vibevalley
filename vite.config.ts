@@ -22,7 +22,7 @@ export default defineConfig({
       // db:check is a script: it reads ../effect-sqlc, outside what the cache can see.
       "server:check": [
         "vp check",
-        "vp run --filter @vibevalley/protocol test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
       ],
