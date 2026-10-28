@@ -99,7 +99,7 @@ describe("crons", () => {
         yield* drained;
         expect(due.map((d) => [d.cron.id, d.missed, d.cron.enabled])).toEqual([[made.id, false, false]]);
         const last = (yield* chat.history(general)).at(-1)!;
-        expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时「看进度」到点了：看看帮工们的进度"]);
+        expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时任务「看进度」到点了：看看帮工们的进度"]);
         expect(s.list()[0]!.enabled).toBe(false);
         yield* s.tick;
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), owner))).toMatchObject({

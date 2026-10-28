@@ -496,7 +496,7 @@ describe("the orchestrator", () => {
     const f = farm(
       (c) => {
         const result = answeredWith(c);
-        if (result !== undefined) return answer("定时：" + result);
+        if (result !== undefined) return answer("定时任务：" + result);
         const line = lastLine(c);
         if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
         return respond(c);
@@ -513,7 +513,7 @@ describe("the orchestrator", () => {
       // The farm's clock, not a wait, brings it due.
       offset = 100;
       yield* crons.tick;
-      yield* until(() => words().some((w) => w.startsWith("定时：定好了，等主人同意才生效")), "the orchestrator told it waits");
+      yield* until(() => words().some((w) => w.startsWith("定时任务：定好了，等主人同意才生效")), "the orchestrator told it waits");
       const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
       expect(mine(false)).toMatchObject([{ pending: true, by: "orchestrator" }]);
       yield* orchestrator.say("每天九点跑一遍测试", {}, undefined, "");

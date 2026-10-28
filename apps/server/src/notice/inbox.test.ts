@@ -75,7 +75,7 @@ test("each item is worded for every route: the phone, the system notice, the tra
   expect([handedBack!.who, handedBack!.words]).toEqual(["小吴", { label: "等你看", title: "小吴 做完了", body: "打卡 写好了", tray: "小吴 做完了，等你看" }]);
   expect([asked!.who, asked!.words]).toEqual([
     "管家",
-    { label: "定时等你同意", title: "管家想定一个定时", body: "「每天看测试」：同意了才开始", tray: "定时「每天看测试」等你同意" },
+    { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「每天看测试」：同意了才开始", tray: "定时任务「每天看测试」等你同意" },
   ]);
 });
 

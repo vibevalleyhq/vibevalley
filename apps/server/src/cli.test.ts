@@ -112,7 +112,7 @@ describe("the command line", () => {
       const list = (args: string[]) => Effect.map(run(args), (r) => JSON.parse(r.out) as unknown);
 
       const cron = doc(yield* run(["cron", "create"], { name: "早上看看", text: "看看昨天的改动", when: { kind: "daily", time: "09:00" } }));
-      expect(doc(yield* run(["cron", "delete", cron.id, "--dry-run"])).does[0]).toContain("删掉定时「早上看看」");
+      expect(doc(yield* run(["cron", "delete", cron.id, "--dry-run"])).does[0]).toContain("删掉定时任务「早上看看」");
       expect(JSON.stringify(yield* list(["cron", "list"]))).toContain(cron.id);
 
       const skill = doc(yield* run(["skill", "create"], { id: "", name: "写测试", description: "先写测试", body: "先写测试再改" }));
