@@ -11,13 +11,13 @@ import {
   type Memory,
   type Priority,
   PriorityValues,
-  type Recurrence,
+  type Cron,
   type Spent,
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "../agent/seed.ts";
-import { nextText, whenText } from "../recurrence/when.ts";
+import { nextText, whenText } from "../cron/when.ts";
 import { head } from "../base/text.ts";
 import { yuan } from "../runtime/money.ts";
 import type { Handlers } from "@vibevalley/protocol/api";
@@ -149,7 +149,7 @@ export function issueDetail(issue: Issue, who: string, timeline: IssueTimeline |
   return lines.join("\n");
 }
 
-export function recurrenceLine(s: Recurrence, channel: string): string {
+export function cronLine(s: Cron, channel: string): string {
   const direct = s.agent ? "，直接派给 " + s.agent + (s.project ? " 去 " + s.project : "") : "";
   const next = s.enabled ? "下次 " + nextText(s) : nextText(s);
   return `- ${s.id} 号「${s.name}」#${channel} ${whenText(s.when, s.tz)}${direct}；${next}\n  ${s.text}`;
@@ -234,7 +234,7 @@ export const params = {
   channelMessageList: {
     id: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @owner",
   },
-  recurrence: {
+  cron: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
     at: "ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00",
     channel: "在哪个频道，比如 #clock-in；不填是你正在回话的频道",
@@ -323,10 +323,10 @@ export const descriptions = {
     "改一张工单：优先级、交付方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
   "issue.status.update":
     "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 assignee 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
-  "recurrence.create":
-    "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。when.kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（expr 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
-  "recurrence.list": "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
-  "recurrence.delete": "删掉一个定时（编号从 recurrence_list 看）。",
+  "cron.create":
+    "定一件按时间来的事：到点时频道里出现一条「⏰ 定时任务」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。when.kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（expr 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
+  "cron.list": "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
+  "cron.delete": "删掉一个定时（编号从 cron_list 看）。",
   "channel.create":
     "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
   "channel.update": "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
@@ -467,19 +467,19 @@ export const answers = {
     prOpenNote: (number: number, url: string) => `#${number} 的 PR 开着：${url}，合了才算完成`,
     moved: (line: string) => "挪好了：" + line,
   },
-  recurrence: {
+  cron: {
     noChannelShort: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看",
     badTime: (at: string) => "at 不是一个时间：" + (at || "（没填）"),
     pending: (line: string) =>
       "定好了，等主人同意才生效：\n" +
       line +
-      "\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时列表里点「同意」才开始。跟主人说一声它是做什么的。",
+      "\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时任务列表里点「同意」才开始。跟主人说一声它是做什么的。",
     confirmed: (line: string) => "定好了：\n" + line,
   },
-  listRecurrences: {
+  listCrons: {
     none: "没有定时。",
   },
-  cancelRecurrence: {
+  cancelCron: {
     canceled: (name: string) => "删掉了「" + name + "」。",
   },
   openChannel: {

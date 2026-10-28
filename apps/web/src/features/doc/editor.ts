@@ -152,13 +152,13 @@ export class DocEditor {
       this.error = reasonOf(e);
     }
     this.changed();
-    this.recurrence();
+    this.cron();
   }
 
-  private recurrence() {
+  private cron() {
     clearTimeout(this.poll);
     if (this.disposed) return;
-    this.poll = setTimeout(() => void this.refresh().then(() => this.recurrence()), this.othersWriting ? pollFast : pollEvery);
+    this.poll = setTimeout(() => void this.refresh().then(() => this.cron()), this.othersWriting ? pollFast : pollEvery);
   }
 
   private async refresh() {
@@ -184,7 +184,7 @@ export class DocEditor {
       await this.api.doc.demo({ id: this.docId });
       this.error = undefined;
       this.heardAt = this.polls;
-      this.recurrence();
+      this.cron();
     } catch (e) {
       this.error = reasonOf(e);
     }

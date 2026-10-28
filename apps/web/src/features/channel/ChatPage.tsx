@@ -44,7 +44,7 @@ import { toast } from "../../ui/toasts";
 import { Dialog } from "../../ui/Dialog";
 import { Select } from "../../ui/Field";
 import { MessageList } from "./MessageList";
-import { Jobs, Recurrences } from "./Tabs";
+import { Jobs, Crons } from "./Tabs";
 
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
@@ -114,12 +114,12 @@ function Chat() {
   );
 }
 
-type Tab = "chat" | "jobs" | "recurrences";
+type Tab = "chat" | "jobs" | "crons";
 
 const tabs: { tab: Tab; icon: IconName; label: string }[] = [
   { tab: "chat", icon: "chat", label: t("web.channel.tab.chat") },
   { tab: "jobs", icon: "issues", label: t("web.channel.tab.jobs") },
-  { tab: "recurrences", icon: "clock", label: t("web.channel.tab.recurrences") },
+  { tab: "crons", icon: "clock", label: t("web.channel.tab.crons") },
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
@@ -276,8 +276,8 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <Show when={tab() === "jobs"}>
               <Jobs channel={c()} />
             </Show>
-            <Show when={tab() === "recurrences"}>
-              <Recurrences channel={c()} />
+            <Show when={tab() === "crons"}>
+              <Crons channel={c()} />
             </Show>
             <ChannelSettingsDialog channel={c()} open={settings()} onClose={() => setSettings(false)} onGone={() => router.navigate("/chat")} />
           </>

@@ -26,7 +26,7 @@
     "done": "做过了",
     "off": "关着"
   },
-  "cron": {
+  "expr": {
     "fields": {
       "0": "分钟",
       "1": "小时",
@@ -39,20 +39,20 @@
     "never": "这个 cron 永远不会到点：{expr}"
   },
   "problem": {
-    "noName": "定时要有个名字",
-    "noText": "定时要写到点了做什么",
+    "noName": "定时任务要有个名字",
+    "noText": "定时任务要写到点了做什么",
     "zone": "不认识这个时区：{tz}",
     "past": "一次性的时间要在以后",
     "every": "间隔至少 {min} 分钟",
     "time": "时间写成 HH:MM，比如 09:00：{time}",
     "days": "每周的哪几天：0 到 6，0 是周日",
-    "kind": "不认识这种定时"
+    "kind": "不认识这种定时任务"
   },
-  "due": "{missed, select, true {⏰ 定时「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时「{name}」到点了：{text}}}",
-  "noRecurrence": "没有 {id} 号定时",
+  "due": "{missed, select, true {⏰ 定时任务「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时任务「{name}」到点了：{text}}}",
+  "noCron": "没有 {id} 号定时任务",
   "noChannel": "没有 {name} 这个频道",
   "noProfile": "没有叫 {name} 的档案",
-  "noProject": "#{channel} 没有默认项目：直接派给帮工的定时要写 project",
-  "remove": "删掉定时「{name}」：以后不再到点开工，它开过的工单留着",
-  "removeWhen": "删掉定时「{name}」（{when}）：以后不再到点开工，它开过的工单留着"
+  "noProject": "#{channel} 没有默认项目：直接派给帮工的定时任务要写 project",
+  "remove": "删掉定时任务「{name}」：以后不再到点开工，它开过的工单留着",
+  "removeWhen": "删掉定时任务「{name}」（{when}）：以后不再到点开工，它开过的工单留着"
 }

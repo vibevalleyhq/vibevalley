@@ -8,7 +8,7 @@
     "agent": "列出档案，找它的 id",
     "skill": "列出技能，找它的 id",
     "template": "列出模板，找它的 id",
-    "recurrence": "列出定时，找它的 id",
+    "cron": "列出定时任务，找它的 id",
     "device": "看连着的设备，找它的 id",
     "archive": "列出管家的旧账",
     "channel": "列出频道，找它的 id",

@@ -12,7 +12,7 @@ export const patrolBrief = {
   graphReady: (title: string, id: string) => "计划「" + title + "」（" + id + "）都做完了，{ago}还没合进主分支",
   taskFailed: (title: string, id: string, task: string, taskTitle: string, why: string) =>
     "计划「" + title + "」（" + id + "）的步骤 " + task + "「" + taskTitle + "」没做成，{ago}没人管了" + (why !== "" ? "：" + why : ""),
-  recurrence: (name: string, id: string) => "定时「" + name + "」（" + id + "）等主人同意，{ago}了",
+  cron: (name: string, id: string) => "定时「" + name + "」（" + id + "）等主人同意，{ago}了",
   mention: (name: string, address: string, text: string) => name + " 在 " + address + " 问主人的话，{ago}没人回：「" + text + "」",
 };
 

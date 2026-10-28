@@ -27,7 +27,7 @@ import {
   type Priority,
   type ProjectTemplates,
   type RunTrigger,
-  type Recurrence,
+  type Cron,
   type Session,
   type SessionId,
   type TaskGraph,
@@ -40,7 +40,7 @@ import { templateCatalog } from "../agent/seed.ts";
 import { attentionIn } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
-import { dueText } from "../recurrence/rules.ts";
+import { dueText } from "../cron/rules.ts";
 import {
   answerCureWords,
   cureWords,
@@ -77,7 +77,7 @@ import { refinement } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
 import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
-import { type Due, Recurrences } from "../recurrence/recurrence.ts";
+import { type Due, Crons } from "../cron/cron.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
@@ -89,7 +89,7 @@ export interface OrchestratorWork {
   readonly issue: Issue;
   readonly channel: string;
   readonly by: RunTrigger;
-  readonly recurrence?: Recurrence;
+  readonly cron?: Cron;
   /** What the owner said with it, asking again (another round, a reopen). */
   readonly said?: string;
 }
@@ -142,7 +142,7 @@ export interface IssueShape {
   readonly nextTaskId: () => Effect.Effect<string>;
   /** Issues for the orchestrator, subscribed before it returns. */
   readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
-  readonly ofRecurrence: (id: string) => Effect.Effect<Issue | undefined>;
+  readonly ofCron: (id: string) => Effect.Effect<Issue | undefined>;
   readonly refreshPullRequests: Effect.Effect<void>;
   readonly tryQueued: Effect.Effect<void>;
 }
@@ -233,7 +233,7 @@ export const make = (options: IssueOptions = {}) =>
     const runtimes = yield* Runtimes;
     const sessions = yield* Sessions;
     const chat = yield* Channels;
-    const recurrences = yield* Recurrences;
+    const crons = yield* Crons;
     const sql = yield* SqlClient.SqlClient;
     const { run: db, one, inTx } = yield* Db;
     const worked = new IssueSessions();
@@ -272,7 +272,7 @@ export const make = (options: IssueOptions = {}) =>
         ...(blockedBy ? { blockedBy } : {}),
         ...(graph ? { graph } : {}),
         ...(task ? { task } : {}),
-        ...(row.recurrence !== null ? { recurrence: row.recurrence } : {}),
+        ...(row.cron !== null ? { cron: row.cron } : {}),
         status: "backlog",
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
@@ -354,7 +354,7 @@ export const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, recurrence?: string, talk?: string) {
+    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, cron?: string, talk?: string) {
       const [title, description] = yield* issueWords(req);
       const id = newId();
       yield* db(
@@ -366,7 +366,7 @@ export const make = (options: IssueOptions = {}) =>
           assignee: nullText(req.assignee),
           priority: req.priority ?? "medium",
           created_at: yield* Clock.currentTimeMillis,
-          recurrence: recurrence ?? null,
+          cron: cron ?? null,
           // The orchestrator never changes code: what it is given is answered.
           deliver: req.deliver ?? (store.isOrchestrator(req.assignee ?? "") ? "answer" : "change"),
           talk: talk ?? null,
@@ -529,12 +529,12 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
-    const toOrchestrator = Effect.fn("Issues.toOrchestrator")(function* (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence, said?: string) {
+    const toOrchestrator = Effect.fn("Issues.toOrchestrator")(function* (issue: Issue, channel: string, by: RunTrigger, due?: Cron, said?: string) {
       if (isClosed(issue.status)) yield* db(q.reopenIssue({ id: issue.id }));
       const run: IssueRun = { startedAt: yield* Clock.currentTimeMillis };
       yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
       yield* publish(issue.id);
-      PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
+      PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { cron: due } : {}), ...(said ? { said } : {}) });
     });
 
     /** said: the owner's words with it, when it is asked again. */
@@ -610,12 +610,12 @@ export const make = (options: IssueOptions = {}) =>
       return hired.session.id;
     });
 
-    /** A recurrence has one issue, for the session it names or for the orchestrator; each time it comes due is a run of that issue. */
+    /** A cron has one issue, for the session it names or for the orchestrator; each time it comes due is a run of that issue. */
     const scheduled = Effect.fn("Issues.scheduled")(function* (due: Due) {
-      const s = due.recurrence;
+      const s = due.cron;
       const channel = yield* chat.topOf(s.channel);
-      const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
-      const found = yield* ofRecurrence(s.id);
+      const by: RunTrigger = { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) };
+      const found = yield* ofCron(s.id);
       let issue = found;
       if (!issue) {
         const project = s.project ?? (channel.project || undefined);
@@ -623,7 +623,7 @@ export const make = (options: IssueOptions = {}) =>
           add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? chat.orchestratorOf(channel.id) }, s.id),
         );
         if (made._tag === "Failure")
-          return yield* chat.notice(channel.id, t("server.issue.recurrenceNoIssue", { name: s.name, why: reasonOf(made.failure) }), "recurrence_refused");
+          return yield* chat.notice(channel.id, t("server.issue.cronNoIssue", { name: s.name, why: reasonOf(made.failure) }), "cron_refused");
         issue = made.success;
       }
       const text = dueText(s, due.missed);
@@ -638,11 +638,11 @@ export const make = (options: IssueOptions = {}) =>
         }),
       );
       if (result._tag === "Failure")
-        yield* chat.notice(channel.id, t("server.issue.recurrenceNoStart", { name: s.name, why: reasonOf(result.failure) }), "recurrence_refused");
+        yield* chat.notice(channel.id, t("server.issue.cronNoStart", { name: s.name, why: reasonOf(result.failure) }), "cron_refused");
     });
 
-    const ofRecurrence = Effect.fn("Issues.ofRecurrence")(function* (id: string) {
-      const row = yield* one(q.latestOfRecurrence({ recurrence: id }));
+    const ofCron = Effect.fn("Issues.ofCron")(function* (id: string) {
+      const row = yield* one(q.latestOfCron({ cron: id }));
       if (!row) return undefined;
       return Option.getOrUndefined(yield* Effect.option(get(row.id)));
     });
@@ -934,7 +934,7 @@ export const make = (options: IssueOptions = {}) =>
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
     const finished = yield* sessions.finishedRuns;
-    const due = yield* recurrences.due;
+    const due = yield* crons.due;
     const logged =
       (what: string) =>
       <A, E>(e: Effect.Effect<A, E>) =>
@@ -960,7 +960,7 @@ export const make = (options: IssueOptions = {}) =>
         }),
       ),
     );
-    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`recurrence ${d.recurrence.id}`))));
+    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`cron ${d.cron.id}`))));
     if (options.background ?? true) {
       // Each waits a period before its first run, then runs every period.
       const tryEvery = options.tryEveryMs ?? 5000;
@@ -1251,7 +1251,7 @@ export const make = (options: IssueOptions = {}) =>
       }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
-      ofRecurrence,
+      ofCron,
       refreshPullRequests,
       tryQueued,
     };

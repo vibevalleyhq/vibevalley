@@ -144,14 +144,14 @@ export class VibeValleyApi {
     },
   };
 
-  readonly recurrence = {
-    create: (a: T.RecurrenceRequest): Promise<T.Recurrence> => this.call("/api/v1/recurrence/create", a) as Promise<T.Recurrence>,
-    list: (): Promise<T.Recurrence[]> => this.call("/api/v1/recurrence/list", undefined) as Promise<T.Recurrence[]>,
+  readonly cron = {
+    create: (a: T.CronRequest): Promise<T.Cron> => this.call("/api/v1/cron/create", a) as Promise<T.Cron>,
+    list: (): Promise<T.Cron[]> => this.call("/api/v1/cron/list", undefined) as Promise<T.Cron[]>,
     /** Only what the body gives changes. */
-    update: (a: { id: string } & T.RecurrenceUpdate): Promise<void> => this.call("/api/v1/recurrence/update", a) as Promise<void>,
-    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/recurrence/delete", a) as Promise<void>,
+    update: (a: { id: string } & T.CronUpdate): Promise<void> => this.call("/api/v1/cron/update", a) as Promise<void>,
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/cron/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/recurrence/previewDelete", a) as Promise<T.Preview>,
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/cron/previewDelete", a) as Promise<T.Preview>,
   };
 
   readonly voice = {

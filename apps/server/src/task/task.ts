@@ -285,7 +285,7 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(graphNews.drafted(draft.id, graphText(draft)));
     });
 
-    const recurrence = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
+    const cron = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
       let graph = get(id);
       if (!graph || graph.state !== "running") return;
       for (const task of startable(graph)) {
@@ -447,7 +447,7 @@ export const make = (options: TaskOptions = {}) =>
               if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, t("server.task.notice.helperGone"));
             }
           } else return;
-          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
+          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* cron(graph.id);
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
@@ -491,7 +491,7 @@ export const make = (options: TaskOptions = {}) =>
             yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.restarted")));
           }
         }
-        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
+        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* cron(graph.id);
       }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
@@ -563,7 +563,7 @@ export const make = (options: TaskOptions = {}) =>
         yield* put(graph, sessionActor(session!.id), t("server.task.notice.splitBy", { name: session!.name })).pipe(
           Effect.mapError((e) => refused(t("server.task.notice.splitNotSaved", { branch, why: reasonOf(e) }))),
         );
-        yield* recurrence(graph.id);
+        yield* cron(graph.id);
         yield* notice("info", t("server.task.notice.split", { name: session!.name, title: graph.title, n: tasks.length }));
         yield* tellOrchestrator(graphNews.split(session!.name, graph.id, tasks.length, graphText(graph)));
         return graphTell.split(graph.title, tasks.length, branch);
@@ -591,7 +591,7 @@ export const make = (options: TaskOptions = {}) =>
             yield* put(withNote({ ...graph, state: "running", branch }, ""), by).pipe(
               Effect.mapError((e) => refused(t("server.task.act.startNotSaved", { branch, why: reasonOf(e) }))),
             );
-            yield* recurrence(graph.id);
+            yield* cron(graph.id);
             return t("server.task.act.started", { title: graph.title, branch });
           }
           case "pause":
@@ -602,7 +602,7 @@ export const make = (options: TaskOptions = {}) =>
             if (graph.state !== "paused") return yield* not();
             yield* put(withNote({ ...graph, state: "running" }, ""), by);
             yield* resumeWorking(graph.id);
-            yield* recurrence(graph.id);
+            yield* cron(graph.id);
             return t("server.task.act.resumed", { title: graph.title });
           case "abandon": {
             if (!isOpen(graph)) return yield* not();
@@ -663,7 +663,7 @@ export const make = (options: TaskOptions = {}) =>
               withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting", tries: 0 })),
               by,
             );
-            yield* recurrence(graph.id);
+            yield* cron(graph.id);
             return t("server.task.act.requeued", { title: task.title });
           }
           case "skip": {
@@ -678,7 +678,7 @@ export const make = (options: TaskOptions = {}) =>
             if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
             yield* put(next, by);
             if (task.session) yield* dismiss(task.session);
-            yield* recurrence(graph.id);
+            yield* cron(graph.id);
             return t("server.task.act.skipped", { title: task.title });
           }
         }

@@ -156,7 +156,7 @@ export function sentTitles(all: readonly Issue[], project: string, orchestrator:
         !i.graph &&
         !i.task &&
         i.parent === undefined &&
-        i.recurrence === undefined &&
+        i.cron === undefined &&
         !isForOrchestrator(i, orchestrator),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -202,8 +202,8 @@ function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string
       return ["started", first ? t("server.issue.timeline.start") : t("server.issue.timeline.restart")];
     case "task":
       return ["started", t("server.issue.timeline.graph")];
-    case "recurrence":
-      return ["started", t("server.issue.timeline.recurrence", { missed: trigger.missed ?? false })];
+    case "cron":
+      return ["started", t("server.issue.timeline.cron", { missed: trigger.missed ?? false })];
     case "runtime":
       return ["started", t("server.issue.timeline.runtime")];
   }

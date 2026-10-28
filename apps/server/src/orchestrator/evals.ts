@@ -42,7 +42,7 @@ export interface EvalCase {
 
 export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as const;
 
-/** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or recurrences). */
+/** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). */
 export const orchestratorToolNames = () => [
   ...(Object.keys(schemas) as Op[]).map(toolName),
   ...selfTools({ home: "", skills: () => [], memory: true, now: () => 0 }).map((t) => t.name),

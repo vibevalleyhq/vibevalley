@@ -406,7 +406,7 @@ export type ChannelInUseParams = typeof ChannelInUseParams.Type
 
 
 export const ChannelInUseResult = Schema.Struct({
-  ["recurrences"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["crons"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["connectors"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["queued"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["issue_threads"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
@@ -414,7 +414,7 @@ export const ChannelInUseResult = Schema.Struct({
 export type ChannelInUseResult = typeof ChannelInUseResult.Type
 
 
-export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from recurrence r where r.channel_id = $1)::int as recurrences,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(*) from issue_queue q where q.channel = $1)::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
+export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from cron r where r.channel_id = $1)::int as crons,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(*) from issue_queue q where q.channel = $1)::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
 
 export const channelInUse = Effect.fn("ChannelInUse")(function* (params: ChannelInUseParams) {
   const sql = yield* SqlClient.SqlClient

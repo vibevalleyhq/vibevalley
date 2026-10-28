@@ -18,7 +18,7 @@
 ## 在哪
 
 - **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、默认管家（没有就从内置的 `orchestrator` 模板装上）、模板的装和更新、角色的规则（`roleProblem`，`orchestrators`、`isOrchestrator`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`packages/agent` 是 VibeValley 自己的 agent（[VibeValley 自己的 agent](docs/subsystems/brain.md)）。
-- **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时读取、今天的花费、`assess`、`resolve`、`check`；`rules.ts` 的 `agentProblems`、`moneyStop`、额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
+- **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时任务读取、今天的花费、`assess`、`resolve`、`check`；`rules.ts` 的 `agentProblems`、`moneyStop`、额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
 - **模板**：`apps/server/src/agent/template.ts` 读一个模板文件夹（`readTemplate`）、内置的目录（`builtInTemplates`，`templates/<id>/`，次序在 `templates/index.json`）、本机加进来的（`addedTemplates`，`$VIBEVALLEY_HOME/agent-templates/<id>/`），照模板做出档案（`profileOf`）和照模板更新（`updatedFrom`）。
 - **种子**：`apps/server/src/agent/seeds.json` 的 `defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seed.ts` 读它（`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
@@ -30,7 +30,7 @@
 - **角色（`role`）是封闭的两种**（`AgentRoleValues`）：`orchestrator`、`worker`，新建默认是帮工。派活用的档案（`agents()`、`named`、`chooseAgent`）只有帮工；全部档案（`all()`）和按 id 取的含管家。管家只在 `vibevalley` 上跑：保存、新建一份管家档案时农机不是它就拒绝（`roleProblem`）；默认管家（`defaultOrchestrator`）改成帮工拒绝。
 - **职责（`duty`）和适合的活（`tags`）是两个字段，用法不同。**
   - `duty` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Duty>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Duty>；适合的活：<Tags>」（`session/rules.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
-  - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
+  - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时任务，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
 - **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了或不符合形状的 `config.json` 不覆盖**：文件按档案、技能和农机设置的 Schema 读回；读取、解析或形状校验失败就改名成 `config.json.unreadable-<毫秒>` 留着，像新农场一样起；改不了名就不开机。
 - **删技能同时解除档案引用**：`deleteSkill` 在同一次 `change` 中删除技能和所有档案（包括管家）的对应技能 id，写盘失败两边都不变；再建同名技能不会让旧档案自动带上它。
@@ -110,7 +110,7 @@
 - **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`Settings`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
 - **工单（`issue`）**：`hire` 读档案、跑 `check`，有 `error` 就回「<档案> 派不出去：<原因>」；档案停用另回「<档案> 被停用了」。
 - **管家（`orchestrator`）、工具（`tool`）、计划（`task`）**：`Runtimes.candidates` 是每个档案和它现在能不能派（`assess`），`Runtimes.choose` 在其中按 `runtime/rules.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进现状。
-- **记性（`memory`）**、**定时（`recurrence`）**：`Agents` 列档案（不填档案的检索、定时派给谁）。
+- **记性（`memory`）**、**定时任务（`cron`）**：`Agents` 列档案（不填档案的检索、定时任务派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
 - **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。
 - **oar（`@botiverse/oar`）**：适配器的安装、`listModels`、账户用量、清单（技能、MCP、工具）、`refusedSessionOptions`。

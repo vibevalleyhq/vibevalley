@@ -53,11 +53,11 @@
       "label": "Calling you",
       "title": "{who} is calling you"
     },
-    "recurrence-ask": {
-      "label": "A schedule to approve",
-      "title": "The manager wants to set a schedule",
+    "cron-ask": {
+      "label": "A scheduled task to approve",
+      "title": "The manager wants to set a scheduled task",
       "body": "\"{text}\": it starts once you approve",
-      "tray": "The schedule \"{text}\" waits for your approval"
+      "tray": "The scheduled task \"{text}\" waits for your approval"
     }
   }
 }

@@ -146,26 +146,26 @@ export const parameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "project.list": Schema.Struct({}),
-  "recurrence.create": Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.agent })),
-    channel: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.channel })),
-    name: Schema.String.annotate({ description: params.recurrence.name }),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.project })),
-    text: Schema.String.annotate({ description: params.recurrence.text }),
-    tz: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.tz })),
+  "cron.create": Schema.Struct({
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.cron.agent })),
+    channel: Schema.optionalKey(Schema.String.annotate({ description: params.cron.channel })),
+    name: Schema.String.annotate({ description: params.cron.name }),
+    project: Schema.optionalKey(Schema.String.annotate({ description: params.cron.project })),
+    text: Schema.String.annotate({ description: params.cron.text }),
+    tz: Schema.optionalKey(Schema.String.annotate({ description: params.cron.tz })),
     when: Schema.Struct({
-      at: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.at })),
+      at: Schema.optionalKey(Schema.String.annotate({ description: params.cron.at })),
       days: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Finite))),
-      expr: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.expr })),
+      expr: Schema.optionalKey(Schema.String.annotate({ description: params.cron.expr })),
       kind: Schema.Literals(["once", "every", "daily", "weekly", "cron"]),
       minutes: Schema.optionalKey(Schema.Finite),
       time: Schema.optionalKey(Schema.String.annotate({ description: "HH:MM" })),
-    }).annotate({ description: params.recurrence.when }),
+    }).annotate({ description: params.cron.when }),
   }).annotate({ requiredOrder: ["name", "text", "when"] }),
-  "recurrence.delete": Schema.Struct({
+  "cron.delete": Schema.Struct({
     id: Schema.String,
   }),
-  "recurrence.list": Schema.Struct({}),
+  "cron.list": Schema.Struct({}),
   "session.list": Schema.Struct({}),
   "session.stop": Schema.Struct({
     id: Schema.String.annotate({ description: params.issueOrAgent }),
