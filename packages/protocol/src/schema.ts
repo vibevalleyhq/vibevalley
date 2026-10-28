@@ -1574,7 +1574,10 @@ export const VoiceSettings: Codec<T.VoiceSettings> = Schema.Struct({
   idleSeconds: Schema.Number,
 });
 
+export const DictationVia: Codec<T.DictationVia> = Schema.Literals(T.DictationViaValues);
+
 export const Dictation: Codec<T.Dictation> = Schema.Struct({
+  via: DictationVia,
   url: Schema.String,
   model: Schema.String,
 });
@@ -1609,6 +1612,7 @@ export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   ttsKey: KeyStatus,
   dictation: Dictation,
   dictationKey: KeyStatus,
+  dictationReady: Schema.Boolean,
   mossKey: KeyStatus,
   memorySources: Schema.mutable(Schema.Array(MemorySource)),
 });

@@ -33,14 +33,15 @@
   "manyCalls": "Several calls are connecting: update the app and try again",
   "noCall": "No call is connecting",
   "dictation": {
-    "unset": "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
+    "unset": "Dictation is not set up: fill in your own address and model under Dictation, or switch to MOSS",
     "format": "Dictation does not know recordings in {format}",
     "empty": "The recording is empty, or not base64",
     "tooLong": "The recording is too long: at most 25 MB a piece",
     "unreachable": "The dictation address cannot be reached: {why}",
     "cut": "The dictation answer broke off halfway: {why}",
     "status": "The dictation address answered {status}: {detail}",
-    "shape": "The dictation address did not answer in OpenAI's transcription format"
+    "shape": "The dictation address did not answer in OpenAI's transcription format",
+    "noMossKey": "Dictation goes through MOSS, and no MOSS API key is saved: add it under Dictation"
   },
   "moss": {
     "noKey": "No MOSS Live API key yet",

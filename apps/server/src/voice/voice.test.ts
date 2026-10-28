@@ -672,7 +672,7 @@ describe("voice", () => {
       );
       const address = server.address();
       const port = address && typeof address === "object" ? address.port : 0;
-      yield* Effect.orDie((yield* Setting).save({ dictation: { url: `http://127.0.0.1:${port}/v1`, model: "m" } }));
+      yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: `http://127.0.0.1:${port}/v1`, model: "m" } }));
       const voice = yield* Voice;
       for (let i = 0; i < 2; i++) {
         expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
@@ -694,7 +694,7 @@ describe("voice", () => {
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const setting = yield* Setting;
-      yield* Effect.orDie(setting.save({ dictation: { url: "http://dictation.test/v1", model: "whisper-1" } }));
+      yield* Effect.orDie(setting.save({ dictation: { via: "own", url: "http://dictation.test/v1", model: "whisper-1" } }));
       const dictating = yield* Effect.forkChild(voice.dictate("AAAA", "wav"));
       yield* Effect.promise(() => pending.started);
       yield* Fiber.interrupt(dictating);
@@ -707,7 +707,7 @@ describe("voice", () => {
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const setting = yield* Setting;
-      yield* Effect.orDie(setting.save({ dictation: { url: "http://dictation.test/v1", model: "whisper-1" } }));
+      yield* Effect.orDie(setting.save({ dictation: { via: "own", url: "http://dictation.test/v1", model: "whisper-1" } }));
       const dictating = yield* Effect.forkChild(Effect.flip(voice.dictate("AAAA", "wav")));
       yield* Effect.promise(() => pending.started);
       const reason = new DOMException("test timeout", "TimeoutError");
@@ -718,13 +718,60 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
   });
 
-  it.live("says dictation is not set up", () =>
+  it.live("says dictation is not set up: MOSS without its key, or an own address left empty", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
+      expect((yield* Setting).status().dictationReady).toBe(false);
+      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+        _tag: "VoiceUnavailable",
+        reason: expect.stringContaining("MOSS 的 API Key"),
+        settings: "dictation",
+      });
+      yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: "", model: "" } }));
       expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
         _tag: "VoiceUnavailable",
         reason: expect.stringContaining("听写还没配"),
       });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
+
+  it.live("dictation goes to MOSS's transcription by default, with the MOSS key", () => {
+    const sent: { url: string; auth: string | null; model: unknown; format: unknown; file: unknown }[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      sent.push({
+        url: input instanceof Request ? input.url : input.toString(),
+        auth: new Headers(init?.headers).get("authorization"),
+        model: form.get("model"),
+        format: form.get("response_format"),
+        file: (form.get("file") as File | null)?.name,
+      });
+      return new Response(JSON.stringify({ text: " 你好 " }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    return Effect.gen(function* () {
+      const setting = yield* Setting;
+      yield* Effect.orDie(setting.save({ mossKey: "sk-moss-test" }));
+      expect(setting.status().dictation.via).toBe("moss");
+      expect(setting.status().dictationReady).toBe(true);
+      const voice = yield* Voice;
+      expect(yield* voice.dictate("AAAA", "wav")).toEqual({ text: "你好" });
+      expect(sent).toEqual([
+        {
+          url: "https://api.mosi.cn/v1/audio/transcriptions",
+          auth: "Bearer sk-moss-test",
+          model: "moss-transcribe-1.0",
+          format: "json",
+          file: "dictation.wav",
+        },
+      ]);
+      // The owner's own address, chosen, keeps its own key; switching back to MOSS finds it again.
+      yield* Effect.orDie(setting.save({ dictation: { via: "own", url: "http://dictation.test/v1", model: "whisper-1" }, dictationKey: "own-key" }));
+      yield* voice.dictate("AAAA", "wav");
+      expect(sent[1]).toMatchObject({ url: "http://dictation.test/v1/audio/transcriptions", auth: "Bearer own-key", model: "whisper-1" });
+      yield* Effect.orDie(setting.save({ dictation: { via: "moss", url: "http://dictation.test/v1", model: "whisper-1" } }));
+      expect(setting.status().dictation).toEqual({ via: "moss", url: "http://dictation.test/v1", model: "whisper-1" });
+      yield* voice.dictate("AAAA", "wav");
+      expect(sent[2]).toMatchObject({ url: "https://api.mosi.cn/v1/audio/transcriptions", auth: "Bearer sk-moss-test" });
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+  });
 });

@@ -29,7 +29,7 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
   await new Promise<void>((resolve) => transcriber.listen(0, "127.0.0.1", resolve));
   try {
     const { port } = transcriber.address() as AddressInfo;
-    await api.setting.update({ dictation: { url: `http://127.0.0.1:${port}/v1`, model: "whisper" } });
+    await api.setting.update({ dictation: { via: "own", url: `http://127.0.0.1:${port}/v1`, model: "whisper" } });
     // What the capture worklet hands the page is counted, so the recording stops once there is something to send.
     await page.addInitScript(() => {
       const Real = AudioWorkletNode;

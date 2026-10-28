@@ -10,6 +10,10 @@ import { afterRealTime } from "../base/time.ts";
 
 export const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 
+/** MOSS's transcription (platform.mosi.cn/docs/reference/transcriptions): OpenAI's /audio/transcriptions, with the same key
+ * as MOSS Live. moss-transcribe-1.0 is the plain one; the diarize model (speakers, streaming) is not needed to dictate. */
+export const mossTranscription = { url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0" } as const;
+
 /** Real time: the handshake and the first answer each come within a few hundred ms. */
 const deadlineMs = 8_000;
 

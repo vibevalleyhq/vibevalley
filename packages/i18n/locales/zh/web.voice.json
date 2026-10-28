@@ -87,7 +87,11 @@
       "checking": "在接…",
       "ok": "接通了",
       "keyHint": "MOSS 开放平台的 key，只在这台电脑的服务端用"
-    }
+    },
+    "dictationVia": "听写走哪",
+    "dictationOwn": "自己的地址",
+    "dictationMossIntro": "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。录音经服务端交给 MOSS 的转写（moss-transcribe-1.0），用的是和 MOSS Live 同一把 API Key。",
+    "dictationMossKey": "MOSS 的 API Key（和 MOSS Live 共用）"
   },
   "choices": {
     "area": {

@@ -87,7 +87,11 @@
       "checking": "Connecting…",
       "ok": "Connected",
       "keyHint": "A key from the MOSS platform, used only by this machine's server"
-    }
+    },
+    "dictationVia": "Dictation goes to",
+    "dictationOwn": "Your own address",
+    "dictationMossIntro": "The record button beside the chat box: say something, stop, and it becomes text in the box to read before sending. The server hands the recording to MOSS's transcription (moss-transcribe-1.0), with the same API key as MOSS Live.",
+    "dictationMossKey": "MOSS API key (shared with MOSS Live)"
   },
   "choices": {
     "area": {

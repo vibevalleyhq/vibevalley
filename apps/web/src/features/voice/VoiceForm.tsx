@@ -110,7 +110,8 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   };
   const voiceDirty = () => !sameVoice(draft(), base().voice);
   const appIdDirty = () => appId().trim() !== (base().agoraAppId.value ?? "");
-  const dictationDirty = () => dictation().url.trim() !== base().dictation.url || dictation().model.trim() !== base().dictation.model;
+  const dictationDirty = () =>
+    dictation().via !== base().dictation.via || dictation().url.trim() !== base().dictation.url || dictation().model.trim() !== base().dictation.model;
   const dirty = () => voiceDirty() || appIdDirty() || dictationDirty() || Object.values(secrets()).some((v) => v?.trim()) || cleared().size > 0;
   const problem = useProblem(() => ({ voice: draft(), ...(dictationDirty() ? { dictation: dictation() } : {}) }));
   const atDefaults = () => sameVoice(draft(), withPart(props.part, draft(), base().voiceDefaults));
@@ -121,7 +122,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     if (appIdDirty() && !cleared().has("agoraAppId")) update.agoraAppId = appId().trim();
     for (const [k, v] of Object.entries(secrets())) if (v?.trim()) update[k] = v.trim();
     if (voiceDirty()) update.voice = withPart(props.part, base().voice, draft());
-    if (dictationDirty()) update.dictation = { url: dictation().url.trim(), model: dictation().model.trim() };
+    if (dictationDirty()) update.dictation = { via: dictation().via, url: dictation().url.trim(), model: dictation().model.trim() };
     setBusy(true);
     setError(undefined);
     try {
@@ -386,35 +387,64 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             <Show when={props.view === "dictation"}>
               <Card
                 title={t("web.voice.voice.dictation")}
-                action={<IconLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />}
+                action={
+                  dictation().via === "moss" ? (
+                    <IconLink href="https://platform.mosi.cn/" label={t("web.voice.voice.moss.console")} />
+                  ) : (
+                    <IconLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />
+                  )
+                }
                 class="max-w-4xl"
               >
-                <p class="text-sm text-muted">{t("web.voice.voice.dictationIntro")}</p>
-                <Cols>
-                  <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.dictationAddress")}>
-                    <TextInput
-                      aria-label={t("web.voice.voice.dictationAddressLabel")}
-                      class="font-mono"
-                      placeholder="http://127.0.0.1:8080/v1"
-                      value={dictation().url}
-                      onInput={(e) => {
-                        setDictation({ ...dictation(), url: e.currentTarget.value });
-                      }}
-                    />
-                  </Labeled>
-                  <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.dictationModel")}>
-                    <TextInput
-                      aria-label={t("web.voice.voice.dictationModelLabel")}
-                      class="font-mono"
-                      placeholder="qwen3"
-                      value={dictation().model}
-                      onInput={(e) => {
-                        setDictation({ ...dictation(), model: e.currentTarget.value });
-                      }}
-                    />
-                  </Labeled>
-                  {secret("dictationKey", t("web.voice.voice.dictationKey"), () => base().dictationKey)}
-                </Cols>
+                <Segmented
+                  label={t("web.voice.voice.dictationVia")}
+                  testid="dictation-via"
+                  value={dictation().via}
+                  options={[
+                    { value: "moss", label: "MOSS" },
+                    { value: "own", label: t("web.voice.voice.dictationOwn") },
+                  ]}
+                  onChange={(via) => setDictation({ ...dictation(), via })}
+                />
+                <p class="text-sm text-muted">{dictation().via === "moss" ? t("web.voice.voice.dictationMossIntro") : t("web.voice.voice.dictationIntro")}</p>
+                <Show
+                  when={dictation().via === "own"}
+                  fallback={
+                    <Cols>
+                      <div data-testid="dictation-moss-key" class="contents">
+                        {secret("mossKey", t("web.voice.voice.dictationMossKey"), () => base().mossKey)}
+                      </div>
+                    </Cols>
+                  }
+                >
+                  <Cols>
+                    <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.dictationAddress")}>
+                      <TextInput
+                        aria-label={t("web.voice.voice.dictationAddressLabel")}
+                        data-testid="dictation-url"
+                        class="font-mono"
+                        placeholder="http://127.0.0.1:8080/v1"
+                        value={dictation().url}
+                        onInput={(e) => {
+                          setDictation({ ...dictation(), url: e.currentTarget.value });
+                        }}
+                      />
+                    </Labeled>
+                    <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.dictationModel")}>
+                      <TextInput
+                        aria-label={t("web.voice.voice.dictationModelLabel")}
+                        data-testid="dictation-model"
+                        class="font-mono"
+                        placeholder="qwen3"
+                        value={dictation().model}
+                        onInput={(e) => {
+                          setDictation({ ...dictation(), model: e.currentTarget.value });
+                        }}
+                      />
+                    </Labeled>
+                    {secret("dictationKey", t("web.voice.voice.dictationKey"), () => base().dictationKey)}
+                  </Cols>
+                </Show>
               </Card>
             </Show>
           </div>

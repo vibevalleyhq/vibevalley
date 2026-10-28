@@ -28,6 +28,10 @@ test("the recorded cases", () => {
 test("what settings refuse", () => {
   expect(settingsProblem({ deepseekApiKey: "sk has spaces" })).toMatch(/DeepSeek/);
   expect(settingsProblem({ agoraAppCertificate: "123" })).toMatch(/Certificate/);
+  // An own address is checked; while MOSS is chosen the address kept beside it is not.
+  expect(settingsProblem({ dictation: { via: "own", url: "not a url", model: "m" } })).not.toBe("");
+  expect(settingsProblem({ dictation: { via: "own", url: "http://127.0.0.1:8080/v1", model: "" } })).not.toBe("");
+  expect(settingsProblem({ dictation: { via: "moss", url: "not a url", model: "" } })).toBe("");
   expect(settingsProblem({ agoraAppId: "not-an-app-id" })).toMatch(/App ID/);
   expect(settingsProblem({ deepseekApiKey: "", agoraAppId: "" })).toBe("");
   expect(settingsProblem({ agoraAppId: "0123456789ABCDEF0123456789abcdef", deepseekApiKey: " sk-12345678 " })).toBe("");

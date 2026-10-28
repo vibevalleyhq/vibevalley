@@ -48,7 +48,7 @@ export function settingsProblem(u: SettingsUpdate): string {
   if (certificate !== "" && !agoraID.test(certificate)) return t("server.setting.agoraCertificate");
   for (const key of [u.asrKey, u.llmKey, u.ttsKey, u.dictationKey, u.mossKey]) if (hasSpace(trimmed(key))) return t("server.setting.voiceKeySpace");
   const d = u.dictation;
-  if (d && d.url.trim() !== "") {
+  if (d?.via === "own" && d.url.trim() !== "") {
     if (!voiceURL.test(d.url.trim())) return t("server.setting.dictationUrl");
     if (d.model.trim() === "") return t("server.setting.dictationModel");
   }

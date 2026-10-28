@@ -1,4 +1,4 @@
-// What the voice parts show on a test server: it has no transcriber, so dictation waits to be set up. A call without
+// What the voice parts show on a test server: no MOSS key and no address of its own, so dictation waits to be set up. A call without
 // Agora's keys is farm-phone.spec.ts's.
 
 import { expect, test } from "./fixtures";

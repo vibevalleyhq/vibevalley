@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Check, Dictation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { Check, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { setLocale } from "@vibevalley/i18n";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
@@ -27,6 +27,13 @@ const MemorySourceConfig = Schema.Struct({
 });
 type MemorySourceConfig = typeof MemorySourceConfig.Type;
 
+/** MOSS is dictation's default, so only the owner's own address is written as a choice. */
+const StoredDictation = Schema.Struct({
+  via: Schema.optionalKey(Schema.Literal("own")),
+  url: Schema.String,
+  model: Schema.String,
+});
+
 /** settings.json, in the order the file has it. */
 const Stored = Schema.Struct({
   locale: Schema.optionalKey(S.Locale),
@@ -38,7 +45,7 @@ const Stored = Schema.Struct({
   ttsKey: Schema.optionalKey(Schema.String),
   voice: Schema.optionalKey(S.SettingsUpdateVoice),
   dictationKey: Schema.optionalKey(Schema.String),
-  dictation: Schema.optionalKey(S.Dictation),
+  dictation: Schema.optionalKey(StoredDictation),
   mossKey: Schema.optionalKey(Schema.String),
   memorySources: Schema.optionalKey(Schema.Array(MemorySourceConfig)),
 });
@@ -57,10 +64,11 @@ export interface VoiceConfig {
   readonly deepseekApiKey: string;
 }
 
-/** Read together, so an address is never paired with another one's key. */
-export interface DictationConfig extends Dictation {
-  readonly key: string;
-}
+/** Read together, so an address is never paired with another one's key. MOSS's key is the one 设置 › MOSS keeps; "" when
+ * none is saved. */
+export type DictationConfig =
+  | { readonly via: "moss"; readonly key: string }
+  | { readonly via: "own"; readonly url: string; readonly model: string; readonly key: string };
 
 export interface AgoraCredentials {
   readonly appId: string;
@@ -77,7 +85,7 @@ export interface SettingShape {
   readonly deepseekApiKey: () => string;
   readonly agora: () => AgoraCredentials | undefined;
   readonly voice: () => VoiceSettings;
-  /** Undefined when no address is set. */
+  /** Undefined when the owner's own address is chosen and not set. */
   readonly dictation: () => DictationConfig | undefined;
   /** "" when none is saved. */
   readonly mossKey: () => string;
@@ -138,8 +146,9 @@ export const make = Effect.gen(function* () {
       asrKey: secret(s.asrKey, "settings"),
       llmKey: secret(s.llmKey, "settings"),
       ttsKey: secret(s.ttsKey, "settings"),
-      dictation: s.dictation ?? { url: "", model: "" },
+      dictation: { via: s.dictation?.via ?? "moss", url: s.dictation?.url ?? "", model: s.dictation?.model ?? "" },
       dictationKey: secret(s.dictationKey, "settings"),
+      dictationReady: s.dictation?.via === "own" ? !!s.dictation.url : !!s.mossKey,
       mossKey: secret(s.mossKey, "settings"),
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
@@ -161,8 +170,12 @@ export const make = Effect.gen(function* () {
     }
     if (u.locale) next.locale = u.locale === "zh" ? undefined : u.locale;
     if (u.dictation) {
-      const d = { url: u.dictation.url.trim().replace(/\/+$/, ""), model: u.dictation.model.trim() };
-      next.dictation = d.url === "" && d.model === "" ? undefined : d;
+      const d = {
+        via: u.dictation.via === "own" ? ("own" as const) : undefined,
+        url: u.dictation.url.trim().replace(/\/+$/, ""),
+        model: u.dictation.model.trim(),
+      };
+      next.dictation = !d.via && d.url === "" && d.model === "" ? undefined : d;
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
@@ -193,7 +206,11 @@ export const make = Effect.gen(function* () {
       return appId && appCertificate ? { appId, appCertificate } : undefined;
     },
     voice: () => voiceOf(stored),
-    dictation: () => (stored.dictation?.url ? { ...stored.dictation, key: stored.dictationKey ?? "" } : undefined),
+    dictation: () => {
+      const d = stored.dictation;
+      if (d?.via !== "own") return { via: "moss", key: stored.mossKey ?? "" };
+      return d.url ? { via: "own", url: d.url, model: d.model, key: stored.dictationKey ?? "" } : undefined;
+    },
     mossKey: () => stored.mossKey ?? "",
     memorySources: () => [...(stored.memorySources ?? [])],
     voiceConfig: () => ({

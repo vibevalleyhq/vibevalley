@@ -1553,6 +1553,8 @@ export interface SettingsStatus {
   ttsKey: KeyStatus;
   dictation: Dictation;
   dictationKey: KeyStatus;
+  /** Whether a recording has somewhere to go: MOSS with its key, or an own address. */
+  dictationReady: boolean;
   /** MOSS Live (wss://api.mosi.cn/v1/realtime): a realtime voice model the server connects to. */
   mossKey: KeyStatus;
   memorySources: MemorySource[];
@@ -1583,7 +1585,14 @@ export interface MemorySourceUpdate {
   key?: string;
 }
 
+/** Where dictation's recordings are transcribed: MOSS (moss-transcribe-1.0, with the MOSS key), or an OpenAI-compatible
+ * address of the owner's (own). */
+export const DictationViaValues = ["moss", "own"] as const;
+export type DictationVia = (typeof DictationViaValues)[number];
+
+/** url and model are the owner's own address's; kept while MOSS is chosen, so switching back finds them. */
 export interface Dictation {
+  via: DictationVia;
   url: string;
   model: string;
 }
