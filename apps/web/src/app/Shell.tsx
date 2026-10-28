@@ -47,7 +47,12 @@ function Rail(props: { here?: Place }) {
   const frames = useFrames();
   const settings = places.find((p) => p.id === "settings")!;
   return (
-    <nav aria-label={appWording().rail} class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">
+    <nav
+      aria-label={appWording().rail}
+      class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3 md:w-20"
+      // The window's buttons sit over the rail's top: it is at least as wide as they reach, and a little.
+      style={titleBar.left > 0 ? { "min-width": `${titleBar.left + 8}px` } : undefined}
+    >
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
