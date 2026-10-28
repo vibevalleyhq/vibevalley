@@ -183,7 +183,7 @@ test("scrolled up from the newest, a pill leads back down", async ({ page, api }
   await expect(page.getByRole("button", { name: "回到最新" })).toHaveCount(0);
 });
 
-test("/ offers the commands, and /issue writes a ticket instead of saying the line", async ({ page, api }) => {
+test("/ offers the commands, and /issue writes an issue instead of saying the line", async ({ page, api }) => {
   const id = await newChannel(api, "命令");
   await page.goto(`/chat/${id}`);
   const box = page.getByRole("textbox", { name: "发送消息至 #命令" });
