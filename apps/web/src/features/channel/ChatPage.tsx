@@ -1,7 +1,7 @@
 import { chatWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Channel, type ChatMessage, type MessageHit, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, orchestratorAgent, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import {
   archivedOf,
@@ -35,7 +35,7 @@ import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer, FileDrop } from "./Composer";
 import { switcher } from "./QuickSwitcher";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
-import { useWorkAgents } from "../../base/agents";
+import { ready, useAgents } from "../../base/query";
 import { toast } from "../../ui/toasts";
 import { Dialog } from "../../ui/Dialog";
 import { Select } from "../../ui/Field";
@@ -171,9 +171,9 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               <button
                 type="button"
                 class={[iconButton, { "bg-selected": threadsOpen() }]}
-                aria-label={chatWording().threadList.open}
+                aria-label={chatWording().threadList.title}
                 aria-expanded={aria(threadsOpen())}
-                title={chatWording().threadList.open}
+                title={chatWording().threadList.title}
                 onClick={() => setThreadsOpen(!threadsOpen())}
               >
                 <Icon name="button-thread" size={18} />
@@ -394,7 +394,8 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
 
 /** The helper profiles the owner can talk with alone: picking one opens its direct channel, made the first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
-  const agents = useWorkAgents();
+  const all = useAgents();
+  const agents = () => ready(all, []).filter((a) => a.id !== orchestratorAgent);
   const open = (agent: string) =>
     api.channel.direct
       .create({ agent })
@@ -407,7 +408,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
       class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
     >
       <p class="px-2 py-1 text-xs font-semibold text-muted">{chatWording().direct.pick}</p>
-      <Show when={agents().length === 0}>
+      <Show when={!all.isPending && agents().length === 0}>
         <p class="px-2 py-1 text-sm text-muted">{chatWording().direct.none}</p>
       </Show>
       <For each={agents()} keyed={(a) => a.id}>
