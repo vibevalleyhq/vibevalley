@@ -64,6 +64,7 @@ export function Phone(props: { room: { w: number; h: number } }) {
   const large = useFarm((s) => s.chatLarge);
   return (
     <Handset
+      screen={ringing() === null ? app() : "ringing"}
       big={game()}
       tall={game() || ringing() !== null}
       unfolded={unfolded()}
@@ -146,6 +147,7 @@ const bark = "#2f1f13";
 const outline = `inset 0 0 0 2px ${bark}`;
 
 function Handset(props: {
+  screen: string;
   children: JSX.Element;
   big: boolean;
   tall: boolean;
@@ -196,6 +198,7 @@ function Handset(props: {
     <section
       aria-label={t("web.farm.phone.label")}
       data-testid="phone"
+      data-screen={props.screen}
       class="pointer-events-auto relative px-[10px] pt-[10px] pb-3 font-pixel text-[12px] leading-[1.5] tabular-nums"
       style={{
         width: `${width()}px`,
@@ -242,7 +245,7 @@ function Handset(props: {
         </div>
       </div>
       <Show when={pad()}>
-        <div class="mt-2 flex items-center justify-between px-1">
+        <div data-testid="pad" class="mt-2 flex items-center justify-between px-1">
           <Cross />
           <span class="flex gap-2">
             <AbKey button="b" label="B" />

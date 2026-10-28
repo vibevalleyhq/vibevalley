@@ -54,7 +54,7 @@ export function IssueView() {
   return (
     <Show when={session()}>
       {(s) => (
-        <FarmDialog title={t("web.farm.plotOf", { name: s().name })} size="lg" onClose={() => farm.select(null)}>
+        <FarmDialog title={t("web.farm.plotOf", { name: s().name })} size="lg" testid="plot" onClose={() => farm.select(null)}>
           <PlotDetail session={s()} onDone={() => farm.select(null)} />
         </FarmDialog>
       )}

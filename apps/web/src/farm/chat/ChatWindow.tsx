@@ -320,11 +320,11 @@ function CallProblem(props: { call: VoiceCall }) {
   const open = () => props.call.phase === "idle" && props.call.problem !== undefined;
   return (
     <Show when={open()}>
-      <div role="alert" class="shrink-0 border-b border-cream-200 bg-berry/10">
+      <div role="alert" data-testid="call-problem" class="shrink-0 border-b border-cream-200 bg-berry/10">
         <div class="flex flex-col gap-2 px-3 py-2.5 font-pixel text-[12px] leading-[1.625] text-bark-900">
           <div class="flex items-start gap-2">
             <span class="min-w-0 flex-1">{t("web.farm.chat.noVoice", { why: props.call.problem ?? "" })}</span>
-            <PxButton size="sm" icon="button-close" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
+            <PxButton size="sm" icon="button-close" data-testid="call-problem-dismiss" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
           </div>
           <Show when={props.call.problemAt}>
             {(at) => (
@@ -332,6 +332,7 @@ function CallProblem(props: { call: VoiceCall }) {
                 <PxButton
                   tone="primary"
                   size="sm"
+                  data-testid="call-problem-fix"
                   onClick={() => {
                     voiceCall.dismiss();
                     router.navigate(`/settings/${at()}`);
