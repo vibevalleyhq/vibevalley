@@ -151,6 +151,9 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               data-key={item().message.id}
               data-from={item().message.from}
               data-from-kind={item().message.fromKind}
+              data-edited={item().message.edited !== undefined ? "" : undefined}
+              data-deleted={item().message.deleted !== undefined ? "" : undefined}
+              data-pinned={item().message.pinned !== undefined ? "" : undefined}
               data-kind={item().message.kind}
               data-number={item().message.channel === id() ? item().message.number : undefined}
               class={[

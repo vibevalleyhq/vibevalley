@@ -124,10 +124,16 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </For>
         </div>
       </Show>
-      <Show when={problem()}>{(p) => <p class="mb-1.5 text-xs text-berry">{p()}</p>}</Show>
+      <Show when={problem()}>
+        {(p) => (
+          <p role="alert" data-testid="chat-problem" class="mb-1.5 text-xs text-berry">
+            {p()}
+          </p>
+        )}
+      </Show>
       <Show when={draft().reply}>
         {(m) => (
-          <div class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
+          <div data-testid="replying" data-key={m().number} class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />
             <span class="min-w-0 flex-1 truncate">
               {t("shared.join.labeled", {
@@ -138,6 +144,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             <button
               type="button"
               class="cursor-pointer rounded p-0.5 hover:bg-page"
+              data-testid="cancel-reply"
               aria-label={t("web.channel.composer.cancelReply")}
               title={t("web.channel.composer.cancelReply")}
               onClick={() => drafts.reply(props.channel!.id, undefined)}
@@ -151,7 +158,11 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
         <div class="mb-1.5 flex flex-wrap gap-1.5">
           <For each={draft().files} keyed={(f) => f.id}>
             {(f) => (
-              <span class="flex items-center gap-1.5 rounded-md border border-line bg-page py-1 pr-1 pl-2 text-xs">
+              <span
+                data-testid="pending-file"
+                data-key={f().name}
+                class="flex items-center gap-1.5 rounded-md border border-line bg-page py-1 pr-1 pl-2 text-xs"
+              >
                 <Icon name="attach" size={12} />
                 <span class="max-w-48 truncate">{f().name}</span>
                 <button

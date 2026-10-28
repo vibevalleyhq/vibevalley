@@ -585,6 +585,7 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
   return (
     <div
       role="dialog"
+      data-testid="pins"
       aria-label={t("web.channel.pins.title")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
@@ -596,6 +597,8 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
         {(m) => (
           <button
             type="button"
+            data-testid="pin"
+            data-key={m().id}
             class="cursor-pointer rounded-md px-2 py-1.5 text-left hover:bg-hover"
             onClick={() => {
               router.navigate(messagePath(channelOf(core()?.chat, m().channel), m().number));
@@ -627,13 +630,17 @@ function Members(props: { channel: Channel }) {
     return (core()?.sessions ?? []).filter((h) => (h.channel ?? fallback) === props.channel.id);
   };
   return (
-    <aside aria-label={t("web.channel.members.title")} class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex">
+    <aside
+      aria-label={t("web.channel.members.title")}
+      data-testid="members"
+      class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex"
+    >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
         <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{t("web.channel.members.owner").slice(0, 1)}</span>
         {t("web.channel.members.owner")}
       </div>
-      <div class="flex items-center gap-2 px-1 py-1 text-sm">
+      <div data-testid="member-orchestrator" data-key={here()} class="flex items-center gap-2 px-1 py-1 text-sm">
         <OrchestratorFace size={28} agent={here()} />
         <span class="flex min-w-0 flex-1 flex-col">
           <span class="truncate">{nameOf(here())}</span>

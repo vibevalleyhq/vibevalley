@@ -75,19 +75,44 @@ export function Attachments(props: { files: readonly Attachment[] }) {
           switch (shownAs(file.type)) {
             case "image":
               return (
-                <a href={at()} target="_blank" rel="noreferrer" class="block">
+                <a href={at()} target="_blank" rel="noreferrer" data-testid="attachment" data-key={file.id} data-kind="image" class="block">
                   <img src={at()} alt={file.name} class="max-h-64 max-w-80 rounded-md border border-line object-contain" loading="lazy" />
                 </a>
               );
             case "video":
-              return <video src={at()} controls preload="metadata" aria-label={file.name} class="max-h-72 max-w-96 rounded-md border border-line bg-ink" />;
+              return (
+                <video
+                  data-testid="attachment"
+                  data-key={file.id}
+                  data-kind="video"
+                  src={at()}
+                  controls
+                  preload="metadata"
+                  aria-label={file.name}
+                  class="max-h-72 max-w-96 rounded-md border border-line bg-ink"
+                />
+              );
             case "audio":
-              return <audio src={at()} controls preload="metadata" aria-label={file.name} class="max-w-96" />;
+              return (
+                <audio
+                  data-testid="attachment"
+                  data-key={file.id}
+                  data-kind="audio"
+                  src={at()}
+                  controls
+                  preload="metadata"
+                  aria-label={file.name}
+                  class="max-w-96"
+                />
+              );
             case "pdf":
             case "file":
               return (
                 <a
                   href={at()}
+                  data-testid="attachment"
+                  data-key={file.id}
+                  data-kind={shownAs(file.type)}
                   target="_blank"
                   rel="noreferrer"
                   class="flex items-center gap-2 rounded-md border border-line bg-page px-3 py-2 text-sm hover:bg-hover"
@@ -150,6 +175,9 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
           return (
             <button
               type="button"
+              data-testid="reaction"
+              data-key={r().emoji}
+              data-count={r().by.length}
               aria-pressed={aria(mine())}
               title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: list(r().by.map(props.names)) })}
               onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji: r().emoji }))}
@@ -178,6 +206,7 @@ function AddReaction(props: { id: string }) {
       <button
         type="button"
         ref={(el) => (button = el)}
+        data-testid="add-reaction"
         aria-label={t("web.channel.emoji.more")}
         title={t("web.channel.emoji.more")}
         aria-expanded={aria(open())}
@@ -227,6 +256,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   return (
     <div
       role="toolbar"
+      data-testid="message-tools"
       aria-label={t("web.channel.tools.label")}
       // Shown while hovered, and while something it opened is: the picker is outside the row.
       class={[
@@ -241,6 +271,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
               <button
                 type="button"
                 class={tool}
+                data-testid="quick-reaction"
+                data-key={emoji}
                 aria-label={emoji}
                 onClick={() => {
                   setPicking(false);
@@ -276,12 +308,22 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           }}
         />
       </Show>
-      <button type="button" class={tool} aria-label={t("web.channel.tools.react")} title={t("web.channel.tools.react")} onClick={() => setPicking(!picking())}>
+      <button
+        type="button"
+        class={tool}
+        data-testid="message-tool"
+        data-key="react"
+        aria-label={t("web.channel.tools.react")}
+        title={t("web.channel.tools.react")}
+        onClick={() => setPicking(!picking())}
+      >
         <Icon name="react" size={16} />
       </button>
       <button
         type="button"
         class={tool}
+        data-testid="message-tool"
+        data-key="reply"
         aria-label={t("web.channel.tools.reply")}
         title={t("web.channel.tools.reply")}
         onClick={() => drafts.reply(props.m.channel, props.m)}
@@ -292,6 +334,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <button
           type="button"
           class={tool}
+          data-testid="message-tool"
+          data-key="thread"
           aria-label={t("web.channel.tools.thread")}
           title={t("web.channel.tools.thread")}
           onClick={() =>
@@ -307,6 +351,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       <button
         type="button"
         class={tool}
+        data-testid="message-tool"
+        data-key="pin"
         aria-label={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
         title={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
         aria-pressed={aria(props.m.pinned !== undefined)}
@@ -315,7 +361,15 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
       </button>
       <Show when={editable()}>
-        <button type="button" class={tool} aria-label={t("web.channel.tools.edit")} title={t("web.channel.tools.edit")} onClick={() => props.onEdit()}>
+        <button
+          type="button"
+          class={tool}
+          data-testid="message-tool"
+          data-key="edit"
+          aria-label={t("web.channel.tools.edit")}
+          title={t("web.channel.tools.edit")}
+          onClick={() => props.onEdit()}
+        >
           <Icon name="edit" size={14} />
         </button>
       </Show>
@@ -323,6 +377,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <button
           type="button"
           class={tool}
+          data-testid="message-tool"
+          data-key="more"
           aria-label={t("web.channel.more.label")}
           title={t("web.channel.more.label")}
           aria-expanded={aria(more())}
@@ -336,12 +392,19 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             aria-label={t("web.channel.more.label")}
             class="absolute right-0 bottom-full z-20 mb-1 flex w-44 flex-col rounded-md border border-line bg-page p-1 shadow-float"
           >
-            <button type="button" role="menuitem" class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover" onClick={copyLink}>
+            <button
+              type="button"
+              role="menuitem"
+              data-key="copy-link"
+              class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover"
+              onClick={copyLink}
+            >
               {t("web.channel.more.copyLink")}
             </button>
             <button
               type="button"
               role="menuitem"
+              data-key="mark-unread"
               class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover"
               onClick={() => {
                 setMore(false);
@@ -356,6 +419,9 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       <button
         type="button"
         class={[tool, { "bg-berry/15": sure() }]}
+        data-testid="message-tool"
+        data-key="delete"
+        data-sure={sure() ? "" : undefined}
         aria-label={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
         title={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
         onBlur={() => setSure(false)}
@@ -391,6 +457,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
     <div class="mt-0.5">
       <textarea
         ref={autofocus()}
+        data-testid="message-edit"
         value={text()}
         aria-label={t("web.channel.tools.edit")}
         onInput={(e) => setText(e.currentTarget.value)}
