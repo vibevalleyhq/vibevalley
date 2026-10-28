@@ -30,9 +30,9 @@ test("the pointers and the sounds", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^播放 / })).not.toHaveCount(0);
 });
 
-test("a place the page does not know goes to the farm", async ({ page }) => {
+test("a place the page does not know goes to the workbench", async ({ page }) => {
   await page.goto("/nowhere-at-all");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/chat$/);
 });
 
 test("图鉴 as it looks", async ({ page }) => {

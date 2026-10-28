@@ -43,6 +43,6 @@ test("the farm links to the workbench, and the workbench back to the farm", asyn
   await page.getByRole("link", { name: "工作台" }).click();
   await expect(page).toHaveURL(/\/issues$/);
   await page.getByRole("navigation", { name: "工作台" }).getByRole("link", { name: "回农场" }).first().click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/farm$/);
   await expect(page.getByRole("region", { name: "码农场物语的像素农场" }).locator("canvas")).toBeVisible();
 });

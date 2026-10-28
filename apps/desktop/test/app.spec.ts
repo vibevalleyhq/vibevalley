@@ -33,8 +33,8 @@ test("the desktop app shows the live board and sends a notice", async () => {
   try {
     expect(await app.evaluate(({ app }) => app.getPath("userData"))).toBe(userData);
     const page = await app.firstWindow();
-    // The window opens on the farm once the server is up; the board is a place of its own.
-    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 45_000 });
+    // The window opens on the workbench once the server is up; the board is a place of its own.
+    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/, { timeout: 45_000 });
     server = new URL(page.url()).origin;
     await page.goto(server + "/issues");
     await expect(page.getByRole("status")).toHaveText("已连上");

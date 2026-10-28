@@ -1,6 +1,6 @@
 # 客户端
 
-VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端在 `/` 提供，桌面壳、浏览器和手机的壳打开的都是它。它读服务端折好的帧（`StateFrame`），经 `@vibevalley/protocol` 的 `VibeValleyApi` 发命令，自己不折事实、不重写服务端的规则；`/` 是像素农场（`src/farm`），其余是工作台：每个概念一个 `src/features/<概念>`，里面是它的页。桌面版是 Electron 壳 `apps/desktop`：用自己的 Node 带着服务端起来、打开它的页面，另有菜单栏、系统通知和语音快捷键；手机的壳是 `apps/mobile`（Expo、React Native）：扫码配对，在 WebView 里打开那台电脑经「连接到本机」放出的页面，另有系统通知和锁屏也不断的通话。两个壳都经宿主接口 `@vibevalley/protocol/host` 给页面。
+VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端在 `/` 提供，桌面壳、浏览器和手机的壳打开的都是它。它读服务端折好的帧（`StateFrame`），经 `@vibevalley/protocol` 的 `VibeValleyApi` 发命令，自己不折事实、不重写服务端的规则；开页落在工作台，`/farm` 是像素农场（`src/farm`）；工作台里每个概念一个 `src/features/<概念>`，里面是它的页。桌面版是 Electron 壳 `apps/desktop`：用自己的 Node 带着服务端起来、打开它的页面，另有菜单栏、系统通知和语音快捷键；手机的壳是 `apps/mobile`（Expo、React Native）：扫码配对，在 WebView 里打开那台电脑经「连接到本机」放出的页面，另有系统通知和锁屏也不断的通话。两个壳都经宿主接口 `@vibevalley/protocol/host` 给页面。
 
 ## 管什么，不管什么
 
@@ -66,7 +66,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **首页**：只在这台设备第一次打开农场时出来（`localStorage` 的 `vibevalley.title.seen`），之后直接进农场，菜单的「回到首页」能回去。
 
-**工作台的路由**（`base/router.ts`、`app/App.tsx`）：`/farm/<项目>` 是这个项目的农场，`/` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/orchestrator` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
+**工作台的路由**（`base/router.ts`、`app/App.tsx`）：`/` 打开工作台的第一个地方（聊天），农场是一个皮、点一下就到；`/farm/<项目>` 是这个项目的农场，`/farm` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/orchestrator` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回工作台。
 
 **通知和菜单栏**（`src/features/notice/Follow.tsx`，挂在每一页上）：
 

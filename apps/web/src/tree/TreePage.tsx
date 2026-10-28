@@ -54,7 +54,7 @@ export function TreePage() {
 
   const home = () => {
     playSound("open");
-    router.navigate("/");
+    router.navigate("/farm");
   };
   const sow = (seed: MemoryItem) => {
     playSound("open");

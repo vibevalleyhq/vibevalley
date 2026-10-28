@@ -95,7 +95,7 @@ test("helpers walk in, work their plots and the library, and light lanterns at n
   // not drawn frame by frame and not waited out.
   await page.clock.fastForward(9000);
   await page.screenshot({ path: test.info().outputPath("day.png") });
-  await page.goto("/?tod=0.95");
+  await page.goto("/farm?tod=0.95");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await page.clock.fastForward(9000);
   await page.screenshot({ path: test.info().outputPath("night.png") });

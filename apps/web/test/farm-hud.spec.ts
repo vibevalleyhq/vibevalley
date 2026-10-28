@@ -87,13 +87,13 @@ test("a project's farm names it on the sign; an empty plot sows in it, and 草�
   await expect(page).toHaveURL(/\/projects$/);
 });
 
-test("/ opens the farm entered last, and a farm with no project sends sowing to the map", async ({ page, api }) => {
+test("/farm opens the farm entered last, and a farm with no project sends sowing to the map", async ({ page, api }) => {
   await api.project.create({ name: "farm-home" });
   // A device that never entered a farm still lands on one: 回农场 never strands it on the map.
-  await page.goto("/");
+  await page.goto("/farm");
   await expect(page).toHaveURL(/\/farm\/.+/);
   await openFarm(page, "farm-home");
-  await page.goto("/");
+  await page.goto("/farm");
   await expect(page).toHaveURL(/\/farm\/farm-home$/);
   await openFarm(page);
   const canvas = page.getByTestId("village").locator("canvas");

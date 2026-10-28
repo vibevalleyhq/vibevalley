@@ -4,7 +4,7 @@ test("the rail lists every place, the farm at the top, and marks where you are",
   await page.goto("/issues");
   await expect(page.getByRole("status")).toHaveText("已连上");
   const nav = page.getByRole("navigation", { name: "工作台" });
-  await expect(nav.getByRole("link", { name: "回农场" }).first()).toHaveAttribute("href", "/");
+  await expect(nav.getByRole("link", { name: "回农场" }).first()).toHaveAttribute("href", "/farm");
   for (const label of ["聊天", "工单", "文档", "档案", "农具", "项目", "图鉴", "设置"])
     await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `) })).toBeVisible();
   await expect(nav.getByRole("link", { name: /^工单 · / })).toHaveAttribute("aria-current", "page");
