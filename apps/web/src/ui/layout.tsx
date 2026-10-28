@@ -90,12 +90,14 @@ export function Toggle(props: {
   checked: boolean;
   onChange: (on: boolean) => void;
   disabled?: boolean;
+  testid?: string;
 }) {
   return (
     <label class={["flex items-start gap-2", props.disabled ? "opacity-50" : "cursor-pointer"]}>
       <button
         type="button"
         role="switch"
+        data-testid={props.testid}
         aria-checked={aria(props.checked)}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
@@ -126,6 +128,8 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
       <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-9 font-mono", props.class]} />
       <button
         type="button"
+        data-testid="reveal"
+        aria-pressed={aria(shown())}
         class="absolute inset-y-0 right-1 my-auto inline-flex size-7 cursor-pointer items-center justify-center rounded text-faint hover:bg-hover hover:text-ink"
         aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}

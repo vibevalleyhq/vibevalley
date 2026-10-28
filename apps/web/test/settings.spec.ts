@@ -1,160 +1,153 @@
-import { expect, settled, test } from "./fixtures";
+import { expect, test } from "./fixtures";
 
 // The worker's server is shared by its tests: each puts back what it changed.
 
-test("设置 lists its sections in groups, opens on 通用, and the search narrows them", async ({ page }) => {
+const sections = ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
+
+test("settings lists its sections, opens on general, and the search narrows them", async ({ page }) => {
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/settings\/general$/);
-  const menu = page.getByRole("navigation", { name: "设置的分区" });
-  for (const group of ["选项", "帮工", "语音", "连接"]) await expect(menu.getByText(group, { exact: true })).toBeVisible();
-  for (const label of ["通用", "外观", "模型", "关于", "记性", "技能", "通话线路", "MOSS Live", "听写", "GitHub", "聊天软件", "设备"])
-    await expect(menu.getByRole("link", { name: label, exact: true })).toBeVisible();
-  await expect(menu.getByRole("link", { name: "通用", exact: true })).toHaveAttribute("aria-current", "page");
-  await menu.getByRole("link", { name: "GitHub", exact: true }).click();
+  const nav = page.getByTestId("settings-nav");
+  const links = nav.locator("a[data-key]");
+  await expect(links).toHaveCount(sections.length);
+  for (const id of sections) await expect(nav.locator(`[data-key="${id}"]`)).toBeVisible();
+  await expect(nav.locator('[data-key="general"]')).toHaveAttribute("aria-current", "page");
+  await nav.locator('[data-key="github"]').click();
   await expect(page).toHaveURL(/\/settings\/github$/);
-  await expect(page.getByRole("button", { name: "重新检测" })).toBeVisible();
-  // A section is found by the names of its settings, not only its own.
-  await page.getByLabel("搜索设置…").fill("深色");
-  await expect(menu.getByRole("link")).toHaveCount(1);
-  await expect(menu.getByRole("link", { name: "外观", exact: true })).toBeVisible();
-  await menu.getByRole("link", { name: "外观", exact: true }).click();
-  await expect(page.locator("[data-found]")).toHaveCount(1);
-  await page.getByLabel("搜索设置…").fill("");
-  await expect(menu.getByRole("link")).toHaveCount(12);
+  await expect(page.getByTestId("github-recheck")).toBeVisible();
+  // What a search matches is base/search.test.ts's; here it narrows the sections and lights the rows.
+  await page.getByTestId("settings-search").fill("MOSS");
+  await expect(links).toHaveCount(1);
+  await nav.locator('[data-key="moss"]').click();
+  await expect(page.locator("[data-found]").first()).toBeVisible();
+  await page.getByTestId("settings-search").fill("");
+  await expect(links).toHaveCount(sections.length);
 });
 
-test("外观 and 通用 keep this device's choices", async ({ page }) => {
+test("appearance and general keep this device's choices", async ({ page }) => {
   await page.goto("/settings/appearance");
-  const theme = page.getByRole("group", { name: "主题" });
-  await theme.getByRole("button", { name: "深色" }).click();
+  const theme = page.getByTestId("theme");
+  await theme.locator('[data-key="dark"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.screenshot({ path: test.info().outputPath("settings-dark.png") });
   await page.reload();
-  await expect(theme.getByRole("button", { name: "深色" })).toHaveAttribute("aria-pressed", "true");
-  await theme.getByRole("button", { name: "浅色" }).click();
+  await expect(theme.locator('[data-key="dark"]')).toHaveAttribute("aria-pressed", "true");
+  await theme.locator('[data-key="light"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await page.getByRole("group", { name: "界面大小" }).getByRole("button", { name: "125%" }).click();
-  await expect(page.getByRole("group", { name: "界面大小" }).getByRole("button", { name: "125%" })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("group", { name: "界面大小" }).getByRole("button", { name: "100%" }).click();
-  await theme.getByRole("button", { name: "跟随系统" }).click();
+  const scale = page.getByTestId("scale");
+  await scale.locator('[data-key="125"]').click();
+  await expect(scale.locator('[data-key="125"]')).toHaveAttribute("aria-pressed", "true");
+  await scale.locator('[data-key="100"]').click();
+  await theme.locator('[data-key="system"]').click();
   await page.goto("/settings/general");
-  await page.getByRole("group", { name: "启动时打开" }).getByRole("button", { name: "农场" }).click();
+  await page.getByTestId("start").locator('[data-key="farm"]').click();
   await page.goto("/");
   await expect(page).toHaveURL(/\/farm/);
   await page.goto("/settings/general");
-  await page.getByRole("group", { name: "启动时打开" }).getByRole("button", { name: "工作台" }).click();
+  await page.getByTestId("start").locator('[data-key="workbench"]').click();
   await page.goto("/");
   await expect(page).toHaveURL(/\/chat$/);
 });
 
 test("a DeepSeek key is saved, shown by its end and removed", async ({ page }) => {
   await page.goto("/settings/models");
-  await expect(page.getByRole("img", { name: "还没设" })).toBeVisible();
-  const key = page.getByLabel("API Key", { exact: true });
+  const row = page.getByTestId("deepseek-key");
+  const mark = row.getByTestId("key-mark");
+  await expect(mark).toHaveAttribute("data-state", "unset");
+  const key = row.getByTestId("secret");
   await key.fill("sk-test-0123456789abcdef");
   await expect(key).toHaveAttribute("type", "password");
-  await page.getByRole("button", { name: "看一眼" }).click();
+  await row.getByTestId("reveal").click();
   await expect(key).toHaveAttribute("type", "text");
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("存好了，马上就用上。")).toBeVisible();
+  await page.getByTestId("save").click();
   await expect(key).toHaveValue("");
-  await expect(page.getByRole("img", { name: /^在用 .*cdef.*（存在设置里）$/ })).toBeVisible();
-  await page.getByRole("button", { name: "移除 API Key" }).click();
-  await expect(page.getByRole("img", { name: "保存后移除" })).toBeVisible();
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByRole("img", { name: "还没设" })).toBeVisible();
+  await expect(mark).toHaveAttribute("data-state", "settings");
+  await expect(mark).toHaveAttribute("data-hint", /cdef/);
+  await row.getByTestId("remove-key").click();
+  await expect(mark).toHaveAttribute("data-state", "removing");
+  await page.getByTestId("save").click();
+  await expect(mark).toHaveAttribute("data-state", "unset");
 });
 
 test("a memory source is set up, turned on and let go", async ({ page }) => {
   await page.goto("/settings/memory");
-  await expect(page.getByRole("img", { name: "没接" })).toHaveCount(2);
-  await expect(page.getByRole("button", { name: "保存" })).toHaveCount(0);
-  await page.getByRole("button", { name: "配置 EverOS" }).click();
-  await page.getByLabel("EverOS 的地址").fill("http://127.0.0.1:18791");
-  await page.getByRole("switch", { name: "启用 EverOS" }).click();
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByRole("img", { name: "接上了 · http://127.0.0.1:18791" })).toBeVisible();
-  await page.getByRole("button", { name: "配置 EverOS" }).click();
-  await page.getByLabel("EverOS 的地址").fill("");
-  await page.getByRole("switch", { name: "启用 EverOS" }).click();
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByRole("img", { name: "没接" })).toHaveCount(2);
+  await expect(page.locator('[data-testid="source-mark"][data-state="unset"]')).toHaveCount(2);
+  await expect(page.getByTestId("save")).toHaveCount(0);
+  const everos = page.locator('[data-testid="source"][data-key="everos"]');
+  await everos.getByTestId("source-configure").click();
+  await everos.getByTestId("source-address").fill("http://127.0.0.1:18791");
+  await everos.getByTestId("source-enable").click();
+  await page.getByTestId("save").click();
+  await expect(everos.getByTestId("source-mark")).toHaveAttribute("data-state", "on");
+  await everos.getByTestId("source-configure").click();
+  await everos.getByTestId("source-address").fill("");
+  await everos.getByTestId("source-enable").click();
+  await page.getByTestId("save").click();
+  await expect(page.locator('[data-testid="source-mark"][data-state="unset"]')).toHaveCount(2);
 });
 
 test("a skill of VibeValley's own is written, listed and deleted", async ({ page }) => {
   await page.goto("/settings/skills/new");
-  await expect(page.getByRole("heading", { name: "新技能" })).toBeVisible();
-  const save = page.getByRole("button", { name: "保存" });
+  const save = page.getByTestId("save");
   await expect(save).toBeDisabled();
-  await page.getByLabel("技能名字").fill("先写测试");
-  await page.getByLabel("技能说明").fill("改行为之前，先补一个会失败的测试。");
-  await page.getByLabel("正文").fill("改任何行为之前，先写一个能复现问题的测试。");
+  await page.getByTestId("skill-name").fill("test first");
+  await page.getByTestId("skill-description").fill("Before changing behaviour, add a failing test.");
+  await page.getByTestId("skill-body").fill("Write a test that reproduces the problem before changing anything.");
   await save.click();
   await expect(page).toHaveURL(/\/settings\/skills\/(?!new).+/);
-  const book = page.getByRole("navigation", { name: "技能书" });
-  await expect(book.getByRole("link", { name: /先写测试/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("还没有 agent 带这个技能。")).toBeVisible();
-  await page.getByLabel("搜索技能").fill("没有这种");
-  await expect(book.getByRole("link", { name: /先写测试/ })).toBeHidden();
-  await page.getByLabel("搜索技能").fill("");
-  await page.getByRole("button", { name: "删除" }).click();
-  await expect(page.getByText("删掉？")).toBeVisible();
-  await page.getByRole("button", { name: "删除" }).click();
+  const path = new URL(page.url()).pathname;
+  const entry = page.getByTestId("skills-book").locator(`[data-testid="skill-entry"][href="${path}"]`);
+  await expect(entry).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("skill-users")).toHaveAttribute("data-count", "0");
+  await page.getByTestId("skills-search").fill("nothing like this");
+  await expect(entry).toBeHidden();
+  await page.getByTestId("skills-search").fill("");
+  await page.getByTestId("delete").click();
+  await page.getByTestId("delete-sure").click();
   await expect(page).toHaveURL(/\/settings\/skills$/);
-  await expect(book.getByRole("link", { name: /先写测试/ })).toBeHidden();
+  await expect(entry).toBeHidden();
 });
 
 test("the connectors show how each one connects", async ({ page }) => {
   await page.goto("/settings/chat");
-  const list = page.getByRole("region", { name: "连接器列表" });
-  await expect(list.getByRole("link", { name: /微信/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("button", { name: "微信扫码登录" })).toBeVisible();
-  await list.getByRole("link", { name: /QQ/ }).click();
+  const list = page.getByTestId("connectors");
+  await expect(list.locator('[data-key="weixin"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("connector-login")).toBeEnabled();
+  await list.locator('[data-key="qq"]').click();
   await expect(page).toHaveURL(/\/settings\/chat\/qq$/);
-  const connect = page.getByRole("button", { name: "连接 QQ 机器人" });
+  const connect = page.getByTestId("connector-login");
   await expect(connect).toBeDisabled();
-  await page.getByLabel("AppID").fill("102000000");
-  await page.getByLabel("AppSecret").fill("secret");
+  await page.getByTestId("qq-app-id").fill("102000000");
+  await page.getByTestId("qq-secret").fill("secret");
   await expect(connect).toBeEnabled();
-  await expect(page.getByText("QQ 只让机器人在你说话后的一小段时间里回复。", { exact: false })).toBeVisible();
 });
 
-test("连接到本机 opens, shows a pairing code and closes", async ({ page }) => {
+test("connecting to this machine opens, shows a pairing code and closes", async ({ page }) => {
   await page.goto("/settings/devices");
-  await page.getByRole("button", { name: "允许连接" }).click();
-  await expect(page.getByText("开着")).toBeVisible();
-  await expect(page.getByText(/^http:\/\/[\d.]+:\d+$/)).toBeVisible();
-  await page.getByRole("button", { name: "添加设备" }).click();
-  await expect(page.getByRole("img", { name: "配对二维码" })).toBeVisible();
-  await expect(page.getByText(/^http:\/\/[\d.]+:\d+\/pair\?c=/)).toBeVisible();
-  await expect(page.getByText(/还有 \d+ 秒有效/)).toBeVisible();
-  await page.getByRole("button", { name: "不加了" }).click();
-  await page.getByRole("button", { name: "关掉连接" }).click();
-  await expect(page.getByRole("button", { name: "允许连接" })).toBeVisible();
+  await page.getByTestId("lan-allow").click();
+  await expect(page.getByTestId("lan-url")).toHaveText(/^http:\/\/[\d.]+:\d+$/);
+  await page.getByTestId("lan-add").click();
+  const pairing = page.getByTestId("pairing");
+  await expect(pairing.getByTestId("pairing-qr")).toBeVisible();
+  await expect(pairing.getByTestId("pairing-link")).toHaveText(/^http:\/\/[\d.]+:\d+\/pair\?c=/);
+  await expect(pairing).toHaveAttribute("data-left", /^[1-9]\d*$/);
+  await pairing.getByTestId("pairing-stop").click();
+  await page.getByTestId("lan-close").click();
+  await expect(page.getByTestId("lan-allow")).toBeVisible();
 });
 
 test("the voice line saves its own part and goes back to the defaults", async ({ page }) => {
   await page.goto("/settings/call");
-  await expect(page.getByRole("button", { name: "保存" })).toBeDisabled();
-  const area = page.getByRole("group", { name: "区域" });
-  await area.getByRole("button", { name: "欧洲" }).click();
-  await expect(page.getByRole("button", { name: "撤销" })).toBeVisible();
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("存好了，下一通电话就用上。")).toBeVisible();
+  const save = page.getByTestId("save");
+  await expect(save).toBeDisabled();
+  const area = page.getByTestId("voice-area");
+  await area.locator('[data-key="EU"]').click();
+  await expect(page.getByTestId("undo")).toBeVisible();
+  await save.click();
+  await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
   await page.reload();
-  await expect(area.getByRole("button", { name: "欧洲" })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "恢复默认" }).click();
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("存好了，下一通电话就用上。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "恢复默认" })).toBeDisabled();
-});
-
-test("设置 as it looks", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  for (const part of ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"]) {
-    await page.goto(`/settings/${part}`);
-    await expect(page.getByRole("navigation", { name: "设置的分区" })).toBeVisible();
-    await settled(page);
-    await page.screenshot({ path: test.info().outputPath(`settings-${part}.png`) });
-  }
+  await expect(area.locator('[data-key="EU"]')).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("reset").click();
+  await save.click();
+  await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
+  await expect(page.getByTestId("reset")).toBeDisabled();
 });

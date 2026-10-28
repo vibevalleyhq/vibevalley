@@ -23,7 +23,15 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
         : t("web.base.form.unset");
   return (
     <Tip text={text()}>
-      <span role="img" aria-label={text()} tabindex={0} class="inline-flex rounded outline-none focus-visible:outline-2 focus-visible:outline-focus">
+      <span
+        role="img"
+        data-testid="key-mark"
+        data-state={props.removing ? "removing" : (props.status.source ?? "unset")}
+        data-hint={props.status.hint}
+        aria-label={text()}
+        tabindex={0}
+        class="inline-flex rounded outline-none focus-visible:outline-2 focus-visible:outline-focus"
+      >
         <Show when={props.removing || props.status.source} fallback={<span class="m-[3px] block size-2 rounded-full border border-faint" aria-hidden="true" />}>
           <Icon name={props.removing ? "cross" : "check"} size={14} />
         </Show>

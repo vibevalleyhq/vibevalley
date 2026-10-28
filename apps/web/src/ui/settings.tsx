@@ -49,13 +49,14 @@ export function SettingsGroup(props: { title?: string; note?: JSX.Element; child
  * One setting: its name and one line on what it does (hint), more on hover (tip), its control on the right. wide puts the
  * control under the words, for a field too wide to sit beside them.
  */
-export function SettingRow(props: { label: string; hint?: string; tip?: string; wide?: boolean; children?: JSX.Element }) {
+export function SettingRow(props: { label: string; hint?: string; tip?: string; wide?: boolean; testid?: string; children?: JSX.Element }) {
   const query = useContext(SettingsSearch);
   const found = () => query() !== "" && matches(query(), [props.label, props.hint, props.tip]);
   return (
     <div
       class={["flex gap-x-6 gap-y-2 px-4 py-3", props.wide ? "flex-col" : "flex-wrap items-center", { "bg-wheat/15": found() }]}
       data-found={found() ? "" : undefined}
+      data-testid={props.testid}
     >
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <div class="flex items-center gap-1.5">
@@ -87,12 +88,14 @@ export function KeyRow(props: {
   link?: { readonly href: string; readonly label: string };
   placeholder?: string;
   after?: JSX.Element;
+  testid?: string;
 }) {
   return (
-    <SettingRow label={props.label} hint={props.hint} tip={props.tip}>
+    <SettingRow label={props.label} hint={props.hint} tip={props.tip} testid={props.testid}>
       <KeyMark status={props.status} removing={props.removing} />
       <div class={["w-64", { "pointer-events-none opacity-40": props.removing }]}>
         <SecretInput
+          data-testid="secret"
           aria-label={props.label}
           placeholder={props.placeholder ?? t("web.base.form.keepEmpty")}
           value={props.value}
@@ -101,6 +104,7 @@ export function KeyRow(props: {
       </div>
       <Show when={props.status.source === "settings"}>
         <IconButton
+          testid="remove-key"
           icon={props.removing ? "undo" : "delete"}
           tone={props.removing ? undefined : "danger"}
           label={props.removing ? t("web.base.form.keepKey", { label: props.label }) : t("web.base.form.removeKey", { label: props.label })}

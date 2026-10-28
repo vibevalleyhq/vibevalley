@@ -60,9 +60,14 @@ export function SettingsPage(props: { rest: string }) {
       {(section) => (
         <SettingsSearch value={q}>
           <div class="flex h-full min-h-0 flex-col md:flex-row">
-            <nav aria-label={t("web.setting.nav.label")} class="flex shrink-0 flex-col gap-4 border-line p-3 md:w-56 md:overflow-y-auto md:border-r">
+            <nav
+              aria-label={t("web.setting.nav.label")}
+              data-testid="settings-nav"
+              class="flex shrink-0 flex-col gap-4 border-line p-3 md:w-56 md:overflow-y-auto md:border-r"
+            >
               <TextInput
                 type="search"
+                data-testid="settings-search"
                 aria-label={t("web.setting.nav.search")}
                 placeholder={t("web.setting.nav.search")}
                 value={query()}
@@ -77,6 +82,7 @@ export function SettingsPage(props: { rest: string }) {
                         {(s) => (
                           <A
                             href={`/settings/${s.id}`}
+                            data-key={s.id}
                             aria-current={s === section() ? "page" : undefined}
                             class={[
                               "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",

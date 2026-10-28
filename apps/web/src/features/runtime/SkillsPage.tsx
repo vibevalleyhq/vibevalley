@@ -47,9 +47,14 @@ export function SkillsPage(props: { id?: string }) {
 
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <nav aria-label={t("web.runtime.library.book")} class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto">
+      <nav
+        aria-label={t("web.runtime.library.book")}
+        data-testid="skills-book"
+        class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto"
+      >
         <h2 class="px-2 pt-1.5 text-base font-semibold">{t("web.runtime.library.book")}</h2>
         <TextInput
+          data-testid="skills-search"
           aria-label={t("web.runtime.library.search")}
           placeholder={t("web.runtime.library.searchHint")}
           value={query()}
@@ -82,7 +87,7 @@ export function SkillsPage(props: { id?: string }) {
         </ul>
         <div class="flex items-center gap-2 px-2 pt-3">
           <h3 class="flex-1 text-xs font-semibold text-muted">{t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}</h3>
-          <A href={skillPath("new")} class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-leaf">
+          <A href={skillPath("new")} data-testid="new-skill" class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-leaf">
             {t("web.runtime.library.newSkill")}
           </A>
         </div>
@@ -108,6 +113,7 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
     <li>
       <A
         href={props.to}
+        data-testid="skill-entry"
         aria-current={props.on ? "page" : undefined}
         class={["flex flex-col rounded-md px-2 py-1.5 hover:bg-hover", { "bg-selected": props.on }]}
       >
@@ -196,18 +202,25 @@ function SkillEditor(props: { skill?: Skill }) {
         <div class="flex flex-wrap items-center gap-2">
           <Show when={skill}>
             {(s) => (
-              <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.base.form.remove")}</Button>}>
+              <Show
+                when={sure()}
+                fallback={
+                  <Button data-testid="delete" onClick={() => setSure(true)}>
+                    {t("web.base.form.remove")}
+                  </Button>
+                }
+              >
                 <span class="text-xs text-muted">
                   {agents().length > 0 ? t("web.runtime.library.inUse", { n: agents().length }) : t("web.runtime.library.removeIt")}
                 </span>
-                <Button tone="danger" disabled={busy()} onClick={() => void remove(s())}>
+                <Button tone="danger" data-testid="delete-sure" disabled={busy()} onClick={() => void remove(s())}>
                   {t("web.base.form.remove")}
                 </Button>
                 <Button onClick={() => setSure(false)}>{t("web.base.form.never")}</Button>
               </Show>
             )}
           </Show>
-          <Button tone="primary" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
+          <Button tone="primary" data-testid="save" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
             {t("web.base.form.save")}
           </Button>
         </div>
@@ -215,6 +228,7 @@ function SkillEditor(props: { skill?: Skill }) {
     >
       <Field label={t("web.runtime.library.name")}>
         <TextInput
+          data-testid="skill-name"
           aria-label={t("web.runtime.library.nameLabel")}
           placeholder={t("web.runtime.library.nameHint")}
           value={draft().name}
@@ -223,6 +237,7 @@ function SkillEditor(props: { skill?: Skill }) {
       </Field>
       <Field label={t("web.runtime.library.when")} hint={t("web.runtime.library.whenHint")}>
         <TextInput
+          data-testid="skill-description"
           aria-label={t("web.runtime.library.description")}
           placeholder={t("web.runtime.library.descriptionHint")}
           value={draft().description}
@@ -231,6 +246,7 @@ function SkillEditor(props: { skill?: Skill }) {
       </Field>
       <Field label={t("web.runtime.library.body")} hint={t("web.runtime.library.bodyHint")}>
         <TextArea
+          data-testid="skill-body"
           aria-label={t("web.runtime.library.body")}
           rows={14}
           placeholder={t("web.runtime.library.bodyExample")}
@@ -238,7 +254,7 @@ function SkillEditor(props: { skill?: Skill }) {
           onInput={(e) => setDraft({ ...draft(), body: e.currentTarget.value })}
         />
       </Field>
-      <div class="flex flex-col gap-1.5">
+      <div data-testid="skill-users" data-count={agents().length} class="flex flex-col gap-1.5">
         <span class="text-xs font-medium text-muted">{t("web.runtime.library.who")}</span>
         <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">{t("web.runtime.library.nobody")}</p>}>
           <div class="flex flex-wrap gap-2">

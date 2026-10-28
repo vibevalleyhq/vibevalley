@@ -263,6 +263,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   <Labeled label={t("web.voice.voice.area")} hint={t("web.voice.voice.areaHint")}>
                     <Segmented
                       label={t("web.voice.voice.area")}
+                      testid="voice-area"
                       value={draft().area}
                       options={AreaValues.map((a) => ({ value: a, label: areaLabel[a] }))}
                       onChange={(area) => set({ ...draft(), area })}
@@ -275,6 +276,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
                     <Segmented
                       label={t("web.voice.voice.asr")}
+                      testid="voice-asr"
                       value={asr().vendor}
                       options={options(asrLabel)}
                       onChange={(v) => set({ ...draft(), asr: v === asr().vendor ? asr() : asrStart[v] })}
@@ -293,6 +295,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       <Labeled label={t("web.voice.voice.deepgramModel")}>
                         <Segmented
                           label={t("web.voice.voice.deepgramModel")}
+                          testid="voice-deepgram-model"
                           value={a().model}
                           options={plain(ModelValues)}
                           onChange={(model) => set({ ...draft(), asr: { vendor: "deepgram", model } })}
@@ -324,6 +327,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
                   <Segmented
                     label={t("web.voice.voice.who")}
+                    testid="voice-answer"
                     value={answer().vendor}
                     options={options(answerLabel)}
                     onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
@@ -334,6 +338,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     <Labeled label={t("web.voice.voice.model")}>
                       <Segmented
                         label={t("web.voice.voice.model")}
+                        testid="voice-model"
                         value={a().model}
                         options={plain(VoiceAnswerAgoraModelValues)}
                         onChange={(model) => set({ ...draft(), answer: { vendor: "agora", model } })}
@@ -463,6 +468,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             >
               <Segmented
                 label={t("web.voice.voice.persona.tts")}
+                testid="voice-tts"
                 value={tts().vendor}
                 options={options(ttsLabel)}
                 onChange={(v) => set({ ...draft(), tts: v === tts().vendor ? tts() : ttsStart[v] })}
@@ -473,6 +479,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Labeled label={t("web.voice.voice.persona.ttsModel")}>
                   <Segmented
                     label={t("web.voice.voice.persona.ttsModel")}
+                    testid="voice-tts-model"
                     value={narrowed().model}
                     options={plain(VoiceTTSMinimaxModelValues)}
                     onChange={(model) => set({ ...draft(), tts: { ...narrowed(), model } })}
@@ -485,6 +492,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.openaiVoice")}>
                   <Segmented
                     label={t("web.voice.voice.persona.voice")}
+                    testid="voice-voice"
                     value={narrowed().voice}
                     options={plain(VoiceValues)}
                     onChange={(voice) => set({ ...draft(), tts: { ...narrowed(), voice } })}
