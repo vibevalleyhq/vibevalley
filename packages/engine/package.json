@@ -6,7 +6,8 @@
     "./pixi": "./src/pixi/index.ts",
     "./nav": "./src/nav/index.ts",
     "./audio": "./src/audio/index.ts",
-    "./clock": "./src/clock.ts"
+    "./clock": "./src/clock.ts",
+    "./framing": "./src/framing.ts"
   },
   "dependencies": {
     "pixi.js": "catalog:"

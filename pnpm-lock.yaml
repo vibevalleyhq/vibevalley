@@ -357,6 +357,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      '@vibevalley/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@vibevalley/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

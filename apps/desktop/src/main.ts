@@ -3,10 +3,11 @@
 
 import { currentLocale, setLocale } from "@vibevalley/protocol/words";
 import { desktopWording, followSavedLocale } from "./words";
-import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, shell } from "electron";
+import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Notice, TraySummary } from "@vibevalley/protocol/host";
+import { farmFraming, type Notice, type TraySummary } from "@vibevalley/protocol/host";
+import { filledNear } from "@vibevalley/engine/framing";
 import { watchForDev } from "./dev";
 import { startIsland } from "./island";
 import { loginShellPath, type RunningServer, startServer } from "./server";
@@ -41,17 +42,20 @@ let window: BrowserWindow | undefined;
 /** The page's ground (apps/web style.css): what the window is painted with between one page and the next. */
 const ground = "#2b3320";
 
+/** The smallest window: twice the farm. */
+const minSize = { w: farmFraming.picture.w * 2, h: farmFraming.picture.h * 2 };
+
 /** The one window, made when first asked for. */
 function windowNow(): BrowserWindow {
   if (window) return window;
   const made = new BrowserWindow({
-    // The farm's proportions, so that it meets the window's edges (apps/web farm/world/framing.ts scales it by whole
-    // steps only): three times its 384 × 256, and 3 : 2 however the window is sized.
-    width: 1152,
-    height: 768,
+    // The farm's proportions, so that it meets the window's edges (farmFraming: it is scaled by whole steps only): three
+    // times its 384 × 256, and 3 : 2 however the window is sized.
+    width: farmFraming.picture.w * 3,
+    height: farmFraming.picture.h * 3,
     useContentSize: true,
-    minWidth: 768,
-    minHeight: 512,
+    minWidth: minSize.w,
+    minHeight: minSize.h,
     title: "VibeValley",
     show: false,
     backgroundColor: ground,
@@ -60,6 +64,15 @@ function windowNow(): BrowserWindow {
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   made.setAspectRatio(3 / 2);
+  // A size between two whole scales leaves bars around the farm: once a resize ends, the window takes the nearest size
+  // the farm fills. A maximized or full-screen window keeps the screen's size.
+  made.on("resized", () => {
+    if (made.isFullScreen() || made.isMaximized()) return;
+    const [w = 0, h = 0] = made.getContentSize();
+    const area = screen.getDisplayMatching(made.getBounds()).workAreaSize;
+    const to = filledNear({ w, h }, farmFraming.picture, farmFraming.cut, minSize, { w: area.width, h: area.height });
+    if (to.w !== w || to.h !== h) made.setContentSize(to.w, to.h, true);
+  });
   // The page stays on the server's origin; any other link opens in the browser.
   made.webContents.setWindowOpenHandler(({ url: to }) => {
     void shell.openExternal(to);
