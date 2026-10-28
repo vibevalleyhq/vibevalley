@@ -1,3 +1,4 @@
+import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
 import { chatWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
@@ -34,10 +35,10 @@ import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "../session";
 import { useAgent, useOrchestrators } from "../../base/agents";
 
-const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {
-  completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "icon-harvest" },
-  failed: { label: wording().outcome.failed, fill: "#e9a092", icon: "icon-bug" },
-  interrupted: { label: wording().outcome.interrupted, fill: "#e2c995", icon: "icon-shovel" },
+const outcomeTag: Record<Outcome, { label: string; fill: string; icon: IconName }> = {
+  completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "check" },
+  failed: { label: wording().outcome.failed, fill: "#e9a092", icon: "cross" },
+  interrupted: { label: wording().outcome.interrupted, fill: "#e2c995", icon: "stop" },
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
@@ -270,7 +271,7 @@ function Dispatch(props: { text: string }) {
         aria-expanded={aria(open())}
         class="mt-[5px] cursor-pointer"
       >
-        <Icon name={open() ? "button-collapse" : "button-enlarge"} size={12} class="opacity-50 group-hover/d:opacity-100" />
+        <Icon name={open() ? "collapse" : "enlarge"} size={12} class="opacity-50 group-hover/d:opacity-100" />
       </button>
     </div>
   );
@@ -325,7 +326,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
     >
       <Show when={props.m.kind === "dispatch"}>
         <div class="mb-1">
-          <Tag icon="icon-seeds" label={chatWording().messages.dispatch} fill="#f3d38a" />
+          <Tag icon="send" label={chatWording().messages.dispatch} fill="#f3d38a" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
@@ -354,7 +355,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>
         {(spent) => (
           <div class="mt-1 flex items-center gap-1 text-xs text-muted">
-            <Icon name="icon-coin" size={12} />
+            <Icon name="spend" size={12} />
             {chatWording().messages.spent(spentText(spent()))}
           </div>
         )}
@@ -384,7 +385,7 @@ function ThreadPreview(props: { thread: Channel }) {
       class="group/t mt-2 flex w-full max-w-xl cursor-pointer flex-col gap-1 rounded-lg border border-line px-3 py-2 text-left hover:bg-hover focus-visible:border-focus"
     >
       <span class="flex w-full items-center gap-1.5">
-        <Icon name="button-thread" size={16} />
+        <Icon name="thread" size={16} />
         <span class="text-sm font-semibold text-accent">
           {props.thread.replies > 0
             ? chatWording().replies(props.thread.replies)
@@ -403,7 +404,7 @@ function ThreadPreview(props: { thread: Channel }) {
             </>
           )}
         </Show>
-        <Icon name="button-next" size={12} class="opacity-60 group-hover/t:opacity-100" />
+        <Icon name="expand" size={12} class="opacity-60 group-hover/t:opacity-100" />
       </span>
       <Show when={last()}>
         {(m) => (

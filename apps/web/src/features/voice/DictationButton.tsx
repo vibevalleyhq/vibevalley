@@ -1,5 +1,6 @@
 // The dictation button every input row has.
 
+import type { IconName } from "../../ui/icons";
 import { voiceWording } from "./words";
 import { onSettled } from "solid-js";
 import { dictation, insertDictated } from "./dictation";
@@ -23,14 +24,14 @@ export function DictationButton(props: {
   // Unknown until the settings are read; the server says what is missing then.
   const settings = useSettings();
   const off = () => ready(settings, undefined)?.dictation.url === "";
-  const look = (): [string, string] =>
+  const look = (): [IconName, string] =>
     off()
-      ? ["button-record", voiceWording().dictation.unset]
+      ? ["record", voiceWording().dictation.unset]
       : phase() === "recording"
-        ? ["button-stop", voiceWording().dictation.recording]
+        ? ["stop", voiceWording().dictation.recording]
         : phase() === "transcribing"
-          ? ["button-wait", voiceWording().dictation.transcribing]
-          : ["button-record", problem() ? voiceWording().dictation.failed(problem() ?? "") : voiceWording().dictation.start];
+          ? ["wait", voiceWording().dictation.transcribing]
+          : ["record", problem() ? voiceWording().dictation.failed(problem() ?? "") : voiceWording().dictation.start];
   return (
     <button
       type="button"

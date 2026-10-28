@@ -138,7 +138,7 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
             <p class="font-mono text-[11.5px] break-all select-all">{props.pairing.link}</p>
             <p class="text-xs text-muted">{lanWording().lan.left(left())}</p>
             <div class="flex flex-wrap gap-2 pt-1">
-              <Button icon="button-copy" onClick={() => void copy(props.pairing.link)}>
+              <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
                 {lanWording().lan.copy}
               </Button>
               <Button onClick={() => void props.act(() => api.lan.pairing.start())}>{lanWording().lan.newCode}</Button>

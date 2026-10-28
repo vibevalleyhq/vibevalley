@@ -39,6 +39,7 @@ catalog:
   hast-util-to-dom: "^4.0.1"
   pixi.js: "^8.22.0"
   react-native-agora: "^4.6.4"
+  reicon: "1.2.5"
   remark-gfm: "^4.0.1"
   remark-parse: "^11.0.0"
   remark-rehype: "^11.1.2"

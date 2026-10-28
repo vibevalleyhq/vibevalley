@@ -1,3 +1,4 @@
+import type { IconName } from "../../ui/icons";
 import { chatWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -106,10 +107,10 @@ function Chat() {
 
 type Tab = "chat" | "jobs" | "recurrences";
 
-const tabs: { tab: Tab; icon: string; label: string }[] = [
-  { tab: "chat", icon: "icon-board", label: chatWording().tab.chat },
-  { tab: "jobs", icon: "icon-tasks", label: chatWording().tab.jobs },
-  { tab: "recurrences", icon: "icon-clock", label: chatWording().tab.recurrences },
+const tabs: { tab: Tab; icon: IconName; label: string }[] = [
+  { tab: "chat", icon: "chat", label: chatWording().tab.chat },
+  { tab: "jobs", icon: "issues", label: chatWording().tab.jobs },
+  { tab: "recurrences", icon: "clock", label: chatWording().tab.recurrences },
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
@@ -128,7 +129,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
     <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
       <header class={[head, "gap-3 px-4"]}>
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={chatWording().channels} onClick={() => props.onDrawer()}>
-          <Icon name="icon-board" size={18} />
+          <Icon name="chat" size={18} />
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
@@ -141,7 +142,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         </div>
         <Show when={search() !== undefined}>
           <label class="flex h-8 w-48 items-center gap-1.5 rounded-md border border-line px-2 focus-within:border-focus">
-            <Icon name="button-search" size={14} />
+            <Icon name="search" size={14} />
             <input
               ref={autofocus()}
               value={search() ?? ""}
@@ -164,7 +165,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             setTab("chat");
           }}
         >
-          <Icon name="act-search" size={18} />
+          <Icon name="search" size={18} />
         </button>
         <Show when={props.channel?.type === "channel" ? props.channel : undefined}>
           {(c) => (
@@ -177,7 +178,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
                 title={chatWording().threadList.title}
                 onClick={() => setThreadsOpen(!threadsOpen())}
               >
-                <Icon name="button-thread" size={18} />
+                <Icon name="thread" size={18} />
               </button>
               <Show when={threadsOpen()}>
                 <ThreadList channel={c()} onPick={() => setThreadsOpen(false)} />
@@ -195,7 +196,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             disabled={!props.channel}
             onClick={() => setPinsOpen(!pinsOpen())}
           >
-            <Icon name="icon-star" size={18} />
+            <Icon name="pin" size={18} />
           </button>
           <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} onPick={() => setPinsOpen(false)} />}</Show>
         </div>
@@ -217,7 +218,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           disabled={!props.channel}
           onClick={() => setSettings(true)}
         >
-          <Icon name="icon-wrench" size={18} />
+          <Icon name="settings" size={18} />
         </button>
       </header>
       <div role="tablist" aria-label={chatWording().inChannel} class="flex shrink-0 gap-1 border-b border-line px-3">
@@ -308,7 +309,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           title={chatWording().farmSearch.open}
           onClick={() => props.onSearch()}
         >
-          <Icon name="button-search" size={16} />
+          <Icon name="search" size={16} />
         </button>
       </div>
       <div class="flex-1 overflow-y-auto p-3">
@@ -331,7 +332,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
               title={chatWording().newChannel}
               onClick={() => props.onNew()}
             >
-              <Icon name="button-add" size={14} />
+              <Icon name="add" size={14} />
             </button>
           }
         >
@@ -360,7 +361,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
                 aria-expanded={aria(picking())}
                 onClick={() => setPicking(!picking())}
               >
-                <Icon name="button-add" size={14} />
+                <Icon name="add" size={14} />
               </button>
               <Show when={picking()}>
                 <DirectPicker
@@ -438,7 +439,7 @@ function Section(props: { title: string; count: number; action?: JSX.Element; ne
     <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title}>
       <div class="flex items-center px-1 pb-1">
         <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} class="flex flex-1 cursor-pointer items-center gap-1 text-left">
-          <Icon name="button-next" size={10} class={["opacity-60 transition-transform duration-150", { "rotate-90": open() }]} />
+          <Icon name="expand" size={10} class={["opacity-60 transition-transform duration-150", { "rotate-90": open() }]} />
           <span class="text-xs font-semibold text-muted">{props.title}</span>
           <span class="text-xs text-faint">{props.count}</span>
         </button>
@@ -639,7 +640,7 @@ function Members(props: { channel: Channel }) {
                   .catch((e) => toast(reasonOf(e), "bad"))
               }
             >
-              <Icon name="button-thread" size={14} />
+              <Icon name="thread" size={14} />
             </button>
           </div>
         )}
@@ -686,7 +687,7 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
     <section aria-label={chatWording().thread} class="flex min-w-0 flex-1 flex-col">
       <header class={[head, "gap-2.5 px-4"]}>
         <span class="flex size-8 shrink-0 items-center justify-center">
-          <Show when={session()} fallback={<Icon name="button-thread" size={16} />}>
+          <Show when={session()} fallback={<Icon name="thread" size={16} />}>
             {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
           </Show>
         </span>
@@ -708,7 +709,7 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
           }}
         />
         <button type="button" class={iconButton} aria-label={chatWording().closeThread} title={chatWording().closeThread} onClick={() => props.onClose()}>
-          <Icon name="button-close" size={16} />
+          <Icon name="close" size={16} />
         </button>
       </header>
       <FileDrop channel={props.thread}>
@@ -746,7 +747,7 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
           class="mt-1 flex cursor-pointer items-center gap-1 px-1 text-left text-xs text-muted hover:text-ink"
           onClick={() => setShowArchived(!showArchived())}
         >
-          <Icon name="button-next" size={10} class={["opacity-60 transition-transform", { "rotate-90": showArchived() }]} />
+          <Icon name="expand" size={10} class={["opacity-60 transition-transform", { "rotate-90": showArchived() }]} />
           {chatWording().threadList.archived(archived().length)}
         </button>
         <Show when={showArchived()}>
@@ -774,7 +775,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
         fallback={
           <button type="button" class="flex min-w-0 flex-1 cursor-pointer flex-col py-1.5 pl-1 text-left" onClick={() => props.onOpen()}>
             <span class="flex items-center gap-1.5 text-sm">
-              <Icon name="button-thread" size={14} />
+              <Icon name="thread" size={14} />
               <span class="min-w-0 flex-1 truncate font-medium">{props.title}</span>
               <span class="shrink-0 text-xs text-muted">{chatWording().replies(props.thread.replies)}</span>
             </span>
@@ -815,7 +816,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
           setRenaming(true);
         }}
       >
-        <Icon name="button-edit" size={14} />
+        <Icon name="edit" size={14} />
       </button>
       <button
         type="button"
@@ -824,7 +825,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
         title={props.thread.archived !== undefined ? chatWording().threadList.unarchive(props.title) : chatWording().threadList.archive(props.title)}
         onClick={() => run(() => api.channel.archive.toggle({ id: props.thread.id }))}
       >
-        <Icon name="icon-crate" size={14} />
+        <Icon name="archive" size={14} />
       </button>
     </div>
   );
@@ -856,7 +857,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
   return (
     <div class="flex flex-col gap-3">
       <label class="flex h-9 items-center gap-2 rounded-md border border-line px-2 focus-within:border-focus">
-        <Icon name="button-search" size={16} />
+        <Icon name="search" size={16} />
         <input
           ref={autofocus()}
           value={text()}

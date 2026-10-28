@@ -7,11 +7,12 @@ import { type BoardCard, cardLook, cardMove, cardProject, laneOrder } from "./ca
 import { closedShown, type Lane, laneLabel, lanes, laneStatus } from "./rules";
 import { autofocus } from "../../base/util";
 import { Icon } from "../../ui/Icon";
+import type { IconName } from "../../ui/icons";
 import { Segmented } from "../../ui/Segmented";
 import { useGraphs, useNameOf } from "./hooks";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
-export function IconButton(props: { icon: string; label: string; onClick: () => void; size?: number }) {
+export function IconButton(props: { icon: IconName; label: string; onClick: () => void; size?: number }) {
   return (
     <button
       type="button"
@@ -168,8 +169,8 @@ function LaneView(props: {
         <span class="text-xs text-muted">{head()}</span>
         <Show when={props.lane === "todo"}>
           <span class="ml-auto flex">
-            <IconButton icon="button-add" label={issuesWording().board.write} onClick={props.focusAdd} />
-            <IconButton icon="button-edit" label={issuesWording().board.writeFull} onClick={p().onWrite} />
+            <IconButton icon="add" label={issuesWording().board.write} onClick={props.focusAdd} />
+            <IconButton icon="edit" label={issuesWording().board.writeFull} onClick={p().onWrite} />
           </span>
         </Show>
       </header>

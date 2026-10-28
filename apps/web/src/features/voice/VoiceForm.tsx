@@ -614,7 +614,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
                 class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-40"
                 onClick={() => sample && play(v.id, sample)}
               >
-                <Icon name={playing() === v.id ? "button-stop" : "button-play"} size={16} />
+                <Icon name={playing() === v.id ? "stop" : "play"} size={16} />
               </button>
               <button
                 type="button"

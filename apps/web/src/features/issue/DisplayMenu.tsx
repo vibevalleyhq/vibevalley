@@ -31,7 +31,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
     ].filter(Boolean);
   return (
     <div ref={(el) => (box = el)} class="relative">
-      <Button tone="quiet" icon="button-settings" aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
+      <Button tone="quiet" icon="settings" aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
         {issuesWording().display.show}
       </Button>
       <Show when={open()}>

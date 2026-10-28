@@ -14,7 +14,7 @@ import { Keyed } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { Button } from "../../ui/Button";
 import { Field, Select, TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
+import { SpriteIcon } from "../../ui/pixel";
 import { Qr } from "../../ui/Qr";
 import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "../../ui/layout";
 
@@ -77,7 +77,7 @@ export function ConnectorsPage(props: { id?: string }) {
                 active={c === selected()}
                 title={connectorLabel[c]}
                 line={of(c) && of(c)!.state !== "off" ? stateLabel[of(c)!.state] : connectorHow[c]}
-                leading={<Icon name={`connector-${c}`} size={36} />}
+                leading={<SpriteIcon name={`connector-${c}`} size={36} />}
                 trailing={<span class={["size-2 shrink-0 rounded-full", dot(of(c)?.state)]} aria-hidden="true" />}
               />
             )}

@@ -1,6 +1,7 @@
 // The chat's words: channels and threads, feeds and unread counts, names to @, the clocks and a helper's
 // phase. Nothing here folds facts: it only reads the chat the server sent.
 
+import { actionIcon, type IconName } from "../../ui/icons";
 import { chatWording } from "./words";
 import { appWording } from "../../base/words";
 import { wording } from "@vibevalley/protocol/words";
@@ -262,20 +263,20 @@ export function phaseDot(p: Phase): DotTone {
 }
 
 /** The sprite for a phase; undefined draws nothing. */
-export function phaseIcon(p: Phase): string | undefined {
+export function phaseIcon(p: Phase): IconName | undefined {
   switch (p._tag) {
     case "arriving":
-      return "icon-seeds";
+      return "send";
     case "working":
-      return p.doing.action === "none" ? undefined : `act-${p.doing.action}`;
+      return p.doing.action === "none" ? undefined : actionIcon[p.doing.action];
     case "done":
-      return "icon-harvest";
+      return "check";
     case "failed":
-      return "icon-bug";
+      return "cross";
     case "resting":
-      return "act-wait";
+      return "wait";
     case "closed":
-      return p.closed === "merged" ? "icon-harvest" : "act-wait";
+      return p.closed === "merged" ? "check" : "wait";
   }
 }
 

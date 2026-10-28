@@ -167,7 +167,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
             <>
               <DeleteButton agent={saved()} />
               <Button
-                icon="button-thread"
+                icon="thread"
                 onClick={() =>
                   void api.channel.direct
                     .create({ agent: saved().id })
@@ -284,7 +284,7 @@ function Problems(props: { problems: AgentProblem[] }) {
       when={props.problems.length > 0}
       fallback={
         <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-[#3f6427]">
-          <Icon name="mark-check" size={12} />
+          <Icon name="check" size={12} />
           {agentsWording().fine}
         </p>
       }
@@ -293,7 +293,7 @@ function Problems(props: { problems: AgentProblem[] }) {
         <For each={props.problems}>
           {(i) => (
             <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-[#b8682a]"]}>
-              <Icon name={i.level === "error" ? "mark-cross" : "mark-warn"} size={12} class="mt-1" />
+              <Icon name={i.level === "error" ? "cross" : "warn"} size={12} class="mt-1" />
               {i.level === "error" ? agentsWording().cannot : ""}
               {i.text}
             </li>
@@ -310,7 +310,7 @@ function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => voi
   return (
     <div class="flex flex-col gap-5">
       <div>
-        <Button icon="button-replay" onClick={() => props.onChange(randomLook())}>
+        <Button icon="shuffle" onClick={() => props.onChange(randomLook())}>
           {agentsWording().random}
         </Button>
       </div>
@@ -641,7 +641,7 @@ function Facts(props: { runtime: string; info?: RuntimeInfo }) {
       <h3 class="text-sm font-semibold">{agentsWording().can(props.info ? props.info.preset.label : props.runtime)}</h3>
       <Show when={props.info} fallback={<span class="text-sm">{agentsWording().readingMachines}</span>}>
         <span class="flex items-start gap-1.5 text-sm">
-          <Icon name={facts().steer ? "mark-check" : "mark-cross"} size={12} class="mt-1" />
+          <Icon name={facts().steer ? "check" : "cross"} size={12} class="mt-1" />
           {facts().steer ? agentsWording().steer : agentsWording().noSteer}
         </span>
         <span class="text-sm">{facts().inProcess ? agentsWording().inProcess : agentsWording().ownProcess}</span>
@@ -733,7 +733,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch 
                 >
                   <span class={["mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border bg-page", on() ? "border-accent" : "border-ink/25"]}>
                     <Show when={on()}>
-                      <Icon name="mark-check" size={12} />
+                      <Icon name="check" size={12} />
                     </Show>
                   </span>
                   <span class="flex flex-col">

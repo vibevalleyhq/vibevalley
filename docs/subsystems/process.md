@@ -55,7 +55,7 @@
 - **各子系统**：沉淀的去处；`docs:verify` 查它们的链接和路径。
 - **地基、客户端**：它们的检查（黄金数据、`schema.test.ts`、`db:check`、各包的类型）是第 2 层的另一半，跟着各自的代码住。
 - **验收只有一个 skill**：[acceptance](.agents/skills/acceptance/SKILL.md) 的入口写共同的沙箱（`scripts/verify-server.ts` 起隔离的服务端）、证据和收拾，按「改了什么」指到一份分册（服务端、页面、手机壳、管家的评测，管家的评测归[管家](docs/subsystems/orchestrator.md)）。一个入口，agent 改完不用先猜该找哪个 skill；分册只在用得上时读，验一个接口不带上模拟器和花钱的步骤。
-- **农场的皮**：读 `process.py` 写出的 `apps/web/public/pixel/` 和 `sprites.json`；界面按钮图标只用这条流水线的贴图（[AGENTS.md](AGENTS.md#规矩)「图标是像素素材」）。
+- **农场的皮**：读 `process.py` 写出的 `apps/web/public/pixel/` 和 `sprites.json`；像素皮的按钮图标只用这条流水线的贴图；工作台的图标是 reicon（[客户端](docs/subsystems/app.md)「图标分两套」）。
 
 ## 为什么这样
 

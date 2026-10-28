@@ -73,7 +73,7 @@ export function IssueList(props: {
                 case "status":
                   return <StatusMark status={laneStatus[g().lane!]} />;
                 case "project":
-                  return <Icon name="button-folder" size={14} />;
+                  return <Icon name="folder" size={14} />;
                 case "agent":
                   return !key ? (
                     <NoFaceMark size={14} />
@@ -95,17 +95,13 @@ export function IssueList(props: {
                     aria-label={isFolded() ? issuesWording().list.unfold(label()) : issuesWording().list.fold(label())}
                     class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
                   >
-                    <Icon name="button-next" size={10} class={{ "rotate-90": !isFolded() }} />
+                    <Icon name="expand" size={10} class={{ "rotate-90": !isFolded() }} />
                     {icon()}
                     <span class="truncate text-sm font-semibold">{label()}</span>
                     <span class="text-xs text-muted">{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
-                    <IconButton
-                      icon="button-add"
-                      label={issuesWording().list.writeIn(label())}
-                      onClick={() => setAdding(adding() === g().key ? null : g().key)}
-                    />
+                    <IconButton icon="add" label={issuesWording().list.writeIn(label())} onClick={() => setAdding(adding() === g().key ? null : g().key)} />
                   </Show>
                 </header>
                 <Show when={!isFolded()}>

@@ -32,6 +32,7 @@ import { Dialog } from "../../ui/Dialog";
 import { AgentFace } from "../../ui/Face";
 import { Field, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
+import { SpriteIcon } from "../../ui/pixel";
 import { Segmented } from "../../ui/Segmented";
 import { Card, ListCard, ListRow, Quiet } from "../../ui/layout";
 import { IslandDetail, ProjectMap, useIslands } from "./ProjectMap";
@@ -67,7 +68,7 @@ export function ProjectsPage(props: { rest: string }) {
           title={projectsWording().title}
           label={projectsWording().list}
           action={
-            <Button icon="button-add" onClick={() => setCreating(true)}>
+            <Button icon="add" onClick={() => setCreating(true)}>
               {projectsWording().add}
             </Button>
           }
@@ -88,7 +89,7 @@ export function ProjectsPage(props: { rest: string }) {
                         active={p.name === selected()?.name}
                         title={p.name}
                         line={line()}
-                        leading={<Icon name={islandLook(p.name)} size={40} />}
+                        leading={<SpriteIcon name={islandLook(p.name)} size={40} />}
                       />
                     );
                   }}
@@ -184,7 +185,7 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
   return (
     <section class="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
       <span class="flex size-24 shrink-0 items-center justify-center rounded-lg bg-hover">
-        <Icon name={`plot-${growth().crop}`} size={80} label={projectsWording().growth(growth().label)} />
+        <SpriteIcon name={`plot-${growth().crop}`} size={80} label={projectsWording().growth(growth().label)} />
       </span>
       <div class="flex min-w-0 flex-1 flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
@@ -207,7 +208,7 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
           />
         </div>
         <div class="flex items-center gap-1.5">
-          <Icon name="button-folder" size={14} />
+          <Icon name="folder" size={14} />
           <span class="min-w-0 truncate font-mono text-xs text-muted" title={props.project.path}>
             {props.project.path}
           </span>
@@ -218,7 +219,7 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
             class="cursor-pointer rounded p-1 hover:bg-hover"
             onClick={() => void copyPath(props.project.path)}
           >
-            <Icon name="button-copy" size={14} />
+            <Icon name="copy" size={14} />
           </button>
         </div>
       </div>
@@ -234,7 +235,7 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
           }}
           class="cursor-pointer rounded-md border border-line p-1.5 hover:bg-hover disabled:opacity-50"
         >
-          <Icon name="button-refresh" size={16} />
+          <Icon name="refresh" size={16} />
         </button>
         <Show when={counted()}>{(c) => <span class="text-xs text-muted">{projectsWording().countedAgo(since(c().at, props.now))}</span>}</Show>
       </div>
@@ -281,7 +282,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
                     style={{ "flex-grow": Math.max(1, Math.round(s.share * 10000)), background: s.color }}
                   >
                     <Show when={s.share >= logoInBed}>
-                      <Icon name={langIcon(s.id)} size={36} />
+                      <SpriteIcon name={langIcon(s.id)} size={36} />
                     </Show>
                   </span>
                 )}
@@ -291,7 +292,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
               <For each={shares()}>
                 {(s) => (
                   <div class="flex items-center gap-3">
-                    <Icon name={langIcon(s.id)} size={32} />
+                    <SpriteIcon name={langIcon(s.id)} size={32} />
                     <div class="flex min-w-0 flex-1 flex-col gap-1">
                       <span class="flex text-sm">
                         <span class="min-w-0 flex-1 truncate font-medium">{s.label}</span>
@@ -407,7 +408,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
                     <For each={week}>
                       {(d) => (
                         <span onMouseEnter={() => setPointed(d)} style={{ opacity: d.future ? 0 : worked() ? 1 : 0.5 }}>
-                          <Icon name={`day-${d.level}`} size={tile} />
+                          <SpriteIcon name={`day-${d.level}`} size={tile} />
                         </span>
                       )}
                     </For>
@@ -424,7 +425,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
             <For each={levelName}>
               {(n, l) => (
                 <span title={n}>
-                  <Icon name={`day-${l()}`} size={tile} />
+                  <SpriteIcon name={`day-${l()}`} size={tile} />
                 </span>
               )}
             </For>

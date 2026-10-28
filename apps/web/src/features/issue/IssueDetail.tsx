@@ -1,3 +1,4 @@
+import type { IconName } from "../../ui/icons";
 import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
@@ -358,7 +359,7 @@ export function IssueDetail(props: {
                   onClick={() => void navigator.clipboard?.writeText(worktree())}
                   class="cursor-pointer rounded p-0.5 hover:bg-hover"
                 >
-                  <Icon name="button-copy" size={14} />
+                  <Icon name="copy" size={14} />
                 </button>
               </span>
             </Property>
@@ -396,10 +397,10 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
   );
 }
 
-const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: string; label: string }> = {
-  met: { icon: "mark-check", label: issuesWording().detail.result.met },
-  unmet: { icon: "mark-cross", label: issuesWording().detail.result.unmet },
-  unsure: { icon: "mark-warn", label: issuesWording().detail.result.unsure },
+const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; label: string }> = {
+  met: { icon: "check", label: issuesWording().detail.result.met },
+  unmet: { icon: "cross", label: issuesWording().detail.result.unmet },
+  unsure: { icon: "warn", label: issuesWording().detail.result.unsure },
 };
 
 /** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on

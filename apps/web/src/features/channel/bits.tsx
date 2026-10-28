@@ -4,6 +4,7 @@ import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { type DotTone, phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
+import type { IconName } from "../../ui/icons";
 import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
@@ -70,7 +71,7 @@ export function Count(props: { n: number }) {
   return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
 }
 
-export function Tag(props: { icon?: string; label: string; fill: string }) {
+export function Tag(props: { icon?: IconName; label: string; fill: string }) {
   return (
     <span class="inline-flex items-center gap-1 rounded px-1.5 py-px text-xs font-medium" style={{ background: props.fill }}>
       {props.icon && <Icon name={props.icon} size={12} />}
@@ -79,7 +80,7 @@ export function Tag(props: { icon?: string; label: string; fill: string }) {
   );
 }
 
-export function Empty(props: { icon: string; children: JSX.Element }) {
+export function Empty(props: { icon: IconName; children: JSX.Element }) {
   return (
     <div class="flex h-full items-center justify-center p-6">
       <div class="flex max-w-96 flex-col items-center gap-3 text-center text-sm text-muted">

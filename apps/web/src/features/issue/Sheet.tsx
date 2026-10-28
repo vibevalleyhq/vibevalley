@@ -44,7 +44,7 @@ export function Fold(props: { label: string; summary?: string; open?: boolean; l
         onClick={() => setOpen(!open())}
         class="flex w-full cursor-pointer items-center gap-2 py-2.5 text-left hover:bg-hover"
       >
-        <Icon name="button-next" size={10} class={["transition-transform", { "rotate-90": open() }]} />
+        <Icon name="expand" size={10} class={["transition-transform", { "rotate-90": open() }]} />
         {props.leading}
         <span class="shrink-0 text-sm font-semibold">{props.label}</span>
         <Show when={props.summary}>
@@ -66,7 +66,7 @@ export function More(props: { children: JSX.Element }) {
   return (
     <div class="mt-1">
       <button type="button" onClick={() => setOpen(!open())} class="flex cursor-pointer items-center gap-1.5 py-1 text-xs text-muted hover:text-ink">
-        <Icon name="button-next" size={8} class={{ "rotate-90": open() }} />
+        <Icon name="expand" size={8} class={{ "rotate-90": open() }} />
         {open() ? issuesWording().sheet.less : issuesWording().sheet.more}
       </button>
       <Show when={open()}>
@@ -105,7 +105,7 @@ export function Stages(props: { at: Stage }) {
             </Show>
             <span class="flex items-center gap-1.5 whitespace-nowrap">
               <Show when={i() < ati()} fallback={<span class={["size-2 rounded-full", s === props.at ? "bg-wheat" : "bg-line"]} />}>
-                <Icon name="mark-check" size={12} label={issuesWording().sheet.stageDone(stageLabel[s])} />
+                <Icon name="check" size={12} label={issuesWording().sheet.stageDone(stageLabel[s])} />
               </Show>
               <span class={s === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}>{stageLabel[s]}</span>
             </span>

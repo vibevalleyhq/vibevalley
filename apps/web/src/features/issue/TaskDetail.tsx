@@ -49,7 +49,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
     <div class="pr-10">
       <div class="flex items-center gap-2 px-2">
         <span class="inline-flex items-center gap-1 rounded bg-leaf/30 px-1.5 py-0.5 text-xs">
-          <Icon name="icon-tasks" size={12} />
+          <Icon name="issues" size={12} />
           {issuesWording().task.label}
         </span>
         <span class="text-xs text-muted">{issuesWording().task.steps(total())}</span>
@@ -130,7 +130,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                               when={task().state === "merged"}
                               fallback={<span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${stepTone[task().state]})` }} />}
                             >
-                              <Icon name="mark-check" size={12} />
+                              <Icon name="check" size={12} />
                             </Show>
                           }
                         >
@@ -157,7 +157,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                           <div class="mt-2 flex flex-wrap gap-2">
                             <Show when={issue()}>
                               {(is) => (
-                                <Button icon="button-open" onClick={() => props.onOpen(is())}>
+                                <Button icon="open" onClick={() => props.onOpen(is())}>
                                   {issuesWording().task.open}
                                 </Button>
                               )}

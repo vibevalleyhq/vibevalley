@@ -38,6 +38,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **干活过程由一个读取模块持有**：`SessionLogs` 为正在看的每个 Session 共享一份日志，先订阅再读快照；直播流每次连上都补读，断线期间已经完成、不再发事件的步骤也能回来。快照替换保留窗口，读取期间收到的步骤按 `seq` 和 `revision` 合并，旧直播片段不能盖掉新快照。最后一个读者离开就释放日志；工作台、农场、轨迹和消息下的步骤都经 `createSessionEvents` 读，不按帮工的阶段猜刷新时机。日志的信号不挂起同页的时间线和改动查询。
 - **界面读按 id 合并的帧**：`createFrames` 把每一帧按 id `reconcile` 进 Solid 的 store，只有变了的字段触发更新；要比前后两帧的（音效、画布、来电、特效）读原始的帧（`base/frame.ts` 的 `rawFrame()`）。农场的 store、本机的选择（`base/prefs.ts`：下一单派谁、管家的长相、宠物）、toast、通话、听写是和框架无关的模块，经 `createExternal` 接进来。
 - **页面分层，只往前 import**：`base` → `ui` → `ui/pixel` → `features` → 皮（`farm`、`tree`）→ `app`，一个文件只 import 自己这层和前面的（lint 的 `vibevalley/page-layers`，`scripts/oxlint-plugin.ts`）；一个 feature 只经另一个的 `index.ts` 用它，feature 之间的依赖不成环（`src/layers.test.ts`）。所以工作台不靠农场的规则和状态：农场是皮，feature 和部件都不认识它；两边都要的放在皮下面：帧在 `base/frame`，本机的选择在 `base/prefs`，额度的说法在 `features/runtime/quota`，工单的动作在 `features/issue/acts`，画在 `ui/pixel`；只有挂皮的 `app/` 认识皮。两个 feature 都要的一个字、一个格式、一个查询，放到两者下面那层，或者各留一份字，不让一个伸进另一个里。
+- **图标分两套**：工作台的按钮和标记是 reicon 的线条图标（Outline，跟着字的颜色），`ui/icons.ts` 给每个意思一个图（`close`、`issues`、`check`……），`ui/Icon.tsx` 的 `<Icon name>` 只收这张表里的名字，写错编不过；勾、叉、警告自带绿、红、黄。帮工在干什么由 `actionIcon` 对到图。像素皮（`farm`、`tree`、`ui/pixel`）用 `ui/pixel` 的 `SpriteIcon` 画 `public/pixel` 的贴图。头像（`ui/Face.tsx`）、农机的 logo、项目页的岛和作物、项目地图、额度瓶、连接器的 logo 是画，不是图标，在工作台里也用 `SpriteIcon`。
 - **一处响应性出错，整页停住**：一个错误逃出所有边界时 Solid 停掉整页的更新（`REACTIVITY_HALTED`），页面看着还在、不再动。`<Show>`、`<Match>` 的函数子节点拿到的值在分支收起后一读就抛，分支里还在结算的查询会读到它，所以带查询的面板按普通值 keyed、自己记住最后找到的那个；`ref` 的回调不读 `<For>` 每一项的值。Playwright 里逃出页面的错误让用例失败（`test/fixtures.ts`）。
 - **宿主接口是封闭的**：每个宿主实现全部方法，没有的能力是 null，页面据此决定画不画，不问「我在哪个壳里」。桌面壳经 preload 的 `contextBridge` 给（`contextIsolation`、`sandbox`，页面碰不到 Node 和 Electron）；手机壳的 WebView 带着 `ReactNativeWebView`，`currentHost()` 见到它就建 `mobileHost`：页面把要的东西写成 JSON 发过去，壳按 id 答，通话的事件也这样送回（`window.vibevalleyFromHost`）；浏览器全是 null。
 - **桌面窗口是沉浸式的**（macOS）：窗口没有自己的标题栏，页面画到顶边，红绿灯浮在左上角；宿主的 `titleBar`（`{ top: 28, left: 76 }`）说顶上那一条多高、红绿灯占到多宽。页面最前面放一条这么高的拖动条（`ui/TitleBar.tsx` 的 `WindowStrip`，`-webkit-app-region: drag`），条里的按钮、链接、输入框照样能点（`style.css` 的 `no-drag`）；工作台的侧栏顶上、农场左上角那组 HUD 让出这一条。窗口的内容区默认 1152×768，拖动时保持 3:2，农场正好铺满（[农场的皮](docs/subsystems/farm.md)「放大只用整数倍」）。从仓库跑时 Dock 上的图标是 `apps/web/public/icons/app-256.png`，打包的用 `resources/icon.icns`。其他系统和浏览器、手机是 null，用自己的标题栏。
@@ -107,6 +108,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **宿主接口封闭、缺的是 null。** 页面问「我在哪个壳里」再分支，每加一个宿主就要改每一处；按能力有没有来画，加宿主只是实现一遍接口。
 - **连进来的浏览器用 cookie 带钥匙。** 页面的状态流和 REST 都走 `fetch`，同源的 cookie 自动带上，页面不用改；监听只认 cookie 和 `Bearer` 头，不把钥匙转给本机的服务端。
 - **首页只给第一次来的人。** 天天用的人每次都要先点「继续游戏」，点开一条通知也被首页挡住要多点一次。不做「新游戏」清档：农场里是主人的频道、账本和帮工的分支，一个按钮清掉代价太大。
+- **工作台用线条图标，像素图留给皮和画。** 工作台是 Linear 那样的工作界面，像素贴图在密的版面里像一排 emoji，和本来就是矢量的状态圈、头像以外的界面对不上。图标按意思起名、集中在一张表里，同一个意思在每页是同一个图，换一套图只改这张表；像素皮仍用照 Hugeicons 画的贴图，所以两边的形状认得出来。放弃了让 `<Icon>` 看自己在哪张皮里再选图：那样每个图标都要有两份，皮的边界也藏进了组件里。用 reicon 的原生 JS 包，不用框架包：它没有 Solid 的版本，每个图标是一个返回 `<svg>` 的函数，Solid 直接放进页面。
 - **设置是工作台的一页。** 首页、扳手和缺钥匙的开始游戏都进 `/settings`，不另开一处设置窗口。
 
 ## 还没做的

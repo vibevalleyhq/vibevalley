@@ -7,7 +7,7 @@ import { For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
 import { useCore, useFrames } from "../base/frame";
-import { AgentFace, OrchestratorFace } from "../ui/Face";
+import { OrchestratorFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
 import { A } from "../ui/A";
 import { useRouter } from "../base/router";
@@ -19,13 +19,8 @@ const head = 66;
 
 const linkWords = { connecting: appWording().link.connecting, open: appWording().link.open, lost: appWording().link.lost } as const;
 
-/** A place's picture at 26 px: the agents' is a helper's face. */
-export function PlaceIcon(props: { place: Place }) {
-  return (
-    <Show when={props.place.id === "agents"} fallback={<Icon name={props.place.icon} size={26} />}>
-      <AgentFace agentId="backend" size={26} />
-    </Show>
-  );
+function PlaceIcon(props: { place: Place }) {
+  return <Icon name={props.place.icon} size={22} />;
 }
 
 function Slot(props: { to: string; label: string; current?: boolean; fill?: string; children: JSX.Element }) {
@@ -35,7 +30,7 @@ function Slot(props: { to: string; label: string; current?: boolean; fill?: stri
       title={props.label}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
-      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px] hover:bg-[#fffaf022] focus-visible:outline-2 focus-visible:outline-focus"
+      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px] text-[#fffaf0b3] hover:bg-[#fffaf022] hover:text-page aria-[current=page]:text-page focus-visible:outline-2 focus-visible:outline-focus"
       style={props.current ? { background: props.fill ?? "#fffaf033" } : undefined}
     >
       {props.children}
@@ -74,7 +69,7 @@ function Rail(props: { here?: Place }) {
           <PlaceIcon place={settings} />
         </Slot>
         <Slot to="/" label={appWording().farm}>
-          <Icon name="icon-seeds" size={26} />
+          <Icon name="farm" size={22} />
         </Slot>
         <span role="status" title={linkWords[frames.link]} class="flex h-4 items-center">
           <span

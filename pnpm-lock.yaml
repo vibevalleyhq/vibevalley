@@ -242,6 +242,9 @@ catalogs:
     react-native-agora:
       specifier: ^4.6.4
       version: 4.6.4
+    reicon:
+      specifier: 1.2.5
+      version: 1.2.5
     remark-gfm:
       specifier: ^4.0.1
       version: 4.0.1
@@ -511,6 +514,9 @@ importers:
       pixi.js:
         specifier: 'catalog:'
         version: 8.22.0
+      reicon:
+        specifier: 'catalog:'
+        version: 1.2.5
       remark-gfm:
         specifier: 'catalog:'
         version: 4.0.1(supports-color@8.1.1)
@@ -5428,6 +5434,9 @@ packages:
   regjsparser@0.13.4:
     resolution: {integrity: sha512-EWV80YgFaVgFrjGCAsV7oybp4GOxbls5RzBg8OB0nKEVXsBJR1JlV8Di1JhCROg3MzTfe1RI8yitIm1eOs68iA==}
     hasBin: true
+
+  reicon@1.2.5:
+    resolution: {integrity: sha512-2I7zqhdNftyIO4FFv8Txy168gFIvy5qOO56zHlLNl1cyBmt6fy41LM8k+566epgcJN2pJd1Wk9TA+CXUZszUNA==}
 
   remark-gfm@4.0.1:
     resolution: {integrity: sha512-1quofZ2RQ9EWdeN34S79+KExV1764+wCUGop5CPL1WGdD0ocPpu91lzPGbwWMECpEpd42kJGQwzRfyov9j4yNg==}
@@ -11773,6 +11782,8 @@ snapshots:
   regjsparser@0.13.4:
     dependencies:
       jsesc: 3.1.0
+
+  reicon@1.2.5: {}
 
   remark-gfm@4.0.1(supports-color@8.1.1):
     dependencies:

@@ -1,17 +1,17 @@
 import type { JSX } from "@solidjs/web";
+import { type IconName, icons, iconTone } from "./icons";
 
-// The pixel icons (apps/web/public/pixel, served at /pixel): drawn whole-pixel, never smoothed.
+// The workbench's icons (ui/icons.ts): reicon's line drawings in the text's colour, decorative unless labelled.
 
-export function Icon(props: { name: string; size?: number; label?: string; class?: JSX.ClassValue }) {
+export function Icon(props: { name: IconName; size?: number; label?: string; class?: JSX.ClassValue }) {
   return (
-    <img
-      src={`/pixel/${props.name}.png`}
-      width={props.size ?? 16}
-      height={props.size ?? 16}
-      alt={props.label ?? ""}
+    <span
+      role={props.label ? "img" : undefined}
+      aria-label={props.label}
       aria-hidden={props.label ? undefined : "true"}
-      draggable="false"
-      class={["shrink-0 object-contain [image-rendering:pixelated]", props.class]}
-    />
+      class={["inline-flex shrink-0", iconTone[props.name], props.class]}
+    >
+      {icons[props.name]({ size: props.size ?? 16 })}
+    </span>
   );
 }

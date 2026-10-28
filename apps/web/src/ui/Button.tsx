@@ -1,6 +1,7 @@
 import { omit } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { Icon } from "./Icon";
+import type { IconName } from "./icons";
 
 export type Tone = "plain" | "primary" | "quiet" | "danger";
 
@@ -11,7 +12,7 @@ const tones: Record<Tone, string> = {
   danger: "border border-line bg-page text-berry hover:bg-hover",
 };
 
-export function Button(props: { tone?: Tone; icon?: string; children?: JSX.Element } & JSX.ButtonHTMLAttributes<HTMLButtonElement>) {
+export function Button(props: { tone?: Tone; icon?: IconName; children?: JSX.Element } & JSX.ButtonHTMLAttributes<HTMLButtonElement>) {
   const rest = omit(props, "tone", "icon", "children", "class");
   return (
     <button

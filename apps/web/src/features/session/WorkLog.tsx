@@ -1,3 +1,4 @@
+import { actionIcon, type IconName } from "../../ui/icons";
 import { sessionWording } from "./words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -44,9 +45,9 @@ export function TurnSteps(props: { session: string; run: string | undefined; orc
             aria-expanded={aria(open())}
             class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted hover:bg-hover"
           >
-            <Icon name="icon-log" size={14} />
+            <Icon name="log" size={14} />
             {text()}
-            <Icon name={open() ? "button-collapse" : "button-enlarge"} size={10} class="opacity-60" />
+            <Icon name={open() ? "collapse" : "enlarge"} size={10} class="opacity-60" />
           </button>
           <Show when={open()}>
             <WorkLog steps={steps()} now={now()} asked={sessionWording().log.heard} class="mt-1.5" />
@@ -98,7 +99,7 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
         aria-label={open() ? sessionWording().log.fold : sessionWording().log.unfold}
         class="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-hover"
       >
-        <Icon name="button-next" size={12} class={["transition-transform duration-150", { "rotate-90": open() }]} />
+        <Icon name="expand" size={12} class={["transition-transform duration-150", { "rotate-90": open() }]} />
         <span class="text-sm font-semibold">{props.label}</span>
         <span class="min-w-0 flex-1 truncate text-xs text-muted">
           {sessionWording().log.steps(props.round.steps.length, tookText(roundMs(props.round, end())))}
@@ -195,7 +196,7 @@ function Box(props: { fill?: string; edge?: boolean; faint?: boolean; label: str
   );
 }
 
-function Line(props: { mark: string; step: SessionEvent; now: number; fill: string; ink: string }) {
+function Line(props: { mark: IconName; step: SessionEvent; now: number; fill: string; ink: string }) {
   return (
     <div class="flex items-start gap-2 rounded-md px-3 py-1.5" style={{ background: props.fill }}>
       <Icon name={props.mark} size={12} class="mt-1" />
@@ -234,13 +235,13 @@ function Step(props: { step: SessionEvent; now: number }) {
         <ToolStep step={props.step} now={props.now} />
       </Match>
       <Match when={props.step.type === "llm/retry"}>
-        <Line mark="button-replay" step={props.step} now={props.now} fill="#e5a93c1f" ink="text-ink" />
+        <Line mark="retry" step={props.step} now={props.now} fill="#e5a93c1f" ink="text-ink" />
       </Match>
       <Match when={props.step.type === "llm/usage"}>
-        <Line mark="icon-coin" step={props.step} now={props.now} fill="#e5a93c0f" ink="text-muted" />
+        <Line mark="spend" step={props.step} now={props.now} fill="#e5a93c0f" ink="text-muted" />
       </Match>
       <Match when={props.step.type === "run/error"}>
-        <Line mark="mark-warn" step={props.step} now={props.now} fill="#c84a3a1a" ink="text-berry" />
+        <Line mark="warn" step={props.step} now={props.now} fill="#c84a3a1a" ink="text-berry" />
       </Match>
     </Switch>
   );
@@ -260,12 +261,12 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         aria-expanded={aria(open())}
         class={["flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-hover", { "bg-hover": open() }]}
       >
-        <Icon name={`act-${props.step.action ?? "other"}`} size={16} />
+        <Icon name={actionIcon[props.step.action ?? "other"]} size={16} />
         <span class="w-16 shrink-0 truncate text-sm font-medium">{kind()}</span>
         <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{farm() ?? props.step.text}</span>
         <span title={state()} class="shrink-0">
           <Show when={props.step.ok !== undefined} fallback={<span class="text-xs text-faint">…</span>}>
-            <Icon name={props.step.ok ? "mark-check" : "mark-cross"} size={12} label={state()} />
+            <Icon name={props.step.ok ? "check" : "cross"} size={12} label={state()} />
           </Show>
         </span>
         <When at={props.step.time} now={props.now} />

@@ -52,11 +52,11 @@ function AgentsPage() {
               title={agentsWording().templates.openLine}
               class="inline-flex h-7 items-center gap-1.5 rounded-md border border-line px-2.5 text-sm hover:bg-hover"
             >
-              <Icon name="button-folder" size={14} />
+              <Icon name="folder" size={14} />
               {agentsWording().templates.open}
             </A>
             <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
-              <Icon name="button-add" size={14} />
+              <Icon name="add" size={14} />
               {agentsWording().list.make}
             </A>
           </span>
@@ -69,7 +69,7 @@ function AgentsPage() {
             aria-label={agentsWording().list.makeOrchestrator}
             class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-[#3f6427]"
           >
-            <Icon name="button-add" size={28} />
+            <Icon name="add" size={28} />
             {agentsWording().list.makeOrchestrator}
           </A>
         </div>
@@ -100,7 +100,7 @@ function AgentsPage() {
             aria-label={agentsWording().list.make}
             class="flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-[#3f6427]"
           >
-            <Icon name="button-add" size={28} />
+            <Icon name="add" size={28} />
             {agentsWording().list.make}
           </A>
         </div>
