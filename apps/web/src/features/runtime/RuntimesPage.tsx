@@ -101,7 +101,7 @@ export function RuntimesPage(props: { rest: string }) {
       <div class="h-full p-3">
         <Split
           list={
-            <ListCard title={t("web.runtime.title")} label={t("web.runtime.list")}>
+            <ListCard title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
               <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</li>
               <For each={list()}>
                 {(r) => {
@@ -111,6 +111,7 @@ export function RuntimesPage(props: { rest: string }) {
                   return (
                     <ListRow
                       to={`/runtimes/${r.id}`}
+                      item={r.id}
                       active={selected()?.id === r.id}
                       title={r.preset.label}
                       line={`${statusOf(r)}${using() > 0 ? t("web.runtime.usedBy", { n: using() }) : ""}`}
@@ -218,7 +219,7 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <Card
         title={t("web.runtime.agents")}
         action={
-          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} class="text-xs text-muted underline hover:text-ink">
+          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" class="text-xs text-muted underline hover:text-ink">
             {t("web.runtime.makeAgent")}
           </A>
         }
@@ -365,10 +366,11 @@ function FactsCard(props: { info: RuntimeInfo }) {
 }
 
 /** The text is kept as typed, the number follows it (empty or 0 means none). */
-function NumberInput(props: { value?: number; onChange: (n: number | undefined) => void; placeholder: string; label: string }) {
+function NumberInput(props: { value?: number; onChange: (n: number | undefined) => void; placeholder: string; label: string; testid?: string }) {
   const [text, setText] = createSignal(untrack(() => (props.value ? String(props.value) : "")));
   return (
     <TextInput
+      data-testid={props.testid}
       aria-label={props.label}
       class="font-mono"
       placeholder={props.placeholder}
@@ -425,8 +427,10 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
       action={
         <Show when={dirty()}>
           <span class="flex gap-2">
-            <Button onClick={() => setDraft(props.info.settings)}>{t("web.runtime.discard")}</Button>
-            <Button tone="primary" onClick={() => void save()}>
+            <Button data-testid="discard" onClick={() => setDraft(props.info.settings)}>
+              {t("web.runtime.discard")}
+            </Button>
+            <Button tone="primary" data-testid="save" onClick={() => void save()}>
               {t("web.runtime.save")}
             </Button>
           </span>
@@ -474,6 +478,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
         <Field label={t("web.runtime.maxWorking")} hint={t("web.runtime.maxWorkingHint")}>
           <NumberInput
             label={t("web.runtime.maxWorking")}
+            testid="max-working"
             placeholder={t("web.runtime.noLimit")}
             value={draft().maxWorking}
             onChange={(n) => {

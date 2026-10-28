@@ -447,7 +447,12 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
         <Switch>
           <Match when={tab() === "who"}>
             <Labeled label={t("web.agent.name")} tip={t("web.agent.nameTip")} error={props.nameTaken ? t("web.agent.nameTaken") : undefined}>
-              <TextInput aria-label={t("web.agent.name")} value={draft().name} onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })} />
+              <TextInput
+                data-testid="agent-name"
+                aria-label={t("web.agent.name")}
+                value={draft().name}
+                onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })}
+              />
             </Labeled>
             <Labeled label={t("web.agent.duty")} tip={t("web.agent.dutyTip")}>
               <TextInput

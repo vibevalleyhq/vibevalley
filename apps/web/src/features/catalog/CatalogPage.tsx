@@ -126,6 +126,7 @@ function Search(props: { query: string; onChange: (q: string) => void; placehold
   return (
     <div class="flex flex-wrap items-center gap-2">
       <TextInput
+        data-testid="catalog-search"
         aria-label={t("web.catalog.find")}
         class="min-w-48 flex-1"
         placeholder={props.placeholder}
@@ -171,6 +172,7 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
   const ShelfButton = (b: { id: string; label: string; count: number }) => (
     <button
       type="button"
+      data-key={b.id}
       aria-pressed={aria(shelf() === b.id)}
       onClick={() => setShelf(b.id)}
       class={["flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-sm", shelf() === b.id ? "bg-selected font-semibold" : "hover:bg-hover"]}
@@ -185,7 +187,7 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
         <Layout
           left={
             <Column tabs={props.tabs}>
-              <nav aria-label={t("web.catalog.categories")} class="flex flex-col gap-0.5">
+              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" class="flex flex-col gap-0.5">
                 <ShelfButton id="all" label={t("web.catalog.all")} count={pics().length} />
                 <For each={present()}>{(s) => <ShelfButton id={s.id} label={s.label} count={counts().get(s.id) ?? 0} />}</For>
               </nav>
@@ -224,6 +226,8 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
                                   type="button"
                                   title={`${p.name} · ${numberText(p.w)}×${numberText(p.h)}`}
                                   aria-label={p.name}
+                                  data-testid="picture"
+                                  data-key={p.name}
                                   aria-current={selected()?.name === p.name ? "true" : undefined}
                                   onClick={() => router.navigate(`/catalog/${encodeURIComponent(p.name)}`)}
                                   class={[
@@ -324,7 +328,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
   const remake = () => remakeOf(props.picture);
   const scales = () => [...new Set([1, 2, 4, 8, scale()])].sort((a, b) => a - b);
   return (
-    <Card title={props.picture.name} action={<Copy text={props.picture.name} />}>
+    <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
       <div class="flex max-h-88 min-h-40 items-center justify-center overflow-auto rounded-md p-3" style={groundStyle(props.ground)}>
         <span class="relative" style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
           <Img p={shown()} scale={scale()} />
@@ -363,7 +367,9 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
         {(f) => (
           <div class="flex flex-col gap-1.5 rounded-lg bg-hover p-2">
             <div class="flex items-center gap-2">
-              <Button onClick={() => setPlaying(!playing())}>{playing() ? t("web.catalog.stop") : t("web.catalog.play")}</Button>
+              <Button data-testid="play" aria-pressed={aria(playing())} onClick={() => setPlaying(!playing())}>
+                {playing() ? t("web.catalog.stop") : t("web.catalog.play")}
+              </Button>
               <span class="text-xs text-muted">{t("web.catalog.frames", { n: f().length })}</span>
               <span class="flex-1" />
               <input
@@ -478,7 +484,7 @@ function CursorTile(props: { name: string; hx: number; hy: number; ground: Groun
     return n ? height / n.h : undefined;
   };
   return (
-    <div class="flex flex-col items-center gap-1 p-1">
+    <div data-testid="cursor" data-key={props.name} class="flex flex-col items-center gap-1 p-1">
       <span class="flex h-16 w-full items-center justify-center rounded-md" style={groundStyle(props.ground)}>
         <span class="relative" style={{ height: `${height}px`, width: `${natural() && k() ? natural()!.w * k()! : height}px` }}>
           <img
@@ -541,6 +547,8 @@ function Sounds(props: { tabs: JSX.Element }) {
                     {(name) => (
                       <button
                         type="button"
+                        data-testid="sound"
+                        data-key={name}
                         aria-label={t("web.catalog.playSound", { name: SOUND_LABEL[name] ?? name })}
                         onClick={() => playSound(name)}
                         class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page pr-3 pl-1.5 hover:bg-hover active:bg-selected"
