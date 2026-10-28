@@ -18,13 +18,14 @@ import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useSkills } from "../runtime";
 import { AgentPage } from "./AgentPage";
+import { TemplatesPage } from "./TemplatesPage";
 import { orchestratorHref } from "../orchestrator";
 
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {
   return (
     <Show when={props.rest} keyed fallback={<AgentsPage />}>
-      {(id) => <AgentPage id={decodeURIComponent(id)} />}
+      {(id) => (id === "templates" ? <TemplatesPage /> : <AgentPage id={decodeURIComponent(id)} />)}
     </Show>
   );
 }
@@ -45,10 +46,20 @@ function AgentsPage() {
             <h1 class="text-2xl font-semibold">{agentsWording().list.title}</h1>
             <p class="text-sm text-muted">{agentsWording().list.intro}</p>
           </div>
-          <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
-            <Icon name="button-add" size={14} />
-            {agentsWording().list.make}
-          </A>
+          <span class="flex flex-wrap items-center gap-2">
+            <A
+              href="/agents/templates"
+              title={agentsWording().templates.openLine}
+              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-line px-2.5 text-sm hover:bg-hover"
+            >
+              <Icon name="button-folder" size={14} />
+              {agentsWording().templates.open}
+            </A>
+            <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
+              <Icon name="button-add" size={14} />
+              {agentsWording().list.make}
+            </A>
+          </span>
         </div>
         <h2 class="text-sm font-semibold text-muted">{agentsWording().list.orchestrators}</h2>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -63,6 +74,14 @@ function AgentsPage() {
           </A>
         </div>
         <h2 class="text-sm font-semibold text-muted">{agentsWording().list.workers}</h2>
+        {/* The default orchestrator is always there: once it shows, the profiles are read. */}
+        <Show when={orchestrators().length > 0 && agents().length === 0}>
+          <p class="text-sm text-muted">
+            <A href="/agents/templates" class="underline">
+              {agentsWording().templates.none}
+            </A>
+          </p>
+        </Show>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <For each={agents()}>
             {(a) => (

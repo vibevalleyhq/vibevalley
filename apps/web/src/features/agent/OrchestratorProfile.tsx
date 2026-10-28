@@ -15,6 +15,7 @@ import { Button } from "../../ui/Button";
 import { OrchestratorFace } from "../../ui/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
 import { orchestratorHref, orchestratorLooks } from "../orchestrator";
+import { FromTemplate } from "./FromTemplate";
 
 export function newOrchestrator(): Agent {
   return {
@@ -125,6 +126,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
             </Button>
           </span>
         </div>
+        <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
         <p class="text-sm text-muted">
           {agentsWording().orchestrator.intro}{" "}
           <Show when={props.saved}>

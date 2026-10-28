@@ -46,6 +46,7 @@ import { MemoryPanel } from "../memory";
 import { useSkills } from "../runtime";
 import { TrajectoryList } from "../session";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
+import { FromTemplate } from "./FromTemplate";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;
@@ -211,6 +212,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
     >
       <div class="flex h-full min-h-0 flex-col px-4 pb-4">
         {bar()}
+        <Show when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={setDraft} />}</Show>
         <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-3 lg:flex-row lg:overflow-hidden">
           <div class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-76 lg:overflow-y-auto">
             <LookPanel draft={draft()} onChange={(look) => setDraft({ ...draft(), look })} />

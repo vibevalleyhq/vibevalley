@@ -217,6 +217,11 @@ const RULES: readonly Rule[] = [
     except: /^apps\/server\/src\/(?!.*\/words\.ts$)/,
   },
   {
+    name: "a profile seeded in code",
+    pattern: /\b(seedAgents|orchestratorProfile)\b/,
+    says: "a template (agent/template.ts: builtInTemplates, profileOf); a new farm installs the default orchestrator from its template, and agent.starters",
+  },
+  {
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/,
     says: "Channel (channel_id, Channels): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",

@@ -13,6 +13,7 @@
 | Workspace | 大地图 | `/projects` 的「全部」（`features/project/ProjectMap.tsx`） | `Config.workRoot`、`Config.home`（服务端的配置，不进协议） | |
 | 项目 | 大地图上的一座岛 | `/projects/:project`（`features/project`；岛的地和空位是 `ProjectMap.tsx` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `Workplace` | `/api/v1/project/…` |
 | 档案 | 一种小动物（管家是田头的人） | `/agents`（`features/agent`） | `Agent`（`role` 是管家或帮工） | `/api/v1/agent/…` |
+| 档案模板 | — | `/agents/templates`（`features/agent/TemplatesPage.tsx`） | `AgentTemplate`、档案上的 `from` | `/api/v1/agent/template/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
 | 技能书 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skill/…` |
 | 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是管家的档案时是那个管家的） |
@@ -44,7 +45,7 @@
 |---|---|---|---|
 | Workspace | `base/config.ts` 的 `Config`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_HOME` | |
 | 项目 | `Projects`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
-| 档案、技能书 | `Agents` | `config.json` | |
+| 档案、技能书、档案模板 | `Agents`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
 | 农机 | `Runtimes` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
 | 记性 | `Memories` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
 | 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
