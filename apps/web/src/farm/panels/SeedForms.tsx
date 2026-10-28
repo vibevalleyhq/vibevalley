@@ -148,11 +148,11 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               <Match when={templates.error}>
                 {(e) => (
                   <div class="mt-2.5 flex flex-wrap items-center gap-2">
-                    <p class="text-[12px] text-berry">
+                    <p role="alert" class="text-[12px] text-berry">
                       {t("web.farm.sow.noSeeds")}
                       {reasonOf(e())}
                     </p>
-                    <PxButton size="sm" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
+                    <PxButton size="sm" data-testid="seeds-retry" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
                       {t("web.farm.sow.retry")}
                     </PxButton>
                   </div>
@@ -168,7 +168,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
             <Show when={seeds().kinds.length > 0}>
               <p class={["mt-2.5", xs]}>{t("web.farm.sow.kinds")}</p>
               {/* One kind at a time: its tab, then its seeds. */}
-              <div role="tablist" aria-label={t("web.farm.sow.kinds")} class="mt-1.5 flex flex-wrap gap-1">
+              <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" class="mt-1.5 flex flex-wrap gap-1">
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
                   {(k) => (
                     <button

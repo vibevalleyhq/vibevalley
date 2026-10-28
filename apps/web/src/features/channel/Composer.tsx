@@ -89,7 +89,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const stop = () => api.orchestrator.stop({ agent: box.here() }).catch((e) => toast(reasonOf(e), "bad"));
 
   return (
-    <div class="border-t border-line px-4 pt-3 pb-4">
+    <div data-testid="composer" class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
         <div role="listbox" aria-label={t("web.channel.composer.who")} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
           <For each={box.offered()} keyed={(n) => n.token}>
@@ -181,6 +181,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           ref={(el) => (input = el)}
           value={box.text()}
           rows={2}
+          data-testid="composer-input"
           aria-label={props.placeholder}
           placeholder={props.placeholder}
           onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
@@ -217,6 +218,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           />
           <button
             type="button"
+            data-testid="attach"
             onClick={() => picker?.click()}
             disabled={!props.channel}
             aria-label={t("web.channel.composer.attach")}
@@ -229,6 +231,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             <button
               type="button"
               ref={(el) => (emojiButton = el)}
+              data-testid="emoji"
               onClick={() => setEmoji(!emoji())}
               disabled={!props.channel}
               aria-label={t("web.channel.emoji.open")}
@@ -253,6 +256,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           <Show when={box.stoppable()}>
             <button
               type="button"
+              data-testid="stop"
               onClick={() => void stop()}
               aria-label={t("web.channel.composer.stop")}
               title={t("web.channel.composer.stopHint")}
@@ -263,6 +267,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </Show>
           <button
             type="button"
+            data-testid="send"
             onClick={() => void box.send()}
             disabled={!box.canSend()}
             aria-label={t("web.channel.composer.send")}

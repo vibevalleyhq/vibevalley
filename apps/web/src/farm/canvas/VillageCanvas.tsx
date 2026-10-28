@@ -172,6 +172,7 @@ function Entering(props: { mapped: boolean }) {
       <div class="flex flex-col items-center gap-2 font-pixel text-[12px] text-cream-100">
         <div
           role="progressbar"
+          data-testid="village-loading"
           aria-label={t("web.farm.canvas.entering")}
           aria-valuemin={0}
           aria-valuemax={100}

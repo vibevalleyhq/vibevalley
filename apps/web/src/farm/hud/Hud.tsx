@@ -128,6 +128,7 @@ function TopLeft() {
       {/* A link, so it opens in a new tab too; in the row, so it covers nothing. */}
       <a
         href="/issues"
+        data-testid="to-workbench"
         title={t("web.farm.hud.workbenchHint")}
         onClick={(e) => {
           if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

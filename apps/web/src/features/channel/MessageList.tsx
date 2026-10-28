@@ -106,7 +106,13 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div ref={(el) => (log = el)} class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={t("web.channel.messages.label")}>
+    <div
+      ref={(el) => (log = el)}
+      class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
+      role="log"
+      aria-label={t("web.channel.messages.label")}
+      data-testid="messages"
+    >
       <div class="flex flex-col px-4 pt-3 pb-4">
         <div class="flex justify-center pb-2">
           <Show
@@ -134,11 +140,17 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           )}
         </Show>
         <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
-          <p class="py-8 text-center text-sm text-muted">{searching() ? t("web.channel.messages.notFound") : props.emptyText}</p>
+          <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
+            {searching() ? t("web.channel.messages.notFound") : props.emptyText}
+          </p>
         </Show>
         <For each={items()} keyed={(item) => item.message.id}>
           {(item) => (
             <div
+              data-testid="message"
+              data-key={item().message.id}
+              data-from={item().message.fromKind}
+              data-kind={item().message.kind}
               data-number={item().message.channel === id() ? item().message.number : undefined}
               class={[
                 "rounded-md transition-[opacity,translate,background-color] duration-200 ease-out",

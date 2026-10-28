@@ -68,28 +68,34 @@ function Layer(props: { o: FarmOverlay }) {
     <Switch>
       <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={t("web.farm.panel.harvest", { name: s().name })} icon="icon-harvest" size="lg" onClose={() => farm.review(null)}>
+          <FarmDialog title={t("web.farm.panel.harvest", { name: s().name })} icon="icon-harvest" size="lg" testid="harvest" onClose={() => farm.review(null)}>
             <Keyed key={s().id}>{() => <HarvestReview session={s()} onDone={() => farm.review(null)} />}</Keyed>
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "sow" ? props.o : undefined}>
         {(o) => (
-          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
+          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" testid="sow" onClose={() => farm.sow(null)}>
             <SowForm station={o().station} onDone={() => farm.sow(null)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" onClose={() => farm.water(null)}>
+          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" testid="water" onClose={() => farm.water(null)}>
             <WaterForm session={s()} onDone={() => farm.water(null)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "panel" ? (props.o as { panel: FarmPanel }).panel : undefined}>
         {(panel) => (
-          <FarmDialog title={panelTitle[panel()][0]} icon={panelTitle[panel()][1]} size={panelTitle[panel()][2]} onClose={() => farm.panel(null)}>
+          <FarmDialog
+            title={panelTitle[panel()][0]}
+            icon={panelTitle[panel()][1]}
+            size={panelTitle[panel()][2]}
+            testid={panel()}
+            onClose={() => farm.panel(null)}
+          >
             <Switch fallback={<TaskBoard />}>
               <Match when={panel() === "warehouse"}>
                 <Warehouse />
@@ -111,7 +117,7 @@ function Layer(props: { o: FarmOverlay }) {
         )}
       </Match>
       <Match when={props.o.kind === "menu"}>
-        <FarmDialog title={t("web.farm.panel.menu")} icon="icon-wrench" size="md" onClose={() => farm.menu(false)}>
+        <FarmDialog title={t("web.farm.panel.menu")} icon="icon-wrench" size="md" testid="menu" onClose={() => farm.menu(false)}>
           <Menu />
         </FarmDialog>
       </Match>
