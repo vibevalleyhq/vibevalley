@@ -14,15 +14,17 @@ import * as S from "@vibevalley/protocol/schema";
 import { announced, homeOf } from "../base/lease.ts";
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";
 
+const fallbackServer = "http://127.0.0.1:8787";
 /** The server using this machine's home (its server.json), else the configured default port. */
-const defaultServer = announced(homeOf()) ?? "http://127.0.0.1:8787";
+const defaultServer = announced(homeOf()) ?? fallbackServer;
 
 /** --server, else VIBEVALLEY_SERVER, else the one on this machine. */
 export const ServerFlag = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(
     Flag.withFallbackConfig(Config.String("VIBEVALLEY_SERVER")),
     Flag.withDefault(defaultServer),
-    Flag.withDescription(t("server.cli.flag.server", { fallback: defaultServer })),
+    // The rule, not this machine's address: help reads the same everywhere, and so does its golden data.
+    Flag.withDescription(t("server.cli.flag.server", { fallback: fallbackServer })),
   ),
 });
 
