@@ -40,7 +40,7 @@ import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { AgentFace } from "../../ui/Face";
 import { TextArea } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
+import { SpriteIcon } from "../../ui/pixel";
 import { PoseSprite } from "../../ui/PoseSprite";
 import { Card, Quiet } from "../../ui/layout";
 
@@ -104,7 +104,7 @@ export function ProjectMap() {
           >
             {([icon, words]) => (
               <span class="flex items-center gap-1 text-xs text-muted">
-                <Icon name={icon} size={18} />
+                <SpriteIcon name={icon} size={18} />
                 {words}
               </span>
             )}
@@ -506,7 +506,7 @@ export function IslandDetail(props: { island: Island }) {
   return (
     <Card title={props.island.project} action={<span class="text-sm text-muted">{islandText(props.island)}</span>}>
       <div class="flex items-center gap-2.5">
-        <Icon name={`plot-${growth().crop}`} size={36} />
+        <SpriteIcon name={`plot-${growth().crop}`} size={36} />
         <p class="text-sm text-muted">
           {!props.island.summary
             ? projectsWording().map.gone
@@ -530,19 +530,19 @@ export function IslandDetail(props: { island: Island }) {
                   <span class="line-clamp-2 text-xs text-muted">{phaseText(t.session, now())}</span>
                   <Show when={t.session.branch}>
                     <span class="flex items-center gap-1 font-mono text-xs text-muted">
-                      <Icon name="icon-branch" size={14} />
+                      <SpriteIcon name="icon-branch" size={14} />
                       <span class="truncate">{t.session.branch}</span>
                     </span>
                   </Show>
                 </span>
-                <Icon name={cropSprite(t.plot.crop)} size={32} />
+                <SpriteIcon name={cropSprite(t.plot.crop)} size={32} />
               </button>
             )}
           </For>
         </Show>
       </div>
       <div class="flex items-center gap-2">
-        <Icon name={open() > 0 ? "map-stake" : "plot-locked"} size={24} />
+        <SpriteIcon name={open() > 0 ? "map-stake" : "plot-locked"} size={24} />
         <p class="text-sm text-muted">
           {!props.island.summary
             ? projectsWording().map.noMore
@@ -559,7 +559,7 @@ export function IslandDetail(props: { island: Island }) {
           <For each={props.island.queued}>
             {(item) => (
               <div class="flex items-center gap-2">
-                <Icon name="map-sack" size={20} />
+                <SpriteIcon name="map-sack" size={20} />
                 <span class="min-w-0 flex-1 truncate text-sm">{item.title}</span>
                 <button
                   type="button"
@@ -568,7 +568,7 @@ export function IslandDetail(props: { island: Island }) {
                   onClick={() => go(router.navigate, item.id)}
                   class="cursor-pointer rounded p-1 hover:bg-hover"
                 >
-                  <Icon name="button-open" size={14} />
+                  <SpriteIcon name="button-open" size={14} />
                 </button>
               </div>
             )}

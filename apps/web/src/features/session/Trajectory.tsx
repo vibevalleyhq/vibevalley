@@ -252,7 +252,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
         </span>
         <span class="w-2 shrink-0" />
         <Show when={failed() && tool()}>
-          <Icon name="mark-cross" size={12} class="mt-1 mr-1" />
+          <Icon name="cross" size={12} class="mt-1 mr-1" />
         </Show>
         <span class={["min-w-0 flex-1 text-sm", { "text-berry": failed() }]}>
           <Switch fallback={<span class="block truncate">{oneLine(step().text)}</span>}>
@@ -425,13 +425,13 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
           onClick={() => setWriting(true)}
           class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
         >
-          <Icon name="icon-bug" size={12} />
+          <Icon name="bug" size={12} />
           {sessionWording().trajectory.wrong}
         </button>
       </Show>
       <Show when={props.file}>
         <div title={props.file} class="my-0.5 mr-2 ml-[164px] flex items-center gap-1.5 rounded-md bg-berry/12 px-2 py-1 text-xs">
-          <Icon name="icon-bug" size={12} />
+          <Icon name="bug" size={12} />
           {sessionWording().trajectory.marked}
         </div>
       </Show>

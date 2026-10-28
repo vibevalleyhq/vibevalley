@@ -42,8 +42,10 @@ test/               Playwright against a real server per worker (fixtures.ts)
   feature or piece knows a skin. Why: docs/subsystems/app.md, 为什么这样.
 - **Words** are in the feature's `words.ts` (Chinese and English), following the glossary (docs/README.md#用语);
   farm words only in the skins and `ui/pixel`.
-- **Icons are the pixel drawings** (`<Icon name="icon-tasks" />`, from `public/pixel`; the site uses the same files); no line icons,
-  no characters standing in for icons.
+- **Icons come in two sets.** The workbench's are reicon's line icons, one picture to a meaning in `src/ui/icons.ts`
+  (`<Icon name="issues" />` takes only names from that table). The pixel skins (`farm`, `tree`, `ui/pixel`) draw theirs
+  from `public/pixel` with `SpriteIcon` (the site uses the same files). Faces, runtime logos and illustrations are pixel
+  drawings everywhere. No characters stand in for icons.
 - **App icons** are in `public/icons/`: `app-32.png`, `app-64.png` and `app-256.png`. The site build copies these packaged
   files; it does not keep another set.
 - **The host** (`@vibevalley/protocol/host`, found by `currentHost()` in `src/base/host.ts`) is the only way to the machine; a capability that is null is not drawn.

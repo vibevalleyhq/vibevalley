@@ -274,7 +274,7 @@ function Copy(props: { text: string }) {
       onClick={() => void copy(props.text)}
       class="flex shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-hover"
     >
-      <Icon name={done() ? "mark-check" : "button-copy"} size={12} />
+      <Icon name={done() ? "check" : "copy"} size={12} />
       {done() ? catalogWording().copied : catalogWording().copy}
     </button>
   );
@@ -544,7 +544,7 @@ function Sounds(props: { tabs: JSX.Element }) {
                         onClick={() => playSound(name)}
                         class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page pr-3 pl-1.5 hover:bg-hover active:bg-selected"
                       >
-                        <Icon name="button-play" size={16} />
+                        <Icon name="play" size={16} />
                         <span class="text-sm font-medium">{SOUND_LABEL[name] ?? name}</span>
                         <span class="font-mono text-xs text-muted">{name}</span>
                       </button>

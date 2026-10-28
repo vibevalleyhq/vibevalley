@@ -326,7 +326,7 @@ export function ArchivePanel(props: { agent: string }) {
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
-        <Button type="submit" icon="button-search" disabled={!query().trim()}>
+        <Button type="submit" icon="search" disabled={!query().trim()}>
           {memoryWording().memory.find}
         </Button>
       </form>

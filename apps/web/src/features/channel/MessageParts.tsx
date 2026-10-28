@@ -34,7 +34,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
       onClick={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
       class="mb-0.5 flex w-full min-w-0 cursor-pointer items-center gap-1.5 text-left text-xs text-muted hover:text-ink"
     >
-      <Icon name="button-back" size={10} class="opacity-60" />
+      <Icon name="reply" size={10} class="opacity-60" />
       <Show when={answered()} fallback={<span>#{props.number}</span>}>
         {(m) => (
           <Show when={m().deleted === undefined} fallback={<span class="italic">{chatWording().messages.replyGone}</span>}>
@@ -97,7 +97,7 @@ export function Attachments(props: { files: readonly Attachment[] }) {
                   rel="noreferrer"
                   class="flex items-center gap-2 rounded-md border border-line bg-page px-3 py-2 text-sm hover:bg-hover"
                 >
-                  <Icon name={shownAs(file.type) === "pdf" ? "icon-log" : "button-folder"} size={16} />
+                  <Icon name={shownAs(file.type) === "pdf" ? "file" : "attach"} size={16} />
                   <span class="flex min-w-0 flex-col">
                     <span class="max-w-64 truncate">{file.name}</span>
                     <span class="text-xs text-muted">
@@ -193,7 +193,7 @@ function AddReaction(props: { id: string }) {
           open() ? "" : "opacity-0 group-focus-within/m:opacity-100 group-hover/m:opacity-100 focus-visible:opacity-100",
         ]}
       >
-        <Icon name="button-add" size={12} />
+        <Icon name="add" size={12} />
       </button>
       <Show when={open()}>
         <EmojiPicker
@@ -265,7 +265,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             aria-expanded={aria(everyEmoji())}
             onClick={() => setEveryEmoji(!everyEmoji())}
           >
-            <Icon name="button-add" size={14} />
+            <Icon name="add" size={14} />
           </button>
         </div>
       </Show>
@@ -282,7 +282,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         />
       </Show>
       <button type="button" class={tool} aria-label={chatWording().tools.react} title={chatWording().tools.react} onClick={() => setPicking(!picking())}>
-        <Icon name="icon-hand" size={16} />
+        <Icon name="react" size={16} />
       </button>
       <button
         type="button"
@@ -291,7 +291,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         title={chatWording().tools.reply}
         onClick={() => drafts.reply(props.m.channel, props.m)}
       >
-        <Icon name="button-back" size={14} />
+        <Icon name="reply" size={14} />
       </button>
       <Show when={props.inChannel}>
         <button
@@ -306,7 +306,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             })
           }
         >
-          <Icon name="button-thread" size={16} />
+          <Icon name="thread" size={16} />
         </button>
       </Show>
       <button
@@ -317,11 +317,11 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         aria-pressed={aria(props.m.pinned !== undefined)}
         onClick={() => run(() => api.channel.pin.toggle({ id: props.m.id }))}
       >
-        <Icon name="icon-star" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
+        <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
       </button>
       <Show when={editable()}>
         <button type="button" class={tool} aria-label={chatWording().tools.edit} title={chatWording().tools.edit} onClick={() => props.onEdit()}>
-          <Icon name="button-edit" size={14} />
+          <Icon name="edit" size={14} />
         </button>
       </Show>
       <div class="relative">
@@ -333,7 +333,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           aria-expanded={aria(more())}
           onClick={() => setMore(!more())}
         >
-          <Icon name="button-more" size={14} />
+          <Icon name="more" size={14} />
         </button>
         <Show when={more()}>
           <div
@@ -370,7 +370,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           run(() => api.channel.message.delete({ id: props.m.id }));
         }}
       >
-        <Icon name="button-delete" size={14} />
+        <Icon name="delete" size={14} />
       </button>
     </div>
   );
@@ -428,9 +428,9 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
                     keeps() ? "border-line bg-page" : "border-dashed border-line text-faint line-through",
                   ]}
                 >
-                  <Icon name="button-folder" size={12} />
+                  <Icon name="attach" size={12} />
                   <span class="max-w-48 truncate">{f.name}</span>
-                  <Icon name={keeps() ? "button-close" : "button-add"} size={10} />
+                  <Icon name={keeps() ? "close" : "add"} size={10} />
                 </button>
               );
             }}

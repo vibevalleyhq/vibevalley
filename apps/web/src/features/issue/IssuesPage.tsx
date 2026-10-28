@@ -260,7 +260,7 @@ function Overlay(props: { onClose: () => void; children: JSX.Element }) {
         class="relative h-fit w-full max-w-[1080px] rounded-xl border border-line bg-page px-6 py-5 shadow-float"
       >
         <div class="absolute top-3 right-3">
-          <IconButton icon="button-close" label={issuesWording().page.close} onClick={props.onClose} />
+          <IconButton icon="close" label={issuesWording().page.close} onClick={props.onClose} />
         </div>
         {props.children}
       </div>
@@ -286,7 +286,7 @@ function Toolbar(props: {
       <div class="flex flex-col-reverse gap-2 @min-[760px]:flex-row @min-[760px]:items-center">
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <label class="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
-            <Icon name="button-search" size={14} />
+            <Icon name="search" size={14} />
             <input
               value={props.filter.query}
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
@@ -295,7 +295,7 @@ function Toolbar(props: {
               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
-          <Icon name="button-filter" size={16} label={issuesWording().page.filter} />
+          <Icon name="filter" size={16} label={issuesWording().page.filter} />
           <SelectOf
             label={issuesWording().page.byProject}
             value={props.filter.project}

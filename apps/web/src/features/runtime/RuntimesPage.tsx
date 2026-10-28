@@ -31,6 +31,7 @@ import { KeyValueEditor } from "../../ui/Chips";
 import { AgentFace } from "../../ui/Face";
 import { Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
+import { SpriteIcon } from "../../ui/pixel";
 import { Segmented } from "../../ui/Segmented";
 import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../../ui/layout";
 
@@ -261,7 +262,7 @@ function Usage(props: { info: RuntimeInfo }) {
           <Match when={usage()}>
             <div class="flex items-start gap-3">
               <span class="flex w-14 shrink-0 flex-col items-center">
-                <Icon name={bottleSprite(quota())} size={52} />
+                <SpriteIcon name={bottleSprite(quota())} size={52} />
                 <span class="text-sm">{quota().short || "—"}</span>
               </span>
               <div class="flex min-w-0 flex-1 flex-col gap-2.5">
@@ -327,7 +328,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
     <Card title={runtimesWording().can}>
       <div class="flex flex-col gap-1.5">
         <span class="flex items-start gap-1.5 text-sm">
-          <Icon name={facts().steer ? "mark-check" : "mark-cross"} size={12} class="mt-1" />
+          <Icon name={facts().steer ? "check" : "cross"} size={12} class="mt-1" />
           {facts().steer ? runtimesWording().steer : runtimesWording().noSteer}
         </span>
         <span class="text-sm">{facts().inProcess ? runtimesWording().inProcess : runtimesWording().ownProcess}</span>

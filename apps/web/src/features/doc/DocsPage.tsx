@@ -90,7 +90,7 @@ export function DocsPage(props: { rest: string }) {
             value={title()}
             onInput={(e) => setTitle(e.currentTarget.value)}
           />
-          <Button type="submit" tone="primary" icon="button-add">
+          <Button type="submit" tone="primary" icon="add">
             {docWording().docs.new}
           </Button>
         </form>
@@ -123,7 +123,7 @@ export function DocsPage(props: { rest: string }) {
       <div class={[id() ? "flex" : "hidden lg:flex", "min-h-0 min-w-0 flex-1 flex-col gap-2"]}>
         <Show when={id()}>
           <div class="lg:hidden">
-            <Button icon="button-back" onClick={() => router.navigate(docPath())}>
+            <Button icon="back" onClick={() => router.navigate(docPath())}>
               {docWording().docs.all}
             </Button>
           </div>
@@ -204,7 +204,7 @@ function DocView(props: { id: string }) {
     <article aria-label={doc()?.title ?? docWording().docs.doc} class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2">
       <div class="flex items-start gap-2 pb-1 pl-[35px]">
         <h1 class="min-w-0 flex-1 text-2xl font-semibold">{doc()?.title ?? ""}</h1>
-        <Button icon="button-play" onClick={() => void editor.demo()}>
+        <Button icon="play" onClick={() => void editor.demo()}>
           {docWording().docs.demo}
         </Button>
       </div>
@@ -249,7 +249,7 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
             ]}
           >
             <Show when={r().attrs.checked}>
-              <Icon name="mark-check" size={10} />
+              <Icon name="check" size={10} />
             </Show>
           </button>
         );

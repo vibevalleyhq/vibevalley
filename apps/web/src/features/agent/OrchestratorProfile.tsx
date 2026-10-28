@@ -112,7 +112,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
                       </span>
                     </Show>
                   </Show>
-                  <Button icon="button-thread" onClick={talk}>
+                  <Button icon="thread" onClick={talk}>
                     {agentsWording().talk}
                   </Button>
                   <Show when={dirty()}>

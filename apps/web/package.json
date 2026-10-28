@@ -16,6 +16,7 @@
     "effect": "catalog:",
     "hast-util-to-dom": "catalog:",
     "pixi.js": "catalog:",
+    "reicon": "catalog:",
     "remark-gfm": "catalog:",
     "remark-parse": "catalog:",
     "remark-rehype": "catalog:",

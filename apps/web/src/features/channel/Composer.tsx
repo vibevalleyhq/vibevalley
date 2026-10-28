@@ -121,7 +121,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       <Show when={draft().reply}>
         {(m) => (
           <div class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
-            <Icon name="button-back" size={12} />
+            <Icon name="reply" size={12} />
             <span class="min-w-0 flex-1 truncate">
               {chatWording().composer.replying(m().from === ownerId ? chatWording().messages.owner : m().name)}：{m().text}
             </span>
@@ -132,7 +132,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               title={chatWording().composer.cancelReply}
               onClick={() => drafts.reply(props.channel!.id, undefined)}
             >
-              <Icon name="button-close" size={12} />
+              <Icon name="close" size={12} />
             </button>
           </div>
         )}
@@ -142,7 +142,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           <For each={draft().files} keyed={(f) => f.id}>
             {(f) => (
               <span class="flex items-center gap-1.5 rounded-md border border-line bg-page py-1 pr-1 pl-2 text-xs">
-                <Icon name="button-folder" size={12} />
+                <Icon name="attach" size={12} />
                 <span class="max-w-48 truncate">{f().name}</span>
                 <button
                   type="button"
@@ -150,7 +150,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
                   aria-label={chatWording().composer.removeFile(f().name)}
                   onClick={() => drafts.drop(props.channel!.id, f().id)}
                 >
-                  <Icon name="button-close" size={10} />
+                  <Icon name="close" size={10} />
                 </button>
               </span>
             )}
@@ -219,7 +219,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             title={chatWording().composer.attach}
             class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
           >
-            <Icon name="button-folder" size={16} />
+            <Icon name="attach" size={16} />
           </button>
           <div>
             <button
@@ -232,7 +232,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               title={chatWording().emoji.open}
               class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
             >
-              <span class="text-base leading-none grayscale-[0.4]">🙂</span>
+              <Icon name="react" size={16} />
             </button>
             <Show when={emoji()}>
               <EmojiPicker
@@ -254,7 +254,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               title={chatWording().composer.stopHint}
               class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
             >
-              <Icon name="button-stop" size={14} />
+              <Icon name="stop" size={14} />
             </button>
           </Show>
           <button
@@ -268,7 +268,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               box.canSend() ? "border-accent bg-accent hover:bg-leaf" : "border-transparent opacity-50",
             ]}
           >
-            <Icon name="button-send" size={14} />
+            <Icon name="send" size={14} />
           </button>
         </div>
       </div>
