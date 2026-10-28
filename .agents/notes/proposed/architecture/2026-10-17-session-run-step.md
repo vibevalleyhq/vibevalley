@@ -28,7 +28,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 - 删掉 `Trajectory`、`TrajectoryHead` 和 `*.head.json`。已有的头文件搬进 `session` 表一次；旧的事件没有 Run，按时间落进对应的 Run，落不进的留空。走了的 Session 也是 `Session`：`Phase` 加一个 `closed`（结束的时间和怎么关的）。
 - 接口：`session.list` 返回 `[]Session`（活的和走了的）；`session.get <id>` 返回它和它的 Run；新的 `session.event.list <id> [--run]` 返回事件。
-- 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md) 它是档案 `orchestrator`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
+- 管家也是一个 agent loop，按 [agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md) 它是档案 `orchestrator`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
 
 ### 和消息之间只有两个口子，都在服务端
 

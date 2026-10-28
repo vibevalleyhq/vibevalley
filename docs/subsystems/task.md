@@ -117,7 +117,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 
 ## 还没做的
 
-- 计划和 agent 自己的任务图合成一个 Task：一份图的规则、一个推进的引擎，执行者和存储可换；开工要主人点头写进代码：[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)。
+- 计划和 agent 自己的任务图合成一个 Task：一份「一件」的规则，执行者和存储可换：[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)。
 - 先采样几份再验证、挑一份：[先采样再验证](.agents/notes/proposed/architecture/2026-10-14-sample-then-verify.md)。
 - 还没有提案的：审查步骤、计划模板、半路重新规划、跨项目的计划、计划分支冲突时派帮工解决、计划自己的串。
 
