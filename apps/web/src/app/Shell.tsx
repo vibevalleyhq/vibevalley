@@ -13,6 +13,8 @@ import { A } from "../ui/A";
 import { useRouter } from "../base/router";
 import { titleBar } from "../ui/TitleBar";
 import { QuickSwitcher, switcher } from "../features/channel";
+import { pressed } from "../base/shortcuts";
+import { ShortcutSheet } from "../ui/ShortcutSheet";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -113,10 +115,10 @@ function Desk(props: { place?: Place }) {
 export function Shell(props: { children: JSX.Element }) {
   const router = useRouter();
   const here = () => placeOf(router.path().split("?")[0]!);
-  // Ctrl+K (⌘K on a Mac) anywhere in the workbench.
+  // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return;
+      if (!pressed(e, "switcher")) return;
       e.preventDefault();
       switcher.toggle();
     };
@@ -127,6 +129,7 @@ export function Shell(props: { children: JSX.Element }) {
     // The interface size (设置 › 外观) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
     <div class="flex h-full [zoom:var(--workbench-zoom,1)]">
       <QuickSwitcher />
+      <ShortcutSheet />
       <Rail here={here()} />
       <main class="flex min-w-0 flex-1 flex-col">
         <Show when={here()?.id !== "chat"}>

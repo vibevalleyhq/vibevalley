@@ -1392,6 +1392,28 @@ export const catalogs = {
       big: "{n} 万",
       file: { pdf: "PDF · 在新标签页里看", remove: "去掉 {name}" },
       lightbox: { label: "看图", prev: "上一张", next: "下一张", original: "打开原图", close: "关上" },
+      shortcuts: {
+        title: "快捷键",
+        place: { everywhere: "到处", composer: "输入框", lists: "菜单和名单", pictures: "看图", farm: "农场", desktop: "桌面版（系统全局）" },
+        say: {
+          switcher: "跳到频道、串、私聊",
+          sheet: "打开这张表",
+          close: "关掉对话框、菜单、浮层",
+          send: "发出去",
+          newline: "换行",
+          mention: "叫人",
+          editLast: "改自己上一条（输入框空着时）",
+          dropReply: "不回复那一条了",
+          move: "上下挑",
+          pick: "选中",
+          flip: "上一张、下一张",
+          tool: "拿起第几样农具",
+          names: "按住写出院子里每样东西的名字",
+          farmMenu: "放下农具，或打开菜单",
+          debug: "调试台",
+          voice: "跟管家说话（在设置里能换）",
+        },
+      },
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -4905,6 +4927,35 @@ export const catalogs = {
       big: "{n}k",
       file: { pdf: "PDF · opens in a new tab", remove: "Remove {name}" },
       lightbox: { label: "Pictures", prev: "Previous", next: "Next", original: "Open the original", close: "Close" },
+      shortcuts: {
+        title: "Keyboard shortcuts",
+        place: {
+          everywhere: "Everywhere",
+          composer: "Message box",
+          lists: "Menus and lists",
+          pictures: "Pictures",
+          farm: "Farm",
+          desktop: "Desktop app (system-wide)",
+        },
+        say: {
+          switcher: "Jump to a channel, thread or direct message",
+          sheet: "Open this sheet",
+          close: "Close a dialog, menu or popover",
+          send: "Send",
+          newline: "New line",
+          mention: "Call someone",
+          editLast: "Edit your last message (box empty)",
+          dropReply: "Stop replying to that message",
+          move: "Move up and down",
+          pick: "Pick",
+          flip: "Previous, next",
+          tool: "Hold the nth tool",
+          names: "Hold to name everything in the yard",
+          farmMenu: "Put the tool down, or open the menu",
+          debug: "Debug console",
+          voice: "Talk to the manager (changeable in settings)",
+        },
+      },
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -8445,6 +8496,29 @@ export interface Messages {
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
+  "web.base.shortcuts.place.composer": undefined;
+  "web.base.shortcuts.place.desktop": undefined;
+  "web.base.shortcuts.place.everywhere": undefined;
+  "web.base.shortcuts.place.farm": undefined;
+  "web.base.shortcuts.place.lists": undefined;
+  "web.base.shortcuts.place.pictures": undefined;
+  "web.base.shortcuts.say.close": undefined;
+  "web.base.shortcuts.say.debug": undefined;
+  "web.base.shortcuts.say.dropReply": undefined;
+  "web.base.shortcuts.say.editLast": undefined;
+  "web.base.shortcuts.say.farmMenu": undefined;
+  "web.base.shortcuts.say.flip": undefined;
+  "web.base.shortcuts.say.mention": undefined;
+  "web.base.shortcuts.say.move": undefined;
+  "web.base.shortcuts.say.names": undefined;
+  "web.base.shortcuts.say.newline": undefined;
+  "web.base.shortcuts.say.pick": undefined;
+  "web.base.shortcuts.say.send": undefined;
+  "web.base.shortcuts.say.sheet": undefined;
+  "web.base.shortcuts.say.switcher": undefined;
+  "web.base.shortcuts.say.tool": undefined;
+  "web.base.shortcuts.say.voice": undefined;
+  "web.base.shortcuts.title": undefined;
   "web.base.time.clock": { readonly am: boolean; readonly hh: string | number; readonly mm: string | number };
   "web.base.time.date": { readonly d: string | number; readonly m: string | number; readonly y: string | number };
   "web.base.time.day": { readonly d: string | number; readonly m: string | number; readonly weekday: string | number };

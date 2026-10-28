@@ -37,3 +37,20 @@ test("the chat has no head: the rail is all", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^聊天 · / })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("link", { name: /没开工|开工中/ })).toHaveCount(0);
 });
+
+test("? off a text field opens every shortcut, by where it works; in a field it is a question mark", async ({ page }) => {
+  await page.goto("/issues");
+  await expect(page.getByRole("status")).toHaveText("已连上");
+  await page.keyboard.press("?");
+  const sheet = page.getByRole("dialog", { name: "快捷键" });
+  await expect(sheet.getByRole("region", { name: "到处" }).getByText("跳到频道、串、私聊")).toBeVisible();
+  await expect(sheet.getByRole("region", { name: "农场" })).toBeVisible();
+  // It grows in: the shot waits until it is all there.
+  await expect(sheet).toHaveCSS("opacity", "1");
+  await page.screenshot({ path: test.info().outputPath("shortcuts.png") });
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await page.getByRole("textbox").first().click();
+  await page.keyboard.press("?");
+  await expect(sheet).toBeHidden();
+});

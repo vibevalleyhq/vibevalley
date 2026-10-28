@@ -161,5 +161,34 @@
     "next": "Next",
     "original": "Open the original",
     "close": "Close"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "place": {
+      "everywhere": "Everywhere",
+      "composer": "Message box",
+      "lists": "Menus and lists",
+      "pictures": "Pictures",
+      "farm": "Farm",
+      "desktop": "Desktop app (system-wide)"
+    },
+    "say": {
+      "switcher": "Jump to a channel, thread or direct message",
+      "sheet": "Open this sheet",
+      "close": "Close a dialog, menu or popover",
+      "send": "Send",
+      "newline": "New line",
+      "mention": "Call someone",
+      "editLast": "Edit your last message (box empty)",
+      "dropReply": "Stop replying to that message",
+      "move": "Move up and down",
+      "pick": "Pick",
+      "flip": "Previous, next",
+      "tool": "Hold the nth tool",
+      "names": "Hold to name everything in the yard",
+      "farmMenu": "Put the tool down, or open the menu",
+      "debug": "Debug console",
+      "voice": "Talk to the manager (changeable in settings)"
+    }
   }
 }

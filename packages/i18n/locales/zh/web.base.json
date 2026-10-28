@@ -161,5 +161,34 @@
     "next": "下一张",
     "original": "打开原图",
     "close": "关上"
+  },
+  "shortcuts": {
+    "title": "快捷键",
+    "place": {
+      "everywhere": "到处",
+      "composer": "输入框",
+      "lists": "菜单和名单",
+      "pictures": "看图",
+      "farm": "农场",
+      "desktop": "桌面版（系统全局）"
+    },
+    "say": {
+      "switcher": "跳到频道、串、私聊",
+      "sheet": "打开这张表",
+      "close": "关掉对话框、菜单、浮层",
+      "send": "发出去",
+      "newline": "换行",
+      "mention": "叫人",
+      "editLast": "改自己上一条（输入框空着时）",
+      "dropReply": "不回复那一条了",
+      "move": "上下挑",
+      "pick": "选中",
+      "flip": "上一张、下一张",
+      "tool": "拿起第几样农具",
+      "names": "按住写出院子里每样东西的名字",
+      "farmMenu": "放下农具，或打开菜单",
+      "debug": "调试台",
+      "voice": "跟管家说话（在设置里能换）"
+    }
   }
 }
