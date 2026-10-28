@@ -258,10 +258,11 @@ function Overlay(props: { onClose: () => void; children: JSX.Element }) {
         role="dialog"
         aria-modal="true"
         aria-label={t("web.issue.page.sheet")}
+        data-testid="issue"
         class="relative h-fit w-full max-w-[1080px] rounded-xl border border-line bg-page px-6 py-5 shadow-float"
       >
         <div class="absolute top-3 right-3">
-          <IconButton icon="close" label={t("web.issue.page.close")} onClick={props.onClose} />
+          <IconButton icon="close" label={t("web.issue.page.close")} testid="issue-close" onClick={props.onClose} />
         </div>
         {props.children}
       </div>
@@ -323,6 +324,7 @@ function Toolbar(props: {
         <div class="ml-auto flex items-center gap-1.5">
           <Segmented
             label={t("web.issue.page.view")}
+            testid="issue-view"
             value={props.look.view}
             onChange={(view) => props.onLook({ ...props.look, view })}
             options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}

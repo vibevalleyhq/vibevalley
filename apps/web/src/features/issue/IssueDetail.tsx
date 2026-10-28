@@ -81,7 +81,7 @@ export function IssueDetail(props: {
 
   /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
-    <Button tone={lead() ? "primary" : acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>
+    <Button data-act={a} tone={lead() ? "primary" : acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>
       {acts.label(a)}
     </Button>
   );
@@ -561,7 +561,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           </Show>
           <For each={props.issue.attention.acts}>
             {(a) => (
-              <Button tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
+              <Button data-act={a.act} tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
                 {t(`shared.act.${a.act}`)}
               </Button>
             )}

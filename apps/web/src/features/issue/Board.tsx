@@ -130,6 +130,8 @@ function LaneView(props: {
   return (
     <section
       aria-label={laneLabel[props.lane]}
+      data-testid="lane"
+      data-key={props.lane}
       onDragOver={(e) => {
         if (!accepts(props.drag.dragging())) return;
         e.preventDefault();
@@ -236,6 +238,9 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
       <div
         role="button"
         tabindex={0}
+        data-testid="issue-card"
+        data-key={props.card.id}
+        data-kind={props.card.kind}
         aria-label={look().title}
         aria-current={props.selected ? "true" : undefined}
         title={look().detail}

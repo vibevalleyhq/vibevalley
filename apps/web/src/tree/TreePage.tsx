@@ -117,13 +117,13 @@ export function TreePage() {
           <div class={[pxText.xs, "text-bark-500"]}>{t("web.tree.skyHint")}</div>
         </PxWindow>
         <div class="absolute top-3 right-3">
-          <PxButton icon="icon-tree" onClick={() => lookUp(false)}>
+          <PxButton icon="icon-tree" data-testid="tree-back" onClick={() => lookUp(false)}>
             {t("web.tree.back")}
           </PxButton>
         </div>
       </Show>
       <div class={["absolute top-3 left-3", { hidden: sky() }]}>
-        <PxButton icon="icon-map" onClick={home}>
+        <PxButton icon="icon-map" data-testid="tree-home" onClick={home}>
           {t("web.tree.farm")}
         </PxButton>
       </div>
@@ -149,7 +149,9 @@ export function TreePage() {
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
             class="flex-1 accent-[var(--color-leaf-500)]"
           />
-          <span class={[pxText.xs, "w-[64px] text-right"]}>{until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}</span>
+          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} class={[pxText.xs, "w-[64px] text-right"]}>
+            {until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}
+          </span>
         </label>
       </PxWindow>
       <Show when={hover()}>{(h) => <Tip hover={h()} tree={tree} agentName={agentName} now={now()} />}</Show>
@@ -162,6 +164,7 @@ function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: T
     <div class={["flex gap-2", props.class]}>
       <PxPick
         label={t("web.tree.byHelper")}
+        testid="tree-by-helper"
         placeholder={t("web.tree.allHelpers")}
         clearable
         value={props.filter.agent}
@@ -170,6 +173,7 @@ function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: T
       />
       <PxPick
         label={t("web.tree.byProject")}
+        testid="tree-by-project"
         placeholder={t("web.tree.allProjects")}
         clearable
         value={props.filter.project}
@@ -201,6 +205,7 @@ function Panel(props: {
   const days = () => Math.max(1, Math.ceil((props.now - props.tree.since) / 86_400_000));
   return (
     <PxWindow
+      testid="tree-panel"
       class={["absolute flex flex-col gap-3 overflow-y-auto p-4", props.narrow ? "inset-x-2 bottom-2 h-[48%]" : "top-3 right-3 bottom-3"]}
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
@@ -296,7 +301,7 @@ function Panel(props: {
                 <li class="flex items-center gap-2">
                   <SpriteIcon name="icon-seed" size={20} />
                   <span class={[pxText.sm, "min-w-0 flex-1"]}>{seed.body}</span>
-                  <PxButton size="sm" tone="primary" onClick={() => props.onSow(seed)}>
+                  <PxButton size="sm" tone="primary" data-testid="tree-sow" onClick={() => props.onSow(seed)}>
                     {t("web.tree.sow")}
                   </PxButton>
                 </li>
@@ -305,7 +310,7 @@ function Panel(props: {
           </ul>
         </Show>
       </Section>
-      <PxButton tone="accent" icon="icon-stars" class="mt-auto w-full" onClick={props.onLookUp}>
+      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" class="mt-auto w-full" onClick={props.onLookUp}>
         {t("web.tree.lookUp")}
       </PxButton>
     </PxWindow>

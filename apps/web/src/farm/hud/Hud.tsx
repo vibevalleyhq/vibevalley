@@ -36,10 +36,11 @@ const top = 52;
 const bottom = 36;
 
 /** A HUD part: a button with its words as a tooltip and an accessible name. */
-export function HudTap(props: { label: string; onClick: () => void; selected?: boolean; children: JSX.Element }) {
+export function HudTap(props: { label: string; testid?: string; onClick: () => void; selected?: boolean; children: JSX.Element }) {
   return (
     <button
       type="button"
+      data-testid={props.testid}
       title={props.label}
       aria-label={props.label}
       aria-pressed={props.selected === undefined ? undefined : aria(props.selected)}
@@ -91,7 +92,7 @@ function TopLeft() {
   };
   return (
     <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
-      <HudTap label={t("web.farm.hud.look")} onClick={() => open("orchestrator")}>
+      <HudTap label={t("web.farm.hud.look")} testid="hud-orchestrator" onClick={() => open("orchestrator")}>
         <span class="inline-block pr-0.5 pb-0.5">
           <span
             class="box-border flex items-center justify-center border-2 shadow-[2px_2px_0_0_#3a2a1899]"
@@ -101,7 +102,7 @@ function TopLeft() {
           </span>
         </span>
       </HudTap>
-      <HudTap label={t("web.farm.panel.graphs")} onClick={() => open("graphs")}>
+      <HudTap label={t("web.farm.panel.graphs")} testid="hud-graphs" onClick={() => open("graphs")}>
         <span class="inline-block pr-0.5 pb-0.5 text-left">
           <span
             class="box-border flex flex-col justify-center border-2 px-1.5 py-0.5 shadow-[2px_2px_0_0_#3a2a1899]"
@@ -157,21 +158,25 @@ function TopRight() {
   };
   return (
     <div class="absolute flex items-start" style={{ right: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
-      <HudTap label={t("web.farm.hud.treeHint")} onClick={() => go("/tree")}>
+      <HudTap label={t("web.farm.hud.treeHint")} testid="hud-tree" onClick={() => go("/tree")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-tree" size={20} />
           {t("web.farm.hud.tree")}
         </HudCard>
       </HudTap>
       <Show when={webRoutes.includes("/projects")}>
-        <HudTap label={t("web.farm.hud.mapHint")} onClick={() => go("/projects")}>
+        <HudTap label={t("web.farm.hud.mapHint")} testid="hud-map" onClick={() => go("/projects")}>
           <HudCard height={top}>
             <SpriteIcon name="icon-map" size={20} />
             {t("web.farm.hud.map")}
           </HudCard>
         </HudTap>
       </Show>
-      <HudTap label={unread() > 0 ? t("web.farm.hud.channelsUnread", { n: unread() }) : t("web.farm.chat.channels")} onClick={() => go("/chat")}>
+      <HudTap
+        label={unread() > 0 ? t("web.farm.hud.channelsUnread", { n: unread() }) : t("web.farm.chat.channels")}
+        testid="hud-chat"
+        onClick={() => go("/chat")}
+      >
         <HudCard height={top}>
           <SpriteIcon name="icon-board" size={20} />
           {t("web.farm.chat.channels")}
@@ -183,6 +188,7 @@ function TopRight() {
       <QuotaPill height={top} />
       <HudTap
         label={t("web.farm.hud.menuHint")}
+        testid="hud-menu"
         onClick={() => {
           playSound("open");
           farm.menu(true);
@@ -226,6 +232,7 @@ function ToolBar() {
         {(tool, i) => (
           <HudTap
             label={t("shared.join.aside", { text: t("shared.join.labeled", { label: tool.label, text: tool.hint }), aside: i() + 1 })}
+            testid={`tool-${tool.id}`}
             selected={held() === tool.id}
             onClick={() => farm.hold(tool.id)}
           >

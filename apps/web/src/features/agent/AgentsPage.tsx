@@ -109,9 +109,9 @@ function AgentsPage() {
   );
 }
 
-function CardShell(props: { to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
+function CardShell(props: { agent: Agent; to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
   return (
-    <div class={["group relative", { "opacity-60": !!props.muted }]}>
+    <div data-testid="agent-card" data-key={props.agent.id} data-role={props.agent.role} class={["group relative", { "opacity-60": !!props.muted }]}>
       <A
         href={props.to}
         aria-label={props.label}
@@ -131,7 +131,7 @@ const footer = "mt-auto flex items-center gap-3 border-t border-line pt-3 text-x
 function OrchestratorCard(props: { agent: Agent }) {
   const main = () => props.agent.id === defaultOrchestrator;
   return (
-    <CardShell to={orchestratorHref(props.agent.id)} label={props.agent.name}>
+    <CardShell agent={props.agent} to={orchestratorHref(props.agent.id)} label={props.agent.name}>
       <div class="flex items-start gap-3 pb-3">
         <span class="flex size-20 shrink-0 items-center justify-center rounded-lg bg-hover">
           <OrchestratorFace size={68} agent={props.agent.id} />
@@ -166,6 +166,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
   };
   return (
     <CardShell
+      agent={props.agent}
       to={`/agents/${encodeURIComponent(props.agent.id)}`}
       label={props.agent.name}
       muted={!props.agent.enabled}

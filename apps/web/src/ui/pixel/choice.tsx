@@ -61,6 +61,7 @@ export function PxPick(props: {
   label?: string;
   clearable?: boolean;
   id?: string;
+  testid?: string;
 }) {
   const listId = createUniqueId();
   let wrap!: HTMLDivElement;
@@ -92,6 +93,7 @@ export function PxPick(props: {
     <div ref={(el) => (wrap = el)} class="relative w-full">
       <button
         id={props.id}
+        data-testid={props.testid}
         type="button"
         disabled={props.disabled}
         aria-label={props.label}
@@ -138,6 +140,7 @@ export function PxPick(props: {
                 <li
                   id={`${listId}-${i()}`}
                   role="option"
+                  data-key={o.value}
                   aria-selected={aria(o.value === props.value)}
                   onMouseEnter={() => setHighlight(i())}
                   // Down, not click: the trigger keeps the focus.

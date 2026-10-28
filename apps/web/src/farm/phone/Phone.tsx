@@ -195,6 +195,7 @@ function Handset(props: {
   return (
     <section
       aria-label={t("web.farm.phone.label")}
+      data-testid="phone"
       class="pointer-events-auto relative px-[10px] pt-[10px] pb-3 font-pixel text-[12px] leading-[1.5] tabular-nums"
       style={{
         width: `${width()}px`,
@@ -212,6 +213,7 @@ function Handset(props: {
           <button
             type="button"
             aria-label={t("web.farm.phone.home")}
+            data-testid="phone-home"
             title={t("web.farm.phone.homeHint")}
             onClick={() => props.onHome()}
             class="cursor-pointer hover:underline"
@@ -261,6 +263,8 @@ function UnfoldTab(props: { unread: number }) {
     <button
       type="button"
       aria-label={props.unread > 0 ? t("web.farm.phone.openChatUnread", { n: props.unread }) : t("web.farm.phone.openChat")}
+      data-testid="phone-chat"
+      data-unread={props.unread}
       title={t("web.farm.phone.openChat")}
       onClick={() => {
         playSound("open");

@@ -172,7 +172,7 @@ export function ChatWindow() {
   const showSuggestions = () => !thread() && (core()?.call === "live" || (said().ready && said().messages.length === 0));
 
   return (
-    <section aria-label={t("web.farm.chat.label")} class="relative h-full w-full">
+    <section aria-label={t("web.farm.chat.label")} data-testid="farm-chat" class="relative h-full w-full">
       <div class="flex h-full flex-col overflow-hidden bg-cream-50 font-pixel text-[12px] leading-[1.625] text-bark-900">
         <Show
           when={thread()}
@@ -209,6 +209,7 @@ export function ChatWindow() {
           class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto p-3"
           aria-label={thread() ? t("web.farm.chat.thread") : farmChannelLabel(shown())}
           role="log"
+          data-testid="messages"
         >
           <div class="flex flex-col gap-2">
             <Show when={hasOlder() && shown()}>
@@ -231,18 +232,20 @@ export function ChatWindow() {
             </Show>
             <For each={items()} keyed={(item) => item.message.id}>
               {(item, i) => (
-                <Item
-                  m={item().message}
-                  thread={item().thread}
-                  first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
-                  agents={agents()}
-                  chatUnread={(channel) => unreadIn(channel)}
-                />
+                <div data-testid="message" data-key={item().message.id} data-from={item().message.fromKind} data-kind={item().message.kind}>
+                  <Item
+                    m={item().message}
+                    thread={item().thread}
+                    first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
+                    agents={agents()}
+                    chatUnread={(channel) => unreadIn(channel)}
+                  />
+                </div>
               )}
             </For>
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
-                <div class="opacity-70" aria-label={t("web.farm.chat.sending")}>
+                <div class="opacity-70" aria-label={t("web.farm.chat.sending")} data-testid="message" data-from="owner" data-state="sending">
                   <ChatRow mine first title={t("web.farm.chat.sending")}>
                     <span class="whitespace-pre-line">{p().text}</span>
                   </ChatRow>
