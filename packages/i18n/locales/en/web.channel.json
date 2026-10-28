@@ -129,7 +129,6 @@
     "replying": "Replying to {name}",
     "cancelReply": "Cancel the reply",
     "attach": "Attach a file",
-    "removeFile": "Remove {name}",
     "uploadFailed": "Not uploaded: {why}"
   },
   "manage": {

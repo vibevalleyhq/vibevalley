@@ -150,5 +150,16 @@
     "hide": "Hide",
     "peek": "Peek"
   },
-  "big": "{n}k"
+  "big": "{n}k",
+  "file": {
+    "pdf": "PDF · opens in a new tab",
+    "remove": "Remove {name}"
+  },
+  "lightbox": {
+    "label": "Pictures",
+    "prev": "Previous",
+    "next": "Next",
+    "original": "Open the original",
+    "close": "Close"
+  }
 }

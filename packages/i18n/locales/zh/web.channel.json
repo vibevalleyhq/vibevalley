@@ -129,7 +129,6 @@
     "replying": "回复 {name}",
     "cancelReply": "不回复了",
     "attach": "附上文件",
-    "removeFile": "去掉 {name}",
     "uploadFailed": "没传上去：{why}"
   },
   "manage": {

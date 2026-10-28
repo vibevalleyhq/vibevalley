@@ -1177,7 +1177,6 @@ export const catalogs = {
       trajectories: "轨迹",
       remove: "删除",
       removeWhich: "删掉 {name}？",
-      never: "算了",
       fine: "配置没问题，可以派活。",
       problems: "派不出去的原因",
       cannot: "派不出去：",
@@ -1391,6 +1390,8 @@ export const catalogs = {
       write: "记下",
       secret: { hide: "藏起来", peek: "看一眼" },
       big: "{n} 万",
+      file: { pdf: "PDF · 在新标签页里看", remove: "去掉 {name}" },
+      lightbox: { label: "看图", prev: "上一张", next: "下一张", original: "打开原图", close: "关上" },
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -1560,7 +1561,6 @@ export const catalogs = {
         replying: "回复 {name}",
         cancelReply: "不回复了",
         attach: "附上文件",
-        removeFile: "去掉 {name}",
         uploadFailed: "没传上去：{why}",
       },
       manage: {
@@ -4669,7 +4669,6 @@ export const catalogs = {
       trajectories: "Trajectories",
       remove: "Delete",
       removeWhich: "Delete {name}?",
-      never: "Never mind",
       fine: "The configuration is fine: it can be sent work.",
       problems: "Why it cannot be sent",
       cannot: "Cannot be sent: ",
@@ -4902,6 +4901,8 @@ export const catalogs = {
       write: "Remember it",
       secret: { hide: "Hide", peek: "Peek" },
       big: "{n}k",
+      file: { pdf: "PDF · opens in a new tab", remove: "Remove {name}" },
+      lightbox: { label: "Pictures", prev: "Previous", next: "Next", original: "Open the original", close: "Close" },
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -5075,7 +5076,6 @@ export const catalogs = {
         replying: "Replying to {name}",
         cancelReply: "Cancel the reply",
         attach: "Attach a file",
-        removeFile: "Remove {name}",
         uploadFailed: "Not uploaded: {why}",
       },
       manage: {
@@ -8260,7 +8260,6 @@ export interface Messages {
   "web.agent.name": undefined;
   "web.agent.nameTaken": undefined;
   "web.agent.nameTip": undefined;
-  "web.agent.never": undefined;
   "web.agent.newName": { readonly runtime: string | number };
   "web.agent.noEffort": undefined;
   "web.agent.noEffortModel": { readonly model: string | number };
@@ -8387,6 +8386,8 @@ export interface Messages {
   "web.base.chips.valueHint": undefined;
   "web.base.chips.valueOf": { readonly k: string | number };
   "web.base.farm": undefined;
+  "web.base.file.pdf": undefined;
+  "web.base.file.remove": { readonly name: string | number };
   "web.base.form.asking": undefined;
   "web.base.form.from.config": undefined;
   "web.base.form.from.settings": undefined;
@@ -8405,6 +8406,11 @@ export interface Messages {
   "web.base.form.undo": undefined;
   "web.base.form.unreachable": { readonly why: string | number };
   "web.base.form.unset": undefined;
+  "web.base.lightbox.close": undefined;
+  "web.base.lightbox.label": undefined;
+  "web.base.lightbox.next": undefined;
+  "web.base.lightbox.original": undefined;
+  "web.base.lightbox.prev": undefined;
   "web.base.link.connecting": undefined;
   "web.base.link.lost": undefined;
   "web.base.link.open": undefined;
@@ -8545,7 +8551,6 @@ export interface Messages {
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
-  "web.channel.composer.removeFile": { readonly name: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.send": undefined;
   "web.channel.composer.sendHint": undefined;
