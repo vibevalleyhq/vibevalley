@@ -6,7 +6,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （Context.Service）：core、setting、agent、project、memory、doc、runtime、session、channel、cron、issue、
+                           （Context.Service）：core、setting、agent、project、memory、doc、artifact、runtime、session、channel、cron、issue、
                            task、notice、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
                            oar 的 vibevalley runtime）；base 是地基，services.ts 按次序把它们组装起来，

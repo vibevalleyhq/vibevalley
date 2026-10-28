@@ -26,7 +26,21 @@ export const agentOnly: Partial<Record<Op, readonly string[]>> = {
   "channel.message.list": ["unread"],
   // Written down and sent, or drafted by a helper, in one call, from the channel being answered or the one named.
   "issue.create": ["start", "draft", "channel"],
+  // A helper hands in a file from its working directory; the server reads it.
+  "artifact.create": ["file"],
+  "artifact.version.create": ["file"],
 };
+
+const artifactText = {
+  content: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.content })),
+  note: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.note })),
+};
+const artifactKind = Schema.Literals(["html", "markdown"]).annotate({ description: params.artifact.kind });
+const artifactId = Schema.String.annotate({ description: params.artifact.id });
+const artifactRead = Schema.Struct({
+  id: artifactId,
+  version: Schema.optionalKey(Schema.Int.annotate({ description: params.artifact.version })),
+});
 
 const channelRead = Schema.Struct({
   before: Schema.optionalKey(Schema.Finite),
@@ -37,6 +51,20 @@ const channelRead = Schema.Struct({
 
 /** The orchestrator's, by endpoint. */
 export const parameters = {
+  "artifact.content.get": artifactRead,
+  "artifact.create": Schema.Struct({
+    ...artifactText,
+    channel: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.channel })),
+    issue: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.issue })),
+    kind: artifactKind,
+    title: Schema.String.annotate({ description: params.artifact.title }),
+  }).annotate({ requiredOrder: ["title", "kind"] }),
+  "artifact.get": Schema.Struct({ id: artifactId }),
+  "artifact.list": Schema.Struct({
+    channel: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.channel })),
+    issue: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.issue })),
+  }),
+  "artifact.version.create": Schema.Struct({ ...artifactText, id: artifactId }),
   "channel.create": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
     name: Schema.String,
@@ -174,6 +202,22 @@ export const parameters = {
 
 /** A session's, by endpoint; channel.message.list is the orchestrator's. */
 export const sessionParameters = {
+  "artifact.content.get": artifactRead,
+  "artifact.create": Schema.Struct({
+    ...artifactText,
+    file: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.file })),
+    kind: artifactKind,
+    title: Schema.String.annotate({ description: params.artifact.title }),
+  }).annotate({ requiredOrder: ["title", "kind"] }),
+  "artifact.get": Schema.Struct({ id: artifactId }),
+  "artifact.list": Schema.Struct({
+    channel: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.channel })),
+  }),
+  "artifact.version.create": Schema.Struct({
+    ...artifactText,
+    file: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.file })),
+    id: artifactId,
+  }),
   "channel.message.list": channelRead,
   "channel.message.send": Schema.Struct({
     anyway: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelMessageSend.anyway })),

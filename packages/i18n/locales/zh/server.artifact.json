@@ -1,0 +1,18 @@
+{
+  "noTitle": "产出要有个标题",
+  "longTitle": "标题太长了，最多 {max} 个字",
+  "badKind": "认不得 {kind} 这种产出，只认 {kinds}",
+  "empty": "产出是空的",
+  "tooBig": "一版最多 {mb} MB",
+  "notKept": "产出没存下来：{why}",
+  "missing": "没有 {id} 这个产出",
+  "noVersion": "「{title}」没有第 {version} 版，最新是第 {latest} 版",
+  "noFile": "「{title}」第 {version} 版的内容不见了",
+  "made": "做了「{title}」",
+  "versioned": "「{title}」出了第 {version} 版",
+  "withNote": "{said}：{note}",
+  "preview": {
+    "remove": "删掉「{title}」和它的 {n} 版",
+    "cards": "对话里的卡片还在，点开说已经删掉了"
+  }
+}

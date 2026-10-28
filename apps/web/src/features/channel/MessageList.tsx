@@ -7,6 +7,7 @@ import { createEffect, createMemo, createSignal, For, Show, untrack } from "soli
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
 import { api } from "../../base/api";
+import { ArtifactCard } from "../artifact";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import {
   channelOf,
@@ -400,6 +401,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
         <Dispatch text={props.m.text} />
       </Show>
       <Show when={props.m.attachments}>{(files) => <Attachments files={files()} />}</Show>
+      <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</Show>
       <Show when={props.m.deleted === undefined && props.m.text}>{(text) => <LinkedMessages text={text()} />}</Show>
       <Show when={props.m.deleted === undefined && (props.m.embeds ?? []).length > 0 ? props.m.embeds : undefined}>
         {(embeds) => <Embeds embeds={embeds()} />}

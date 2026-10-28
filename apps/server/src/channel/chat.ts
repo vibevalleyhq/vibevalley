@@ -29,6 +29,7 @@ import {
   type SubjectKind,
   type SessionId,
   type Attachment,
+  type ArtifactCard,
   attachmentMax,
   type AttachmentUpload,
   type MessageHit,
@@ -174,6 +175,8 @@ interface Meta {
   spoken?: boolean;
   attachments?: Attachment[];
   embeds?: Embed[];
+  /** The artifact it announces, as it was then (artifact/). */
+  artifact?: ArtifactCard;
 }
 
 const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
@@ -187,6 +190,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   spoken: Schema.optionalKey(Schema.Boolean),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
+  artifact: Schema.optionalKey(S.ArtifactCard),
 });
 
 /** Anything unreadable is no meta. */
@@ -243,18 +247,21 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(row.reactions !== null ? { reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })) } : {}),
     ...(meta.attachments && meta.attachments.length > 0 ? { attachments: meta.attachments } : {}),
     ...(meta.embeds && meta.embeds.length > 0 ? { embeds: meta.embeds } : {}),
+    ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
   };
 }
 
 const notifyOf = (n: string): Notify => (n === "mentions" || n === "none" ? n : "all");
 
 const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: number | null; deleted_at?: number | null }, filesAt: (id: string) => string) => {
-  const files = metaOf(row.meta).attachments ?? [];
+  const meta = metaOf(row.meta);
+  const files = meta.attachments ?? [];
   return {
     ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
     ...(row.edited_at ? { edited: true } : {}),
     ...(row.deleted_at ? { deleted: true } : {}),
     ...(files.length > 0 ? { attachments: files.map((f) => ({ name: f.name, path: filesAt(f.id) })) } : {}),
+    ...(meta.artifact && !row.deleted_at ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } } : {}),
   };
 };
 
@@ -342,6 +349,12 @@ export interface ChannelShape {
   readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
   /** A session's or the orchestrator's words, through channel_message_send. */
   readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
+  /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
+   * session's own thread, else the default channel. */
+  readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
+  /** Words that announce an artifact (artifact/), with its card, said as from (the owner, a session or an orchestrator) in
+   * a channel placeOf names. Never held for unseen messages, as speak's are: it answers none of them. */
+  readonly announce: (from: string, channel: string, text: string, card: ArtifactCard) => Effect.Effect<ChatMessage, ApiError>;
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
   /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
@@ -1618,6 +1631,26 @@ export const make = Effect.gen(function* () {
           });
           yield* setRead(from, channel, written.number, yield* Clock.currentTimeMillis);
           return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
+        }),
+      ),
+    placeOf: (from, channel) => (model.channel(channel) ? Effect.succeed(channel) : resolveTarget(from, channel)),
+    announce: (from, channel, text, card) =>
+      locked(
+        Effect.gen(function* () {
+          const where = model.channel(channel) ? channel : yield* resolveTarget(from, channel);
+          if (!model.channel(where)) return yield* Effect.fail(refused(t("server.channel.channelGone")));
+          const run = helpers?.currentRun(from);
+          if (agents.isOrchestrator(from)) yield* seat(from);
+          const written = yield* write({
+            channel: where,
+            from,
+            kind: "chat",
+            text: text.trim(),
+            meta: { ...(run ? { run } : {}), artifact: card },
+            ...(from === ownerId ? { readBy: ownerId } : {}),
+          });
+          if (from !== ownerId) yield* setRead(from, where, written.number, yield* Clock.currentTimeMillis);
+          return toMessage(written.row);
         }),
       ),
     spoken: (from, text, sendKey) =>

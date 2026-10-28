@@ -10,7 +10,7 @@
     "name": "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）",
     "ownModel": "模型；不填用配置里的",
     "mcp": "MCP 配置文件；不填用家目录里的 mcp.json",
-    "server": "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是 {fallback}",
+    "server": "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
     "dryRun": "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
     "json": "请求体：JSON 文本，- 读标准输入，@文件 读文件",
     "watch": "一直看：每一帧一行 JSON"

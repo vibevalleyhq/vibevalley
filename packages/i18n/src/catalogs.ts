@@ -83,6 +83,7 @@ export const catalogs = {
         channel: "列出频道，找它的 id",
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
+        artifact: "列出产出，找它的 id",
       },
       projectRef: "项目 {id}",
       helperRef: "帮工 {id}",
@@ -120,6 +121,21 @@ export const catalogs = {
       quoted: "「{name}」",
       efforts: "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
       effortsAnd: "、",
+    },
+    "server.artifact": {
+      noTitle: "产出要有个标题",
+      longTitle: "标题太长了，最多 {max} 个字",
+      badKind: "认不得 {kind} 这种产出，只认 {kinds}",
+      empty: "产出是空的",
+      tooBig: "一版最多 {mb} MB",
+      notKept: "产出没存下来：{why}",
+      missing: "没有 {id} 这个产出",
+      noVersion: "「{title}」没有第 {version} 版，最新是第 {latest} 版",
+      noFile: "「{title}」第 {version} 版的内容不见了",
+      made: "做了「{title}」",
+      versioned: "「{title}」出了第 {version} 版",
+      withNote: "{said}：{note}",
+      preview: { remove: "删掉「{title}」和它的 {n} 版", cards: "对话里的卡片还在，点开说已经删掉了" },
     },
     "server.base": {
       noFile: "{path}: 没有这个文件",
@@ -189,7 +205,7 @@ export const catalogs = {
         name: "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）",
         ownModel: "模型；不填用配置里的",
         mcp: "MCP 配置文件；不填用家目录里的 mcp.json",
-        server: "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是 {fallback}",
+        server: "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
         dryRun: "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
         json: "请求体：JSON 文本，- 读标准输入，@文件 读文件",
         watch: "一直看：每一帧一行 JSON",
@@ -1318,6 +1334,24 @@ export const catalogs = {
       runtimeDefaultModel: "runtime 默认（{model}）",
       noEffort: "这个模型没有推理强度可选。",
       noEffortModel: "{model}没有推理强度可选。",
+    },
+    "web.artifact": {
+      place: { label: "产出", hint: "帮工和管家交出来的一页：设计、报告、对比，按版本看" },
+      card: { version: "第 {version} 版", open: "打开「{title}」" },
+      kind: { html: "网页", markdown: "说明" },
+      page: {
+        by: "{name} 做的",
+        updated: "{when}更新",
+        versions: "版本",
+        open: "在新标签页打开",
+        delete: "删掉",
+        deleteAsk: "删掉这个产出和它的每一版？对话里的卡片还在。",
+        deleted: "删掉了「{title}」",
+        gone: "这个产出已经删掉了，或者没有这个产出。",
+        frame: "「{title}」第 {version} 版",
+      },
+      talk: { atMessage: "在对话里", reply: "回复这一版", replyHint: "写给做它的帮工：哪里要改", send: "回复", sent: "回复了第 {version} 版" },
+      issue: { title: "产出" },
     },
     "web.base": {
       place: {
@@ -3596,6 +3630,7 @@ export const catalogs = {
         channel: "List the channels and find its id",
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
+        artifact: "List the artifacts to find its id",
       },
       projectRef: "project {id}",
       helperRef: "helper {id}",
@@ -3633,6 +3668,21 @@ export const catalogs = {
       quoted: '"{name}"',
       efforts: '{runtime} has only the {efforts} thinking efforts, not "{asked}"',
       effortsAnd: " and ",
+    },
+    "server.artifact": {
+      noTitle: "An artifact needs a title",
+      longTitle: "The title is too long: at most {max} characters",
+      badKind: "No artifact of kind {kind}: only {kinds}",
+      empty: "The artifact is empty",
+      tooBig: "A version is at most {mb} MB",
+      notKept: "The artifact was not kept: {why}",
+      missing: "There is no artifact {id}",
+      noVersion: '"{title}" has no version {version}; the latest is {latest}',
+      noFile: 'The content of "{title}" version {version} is gone',
+      made: 'Made "{title}"',
+      versioned: '"{title}" is at version {version}',
+      withNote: "{said}: {note}",
+      preview: { remove: 'Delete "{title}" and its {n} versions', cards: "Its cards stay in the conversation and say it was deleted when opened" },
     },
     "server.base": {
       noFile: "{path}: no such file",
@@ -3702,7 +3752,7 @@ export const catalogs = {
         name: "The own agent's name (its home is ~/.vibevalley/agent/<name>)",
         ownModel: "The model; the configuration's when empty",
         mcp: "The MCP configuration file; mcp.json in the home when empty",
-        server: "The server's address; VIBEVALLEY_SERVER when empty, else {fallback}",
+        server: "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
         dryRun: "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
         json: "The request body: JSON text, - to read stdin, @file to read a file",
         watch: "Keep watching: one JSON line per frame",
@@ -4889,6 +4939,30 @@ export const catalogs = {
       runtimeDefaultModel: "The runtime's default ({model})",
       noEffort: "This model has no effort levels.",
       noEffortModel: "{model} has no effort levels.",
+    },
+    "web.artifact": {
+      place: { label: "Artifacts", hint: "Pages helpers and the orchestrator hand in: designs, reports, comparisons, by version" },
+      card: { version: "Version {version}", open: 'Open "{title}"' },
+      kind: { html: "Page", markdown: "Notes" },
+      page: {
+        by: "Made by {name}",
+        updated: "Updated {when}",
+        versions: "Versions",
+        open: "Open in a new tab",
+        delete: "Delete",
+        deleteAsk: "Delete this artifact and every version? Its cards stay in the conversation.",
+        deleted: 'Deleted "{title}"',
+        gone: "This artifact was deleted, or there is no such artifact.",
+        frame: '"{title}" version {version}',
+      },
+      talk: {
+        atMessage: "In the conversation",
+        reply: "Reply to this version",
+        replyHint: "For the helper who made it: what to change",
+        send: "Reply",
+        sent: "Replied to version {version}",
+      },
+      issue: { title: "Artifacts" },
     },
     "web.base": {
       place: {
@@ -7310,6 +7384,20 @@ export interface Messages {
   "server.agent.template.unreadable": { readonly file: string | number; readonly why: string | number };
   "server.agent.unequip": { readonly holders: string | number };
   "server.archiveRef": { readonly name: string | number };
+  "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
+  "server.artifact.empty": undefined;
+  "server.artifact.longTitle": { readonly max: string | number };
+  "server.artifact.made": { readonly title: string | number };
+  "server.artifact.missing": { readonly id: string | number };
+  "server.artifact.noFile": { readonly title: string | number; readonly version: string | number };
+  "server.artifact.noTitle": undefined;
+  "server.artifact.noVersion": { readonly latest: string | number; readonly title: string | number; readonly version: string | number };
+  "server.artifact.notKept": { readonly why: string | number };
+  "server.artifact.preview.cards": undefined;
+  "server.artifact.preview.remove": { readonly n: string | number; readonly title: string | number };
+  "server.artifact.tooBig": { readonly mb: string | number };
+  "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
+  "server.artifact.withNote": { readonly note: string | number; readonly said: string | number };
   "server.base.homeTaken": { readonly home: string | number };
   "server.base.homeUnlocked": { readonly home: string | number };
   "server.base.noFile": { readonly path: string | number };
@@ -7739,6 +7827,7 @@ export interface Messages {
   "server.lan.wrongCode": undefined;
   "server.lookIn.agent": undefined;
   "server.lookIn.archive": undefined;
+  "server.lookIn.artifact": undefined;
   "server.lookIn.channel": undefined;
   "server.lookIn.cron": undefined;
   "server.lookIn.device": undefined;
@@ -8521,6 +8610,27 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
+  "web.artifact.card.open": { readonly title: string | number };
+  "web.artifact.card.version": { readonly version: string | number };
+  "web.artifact.issue.title": undefined;
+  "web.artifact.kind.html": undefined;
+  "web.artifact.kind.markdown": undefined;
+  "web.artifact.page.by": { readonly name: string | number };
+  "web.artifact.page.delete": undefined;
+  "web.artifact.page.deleteAsk": undefined;
+  "web.artifact.page.deleted": { readonly title: string | number };
+  "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
+  "web.artifact.page.gone": undefined;
+  "web.artifact.page.open": undefined;
+  "web.artifact.page.updated": { readonly when: string | number };
+  "web.artifact.page.versions": undefined;
+  "web.artifact.place.hint": undefined;
+  "web.artifact.place.label": undefined;
+  "web.artifact.talk.atMessage": undefined;
+  "web.artifact.talk.reply": undefined;
+  "web.artifact.talk.replyHint": undefined;
+  "web.artifact.talk.send": undefined;
+  "web.artifact.talk.sent": { readonly version: string | number };
   "web.base.big": { readonly n: string | number };
   "web.base.cast.outfit.farmer": undefined;
   "web.base.cast.outfit.gardener": undefined;

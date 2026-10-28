@@ -180,6 +180,17 @@ export interface Handlers<R = never> {
   /** The thread under a message, made if it has none: its id. */
   readonly "channel.thread.create": (a: { readonly id: string }) => Effect.Effect<string, ApiError, R>;
   readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
+  /** The artifacts announced in a channel or made for an issue, newest first; every one the farm has when neither is given. */
+  readonly "artifact.list": (a: T.ArtifactListRequest) => Effect.Effect<T.Artifact[], ApiError, R>;
+  readonly "artifact.get": (a: { readonly id: string }) => Effect.Effect<T.Artifact, ApiError, R>;
+  /** A version's words, as made: what an agent reads to make the next one. */
+  readonly "artifact.content.get": (a: T.ArtifactReadRequest) => Effect.Effect<T.ArtifactContent, ApiError, R>;
+  /** Makes one, and its maker says so where it is announced, with its card. */
+  readonly "artifact.create": (a: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  /** A new version over the latest; the old ones stay. Announced like the first. */
+  readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  readonly "artifact.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  readonly "artifact.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
   readonly "channel.archive.toggle": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** A channel nothing points at any more, with its threads and messages. */
@@ -347,6 +358,7 @@ const agentDeleteInput = input({ id: Schema.String });
 const memoryDeleteInput = input({ agent: Schema.String, memory: Schema.String });
 const skillDeleteInput = input({ id: Schema.String });
 const lanDeviceDeleteInput = input({ id: Schema.String });
+const artifactDeleteInput = input({ id: Schema.String });
 
 export const endpoints: readonly Endpoint[] = [
   {
@@ -780,6 +792,56 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: S.AttachmentUpload,
     result: S.Attachment,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.list",
+    about: [],
+    input: S.ArtifactListRequest,
+    result: Schema.mutable(Schema.Array(S.Artifact)),
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.Artifact,
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.content.get",
+    about: ["id"],
+    input: S.ArtifactReadRequest,
+    result: S.ArtifactContent,
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.create",
+    about: [],
+    input: S.ArtifactRequest,
+    result: S.Artifact,
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.version.create",
+    about: ["id"],
+    input: S.ArtifactVersionRequest,
+    result: S.Artifact,
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.delete",
+    about: ["id"],
+    input: artifactDeleteInput,
+    result: undefined,
+    can: ["owner", "remote"],
+    dryRun: "artifact.previewDelete",
+  },
+  {
+    op: "artifact.previewDelete",
+    about: ["id"],
+    input: artifactDeleteInput,
+    result: S.Preview,
     can: ["owner", "remote"],
   },
   {

@@ -1,0 +1,35 @@
+{
+  "place": {
+    "label": "Artifacts",
+    "hint": "Pages helpers and the orchestrator hand in: designs, reports, comparisons, by version"
+  },
+  "card": {
+    "version": "Version {version}",
+    "open": "Open \"{title}\""
+  },
+  "kind": {
+    "html": "Page",
+    "markdown": "Notes"
+  },
+  "page": {
+    "by": "Made by {name}",
+    "updated": "Updated {when}",
+    "versions": "Versions",
+    "open": "Open in a new tab",
+    "delete": "Delete",
+    "deleteAsk": "Delete this artifact and every version? Its cards stay in the conversation.",
+    "deleted": "Deleted \"{title}\"",
+    "gone": "This artifact was deleted, or there is no such artifact.",
+    "frame": "\"{title}\" version {version}"
+  },
+  "talk": {
+    "atMessage": "In the conversation",
+    "reply": "Reply to this version",
+    "replyHint": "For the helper who made it: what to change",
+    "send": "Reply",
+    "sent": "Replied to version {version}"
+  },
+  "issue": {
+    "title": "Artifacts"
+  }
+}

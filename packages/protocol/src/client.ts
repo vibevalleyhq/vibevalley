@@ -250,6 +250,24 @@ export class VibeValleyApi {
     },
   };
 
+  readonly artifact = {
+    /** The artifacts announced in a channel or made for an issue, newest first; every one the farm has when neither is given. */
+    list: (a: T.ArtifactListRequest): Promise<T.Artifact[]> => this.call("/api/v1/artifact/list", a) as Promise<T.Artifact[]>,
+    get: (a: { id: string }): Promise<T.Artifact> => this.call("/api/v1/artifact/get", a) as Promise<T.Artifact>,
+    /** Makes one, and its maker says so where it is announced, with its card. */
+    create: (a: T.ArtifactRequest): Promise<T.Artifact> => this.call("/api/v1/artifact/create", a) as Promise<T.Artifact>,
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/artifact/delete", a) as Promise<void>,
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/artifact/previewDelete", a) as Promise<T.Preview>,
+    content: {
+      /** A version's words, as made: what an agent reads to make the next one. */
+      get: (a: T.ArtifactReadRequest): Promise<T.ArtifactContent> => this.call("/api/v1/artifact/content/get", a) as Promise<T.ArtifactContent>,
+    },
+    version: {
+      /** A new version over the latest; the old ones stay. Announced like the first. */
+      create: (a: T.ArtifactVersionRequest): Promise<T.Artifact> => this.call("/api/v1/artifact/version/create", a) as Promise<T.Artifact>,
+    },
+  };
+
   readonly game = {
     achievement: {
       list: (): Promise<T.Achievement[]> => this.call("/api/v1/game/achievement/list", undefined) as Promise<T.Achievement[]>,

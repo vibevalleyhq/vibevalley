@@ -13,7 +13,8 @@
     "archive": "List the manager's archive",
     "channel": "List the channels and find its id",
     "graph": "List the plans and find its id",
-    "memories": "List its memories and find that one's id"
+    "memories": "List its memories and find that one's id",
+    "artifact": "List the artifacts to find its id"
   },
   "projectRef": "project {id}",
   "helperRef": "helper {id}",
