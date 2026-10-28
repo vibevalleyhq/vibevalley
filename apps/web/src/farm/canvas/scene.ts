@@ -49,6 +49,7 @@ import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
+import { orchestratorMood } from "../../base/frame";
 import { prefsNow } from "../../base/prefs";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
@@ -591,7 +592,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     fx.update(dt, store.bedFx, store.rewards, bedOfSession);
 
     // The orchestrator talks and listens; the pet wakes up for a call.
-    const mood = state.orchestrator;
+    const mood = orchestratorMood(state);
     const chosen = prefsNow().orchestratorLook;
     const lookId = chosen !== "farmer" && orchestratorLooks.some((l) => l.id === chosen) && has(`manager-${chosen}`) ? chosen : "farmer";
     const base = lookId === "farmer" ? "manager" : `manager-${lookId}`;

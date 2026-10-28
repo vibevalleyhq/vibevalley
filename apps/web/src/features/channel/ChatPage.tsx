@@ -28,7 +28,7 @@ import {
 } from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
-import { useCore } from "../../base/frame";
+import { orchestratorMood, useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
@@ -387,7 +387,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           </Section>
         </Show>
       </div>
-      <OrchestratorLine mood={core()?.orchestrator ?? "idle"} />
+      <OrchestratorLine mood={orchestratorMood(core())} />
     </aside>
   );
 }
@@ -606,7 +606,7 @@ function Members(props: { channel: Channel }) {
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
         <OrchestratorFace size={28} />
         <span class="flex-1">{chatWording().orchestrator}</span>
-        <span class="text-xs text-muted">{mood[core()?.orchestrator ?? "idle"]}</span>
+        <span class="text-xs text-muted">{mood[orchestratorMood(core())]}</span>
       </div>
       <For each={helpers()} keyed={(h) => h.id}>
         {(h) => (

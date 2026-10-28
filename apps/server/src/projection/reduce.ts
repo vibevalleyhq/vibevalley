@@ -24,9 +24,13 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return [{ ...state, call: f.state, callReason: reason }, true];
     }
     case "orchestrator": {
-      if (state.orchestrator === f.state && state.orchestratorChannel === f.channel) return [state, false];
-      const { orchestratorChannel: _was, ...rest } = state;
-      return [{ ...rest, orchestrator: f.state, ...(f.channel ? { orchestratorChannel: f.channel } : {}) }, true];
+      const was = state.orchestrators?.[f.agent];
+      if ((was?.state ?? "idle") === f.state && was?.channel === f.channel) return [state, false];
+      // At rest it leaves the map: idle is what an orchestrator not in it is.
+      const { [f.agent]: _was, ...others } = state.orchestrators ?? {};
+      const now = f.state === "idle" && !f.channel ? others : { ...others, [f.agent]: { state: f.state, ...(f.channel ? { channel: f.channel } : {}) } };
+      const { orchestrators: _all, ...rest } = state;
+      return [{ ...rest, ...(Object.keys(now).length > 0 ? { orchestrators: now } : {}) }, true];
     }
     case "message": {
       const [chat, news] = withMessage(state.chat, f.message);

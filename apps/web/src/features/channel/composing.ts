@@ -8,6 +8,7 @@ import { type ChatMessage, type Channel, type SayRequest, type WorkspaceState } 
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
+import { orchestratorMood } from "../../base/frame";
 
 export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
   await api.channel.message.send({ id: channel.id, text, agent, sendKey });
@@ -167,6 +168,6 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     focus: () => setClosed(false),
     canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     /** The orchestrator is in a round the owner may stop. */
-    stoppable: () => core()?.orchestrator === "thinking" || core()?.orchestrator === "speaking",
+    stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core())),
   };
 }

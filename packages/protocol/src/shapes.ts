@@ -559,9 +559,8 @@ export interface ChannelReset {
 export interface WorkspaceState {
   call: CallState;
   callReason?: string;
-  orchestrator: OrchestratorState;
-  /** Where the orchestrator is thinking or writing, as its last orchestrator fact says. */
-  orchestratorChannel?: string;
+  /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
+  orchestrators?: Record<string, OrchestratorNow>;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -983,6 +982,8 @@ export interface Skill {
 }
 
 export interface OrchestratorEvalRequest {
+  /** The orchestrator whose log it is, by its profile id; the default one when none is given. */
+  agent?: string;
   on: number;
   want: string;
 }
@@ -2001,9 +2002,18 @@ export interface FactCall {
   reason?: string;
 }
 
+/** What an orchestrator is doing now. */
+export interface OrchestratorNow {
+  state: OrchestratorState;
+  /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
+  channel?: string;
+}
+
 export interface FactOrchestrator {
   type: "orchestrator";
   at: number;
+  /** Its profile id. */
+  agent: string;
   state: OrchestratorState;
   /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
   channel?: string;

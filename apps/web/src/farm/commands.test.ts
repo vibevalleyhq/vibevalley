@@ -61,7 +61,7 @@ function frame(attention: IssueAttention, session: Session = helper): StateFrame
     attention,
   };
   return {
-    state: { call: "idle", orchestrator: "idle", sessions: [session], issues: [issue] },
+    state: { call: "idle", sessions: [session], issues: [issue] },
     inbox: [],
     graphs: [],
     effects: [],

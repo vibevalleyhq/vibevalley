@@ -33,7 +33,7 @@ import { farm } from "../store";
 import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
 import { TurnSteps } from "../../features/session";
-import { useCore } from "../../base/frame";
+import { orchestratorMood, useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";
 import { PxButton, SpriteIcon } from "../../ui/pixel";
@@ -67,7 +67,8 @@ const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
   if (s.call === "connecting") return "connecting";
   if (s.call === "error" || v.problem !== undefined) return "error";
   if (s.call !== "live") return "off";
-  return s.orchestrator === "speaking" ? "speaking" : s.orchestrator === "thinking" ? "thinking" : "listening";
+  const mood = orchestratorMood(s);
+  return mood === "speaking" ? "speaking" : mood === "thinking" ? "thinking" : "listening";
 };
 
 function Dots() {

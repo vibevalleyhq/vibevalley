@@ -176,6 +176,11 @@ export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
 export const OrchestratorState: Codec<T.OrchestratorState> = Schema.Literals(T.OrchestratorStateValues);
 
+export const OrchestratorNow: Codec<T.OrchestratorNow> = Schema.Struct({
+  state: OrchestratorState,
+  channel: Schema.optionalKey(Schema.String),
+});
+
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
 export const MessageKind: Codec<T.MessageKind> = Schema.Literals(T.MessageKindValues);
@@ -700,8 +705,7 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
 export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
-  orchestrator: OrchestratorState,
-  orchestratorChannel: Schema.optionalKey(Schema.String),
+  orchestrators: Schema.optionalKey(Schema.Record(Schema.String, OrchestratorNow)),
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -1236,6 +1240,7 @@ export const Skill: Codec<T.Skill> = Schema.Struct({
 });
 
 export const OrchestratorEvalRequest: Codec<T.OrchestratorEvalRequest> = Schema.Struct({
+  agent: Schema.optionalKey(Schema.String),
   on: Schema.Number,
   want: Schema.String,
 });
@@ -1634,6 +1639,7 @@ export const FactCall: Codec<T.FactCall> = Schema.Struct({
 export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
   type: Schema.Literal("orchestrator"),
   at: Schema.Number,
+  agent: Schema.String,
   state: OrchestratorState,
   channel: Schema.optionalKey(Schema.String),
 });

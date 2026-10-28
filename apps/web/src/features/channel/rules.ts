@@ -207,10 +207,12 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
   });
 }
 
-/** The orchestrator's dots in a channel: it is thinking or writing its answer there, as the server says. */
+/** An orchestrator's dots in a channel: one is thinking or writing its answer there, as the server says. */
 export function orchestratorTyping(state: WorkspaceState | undefined, channel: Channel | undefined): "thinking" | "speaking" | undefined {
-  if (!state || !channel || state.orchestratorChannel !== channel.id) return undefined;
-  return state.orchestrator === "thinking" || state.orchestrator === "speaking" ? state.orchestrator : undefined;
+  if (!channel) return undefined;
+  for (const now of Object.values(state?.orchestrators ?? {}))
+    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking")) return now.state;
+  return undefined;
 }
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();

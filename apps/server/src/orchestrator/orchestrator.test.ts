@@ -189,7 +189,7 @@ describe("the orchestrator", () => {
       // The owner speaking, from any door, opens the farm.
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
-      const kept = readFileSync(join(config.home, "orchestrator", "orchestrator.jsonl"), "utf8");
+      const kept = readFileSync(join(config.home, "agent", "orchestrator", "orchestrator.jsonl"), "utf8");
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/);
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

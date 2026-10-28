@@ -342,7 +342,8 @@ export interface ChannelShape {
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
   /** The orchestrator's words, one whole message each: it shows once said in full. */
-  readonly orchestratorSays: (channel: string, text: string, run: string) => Effect.Effect<void>;
+  /** from: the orchestrator's profile id. */
+  readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
   readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
@@ -369,7 +370,7 @@ export interface ChannelShape {
    * Subscribed before it returns. */
   readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: ChatMessage }>, never, Scope.Scope>;
   /** What came to the orchestrator and does not wake it. */
-  readonly orchestratorDigest: () => Effect.Effect<InboxMessage[]>;
+  readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
@@ -1597,12 +1598,9 @@ export const make = Effect.gen(function* () {
           return written.again;
         }).pipe(Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false))),
       ),
-    orchestratorSays: (channel, text, run) =>
+    orchestratorSays: (channel, text, run, from) =>
       text.trim()
-        ? locked(write({ channel, from: defaultOrchestrator, kind: "chat", text, meta: run ? { run } : {} })).pipe(
-            Effect.asVoid,
-            logged("the orchestrator's words"),
-          )
+        ? locked(write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })).pipe(Effect.asVoid, logged("the orchestrator's words"))
         : Effect.void,
     notice: (channel, text, code) => locked(write({ channel, from: "system", kind: "notice", text, meta: { code } })).pipe(logged("notice")),
     read: (who, opt = {}) =>
@@ -1653,11 +1651,11 @@ export const make = Effect.gen(function* () {
           : Stream.empty,
       ),
     ),
-    orchestratorDigest: () =>
+    orchestratorDigest: (agent) =>
       locked(
         Effect.sync(() =>
           open
-            .of(defaultOrchestrator)
+            .of(agent)
             .filter((r) => !(r.wakes && r.held_by === null))
             .map(asInbox),
         ),
