@@ -206,7 +206,9 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
 4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
 
-**写一个新界面之前**：先找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`Segmented`、`Dialog`、`Field`、`Tip`、`Icon`），有就用，不另写一个长得差不多的。
+**写一个新界面之前**：先找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Tip`、`Icon`、`Dot`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。
+
+**类名怎么拼**：Solid 的 `class` 直接收数组和对象（`class={["h-7 …", { "bg-selected": on }, props.class]}`），不用 clsx。原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。所以不用 tailwind-merge 去合并互相冲突的类：真有要盖的那天，再加一个按我们的令牌配好的 `cn`。
 
 **交之前自己查一遍**：
 
