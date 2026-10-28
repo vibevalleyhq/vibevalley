@@ -51,7 +51,7 @@ function Rail(props: { here?: Place }) {
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
-        <Slot to="/" label={t("web.base.farm")} current fill="#e5a93c">
+        <Slot to="/farm" label={t("web.base.farm")} current fill="#e5a93c">
           <OrchestratorFace size={38} />
         </Slot>
       </div>
@@ -68,7 +68,7 @@ function Rail(props: { here?: Place }) {
         <Slot to={settings.path} label={`${settings.label} · ${settings.hint}`} current={props.here === settings}>
           <PlaceIcon place={settings} />
         </Slot>
-        <Slot to="/" label={t("web.base.farm")}>
+        <Slot to="/farm" label={t("web.base.farm")}>
           <Icon name="farm" size={22} />
         </Slot>
         <span role="status" title={linkWords[frames.link]} class="flex h-4 items-center">
@@ -102,7 +102,7 @@ function Desk(props: { place?: Place }) {
           </>
         )}
       </Show>
-      <A href="/" aria-label={status()} class="flex h-7 items-center gap-1.5 rounded-md border border-line bg-page px-2.5 text-xs hover:bg-hover">
+      <A href="/farm" aria-label={status()} class="flex h-7 items-center gap-1.5 rounded-md border border-line bg-page px-2.5 text-xs hover:bg-hover">
         <span class={["h-2 w-2 rounded-full", live() ? "bg-leaf" : "bg-faint"]} aria-hidden="true" />
         {status()}
       </A>

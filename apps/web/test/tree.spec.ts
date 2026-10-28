@@ -12,7 +12,7 @@ test("the farm's 记忆树 button opens the tree, and 回农场 comes back", asy
   await expect(page).toHaveURL(/\/tree$/);
   await expect(page.getByRole("heading", { name: "农场的记忆树" })).toBeVisible();
   await page.getByRole("button", { name: "回农场" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/farm$/);
 });
 
 test("the tree shows its counts, grows back with the slider, and turns into the sky, without errors", async ({ page }) => {

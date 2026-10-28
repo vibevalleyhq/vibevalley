@@ -35,7 +35,7 @@ test("a device the owner lets in opens the farm through the lan listener", async
     await expect(page.getByRole("status")).toContainText("等那台电脑上的主人点头");
     await expect.poll(async () => (await api.lan.get()).pairing?.asking).toBe("iPhone");
     await api.lan.pairing.answer({ allow: true });
-    await expect(page).toHaveURL(url + "/");
+    await expect(page).toHaveURL(url + "/chat");
     await page.goto(url + "/issues");
     await expect(page.getByRole("region", { name: "待办", exact: true })).toBeVisible();
     await phone.close();

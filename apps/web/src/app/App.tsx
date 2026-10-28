@@ -24,6 +24,7 @@ import { ready, useProjects } from "../base/query";
 import { farmState } from "../farm/store";
 import { useRouter } from "../base/router";
 import { Shell } from "./Shell";
+import { places as placeList } from "./places";
 import { WindowStrip } from "../ui/TitleBar";
 
 type Rest = () => string;
@@ -45,10 +46,10 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
 };
 
 /**
- * `/`: the farm entered last on this machine (trusted while the projects are still coming); without one, the farm of
+ * `/farm`: the farm entered last on this machine (trusted while the projects are still coming); without one, the farm of
  * the project worked on last, so 回农场 always lands on a farm; with no project yet, the farm of the sessions without one.
  */
-function Home() {
+function FarmHome() {
   const projects = useProjects();
   const last = farmState().project;
   const list = () => ready(projects, undefined);
@@ -72,8 +73,13 @@ function Routes() {
   const rest = () => pathname().split("/").slice(2).join("/");
   return (
     <Switch fallback={<Navigate href="/" />}>
+      {/* The workbench first: the farm is a skin over it, a click away. */}
       <Match when={pathname() === "/"}>
-        <Home />
+        <Navigate href={placeList[0]!.path} />
+      </Match>
+      {/* Before the farms by project: /farm/ (empty) is the farm of the sessions without one. */}
+      <Match when={pathname() === "/farm"}>
+        <FarmHome />
       </Match>
       <Match when={place() === "farm"}>
         {/* One farm per project: entering another builds its farm anew. */}

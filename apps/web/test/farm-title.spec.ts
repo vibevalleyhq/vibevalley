@@ -8,7 +8,7 @@ test.use({ farm: "title" });
 
 test("a new farm: 继续游戏 is off, 开始游戏 asks for the key first, 设置 leaves, and the title does not come back", async ({ page }) => {
   await page.clock.install();
-  await page.goto("/?tod=0.9");
+  await page.goto("/farm?tod=0.9");
   const title = page.getByRole("dialog", { name: "码农场物语 首页" });
   await expect(title.getByRole("heading", { name: "码农场物语" })).toBeVisible();
   await expect(title.getByRole("button", { name: "继续游戏" })).toBeDisabled();
@@ -29,7 +29,7 @@ test("with a farm, 继续游戏 is picked and Enter goes in", async ({ page, api
   await api.orchestrator.open();
   await api.channel.message.send({ id: await defaultChannel(api), text: "早", sendKey: "title-test-1" });
   await page.clock.install();
-  await page.goto("/?tod=0.4");
+  await page.goto("/farm?tod=0.4");
   const title = page.getByRole("dialog", { name: "码农场物语 首页" });
   await expect(title.getByRole("button", { name: "继续游戏" })).toBeEnabled();
   await page.clock.runFor(800);
