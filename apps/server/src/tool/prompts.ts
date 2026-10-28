@@ -115,35 +115,36 @@ export function spanWords(ms: number): string {
 }
 
 /** One line: its number and short title first, so the orchestrator names it by them; who is the one doing it, when any. */
-export function issueLine(t: Issue, who: string, now: number): string {
-  const st = t.attention;
+export function issueLine(issue: Issue, who: string, now: number): string {
+  const st = issue.attention;
   const stuck = st.stuck ? "（" + wording().stuck[st.stuck] + "）" : "";
-  const parts = [`#${t.number}「${shortTitle(t.title)}」${wording().attention[st.state]}${stuck}`];
-  if (t.project) parts.push(t.project);
+  const parts = [`#${issue.number}「${shortTitle(issue.title)}」${wording().attention[st.state]}${stuck}`];
+  if (issue.project) parts.push(issue.project);
   if (who) parts.push(who);
-  if (t.priority !== "medium") parts.push(wording().priority[t.priority] + "优先级");
+  if (issue.priority !== "medium") parts.push(wording().priority[issue.priority] + "优先级");
   if (attentionWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
 
 /** One issue in full: what it asks, its criteria as far as they got, what it waits on, and its story, newest first. */
-export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
-  const lines = [issueLine(t, who, now).slice(2)];
-  if (t.title !== shortTitle(t.title) || t.description) lines.push("要做的：" + head([t.title, t.description ?? ""].join("\n").trim(), 600));
-  const criteria = t.criteria ?? [];
+export function issueDetail(issue: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
+  const lines = [issueLine(issue, who, now).slice(2)];
+  if (issue.title !== shortTitle(issue.title) || issue.description)
+    lines.push("要做的：" + head([issue.title, issue.description ?? ""].join("\n").trim(), 600));
+  const criteria = issue.criteria ?? [];
   if (criteria.length > 0) {
     lines.push("验收标准：");
     criteria.forEach((c, i) => {
-      const check = (t.checks ?? []).find((x) => x.criterion === i);
+      const check = (issue.checks ?? []).find((x) => x.criterion === i);
       const mark = check ? { met: "做到了", unmet: "没做到", unsure: "不确定" }[check.result] : "还没说";
       lines.push(`  ${i + 1}. ${c}（${mark}）`);
     });
   }
-  if (t.questions.length > 0) lines.push("在等主人回答：" + t.questions.map((a) => a.question).join("；"));
-  const open = t.findings.filter((f) => !f.resolved);
+  if (issue.questions.length > 0) lines.push("在等主人回答：" + issue.questions.map((a) => a.question).join("；"));
+  const open = issue.findings.filter((f) => !f.resolved);
   if (open.length > 0) lines.push("验收没过要修的：" + open.map((f) => f.text).join("；"));
-  if (t.lastRun?.outcome) lines.push("最后一轮" + wording().outcome[t.lastRun.outcome] + "，在等主人点头");
-  if (t.pullRequest) lines.push(`PR #${t.pullRequest.number}（${t.pullRequest.state}）${t.pullRequest.url}`);
+  if (issue.lastRun?.outcome) lines.push("最后一轮" + wording().outcome[issue.lastRun.outcome] + "，在等主人点头");
+  if (issue.pullRequest) lines.push(`PR #${issue.pullRequest.number}（${issue.pullRequest.state}）${issue.pullRequest.url}`);
   for (const m of (timeline?.milestones ?? []).slice(0, 8)) lines.push(`  · ${spanWords(now - m.at)}前 ${m.who ? m.who + " " : ""}${head(m.text, 120)}`);
   return lines.join("\n");
 }
@@ -156,9 +157,9 @@ export function recurrenceLine(s: Recurrence, channel: string): string {
 
 /** The way JavaScript's Date reads the forms a model writes. */
 export function parseTime(s: string): number | undefined {
-  const t = s.trim();
-  if (t === "") return undefined;
-  const ms = new Date(t).getTime();
+  const text = s.trim();
+  if (text === "") return undefined;
+  const ms = new Date(text).getTime();
   return Number.isNaN(ms) ? undefined : ms;
 }
 

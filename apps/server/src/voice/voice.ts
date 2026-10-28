@@ -134,20 +134,20 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
       }
     }
     let tts: Vendors["tts"];
-    const t = voice.tts;
-    switch (t.vendor) {
+    const item = voice.tts;
+    switch (item.vendor) {
       case "minimax":
-        tts = new MiniMaxTTS({ model: t.model, voiceId: t.voiceId });
+        tts = new MiniMaxTTS({ model: item.model, voiceId: item.voiceId });
         break;
       case "openai":
-        tts = new OpenAITTS({ voice: t.voice });
+        tts = new OpenAITTS({ voice: item.voice });
         break;
       case "microsoft":
         if (!keys.ttsKey) return unavailable(voiceWording().noTtsKey, "voice");
-        tts = new MicrosoftTTS({ key: keys.ttsKey, region: t.region, voiceName: t.voiceName });
+        tts = new MicrosoftTTS({ key: keys.ttsKey, region: item.region, voiceName: item.voiceName });
         break;
       default: {
-        const exhaustive: never = t;
+        const exhaustive: never = item;
         return unavailable(voiceWording().unknown(voiceWording().part.tts, (exhaustive as { vendor: string }).vendor));
       }
     }
@@ -277,7 +277,7 @@ export interface VoiceShape {
 
 /** Agora reads out at most 512 bytes at a time: the words in pieces under that, cut after a sentence where one ends. */
 export function speakPieces(text: string, max = 480): string[] {
-  const bytes = (t: string) => Buffer.byteLength(t, "utf8");
+  const bytes = (text: string) => Buffer.byteLength(text, "utf8");
   const out: string[] = [];
   let rest = text.trim();
   while (rest !== "") {
@@ -481,9 +481,9 @@ export const make = (options: VoiceOptions = {}) =>
     const openTunnel =
       options.tunnel ??
       (async (port: number) => {
-        const t = await cloudflared(port);
-        if (!(await tunnelAnswers(t.url))) logs.info(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
-        return t;
+        const item = await cloudflared(port);
+        if (!(await tunnelAnswers(item.url))) logs.info(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`);
+        return item;
       });
     // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
     let opening: Promise<string> | undefined;
@@ -493,13 +493,13 @@ export const make = (options: VoiceOptions = {}) =>
       closing = undefined;
       if (!tunnel) {
         opening ??= openTunnel(linePort)
-          .then((t) => {
+          .then((item) => {
             if (stopped) {
-              t.close();
+              item.close();
               throw new Error(voiceWording().lineClosed);
             }
-            tunnel = t;
-            return t.url;
+            tunnel = item;
+            return item.url;
           })
           .finally(() => {
             opening = undefined;

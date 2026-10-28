@@ -178,7 +178,7 @@ describe("doc", () => {
           const ack = yield* submit(s, id, "owner", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
           return ack.results[0]!.status === "applied" ? b.id : "";
         });
-        const taken = yield* waitFor(tryTaking, (t) => t !== "", "the owner taking the block over");
+        const taken = yield* waitFor(tryTaking, (item) => item !== "", "the owner taking the block over");
         expect(taken).not.toBe("");
         yield* finished(s);
         const snap = yield* s.get(id);

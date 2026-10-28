@@ -267,8 +267,8 @@ const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" 
 });
 
 const optional = (s: string | undefined) => {
-  const t = (s ?? "").trim();
-  return t === "" ? null : t;
+  const text = (s ?? "").trim();
+  return text === "" ? null : text;
 };
 
 interface ThreadSubject {
@@ -1357,7 +1357,7 @@ export const make = Effect.gen(function* () {
     ].filter(Boolean);
     if (why.length > 0) return yield* Effect.fail(refused(channelWording().inUse(why.join("、"))));
     const threads = model.threadsOf(id);
-    const said = (row.last_number ?? 0) + threads.reduce((n, t) => n + t.reply_count, 0);
+    const said = (row.last_number ?? 0) + threads.reduce((n, thread) => n + thread.reply_count, 0);
     return { target: targetOfChannel(row), threads: threads.length, said };
   });
 
@@ -1801,7 +1801,7 @@ export const make = Effect.gen(function* () {
           for (const [position, each] of (order ?? []).entries()) model.patched(each, { position });
           for (const each of order ?? [id]) yield* publishChannel(each);
           // Its threads are looked after by the same orchestrator: they show the new one too.
-          if (orchestrator !== row.orchestrator) for (const t of model.threadsOf(id)) yield* publishChannel(t.id);
+          if (orchestrator !== row.orchestrator) for (const item of model.threadsOf(id)) yield* publishChannel(item.id);
         }),
       ),
     archive: (id) =>

@@ -33,7 +33,7 @@ const withText: Readonly<Record<string, boolean>> = {
   issue_ref: false,
 };
 
-export const knownType = (t: string) => t in withText;
+export const knownType = (text: string) => text in withText;
 
 export interface Revision {
   readonly block: string;

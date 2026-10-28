@@ -13,11 +13,13 @@ export const tokensOf = (u: { input: number; cacheRead: number; output: number }
 export const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
 /** changed is a prefix_changed's parts, none when the prompt's start was as before. */
-export function usageText(t: EventTokens, changed: readonly string[] = []): string {
-  const prompt = t.cacheRead + t.input;
+export function usageText(tokens: EventTokens, changed: readonly string[] = []): string {
+  const prompt = tokens.cacheRead + tokens.input;
   const w = sessionWording().usage;
   let text =
-    prompt > 0 ? w.cached(Math.trunc((t.cacheRead * 100) / prompt), digits(t.cacheRead), digits(t.input), digits(t.output)) : w.unread(digits(t.output));
+    prompt > 0
+      ? w.cached(Math.trunc((tokens.cacheRead * 100) / prompt), digits(tokens.cacheRead), digits(tokens.input), digits(tokens.output))
+      : w.unread(digits(tokens.output));
   // As the brain's prefix_changed names the parts.
   if (changed.length > 0) text += w.changed(changed.map((n) => w.parts[n] ?? n));
   return text;

@@ -210,20 +210,20 @@ export const taskIssueID = (graph: string, key: string): IssueId => issueId(grap
 
 /** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
-  const was = new Map(before.map((t) => [t.id, t]));
+  const was = new Map(before.map((item) => [item.id, item]));
   const keep = (draft: Draft, closed: Closing | undefined): Issue => {
-    const t = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
-    const old = was.get(t.id);
+    const item = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
+    const old = was.get(item.id);
     if (old) {
-      Object.assign(t, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
-      if (closed !== undefined && old.closedAt !== undefined) t.closedAt = old.closedAt;
+      Object.assign(item, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
+      if (closed !== undefined && old.closedAt !== undefined) item.closedAt = old.closedAt;
     }
-    t.sessions ??= [];
-    delete t.delivered;
-    delete t.canceled;
-    if (closed) Object.assign(t, closed);
-    if (closed !== undefined && t.closedAt === undefined) t.closedAt = now;
-    return t;
+    item.sessions ??= [];
+    delete item.delivered;
+    delete item.canceled;
+    if (closed) Object.assign(item, closed);
+    if (closed !== undefined && item.closedAt === undefined) item.closedAt = now;
+    return item;
   };
   const project = graph.project;
   const out = [
@@ -279,8 +279,8 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
 
 export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
   const issues = state.issues ?? [];
-  const t = issues.find((t) => t.id === id && t.graph);
-  return t ? graphFrom(t, issues) : undefined;
+  const item = issues.find((issue) => issue.id === id && issue.graph);
+  return item ? graphFrom(item, issues) : undefined;
 }
 
 /** How a task graph's issue closes: done with what it delivered, or canceled. */

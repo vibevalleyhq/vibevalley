@@ -165,7 +165,7 @@ const inventory = <T>(
   read: InventoryReader<T> | undefined,
   found: AvailableInstallation,
   cwd: string,
-  entry: (t: T) => InventoryEntry,
+  entry: (item: T) => InventoryEntry,
 ): Effect.Effect<InventoryEntry[] | null> =>
   read
     ? Effect.map(
@@ -356,11 +356,11 @@ export const make = (options: RuntimeOptions = {}) =>
               ...(m.enabled !== undefined ? { enabled: m.enabled } : {}),
             };
           }),
-          inventory(runtime.tools, found, cwd, (t) => ({
-            name: t.name,
-            ...optional("description", t.description),
-            ...optional("source", t.mcpServerId || t.source),
-            ...(t.enabled !== undefined ? { enabled: t.enabled } : {}),
+          inventory(runtime.tools, found, cwd, (item) => ({
+            name: item.name,
+            ...optional("description", item.description),
+            ...optional("source", item.mcpServerId || item.source),
+            ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
           })),
         ],
         { concurrency: "unbounded" },

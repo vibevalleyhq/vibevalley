@@ -144,7 +144,7 @@ export function cueFor(one: Source, cue: RecallCue): RecallCue {
 }
 
 /** Takes the groups best first, one from each in turn (their scores do not compare), leaving out what is nearly one taken. */
-export function interleave<T>(groups: readonly (readonly T[])[], text: (t: T) => string, keep: (t: T) => boolean): T[] {
+export function interleave<T>(groups: readonly (readonly T[])[], text: (item: T) => string, keep: (item: T) => boolean): T[] {
   const out: T[] = [];
   const seen: Set<string>[] = [];
   const texts: string[] = [];
@@ -155,7 +155,7 @@ export function interleave<T>(groups: readonly (readonly T[])[], text: (t: T) =>
       more = true;
       const one = g[rank]!;
       const terms = termsOf(text(one));
-      if (texts.includes(text(one)) || seen.some((t) => memoryLikeness(t, terms) >= 0.8)) continue;
+      if (texts.includes(text(one)) || seen.some((item) => memoryLikeness(item, terms) >= 0.8)) continue;
       if (!keep(one)) continue;
       seen.push(terms);
       texts.push(text(one));

@@ -177,7 +177,7 @@ type Want =
 /** What a session questions of the owner. Its issue's attention says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
 function wantOf(h: Session, state: WorkspaceState): Want | undefined {
-  const issue = h.issue === undefined ? undefined : state.issues?.find((t) => t.id === h.issue && t.sessions.at(-1) === h.id);
+  const issue = h.issue === undefined ? undefined : state.issues?.find((item) => item.id === h.issue && item.sessions.at(-1) === h.id);
   if (!issue) {
     const need = needOf(h);
     switch (need?.kind) {

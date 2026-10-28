@@ -493,7 +493,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const shape: TaskShape = {
       splitIssueOf: (issue, title, steps) =>
-        Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((t) => t.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
+        Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((item) => item.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
       graphs: () => graphsOf(core.state()),
       graph: need,
       comeBack,
@@ -537,7 +537,7 @@ export const make = (options: TaskOptions = {}) =>
       splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
         const state = core.state();
         const session = sessionOf(state, sessionId);
-        const issue = session?.issue ? (state.issues ?? []).find((t) => t.id === session.issue) : undefined;
+        const issue = session?.issue ? (state.issues ?? []).find((item) => item.id === session.issue) : undefined;
         const why = issueSplitRefusal(session, issue, store.isOrchestrator);
         if (why) return yield* Effect.fail(refused(why));
         const tasks = steps.map(freshTask);
@@ -722,4 +722,4 @@ export const make = (options: TaskOptions = {}) =>
 export const layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
 
 /** Issues' startup: the task graphs come back. */
-export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (t) => t.comeBack));
+export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (item) => item.comeBack));

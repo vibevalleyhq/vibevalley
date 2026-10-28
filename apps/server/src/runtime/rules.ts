@@ -135,7 +135,7 @@ export function chooseAgent(candidates: readonly Candidate[], task: string, name
   let bestScore = -1;
   for (const c of candidates) {
     if (!c.usable) continue;
-    const score = (c.agent.tags ?? []).filter((t) => text.includes(t.toLowerCase())).length;
+    const score = (c.agent.tags ?? []).filter((item) => text.includes(item.toLowerCase())).length;
     if (score > bestScore) {
       best = c.agent;
       bestScore = score;

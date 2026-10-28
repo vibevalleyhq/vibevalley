@@ -73,10 +73,10 @@ const int64Max = 9223372036854775807n;
 export function parseChatTarget(target: string): ChatTarget | undefined {
   const direct = chatDirectTarget.exec(target.trim());
   if (direct) return { kind: "direct", peer: chatNamed[direct[1]!] ?? direct[1]! };
-  const t = target.trim().replace(/^#/, "");
-  const m = chatThreadTarget.exec(t);
+  const text = target.trim().replace(/^#/, "");
+  const m = chatThreadTarget.exec(text);
   if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
-  return channelNamePattern.test(t) ? { kind: "channel", name: t } : undefined;
+  return channelNamePattern.test(text) ? { kind: "channel", name: text } : undefined;
 }
 
 export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "direct" | "dispatch" | "addressed" | "graph";

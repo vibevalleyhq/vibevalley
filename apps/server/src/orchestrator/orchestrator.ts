@@ -472,7 +472,9 @@ export const make = (options: OrchestratorOptions = {}) =>
           on,
           want,
           modelId(me.id),
-          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map((t) => t.name),
+          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
+            (item) => item.name,
+          ),
         );
       },
     });

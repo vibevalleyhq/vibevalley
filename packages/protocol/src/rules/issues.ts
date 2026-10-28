@@ -20,7 +20,7 @@ export function shortTitle(text: string): string {
 }
 
 /** What its close says: done with what it delivered, or canceled and why. */
-export const closedText = (t: Pick<Issue, "status" | "delivered" | "canceled">): string => {
+export const closedText = (pick: Pick<Issue, "status" | "delivered" | "canceled">): string => {
   const w = wording();
-  return t.delivered ? w.doneWith(w.delivered[t.delivered]) : t.canceled ? w.canceledFor(w.canceled[t.canceled]) : w.status[t.status];
+  return pick.delivered ? w.doneWith(w.delivered[pick.delivered]) : pick.canceled ? w.canceledFor(w.canceled[pick.canceled]) : w.status[pick.status];
 };

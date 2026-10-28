@@ -178,7 +178,7 @@ export function viewOf(state: WorkspaceState): FarmView {
   for (const h of state.sessions)
     plots[h.id] = plotOf(
       h,
-      (state.issues ?? []).find((t) => t.id === h.issue),
+      (state.issues ?? []).find((item) => item.id === h.issue),
     );
   return { level: farmLevelOf(state), plots, achievements: standingsOf(state.progress) };
 }
@@ -207,8 +207,8 @@ function achievementEffect(id: string, tier: number): GameEffectAchievement {
     const words = achievementInWords(a);
     e.detail = a.detail;
     e.oneOff = a.tiers.length === 1 ? true : undefined;
-    const t = tier >= 1 && tier <= words.tiers.length ? words.tiers[tier - 1] : undefined;
-    if (t) Object.assign(e, { title: t.title, reached: t.reached, coins: t.coins });
+    const item = tier >= 1 && tier <= words.tiers.length ? words.tiers[tier - 1] : undefined;
+    if (item) Object.assign(e, { title: item.title, reached: item.reached, coins: item.coins });
   }
   return e;
 }

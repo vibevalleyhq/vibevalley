@@ -135,8 +135,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
         scope: ownership(k),
       });
     for (const ep of found.data?.episodes ?? []) {
-      const t = ep.summary || ep.episode || "";
-      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? `${ep.subject}：${t}` : t, score: ep.score ?? 0, scope: ownership(ep) });
+      const item = ep.summary || ep.episode || "";
+      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? `${ep.subject}：${item}` : item, score: ep.score ?? 0, scope: ownership(ep) });
     }
     return hits;
   });

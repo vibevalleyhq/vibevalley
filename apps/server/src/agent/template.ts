@@ -70,30 +70,30 @@ const readText = (dir: string, file: string) => (existsSync(join(dir, file)) ? r
 /** A template folder read in the farm's language (English falls back to the Chinese file by file); it throws a
  * TemplateProblem when it is not one. installed is filled in by who lists it. */
 export function readTemplate(dir: string, source: AgentTemplateSource): AgentTemplate {
-  const t = readJson(TemplateFile, dir, "agent.json");
-  if (!t) throw new TemplateProblem(agentWording().template.noFile(join(dir, "agent.json")));
-  if (!idPattern.test(t.id)) throw new TemplateProblem(agentWording().template.badId(join(dir, "agent.json"), t.id));
-  if (t.version < 1) throw new TemplateProblem(agentWording().template.badVersion(join(dir, "agent.json")));
+  const item = readJson(TemplateFile, dir, "agent.json");
+  if (!item) throw new TemplateProblem(agentWording().template.noFile(join(dir, "agent.json")));
+  if (!idPattern.test(item.id)) throw new TemplateProblem(agentWording().template.badId(join(dir, "agent.json"), item.id));
+  if (item.version < 1) throw new TemplateProblem(agentWording().template.badVersion(join(dir, "agent.json")));
   // An orchestrator always runs on VibeValley's own agent: its template names no other runtime.
-  if (t.role === "orchestrator" && t.runtime !== undefined && t.runtime !== orchestratorRuntime)
+  if (item.role === "orchestrator" && item.runtime !== undefined && item.runtime !== orchestratorRuntime)
     throw new TemplateProblem(agentWording().orchestratorRuntime(orchestratorRuntime));
-  if (t.role === "worker" && !t.runtime) throw new TemplateProblem(agentWording().template.noRuntime(join(dir, "agent.json")));
+  if (item.role === "worker" && !item.runtime) throw new TemplateProblem(agentWording().template.noRuntime(join(dir, "agent.json")));
   const en = currentLocale() === "en";
   const words = en ? readJson(WordsFile, dir, "agent.en.json") : undefined;
   const persona = (en ? readText(dir, "persona.en.md") : undefined) ?? readText(dir, "persona.md") ?? "";
-  const look = t.look ?? {};
+  const look = item.look ?? {};
   return {
-    id: t.id,
-    version: t.version,
-    role: t.role,
-    name: words?.name ?? t.name,
-    duty: words?.duty ?? t.duty ?? "",
-    tags: [...(words?.tags ?? t.tags ?? [])],
-    runtime: t.role === "orchestrator" ? orchestratorRuntime : t.runtime!,
-    model: t.model ?? "",
-    effort: t.effort ?? "",
-    personaMode: t.personaMode ?? "append",
-    worktree: t.worktree ?? t.role === "worker",
+    id: item.id,
+    version: item.version,
+    role: item.role,
+    name: words?.name ?? item.name,
+    duty: words?.duty ?? item.duty ?? "",
+    tags: [...(words?.tags ?? item.tags ?? [])],
+    runtime: item.role === "orchestrator" ? orchestratorRuntime : item.runtime!,
+    model: item.model ?? "",
+    effort: item.effort ?? "",
+    personaMode: item.personaMode ?? "append",
+    worktree: item.worktree ?? item.role === "worker",
     look: {
       ...look,
       build: look.build ?? "biped",
@@ -142,36 +142,36 @@ export function copyTemplate(from: string, home: string, id: string) {
 export const removeTemplate = (home: string, id: string) => rmSync(join(addedDir(home), id), { recursive: true, force: true });
 
 /** A new profile from a template, under the id and name given (both free among the profiles). */
-export const profileOf = (t: AgentTemplate, id: string, name: string): Agent => ({
+export const profileOf = (item: AgentTemplate, id: string, name: string): Agent => ({
   id,
   name,
-  role: t.role,
-  duty: t.duty,
+  role: item.role,
+  duty: item.duty,
   enabled: true,
-  runtime: t.runtime,
-  model: t.model,
-  effort: t.effort,
-  persona: t.persona,
-  personaMode: t.personaMode,
+  runtime: item.runtime,
+  model: item.model,
+  effort: item.effort,
+  persona: item.persona,
+  personaMode: item.personaMode,
   skills: [],
   mcpServers: [],
   disallowedTools: [],
   env: {},
   workdir: "",
-  worktree: t.worktree,
-  tags: [...t.tags],
-  look: structuredClone(t.look),
-  from: { template: t.id, version: t.version },
+  worktree: item.worktree,
+  tags: [...item.tags],
+  look: structuredClone(item.look),
+  from: { template: item.id, version: item.version },
 });
 
 /** A profile made again from its template's version now: what the template says of the work (duty, tags, persona and
  * how it is given) is replaced; its name, look, machine and model, and what is this machine's, stay. */
-export const updatedFrom = (t: AgentTemplate, a: Agent): Agent => ({
+export const updatedFrom = (item: AgentTemplate, a: Agent): Agent => ({
   ...a,
-  duty: t.duty,
-  tags: [...t.tags],
-  persona: t.persona,
-  personaMode: t.personaMode,
-  worktree: t.worktree,
-  from: { template: t.id, version: t.version },
+  duty: item.duty,
+  tags: [...item.tags],
+  persona: item.persona,
+  personaMode: item.personaMode,
+  worktree: item.worktree,
+  from: { template: item.id, version: item.version },
 });

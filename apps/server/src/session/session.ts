@@ -448,7 +448,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       return token;
     };
     const revokeToken = (session: string) => void tokens.delete(session);
-    const who = (token: string) => [...tokens.entries()].find(([, t]) => t === token)?.[0] ?? "";
+    const who = (token: string) => [...tokens.entries()].find(([, item]) => item === token)?.[0] ?? "";
 
     // A session's own row keeps what taking it up again needs, so it goes with the database: one made again from a new
     // schema brings back no session (and none on an issue the database no longer has).

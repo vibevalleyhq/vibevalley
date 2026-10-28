@@ -159,25 +159,26 @@ export const make = Effect.gen(function* () {
   const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<Issue | string> {
     const k = key.trim().replace(/^#/, "");
     const all = yield* issue.list();
-    if (/^\d+$/.test(k)) return all.find((t) => t.number === Number(k)) ?? answers.noIssueNumber(k);
-    const byId = all.find((t) => t.id === k);
+    if (/^\d+$/.test(k)) return all.find((item) => item.number === Number(k)) ?? answers.noIssueNumber(k);
+    const byId = all.find((item) => item.id === k);
     if (byId) return byId;
     const w = findSession(k);
-    const of = w?.session.issue ? all.find((t) => t.id === w.session.issue) : undefined;
+    const of = w?.session.issue ? all.find((item) => item.id === w.session.issue) : undefined;
     return of ?? answers.noIssueOrAgent(k);
   });
-  const withIssue = <E>(key: string, f: (t: Issue) => Effect.Effect<string, E>) =>
-    Effect.flatMap(findIssue(key), (t) => (typeof t === "string" ? Effect.succeed(t) : f(t)));
-  const issueTool = <E>(op: IssueTool, f: (t: Issue) => Effect.Effect<string, E>) => tool(op, descriptions[op], (p) => withIssue(p.id, f));
+  const withIssue = <E>(key: string, f: (issue: Issue) => Effect.Effect<string, E>) =>
+    Effect.flatMap(findIssue(key), (item) => (typeof item === "string" ? Effect.succeed(item) : f(item)));
+  const issueTool = <E>(op: IssueTool, f: (issue: Issue) => Effect.Effect<string, E>) => tool(op, descriptions[op], (p) => withIssue(p.id, f));
   /** The helper on the farm working the issue now, if any: its newest session. */
-  const workerOf = (t: Issue) => {
-    const last = t.sessions.at(-1);
+  const workerOf = (issue: Issue) => {
+    const last = issue.sessions.at(-1);
     return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
   };
-  const whoOf = (t: Issue) =>
-    workerOf(t)?.session.name ?? (t.assignee === defaultOrchestrator ? ownerAgentWord : t.assignee ? (agents.agent(t.assignee)?.name ?? "") : "");
-  const nobodyOn = (t: Issue) => answers.nobodyOn(t.number);
-  const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((t) => t.id === w.session.issue)?.number : undefined);
+  const whoOf = (issue: Issue) =>
+    workerOf(issue)?.session.name ??
+    (issue.assignee === defaultOrchestrator ? ownerAgentWord : issue.assignee ? (agents.agent(issue.assignee)?.name ?? "") : "");
+  const nobodyOn = (issue: Issue) => answers.nobodyOn(issue.number);
+  const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((item) => item.id === w.session.issue)?.number : undefined);
 
   // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
   const participant = (c: Caller) => c.session || c.agent;
@@ -231,11 +232,11 @@ export const make = Effect.gen(function* () {
 
   const issueGet = issueTool(
     "issue.get",
-    Effect.fn("Tools.issueGet")(function* (t: Issue) {
-      const w = workerOf(t);
-      const timeline = yield* Effect.orElseSucceed(issue.timeline(t.id), () => undefined);
-      const lines = [issueDetail(t, whoOf(t), timeline, clock.currentTimeMillisUnsafe())];
-      if (w) lines.push(sessionLine(w, clock.currentTimeMillisUnsafe(), t.number), answers.check.workdir(w.place.cwd), answers.check.lastReport(w.lastText));
+    Effect.fn("Tools.issueGet")(function* (item: Issue) {
+      const w = workerOf(item);
+      const timeline = yield* Effect.orElseSucceed(issue.timeline(item.id), () => undefined);
+      const lines = [issueDetail(item, whoOf(item), timeline, clock.currentTimeMillisUnsafe())];
+      if (w) lines.push(sessionLine(w, clock.currentTimeMillisUnsafe(), item.number), answers.check.workdir(w.place.cwd), answers.check.lastReport(w.lastText));
       return lines.join("\n");
     }),
   );
@@ -244,9 +245,9 @@ export const make = Effect.gen(function* () {
     issueTool(
       "issue.diff.get",
       Effect.fn("Tools.issueDiff")(
-        function* (t: Issue) {
+        function* (item: Issue) {
           const c = yield* callerOf(who);
-          return changesText(yield* issue.changes(t.id, c.actor));
+          return changesText(yield* issue.changes(item.id, c.actor));
         },
         Effect.catch((e) => Effect.succeed(answers.changes.failed(said(e)))),
       ),
@@ -350,8 +351,8 @@ export const make = Effect.gen(function* () {
     "issue.review",
     descriptions["issue.review"],
     Effect.fn("Tools.issueReview")(function* (p: Orchestrator<"issue.review">) {
-      return yield* withIssue(p.id, (t) =>
-        issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }).pipe(
+      return yield* withIssue(p.id, (item) =>
+        issue.review(item.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }).pipe(
           Effect.map((done) => (p.pass ? answers.accept.passed(done.number) : answers.accept.failed(done.number, openFindings(done)))),
           Effect.catch((e) => Effect.succeed(said(e))),
         ),
@@ -365,11 +366,11 @@ export const make = Effect.gen(function* () {
       descriptions["issue.comment.create"],
       Effect.fn("Tools.issueComment")(function* (p: Orchestrator<"issue.comment.create">) {
         const c = yield* callerOf(who);
-        return yield* withIssue(p.id, (t) => {
-          const w = workerOf(t);
-          if (!w) return Effect.succeed(nobodyOn(t));
+        return yield* withIssue(p.id, (item) => {
+          const w = workerOf(item);
+          if (!w) return Effect.succeed(nobodyOn(item));
           return chat.tellSession(participant(c), w.session.id, p.text, "").pipe(
-            Effect.as(answers.tell.told(t.number, w.session.name)),
+            Effect.as(answers.tell.told(item.number, w.session.name)),
             Effect.catch((e) => Effect.succeed(answers.tell.failed(said(e)))),
           );
         });
@@ -380,10 +381,10 @@ export const make = Effect.gen(function* () {
     issueTool(
       "session.stop",
       Effect.fn("Tools.sessionStop")(
-        function* (t: Issue) {
+        function* (item: Issue) {
           yield* callerOf(who);
-          yield* issue.stop(t.id);
-          return answers.stop.stopped(t.number);
+          yield* issue.stop(item.id);
+          return answers.stop.stopped(item.number);
         },
         Effect.catch((e) => Effect.succeed(said(e))),
       ),
@@ -403,7 +404,7 @@ export const make = Effect.gen(function* () {
       return (
         found
           .slice(0, limit)
-          .map((t) => issueLine(t, whoOf(t), now))
+          .map((item) => issueLine(item, whoOf(item), now))
           .join("\n") + more
       );
     }),
@@ -445,11 +446,11 @@ export const make = Effect.gen(function* () {
           }),
         );
         if (added._tag === "Failure") return answers.issueCreate.notRecordedFailed(said(added.failure));
-        const t = added.success;
-        const noted = answers.issueCreate.noted(t.number, shortTitle(t.title), t.deliver === "answer");
+        const item = added.success;
+        const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
         if (p.start) {
           // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
-          const started = yield* Effect.result(issue.start(t.id, channel.id));
+          const started = yield* Effect.result(issue.start(item.id, channel.id));
           if (started._tag === "Failure") return answers.issueCreate.queuedNoStart(noted, said(started.failure));
           const sent = started.success;
           if (sent.queued) return answers.issueCreate.queuedInChannel(noted, channel.name, sent.queued);
@@ -464,7 +465,7 @@ export const make = Effect.gen(function* () {
           );
         }
         if (!p.draft) return answers.issueCreate.inBacklog(noted, answers.issueCreate.notStartedNote);
-        const refined = yield* issue.refine(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id).pipe(
+        const refined = yield* issue.refine(item.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id).pipe(
           Effect.as(answers.issueCreate.draftingNote),
           Effect.catch((e) => Effect.succeed(answers.issueCreate.draftFailed(said(e)))),
         );
@@ -478,7 +479,7 @@ export const make = Effect.gen(function* () {
       descriptions["issue.update"],
       Effect.fn("Tools.issueUpdate")(function* (p: Orchestrator<"issue.update">) {
         const c = yield* callerOf(who);
-        return yield* withIssue(p.id, (t) => {
+        return yield* withIssue(p.id, (item) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
           if (p.priority && !priority) return Effect.succeed(noSuchPriority(p.priority));
           let assignee: string | undefined;
@@ -489,7 +490,7 @@ export const make = Effect.gen(function* () {
           }
           return issue
             .edit(
-              t.id,
+              item.id,
               {
                 ...(p.title !== undefined ? { title: p.title } : {}),
                 ...(p.description !== undefined ? { description: p.description } : {}),
@@ -520,15 +521,15 @@ export const make = Effect.gen(function* () {
         return yield* withIssue(
           p.id,
           Effect.fnUntraced(
-            function* (t: Issue) {
+            function* (item: Issue) {
               // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
               let agent: string | undefined;
-              if (p.assignee || (to === "todo" && t.status === "backlog" && !t.assignee)) {
-                const chosen = yield* choose(t.title + "\n" + (t.description ?? ""), p.assignee ?? "", p.assignee ? "" : c.picked);
+              if (p.assignee || (to === "todo" && item.status === "backlog" && !item.assignee)) {
+                const chosen = yield* choose(item.title + "\n" + (item.description ?? ""), p.assignee ?? "", p.assignee ? "" : c.picked);
                 if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
-              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, agent ? { assignee: agent } : {});
+              const done = yield* issue.setStatus(item.id, to, p.text ?? "", c.here, c.actor, agent ? { assignee: agent } : {});
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);
@@ -703,15 +704,15 @@ export const make = Effect.gen(function* () {
       sessionDescriptions["issue.split"](maxTasks),
       Effect.fn("Tools.issueSplit")(function* (p: Session<"issue.split">) {
         const c = yield* callerOf(who);
-        const steps = (p.tasks ?? []).map((t) => ({
-          id: t.id,
-          title: t.title ?? "",
-          brief: t.brief,
-          ...(t.needs ? { needs: t.needs } : {}),
-          agent: t.agent ?? "",
-          check: t.check ?? "",
-          ...(t.scope ? { scope: t.scope } : {}),
-          ...(t.acceptance ? { acceptance: true } : {}),
+        const steps = (p.tasks ?? []).map((item) => ({
+          id: item.id,
+          title: item.title ?? "",
+          brief: item.brief,
+          ...(item.needs ? { needs: item.needs } : {}),
+          agent: item.agent ?? "",
+          check: item.check ?? "",
+          ...(item.scope ? { scope: item.scope } : {}),
+          ...(item.acceptance ? { acceptance: true } : {}),
         }));
         return yield* answered(tasks.splitIssue(c.session, p.title ?? "", steps));
       }),

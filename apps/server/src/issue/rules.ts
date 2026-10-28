@@ -26,11 +26,11 @@ import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 
 /** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's job ends with the block parseAnswer reads. */
-export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
-  let job = t.title;
-  if (t.description) job += "\n\n" + t.description;
-  if (t.criteria && t.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + t.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
-  return t.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
+export function issueJob(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
+  let job = pick.title;
+  if (pick.description) job += "\n\n" + pick.description;
+  if (pick.criteria && pick.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  return pick.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
 }
 
 /** 接着修 for an answer that could not be read; cureWords is the one for a failed round. */
@@ -186,7 +186,7 @@ export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): 
 }
 
 export const filledKinds = (kinds: readonly TemplateKind[], stack: Partial<ProjectStack>): TemplateKind[] =>
-  kinds.map((k) => ({ ...k, templates: k.templates.map((t) => filledTemplate(t, stack)) }));
+  kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): TemplateBlank | undefined {
   const start = text.indexOf("〔");
@@ -195,9 +195,9 @@ function firstBlank(text: string): TemplateBlank | undefined {
   return end < 0 ? undefined : { start, end: end + 1 };
 }
 
-function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
+function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {
   const w = issueWording().timeline;
-  switch (t.kind) {
+  switch (trigger.kind) {
     case "refine":
       return ["started", w.refine];
     case "comment":
@@ -207,7 +207,7 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
     case "task":
       return ["started", w.graph];
     case "recurrence":
-      return ["started", w.recurrence(t.missed ?? false)];
+      return ["started", w.recurrence(trigger.missed ?? false)];
     case "runtime":
       return ["started", w.runtime];
   }
@@ -215,9 +215,9 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
 
 /** runs oldest first; names: a session's name by its id. The milestones come newest first, the questions it waits on now
  * with its last run. */
-export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
+export function milestonesOf(issue: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
   const w = issueWording().timeline;
-  const out: Milestone[] = [{ at: t.createdAt, kind: "opened", text: w.opened }];
+  const out: Milestone[] = [{ at: issue.createdAt, kind: "opened", text: w.opened }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
   runs.forEach((r, i) => {
     const who = names.get(r.session);
@@ -229,7 +229,8 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
     const said = r.summary ? w.said(r.summary) : "";
     switch (r.outcome) {
       case "completed":
-        if (i === lastDone && t.questions.length > 0) out.push({ at: r.endedAt, kind: "asked", ...by, text: w.asked(t.questions.map((a) => a.question)) });
+        if (i === lastDone && issue.questions.length > 0)
+          out.push({ at: r.endedAt, kind: "asked", ...by, text: w.asked(issue.questions.map((a) => a.question)) });
         else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? w.refined : w.reported) + said });
         break;
       case "failed":
@@ -241,10 +242,10 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
     }
   });
   const sentBack = new Map<number, string[]>();
-  for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
+  for (const f of issue.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
   for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: w.rejected(lines) });
-  if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: w.accepted });
-  if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: closedText(t) });
+  if (issue.reviewedAt !== undefined) out.push({ at: issue.reviewedAt, kind: "accepted", text: w.accepted });
+  if (issue.closedAt !== undefined) out.push({ at: issue.closedAt, kind: "closed", text: closedText(issue) });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
     .map((m, i) => [m, i] as const)
@@ -279,8 +280,8 @@ export const findingsOf = (text: string) =>
 export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
 
 export const nullText = (s: string | undefined) => {
-  const t = (s ?? "").trim();
-  return t === "" ? null : t;
+  const text = (s ?? "").trim();
+  return text === "" ? null : text;
 };
 
 export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);
@@ -293,11 +294,11 @@ export function pickIssues(all: readonly Issue[], f: IssueFilter, now: number): 
   const words = (f.text ?? "").split(spaces).filter(Boolean);
   const project = (f.project ?? "").trim();
   let found = all.filter(
-    (t) =>
-      (f.status ? t.status === f.status : f.closed || (t.status !== "done" && t.status !== "canceled")) &&
-      (!f.wantsOwner || attentionWantsOwner(t.attention.state)) &&
-      (!project || t.project === project) &&
-      words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
+    (item) =>
+      (f.status ? item.status === f.status : f.closed || (item.status !== "done" && item.status !== "canceled")) &&
+      (!f.wantsOwner || attentionWantsOwner(item.attention.state)) &&
+      (!project || item.project === project) &&
+      words.every((w) => (item.title + "\n" + (item.description ?? "")).includes(w)),
   );
   if (f.wantsOwner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
   return f.limit && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
