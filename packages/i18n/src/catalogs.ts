@@ -1656,6 +1656,7 @@ export const catalogs = {
         everyone: "所有人",
         everyoneNote: "叫醒在场的每个帮工",
       },
+      threadWidth: "串的宽窄（拖动，双击回默认）",
     },
     "web.connector": {
       connectors: {
@@ -3156,6 +3157,7 @@ export const catalogs = {
         dictation: "听写",
         chat: "聊天软件",
         devices: "设备",
+        width: "导航的宽窄（拖动，双击回默认）",
       },
       groups: { options: "选项", helpers: "帮工", voice: "语音", connect: "连接" },
       words: {
@@ -5206,6 +5208,7 @@ export const catalogs = {
         everyone: "Everyone",
         everyoneNote: "wakes every helper here",
       },
+      threadWidth: "Thread width (drag; double-click for the default)",
     },
     "web.connector": {
       connectors: {
@@ -6786,6 +6789,7 @@ export const catalogs = {
         dictation: "Dictation",
         chat: "Chat apps",
         devices: "Devices",
+        width: "Navigation width (drag; double-click for the default)",
       },
       groups: { options: "Options", helpers: "Helpers", voice: "Voice", connect: "Connections" },
       words: {
@@ -8798,6 +8802,7 @@ export interface Messages {
   "web.channel.threadList.rename": { readonly title: string | number };
   "web.channel.threadList.title": undefined;
   "web.channel.threadList.unarchive": { readonly title: string | number };
+  "web.channel.threadWidth": undefined;
   "web.channel.tools.edit": undefined;
   "web.channel.tools.editHint": undefined;
   "web.channel.tools.label": undefined;
@@ -10336,6 +10341,7 @@ export interface Messages {
   "web.setting.nav.models": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
+  "web.setting.nav.width": undefined;
   "web.setting.scope.device": undefined;
   "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };

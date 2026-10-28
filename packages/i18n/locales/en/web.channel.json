@@ -227,5 +227,6 @@
     "orchestratorNote": "sends work, splits plans, answers how it goes",
     "everyone": "Everyone",
     "everyoneNote": "wakes every helper here"
-  }
+  },
+  "threadWidth": "Thread width (drag; double-click for the default)"
 }

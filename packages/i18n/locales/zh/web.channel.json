@@ -227,5 +227,6 @@
     "orchestratorNote": "派活、拆计划、问进度",
     "everyone": "所有人",
     "everyoneNote": "叫醒在场的每个帮工"
-  }
+  },
+  "threadWidth": "串的宽窄（拖动，双击回默认）"
 }

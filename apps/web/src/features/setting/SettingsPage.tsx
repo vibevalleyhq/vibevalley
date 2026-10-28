@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // link lands on it; the chosen one on the right, as groups of rows (ui/settings.tsx). The search keeps the sections
 // whose name or words hold it, and lights the rows that do.
 
+import { Splitter, usePaneWidth } from "../../ui/Splitter";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { IconName } from "../../ui/icons";
 import { SkillsPage } from "../runtime";
@@ -54,12 +55,20 @@ export function SettingsPage(props: { rest: string }) {
   const section = () => sections.find((s) => s.id === parts()[0]);
   const id = () => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined);
   const shown = (g: Group) => sections.filter((s) => s.group === g && (q() === "" || matches(q(), s.label, s.words)));
+  const navWidth = usePaneWidth("settingsNav", 224, 176, 360);
   return (
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
         <SettingsSearch value={q}>
           <div class="flex h-full min-h-0 flex-col md:flex-row">
-            <nav aria-label={t("web.setting.nav.label")} class="flex shrink-0 flex-col gap-4 border-line p-3 md:w-56 md:overflow-y-auto md:border-r">
+            <nav
+              aria-label={t("web.setting.nav.label")}
+              class="relative flex shrink-0 flex-col gap-4 border-line p-3 md:w-(--pane-w) md:overflow-y-auto md:border-r"
+              style={{ "--pane-w": `${navWidth()}px` }}
+            >
+              <div class="hidden md:block">
+                <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
+              </div>
               <TextInput
                 type="search"
                 aria-label={t("web.setting.nav.search")}

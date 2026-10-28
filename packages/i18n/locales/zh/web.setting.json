@@ -52,7 +52,8 @@
     "call": "通话线路",
     "dictation": "听写",
     "chat": "聊天软件",
-    "devices": "设备"
+    "devices": "设备",
+    "width": "导航的宽窄（拖动，双击回默认）"
   },
   "groups": {
     "options": "选项",

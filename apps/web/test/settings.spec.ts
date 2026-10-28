@@ -158,3 +158,19 @@ test("设置 as it looks", async ({ page }) => {
     await page.screenshot({ path: test.info().outputPath(`settings-${part}.png`) });
   }
 });
+
+test("the settings navigation is as wide as it was dragged, on this machine, until a double click puts it back", async ({ page }) => {
+  await page.goto("/settings/general");
+  const edge = page.getByRole("separator", { name: "导航的宽窄（拖动，双击回默认）" });
+  await expect(edge).toHaveAttribute("aria-valuenow", "224");
+  await edge.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(edge).toHaveAttribute("aria-valuenow", "256");
+  const nav = page.getByRole("navigation", { name: "设置" });
+  expect(Math.round((await nav.boundingBox())!.width)).toBe(256);
+  await page.reload();
+  await expect(edge).toHaveAttribute("aria-valuenow", "256");
+  await edge.dblclick();
+  await expect(edge).toHaveAttribute("aria-valuenow", "224");
+});
