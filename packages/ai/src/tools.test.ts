@@ -1,10 +1,11 @@
 import { expect, it } from "@effect/vitest";
 import { Exit, Schema } from "effect";
-import { goldenCases, jsonDiff } from "../testing/golden.ts";
+import { join } from "node:path";
+import { goldenCasesAt, jsonDiff } from "@vibevalley/testkit/golden";
 import { coerceArguments, parametersOf, toolArguments } from "./tools.ts";
 
 // Recorded from pi-ai 1.3.0's validateToolArguments: what it made of each tool's arguments, or that it refused them.
-const cases = goldenCases("ai", "arguments.jsonl.gz");
+const cases = goldenCasesAt(join(import.meta.dirname, "testdata", "arguments.jsonl.gz"));
 
 const optional = Schema.optionalKey;
 /** The Schema each recorded JSON Schema was written for. */

@@ -1,5 +1,5 @@
-import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "../../ai/messages.ts";
-import { type Answer, answer, assistantMessage, text, toolCall } from "../../ai/testing.ts";
+import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
+import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import * as engine from "./agentTask.ts";
@@ -12,7 +12,7 @@ import { SessionFile } from "./session.ts";
 import { makeTaskRunner } from "./agentTaskTools.ts";
 import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
 import { textTool } from "./tool.ts";
-import { objectSchema } from "../../ai/tools.ts";
+import { objectSchema } from "@vibevalley/ai/tools";
 import { wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];

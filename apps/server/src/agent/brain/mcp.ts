@@ -8,7 +8,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "./config.ts";
 import { textTool } from "./tool.ts";
-import type { JsonSchema } from "../../ai/tools.ts";
+import type { JsonSchema } from "@vibevalley/ai/tools";
 import { afterRealTime } from "./realTime.ts";
 import { mcp as mcpWords } from "./prompts.ts";
 

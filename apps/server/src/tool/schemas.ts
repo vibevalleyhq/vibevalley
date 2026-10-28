@@ -5,7 +5,7 @@
 
 import { Schema } from "effect";
 import type { Handlers } from "@vibevalley/protocol/api";
-import type { JsonSchema } from "../ai/tools.ts";
+import type { JsonSchema } from "@vibevalley/ai/tools";
 import { params } from "./prompts.ts";
 
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */

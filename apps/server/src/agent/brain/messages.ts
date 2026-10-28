@@ -1,7 +1,7 @@
 // The roles as pi-coding-agent names them, `custom` and `compactionSummary`, so its transcripts (through oar) read the
 // same; the model reads both as a user's words.
 
-import type { Context, ImageContent, Message, TextContent, ToolDeclaration, UserMessage } from "../../ai/messages.ts";
+import type { Context, ImageContent, Message, TextContent, ToolDeclaration, UserMessage } from "@vibevalley/ai/messages";
 import type { AgentMessage } from "../loop/agent.ts";
 import { imagePlaceholder, summary as summaryWords, transcript as transcriptWords } from "./prompts.ts";
 

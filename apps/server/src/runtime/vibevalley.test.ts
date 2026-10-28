@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
-import { answer, text as words, toolCall } from "../ai/testing.ts";
+import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { standaloneOwner } from "../agent/brain/agent.ts";
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until } from "../agent/brain/testing.ts";
 import { wallTime } from "../base/time.ts";

@@ -2,7 +2,7 @@
 // message begins, so a tool call and its result stay together.
 
 import { Effect } from "effect";
-import type { ToolDeclaration, Usage } from "../../ai/messages.ts";
+import type { ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 import { complete, type LLM } from "./config.ts";
 import { archive } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, requestContext, transcript } from "./messages.ts";

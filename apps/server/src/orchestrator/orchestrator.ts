@@ -21,7 +21,7 @@ import { Agents } from "../agent/agent.ts";
 import { traitsOf } from "../agent/prompts.ts";
 import { defaultModel, type LLM } from "../agent/brain/config.ts";
 import { modelClient, noDeepSeekKey } from "../agent/model.ts";
-import { Llm } from "../ai/llm.ts";
+import { Llm } from "@vibevalley/ai/llm";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { agentHome, projectsDir, Settings } from "../base/config.ts";

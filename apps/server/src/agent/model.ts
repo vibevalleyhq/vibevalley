@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 // The model a farm agent talks to: agent/brain's deepseek, with a missing key said to the owner.
 
-import type { LlmShape } from "../ai/llm.ts";
+import type { LlmShape } from "@vibevalley/ai/llm";
 import { deepseek, type LLM, MissingKey } from "./brain/config.ts";
 
 /** Where to put a key, in the owner's words. */

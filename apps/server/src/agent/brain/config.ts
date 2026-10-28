@@ -3,10 +3,10 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { type Effect, Schema } from "effect";
-import type { LlmShape } from "../../ai/llm.ts";
-import type { AssistantMessage, Context } from "../../ai/messages.ts";
-import { getModel, type Model, models } from "../../ai/models.ts";
-import type { RequestOptions } from "../../ai/request.ts";
+import type { LlmShape } from "@vibevalley/ai/llm";
+import type { AssistantMessage, Context } from "@vibevalley/ai/messages";
+import { getModel, type Model, models } from "@vibevalley/ai/models";
+import type { RequestOptions } from "@vibevalley/ai/request";
 import { mcpConfig } from "./prompts.ts";
 
 export const defaultModel = "deepseek-flash";

@@ -12,7 +12,7 @@ import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { modelClient } from "../agent/model.ts";
-import { Llm } from "../ai/llm.ts";
+import { Llm } from "@vibevalley/ai/llm";
 import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";

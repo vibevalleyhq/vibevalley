@@ -6,8 +6,8 @@
 
 import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
 import { join } from "node:path";
-import type { ToolCall, ToolDeclaration, Usage } from "../../ai/messages.ts";
-import type { ThinkingLevel } from "../../ai/models.ts";
+import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
+import type { ThinkingLevel } from "@vibevalley/ai/models";
 import { type Agent, type AgentEvent, make, type Tool } from "../loop/agent.ts";
 import { finished, type AgentTask } from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";

@@ -15,7 +15,7 @@ import { Agents } from "../agent/agent.ts";
 import type { Actor } from "../base/actor.ts";
 import { effectTool } from "../agent/brain/tool.ts";
 import type { Tool } from "../agent/loop/agent.ts";
-import type { JsonSchema } from "../ai/tools.ts";
+import type { JsonSchema } from "@vibevalley/ai/tools";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
 import { Docs } from "../doc/doc.ts";
 import { type ApiError, reasonOf } from "../errors.ts";

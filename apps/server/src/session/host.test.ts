@@ -4,7 +4,7 @@ import { testConfig } from "../testing/layers.ts";
 import { aTurn, until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { scriptedLLM } from "../agent/brain/testing.ts";
-import { answer, text, toolCall } from "../ai/testing.ts";
+import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";
 

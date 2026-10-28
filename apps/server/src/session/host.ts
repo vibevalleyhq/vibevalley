@@ -9,7 +9,7 @@ import { t } from "@vibevalley/i18n";
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Usage } from "../ai/messages.ts";
+import type { Usage } from "@vibevalley/ai/messages";
 import type { Tool } from "../agent/loop/agent.ts";
 import type { OrchestratorState } from "@vibevalley/protocol";
 import { Effect, type Scope } from "effect";

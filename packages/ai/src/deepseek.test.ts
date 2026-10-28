@@ -1,5 +1,6 @@
 import { expect, it } from "@effect/vitest";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { join } from "node:path";
+import { checkCases, goldenCasesAt } from "@vibevalley/testkit/golden";
 import type { Context, Message, ToolDeclaration } from "./messages.ts";
 import { models, type ThinkingLevel } from "./models.ts";
 import { requestBody } from "./request.ts";
@@ -7,7 +8,7 @@ import { responseOf } from "./response.ts";
 
 // First recorded from pi-ai 1.3.0's openai-completions, which this replaces: a change in what a request says or how a
 // stream is read shows here.
-const cases = goldenCases("ai", "deepseek.jsonl.gz");
+const cases = goldenCasesAt(join(import.meta.dirname, "testdata", "deepseek.jsonl.gz"));
 const model = (id: string) => models.find((m) => m.id === id)!;
 
 /** The recorded input leads with pi-ai's system message, holding the prompt and the tools. */

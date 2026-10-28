@@ -11,8 +11,8 @@ import { type BrainMessage, type CompactionSummaryMessage, messageText, userMess
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
 import { stopped, textTool } from "./tool.ts";
-import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "../../ai/testing.ts";
-import { objectSchema } from "../../ai/tools.ts";
+import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
+import { objectSchema } from "@vibevalley/ai/tools";
 import { wallTime } from "../../base/time.ts";
 import { gate, nextTurn, whenTrue } from "../../testing/until.ts";
 

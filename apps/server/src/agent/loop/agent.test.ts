@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Ref } from "effect";
-import type { Context, Message, ToolResultMessage, UserMessage } from "../../ai/messages.ts";
-import { make as llmOver } from "../../ai/llm.ts";
-import { answer, chunk, http, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "../../ai/testing.ts";
-import { objectSchema } from "../../ai/tools.ts";
+import type { Context, Message, ToolResultMessage, UserMessage } from "@vibevalley/ai/messages";
+import { make as llmOver } from "@vibevalley/ai/llm";
+import { answer, chunk, http, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "@vibevalley/ai/testing";
+import { objectSchema } from "@vibevalley/ai/tools";
 import { type AgentEvent, type AgentOptions, AgentBusy, make, type Tool } from "./agent.ts";
 
 const user = (t: string): UserMessage => ({ role: "user", content: t, timestamp: 1 });

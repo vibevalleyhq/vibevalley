@@ -2,8 +2,8 @@
 // (.agents/notes/proposed/architecture/2026-10-27-pi-in-effect.md, step 3).
 
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { answer, text, toolCall } from "../../ai/testing.ts";
-import { objectSchema } from "../../ai/tools.ts";
+import { answer, text, toolCall } from "@vibevalley/ai/testing";
+import { objectSchema } from "@vibevalley/ai/tools";
 import { wallTime } from "../../base/time.ts";
 import { gate } from "../../testing/until.ts";
 import { messageText, userMessage } from "./messages.ts";

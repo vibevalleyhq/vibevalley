@@ -1,4 +1,4 @@
-import { assistantMessage, toolCall } from "../ai/testing.ts";
+import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
 import type { BrainMessage } from "../agent/brain/messages.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf, stubbed } from "./evals.ts";

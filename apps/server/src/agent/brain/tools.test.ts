@@ -13,7 +13,7 @@ import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./agentTaskTools.ts";
 import { effectTool } from "./tool.ts";
-import { objectSchema, toolArguments } from "../../ai/tools.ts";
+import { objectSchema, toolArguments } from "@vibevalley/ai/tools";
 import type { Tool } from "../loop/agent.ts";
 import { scriptedLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";

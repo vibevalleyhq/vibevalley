@@ -3,7 +3,7 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
-import { coerceArguments } from "../ai/tools.ts";
+import { coerceArguments } from "@vibevalley/ai/tools";
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 import { session } from "../base/actor.ts";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";

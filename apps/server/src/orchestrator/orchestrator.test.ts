@@ -1,8 +1,8 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
-import type { Message } from "../ai/messages.ts";
-import { type Answer, answer, toolCall } from "../ai/testing.ts";
+import type { Message } from "@vibevalley/ai/messages";
+import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Said } from "../testing/said.ts";
 import { starter } from "../testing/layers.ts";

@@ -6,7 +6,7 @@ import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, typ
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { models, type ThinkingLevel } from "../ai/models.ts";
+import { models, type ThinkingLevel } from "@vibevalley/ai/models";
 import type { AgentTaskStore } from "../agent/brain/agentTaskStore.ts";
 import { type BrainEvent, type BrainOwner, openBrain } from "../agent/brain/agent.ts";
 import { codingTools } from "../agent/brain/coding.ts";
