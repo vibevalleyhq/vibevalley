@@ -7,7 +7,7 @@ import solid from "@solidjs/vite-plugin";
 export default defineConfig({
   plugins: lazyPlugins(() => [solid()]),
   // Bundled before the first test: found mid-run, Vite reloads the page and the run fails on a cold cache (as on CI).
-  optimizeDeps: { include: ["solid-js", "@solidjs/web", "@floating-ui/dom"] },
+  optimizeDeps: { include: ["solid-js", "@solidjs/web", "@floating-ui/dom", "axe-core"] },
   test: {
     include: ["test/**/*.test.tsx", "test/**/*.test.ts"],
     browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: "chromium" }] },

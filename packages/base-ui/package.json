@@ -13,6 +13,7 @@
   "devDependencies": {
     "@solidjs/vite-plugin": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "axe-core": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:"
   }
