@@ -330,7 +330,7 @@ export interface ChannelUnread {
   unread: number;
   /** Something there names the caller. */
   mentionsYou: boolean;
-  /** The newest message's head. */
+  /** Who said the newest message there. */
   latest?: string;
 }
 
@@ -2227,7 +2227,6 @@ export interface IssueFilter {
   project?: string;
   /** At most this many; none is all. */
   limit?: number;
-  /** Closed ones too. */
   closed?: boolean;
   /** Only those waiting on the owner, the longest waiting first. */
   wantsOwner?: boolean;
