@@ -6,7 +6,8 @@
 import { build, Platform } from "electron-builder";
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { workspaceClosure } from "../src/workspace.ts";
 
 const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");
@@ -26,7 +27,9 @@ rmSync(stage, { recursive: true, force: true });
 mkdirSync(server, { recursive: true });
 const skip = (path: string) => !/\.test\.ts$|\/testdata(\/|$)|\/testing(\/|$)/.test(path);
 for (const dir of ["src", "db"]) cpSync(join(repo, "apps/server", dir), join(server, dir), { recursive: true, filter: skip });
-cpSync(join(repo, "packages/protocol/src"), join(stage, "protocol/src"), { recursive: true, filter: skip });
+// Each workspace package the server runs on sits beside it as stage/<folder>, its src only: the code runs from source.
+const packages = workspaceClosure(repo, join(repo, "apps/server"));
+for (const dir of packages.values()) cpSync(join(dir, "src"), join(stage, basename(dir), "src"), { recursive: true, filter: skip });
 
 // npm does not read pnpm's catalog: each "catalog:" becomes the version pnpm installed for the package, as the lockfile has it.
 const installed = (dir: string): Record<string, string> => {
@@ -47,15 +50,19 @@ const staged = (dir: string, dependencies: Record<string, string>) => {
   );
 };
 
-// The workspace's own packages become local folders; --install-links copies them into node_modules, so the staged
-// server needs nothing outside itself.
-const protocol = JSON.parse(readFileSync(join(repo, "packages/protocol/package.json"), "utf8"));
-protocol.dependencies = staged(join(repo, "packages/protocol"), protocol.dependencies);
-writeFileSync(join(stage, "protocol/package.json"), JSON.stringify({ ...protocol, scripts: undefined, devDependencies: undefined }, null, 2));
-const pkg = JSON.parse(readFileSync(join(repo, "apps/server/package.json"), "utf8"));
-pkg.dependencies = staged(join(repo, "apps/server"), pkg.dependencies);
-pkg.dependencies["@vibevalley/protocol"] = "file:../protocol";
-writeFileSync(join(server, "package.json"), JSON.stringify({ ...pkg, scripts: undefined, devDependencies: undefined }, null, 2));
+// The workspace's own packages become local folders (npm does not read workspace:); --install-links copies them into
+// node_modules, so the staged server needs nothing outside itself.
+const local = (dependencies: Record<string, string>) =>
+  Object.fromEntries(
+    Object.entries(dependencies).map(([name, spec]) => [name, spec.startsWith("workspace:") ? `file:../${basename(packages.get(name)!)}` : spec]),
+  );
+const stageManifest = (dir: string, to: string) => {
+  const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+  const dependencies = local(staged(dir, pkg.dependencies ?? {}));
+  writeFileSync(join(to, "package.json"), JSON.stringify({ ...pkg, dependencies, scripts: undefined, devDependencies: undefined }, null, 2));
+};
+for (const dir of packages.values()) stageManifest(dir, join(stage, basename(dir)));
+stageManifest(join(repo, "apps/server"), server);
 // tsx reads the nearest tsconfig; the repository's extends a file the app does not carry.
 writeFileSync(
   join(server, "tsconfig.json"),
