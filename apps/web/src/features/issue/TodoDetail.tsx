@@ -14,6 +14,7 @@ import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { TextArea, TextInput } from "../../ui/Field";
 import { run } from "./hooks";
+import { IssueArtifacts } from "../artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
 interface Draft {
@@ -203,6 +204,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           />
         </Fold>
       </div>
+      <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
       <Show when={backlog()}>
         <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
         <Note tone={drafting() ? "water" : "wheat"}>

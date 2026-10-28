@@ -30,6 +30,7 @@ import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
+import { IssueArtifacts } from "../artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
 import { useAgent } from "../../base/agents";
@@ -268,6 +269,8 @@ export function IssueDetail(props: {
           )}
         </Show>
       </section>
+
+      <IssueArtifacts issue={props.issue.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
 
       <section aria-label={t("web.issue.detail.story")} data-testid="issue-story">
         <SheetLabel>{t("web.issue.detail.story")}</SheetLabel>

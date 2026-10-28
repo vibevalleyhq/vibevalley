@@ -1334,6 +1334,25 @@ export const catalogs = {
       noEffort: "这个模型没有推理强度可选。",
       noEffortModel: "{model}没有推理强度可选。",
     },
+    "web.artifact": {
+      place: { label: "产出", hint: "帮工和管家交出来的一页：设计、报告、对比，按版本看" },
+      card: { version: "第 {version} 版", open: "打开「{title}」" },
+      kind: { html: "网页", markdown: "说明" },
+      page: {
+        by: "{name} 做的",
+        updated: "{when}更新",
+        versions: "版本",
+        open: "在新标签页打开",
+        delete: "删掉",
+        deleteAsk: "删掉这个产出和它的每一版？对话里的卡片还在。",
+        deleted: "删掉了「{title}」",
+        gone: "这个产出已经删掉了，或者没有这个产出。",
+        back: "回到对话",
+        frame: "「{title}」第 {version} 版",
+      },
+      talk: { title: "对话", atMessage: "在对话里", reply: "回复这一版", replyHint: "写给做它的帮工：哪里要改", send: "回复", sent: "回复了第 {version} 版" },
+      issue: { title: "产出" },
+    },
     "web.base": {
       place: {
         chat: { label: "聊天", hint: "频道和串" },
@@ -4919,6 +4938,32 @@ export const catalogs = {
       runtimeDefaultModel: "The runtime's default ({model})",
       noEffort: "This model has no effort levels.",
       noEffortModel: "{model} has no effort levels.",
+    },
+    "web.artifact": {
+      place: { label: "Artifacts", hint: "Pages helpers and the orchestrator hand in: designs, reports, comparisons, by version" },
+      card: { version: "Version {version}", open: 'Open "{title}"' },
+      kind: { html: "Page", markdown: "Notes" },
+      page: {
+        by: "Made by {name}",
+        updated: "Updated {when}",
+        versions: "Versions",
+        open: "Open in a new tab",
+        delete: "Delete",
+        deleteAsk: "Delete this artifact and every version? Its cards stay in the conversation.",
+        deleted: 'Deleted "{title}"',
+        gone: "This artifact was deleted, or there is no such artifact.",
+        back: "Back to the conversation",
+        frame: '"{title}" version {version}',
+      },
+      talk: {
+        title: "Conversation",
+        atMessage: "In the conversation",
+        reply: "Reply to this version",
+        replyHint: "For the helper who made it: what to change",
+        send: "Reply",
+        sent: "Replied to version {version}",
+      },
+      issue: { title: "Artifacts" },
     },
     "web.base": {
       place: {
@@ -8565,6 +8610,29 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
+  "web.artifact.card.open": { readonly title: string | number };
+  "web.artifact.card.version": { readonly version: string | number };
+  "web.artifact.issue.title": undefined;
+  "web.artifact.kind.html": undefined;
+  "web.artifact.kind.markdown": undefined;
+  "web.artifact.page.back": undefined;
+  "web.artifact.page.by": { readonly name: string | number };
+  "web.artifact.page.delete": undefined;
+  "web.artifact.page.deleteAsk": undefined;
+  "web.artifact.page.deleted": { readonly title: string | number };
+  "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
+  "web.artifact.page.gone": undefined;
+  "web.artifact.page.open": undefined;
+  "web.artifact.page.updated": { readonly when: string | number };
+  "web.artifact.page.versions": undefined;
+  "web.artifact.place.hint": undefined;
+  "web.artifact.place.label": undefined;
+  "web.artifact.talk.atMessage": undefined;
+  "web.artifact.talk.reply": undefined;
+  "web.artifact.talk.replyHint": undefined;
+  "web.artifact.talk.send": undefined;
+  "web.artifact.talk.sent": { readonly version: string | number };
+  "web.artifact.talk.title": undefined;
   "web.base.big": { readonly n: string | number };
   "web.base.cast.outfit.farmer": undefined;
   "web.base.cast.outfit.gardener": undefined;
