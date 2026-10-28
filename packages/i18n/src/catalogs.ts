@@ -1558,6 +1558,7 @@ export const catalogs = {
         linked: "跳到 {where} 的第 {number} 条",
         newBelow: "有 {n} 条新消息",
         toLatest: "回到最新",
+        roundFor: "{what} · {took}",
       },
       tools: {
         label: "这条消息能做的",
@@ -3070,6 +3071,7 @@ export const catalogs = {
         usedTools: "用了 {n} 个工具",
         process: "这一轮的干活过程",
         tag: { thought: "想了想", subagentThought: "帮手想了想", said: "它说", subagentSaid: "帮手说", usage: "用量" },
+        thoughtFor: "想了 {took} · 用了 {n} 个工具",
       },
       trajectory: {
         lane: { asked: "收到", model: "模型", tool: "工具" },
@@ -5106,6 +5108,7 @@ export const catalogs = {
         linked: "Go to message {number} in {where}",
         newBelow: "{n} new below",
         toLatest: "Back to the newest",
+        roundFor: "{what} · {took}",
       },
       tools: {
         label: "What this message offers",
@@ -6702,6 +6705,7 @@ export const catalogs = {
         usedTools: "{n, plural, one {used # tool} other {used # tools}}",
         process: "This round's work",
         tag: { thought: "Thought", subagentThought: "Subagent thought", said: "Said", subagentSaid: "Subagent said", usage: "Usage" },
+        thoughtFor: "Thought for {took} · {n} tools",
       },
       trajectory: {
         lane: { asked: "Heard", model: "Model", tool: "Tool" },
@@ -8729,6 +8733,7 @@ export interface Messages {
   "web.channel.messages.pinned": undefined;
   "web.channel.messages.reactedBy": { readonly emoji: string | number; readonly names: string | number };
   "web.channel.messages.replyGone": undefined;
+  "web.channel.messages.roundFor": { readonly took: string | number; readonly what: string | number };
   "web.channel.messages.searching": undefined;
   "web.channel.messages.spent": { readonly spent: string | number };
   "web.channel.messages.start": undefined;
@@ -10249,6 +10254,7 @@ export interface Messages {
   "web.session.rounds.tag.subagentThought": undefined;
   "web.session.rounds.tag.thought": undefined;
   "web.session.rounds.tag.usage": undefined;
+  "web.session.rounds.thoughtFor": { readonly n: string | number; readonly took: string | number };
   "web.session.rounds.told": undefined;
   "web.session.rounds.usedTools": { readonly n: number };
   "web.session.trajectory.cacheHit": { readonly pct: string | number };

@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { EventTokens, SessionEvent, SessionEventType } from "@vibevalley/protocol";
-import { cacheHit, mergeSteps, secondsText, summaryOf, tokensText, waterfallOf } from "./rounds";
+import { cacheHit, mergeSteps, secondsText, summaryOf, tokensText, turnLabel, waterfallOf } from "./rounds";
 
 const e = (
   seq: number,
@@ -67,4 +67,11 @@ test("the summary counts rounds, steps, the lanes' time and the usage's tokens",
   expect(tokensText(32600)).toBe("3.3 万");
   expect(secondsText(1240)).toBe("1.2 秒");
   expect(secondsText(65000)).toBe("1 分 5 秒");
+});
+
+test("an orchestrator's round folds to how long it thought and what it used; one without tools says nothing", () => {
+  const round = log.slice(0, 9);
+  expect(turnLabel(round, true)).toBe("想了 9 秒 · 用了 1 个工具");
+  expect(turnLabel(round, false)).toBe("用了 1 个工具");
+  expect(turnLabel(log.slice(9), true)).toBeUndefined();
 });

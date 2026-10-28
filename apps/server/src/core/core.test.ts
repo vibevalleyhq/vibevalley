@@ -85,7 +85,7 @@ describe("core", () => {
         }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
       );
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
-      expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking" } });
+      expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking", since: expect.any(Number) } });
       expect(kept.progress).toBeUndefined();
       expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/);
     });
@@ -156,7 +156,15 @@ describe("core", () => {
       const core = yield* Core;
       yield* core.setOrchestrator("orchestrator", "thinking", "c1");
       yield* core.setOrchestrator("lead", "speaking", "c2");
-      expect(core.state().orchestrators).toEqual({ orchestrator: { state: "thinking", channel: "c1" }, lead: { state: "speaking", channel: "c2" } });
+      expect(core.state().orchestrators).toEqual({
+        orchestrator: { state: "thinking", channel: "c1", since: expect.any(Number) },
+        lead: { state: "speaking", channel: "c2", since: expect.any(Number) },
+      });
+      // A round begins when it starts thinking and goes on while it writes.
+      const began = core.state().orchestrators!.orchestrator!.since;
+      yield* TestClock.adjust(5_000);
+      yield* core.setOrchestrator("orchestrator", "speaking", "c1");
+      expect(core.state().orchestrators?.orchestrator?.since).toBe(began);
       yield* core.setOrchestrator("orchestrator", "listening");
       expect(core.state().orchestrators?.orchestrator).toEqual({ state: "listening" });
       yield* core.setOrchestrator("orchestrator", "idle");

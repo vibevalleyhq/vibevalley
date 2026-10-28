@@ -93,7 +93,8 @@
     "reactedBy": "{names} 回应了 {emoji}",
     "linked": "跳到 {where} 的第 {number} 条",
     "newBelow": "有 {n} 条新消息",
-    "toLatest": "回到最新"
+    "toLatest": "回到最新",
+    "roundFor": "{what} · {took}"
   },
   "tools": {
     "label": "这条消息能做的",

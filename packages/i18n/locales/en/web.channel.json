@@ -93,7 +93,8 @@
     "reactedBy": "{names} reacted with {emoji}",
     "linked": "Go to message {number} in {where}",
     "newBelow": "{n} new below",
-    "toLatest": "Back to the newest"
+    "toLatest": "Back to the newest",
+    "roundFor": "{what} · {took}"
   },
   "tools": {
     "label": "What this message offers",

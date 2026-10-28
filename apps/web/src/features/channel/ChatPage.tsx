@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { tookText } from "../../base/format";
 import { Splitter, usePaneWidth } from "../../ui/Splitter";
 import type { IconName } from "../../ui/icons";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
@@ -670,12 +671,15 @@ function OrchestratorLine(props: { agent: string }) {
   const core = useCore();
   const profile = useAgent(() => props.agent);
   const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
+  const clock = useNow();
+  const since = () => core()?.orchestrators?.[props.agent]?.since;
   return (
     <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={t("web.channel.orchestrator")}>
       <OrchestratorFace size={32} agent={props.agent} />
       {profile()?.name || t("web.channel.orchestrator")}
       <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
       <span class="text-xs text-muted">{mood[now()]}</span>
+      <Show when={since()}>{(at) => <span class="text-xs text-faint">{tookText(Math.max(0, clock() - at()))}</span>}</Show>
       <Show when={now() === "thinking"}>
         <ThinkingDots />
       </Show>

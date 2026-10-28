@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { tookText } from "../../base/format";
 import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
 
@@ -102,6 +103,12 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
   const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
   const typing = () => orchestratorTyping(core(), props.channel);
+  const clock = useNow();
+  // Thinking or writing, and for how long the round has gone on.
+  const roundText = (mood: "thinking" | "speaking", since: number | undefined) => {
+    const what = mood === "speaking" ? t("web.channel.messages.typing") : t("web.channel.messages.thinking");
+    return since === undefined ? what : t("web.channel.messages.roundFor", { what, took: tookText(Math.max(0, clock() - since)) });
+  };
   const orchestrators = useOrchestrators();
   // Scrolled up from the newest: the number it was at then, so what came after is counted for the way back.
   const [awayFrom, setAwayFrom] = createSignal<number>();
@@ -208,7 +215,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               <Frame
                 face={<OrchestratorFace size={36} agent={typer().agent} />}
                 name={orchestrators().find((a) => a.id === typer().agent)?.name || t("web.channel.orchestrator")}
-                meta={typer().mood === "speaking" ? t("web.channel.messages.typing") : t("web.channel.messages.thinking")}
+                meta={roundText(typer().mood, typer().since)}
               >
                 <div class="flex h-5 items-center">
                   <ThinkingDots />
