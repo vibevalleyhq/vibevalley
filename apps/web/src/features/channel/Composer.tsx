@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { useRouter } from "../../base/router";
 import { ownerId } from "@vibevalley/protocol";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
@@ -29,6 +30,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const uploading = () => uploadsIn(props.channel?.id);
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
   const at = untrack(() => props.channel?.id);
+  const router = useRouter();
   const box = createComposer(core, () => input, {
     initial: at ? untrack(() => draftOf(at).text) : undefined,
     target: () => {
@@ -44,6 +46,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       toast(t("web.channel.composer.notSent", { why: reason }), "bad");
     },
     told: (say) => toast(say),
+    opened: (path) => router.navigate(path),
     edited: (value) => {
       setProblem(undefined);
       if (at) drafts.text(at, value);

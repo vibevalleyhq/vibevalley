@@ -8,7 +8,6 @@ import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, t
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
-import { useRouter } from "../../base/router";
 import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
 import { orchestratorMood } from "../../base/frame";
 import { useOrchestrators } from "../../base/agents";
@@ -40,6 +39,8 @@ export interface ComposerWays {
   readonly failed: (reason: string) => void;
   /** What a slash command came to, in words (commands.ts); a failed one goes to failed. */
   readonly told?: (say: string) => void;
+  /** A slash command that opens a place (/dm): the window goes there. */
+  readonly opened?: (path: string) => void;
   /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
   /** Once a line went through: what it carried beside its words (a reply, files) is spent. */
@@ -77,7 +78,6 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
-  const router = useRouter();
 
   const edit = (value: string, at: number) => {
     edits++;
@@ -107,7 +107,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
       const done = await runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() });
       if (disposed) return;
       edit("", 0);
-      if ("open" in done) router.navigate(done.open);
+      if ("open" in done) ways.opened?.(done.open);
       else ways.told?.(done.say);
     } catch (e) {
       if (!disposed) ways.failed(reasonOf(e));
