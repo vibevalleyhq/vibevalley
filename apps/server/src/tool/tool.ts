@@ -2,17 +2,8 @@
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
-import {
-  type Agent,
-  type BlockAttrs,
-  DeliverableValues,
-  type Issue,
-  IssueStatusValues,
-  orchestratorAgent,
-  type RecurrenceWhen,
-  type TaskEdit,
-} from "@vibevalley/protocol";
-import { closedText, phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { type Agent, DeliverableValues, type Issue, IssueStatusValues, orchestratorAgent, type RecurrenceWhen, type TaskEdit } from "@vibevalley/protocol";
+import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
@@ -41,6 +32,7 @@ import {
   changesText,
   channelLine,
   descriptions,
+  sessionDescriptions,
   issueDetail,
   issueLine,
   memoryWhere,
@@ -53,14 +45,14 @@ import {
   sessionLine,
   statusOf,
 } from "./prompts.ts";
-import { parameters, schemas, sessionParameters, sessionSchemas } from "./schemas.ts";
+import { type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";
 import { toolWording } from "./words.ts";
 
 /** A tool's arguments as its Schema reads them. */
 type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
 type Session<K extends keyof typeof sessionParameters> = (typeof sessionParameters)[K]["Type"];
 /** The tools that name an issue and nothing else. */
-type IssueTool = "check" | "changes" | "stop" | "dismiss";
+type IssueTool = "issue.get" | "issue.diff.get" | "session.stop";
 
 /** Who is calling, at the moment of the call. */
 export interface Caller {
@@ -92,7 +84,8 @@ export interface ToolShape {
 
 export class Tools extends Context.Service<Tools, ToolShape>()("vibevalley/Tool") {}
 
-const named = ["issue", "agent", "session", "project", "name", "title", "query", "note", "goal"];
+// The fields that name what a call is about, the first one given wins: an issue's or a channel's id, a profile, a title.
+const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
   const fields = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
@@ -109,8 +102,6 @@ export function toolStart(name: string, args: unknown): ToolStart {
   if (about.length > 40) about = head(about, 40) + "…";
   return { text: about ? w.about(label, about) : label, action: "other", tool: name, input: args === undefined || args === null ? "{}" : JSON.stringify(args) };
 }
-
-const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
 
 const spaces = /\s+/g;
 
@@ -143,11 +134,17 @@ export const make = Effect.gen(function* () {
   const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
 
   // A tool's arguments are read by its Schema before it runs; the model's JSON Schema is made from the same one.
+  // Named by its endpoint (toolName): the name is never written a second time.
   const toolOf =
-    <All extends { readonly [name: string]: Schema.Codec<unknown, unknown, never, never> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
-    <K extends keyof All & string>(name: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
-      const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[name]);
-      return effectTool<unknown>({ name, description, parameters: shown[name], run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError) });
+    <All extends { readonly [op: string]: Schema.Codec<unknown, unknown, never, never> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
+    <K extends keyof All & Op>(op: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
+      const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
+      return effectTool<unknown>({
+        name: toolName(op),
+        description,
+        parameters: shown[op],
+        run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError),
+      });
     };
   const tool = toolOf(parameters, schemas);
   const sessionSchemaTool = toolOf(sessionParameters, sessionSchemas);
@@ -171,8 +168,7 @@ export const make = Effect.gen(function* () {
   });
   const withIssue = <E>(key: string, f: (t: Issue) => Effect.Effect<string, E>) =>
     Effect.flatMap(findIssue(key), (t) => (typeof t === "string" ? Effect.succeed(t) : f(t)));
-  const issueTool = <E>(name: IssueTool, description: string, f: (t: Issue) => Effect.Effect<string, E>) =>
-    tool(name, description, (p) => withIssue(p.issue, f));
+  const issueTool = <E>(op: IssueTool, f: (t: Issue) => Effect.Effect<string, E>) => tool(op, descriptions[op], (p) => withIssue(p.id, f));
   /** The helper on the farm working the issue now, if any: its newest session. */
   const workerOf = (t: Issue) => {
     const last = t.sessions.at(-1);
@@ -208,35 +204,34 @@ export const make = Effect.gen(function* () {
 
   const query = (q: Partial<SearchQuery>): SearchQuery => ({ agent: "", project: "", text: "", kind: "", limit: 0, ...q });
 
-  const projectsTool = tool(
-    "projects",
-    descriptions.projects,
-    Effect.fn("Tools.projects")(function* () {
+  const projectList = tool(
+    "project.list",
+    descriptions["project.list"],
+    Effect.fn("Tools.projectList")(function* () {
       const all = yield* projects.list();
       if (all.length === 0) return answers.projects.empty(projects.root);
       return all.map((p) => "- " + p.name + (p.git ? "" : answers.projects.notGitYet)).join("\n");
     }),
   );
 
-  const channelsTool = tool(
-    "channels",
-    descriptions.channels,
-    Effect.fn("Tools.channels")(function* () {
+  const channelList = tool(
+    "channel.list",
+    descriptions["channel.list"],
+    Effect.fn("Tools.channelList")(function* () {
       return (yield* chat.channels()).map((c) => "- " + channelLine(c)).join("\n");
     }),
   );
 
-  const roster = tool("roster", descriptions.roster, () =>
+  const roster = tool("session.list", descriptions["session.list"], () =>
     Effect.sync(() => {
       const all = run.roster();
       return all.length === 0 ? answers.roster.empty : all.map((w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w))).join("\n");
     }),
   );
 
-  const check = issueTool(
-    "check",
-    descriptions.check,
-    Effect.fn("Tools.check")(function* (t: Issue) {
+  const issueGet = issueTool(
+    "issue.get",
+    Effect.fn("Tools.issueGet")(function* (t: Issue) {
       const w = workerOf(t);
       const timeline = yield* Effect.orElseSucceed(issue.timeline(t.id), () => undefined);
       const lines = [issueDetail(t, whoOf(t), timeline, clock.currentTimeMillisUnsafe())];
@@ -245,11 +240,10 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const changes = (who: Who) =>
+  const issueDiff = (who: Who) =>
     issueTool(
-      "changes",
-      descriptions.changes,
-      Effect.fn("Tools.changes")(
+      "issue.diff.get",
+      Effect.fn("Tools.issueDiff")(
         function* (t: Issue) {
           const c = yield* callerOf(who);
           return changesText(yield* issue.changes(t.id, c.actor));
@@ -258,7 +252,7 @@ export const make = Effect.gen(function* () {
       ),
     );
 
-  const sessionList = sessionSchemaTool("session_list", descriptions.sessionList, () =>
+  const sessionList = sessionSchemaTool("session.list", sessionDescriptions["session.list"], () =>
     Effect.sync(() => {
       // Listed without @: an @ wakes someone, and models copy what they read.
       const lines = [answers.sessionList.intro];
@@ -294,30 +288,30 @@ export const make = Effect.gen(function* () {
     }
   };
 
-  const channelSay = (who: Who) =>
+  const messageSend = (who: Who) =>
     sessionSchemaTool(
-      "channel_say",
-      descriptions.channelSay,
-      Effect.fn("Tools.channel_say")(function* (p: Session<"channel_say">) {
+      "channel.message.send",
+      sessionDescriptions["channel.message.send"],
+      Effect.fn("Tools.messageSend")(function* (p: Session<"channel.message.send">) {
         const c = yield* callerOf(who);
         return spokenText(
           yield* chat.speak(participant(c), p.text, {
-            ...(p.target ? { target: p.target } : {}),
+            ...(p.id ? { target: p.id } : {}),
             ...(p.anyway ? { anyway: true } : {}),
             ...(p.confirm ? { confirm: true } : {}),
-            ...(p.reply !== undefined ? { reply: p.reply } : {}),
+            ...(p.replyTo !== undefined ? { reply: p.replyTo } : {}),
           }),
         );
       }),
     );
 
-  const readChat = (who: Who) =>
+  const messageList = (who: Who) =>
     tool(
-      "read_chat",
-      descriptions.readChat,
-      Effect.fn("Tools.read_chat")(function* (p: Orchestrator<"read_chat">) {
+      "channel.message.list",
+      descriptions["channel.message.list"],
+      Effect.fn("Tools.messageList")(function* (p: Orchestrator<"channel.message.list">) {
         const c = yield* callerOf(who);
-        let where = p.target ?? "";
+        let where = p.id ?? "";
         // A session's default is its own thread, which the channel service fills in.
         if (where === "" && c.session === "") where = (yield* chat.addressOf(c.here)).target;
         const read = yield* Effect.result(
@@ -336,27 +330,27 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const channelInbox = (who: Who) =>
+  const unreadList = (who: Who) =>
     sessionSchemaTool(
-      "channel_inbox",
-      descriptions.channelInbox,
-      Effect.fn("Tools.channel_inbox")(function* () {
+      "channel.unread.list",
+      sessionDescriptions["channel.unread.list"],
+      Effect.fn("Tools.unreadList")(function* () {
         const c = yield* callerOf(who);
-        const rows = yield* chat.inbox(participant(c));
+        const rows = yield* chat.unread(participant(c));
         if (rows.length === 0) return answers.channelInbox.empty;
-        const lines = rows.map((r) => answers.channelInbox.row(r.target, r.unread, r.mentionsYou, r.latest ?? ""));
-        lines.push(answers.channelInbox.nextStep(rows[0]!.target));
+        const lines = rows.map((r) => answers.channelInbox.row(r.channel, r.unread, r.mentionsYou, r.latest ?? ""));
+        lines.push(answers.channelInbox.nextStep(rows[0]!.channel));
         return lines.join("\n");
       }),
     );
 
   // Review is judging what came back against what the issue asked for; a pass only makes it ready, completing it stays
-  // the owner's (issue_status to done).
-  const accept = tool(
-    "accept",
-    descriptions.accept,
-    Effect.fn("Tools.accept")(function* (p: Orchestrator<"accept">) {
-      return yield* withIssue(p.issue, (t) =>
+  // the owner's (issue_status_update to done).
+  const issueReview = tool(
+    "issue.review",
+    descriptions["issue.review"],
+    Effect.fn("Tools.issueReview")(function* (p: Orchestrator<"issue.review">) {
+      return yield* withIssue(p.id, (t) =>
         issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }).pipe(
           Effect.map((done) => (p.pass ? answers.accept.passed(done.number) : answers.accept.failed(done.number, openFindings(done)))),
           Effect.catch((e) => Effect.succeed(said(e))),
@@ -365,16 +359,16 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const tell = (who: Who) =>
+  const issueComment = (who: Who) =>
     tool(
-      "tell",
-      descriptions.tell,
-      Effect.fn("Tools.tell")(function* (p: Orchestrator<"tell">) {
+      "issue.comment.create",
+      descriptions["issue.comment.create"],
+      Effect.fn("Tools.issueComment")(function* (p: Orchestrator<"issue.comment.create">) {
         const c = yield* callerOf(who);
-        return yield* withIssue(p.issue, (t) => {
+        return yield* withIssue(p.id, (t) => {
           const w = workerOf(t);
           if (!w) return Effect.succeed(nobodyOn(t));
-          return chat.tellSession(participant(c), w.session.id, p.message, "").pipe(
+          return chat.tellSession(participant(c), w.session.id, p.text, "").pipe(
             Effect.as(answers.tell.told(t.number, w.session.name)),
             Effect.catch((e) => Effect.succeed(answers.tell.failed(said(e)))),
           );
@@ -382,11 +376,10 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const stop = (who: Who) =>
+  const sessionStop = (who: Who) =>
     issueTool(
-      "stop",
-      descriptions.stop,
-      Effect.fn("Tools.stop")(
+      "session.stop",
+      Effect.fn("Tools.sessionStop")(
         function* (t: Issue) {
           yield* callerOf(who);
           yield* issue.stop(t.id);
@@ -395,42 +388,16 @@ export const make = Effect.gen(function* () {
         Effect.catch((e) => Effect.succeed(said(e))),
       ),
     );
-  const dismiss = issueTool(
-    "dismiss",
-    descriptions.dismiss,
-    Effect.fn("Tools.dismiss")(function* (t: Issue) {
-      const w = workerOf(t);
-      if (!w) return nobodyOn(t);
-      yield* run.dismiss(w.session.id);
-      return answers.dismiss.dismissed(w.session.name, t.number);
-    }),
-  );
-
-  const issuesTool = tool(
-    "issues",
-    descriptions.issues,
-    Effect.fn("Tools.issues")(function* (p: Orchestrator<"issues">) {
-      if (p.issue)
-        return yield* withIssue(p.issue, (t) =>
-          Effect.map(
-            Effect.orElseSucceed(issue.timeline(t.id), () => undefined),
-            (timeline) => issueDetail(t, whoOf(t), timeline, clock.currentTimeMillisUnsafe()),
-          ),
-        );
+  const issueList = tool(
+    "issue.list",
+    descriptions["issue.list"],
+    Effect.fn("Tools.issueList")(function* (p: Orchestrator<"issue.list">) {
       const status = p.status ? statusOf(p.status) : undefined;
       if (p.status && !status) return noSuchStatus(p.status, IssueStatusValues);
-      const words = (p.text ?? "").split(spaces).filter(Boolean);
+      const { limit: _, status: __, ...rest } = p;
+      const found = yield* issue.query({ ...rest, ...(status ? { status } : {}) });
+      if (found.length === 0) return p.wantsOwner ? answers.issues.noneWaiting : answers.issues.none;
       const now = clock.currentTimeMillisUnsafe();
-      let found = (yield* issue.list()).filter(
-        (t) =>
-          t.talk === undefined &&
-          (status ? t.status === status : p.closed || (t.status !== "done" && t.status !== "canceled")) &&
-          (!p.wants_owner || attentionWantsOwner(t.attention.state)) &&
-          (!p.project || t.project === p.project.trim()) &&
-          words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
-      );
-      if (p.wants_owner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
-      if (found.length === 0) return p.wants_owner ? answers.issues.noneWaiting : answers.issues.none;
       const limit = p.limit && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? answers.issues.moreNote(found.length - limit) : "";
       return (
@@ -444,9 +411,9 @@ export const make = Effect.gen(function* () {
 
   const issueCreate = (who: Who) =>
     tool(
-      "issue_create",
-      descriptions.issueCreate,
-      Effect.fn("Tools.issue_create")(function* (p: Orchestrator<"issue_create">) {
+      "issue.create",
+      descriptions["issue.create"],
+      Effect.fn("Tools.issueCreate")(function* (p: Orchestrator<"issue.create">) {
         const c = yield* callerOf(who);
         if (p.draft && p.start) return answers.issueCreate.draftWithStartRefused;
         let channel: Info;
@@ -462,8 +429,8 @@ export const make = Effect.gen(function* () {
         const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
         if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
         let assignee: string | undefined;
-        if (p.agent || p.start) {
-          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? "", p.start ? c.picked : "");
+        if (p.assignee || p.start) {
+          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.assignee ?? "", p.start ? c.picked : "");
           if (typeof a === "string") return answers.issueCreate.notRecorded(a);
           assignee = a.id;
         }
@@ -507,17 +474,17 @@ export const make = Effect.gen(function* () {
 
   const issueUpdate = (who: Who) =>
     tool(
-      "issue_update",
-      descriptions.issueUpdate,
-      Effect.fn("Tools.issue_update")(function* (p: Orchestrator<"issue_update">) {
+      "issue.update",
+      descriptions["issue.update"],
+      Effect.fn("Tools.issueUpdate")(function* (p: Orchestrator<"issue.update">) {
         const c = yield* callerOf(who);
-        return yield* withIssue(p.issue, (t) => {
+        return yield* withIssue(p.id, (t) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
           if (p.priority && !priority) return Effect.succeed(noSuchPriority(p.priority));
           let assignee: string | undefined;
-          if (p.agent) {
-            const a = agents.named(p.agent);
-            if (!a) return Effect.succeed(answers.noProfileNamed(p.agent));
+          if (p.assignee) {
+            const a = agents.named(p.assignee);
+            if (!a) return Effect.succeed(answers.noProfileNamed(p.assignee));
             assignee = a.id;
           }
           return issue
@@ -544,24 +511,24 @@ export const make = Effect.gen(function* () {
 
   const issueStatus = (who: Who) =>
     tool(
-      "issue_status",
-      descriptions.issueStatus,
-      Effect.fn("Tools.issue_status")(function* (p: Orchestrator<"issue_status">) {
+      "issue.status.update",
+      descriptions["issue.status.update"],
+      Effect.fn("Tools.issueStatus")(function* (p: Orchestrator<"issue.status.update">) {
         const c = yield* callerOf(who);
-        const to = statusOf(p.to);
-        if (!to) return noSuchStatus(p.to, ["backlog", "todo", "done", "canceled"]);
+        const to = statusOf(p.status);
+        if (!to) return noSuchStatus(p.status, ["backlog", "todo", "done", "canceled"]);
         return yield* withIssue(
-          p.issue,
+          p.id,
           Effect.fnUntraced(
             function* (t: Issue) {
               // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
               let agent: string | undefined;
-              if (p.agent || (to === "todo" && t.status === "backlog" && !t.assignee)) {
-                const chosen = yield* choose(t.title + "\n" + (t.description ?? ""), p.agent ?? "", p.agent ? "" : c.picked);
+              if (p.assignee || (to === "todo" && t.status === "backlog" && !t.assignee)) {
+                const chosen = yield* choose(t.title + "\n" + (t.description ?? ""), p.assignee ?? "", p.assignee ? "" : c.picked);
                 if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
-              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, agent ? { agent } : {});
+              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, agent ? { assignee: agent } : {});
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);
@@ -573,12 +540,12 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const recurrenceTool = (who: Who) =>
+  const recurrenceCreate = (who: Who) =>
     tool(
-      "recurrence",
-      descriptions.recurrence,
-      Effect.fn("Tools.recurrence")(
-        function* (p: Orchestrator<"recurrence">) {
+      "recurrence.create",
+      descriptions["recurrence.create"],
+      Effect.fn("Tools.recurrenceCreate")(
+        function* (p: Orchestrator<"recurrence.create">) {
           const c = yield* callerOf(who);
           let channel = yield* chat.topOf(c.here);
           if (p.channel) {
@@ -586,25 +553,26 @@ export const make = Effect.gen(function* () {
             if (!byName) return yield* refuse(answers.recurrence.noChannelShort(p.channel));
             channel = byName;
           }
+          const w = p.when;
           let when: RecurrenceWhen;
-          switch (p.kind) {
+          switch (w.kind) {
             case "once": {
-              const at = parseTime(p.at ?? "");
-              if (at === undefined) return yield* refuse(answers.recurrence.badTime(p.at ?? ""));
+              const at = parseTime(w.at ?? "");
+              if (at === undefined) return yield* refuse(answers.recurrence.badTime(w.at ?? ""));
               when = { kind: "once", at };
               break;
             }
             case "every":
-              when = { kind: "every", minutes: p.minutes ?? 0 };
+              when = { kind: "every", minutes: w.minutes ?? 0 };
               break;
             case "daily":
-              when = { kind: "daily", time: p.time ?? "" };
+              when = { kind: "daily", time: w.time ?? "" };
               break;
             case "cron":
-              when = { kind: "cron", expr: p.cron ?? "" };
+              when = { kind: "cron", expr: w.expr ?? "" };
               break;
-            default:
-              when = { kind: "weekly", days: (p.days ?? []).map((d) => Math.trunc(d)), time: p.time ?? "" };
+            case "weekly":
+              when = { kind: "weekly", days: (w.days ?? []).map((d) => Math.trunc(d)), time: w.time ?? "" };
           }
           const made = yield* recurrence.add(
             {
@@ -625,10 +593,10 @@ export const make = Effect.gen(function* () {
       ),
     );
 
-  const listRecurrences = tool(
-    "list_recurrences",
-    descriptions.listRecurrences,
-    Effect.fn("Tools.list_recurrences")(function* () {
+  const recurrenceList = tool(
+    "recurrence.list",
+    descriptions["recurrence.list"],
+    Effect.fn("Tools.recurrenceList")(function* () {
       const all = recurrence.list();
       if (all.length === 0) return answers.listRecurrences.none;
       const names = new Map((yield* chat.channels()).map((c) => [c.id, c.name]));
@@ -636,25 +604,25 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const cancelRecurrence = tool("cancel_recurrence", descriptions.cancelRecurrence, (p: Orchestrator<"cancel_recurrence">) =>
+  const recurrenceDelete = tool("recurrence.delete", descriptions["recurrence.delete"], (p: Orchestrator<"recurrence.delete">) =>
     answered(Effect.map(recurrence.remove(p.id), (s) => answers.cancelRecurrence.canceled(s.name))),
   );
 
-  const openChannel = tool(
-    "open_channel",
-    descriptions.openChannel,
-    Effect.fn("Tools.open_channel")(function* (p: Orchestrator<"open_channel">) {
+  const channelCreate = tool(
+    "channel.create",
+    descriptions["channel.create"],
+    Effect.fn("Tools.channelCreate")(function* (p: Orchestrator<"channel.create">) {
       const c = yield* chat.openChannel(p.name, p.description ?? "", p.project ?? "");
       return answers.openChannel.opened(c.name, c.project);
     }),
   );
 
-  const channelSettings = tool(
-    "channel_settings",
-    descriptions.channelSettings,
-    Effect.fn("Tools.channel_settings")(function* (p: Orchestrator<"channel_settings">) {
-      const c = yield* chat.channelByName(p.channel);
-      if (!c) return yield* refuse(answers.channelSettings.noChannel(p.channel));
+  const channelUpdate = tool(
+    "channel.update",
+    descriptions["channel.update"],
+    Effect.fn("Tools.channelUpdate")(function* (p: Orchestrator<"channel.update">) {
+      const c = (yield* chat.channelByName(p.id)) ?? (yield* chat.channels()).find((x) => x.id === p.id);
+      if (!c) return yield* refuse(answers.channelSettings.noChannel(p.id));
       yield* chat.updateChannel(c.id, {
         ...(p.description !== undefined ? { description: p.description } : {}),
         ...(p.project !== undefined ? { project: p.project } : {}),
@@ -665,32 +633,29 @@ export const make = Effect.gen(function* () {
 
   const graphSplit = (who: Who) =>
     tool(
-      "graph_split",
-      descriptions.graphSplit,
-      Effect.fn("Tools.graph_split")(function* (p: Orchestrator<"graph_split">) {
+      "graph.split",
+      descriptions["graph.split"],
+      Effect.fn("Tools.graphSplit")(function* (p: Orchestrator<"graph.split">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.split(p.goal, p.project, p.agent ?? "", c.actor));
       }),
     );
 
-  const graphsTool = tool("graphs", descriptions.graphs, (p: Orchestrator<"graphs">) =>
+  const graphList = tool("graph.list", descriptions["graph.list"], () =>
     Effect.sync(() => {
-      const texts = tasks
-        .graphs()
-        .filter((g) => (p.id ? g.id === p.id : isOpen(g)))
-        .map(graphText);
-      if (texts.length > 0) return texts.join("\n\n");
-      return p.id ? answers.graphs.noGraphNamed(p.id) : answers.graphs.none;
+      const texts = tasks.graphs().filter(isOpen).map(graphText);
+      return texts.length > 0 ? texts.join("\n\n") : answers.graphs.none;
     }),
   );
 
-  const taskEdit = (who: Who) =>
+  const graphGet = tool("graph.get", descriptions["graph.get"], (p: Orchestrator<"graph.get">) => answered(Effect.map(tasks.graph(p.id.trim()), graphText)));
+
+  const taskUpdate = (who: Who) =>
     tool(
-      "task_edit",
-      descriptions.taskEdit,
-      Effect.fn("Tools.task_edit")(function* (p: Orchestrator<"task_edit">) {
+      "graph.task.update",
+      descriptions["graph.task.update"],
+      Effect.fn("Tools.taskUpdate")(function* (p: Orchestrator<"graph.task.update">) {
         const by = (yield* callerOf(who)).actor;
-        if (p.remove) return yield* answered(tasks.removeTask(p.graph, p.task, by));
         const edit: TaskEdit = {
           ...(p.title !== undefined ? { title: p.title } : {}),
           ...(p.brief !== undefined ? { brief: p.brief } : {}),
@@ -698,35 +663,45 @@ export const make = Effect.gen(function* () {
           ...(p.agent !== undefined ? { agent: p.agent } : {}),
           ...(p.check !== undefined ? { check: p.check } : {}),
         };
-        return yield* answered(tasks.editTask(p.graph, p.task, edit, by));
+        return yield* answered(tasks.editTask(p.id, p.task, edit, by));
       }),
     );
 
-  const graphAction = (who: Who) =>
+  const taskDelete = (who: Who) =>
     tool(
-      "graph_action",
-      descriptions.graphAction,
-      Effect.fn("Tools.graph_action")(function* (p: Orchestrator<"graph_action">) {
-        const c = yield* callerOf(who);
-        return yield* answered(tasks.act(p.graph, p.action, c.actor));
+      "graph.task.delete",
+      descriptions["graph.task.delete"],
+      Effect.fn("Tools.taskDelete")(function* (p: Orchestrator<"graph.task.delete">) {
+        const by = (yield* callerOf(who)).actor;
+        return yield* answered(tasks.removeTask(p.id, p.task, by));
       }),
     );
 
-  const taskAction = (who: Who) =>
+  const graphAct = (who: Who) =>
     tool(
-      "task_action",
-      descriptions.taskAction,
-      Effect.fn("Tools.task_action")(function* (p: Orchestrator<"task_action">) {
+      "graph.act",
+      descriptions["graph.act"],
+      Effect.fn("Tools.graphAct")(function* (p: Orchestrator<"graph.act">) {
         const c = yield* callerOf(who);
-        return yield* answered(tasks.taskAct(p.graph, p.task, p.action, c.actor));
+        return yield* answered(tasks.act(p.id, p.action, c.actor));
+      }),
+    );
+
+  const taskAct = (who: Who) =>
+    tool(
+      "graph.task.act",
+      descriptions["graph.task.act"],
+      Effect.fn("Tools.taskAct")(function* (p: Orchestrator<"graph.task.act">) {
+        const c = yield* callerOf(who);
+        return yield* answered(tasks.taskAct(p.id, p.task, p.action, c.actor));
       }),
     );
 
   const issueSplit = (who: Who) =>
     sessionSchemaTool(
-      "issue_split",
-      descriptions.issueSplit(maxTasks),
-      Effect.fn("Tools.issue_split")(function* (p: Session<"issue_split">) {
+      "issue.split",
+      sessionDescriptions["issue.split"](maxTasks),
+      Effect.fn("Tools.issueSplit")(function* (p: Session<"issue.split">) {
         const c = yield* callerOf(who);
         const steps = (p.tasks ?? []).map((t) => ({
           id: t.id,
@@ -742,34 +717,37 @@ export const make = Effect.gen(function* () {
       }),
     );
 
+  // A session's memories are its profile's: "" is every project, none is the one it works in.
+  const sessionScope = (c: Caller, project: string | undefined) => (project === undefined ? c.project : project.trim());
+
   const memorySearch = (who: Who, forOrchestrator: boolean) =>
     forOrchestrator
       ? tool(
-          "memory_search",
-          descriptions.memorySearchOrchestrator,
-          Effect.fn("Tools.memory_search")(function* (p: Orchestrator<"memory_search">) {
+          "memory.search",
+          descriptions["memory.search"],
+          Effect.fn("Tools.memorySearch")(function* (p: Orchestrator<"memory.search">) {
             const agent = (p.agent ?? "").trim() ? yield* profile(p.agent!) : "";
-            const q = query({ text: p.query ?? "", project: (p.project ?? "").trim(), ...(agent ? { agent } : {}) });
+            const q = query({ text: p.text ?? "", project: (p.project ?? "").trim(), ...(agent ? { agent } : {}) });
             return foundText(yield* memory.search(q), q);
           }, answered),
         )
       : sessionSchemaTool(
-          "memory_search",
-          descriptions.memorySearchSession,
-          Effect.fn("Tools.memory_search")(function* (p: Session<"memory_search">) {
+          "memory.search",
+          sessionDescriptions["memory.search"],
+          Effect.fn("Tools.memorySearch")(function* (p: Session<"memory.search">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
-            const q = query({ agent: c.agent, project: p.all_projects ? "" : c.project, text: p.query ?? "" });
+            const q = query({ agent: c.agent, project: sessionScope(c, p.project), text: p.text ?? "" });
             return foundText(yield* memory.search(q), q);
           }),
         );
 
-  const memoryAdd = (who: Who, forOrchestrator: boolean) =>
+  const memoryCreate = (who: Who, forOrchestrator: boolean) =>
     forOrchestrator
       ? tool(
-          "memory_add",
-          descriptions.memoryAddOrchestrator,
-          Effect.fn("Tools.memory_add")(function* (p: Orchestrator<"memory_add">) {
+          "memory.create",
+          descriptions["memory.create"],
+          Effect.fn("Tools.memoryCreate")(function* (p: Orchestrator<"memory.create">) {
             const id = yield* profile(p.agent);
             const c = yield* callerOf(who);
             const m = yield* memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: c.actor });
@@ -777,13 +755,12 @@ export const make = Effect.gen(function* () {
           }, answered),
         )
       : sessionSchemaTool(
-          "memory_add",
-          descriptions.memoryAddSession,
-          Effect.fn("Tools.memory_add")(function* (p: Session<"memory_add">) {
+          "memory.create",
+          sessionDescriptions["memory.create"],
+          Effect.fn("Tools.memoryCreate")(function* (p: Session<"memory.create">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
-            if (p.agent && p.agent !== c.agent) return yield* refuse(answers.memory.notYourProfile(c.agent, p.agent));
-            const m = yield* memory.remember({ agent: c.agent, text: p.text, project: p.all_projects ? "" : c.project, by: c.actor });
+            const m = yield* memory.remember({ agent: c.agent, text: p.text, project: sessionScope(c, p.project), by: c.actor });
             return answers.memory.remembered(memoryWhere(m), m.id);
           }),
         );
@@ -792,89 +769,88 @@ export const make = Effect.gen(function* () {
   // op pipeline the owner's editor uses, written as its profile (its session id when it has none).
   const writer = (c: Caller) => c.agent || c.session;
 
-  const docRead = (who: Who) =>
+  const docGet = (who: Who) =>
     sessionSchemaTool(
-      "doc_read",
-      descriptions.docRead,
-      Effect.fn("Tools.doc_read")(function* (p: Session<"doc_read">) {
+      "doc.get",
+      sessionDescriptions["doc.get"],
+      Effect.fn("Tools.docGet")(function* (p: Session<"doc.get">) {
         yield* callerOf(who);
-        const snap = yield* docs.get(p.doc.trim());
+        const snap = yield* docs.get(p.id.trim());
         return [answers.doc.header(snap.doc.title, snap.blocks.length), ...snap.blocks.map(blockLine)].join("\n");
       }),
     );
 
-  const docAppend = (who: Who) =>
+  const blockCreate = (who: Who) =>
     sessionSchemaTool(
-      "doc_append",
-      descriptions.docAppend,
-      Effect.fn("Tools.doc_append")(function* (p: Session<"doc_append">) {
+      "doc.block.create",
+      sessionDescriptions["doc.block.create"],
+      Effect.fn("Tools.blockCreate")(function* (p: Session<"doc.block.create">) {
         const c = yield* callerOf(who);
-        const type = (p.type ?? "").trim() || "paragraph";
-        if (!appendTypes.includes(type)) return yield* refuse(answers.doc.badBlockType(appendTypes));
-        const attrs: BlockAttrs =
-          type === "heading" ? { level: p.level && p.level >= 1 && p.level <= 3 ? Math.trunc(p.level) : 2 } : type === "todo" ? { checked: false } : {};
-        const [b, r] = yield* docs.append(p.doc.trim(), writer(c), type, attrs, p.text);
-        if (!r || r.status !== "applied" || !b) return yield* refuse(r?.reason ?? "");
-        return answers.doc.appended(b.id, b.rev);
+        const { id, ...block } = p;
+        const r = yield* docs.appendBlock(id.trim(), writer(c), block);
+        if (r.status !== "applied") return yield* refuse(r.reason ?? "");
+        return answers.doc.appended(r.blockId, r.rev ?? 0);
       }),
     );
 
-  const docUpdate = (who: Who) =>
+  const blockUpdate = (who: Who) =>
     sessionSchemaTool(
-      "doc_update",
-      descriptions.docUpdate,
-      Effect.fn("Tools.doc_update")(function* (p: Session<"doc_update">) {
+      "doc.block.update",
+      sessionDescriptions["doc.block.update"],
+      Effect.fn("Tools.blockUpdate")(function* (p: Session<"doc.block.update">) {
         const c = yield* callerOf(who);
-        const [, r] = yield* docs.updateText(p.doc.trim(), writer(c), p.block.trim(), Math.trunc(p.base_rev ?? 0), p.text);
-        if (r?.status === "applied") return answers.doc.updated(r.blockId, r.rev);
-        if (r?.status === "conflict") {
-          const now = yield* Effect.orElseSucceed(docs.get(p.doc.trim()), () => undefined);
+        const { id, ...block } = p;
+        const r = yield* docs.updateBlock(id.trim(), writer(c), block);
+        if (r.status === "applied") return answers.doc.updated(r.blockId, r.rev);
+        if (r.status === "conflict") {
+          const now = yield* Effect.orElseSucceed(docs.get(id.trim()), () => undefined);
           const x = now?.blocks.find((b) => b.id === r.blockId);
           return answers.doc.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
         }
-        return yield* refuse(r?.reason ?? "");
+        return yield* refuse(r.reason ?? "");
       }),
     );
 
   return Tools.of({
     orchestrator: (who) => [
-      projectsTool,
-      channelsTool,
-      recurrenceTool(who),
-      listRecurrences,
-      cancelRecurrence,
-      openChannel,
-      channelSettings,
-      accept,
-      changes(who),
-      roster,
-      check,
-      tell(who),
-      readChat(who),
-      stop(who),
-      dismiss,
-      issuesTool,
+      issueList,
+      issueGet,
       issueCreate(who),
       issueUpdate(who),
       issueStatus(who),
+      issueComment(who),
+      issueReview,
+      issueDiff(who),
+      roster,
+      sessionStop(who),
+      messageList(who),
+      channelList,
+      channelCreate,
+      channelUpdate,
+      projectList,
+      recurrenceCreate(who),
+      recurrenceList,
+      recurrenceDelete,
       graphSplit(who),
-      graphsTool,
-      taskEdit(who),
-      graphAction(who),
-      taskAction(who),
+      graphList,
+      graphGet,
+      taskUpdate(who),
+      taskDelete(who),
+      graphAct(who),
+      taskAct(who),
       memorySearch(who, true),
-      memoryAdd(who, true),
+      memoryCreate(who, true),
     ],
     session: (who) => [
-      channelSay(who),
-      readChat(who),
-      channelInbox(who),
+      messageSend(who),
+      messageList(who),
+      unreadList(who),
       sessionList,
       memorySearch(who, false),
-      memoryAdd(who, false),
-      docRead(who),
-      docAppend(who),
-      docUpdate(who),
+      memoryCreate(who, false),
+      docGet(who),
+      blockCreate(who),
+      blockUpdate(who),
       issueSplit(who),
     ],
     start: toolStart,

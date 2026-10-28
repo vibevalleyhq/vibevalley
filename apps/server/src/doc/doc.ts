@@ -3,7 +3,20 @@
 // serial and its seq goes up in order.
 
 import { docWording } from "./words.ts";
-import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
+import type {
+  Agent,
+  Block,
+  BlockAttrs,
+  BlockInput,
+  DocAck,
+  DocBlockCreate,
+  DocBlockUpdate,
+  DocOpResult,
+  DocSnapshot,
+  DocSpan,
+  DocSubmit,
+  Document,
+} from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Db } from "../base/db.ts";
@@ -51,11 +64,18 @@ export interface DocShape {
     baseRev: number,
     text: string,
   ) => Effect.Effect<[Block | undefined, DocOpResult | undefined], ApiError>;
+  /** A block of one of the kinds an agent writes appended at the end (doc.block.create); refused for another kind. */
+  readonly appendBlock: (doc: string, actor: string, req: DocBlockCreate) => Effect.Effect<DocOpResult, ApiError>;
+  /** A block's text against the rev it was read at (doc.block.update): a newer rev comes back as a conflict, not an error. */
+  readonly updateBlock: (doc: string, actor: string, req: DocBlockUpdate) => Effect.Effect<DocOpResult, ApiError>;
   /** Starts the demo and returns at once (demo.ts). */
   readonly demo: (id: string, helpers: readonly Agent[]) => Effect.Effect<void, ApiError>;
 }
 
 export class Docs extends Context.Service<Docs, DocShape>()("vibevalley/Doc") {}
+
+/** The block kinds an agent appends; the editor has more (dividers, images), which an agent does not write. */
+const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
 
 const missingDoc = (id: string) => missing(docWording().doc(id), [lookIn.doc]);
 
@@ -218,6 +238,20 @@ export const make = (options: DocOptions = {}) =>
       );
     }, lock.withPermits(1));
 
+    const appendBlock = Effect.fn("Docs.appendBlock")(function* (doc: string, actor: string, req: DocBlockCreate) {
+      const type = (req.type ?? "").trim() || "paragraph";
+      if (!appendTypes.includes(type)) return yield* Effect.fail(refused(docWording().badBlockType(appendTypes)));
+      const level = req.level !== undefined && req.level >= 1 && req.level <= 3 ? Math.trunc(req.level) : 2;
+      const attrs: BlockAttrs = type === "heading" ? { level } : type === "todo" ? { checked: false } : {};
+      const [, r] = yield* append(doc, actor, type, attrs, req.text);
+      return r ?? (yield* Effect.fail(refused(docWording().notApplied)));
+    });
+
+    const updateBlock = Effect.fn("Docs.updateBlock")(function* (doc: string, actor: string, req: DocBlockUpdate) {
+      const [, r] = yield* updateText(doc, actor, req.block.trim(), Math.trunc(req.baseRev), req.text);
+      return r ?? (yield* Effect.fail(refused(docWording().notApplied)));
+    });
+
     const importMarkdown = Effect.fn("Docs.importMarkdown")(function* (title: string, markdown: string, actor: string) {
       const created = yield* create(title);
       const parents: string[] = [];
@@ -322,6 +356,8 @@ export const make = (options: DocOptions = {}) =>
       submit,
       append,
       updateText,
+      appendBlock,
+      updateBlock,
       demo,
     };
     return shape;

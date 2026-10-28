@@ -17,7 +17,7 @@
 - 服务端 `apps/server/src/recurrence`（`Recurrences`）：`recurrence.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`rules.ts` 是只有它用的纯函数：`dueRecurrences`、`isMissed`、`afterRun`、`needsOK`。
 - 几处都用的规则在 `apps/server/src/recurrence/when.ts`：`nextRun`、`recurrenceProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
 - 表：`recurrence`（一个定时一行，时间写法存成 JSON 的 `spec`）；工单表的 `recurrence` 列指着它的定时。
-- 接口：`recurrence.create`、`recurrence.list`、`recurrence.update`、`recurrence.delete`（[capabilities.md](docs/reference/capabilities.md)）；`recurrence.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `recurrence`、`list_recurrences`、`cancel_recurrence` 在 `tool/tool.ts`。
+- 接口：`recurrence.create`、`recurrence.list`、`recurrence.update`、`recurrence.delete`（[capabilities.md](docs/reference/capabilities.md)）；`recurrence.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `recurrence_create`、`recurrence_list`、`recurrence_delete` 在 `tool/tool.ts`。
 - 配置：`recurrence.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
 - 页面：频道菜单的「定时」（`apps/web/src/farm/chat/ChannelMenu.tsx`）和聊天页的「定时」标签（`apps/web/src/features/channel/Tabs.tsx`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`apps/web/src/features/issue/cards.ts`）。
 
@@ -26,7 +26,7 @@
 - **五种时间**（`RecurrenceWhen`，封闭的联合）：`once`（一个时刻）、`every`（每隔几分钟，至少 `minEveryMinutes` = 1）、`daily`（每天 `HH:MM`）、`weekly`（每周几、`HH:MM`，0–6 的整数，0 是周日）、`cron`（五段：分 时 日 月 周几）。每个定时带时区：IANA 名字或偏移（`+08:00`、`+0800`、`+08`，偏移可带 `GMT` 前缀），没给就用这台电脑的时区。校验、下次时间和显示共用同一个解析函数，同值的几种偏移写法在每天、每周和 cron 里都在同一时刻到点。
 - **cron 的读法**：每段是逗号隔开的 `*`、`n`、`a-b`，都能带 `/步长`；周几 0 到 7，0 和 7 都是周日；两个日子段都不以 `*` 开头时照 Vixie cron，哪个对上都算，否则两个都要对上。八年（`cronYears`）里都不会到点的（2 月 30 号）不收；`recurrenceProblem` 说清是哪一段写错了。`whenText` 把常见的说成话（每天、工作日、周末、每周几、每月几号、每小时第几分），其余显示 `cron 0 9 1 1 *`。
 - **下次什么时候不存**，`nextRun` 从上次跑的时间（没跑过就从定好的时间）算：严格晚于它的第一个对上的分钟。`daily`、`weekly`、`cron` 沿着墙上的钟走：调钟跳过的时刻算成调钟前的同一时刻往后挪（春天拨快那晚的 02:30 是 03:30），重复的取第一次；所以写成 cron 的每天、每周和 `daily`、`weekly` 在同样的时刻到点。关着的定时没有下次。
-- **谁定的**（`Recurrence.by`）：`owner` 是主人经接口、命令行定的，`orchestrator` 是管家用 `recurrence` 定的；列表里管家定的写着「管家定的」。
+- **谁定的**（`Recurrence.by`）：`owner` 是主人经接口、命令行定的，`orchestrator` 是管家用 `recurrence_create` 定的；列表里管家定的写着「管家定的」。
 - **等主人同意**（`needsOK`）：主人定的、管家在主人这一轮里（最新那条输入有主人的话）定的，当场生效。管家不是主人叫醒时定的，只有不派帮工的一次性回头看当场生效；会反复来的、直接派帮工的存成关着、`pending`，到点也不跑，在 Inbox 里是一条 `recurrence-ask`。主人点「同意」是 `recurrence.update` 打开，同时清掉 `pending`；点「不要」是 `recurrence.delete`。管家的工具对待批的回「定好了，等主人同意才生效：……」，它照实告诉主人。
 - **派给谁**：写了帮工档案（按 id，再按名字找）的派给那个档案，这时要写项目或频道有默认项目，否则不收；没写的派给管家（工单的 `assignee` 是 `orchestrator`）。管家用的工具里不填频道就是它正在回话的频道，接口里不填是默认频道。
 - **一个定时一张工单**：`Issues.ofRecurrence` 取指着这个定时的最近一张；每次到点是它的一次干活，触发是 `RunTrigger` 的 `recurrence`（带着哪个定时、是不是补跑）。
@@ -61,7 +61,7 @@
 - **工单（`issue`）**：订阅 `Due()`，一个定时一张工单，到点开它的一次干活；派活、排队、重开、带话都照工单的规则（[工单](docs/subsystems/issue.md)）。
 - **频道（`channel`）**：定时属于一个频道（`recurrence.channel_id`）；到点的提示和出错的提示都经 `notice` 说在这个频道里。
 - **帮工档案（`agent`）**：定时只认存在的档案；`orchestrator` 这个 id 没有档案能用。
-- **管家（`orchestrator`、`tool`）**：用 `recurrence`、`list_recurrences`、`cancel_recurrence` 定、看、删，调不了 `recurrence.update`。系统提示里写着：主人说「每天」「到点」时定；派了活、答应了主人一件事、在等一个结果时，可以自己定一次性的回头看；会反复来的只在主人要的时候定。管家自己的定时（没写档案的）快到点时，它闲着也不压缩（`wakeSoon`）。
+- **管家（`orchestrator`、`tool`）**：用 `recurrence_create`、`recurrence_list`、`recurrence_delete` 定、看、删，调不了 `recurrence.update`。系统提示里写着：主人说「每天」「到点」时定；派了活、答应了主人一件事、在等一个结果时，可以自己定一次性的回头看；会反复来的只在主人要的时候定。管家自己的定时（没写档案的）快到点时，它闲着也不压缩（`wakeSoon`）。
 - **Inbox（`apps/server/src/notice/inbox.ts`）**：待批的定时是一条 `recurrence-ask`，主人同意或删掉它就没了。
 
 ## 为什么这样

@@ -84,16 +84,16 @@ export function roundMs(r: Round, end: number) {
 export const lastTime = (r: Round) => allOf(r).at(-1)?.time;
 
 export function farmToolText(text: string) {
-  const m = /^vibevalley__(channel_say|channel_read|channel_inbox|session_list)/.exec(text.trim())?.[1];
+  const m = /^vibevalley__(channel_message_send|channel_message_list|channel_unread_list|session_list)/.exec(text.trim())?.[1];
   switch (m) {
     case undefined:
       return undefined;
-    case "channel_say":
-      return sessionWording().rounds.farm.channel_say;
-    case "channel_read":
-      return sessionWording().rounds.farm.channel_read;
-    case "channel_inbox":
-      return sessionWording().rounds.farm.channel_inbox;
+    case "channel_message_send":
+      return sessionWording().rounds.farm.channel_message_send;
+    case "channel_message_list":
+      return sessionWording().rounds.farm.channel_message_list;
+    case "channel_unread_list":
+      return sessionWording().rounds.farm.channel_unread_list;
     case "session_list":
       return sessionWording().rounds.farm.session_list;
     default:
@@ -332,7 +332,7 @@ export const secondsText = (ms: number) => (ms < 10000 ? appWording().time.tenth
 
 export const tokensText = (n: number) => (n < 10000 ? `${n}` : appWording().big(n, 1));
 
-/** The part after an MCP server's prefix: `mcp__vibevalley__channel_say` is channel_say. */
+/** The part after an MCP server's prefix: `mcp__vibevalley__channel_message_send` is channel_message_send. */
 export function toolName(tool: string) {
   const at = tool.lastIndexOf("__");
   return at >= 0 && at + 2 < tool.length ? tool.slice(at + 2) : tool;

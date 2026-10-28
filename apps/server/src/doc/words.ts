@@ -18,6 +18,8 @@ const zh = {
   demoNotInserted: (status: string) => "演示的块没插进去：" + status,
   noWriter: "没有能写的帮工：先在档案里打开一个",
   demoRunning: "演示正在写，写完再点",
+  badBlockType: (types: readonly string[]) => "块的类型只能是 " + types.join("、"),
+  notApplied: "这一块没写进去",
   op: {
     deleted: "这一块已经删掉了",
     noAttr: (name: string) => `没有属性 ${name}`,
@@ -72,6 +74,8 @@ const en: typeof zh = {
   demoNotInserted: (status) => "The demo's block was not inserted: " + status,
   noWriter: "No helper can write: turn one on in the profiles first",
   demoRunning: "The demo is writing: try again when it is done",
+  badBlockType: (types) => "A block's type can only be " + types.join(", "),
+  notApplied: "The block was not written",
   op: {
     deleted: "This block was deleted",
     noAttr: (name) => `There is no attribute ${name}`,

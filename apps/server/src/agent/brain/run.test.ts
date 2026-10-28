@@ -241,7 +241,7 @@ describe("the agent's own tasks", () => {
       }
       if (!answered(c))
         return answer([
-          toolCall("task_add", {
+          toolCall("todo_add", {
             tasks: [
               { id: "a", brief: "查 A", by: "subagent" },
               { id: "b", brief: "查 B", by: "subagent" },
@@ -279,7 +279,7 @@ describe("the agent's own tasks", () => {
     });
     const reply = (c: Request): Answer => {
       if (systemPrompt(c).includes("派出去的帮手")) return answer([toolCall("wait", {})]);
-      if (!answered(c)) return answer([toolCall("task_add", { tasks: [{ id: "a", brief: "查 A", by: "subagent" }] })]);
+      if (!answered(c)) return answer([toolCall("todo_add", { tasks: [{ id: "a", brief: "查 A", by: "subagent" }] })]);
       return answer("派好了");
     };
     await withAgent(
@@ -308,7 +308,7 @@ describe("the agent's own tasks", () => {
       }
       if (!answered(c))
         return answer([
-          toolCall("task_add", {
+          toolCall("todo_add", {
             tasks: [
               { id: "a", brief: "读" },
               { id: "b", brief: "写" },

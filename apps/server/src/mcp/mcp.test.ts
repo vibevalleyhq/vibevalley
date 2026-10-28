@@ -83,28 +83,28 @@ describe("mcp", () => {
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).sort()).toEqual([
-        "channel_inbox",
-        "channel_say",
-        "doc_append",
-        "doc_read",
-        "doc_update",
+        "channel_message_list",
+        "channel_message_send",
+        "channel_unread_list",
+        "doc_block_create",
+        "doc_block_update",
+        "doc_get",
         "issue_split",
-        "memory_add",
+        "memory_create",
         "memory_search",
-        "read_chat",
         "session_list",
       ]);
       const who = yield* Effect.promise(() => c.tool("session_list"));
       expect(who).toMatch(new RegExp(`^- ${id} `, "m"));
       // Names are listed without an @: models copy a wake.
       expect(who.split("\n").slice(0, -1).join("\n")).not.toContain("@");
-      expect(yield* Effect.promise(() => c.tool("channel_say", { text: "从 MCP 说一句", anyway: true }))).toContain("发出去了");
+      expect(yield* Effect.promise(() => c.tool("channel_message_send", { text: "从 MCP 说一句", anyway: true }))).toContain("发出去了");
       const m = saidIn(thread!).find((x) => x.text === "从 MCP 说一句");
       expect(m).toMatchObject({ from: id, fromKind: "session" });
-      expect(yield* Effect.promise(() => c.tool("channel_inbox"))).not.toBe("");
-      expect(yield* Effect.promise(() => c.tool("read_chat"))).toContain("从 MCP 说一句");
+      expect(yield* Effect.promise(() => c.tool("channel_unread_list"))).not.toBe("");
+      expect(yield* Effect.promise(() => c.tool("channel_message_list"))).toContain("从 MCP 说一句");
       expect(yield* Effect.promise(() => client(mcp, "").tool("session_list"))).toContain("没认出你是谁");
-      expect(yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_say", { text: "冒名" }))).toContain("没认出你是谁");
+      expect(yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" }))).toContain("没认出你是谁");
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
 
@@ -125,7 +125,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const c = client(mcp, "");
       for (const name of yield* Effect.promise(c.list)) {
-        const args = name === "channel_say" || name === "memory_add" ? { text: "must not be posted" } : {};
+        const args = name === "channel_message_send" || name === "memory_create" ? { text: "must not be posted" } : {};
         expect(yield* Effect.promise(() => c.tool(name, args))).toContain("没认出你是谁");
       }
     }).pipe(Effect.scoped, Effect.provide(world())),
@@ -140,17 +140,18 @@ describe("mcp", () => {
       yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: owner });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
-      expect(yield* tool("memory_add", { text: "这个项目测试用 pnpm test" })).toContain("记下了（项目 demo）");
-      expect(yield* tool("memory_add", { text: "提交信息写中文", all_projects: true })).toContain("记下了（所有项目）");
-      expect(yield* tool("memory_add", { text: "冒名记一条", agent: "scout" })).toContain("只能记进你自己的档案");
+      expect(yield* tool("memory_create", { text: "这个项目测试用 pnpm test" })).toContain("记下了（项目 demo）");
+      expect(yield* tool("memory_create", { text: "提交信息写中文", project: "" })).toContain("记下了（所有项目）");
+      // There is no profile to name: what it writes is its own, whatever it says.
+      yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
       // What it wrote is its own, not the owner's: the 记性 tab says which helper wrote it.
       for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["session", "w1"]);
-      const found = yield* tool("memory_search", { query: "测试" });
+      const found = yield* tool("memory_search", { text: "测试" });
       expect(found).toContain("pnpm test");
       expect(found).not.toContain("make check");
-      expect(yield* tool("memory_search", { query: "部署" })).toContain("没有搜到「部署」");
-      expect(yield* Effect.promise(() => client(mcp, "w9").tool("memory_search", { query: "测试" }))).toContain("你不在场");
+      expect(yield* tool("memory_search", { text: "部署" })).toContain("没有搜到「部署」");
+      expect(yield* Effect.promise(() => client(mcp, "w9").tool("memory_search", { text: "测试" }))).toContain("你不在场");
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 
@@ -165,26 +166,26 @@ describe("mcp", () => {
       const d = yield* docs.create("周报");
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
-      const added = yield* tool("doc_append", { doc: d.doc.id, text: "这周做完了**第一步**" });
+      const added = yield* tool("doc_block_create", { id: d.doc.id, text: "这周做完了**第一步**" });
       const block = /加了一块〔(\S+)〕，第 (\d+) 版/.exec(added)![1]!;
-      expect(yield* tool("doc_append", { doc: d.doc.id, text: "下周", type: "heading", level: 1 })).toContain("加了一块");
-      expect(yield* tool("doc_append", { doc: d.doc.id, text: "x", type: "table" })).toContain("没成：块的类型只能是");
-      const read = yield* tool("doc_read", { doc: d.doc.id });
+      expect(yield* tool("doc_block_create", { id: d.doc.id, text: "下周", type: "heading", level: 1 })).toContain("加了一块");
+      expect(yield* tool("doc_block_create", { id: d.doc.id, text: "x", type: "table" })).toContain("没成：块的类型只能是");
+      const read = yield* tool("doc_get", { id: d.doc.id });
       expect(read).toContain("《周报》，2 块");
       expect(read).toContain("〔" + block + " · 第 1 版 · paragraph〕这周做完了第一步");
-      expect(yield* tool("doc_update", { doc: d.doc.id, block, base_rev: 1, text: "这周做完了第一步和第二步" })).toContain("现在是第 2 版");
+      expect(yield* tool("doc_block_update", { id: d.doc.id, block, baseRev: 1, text: "这周做完了第一步和第二步" })).toContain("现在是第 2 版");
       // The owner changes it in the editor; the helper's next rewrite was made against rev 2.
       yield* docs.submit(d.doc.id, "owner", {
         batchId: "owner",
         ops: [{ op: "update_text", blockId: block, baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
       });
-      const stale = yield* tool("doc_update", { doc: d.doc.id, block, base_rev: 2, text: "帮工又改" });
+      const stale = yield* tool("doc_block_update", { id: d.doc.id, block, baseRev: 2, text: "帮工又改" });
       expect(stale).toContain("没改：这一块刚被别人改过，现在是第 3 版");
       expect(stale).toContain("主人改过的");
       const snap = yield* docs.get(d.doc.id);
       expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["主人改过的", "owner", "lab"]);
       expect(yield* docs.markdown(d.doc.id)).toBe("主人改过的\n\n# 下周\n");
-      expect(yield* tool("doc_read", { doc: "nope" })).toContain("没成");
+      expect(yield* tool("doc_get", { id: "nope" })).toContain("没成");
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 });

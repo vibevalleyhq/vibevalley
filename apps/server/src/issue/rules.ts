@@ -5,6 +5,7 @@ import type {
   Deliverable,
   Question,
   Issue,
+  IssueFilter,
   IssueStatus,
   IssueTemplate,
   IssueTimeline,
@@ -17,7 +18,7 @@ import type {
   TemplateBlank,
   TemplateKind,
 } from "@vibevalley/protocol";
-import { closedText, shortTitle } from "@vibevalley/protocol/rules";
+import { attentionWantsOwner, closedText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
 import { clip } from "../base/text.ts";
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
@@ -276,3 +277,21 @@ export const nullText = (s: string | undefined) => {
 };
 
 export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);
+
+const spaces = /\s+/;
+
+/** The issues a filter picks, newest first: the open ones unless it asks for closed ones or names a closed status; waiting on
+ * the owner, the longest waiting first. */
+export function pickIssues(all: readonly Issue[], f: IssueFilter, now: number): Issue[] {
+  const words = (f.text ?? "").split(spaces).filter(Boolean);
+  const project = (f.project ?? "").trim();
+  let found = all.filter(
+    (t) =>
+      (f.status ? t.status === f.status : f.closed || (t.status !== "done" && t.status !== "canceled")) &&
+      (!f.wantsOwner || attentionWantsOwner(t.attention.state)) &&
+      (!project || t.project === project) &&
+      words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
+  );
+  if (f.wantsOwner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
+  return f.limit && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
+}

@@ -362,7 +362,7 @@ describe("markdown", () => {
           span("word"),
         ],
       }),
-      block({ id: "s", orderKey: "VV", type: "paragraph", text: [span("doc_append 和 doc_update 是工具名")] }),
+      block({ id: "s", orderKey: "VV", type: "paragraph", text: [span("doc_block_create 和 doc_block_update 是工具名")] }),
       block({ id: "b", orderKey: "W", type: "paragraph", text: [span("- 像列表的段落")] }),
       block({ id: "c", orderKey: "X", type: "bulleted", text: [span("[ ] 像待办的列表")] }),
       block({ id: "d", orderKey: "Y", type: "numbered", text: [span("一")] }),

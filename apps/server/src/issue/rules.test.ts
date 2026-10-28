@@ -14,6 +14,7 @@ import {
   parseRefinement,
   sentTitles,
   milestonesOf,
+  pickIssues,
   splitJob,
 } from "./rules.ts";
 import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
@@ -208,6 +209,26 @@ describe("templates", () => {
           expect(s.title.includes("〔")).toBe(s.blank !== undefined);
         }
     expect(templateCatalog()[0]!.templates[0]!.text).toBeFalsy();
+  });
+
+  it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {
+    const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
+      ({ title, status, project: "app", attention: { state: "working", acts: [] }, ...more }) as Issue;
+    const waiting = (since: number) => ({ attention: { state: "reviewing" as const, acts: [], since } });
+    const all = [
+      issue("修登录 按钮", "in_review", waiting(5)),
+      issue("加打卡", "todo"),
+      issue("修登录 页面", "in_review", waiting(2)),
+      issue("老的", "done"),
+      issue("别处的", "todo", { project: "web" }),
+    ];
+    const titles = (f: Parameters<typeof pickIssues>[1]) => pickIssues(all, f, 10).map((t) => t.title);
+    expect(titles({})).toEqual(["修登录 按钮", "加打卡", "修登录 页面", "别处的"]);
+    expect(titles({ closed: true, limit: 2 })).toEqual(["修登录 按钮", "加打卡"]);
+    expect(titles({ status: "done" })).toEqual(["老的"]);
+    expect(titles({ text: "修登录 页面" })).toEqual(["修登录 页面"]);
+    expect(titles({ project: "web" })).toEqual(["别处的"]);
+    expect(titles({ wantsOwner: true })).toEqual(["修登录 页面", "修登录 按钮"]);
   });
 
   it("recent titles are the project's own sent issues", () => {

@@ -106,6 +106,8 @@ export interface TaskShape {
   readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
   /** A helper finds its issue is several people's work: the issue becomes the graph, its steps the issues under it, and they start at once. */
   readonly splitIssue: (session: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
+  /** The same split, asked of the session working the issue now: it is that session's branch the graph opens from. */
+  readonly splitIssueOf: (issue: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
   readonly act: (id: string, action: GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
   readonly taskAct: (id: string, task: string, action: TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
   readonly editTask: (id: string, task: string, edit: TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
@@ -115,6 +117,7 @@ export interface TaskShape {
   readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
   /** The task graphs now, as the board has them. */
   readonly graphs: () => TaskGraph[];
+  readonly graph: (id: string) => Effect.Effect<TaskGraph, ApiError>;
   readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
   /** What the orchestrator is told about graphs, subscribed before it returns. */
   readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
@@ -489,7 +492,10 @@ export const make = (options: TaskOptions = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
     const shape: TaskShape = {
+      splitIssueOf: (issue, title, steps) =>
+        Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((t) => t.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
       graphs: () => graphsOf(core.state()),
+      graph: need,
       comeBack,
       split: Effect.fn("Tasks.split")(function* (goal, project, agent, by) {
         const where = project.trim();

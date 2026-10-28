@@ -323,6 +323,17 @@ export interface Channel {
   at: number;
 }
 
+/** A place a participant has not read all of, as channel.unread.list gives it to its caller. */
+export interface ChannelUnread {
+  /** Its address: #channel, #channel:n for a thread, @owner for the orchestrator's direct channel. */
+  channel: string;
+  unread: number;
+  /** Something there names the caller. */
+  mentionsYou: boolean;
+  /** Who said the newest message there. */
+  latest?: string;
+}
+
 export interface ChannelLast {
   from: string;
   name: string;
@@ -1018,6 +1029,22 @@ export type MemoryKind = (typeof MemoryKindValues)[number];
 export interface MemoryRequest {
   text: string;
   project?: string;
+}
+
+/** Where a memory holds: for every project, one project, or a source that does not say. */
+export type MemoryScope = { kind: "global" } | { kind: "project"; project: string } | { kind: "unknown" };
+
+/** A memory a search found, with the source it came from and how well it matched. */
+export interface MemoryFound extends Memory {
+  source: string;
+  score: number;
+  scope: MemoryScope;
+}
+
+export interface MemorySearch {
+  found: MemoryFound[];
+  /** The sources asked, as each says it covered the search. */
+  coverage: string[];
 }
 
 export interface MemoryList {
@@ -2184,6 +2211,46 @@ export interface RecurrenceUpdate {
   enabled?: boolean;
 }
 
+/** A verdict on what was handed back: passed, or not, with the findings (or words) it is mended by. */
+export interface IssueReviewRequest {
+  pass: boolean;
+  findings?: string[];
+  text?: string;
+}
+
+/** Which issues issue.list gives: the open ones by default, the newest first. */
+export interface IssueFilter {
+  /** Only those in this status (closed ones included when it is done or canceled). */
+  status?: IssueStatus;
+  /** Words that the title or description all contain. */
+  text?: string;
+  project?: string;
+  /** At most this many; none is all. */
+  limit?: number;
+  closed?: boolean;
+  /** Only those waiting on the owner, the longest waiting first. */
+  wantsOwner?: boolean;
+}
+
+/** One task of an issue split into several people's work: an issue under the graph the issue becomes. */
+export interface TaskDraft {
+  id: string;
+  title?: string;
+  brief: string;
+  needs?: string[];
+  /** A profile's id or name; empty is the farm's choice. */
+  agent?: string;
+  check?: string;
+  scope?: string[];
+  /** The task that checks the others' work against the whole. */
+  acceptance?: boolean;
+}
+
+export interface IssueSplitRequest {
+  title?: string;
+  tasks: TaskDraft[];
+}
+
 export interface IssueStatusRequest {
   status: IssueStatus;
   /** Moving back to todo: another round with these words (findings, while it waits for acceptance), or, while it is
@@ -2191,7 +2258,7 @@ export interface IssueStatusRequest {
   text?: string;
   /** Moving to todo: the profile that takes it on. Another than its own hands it over: the last session leaves, its branch
    * kept, and this one goes on in the same issue. */
-  agent?: string;
+  assignee?: string;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
 }
@@ -2431,6 +2498,22 @@ export interface DocSubmit {
 
 export const DocOpStatusValues = ["applied", "merged", "conflict", "noop", "rejected"] as const;
 export type DocOpStatus = (typeof DocOpStatusValues)[number];
+
+/** A block appended at a document's end. */
+export interface DocBlockCreate {
+  /** paragraph (the default), heading, bulleted, numbered, todo, quote or code. */
+  type?: string;
+  /** A heading's: 1 to 3, 2 when none. */
+  level?: number;
+  text: string;
+}
+
+/** A block's text rewritten against the rev it was read at: a newer rev is a conflict, not an overwrite. */
+export interface DocBlockUpdate {
+  block: string;
+  baseRev: number;
+  text: string;
+}
 
 export interface DocOpResult {
   status: DocOpStatus;

@@ -21,6 +21,7 @@ import {
   type IssueStatus,
   IssueStatusValues,
   type IssueTimeline,
+  type IssueFilter,
   type IssueUpdate,
   type Preview,
   orchestratorAgent,
@@ -56,6 +57,7 @@ import {
   resumeWords,
   sentTitles,
   splitJob,
+  pickIssues,
 } from "./rules.ts";
 import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { isBusy } from "@vibevalley/protocol/rules";
@@ -97,6 +99,8 @@ export interface OrchestratorWork {
 export interface IssueShape {
   /** The issues on the board: a talk with a profile is not one. */
   readonly list: () => Effect.Effect<Issue[]>;
+  /** The board's issues a filter picks (issue.list). */
+  readonly query: (f: IssueFilter) => Effect.Effect<Issue[]>;
   /** The issues the board holds now (open, and the latest closed). */
   readonly onBoard: () => readonly Issue[];
   readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
@@ -146,7 +150,8 @@ export interface IssueShape {
 }
 
 export interface StatusOptions {
-  readonly agent?: string;
+  /** Moving to todo: the profile that takes it on (a name or an id). */
+  readonly assignee?: string;
 }
 
 /** What starting an issue came to: the session sent, or why it waits in the queue. */
@@ -704,7 +709,7 @@ export const make = (options: IssueOptions = {}) =>
      * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
     const settledMove = Effect.fn("Issues.settledMove")(function* (t: Issue, to: IssueStatus, text: string, opt: StatusOptions) {
       if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused(issueWording().noStatus(to)));
-      const taker = opt.agent ? yield* takerOf(t, to, opt.agent) : undefined;
+      const taker = opt.assignee ? yield* takerOf(t, to, opt.assignee) : undefined;
       const [move, why] = statusMove(t, to);
       const said = text.trim();
       if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
@@ -971,6 +976,11 @@ export const make = (options: IssueOptions = {}) =>
     const shape: IssueShape = {
       onBoard: () => core.state().issues ?? [],
       list: () => Effect.map(list, (all) => all.filter((t) => !t.talk)),
+      query: (f) =>
+        Effect.gen(function* () {
+          const all = (yield* list).filter((t) => !t.talk);
+          return pickIssues(all, f, yield* Clock.currentTimeMillis);
+        }),
       get,
       timeline,
       add: (req) => add(req),

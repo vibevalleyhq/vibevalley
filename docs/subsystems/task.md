@@ -21,7 +21,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 - 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；`rules.ts` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）。
 - 规则：只有服务端跑的，都在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）、`graph.ts`（出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`）；边的规则在 `apps/server/src/base/dag.ts`，和 `agent/brain` 自己的任务共用。工单状态怎么从计划算在 `issue/state.ts` 的 `issueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
-- 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
+- 接口：`graph.*`（`graph.split`、`graph.list`、`graph.get`、`graph.task.update`、`graph.task.delete`、`graph.act`、`graph.task.act`、`graph.diff.get`、`graph.event.list`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graph_list`、`graph_get`、`graph_task_update`、`graph_task_delete`、`graph_act`、`graph_task_act`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
 - 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/features/issue/cards.ts`），子工单的标题前加计划名（`features/issue/rules.ts` 的 `issueTitle`）；工单详情里的一件是 `features/issue/TaskDetail.tsx`。两边对计划的调用（拆、动作、改一件、删一件）和分支的改动都经 `apps/web/src/features/task/data.ts`：每个调用回一句话（成了，或为什么不行），之后重读工单。
 
@@ -93,7 +93,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 - **工单（`issue`）**：`putTask` 写整家工单，`nextTaskId` 给下一个计划号，`hire` 派帮工（查档案、地满没满）；工单服务的转换表不管计划里的工单（[工单](docs/subsystems/issue.md)）。
 - **帮工（`session`）**：派规划的、做件的帮工，`tell` 带话（触发是 `task`），`dismiss` 请走，`mergeInto` 在合并动作里停住写入、合并、离场；正在干或有待开始的一轮时不能合。计划听核心状态的事实：`report`（一轮结束）和 `left`（帮工离开）。
 - **项目（`project`）**：`openBranch`、`mergeBranch`、`branchChanges`（`graph.diff.get` 的改动）、`changedFiles`（冻结文件的判断）、`Run`（检查命令）。
-- **管家（`orchestrator`、`tool`）**：五个工具起头、看、改、动作；计划的新闻进管家的输入（来源 `graph`）；管家的现状写着开着的计划。
+- **管家（`orchestrator`、`tool`）**：七个工具起头、看、改、删、动作；计划的新闻进管家的输入（来源 `graph`）；管家的现状写着开着的计划。
 - **频道（`channel`）**：计划里帮工的汇报标 `forTask`，不投给管家。
 - **Inbox（`apps/server/src/notice/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/orchestrator.md)）。
 - **游戏（`game`）**：一个计划合进主分支记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](docs/reference/farm-ui.md)「金币」）。

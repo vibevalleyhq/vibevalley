@@ -42,10 +42,11 @@
 
 2. 改提示、工具描述或 harness。
 3. 再跑第 1 步的命令。新样例过了（至少 4/5），以前的样例也都还过，vitest 报 `pass on the real model` 通过。
-4. 只想少采几次省钱、换模型、或把家目录里的样例也跑上：
+4. 只想少采几次省钱、换模型、把家目录里的样例也跑上，或改了提示以后只重放没过的那几个（`VIBEVALLEY_EVAL_ONLY` 写样例名的开头，逗号分开；合之前全套还要过一次）：
 
    ```bash
    VIBEVALLEY_EVAL_N=2 VIBEVALLEY_EVAL_MODEL=deepseek-flash VIBEVALLEY_EVALS=~/.vibevalley/orchestrator/evals vp run --filter @vibevalley/server evals
+   VIBEVALLEY_EVAL_ONLY=hand-over-in-place vp run --filter @vibevalley/server evals
    ```
 
    还没写 `expect` 的样例会跳过（`no expect yet, skipped`）。

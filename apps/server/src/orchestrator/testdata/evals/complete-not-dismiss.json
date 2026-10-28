@@ -2,36 +2,40 @@
   "id": "complete-not-dismiss",
   "created": 1792271400000,
   "model": "deepseek-flash",
-  "want": "主人说收下 #41，管家却用 dismiss 让帮工收工，工单还开着、改动没进主分支。收下是完成：用 issue_status 挪到已完成，照工单交付。",
+  "want": "主人说收下 #41，管家却把工单挪到已取消让帮工收工，改动没进主分支。收下是完成：用 issue_status_update 挪到已完成，照工单交付。",
   "memory": "",
   "tools": [
-    "issue_create",
-    "projects",
-    "channels",
-    "recurrence",
-    "list_recurrences",
-    "cancel_recurrence",
-    "open_channel",
-    "channel_settings",
-    "changes",
-    "roster",
-    "check",
-    "tell",
-    "read_chat",
-    "stop",
-    "dismiss",
+    "channel_create",
+    "channel_list",
+    "channel_message_list",
+    "channel_update",
+    "graph_act",
+    "graph_get",
+    "graph_list",
     "graph_split",
-    "graphs",
-    "task_edit",
-    "graph_action",
-    "task_action",
+    "graph_task_act",
+    "graph_task_delete",
+    "graph_task_update",
+    "issue_comment_create",
+    "issue_create",
+    "issue_diff_get",
+    "issue_get",
+    "issue_list",
+    "issue_review",
+    "issue_status_update",
+    "issue_update",
+    "memory_create",
+    "memory_search",
+    "project_list",
+    "recurrence_create",
+    "recurrence_delete",
+    "recurrence_list",
+    "session_list",
+    "session_stop",
     "load_skill",
     "remember",
     "rewrite_memory",
-    "search_archive",
-    "issues",
-    "issue_update",
-    "issue_status"
+    "search_archive"
   ],
   "before": [],
   "input": {
@@ -51,9 +55,10 @@
         {
           "type": "toolCall",
           "id": "call_1",
-          "name": "dismiss",
+          "name": "issue_status_update",
           "arguments": {
-            "issue": "#41"
+            "id": "#41",
+            "status": "已取消"
           }
         }
       ],
@@ -81,7 +86,7 @@
     {
       "role": "toolResult",
       "toolCallId": "call_1",
-      "toolName": "dismiss",
+      "toolName": "issue_status_update",
       "content": [
         {
           "type": "text",
@@ -125,12 +130,9 @@
   "expect": [
     {
       "kind": "called",
-      "tool": "issue_status",
-      "argContains": "已完成"
-    },
-    {
-      "kind": "notCalled",
-      "tool": "dismiss"
+      "tool": "issue_status_update",
+      "argContains": "已完成",
+      "argLacks": "已取消"
     }
   ]
 }

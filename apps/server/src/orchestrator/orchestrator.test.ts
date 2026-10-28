@@ -65,7 +65,7 @@ const respond = (c: Request): Answer => {
     return answer([
       toolCall(
         "issue_create",
-        want.includes("CHANGELOG") ? { title: want, project: "notes", agent: "lab", start: true } : { title: want, project: "demo", start: true },
+        want.includes("CHANGELOG") ? { title: want, project: "notes", assignee: "lab", start: true } : { title: want, project: "demo", start: true },
       ),
     ]);
   if (lastLine(c).includes("定时任务")) return answer("到点了，看了一眼");
@@ -224,7 +224,7 @@ describe("the orchestrator", () => {
     const f = farm((c) => {
       const line = lastLine(c);
       if (answeredWith(c) !== undefined) return answer("看过了");
-      if (line.includes("要告诉主人")) return release.opened.then(() => answer([{ type: "text", text: "#41 交回来了" }, toolCall("roster", {})]));
+      if (line.includes("要告诉主人")) return release.opened.then(() => answer([{ type: "text", text: "#41 交回来了" }, toolCall("session_list", {})]));
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -375,7 +375,7 @@ describe("the orchestrator", () => {
       expect(spoken.kind).toBe("sent");
       const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(intake.chat.head + "【群聊】")), "the orchestrator asked");
       expect(line).not.toContain("长".repeat(797));
-      expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 read_chat 读 " + spoken.target + "）");
+      expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 channel_message_list 读 " + spoken.target + "）");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -387,8 +387,8 @@ describe("the orchestrator", () => {
       if (result !== undefined) return answer("合并：" + result);
       const line = lastLine(c);
       // A helper's words name it by its name; the owner's, by the issue's number.
-      if (line.includes("直接收")) return answer([toolCall("issue_status", { issue: helper, to: "已完成" })]);
-      if (line.includes("收下")) return answer([toolCall("issue_status", { issue: "#" + number, to: "已完成" })]);
+      if (line.includes("直接收")) return answer([toolCall("issue_status_update", { id: helper, status: "已完成" })]);
+      if (line.includes("收下")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "已完成" })]);
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -430,9 +430,9 @@ describe("the orchestrator", () => {
       const result = answeredWith(c);
       if (result !== undefined) return answer("工单：" + result);
       const line = lastLine(c);
-      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", project: "demo", agent: "lab" })]);
-      if (line.includes("开工")) return answer([toolCall("issue_status", { issue: "#" + number, to: "待办" })]);
-      if (line.includes("在等我")) return answer([toolCall("issues", { wants_owner: true })]);
+      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", project: "demo", assignee: "lab" })]);
+      if (line.includes("开工")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "待办" })]);
+      if (line.includes("在等我")) return answer([toolCall("issue_list", { wantsOwner: true })]);
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -456,14 +456,14 @@ describe("the orchestrator", () => {
   });
 
   it.live("lets a recurrence it sets unasked wait for the owner", () => {
-    const daily = { name: "每日测试", text: "跑一遍测试", kind: "daily", time: "09:00" };
+    const daily = { name: "每日测试", text: "跑一遍测试", when: { kind: "daily", time: "09:00" } };
     let offset = 0;
     const f = farm(
       (c) => {
         const result = answeredWith(c);
         if (result !== undefined) return answer("定时：" + result);
         const line = lastLine(c);
-        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("recurrence", daily)]);
+        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("recurrence_create", daily)]);
         return respond(c);
       },
       testConfig(),

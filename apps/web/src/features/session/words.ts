@@ -28,9 +28,9 @@ const zh = {
   },
   rounds: {
     farm: {
-      channel_say: "在群聊里说话",
-      channel_read: "读群聊的消息",
-      channel_inbox: "看有没有找它的话",
+      channel_message_send: "在群聊里说话",
+      channel_message_list: "读群聊的消息",
+      channel_unread_list: "看有没有找它的话",
       session_list: "看群聊里都有谁",
       other: (tool: string) => `群聊：${tool}`,
     },
@@ -112,9 +112,9 @@ const en: typeof zh = {
   },
   rounds: {
     farm: {
-      channel_say: "speaking in the chat",
-      channel_read: "reading the chat",
-      channel_inbox: "checking for words to it",
+      channel_message_send: "speaking in the chat",
+      channel_message_list: "reading the chat",
+      channel_unread_list: "checking for words to it",
       session_list: "seeing who is in the chat",
       other: (tool) => `Chat: ${tool}`,
     },

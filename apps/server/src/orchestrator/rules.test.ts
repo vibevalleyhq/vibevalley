@@ -34,8 +34,8 @@ describe("the orchestrator's rules", () => {
     const cases: [string, string, string][] = [
       ["799", "a".repeat(799), "a".repeat(799)],
       ["800", "字".repeat(800), "字".repeat(800)],
-      ["801", "字".repeat(801), "字".repeat(800) + "…（这条有 801 字，全文用 read_chat 读 #general:3）"],
-      ["an emoji is two units, never cut in half", "a".repeat(799) + "🌾🌾", "a".repeat(799) + "…（这条有 803 字，全文用 read_chat 读 #general:3）"],
+      ["801", "字".repeat(801), "字".repeat(800) + "…（这条有 801 字，全文用 channel_message_list 读 #general:3）"],
+      ["an emoji is two units, never cut in half", "a".repeat(799) + "🌾🌾", "a".repeat(799) + "…（这条有 803 字，全文用 channel_message_list 读 #general:3）"],
       ["spaces around do not count", "  " + "a".repeat(800) + "\n", "a".repeat(800)],
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });

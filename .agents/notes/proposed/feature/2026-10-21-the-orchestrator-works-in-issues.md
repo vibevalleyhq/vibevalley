@@ -7,8 +7,8 @@ Status: proposed
 主人跟管家说的话，多半是在改一张工单的状态：记下、指派、开工、叫停、先别开工、不做了、接着做、换人。工单的状态和挪法服务端已经有了（[工单](docs/subsystems/issue.md)，`apps/server/src/issue/moves.ts` 的 `statusMove`），管家的工具也能按编号点名（第一步，已经做了）。剩下的问题在管家这一侧：
 
 - **默认动作是派活。** 提示的第一条是「主人要做一件事：用 dispatch 派活」（`apps/server/src/orchestrator/orchestrator.ts`）；`dispatch` 把建单、选人和开工绑在一次调用里，直接 `Issue.hire`，满了就拒绝，不像主人在看板上开工那样排队。主人只想讨论、只想记下时，模型最顺手的仍是 `dispatch`：仓库里唯一的评测样例 `think-before-dispatch.json` 就是这一类错。
-- **换不了人。** `issue_update` 的 `agent` 只在派出去以前能改；重开（`reopen`）总派给上一次的档案（`issue.ts` 的 `reopen` 用 `last.agent`）。主人说「#41 换个人做」，管家只能取消再建一张，工单串、分支和来龙去脉都断了。
-- **停、缓、取消没分开说。** 三种动作服务端都有，提示里没有对照，模型会拿 `dismiss` 或「已取消」去执行「先停一下」。
+- **换不了人。** `issue_update` 的 `assignee` 只在派出去以前能改；重开（`reopen`）总派给上一次的档案（`issue.ts` 的 `reopen` 用 `last.agent`）。主人说「#41 换个人做」，管家只能取消再建一张，工单串、分支和来龙去脉都断了。
+- **停、缓、取消没分开说。** 三种动作服务端都有，提示里没有对照，模型会拿 `issue_status_update`（挪到已取消）或「已取消」去执行「先停一下」。
 - **完成被说成合并。** 主人说「收下」，管家只有 `merge` 可用；「查一下」交回来的结论、没改代码的活、这次不想合的改动，管家都没法照实收尾（工单怎么完成见[工单](docs/subsystems/issue.md)「完成和交付」）。
 
 ## Proposal
@@ -24,30 +24,30 @@ Status: proposed
 | 阶段 | 主人说 | 对工单做什么 | 管家用 | 现在 |
 |---|---|---|---|---|
 | — | 「先想想怎么做」「先别派」 | 不动工单，就着已有信息说 | — | 有 |
-| — | 「哪些在等我」「#41 怎么样了」 | 不动工单，读 | `issues`、`check` | 有 |
-| 写下 | 「记一下：登录偶尔白屏」 | 查重，记进备选，交付物是改动 | `issues`（`text`）、`issue_create` | 有 |
+| — | 「哪些在等我」「#41 怎么样了」 | 不动工单，读 | `issue_list`、`issue_get` | 有 |
+| 写下 | 「记一下：登录偶尔白屏」 | 查重，记进备选，交付物是改动 | `issue_list`（`text`）、`issue_create` | 有 |
 | 写下 | 「查一下为什么测试偶尔挂」 | 记一张交付物是结论的工单（`deliver: answer`），要马上查就开工 | `issue_create`（`deliver`） | 有（另一篇 Note 第 3 步） |
-| 写下 | 「这张让 Codex 做，先别开始」 | 写上谁来做，不开工 | `issue_create`、`issue_update` 填 `agent` | 有 |
+| 写下 | 「这张让 Codex 做，先别开始」 | 写上谁来做，不开工 | `issue_create`、`issue_update` 填 `assignee` | 有 |
 | 写下 + 安排 | 「帮我把 README 写了」 | 记下并开工，满了排队 | `issue_create`（`start`） | 有（第 2 步） |
-| 安排 | 「#41 开工」 | 开工，满了排队 | `issue_status` 挪到待办 | 有 |
-| 安排 | 「#41 先别开工」（还在排队） | 挪回备选 | `issue_status` | 有 |
-| 进行中 | 「告诉他先别动数据库」 | 带话；持续有效的要求主人同意的话写进说明 | `tell` | 有 |
-| 进行中 | 「先停一下 #41」 | 叫停这一轮，进「等你看」，改动留着，不会自己再开 | `stop` | 有 |
-| 进行中 | 「#41 接着做」「没做对，再修一下」 | 同一张工单再干一轮，带一句话 | `issue_status` 挪回待办 | 有 |
-| 进行中 | 「#41 换个人做」 | 上一个帮工收工、分支留着，新档案在同一张工单上接着做 | `issue_status` 挪回待办，填 `agent` | 有（第 2 步） |
+| 安排 | 「#41 开工」 | 开工，满了排队 | `issue_status_update` 挪到待办 | 有 |
+| 安排 | 「#41 先别开工」（还在排队） | 挪回备选 | `issue_status_update` | 有 |
+| 进行中 | 「告诉他先别动数据库」 | 带话；持续有效的要求主人同意的话写进说明 | `issue_comment_create` | 有 |
+| 进行中 | 「先停一下 #41」 | 叫停这一轮，进「等你看」，改动留着，不会自己再开 | `session_stop` | 有 |
+| 进行中 | 「#41 接着做」「没做对，再修一下」 | 同一张工单再干一轮，带一句话 | `issue_status_update` 挪回待办 | 有 |
+| 进行中 | 「#41 换个人做」 | 上一个帮工收工、分支留着，新档案在同一张工单上接着做 | `issue_status_update` 挪回待办，填 `assignee` | 有（第 2 步） |
 | 进行中 | 「这件太大，拆开做」 | 拆成子工单，有先后 | `graph_split` | 有（计划是有子工单的工单） |
-| 完成 | 「检查一下达到要求没有」 | 照验收标准验，过了或打回 | `changes`、`accept` | 有 |
-| 完成 | 「收下」「合进去」 | 完成，交付照工单默认：改动合进上级或开 PR，没改动、结论就不碰 git | `issue_status` 挪到已完成 | 有（第 3 步） |
-| 完成 | 「先别合，分支留着」 | 完成，交付是留着分支 | `issue_status` 挪到已完成（`keep_branch`） | 有（第 3 步） |
-| 完成 | 「#41 不做了」 | 不做了，分支上有提交就留着 | `issue_status` 挪到已取消 | 有 |
+| 完成 | 「检查一下达到要求没有」 | 照验收标准验，过了或打回 | `issue_diff_get`、`issue_review` | 有 |
+| 完成 | 「收下」「合进去」 | 完成，交付照工单默认：改动合进上级或开 PR，没改动、结论就不碰 git | `issue_status_update` 挪到已完成 | 有（第 3 步） |
+| 完成 | 「先别合，分支留着」 | 完成，交付是留着分支 | `issue_status_update` 挪到已完成（`keep_branch`） | 有（第 3 步） |
+| 完成 | 「#41 不做了」 | 不做了，分支上有提交就留着 | `issue_status_update` 挪到已取消 | 有 |
 
-「暂停一件事」不另加状态：排着队的挪回备选，在干的叫停，整个计划用 `graph_action pause`。
+「暂停一件事」不另加状态：排着队的挪回备选，在干的叫停，整个计划用 `graph_act` 的 `pause`。
 
 ### 记下和开工是一个工具的两档
 
 `dispatch` 从管家的工具里去掉。`issue_create` 加 `start`：
 
-- 不填 `start`：和现在一样，记进备选，不开工；填了 `agent` 就是指派。
+- 不填 `start`：和现在一样，记进备选，不开工；填了 `assignee` 就是指派。
 - `start: true`：先记下工单，再照主人在看板上开工的路子开工（`Issues.start`）：谁来做照 `dispatch` 原来的规矩挑（填的档案、农机，主人选定的，按「适合的活」）；满了排队；开不了工时工单留在备选，回答里有编号和原因，重试不会多建一张。
 - `channel` 从 `dispatch` 挪过来：工单串开在哪个频道。`start` 和 `draft` 不能一起用：起草交回来以前开不了工。
 
@@ -55,7 +55,7 @@ Status: proposed
 
 ### 换人就是带着另一个档案再干一轮
 
-`issue_status` 和 `PUT /api/v1/issues/{id}/status`（`IssueStatusRequest`）加 `agent`：挪到待办时填一个和上一次不同的档案，就是换人。
+`issue_status_update` 和 `PUT /api/v1/issues/{id}/status`（`IssueStatusRequest`）加 `assignee`：挪到待办时填一个和上一次不同的档案，就是换人。
 
 - 等你看（`round`）：上一个帮工收工（分支留着），工单关上再由新档案重开，新帮工在同一条分支上接着做，工单串不断。
 - 关上的（`reopen`）：由新档案重开。
@@ -67,7 +67,7 @@ Status: proposed
 
 ### 收尾是完成，不是合并
 
-`merge` 工具去掉，并进 `issue_status` 挪到已完成：带交付方式（不填照工单的默认），落地的规矩和 `merge` 一样，要这一轮有主人的话。工单怎么完成、交付怎么算，归工单服务（[工单](docs/subsystems/issue.md)）；管家这边只改工具和说法：完成以后照服务端的回答说交付了什么（「#41 合进 clock-in 的 main 了」「#41 收下了，没有改动」「#41 收下了，分支留着」），不把完成都说成合并。
+`merge` 工具去掉，并进 `issue_status_update` 挪到已完成：带交付方式（不填照工单的默认），落地的规矩和 `merge` 一样，要这一轮有主人的话。工单怎么完成、交付怎么算，归工单服务（[工单](docs/subsystems/issue.md)）；管家这边只改工具和说法：完成以后照服务端的回答说交付了什么（「#41 合进 clock-in 的 main 了」「#41 收下了，没有改动」「#41 收下了，分支留着」），不把完成都说成合并。
 
 ### 管家的提示照意图写
 
@@ -83,7 +83,7 @@ Status: proposed
 
 | 档 | 动作 | 规矩 |
 |---|---|---|
-| 读 | `issues`、`check`、`changes` | 随时 |
+| 读 | `issue_list`、`issue_get`、`issue_diff_get` | 随时 |
 | 写下来 | `issue_create`（不开工）、起草、带话 | 直接做，做完说一句 |
 | 定主意 | 改优先级、改项目、挪状态、开工、换人、取消 | 主人这句话里说了就做；管家自己看出来的，先问一句 |
 | 落地 | 完成（合并、开 PR、留分支、收下结论）、计划开工 | 要主人对这个动作的明确的话 |
@@ -95,9 +95,9 @@ Status: proposed
 
 ### 步骤
 
-1. 按工单点名、`issues`、`issue_create`、`issue_update`、`issue_status`。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「管家以工单为单位」。
+1. 按工单点名、`issue_list`、`issue_create`、`issue_update`、`issue_status_update`。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「管家以工单为单位」。
 2. 去掉 `dispatch`，`issue_create` 加 `start`；换人；提示照意图写；评测样例。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」和[工单](docs/subsystems/issue.md)「换人」。
-3. 跟着[工单](docs/subsystems/issue.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单（已经做了，评测样例 `answer-when-asked-to-check`）。
+3. 跟着[工单](docs/subsystems/issue.md)：它的第 1 步上线后，`merge` 并进 `issue_status_update` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单（已经做了，评测样例 `answer-when-asked-to-check`）。
 4. 跨轮的授权，和上面的分寸表落进工具。
 
 ## Alternatives considered
@@ -121,7 +121,7 @@ Status: proposed
 ## Acceptance criteria
 
 - 管家的工具里没有 `dispatch`；`issue_create` 不填 `start` 不开工，填了 `start` 有空地就开工、满了排进待办；开不了工时工单在备选、回答里有编号，再调一次不多建一张。
-- `issue_status` 挪到待办填另一个档案：等你看的工单，上一个帮工收工、分支留着，新帮工在同一张工单、同一条分支上开工，`assignee` 是新档案；处理中的拒绝；计划的、管家的拒绝。`PUT /api/v1/issues/{id}/status` 带 `agent` 结果一样。
+- `issue_status_update` 挪到待办填另一个档案：等你看的工单，上一个帮工收工、分支留着，新帮工在同一张工单、同一条分支上开工，`assignee` 是新档案；处理中的拒绝；计划的、管家的拒绝。`PUT /api/v1/issues/{id}/status` 带 `agent` 结果一样。
 - 提示照意图写，评测样例（`apps/server/src/orchestrator/testdata/evals`）覆盖：只讨论不建单、问现状直接答不建单、记下不开工、指派不开工、记下并开工、叫停不取消、换人不新建。真模型重放按 `acceptance/orchestrator-evals.md` 另经主人同意再跑。
 - 第 3 步：管家的工具里没有 `merge`；「收下」对没有改动的工单不碰 git，对有提交的照工单默认合并或开 PR，「先别合」留着分支；「查一下」记成 `deliver: answer` 的工单。
 

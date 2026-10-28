@@ -31,9 +31,8 @@ export const lookIn = {
   recurrence: listed("recurrence", commandOf("recurrence.list")),
   device: listed("device", commandOf("lan.get")),
   archive: listed("archive", commandOf("orchestrator.archive.list")),
-  // Channels and task graphs have no list of their own: they are in the core state.
-  channel: listed("channel", ["state"]),
-  graph: listed("graph", ["state"]),
+  channel: listed("channel", commandOf("channel.list")),
+  graph: listed("graph", commandOf("graph.list")),
 } satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */

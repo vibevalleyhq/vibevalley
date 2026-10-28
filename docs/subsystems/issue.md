@@ -48,16 +48,17 @@
 - **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、关的结论：完成了交付了什么 `delivered`，或不做了为什么 `canceled`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
 - **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `WorkspaceState.issues`，`Issues` 每改一次库就施加一条 `issue` 事实；页面只读核心状态。
 - **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves`（能挪到哪）和 `attention.acts`（能做什么）是同一张表的两面，都在 reduce 里和状态一起算（`withIssueStatuses`）：帮工这一轮一结束，看板、地块详情、命令行读到的就是新的，不等服务端再发布这张工单；服务端的拒绝调同一个 `statusMove`。拒绝（不能这样挪、现在不能这样做）带着 `next`：这张工单的按钮和按钮没盖到的挪法，各是一条能直接跑的命令（`moves.ts` 的 `nextSteps`）；要主人说一句的（带话、回答、打回、重开、再干一轮）只说哪个字段要写，不给命令。找不到工单时 `next` 是 `issue list`。挪状态和删工单各有试跑（`issue.status.previewUpdate`、`issue.previewDelete`，命令行的 `--dry-run`）：`setStatus` 先算出挪法和它要定下的（谁接手、交付是没改动、留分支还是合并），再动手；试跑只把同一份算出来的说成话（会派给谁、有没有空位、合进哪、会不会冲突、要不要先替它提交），不写库、不碰 git，所以试跑说能做的，真做不会因为同一个原因被拒。
+- **找和看**：`issue.list` 带过滤（状态、字、项目、条数、关上的、等主人的），默认只列开着的；规则是 `issue/rules.ts` 的 `pickIssues`，管家的 `issue_list` 和命令行用同一条。验收是 `issue.review`（过了只记下验过，完成仍是挪到已完成）；`issue.split` 让在做这张的帮工把它拆成计划（[计划](docs/subsystems/task.md)）。
 - **写只有两个：挪状态、说话**（`issue.status.update`、`issue.comment.create`）。挪是什么由工单现在的处境定，带给帮工的话在服务端拼：等你验收时带话挪回待办是打回（话一行一条成为验收意见），卡住了不带话挪回待办是照原因接着修（`cureWords`）、交代冲突（`conflictBrief`）或接着做（`resumeWords`），挪到已完成是验收通过并照交付方式交付。叫停一轮是帮工的事（`session.stop`）。其余是改字段（`issue.update`，排先后是它的 `before`）、建、删和起草。
 - **按钮是皮**：站位给出的每个按钮（`IssueAction`）带着按下去发什么：挪到哪个状态、话必填、可填还是不收（`move`），对帮工说一句（`say`），或叫停（`stop`）。页面（`apps/web/src/features/issue/acts.ts` 的 `perform`）、农具和命令行的下一步都照它发，不自己判断；页面只决定哪个按钮先开输入框、先开改动或关单对话框。
 - **工单认编号**（`Issues.idOf`）：接口里的工单可以写 `#41`、`41`、工单 id 或干过它的帮工 id；命令行、管家的工具都用编号。
 - **一块地最多一个 worktree**：代码活的分支是 `vibevalley/issue-<号>`，worktree 是 `worktrees/<项目>.<号>`；重开、换帮工、重启都还是这一块。
 - **先有工单身份，再派执行**：即时派活也先写工单、取得编号，再开 Session；启动前写不进工单就不派。派不出去时，项目确认现场已释放才撤掉本次新建工单；已有改动或农机没能停止，就保留工单号和现场，下一张工单不会继承它。已有工单和排队来源保留。`hiring` 只登记既有工单和 Session 的关联、重开、出队，不创建工单。删工单时，现场还被执行占用、或清理后仍有分支，都拒绝删掉身份；换项目也先以保留改动的方式释放旧现场，不能把仍有改动的地留给旧项目、把身份移走。
-- **完成就是验收**：`in_review` 就是「等验收」，挪到已完成就是通过，还没解决的验收意见都算解决。管家的 `accept` 工具（`Issues.review`）照验收标准看过：过了记下 `reviewedAt`（地成熟了），不挡也不代替主人完成；没过就是带着意见又一轮。
+- **完成就是验收**：`in_review` 就是「等验收」，挪到已完成就是通过，还没解决的验收意见都算解决。管家的 `issue_review` 工具（`Issues.review`）照验收标准看过：过了记下 `reviewedAt`（地成熟了），不挡也不代替主人完成；没过就是带着意见又一轮。
 - **计划里的工单 `moves` 是空的**，验收和挪状态都拒绝。
 - **已完成只由主人点头。** 一轮怎么结束的（`completed`、`failed`、`interrupted`）只决定工单停在哪、请主人做什么，不决定活成没成：帮工最后一轮没做成（站位「卡住了」，`stuck: failed`）时 `moves` 里没有已完成，`statusMove` 和完成都拒绝，看板、命令行、管家的工具一样；叫停的一轮还能完成。
 - **谁干活不改变工单怎么走**：派给管家的工单和帮工的工单是同一套状态、站位和挪法（`statusMove` 里没有按做活的人分的支）。工单写明交付物 `deliver`：`change`（改动，合进项目）、`branch`（改动，分支留着给主人自己收）或 `answer`（结论，留在工单上）；派给管家的默认是 `answer`，管家不改代码。帮工对 `change` 和 `branch` 干一样的活。完成的按钮跟着交付物：结论是「知道了」（`acknowledge`），改动是「完成」（`complete`）。没有帮工在做的工单（管家在自己的进程里答）由它自己的 `lastRun`（`{ startedAt, endedAt?, outcome? }`，表的 `last_run`）说站在哪：交给管家时记下开始（进 `in_progress`），这一轮结束时记下结局（进 `in_review`），不管怎么结束都等主人：没做成的不能完成，叫停的能完成；挪回待办、重开是带着主人的话再交给管家（`OrchestratorWork.said`），关上不用请谁回家。服务端开机时只把还在答的关成 `lost`，等你看的留着；接着做的那一轮结束时，`lost` 的工单重新打开、记下结局。
-- **和帮工档案的私聊是一张工单**（`Issue.talk` 是私聊的 id）：不在看板和 `issue.list`、`issue.history.list` 里，管家的 `issues` 也不列它，站位没有按钮；主人在私聊里说话等于在它的串里说话，没有执行在做时派一个只读的（`talkOn`），每轮交回来清掉改动，闲 10 分钟收工（[频道](docs/subsystems/channel.md)）。
+- **和帮工档案的私聊是一张工单**（`Issue.talk` 是私聊的 id）：不在看板和 `issue.list`、`issue.history.list` 里，管家的 `issue_list` 也不列它，站位没有按钮；主人在私聊里说话等于在它的串里说话，没有执行在做时派一个只读的（`talkOn`），每轮交回来清掉改动，闲 10 分钟收工（[频道](docs/subsystems/channel.md)）。
 - **交付物是结论的工单只读**（`deliver: answer`）：交给帮工的活前面写明只读代码、跑只读的命令、不改文件不提交，最后要一个 json 代码块交结论：`conclusion`、`evidence`（依据，至少一条：文件和行号、命令和输出）、`unsure`、`next`（`issueJob`）。汇报怎么读归执行：`readReport` 读最后一个读得出结论又有依据的代码块（`session/rules.ts` 的 `parseAnswer`），放进 `report` 事实的 `answer`，折进帮工的 `lastRun.answer`；工单服务把它记到 `Issue.answer`（表的 `answer`），再请执行把这张工单的 worktree 重置回主分支（`Sessions.discardWork`：帮工留着，不在干活时才重置），所以它改了什么、提交了什么都不出这张工单，完成时交付总是 `none`。做完的一轮读不出结论，站位是「卡住了」（`stuck: failed`），不能完成，「接着修」带上读不出来的原因和格式（`answerCureWords`）。交付物在工单开着时能改（`issue.update` 的 `deliver`），下一轮照新的走。
 - **子工单**带 `parent`、`blockedBy`：计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
 - **还没派的能改、能删、能排先后**（`issue.update` 的 `before`）；派出去以后只能改交付方式。交给帮工的是标题，空一行，再是说明，最后是编了号的验收标准，要它交活时逐条写「标准 N：做到了｜没做到｜不确定」和凭据（`issueJob`）。
@@ -103,7 +104,7 @@
 
 **排队**：没空位的待办留在待办里排着，后台每 5 秒照看板的先后试一次（`tryQueued`），有空就照它排队时记下的来源开工，派不出去的出队、说为什么。空位一出来它自己就走，不另设「现在就试」。
 
-**验收**：等你验收时带话挪回待办就是没过，话一行一条记成验收意见（`findings`），还没解决的编号写成一句话交给帮工再修一轮；挪到已完成就是通过，意见都算解决。管家的 `accept` 走同一个 `Issues.review`：过了记下 `reviewedAt`，原来的意见都算解决，主人照样要完成它。新的一轮开始（带话、再干一轮）`reviewedAt` 作废，意见留着。
+**验收**：等你验收时带话挪回待办就是没过，话一行一条记成验收意见（`findings`），还没解决的编号写成一句话交给帮工再修一轮；挪到已完成就是通过，意见都算解决。管家的 `issue_review` 走同一个 `Issues.review`：过了记下 `reviewedAt`，原来的意见都算解决，主人照样要完成它。新的一轮开始（带话、再干一轮）`reviewedAt` 作废，意见留着。
 
 **主人的话从一处进工单**：主人的话不管从哪来（`issue.comment.create`、在工单串里 `channel.message.send`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅频道的 `ownerInThread`：清掉 `questions`，作废验收。帮工没有串时 `issue.comment.create` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，管家先前的验过作废。
 
