@@ -100,7 +100,7 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
         aria-label={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
         class="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-hover"
       >
-        <Icon name="expand" size={12} class={["transition-transform duration-150", { "rotate-90": open() }]} />
+        <Icon name="expand" size={12} class={["transition-transform duration-120", { "rotate-90": open() }]} />
         <span class="text-sm font-semibold">{props.label}</span>
         <span class="min-w-0 flex-1 truncate text-xs text-muted">
           {t("web.session.log.steps", { n: props.round.steps.length, took: tookText(roundMs(props.round, end())) })}
@@ -142,7 +142,7 @@ function TimeBar(props: { round: Round; end: number }) {
     return total <= 0 ? 1 : total / 80;
   };
   return (
-    <div class="flex h-2 gap-px overflow-hidden rounded-[3px]">
+    <div class="flex h-2 gap-px overflow-hidden rounded-xs">
       <For each={spans()} keyed={(s) => s.step.seq}>
         {(s) => (
           <span
@@ -181,12 +181,10 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   );
 }
 
-function Box(props: { fill?: string; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
+/** tint: the box's ground, a palette class (bg-wheat/14…), so it follows the theme. */
+function Box(props: { tint?: string; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
-    <div
-      class={["rounded-md px-3 py-2", { "border border-line": !!props.edge, "opacity-80": !!props.faint }]}
-      style={props.fill ? { background: props.fill } : undefined}
-    >
+    <div class={["rounded-md px-3 py-2", props.tint, { "border border-line": !!props.edge, "opacity-80": !!props.faint }]}>
       <div class="mb-1 flex items-center">
         <span class="text-xs font-semibold text-muted">{props.label}</span>
         <span class="flex-1" />
@@ -197,9 +195,9 @@ function Box(props: { fill?: string; edge?: boolean; faint?: boolean; label: str
   );
 }
 
-function Line(props: { mark: IconName; step: SessionEvent; now: number; fill: string; ink: string }) {
+function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: string; ink: string }) {
   return (
-    <div class="flex items-start gap-2 rounded-md px-3 py-1.5" style={{ background: props.fill }}>
+    <div class={["flex items-start gap-2 rounded-md px-3 py-1.5", props.tint]}>
       <Icon name={props.mark} size={12} class="mt-1" />
       <span class={["min-w-0 flex-1 text-sm", props.ink]}>{props.step.text}</span>
       <When at={props.step.time} now={props.now} />
@@ -213,12 +211,12 @@ function Step(props: { step: SessionEvent; now: number }) {
   return (
     <Switch>
       <Match when={props.step.type === "user/message"}>
-        <Box fill="#e5a93c24" label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
+        <Box tint="bg-wheat/14" label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={4} />
         </Box>
       </Match>
       <Match when={props.step.type === "memory/recalled"}>
-        <Box fill="#b4cb7c26" label={t("web.session.log.recalled")} step={props.step} now={props.now}>
+        <Box tint="bg-leaf/15" label={t("web.session.log.recalled")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={3} />
         </Box>
       </Match>
@@ -228,7 +226,7 @@ function Step(props: { step: SessionEvent; now: number }) {
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/message"}>
-        <Box fill="#2f1f130f" label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
+        <Box tint="bg-hover" label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={8} markdown />
         </Box>
       </Match>
@@ -236,13 +234,13 @@ function Step(props: { step: SessionEvent; now: number }) {
         <ToolStep step={props.step} now={props.now} />
       </Match>
       <Match when={props.step.type === "llm/retry"}>
-        <Line mark="retry" step={props.step} now={props.now} fill="#e5a93c1f" ink="text-ink" />
+        <Line mark="retry" step={props.step} now={props.now} tint="bg-wheat/12" ink="text-ink" />
       </Match>
       <Match when={props.step.type === "llm/usage"}>
-        <Line mark="spend" step={props.step} now={props.now} fill="#e5a93c0f" ink="text-muted" />
+        <Line mark="spend" step={props.step} now={props.now} tint="bg-wheat/6" ink="text-muted" />
       </Match>
       <Match when={props.step.type === "run/error"}>
-        <Line mark="warn" step={props.step} now={props.now} fill="#c84a3a1a" ink="text-berry" />
+        <Line mark="warn" step={props.step} now={props.now} tint="bg-berry/10" ink="text-berry" />
       </Match>
     </Switch>
   );

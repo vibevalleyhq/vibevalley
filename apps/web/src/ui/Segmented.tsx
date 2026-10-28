@@ -19,9 +19,9 @@ export function Segmented<T extends string>(props: {
             title={o.title}
             onClick={() => props.onChange(o.value)}
             class={[
-              "h-6 cursor-pointer rounded px-2.5 text-sm whitespace-nowrap disabled:cursor-default disabled:opacity-40",
+              "h-6 cursor-pointer rounded px-2.5 text-sm whitespace-nowrap transition-[background-color,color,box-shadow] duration-120 disabled:cursor-default disabled:opacity-50",
               { "flex-1": !!props.block },
-              o.value === props.value ? "bg-page font-medium shadow-[0_1px_2px_#2f1f1326]" : "text-muted hover:text-ink",
+              o.value === props.value ? "bg-page font-medium shadow-raise" : "text-muted hover:text-ink",
             ]}
           >
             {o.label}

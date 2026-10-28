@@ -91,7 +91,11 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   return (
     <div class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
-        <div role="listbox" aria-label={t("web.channel.composer.who")} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
+        <div
+          role="listbox"
+          aria-label={t("web.channel.composer.who")}
+          class="mb-1.5 flex origin-bottom animate-pop-in flex-col rounded-lg border border-line bg-page p-1 shadow-float"
+        >
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
@@ -221,7 +225,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             disabled={!props.channel}
             aria-label={t("web.channel.composer.attach")}
             title={t("web.channel.composer.attach")}
-            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
+            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
           >
             <Icon name="attach" size={16} />
           </button>
@@ -234,7 +238,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               aria-label={t("web.channel.emoji.open")}
               aria-expanded={aria(emoji())}
               title={t("web.channel.emoji.open")}
-              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
+              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
             >
               <Icon name="react" size={16} />
             </button>

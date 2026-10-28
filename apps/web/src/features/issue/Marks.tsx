@@ -126,7 +126,7 @@ export function ProgressMark(props: { done: number; total: number }) {
   const r = 5.5;
   const len = 2 * Math.PI * r;
   return (
-    <span class="inline-flex items-center gap-1 text-[11px] leading-[14px] text-muted">
+    <span class="inline-flex items-center gap-1 text-2xs leading-[14px] text-muted">
       <svg width={13} height={13} viewBox="0 0 13 13" aria-hidden="true" class="-rotate-90">
         <circle cx={6.5} cy={6.5} r={r} fill="none" stroke="var(--color-line)" stroke-width={2} />
         <Show when={part() > 0}>
@@ -168,7 +168,7 @@ export function NoFaceMark(props: { size?: number }) {
 export function FlagChip(props: { text: string; tone: Tone }) {
   return (
     <span
-      class="rounded px-1.5 text-[11px] leading-4 font-medium whitespace-nowrap"
+      class="rounded px-1.5 text-2xs leading-4 font-medium whitespace-nowrap"
       style={{ background: `color-mix(in srgb, ${toneVar(props.tone)} 18%, transparent)` }}
     >
       {props.text}

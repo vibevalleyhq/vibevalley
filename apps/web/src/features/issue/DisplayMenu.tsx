@@ -39,7 +39,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
         <div
           role="dialog"
           aria-label={t("web.issue.display.show")}
-          class="absolute top-full right-0 z-30 mt-1.5 w-[min(340px,calc(100vw-24px))] rounded-lg border border-line bg-page p-3 shadow-float"
+          class="absolute top-full right-0 z-30 mt-1.5 w-[min(340px,calc(100vw-24px))] origin-top-right animate-pop-in rounded-lg border border-line bg-page p-3 shadow-float"
         >
           <div class="flex items-center gap-2">
             <span class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.group")}</span>

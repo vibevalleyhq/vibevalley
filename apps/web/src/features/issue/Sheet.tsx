@@ -137,7 +137,7 @@ export function Pick(props: {
       value={props.value}
       disabled={props.disabled}
       onChange={(e) => props.onChange(e.currentTarget.value)}
-      class="-ml-2 h-7 w-[calc(100%+8px)] cursor-pointer rounded-md border border-transparent bg-transparent px-1.5 text-sm outline-none hover:border-line hover:bg-page focus:border-focus disabled:cursor-default disabled:opacity-60"
+      class="-ml-2 h-7 w-[calc(100%+8px)] cursor-pointer rounded-md border border-transparent bg-transparent px-1.5 text-sm outline-none hover:border-line hover:bg-page focus:border-focus disabled:cursor-default disabled:opacity-50"
     >
       <Show when={props.placeholder !== undefined}>
         <option value="">{props.placeholder}</option>

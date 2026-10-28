@@ -28,17 +28,17 @@ import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
+import { Dot, PhaseGlyph, SenderFace, Tag, type TagTone, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
 import { editingId, setEditingId } from "./draft";
 import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "../session";
 import { useAgent, useOrchestrators } from "../../base/agents";
 
-const outcomeTag: Record<Outcome, { label: string; fill: string; icon: IconName }> = {
-  completed: { label: t("shared.outcome.completed"), fill: "#b4cb7c", icon: "check" },
-  failed: { label: t("shared.outcome.failed"), fill: "#e9a092", icon: "cross" },
-  interrupted: { label: t("shared.outcome.interrupted"), fill: "#e2c995", icon: "stop" },
+const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
+  completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },
+  failed: { label: t("shared.outcome.failed"), tone: "bad", icon: "cross" },
+  interrupted: { label: t("shared.outcome.interrupted"), tone: "wait", icon: "stop" },
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
@@ -106,7 +106,12 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div ref={(el) => (log = el)} class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={t("web.channel.messages.label")}>
+    <div
+      ref={(el) => (log = el)}
+      class="scroll-fade-y flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
+      role="log"
+      aria-label={t("web.channel.messages.label")}
+    >
       <div class="flex flex-col px-4 pt-3 pb-4">
         <div class="flex justify-center pb-2">
           <Show
@@ -141,7 +146,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             <div
               data-number={item().message.channel === id() ? item().message.number : undefined}
               class={[
-                "rounded-md transition-[opacity,translate,background-color] duration-200 ease-out",
+                "rounded-md transition-[opacity,translate,background-color] duration-280",
                 {
                   "starting:translate-y-2 starting:opacity-0": item().message.at > shownAt,
                   "bg-wheat/25": lit() === item().message.number && item().message.channel === id(),
@@ -326,12 +331,12 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
     >
       <Show when={props.m.kind === "dispatch"}>
         <div class="mb-1">
-          <Tag icon="send" label={t("web.channel.messages.dispatch")} fill="#f3d38a" />
+          <Tag icon="send" label={t("web.channel.messages.dispatch")} tone="wait" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
         <div class="mb-1">
-          <Tag icon={outcome().icon} label={outcome().label} fill={outcome().fill} />
+          <Tag icon={outcome().icon} label={outcome().label} tone={outcome().tone} />
         </div>
       </Show>
       <Show
@@ -394,7 +399,7 @@ function ThreadPreview(props: { thread: Channel }) {
               : t("web.channel.names.thread")}
         </span>
         <Show when={unread() > 0}>
-          <Tag label={t("web.channel.messages.unread", { n: unread() })} fill="#b4cb7c" />
+          <Tag label={t("web.channel.messages.unread", { n: unread() })} tone="ok" />
         </Show>
         <Show when={session()} fallback={<span class="flex-1" />}>
           {(s) => (

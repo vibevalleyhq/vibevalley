@@ -14,7 +14,7 @@ export function RuntimeBadge(props: { runtime: string; size: number }) {
   };
   return (
     <span
-      class="absolute -right-0.5 -bottom-0.5 z-1 inline-flex items-center justify-center rounded-[3px] bg-cream-50 ring-1 ring-bark-300/70"
+      class="absolute -right-0.5 -bottom-0.5 z-10 inline-flex items-center justify-center rounded-xs bg-cream-50 ring-1 ring-bark-300/70"
       style={{ width: `${props.size}px`, height: `${props.size}px` }}
       role="img"
       aria-label={label()}

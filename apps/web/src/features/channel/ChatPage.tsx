@@ -47,7 +47,7 @@ import { Jobs, Recurrences } from "./Tabs";
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
 const iconButton =
-  "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40";
+  "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50";
 
 /** /chat is the general; /chat/<id> a channel, or a thread shown beside its channel. */
 export function ChatPage() {
@@ -83,7 +83,7 @@ function Chat() {
       <Show when={drawer()}>
         <div class="absolute inset-0 z-30 md:hidden">
           <div class="absolute inset-0 bg-scrim" onClick={() => setDrawer(false)} />
-          <div class="absolute inset-y-0 left-0 flex w-72 shadow-float transition-transform duration-180 ease-out starting:-translate-x-full">{sidebar()}</div>
+          <div class="absolute inset-y-0 left-0 flex w-72 shadow-float transition-transform duration-280 starting:-translate-x-full">{sidebar()}</div>
         </div>
       </Show>
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
@@ -317,7 +317,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           <Icon name="search" size={16} />
         </button>
       </div>
-      <div class="flex-1 overflow-y-auto p-3">
+      <div class="scroll-fade-y flex-1 overflow-y-auto p-3">
         <button
           type="button"
           onClick={() => switcher.show()}
@@ -413,7 +413,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
     <div
       role="menu"
       aria-label={t("web.channel.direct.pick")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
+      class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
     >
       <p class="px-2 py-1 text-xs font-semibold text-muted">{t("web.channel.direct.pick")}</p>
       <Show when={!all.isPending && agents().length === 0}>
@@ -444,7 +444,7 @@ function Section(props: { title: string; count: number; action?: JSX.Element; ne
     <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title}>
       <div class="flex items-center px-1 pb-1">
         <button type="button" aria-expanded={aria(open())} onClick={() => setOpen(!open())} class="flex flex-1 cursor-pointer items-center gap-1 text-left">
-          <Icon name="expand" size={10} class={["opacity-60 transition-transform duration-150", { "rotate-90": open() }]} />
+          <Icon name="expand" size={10} class={["opacity-60 transition-transform duration-120", { "rotate-90": open() }]} />
           <span class="text-xs font-semibold text-muted">{props.title}</span>
           <span class="text-xs text-faint">{props.count}</span>
         </button>
@@ -569,7 +569,7 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
     <div
       role="dialog"
       aria-label={t("web.channel.pins.title")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
+      class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 origin-top-right animate-pop-in flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
       <p class="px-1 text-xs font-semibold text-muted">{t("web.channel.pins.title")}</p>
       <Show when={pinned()?.length === 0}>
@@ -740,7 +740,7 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
     <div
       role="dialog"
       aria-label={t("web.channel.threadList.title")}
-      class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
+      class="absolute top-full right-0 z-30 mt-1 flex max-h-[28rem] w-96 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
     >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</p>
       <Show when={live().length === 0}>
