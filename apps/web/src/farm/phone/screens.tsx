@@ -193,7 +193,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                   <button
                     type="button"
                     onClick={() => props.onAnswer(c())}
-                    aria-label={`${c().who}：${c().words.label}`}
+                    aria-label={t("shared.join.labeled", { label: c().who, text: c().words.label })}
                     class={[row, "cursor-pointer hover:bg-[#b9cf8c]"]}
                   >
                     <SmallFace>

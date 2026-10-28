@@ -5,6 +5,9 @@ const spoken = "口语，先说结论；不念代码、路径、命令和长列�
 
 /** What the orchestrator is given to tell the owner on the call: everything that waited, as one; ring is what rang, when the
  * owner just picked the call up for it. What it answers is read out. */
+/** A notice told on a call. */
+export const noticeLine = (title: string, body: string) => (body ? title + "：" + body : title);
+
 export function onCallLine(texts: readonly string[], ring?: string): string {
   const list = texts.map((t) => "- " + t).join("\n");
   if (ring)

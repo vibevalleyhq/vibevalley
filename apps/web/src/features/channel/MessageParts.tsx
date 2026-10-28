@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
 import { createSignal, For, Show, untrack } from "solid-js";
@@ -39,12 +39,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
         {(m) => (
           <Show when={m().deleted === undefined} fallback={<span class="italic">{t("web.channel.messages.replyGone")}</span>}>
             <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
-            <span class="min-w-0 truncate">
-              {m().text ||
-                m()
-                  .attachments?.map((a) => a.name)
-                  .join("、")}
-            </span>
+            <span class="min-w-0 truncate">{m().text || list(m().attachments?.map((a) => a.name) ?? [])}</span>
           </Show>
         )}
       </Show>
@@ -156,7 +151,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
             <button
               type="button"
               aria-pressed={aria(mine())}
-              title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: r().by.map(props.names).join("、") })}
+              title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: list(r().by.map(props.names)) })}
               onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji: r().emoji }))}
               class={[
                 "flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
@@ -477,12 +472,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
       <Show when={m()}>
         {(said) => (
           <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</span>}>
-            <span class="line-clamp-3 text-sm">
-              {said().text ||
-                said()
-                  .attachments?.map((a) => a.name)
-                  .join("、")}
-            </span>
+            <span class="line-clamp-3 text-sm">{said().text || list(said().attachments?.map((a) => a.name) ?? [])}</span>
           </Show>
         )}
       </Show>

@@ -288,7 +288,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
       <div class="relative" style={{ width: `${pic().w * s()}px`, height: `${props.cellHeight * s()}px` }}>
         <button
           type="button"
-          aria-label={`${props.island.project}：${islandText(props.island)}`}
+          aria-label={t("shared.join.labeled", { label: props.island.project, text: islandText(props.island) })}
           onClick={open}
           class="absolute inset-x-0 bottom-0 cursor-pointer"
         >
@@ -523,7 +523,7 @@ export function IslandDetail(props: { island: Island }) {
               <button
                 type="button"
                 onClick={() => go(router.navigate, slot.session.id)}
-                aria-label={`${slot.session.name}：${phaseText(slot.session, now())}`}
+                aria-label={t("shared.join.labeled", { label: slot.session.name, text: phaseText(slot.session, now()) })}
                 class="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-left hover:bg-hover"
               >
                 <AgentFace agentId={slot.session.agent} runtime={slot.session.runtime} size={32} />

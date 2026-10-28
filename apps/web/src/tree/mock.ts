@@ -2,6 +2,8 @@
 // MemoryTree is the shape memory.tree is to answer with, and moves into the protocol then. Everything here is fixed by
 // a seed, so the page and its tests see the same tree on every load.
 
+import { currentLocale } from "@vibevalley/i18n";
+
 export type MemoryKind = "leaf" | "fruit" | "seed";
 
 /** A fruit's three parts: an EverOS agent case, or the issue and its last report for a local `issue` memory. */
@@ -67,7 +69,7 @@ export interface MemoryTree {
   readonly links: readonly MemoryLink[];
 }
 
-const agents: MemoryAgent[] = [
+const agentsZh: MemoryAgent[] = [
   { id: "fox", name: "阿郑" },
   { id: "bear", name: "老周" },
   { id: "rabbit", name: "小吴" },
@@ -75,9 +77,9 @@ const agents: MemoryAgent[] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projects = ["heybro", "字幕面板", "官网", "billing"];
+const projectsZh = ["heybro", "字幕面板", "官网", "billing"];
 
-const notes = [
+const notesZh = [
   "表名用单数：issue、issue_session",
   "改完 db/queries 要跑 bun run db:generate",
   "主人不要兼容层，旧数据直接作废",
@@ -100,7 +102,7 @@ const notes = [
   "billing 的 webhook 要验签名",
 ];
 
-const cases: MemoryCase[] = [
+const casesZh: MemoryCase[] = [
   { intent: "字幕面板加拖动对齐", approach: "先写时间轴的纯函数，再接拖动", insight: "吸附阈值按像素算，不按毫秒" },
   { intent: "表名改成单数", approach: "直接改 0001_schema，重生成查询", insight: "schema.test.ts 会查出漏改的索引名" },
   { intent: "官网首页换成像素风", approach: "复用 public/pixel 的图", insight: "图片放大用整数倍，不然像素会糊" },
@@ -111,7 +113,7 @@ const cases: MemoryCase[] = [
   { intent: "手机壳扫码配对", approach: "一台设备一把钥匙", insight: "配对页不能放 /mcp" },
 ];
 
-const skills = [
+const skillsZh = [
   "改表结构的套路",
   "给规则补黄金数据",
   "像素图的整数倍放大",
@@ -119,6 +121,80 @@ const skills = [
   "SSE 的断线重连",
   "写一条好的提交说明",
   "billing 金额的算法",
+];
+
+const agentsEn: MemoryAgent[] = [
+  { id: "fox", name: "Zheng" },
+  { id: "bear", name: "Zhou" },
+  { id: "rabbit", name: "Wu" },
+  { id: "cat", name: "Kimi" },
+  { id: "owl", name: "Grok" },
+];
+
+const projectsEn = ["heybro", "subtitle-panel", "site", "billing"];
+
+const notesEn = [
+  "Table names are singular: issue, issue_session",
+  "After changing db/queries, run bun run db:generate",
+  "The owner wants no compatibility layers; old data is dropped",
+  "The page folds no facts; new data is a protocol field",
+  "A commit subject says the behavior after the change",
+  "No next dev: lint and typecheck, then build",
+  "Comments in English, and only the why",
+  "Subtitle timings are kept in ms, converted when shown",
+  "The site's images come straight from apps/web/public",
+  "billing amounts are in cents, never floats",
+  "Helpers in tests are scriptedRuntime",
+  "Playwright tests get a temporary home",
+  "Icons are pixel sprites, not characters",
+  "Solid 2's Show throws if a function child runs after the branch closes",
+  "The server listens on 127.0.0.1 only",
+  "After changing api.ts, run bun run api:client",
+  "A space between Chinese and English words",
+  "Rewrite golden data only on purpose, after reading the diff",
+  "The subtitle panel's shortcuts never clash with the player's",
+  "billing webhooks must check their signature",
+];
+
+const casesEn: MemoryCase[] = [
+  { intent: "Drag to align in the subtitle panel", approach: "Pure functions for the timeline first, dragging after", insight: "Snap by pixels, not by ms" },
+  {
+    intent: "Make table names singular",
+    approach: "Edit 0001_schema in place, regenerate the queries",
+    insight: "schema.test.ts finds the index names left behind",
+  },
+  {
+    intent: "A pixel-style home page for the site",
+    approach: "Reuse the images in public/pixel",
+    insight: "Scale images by whole numbers, or the pixels blur",
+  },
+  {
+    intent: "Refunds in billing",
+    approach: "Golden data first, then the rule",
+    insight: "A refund is counted from the original order's cents, never worked back",
+  },
+  {
+    intent: "SSE does not reconnect after a drop",
+    approach: "A heartbeat and exponential backoff",
+    insight: "Proxies drop connections idle for over 60 seconds",
+  },
+  {
+    intent: "The orchestrator sends work with its project",
+    approach: "Name the default project in the tool's description",
+    insight: "Changing a tool description means running the evals",
+  },
+  { intent: "The farm's clock keeps real time", approach: "The day clock's speed is set, 600 seconds a day by default", insight: "Tests set the speed to 0" },
+  { intent: "Pair the phone by QR code", approach: "One key per device", insight: "The pairing page never serves /mcp" },
+];
+
+const skillsEn = [
+  "How to change the schema",
+  "Adding golden data to a rule",
+  "Whole-number scaling for pixel art",
+  "Using Show safely in Solid 2",
+  "Reconnecting SSE after a drop",
+  "Writing a good commit subject",
+  "How billing counts money",
 ];
 
 /** A small seeded random: the same tree on every load. */
@@ -137,6 +213,8 @@ const day = 86_400_000;
 
 /** The made-up tree; `stage` from the address (`/tree?stage=3`) lets the owner see each stage. */
 export function mockTree(now: number, stage?: TreeStage): MemoryTree {
+  const en = currentLocale() === "en";
+  const [agents, projects, notes, cases, skills] = en ? [agentsEn, projectsEn, notesEn, casesEn, skillsEn] : [agentsZh, projectsZh, notesZh, casesZh, skillsZh];
   const rnd = random(20261022);
   const pick = <T>(list: readonly T[]) => list[Math.floor(rnd() * list.length)]!;
   const since = now - 46 * day;
@@ -187,7 +265,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     kind: "fruit",
     body: cases[0]!.insight,
     agent: "fox",
-    project: "字幕面板",
+    project: projects[1]!,
     at: now - 6 * day,
     recalled: 4,
     recalledAt: now - 40_000,

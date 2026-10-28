@@ -1,19 +1,41 @@
 import { defineConfig, lazyPlugins } from "vite-plus";
 import solid from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite-plus";
 
+// The bar's words in every language, from the catalogs: the bar shows before any script of the page, so it cannot call
+// t(). Named here so that scripts/i18n.ts check counts them as used.
+const openingKeys = { waking: "web.opening.waking", label: "web.opening.label", cannotStart: "web.opening.cannotStart" } as const;
+const openingWords = () => {
+  const locales = join(import.meta.dirname, "../../packages/i18n/locales");
+  const words: Record<string, Record<string, string>> = {};
+  for (const locale of readdirSync(locales)) {
+    const catalog = JSON.parse(readFileSync(join(locales, locale, "web.json"), "utf8")) as { opening: Record<string, string> };
+    words[locale] = Object.fromEntries(Object.entries(openingKeys).map(([name, key]) => [name, catalog.opening[key.slice("web.opening.".length)]!]));
+  }
+  return JSON.stringify(words);
+};
+const withOpeningWords = (html: string) => {
+  if (!html.includes('"__OPENING_WORDS__"')) throw new Error("opening: public/opening.html needs the words' marker");
+  return html.replace('"__OPENING_WORDS__"', openingWords());
+};
+
 // index.html starts on the bar public/opening.html shows (its comment says why): the part between its markers, written
-// where index.html has the opening marker, so that the two cannot drift apart.
+// where index.html has the opening marker, so that the two cannot drift apart. The desktop app loads opening.html itself
+// from the build, so the copy there gets its words too.
 const opening = (): Plugin => ({
   name: "vibevalley-opening",
   transformIndexHtml(html) {
     const source = readFileSync(join(import.meta.dirname, "public/opening.html"), "utf8");
     const part = /<!-- opening -->([\s\S]*?)<!-- \/opening -->/.exec(source)?.[1];
     if (part === undefined || !html.includes("<!-- opening -->")) throw new Error("opening: public/opening.html and index.html each need the opening marker");
-    return html.replace("<!-- opening -->", part.trim());
+    return html.replace("<!-- opening -->", withOpeningWords(part.trim()));
+  },
+  writeBundle(options) {
+    const file = join(options.dir ?? join(import.meta.dirname, "dist"), "opening.html");
+    writeFileSync(file, withOpeningWords(readFileSync(file, "utf8")));
   },
 });
 

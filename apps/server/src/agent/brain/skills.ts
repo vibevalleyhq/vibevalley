@@ -88,7 +88,7 @@ export function skillIndex(skills: readonly SkillInfo[], max = 160): string {
   return skills
     .map((s) => {
       const r = [...s.description];
-      return "- " + s.name + "：" + (r.length > max ? r.slice(0, max).join("") + "…" : s.description);
+      return skillWords.line(s.name, r.length > max ? r.slice(0, max).join("") + "…" : s.description);
     })
     .join("\n");
 }

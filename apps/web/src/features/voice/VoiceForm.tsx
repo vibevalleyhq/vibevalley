@@ -258,7 +258,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
                   <Select
                     label={t("web.voice.voice.language")}
                     value={draft().language}
-                    options={LanguageValues.map((l) => ({ value: l, label: `${languageLabel[l]}（${l}）` }))}
+                    options={LanguageValues.map((l) => ({ value: l, label: t("shared.join.aside", { text: languageLabel[l], aside: l }) }))}
                     onChange={(l) => l && set({ ...draft(), language: l as VoiceSettings["language"] })}
                   />
                 </Labeled>

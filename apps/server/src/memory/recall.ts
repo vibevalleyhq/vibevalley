@@ -189,8 +189,8 @@ export function foundText(result: SearchResult, q: SearchQuery): string {
     const scope =
       f.scope.kind === "unknown" ? recallWords.unknownScope : f.scope.kind === "global" ? recallWords.everywhere : recallWords.project(f.scope.project);
     let line = f.source !== "" && f.source !== localName ? recallWords.fromSource(sourceLabel(f.source), scope, f.text) : lineOf(f, q.project);
-    if (q.agent === "" && f.agent !== "") line = `- ${f.agent}：${line.replace(/^- /, "")}`;
-    lines.push(`${line}〔${f.id}〕`);
+    if (q.agent === "" && f.agent !== "") line = recallWords.byAgent(f.agent, line);
+    lines.push(recallWords.withId(line, f.id));
   }
   for (const coverage of result.coverage) lines.push(recallWords.coverage(coverage));
   return lines.join("\n");

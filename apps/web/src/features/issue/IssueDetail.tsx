@@ -58,7 +58,7 @@ export function IssueDetail(props: {
     run: async (f) => (await run(async () => (await f(), true))) === true,
     complete: () => props.onClose(props.session ?? head(), true),
     close: () => props.onClose(props.session ?? head(), false),
-    told: (title, description) => toast(`${title}：${description}`),
+    told: (title, description) => toast(t("shared.join.labeled", { label: title, text: description })),
   });
   const { busy, text, setText, box, setBox, go, act } = acts;
   const doAct = acts.send;
@@ -228,7 +228,11 @@ export function IssueDetail(props: {
       <section aria-label={t("web.issue.detail.made")}>
         <SheetLabel>{t("web.issue.detail.made")}</SheetLabel>
         <Switch
-          fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : t("web.issue.detail.nothingToSee")}</p>}
+          fallback={
+            <p class="text-sm text-muted">
+              {s().attention.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
+            </p>
+          }
         >
           <Match when={props.issue.deliver === "answer"}>
             <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">{t("web.issue.detail.noAnswer")}</p>}>
@@ -261,7 +265,7 @@ export function IssueDetail(props: {
         <Show when={props.issue.pullRequest}>
           {(pr) => (
             <a href={pr().url} target="_blank" rel="noreferrer" class="mt-1 block text-sm text-water hover:underline">
-              PR #{pr().number}（{pr().state}）
+              {t("shared.join.aside", { text: `PR #${pr().number}`, aside: pr().state })}
             </a>
           )}
         </Show>

@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 // 模板: every template a profile installs from, the orchestrators' first; a card shows its whole recipe before it is
 // installed, and a folder on this machine can be added beside the built-in ones. /agents/templates.
 
@@ -135,7 +135,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
             <p class="text-muted">
               {t("web.agent.tags")}
               {t("web.agent.colon")}
-              {template().tags.join("、")}
+              {list(template().tags)}
             </p>
           </Show>
           <p class="text-xs font-medium text-muted">{t("web.agent.personaLabel")}</p>

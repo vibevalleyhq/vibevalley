@@ -46,7 +46,5 @@ export function maybe(key: string): string | undefined {
   return table(currentLocale()).get(key) ?? table("zh").get(key);
 }
 
-const separator: Record<Locale, string> = { zh: "、", en: ", " };
-
 /** Items as the language lists them in a sentence. */
-export const list = (items: readonly (string | number)[]): string => items.join(separator[currentLocale()]);
+export const list = (items: readonly (string | number)[]): string => items.join(t("shared.join.separator"));

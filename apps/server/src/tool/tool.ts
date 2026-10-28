@@ -287,7 +287,7 @@ export const make = Effect.gen(function* () {
       case "confirm":
         return answers.spoken.confirm(s.target, s.lastRead);
       default: {
-        const absent = s.absent && s.absent.length > 0 ? answers.spoken.absentNote(s.absent.map((m) => "@" + m).join("、")) : "";
+        const absent = s.absent && s.absent.length > 0 ? answers.spoken.absentNote(s.absent) : "";
         return answers.spoken.sent(s.target, s.message?.number ?? 0, absent);
       }
     }
@@ -331,7 +331,7 @@ export const make = Effect.gen(function* () {
         const r = read.success;
         if (r.messages.length === 0) return p.unread ? answers.readChat.noUnread(r.target) : answers.readChat.empty(r.target);
         const older = r.older ? answers.readChat.olderNote(r.messages[0]!.number) : "";
-        return r.target + older + "：\n" + inboxLines(r.messages);
+        return answers.readChat.head(r.target, older) + inboxLines(r.messages);
       }),
     );
 
@@ -463,7 +463,7 @@ export const make = Effect.gen(function* () {
           return answers.issueCreate.dispatched(
             noted,
             channel.name,
-            h ? h.name + "（" + h.id + "）" : answers.issueCreate.noAgentFallback,
+            h ? answers.issueCreate.who(h.name, h.id) : answers.issueCreate.noAgentFallback,
             h?.project ?? project,
             branch,
           );

@@ -1357,7 +1357,7 @@ export const make = Effect.gen(function* () {
       used.queued ? t("server.channel.queuedThere", { n: used.queued }) : "",
       used.issue_threads ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
     ].filter(Boolean);
-    if (why.length > 0) return yield* Effect.fail(refused(t("server.channel.inUse", { why: why.join("、") })));
+    if (why.length > 0) return yield* Effect.fail(refused(t("server.channel.inUse", { why: list(why) })));
     const threads = model.threadsOf(id);
     const said = (row.last_number ?? 0) + threads.reduce((n, thread) => n + thread.reply_count, 0);
     return { target: targetOfChannel(row), threads: threads.length, said };

@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
 
-import { everosWords } from "./prompts.ts";
+import { everosWords, recallWords } from "./prompts.ts";
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
@@ -127,16 +127,13 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     for (const k of found.data?.agent_cases ?? [])
       hits.push({
         id: `${scope}:${k.id}`,
-        text: [k.task_intent, k.approach, k.key_insight]
-          .map((p) => (p ?? "").trim())
-          .filter((p) => p !== "")
-          .join("；"),
+        text: recallWords.parts([k.task_intent, k.approach, k.key_insight].map((p) => (p ?? "").trim()).filter((p) => p !== "")),
         score: k.score ?? 0,
         scope: ownership(k),
       });
     for (const ep of found.data?.episodes ?? []) {
       const item = ep.summary || ep.episode || "";
-      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? `${ep.subject}：${item}` : item, score: ep.score ?? 0, scope: ownership(ep) });
+      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? recallWords.titled(ep.subject, item) : item, score: ep.score ?? 0, scope: ownership(ep) });
     }
     return hits;
   });
@@ -166,7 +163,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       return hits
         .filter((h) => !cue.skip?.has(h.id) && h.text !== "" && h.scope.kind !== "unknown")
         .slice(0, recallCount)
-        .map((h) => ({ id: h.id, line: "- （EverOS）" + clip(h.text, lineMost), score: h.score }));
+        .map((h) => ({ id: h.id, line: recallWords.sourceLine("EverOS", clip(h.text, lineMost)), score: h.score }));
     }),
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {

@@ -1,0 +1,7 @@
+{
+  "opening": {
+    "waking": "叫醒农场……",
+    "label": "叫醒农场",
+    "cannotStart": "农场起不来：{why}"
+  }
+}

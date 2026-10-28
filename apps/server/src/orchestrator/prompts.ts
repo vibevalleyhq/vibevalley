@@ -84,6 +84,7 @@ export const quotaWords = {
 export const situationWords = {
   blocked: (why: string) => "；现在派不了：" + why,
   disabled: "；现在派不了：停用了",
+  quota: (text: string) => "；" + text,
   noHelpers: "  （没有帮工）",
   noProjects: "（还没有）",
   projects: (list: readonly string[]) => list.join("、"),

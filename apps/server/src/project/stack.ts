@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // What a project is built with, from the markers at its root, first one wins.
 
 import type { ProjectStack } from "@vibevalley/protocol";
@@ -74,7 +75,7 @@ function nodeStack(pkg: string, has: (name: (typeof stackFiles)[number]) => bool
   const runScript = (s: string) => (scripts[s]?.trim() ? `${pm} run ${s}` : "");
   return withCommands({
     name: "node",
-    label: `Node（${pm}）`,
+    label: t("shared.join.aside", { text: "Node", aside: pm }),
     test: runScript("test"),
     lint: runScript("lint"),
     build: runScript("build"),

@@ -18,7 +18,8 @@
  *   no-cjk-literal: what is said to the owner is in the catalogs, in Chinese and in English (packages/i18n/locales,
  *   read as t("key")), and what is said to a model in a prompts.ts; vite.config.ts turns the rule off for those files
  *   and the tests. A string, a template or JSX text with a Chinese character anywhere else is a word left out of the
- *   catalogs. A regular expression is not: it reads what people and models write.
+ *   catalogs; so is Chinese punctuation joining words in code (list() joins a list). A regular expression is not: it
+ *   reads what people and models write.
  *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
@@ -87,7 +88,8 @@ const noCommentDivider = defineRule({
   },
 });
 
-const han = /\p{Script=Han}/u;
+// Chinese punctuation too: a word joined to its neighbor with 「：」 or 「、」 in code reads as Chinese in an English farm.
+const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 
 const noCjkLiteral = defineRule({
   meta: {

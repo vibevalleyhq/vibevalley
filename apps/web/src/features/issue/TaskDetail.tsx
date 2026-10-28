@@ -148,7 +148,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                           </Show>
                           <Show when={task().scope?.length}>
                             <Property label={t("web.issue.task.scope")}>
-                              <span class="font-mono text-xs">{task().scope!.join("、")}</span>
+                              <span class="font-mono text-xs">{list(task().scope!)}</span>
                             </Property>
                           </Show>
                           <Show when={task().conclusion}>

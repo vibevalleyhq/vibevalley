@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { onCallLine } from "./prompts.ts";
+import { noticeLine, onCallLine } from "./prompts.ts";
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
@@ -291,7 +291,7 @@ export function speakPieces(text: string, max = 480): string[] {
     let used = 0;
     while (fit < chars.length && used + bytes(chars[fit]!) <= max) used += bytes(chars[fit++]!);
     const head = chars.slice(0, fit).join("");
-    const end = Math.max(...[..."。！？!?；;\n"].map((p) => head.lastIndexOf(p)));
+    const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/g)].map((m) => m.index));
     const cut = end > 0 ? [...head.slice(0, end + 1)].length : fit;
     out.push(chars.slice(0, cut).join("").trim());
     rest = chars.slice(cut).join("").trim();
@@ -622,7 +622,7 @@ export const make = (options: VoiceOptions = {}) =>
     yield* Effect.forkScoped(
       Stream.runForEach(yield* notices.news, (items) =>
         Effect.sync(() => {
-          if (liveCall()) tell(items.map((i) => (i.words.body ? `${i.words.title}：${i.words.body}` : i.words.title)));
+          if (liveCall()) tell(items.map((i) => noticeLine(i.words.title, i.words.body)));
         }),
       ),
     );

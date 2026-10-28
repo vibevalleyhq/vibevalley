@@ -27,6 +27,7 @@ export const skills = {
   noSuchSkill: (name: string, known: readonly string[]) => `没有叫 ${name} 的技能。有：${known.join("、") || "（没有）"}`,
   cannotRead: (path: string) => `读不到 ${path}`,
   body: (name: string, path: string, text: string) => "# " + name + "\n（来自 " + path + "）\n\n" + text,
+  line: (name: string, description: string) => "- " + name + "：" + description,
 };
 
 export const mcp = {
@@ -34,6 +35,7 @@ export const mcp = {
   connectFailed: (server: string, why: string, lastStderr: string) => `连不上 MCP 服务 ${server}：${why}${lastStderr ? "：" + lastStderr : ""}`,
   callFailed: (server: string, tool: string, why: string) => `${server} 的 ${tool} 出错：${why}`,
   noContent: "（没有内容）",
+  toolDescription: (server: string, description: string) => "（" + server + "）" + description,
 };
 
 export const compaction = {
@@ -94,10 +96,9 @@ export const reminders = {
   badCron: (why: string) => `cron 写得不对（${why}）：五段，分 时 日 月 周，比如 0 9 * * 1-5 是工作日早上九点。`,
   onceNote: " 一次",
   everyNote: (minutes: number) => `每 ${minutes} 分钟`,
-  nextNote: "；下次 ",
-  neverAgain: "（不会再跑）",
-  dueHeader: "【提醒「",
-  dueBody: "」到点了（",
+  line: (id: string, name: string, when: string, next: string | undefined, message: string) =>
+    "- " + id + "「" + name + "」" + when + "；下次 " + (next ?? "（不会再跑）") + "\n  " + message,
+  due: (id: string, name: string, message: string) => "【提醒「" + name + "」到点了（" + id + "）】\n" + message,
   reminderDescription:
     "定一个以后要做的事：到点时你会收到 message，像有人对你说的一样，然后去做。三选一：at（某个时刻，ISO 时间，比如 2026-10-13T09:00:00+08:00）、every_minutes（每隔几分钟）、cron（五段：分 时 日 月 周，本机时区）。message 写清楚到时候要做什么、做完告诉谁。",
   oneOfThree: "at、every_minutes、cron 要正好给一个。",
@@ -108,7 +109,7 @@ export const reminders = {
   none: "没有定好的事。",
   cancelDescription: "取消一件定好的事（id 从 list_reminders 看）。",
   notFound: (id: string) => `没有 ${id}：先 list_reminders 看看。`,
-  canceled: "取消了「",
+  canceled: (name: string) => "取消了「" + name + "」。",
 };
 
 /** An agent's own tasks, as a model reads and changes them (agentTask.ts). */
@@ -131,13 +132,14 @@ export const agentTask = {
   notFound: (id: string) => "没有「" + id + "」这件任务",
   cannotChangeBrief: (id: string, stateWord: string) => "「" + id + "」已经" + stateWord + "，不能再改要做什么或等谁",
   emptyBrief: "brief 是空的",
-  cannotMoveTo: (stateWord: string) => "，不能改成" + stateWord,
+  cannotMove: (id: string, stateWord: string, toWord: string) => "「" + id + "」" + stateWord + "，不能改成" + toWord,
+  problems: (problems: readonly string[]) => problems.join("；"),
   none: "现在没有任务。",
   header: (count: number, readyCount: number) => `任务（${count} 件，${readyCount} 件可以做）：`,
   canDo: "可以做",
   waitingFor: "等着",
   bySubagent: "（帮手做）",
-  waitingOn: "（等 ",
+  waitingOn: (ids: readonly string[]) => "（等 " + ids.join("、") + "）",
 };
 
 /** The agent's own task tools: todo_add, todo_update, todo_list (agentTaskTools.ts). */
@@ -145,19 +147,18 @@ export const agentTaskTools = {
   addDescription:
     "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
     "可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 todo_update 标上。",
-  notRecorded: "没收：",
+  notRecorded: (problems: readonly string[]) => "没收：" + problems.join("；"),
   updateDescription:
     "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。" +
     "没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
   allDone: "\n\n都做完了，这张图收起来了。",
   graphDescription: "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
-  taskHeader: "〔任务〕",
-  done: "）帮手做完了：\n",
-  failed: "）帮手没做成：",
+  done: (id: string, title: string, said: string) => "〔任务〕" + id + "（" + title + "）帮手做完了：\n" + said,
+  failed: (id: string, title: string, said: string) => "〔任务〕" + id + "（" + title + "）帮手没做成：" + said,
   retryNote: "\n改了 brief 把它写回 waiting 重来，或者标 skipped。\n\n",
   foldedSummary: (text: string) => "【整理对话时的任务，以 tasks 为准】\n" + text,
-  nudge: (count: number, ids: string, graph: string) =>
-    `〔任务〕这一轮停了，还有 ${count} 件你可以做：${ids}。接着做；做不了的用 todo_update 标 failed 或 skipped，写明原因。\n\n${graph}`,
+  nudge: (count: number, ids: readonly string[], graph: string) =>
+    `〔任务〕这一轮停了，还有 ${count} 件你可以做：${ids.join("、")}。接着做；做不了的用 todo_update 标 failed 或 skipped，写明原因。\n\n${graph}`,
 };
 
 /** The agent itself: its subagent's name and no-answer fallback, its prompt's sections, its memory-news header,

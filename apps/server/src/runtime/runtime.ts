@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 // The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
 // Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
 // tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
@@ -105,6 +105,8 @@ interface Observation {
   info: RuntimeInfo;
   found?: AvailableInstallation;
   read: number;
+  /** The info holds words (why a runtime is unsupported, its quota): one probed in another language is probed again. */
+  locale?: Locale;
 }
 
 interface Spent {
@@ -204,6 +206,7 @@ export const make = (options: RuntimeOptions = {}) =>
       );
 
     const cache = new Map<string, Observation>();
+    const relabeling = new Set<string>();
     /**
      * Each full probe takes the next number as it starts; the cache keeps the number of the probe it holds, and a probe
      * that started before it is dropped, so a slow full refresh never overwrites a newer one. Usage reads merge into the
@@ -274,7 +277,7 @@ export const make = (options: RuntimeOptions = {}) =>
       const held = cache.get(id);
       if (held && read < held.read) return held.info;
       const info = withSpend({ ...next.info, preset: presetOf(id), facts: facts(id) });
-      cache.set(id, { ...next, info, read });
+      cache.set(id, { ...next, info, read, locale: currentLocale() });
       emit(core.runtime(info));
       return info;
     }
@@ -392,7 +395,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const info = (id: string) =>
       Effect.suspend(() => {
         const hit = cache.get(id);
-        return hit ? Effect.succeed(withSpend(hit.info)) : refresh(id);
+        return hit && hit.locale === currentLocale() ? Effect.succeed(withSpend(hit.info)) : refresh(id);
       });
 
     const refreshUsage = Effect.fnUntraced(function* (id: string) {
@@ -440,6 +443,16 @@ export const make = (options: RuntimeOptions = {}) =>
       list: () =>
         runtimeIds().map((id) => {
           const hit = cache.get(id);
+          // Shown as it was until the probe in the new language lands.
+          if (hit && hit.locale !== currentLocale() && !closed && !relabeling.has(id)) {
+            relabeling.add(id);
+            emit(
+              Effect.ensuring(
+                Effect.ignoreCause(refresh(id)),
+                Effect.sync(() => relabeling.delete(id)),
+              ),
+            );
+          }
           if (hit) return withSpend(hit.info);
           // In the service's own fiber set: a probe that fails is retried by the next list, and none outlives the service.
           if (!closed && !reads.has(id)) emit(Effect.ignoreCause(refresh(id)));

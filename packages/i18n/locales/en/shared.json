@@ -99,5 +99,13 @@
   "greeting": "Hey there! What shall we grow today?",
   "serverAnswered": "the server answered {status}",
   "seconds": "{n} s",
-  "minutes": "{n} min"
+  "minutes": "{n} min",
+  "join": {
+    "labeled": "{label}: {text}",
+    "aside": "{text} ({aside})",
+    "sentence": "{text}.",
+    "and": "{a}, {b}",
+    "clauses": "{a}; {b}",
+    "separator": ", "
+  }
 }

@@ -219,7 +219,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const assessed = await go(runtimes.assess(a));
         const p = assessed.agent;
         let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
-        if (p.enabled && assessed.blocking.length === 0) line += "；" + quotaText(assessed.info);
+        if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
         else if (assessed.blocking.length > 0) line += situationWords.blocked(assessed.blocking[0]!.text);
         else line += situationWords.disabled;
         lines.push(line);

@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import { currentLocale, setLocale } from "@vibevalley/i18n";
 import { followSavedLocale } from "./locale";
+import { setAppMenu } from "./menu";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -126,7 +127,12 @@ ipcMain.handle("host:notify", (_event, notice: Notice) => {
   if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
 });
 
-ipcMain.handle("host:locale", (_event, locale: string) => setLocale(locale === "en" ? "en" : "zh"));
+ipcMain.handle("host:locale", (_event, locale: string) => {
+  const next = locale === "en" ? "en" : "zh";
+  if (next === currentLocale()) return;
+  setLocale(next);
+  setAppMenu();
+});
 
 // The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
 let tray: Tray | undefined;
@@ -167,6 +173,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.setName("VibeValley");
   void app.whenReady().then(async () => {
+    setAppMenu();
     // A packaged app has its icon (resources/icon.icns); run from the repository, the Dock shows Electron's unless set.
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(join(files().web, "icons", "app-256.png")));
     // The window comes at once, on the bar: reading the login shell's PATH and starting the server take seconds.

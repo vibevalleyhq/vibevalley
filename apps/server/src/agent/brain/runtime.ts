@@ -226,10 +226,9 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     });
   };
 
-  return defineRuntime({
+  const runtime = defineRuntime({
     id: vibevalleyRuntime,
     session: start,
-    refusedSessionOptions: { launchArgs: t("server.agent.refused.launchArgs"), serviceTier: t("server.agent.refused.serviceTier") },
     installation: async () => {
       try {
         llmOf("");
@@ -248,4 +247,10 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       })),
     }),
   });
+  // Read when shown, so the words follow the farm's language; defineRuntime copies its input, a getter there would be read once.
+  Object.defineProperty(runtime, "refusedSessionOptions", {
+    get: () => ({ launchArgs: t("server.agent.refused.launchArgs"), serviceTier: t("server.agent.refused.serviceTier") }),
+    enumerable: true,
+  });
+  return runtime;
 }
