@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { FileWriter } from "./files.ts";
 import { newId } from "./ids.ts";
-import { HomeTaken, leaseHome } from "./lease.ts";
+import { announce, announced, HomeTaken, leaseHome } from "./lease.ts";
 import { redact, redactOutput } from "./redact.ts";
 
 test("ids are uuidv7, unique, and sort in the order they were made", () => {
@@ -68,4 +68,16 @@ test("one server per home; a stale lock is taken over", () => {
   again();
   writeFileSync(join(home, ".vibevalley.lock"), "999999");
   leaseHome(home)();
+});
+
+test("a server says where it listens in its home while it runs, and a stopped one's word is not taken", () => {
+  const home = mkdtempSync(join(tmpdir(), "vv-announce-"));
+  expect(announced(home)).toBeUndefined();
+  const withdraw = announce(home, "http://127.0.0.1:56048");
+  expect(announced(home)).toBe("http://127.0.0.1:56048");
+  withdraw();
+  expect(announced(home)).toBeUndefined();
+  // Left behind by a server that died: its pid is not running.
+  writeFileSync(join(home, "server.json"), JSON.stringify({ url: "http://127.0.0.1:1", pid: 2 ** 22 + 7 }));
+  expect(announced(home)).toBeUndefined();
 });

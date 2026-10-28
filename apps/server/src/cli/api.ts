@@ -9,11 +9,13 @@ import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
 import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/protocol";
-import { ApiError, type Endpoint, endpoints, fieldsOf, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
+import { ApiError, type Endpoint, endpoints, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
+import { announced, homeOf } from "../base/lease.ts";
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";
 
-const defaultServer = "http://127.0.0.1:8787";
+/** The server using this machine's home (its server.json), else the configured default port. */
+const defaultServer = announced(homeOf()) ?? "http://127.0.0.1:8787";
 
 /** --server, else VIBEVALLEY_SERVER, else the one on this machine. */
 export const ServerFlag = GlobalFlag.Setting("server")({
