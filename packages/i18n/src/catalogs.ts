@@ -1358,6 +1358,7 @@ export const catalogs = {
         from: { settings: "存在设置里", config: "来自配置（vibevalley.yaml 或环境变量）" },
         inUse: "在用 {hint}（{from}）",
         fromOnly: "在用（{from}）",
+        example: "比如：{value}",
       },
       time: {
         justNow: "刚刚",
@@ -3384,10 +3385,8 @@ export const catalogs = {
         llmAddressLabel: "大模型地址",
         llmModel: "大模型名",
         llmKey: "接口的 key",
-        dictation: "听写",
-        speechServer: "本机的 speech-server →",
-        dictationIntro:
-          "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；填本机的 speech-server，声音就不出这台电脑。",
+        speechServer: "本机的 speech-server",
+        dictationIntro: "转给你填的 OpenAI 兼容地址；用本机的 speech-server，声音不出这台电脑。",
         dictationAddress: "到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。",
         dictationAddressLabel: "听写的地址",
         dictationModel: "本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。",
@@ -3423,9 +3422,8 @@ export const catalogs = {
         moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
         dictationVia: "听写走哪",
         dictationOwn: "自己的地址",
-        dictationMossIntro:
-          "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。录音经服务端交给 MOSS 的转写（moss-transcribe-1.0），用的是和 MOSS Live 同一把 API Key。",
-        dictationMossKey: "MOSS 的 API Key（和 MOSS Live 共用）",
+        dictationMossIntro: "录音经服务端交给 MOSS 转写，用 MOSS Live 的同一把 Key。",
+        dictationMossKey: "API Key",
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -4939,6 +4937,7 @@ export const catalogs = {
         from: { settings: "saved in the settings", config: "from the configuration (vibevalley.yaml or the environment)" },
         inUse: "Using {hint} ({from})",
         fromOnly: "In use ({from})",
+        example: "e.g. {value}",
       },
       time: {
         justNow: "just now",
@@ -7070,10 +7069,8 @@ export const catalogs = {
         llmAddressLabel: "Model address",
         llmModel: "Model name",
         llmKey: "Endpoint key",
-        dictation: "Dictation",
-        speechServer: "Local speech-server →",
-        dictationIntro:
-          "The record button by the farm chat's box: say something, stop, and it turns into text in the box for you to check before sending. The server passes the recording as is to the OpenAI-compatible transcription address below; with a local speech-server, the sound never leaves this computer.",
+        speechServer: "Local speech-server",
+        dictationIntro: "Sent to the OpenAI-compatible address you fill in; with a local speech-server, the sound stays on this computer.",
         dictationAddress: "Up to /v1. Local: http://127.0.0.1:8080/v1; OpenAI: https://api.openai.com/v1. Empty turns dictation off.",
         dictationAddressLabel: "Dictation address",
         dictationModel: "qwen3 for a local speech-server; gpt-4o-mini-transcribe for OpenAI.",
@@ -7116,9 +7113,8 @@ export const catalogs = {
         },
         dictationVia: "Dictation goes to",
         dictationOwn: "Your own address",
-        dictationMossIntro:
-          "The record button beside the chat box: say something, stop, and it becomes text in the box to read before sending. The server hands the recording to MOSS's transcription (moss-transcribe-1.0), with the same API key as MOSS Live.",
-        dictationMossKey: "MOSS API key (shared with MOSS Live)",
+        dictationMossIntro: "The server hands recordings to MOSS, with the same key as MOSS Live.",
+        dictationMossKey: "API key",
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -8552,6 +8548,7 @@ export interface Messages {
   "web.base.file.pdf": undefined;
   "web.base.file.remove": { readonly name: string | number };
   "web.base.form.asking": undefined;
+  "web.base.form.example": { readonly value: string | number };
   "web.base.form.from.config": undefined;
   "web.base.form.from.settings": undefined;
   "web.base.form.fromOnly": { readonly from: string | number };
@@ -10721,7 +10718,6 @@ export interface Messages {
   "web.voice.voice.deepgramModel": undefined;
   "web.voice.voice.deepseekModel": undefined;
   "web.voice.voice.deepseekModelLabel": undefined;
-  "web.voice.voice.dictation": undefined;
   "web.voice.voice.dictationAddress": undefined;
   "web.voice.voice.dictationAddressLabel": undefined;
   "web.voice.voice.dictationIntro": undefined;

@@ -47,7 +47,8 @@ export function Segmented<T extends string>(props: {
       role="group"
       aria-label={props.label}
       data-testid={props.testid}
-      class={["relative inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}
+      // w-fit: in a column (a card's body) a track would otherwise stretch to its width, the thumb small at one end.
+      class={["relative flex-wrap gap-0.5 rounded-md bg-hover p-0.5", props.block ? "flex w-full" : "inline-flex w-fit"]}
     >
       <Show when={thumb()}>
         {(at) => (

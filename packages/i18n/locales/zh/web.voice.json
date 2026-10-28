@@ -46,9 +46,8 @@
     "llmAddressLabel": "大模型地址",
     "llmModel": "大模型名",
     "llmKey": "接口的 key",
-    "dictation": "听写",
-    "speechServer": "本机的 speech-server →",
-    "dictationIntro": "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；填本机的 speech-server，声音就不出这台电脑。",
+    "speechServer": "本机的 speech-server",
+    "dictationIntro": "转给你填的 OpenAI 兼容地址；用本机的 speech-server，声音不出这台电脑。",
     "dictationAddress": "到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。",
     "dictationAddressLabel": "听写的地址",
     "dictationModel": "本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。",
@@ -90,8 +89,8 @@
     },
     "dictationVia": "听写走哪",
     "dictationOwn": "自己的地址",
-    "dictationMossIntro": "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。录音经服务端交给 MOSS 的转写（moss-transcribe-1.0），用的是和 MOSS Live 同一把 API Key。",
-    "dictationMossKey": "MOSS 的 API Key（和 MOSS Live 共用）"
+    "dictationMossIntro": "录音经服务端交给 MOSS 转写，用 MOSS Live 的同一把 Key。",
+    "dictationMossKey": "API Key"
   },
   "choices": {
     "area": {

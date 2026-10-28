@@ -77,7 +77,8 @@
       "config": "from the configuration (vibevalley.yaml or the environment)"
     },
     "inUse": "Using {hint} ({from})",
-    "fromOnly": "In use ({from})"
+    "fromOnly": "In use ({from})",
+    "example": "e.g. {value}"
   },
   "time": {
     "justNow": "just now",

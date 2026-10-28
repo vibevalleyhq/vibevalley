@@ -11,6 +11,7 @@ import { api, reasonOf } from "../../base/api";
 import { hexColor } from "../../ui/cast";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
+import { Hint } from "../../ui/Tip";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../base/agents";
 import { useCore } from "../../base/frame";
 import { ready, useRuntimes } from "../../base/query";
@@ -42,9 +43,9 @@ function AgentsPage() {
     <div class="h-full overflow-y-auto">
       <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-8 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
-          <div class="flex max-w-xl flex-col gap-1">
+          <div class="flex items-center gap-1.5">
             <h1 class="text-2xl font-semibold">{t("web.agent.list.title")}</h1>
-            <p class="text-sm text-muted">{t("web.agent.list.intro")}</p>
+            <Hint text={t("web.agent.list.intro")} />
           </div>
           <span class="flex flex-wrap items-center gap-2">
             <A

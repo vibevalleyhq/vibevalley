@@ -1,4 +1,3 @@
-import { Show } from "solid-js";
 import { A } from "./A";
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
@@ -36,23 +35,33 @@ export function IconButton(props: {
   );
 }
 
-/** A link that is only its icon: out to another site in a new tab, or a page of the workbench. */
-export function IconLink(props: { href: string; label: string; icon?: IconName }) {
-  const look = "inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-selected hover:text-ink";
+/** A link out to another site, in a new tab, that says where it goes: beside a field, where an icon alone would not. */
+export function OutLink(props: { href: string; label: string }) {
+  return (
+    <a
+      href={props.href}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex shrink-0 items-center gap-1 rounded-sm text-xs whitespace-nowrap text-muted hover:text-ink"
+    >
+      {props.label}
+      <Icon name="open" size={12} />
+    </a>
+  );
+}
+
+/** A link that is only its icon, to a page of the workbench. A link out to another site says where it goes (OutLink):
+ * the address type keeps one from being drawn as an icon alone. */
+export function IconLink(props: { href: `/${string}`; label: string; icon?: IconName }) {
   return (
     <Tip text={props.label}>
-      <Show
-        when={/^https?:/.test(props.href)}
-        fallback={
-          <A href={props.href} aria-label={props.label} class={look}>
-            <Icon name={props.icon ?? "open"} size={16} />
-          </A>
-        }
+      <A
+        href={props.href}
+        aria-label={props.label}
+        class="inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-selected hover:text-ink"
       >
-        <a href={props.href} target="_blank" rel="noreferrer" aria-label={props.label} class={look}>
-          <Icon name={props.icon ?? "open"} size={16} />
-        </a>
-      </Show>
+        <Icon name={props.icon ?? "open"} size={16} />
+      </A>
     </Tip>
   );
 }

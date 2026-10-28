@@ -3,7 +3,7 @@ import type { KeySource, KeyStatus } from "@vibevalley/protocol";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import { Icon } from "./Icon";
-import { IconButton, IconLink } from "./IconButton";
+import { IconButton, OutLink } from "./IconButton";
 import { Hint, Tip } from "./Tip";
 
 // A key or an id the owner sets. Whether it is in use is a mark, where it comes from is said on hover; removing one
@@ -30,10 +30,23 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
         data-hint={props.status.hint}
         aria-label={text()}
         tabindex={0}
-        class="inline-flex rounded outline-none focus-visible:outline-2 focus-visible:outline-focus"
+        class="inline-flex shrink-0 items-center gap-0.5 rounded text-2xs whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <Show when={props.removing || props.status.source} fallback={<span class="m-[3px] block size-2 rounded-full border border-faint" aria-hidden="true" />}>
-          <Icon name={props.removing ? "cross" : "check"} size={14} />
+        {/* Said, not only drawn: a hollow dot did not read as "none saved". The key itself shows as its last four. */}
+        <Show
+          when={props.removing || props.status.source}
+          fallback={
+            <span class="text-faint" aria-hidden="true">
+              {t("web.base.form.unset")}
+            </span>
+          }
+        >
+          <Icon name={props.removing ? "cross" : "check"} size={12} class={props.removing ? "text-berry" : "text-leaf"} />
+          <Show when={!props.removing && props.status.hint}>
+            <span class="font-mono text-muted" aria-hidden="true">
+              {props.status.hint}
+            </span>
+          </Show>
         </Show>
       </span>
     </Tip>
@@ -60,7 +73,7 @@ export function KeyField(props: {
         <KeyMark status={props.status} removing={props.removing} />
         <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         <span class="flex-1" />
-        <Show when={props.link}>{(l) => <IconLink href={l().href} label={l().label} />}</Show>
+        <Show when={props.link}>{(l) => <OutLink href={l().href} label={l().label} />}</Show>
       </div>
       <div class="flex items-center gap-1">
         <div class={["min-w-0 flex-1", { "pointer-events-none opacity-40": props.removing }]}>{props.children}</div>
