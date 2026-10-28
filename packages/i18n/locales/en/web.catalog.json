@@ -7,7 +7,8 @@
   "tab": {
     "sprites": "Pictures",
     "cursors": "Cursors",
-    "sounds": "Sounds"
+    "sounds": "Sounds",
+    "kit": "Kit"
   },
   "shelves": "The catalog's shelves",
   "find": "Find a picture",
@@ -102,5 +103,38 @@
       "label": "Other",
       "hint": "What fits no shelf"
     }
+  },
+  "kit": {
+    "intro": "The workbench's tokens and atoms, both themes side by side. These are the classes and components the pages use: change style.css or ui/ and this follows.",
+    "light": "Light",
+    "dark": "Dark",
+    "colour": "Colour",
+    "type": "Type sizes",
+    "shape": "Radii and shadows",
+    "motion": "Motion",
+    "replay": "Play again",
+    "icons": "Icon sizes",
+    "atoms": "Atoms",
+    "primary": "New issue",
+    "plain": "Plain",
+    "quiet": "Quiet",
+    "danger": "Danger",
+    "disabled": "Disabled",
+    "pressed": "Pressed",
+    "delete": "Delete profile",
+    "question": "It cannot be undone.",
+    "view": "View",
+    "list": "List",
+    "board": "Board",
+    "toggle": "On",
+    "done": "Done",
+    "failed": "Failed",
+    "sent": "Sent",
+    "field": "Name",
+    "hint": "The hint sits under the box.",
+    "placeholder": "Type something",
+    "select": "Pick one",
+    "pixel": "Pixel skin",
+    "sample": "An issue for a helper, Issue 42"
   }
 }

@@ -42,3 +42,26 @@ test("图鉴 as it looks", async ({ page }) => {
   await settled(page);
   await page.screenshot({ path: test.info().outputPath("catalog.png") });
 });
+
+test("the kit shelf draws the tokens and atoms in both themes, from the stylesheet itself", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/catalog/kit");
+  await expect(page.getByRole("tab", { name: "界面" })).toHaveAttribute("aria-selected", "true");
+  const light = page.getByTestId("kit-light");
+  const dark = page.getByTestId("kit-dark");
+  await expect(light.getByRole("heading", { name: "浅色" })).toBeVisible();
+  await expect(dark.getByRole("heading", { name: "深色" })).toBeVisible();
+  await settled(page);
+  await page.screenshot({ path: test.info().outputPath("kit.png") });
+  const ground = (pane: typeof light) => pane.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await ground(light)).not.toBe(await ground(dark));
+  // The motion curves are read from the stylesheet, so each one draws.
+  await expect(light.getByTestId("ease")).toHaveCount(4);
+  await light.getByRole("button", { name: "删除档案" }).click();
+  await expect(light.getByText("删了就找不回来。")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(light.getByText("删了就找不回来。")).toBeHidden();
+  await expect(page.getByTestId("kit-pixel").getByRole("button", { name: "primary" })).toBeVisible();
+  await page.setViewportSize({ width: 400, height: 900 });
+  await page.screenshot({ path: test.info().outputPath("kit-narrow.png") });
+});
