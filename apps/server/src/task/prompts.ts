@@ -100,14 +100,14 @@ export const frozenTouchedText = (files: readonly string[]) =>
 export const retryText = (task: Task) => "上一轮没做成。看一下报错，接着把这一步做完：" + task.title + "。";
 
 /** Only the helper an issue was last sent to splits it, and only while it is a plain open issue. */
-export function issueSplitRefusal(session: Session | undefined, issue: Issue | undefined): string {
+export function issueSplitRefusal(session: Session | undefined, issue: Issue | undefined, orchestrator: (id: string) => boolean): string {
   if (!session) return "你已经不在场了";
   if (session.graph) return "你在做计划里的一步：这一步不能再拆，太大就在结论里说，让主人改计划";
   if (!issue) return "你手上没有工单：只有工单能拆";
   if (session.refining) return "你在起草这张工单，还没开工：把要拆的想法写进草稿";
   if (issue.graph || issue.task) return "这张工单已经是计划了";
   if (issue.closedAt !== undefined) return "这张工单已经关了";
-  if (isForOrchestrator(issue)) return "这是派给管家的工单";
+  if (isForOrchestrator(issue, orchestrator)) return "这是派给管家的工单";
   if (!issue.project) return "这张工单没有项目，没法开分支";
   if (issue.sessions.length === 0 || issue.sessions.at(-1) !== session.id) return "这张工单现在不归你做";
   if (!session.branch) return "你直接在项目里干活，没有自己的分支：拆了没处开计划的分支";

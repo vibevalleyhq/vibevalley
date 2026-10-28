@@ -293,8 +293,11 @@ export interface Channel {
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
   default?: boolean;
-  /** A direct channel's other participant: the orchestrator, or a helper profile. The owner talks with it there alone. */
+  /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
+  /** The orchestrator that looks after a channel, by its profile id: the owner's words there go to it. Absent is the
+   * default one (defaultOrchestrator). */
+  orchestrator?: string;
   /** A thread's channel. */
   parent?: string;
   /** A channel's group in the sidebar. */
@@ -1456,6 +1459,8 @@ export interface ChannelUpdate {
   category?: string;
   /** Placed before this channel in the sidebar; empty is last. */
   before?: string;
+  /** The orchestrator that looks after the channel, by its profile id; empty is the default one. */
+  orchestrator?: string;
 }
 
 export interface RecurrenceRequest {

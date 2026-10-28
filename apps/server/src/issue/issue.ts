@@ -24,7 +24,6 @@ import {
   type IssueFilter,
   type IssueUpdate,
   type Preview,
-  defaultOrchestrator,
   ownerId,
   type Priority,
   type ProjectTemplates,
@@ -369,7 +368,7 @@ export const make = (options: IssueOptions = {}) =>
           created_at: yield* Clock.currentTimeMillis,
           recurrence: recurrence ?? null,
           // The orchestrator never changes code: what it is given is answered.
-          deliver: req.deliver ?? (req.assignee === defaultOrchestrator ? "answer" : "change"),
+          deliver: req.deliver ?? (store.isOrchestrator(req.assignee ?? "") ? "answer" : "change"),
           talk: talk ?? null,
         }),
       );
@@ -484,7 +483,7 @@ export const make = (options: IssueOptions = {}) =>
     });
 
     const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
-      if (agent.id === defaultOrchestrator) return { refused: issueWording().orchestratorNotHelper };
+      if (store.isOrchestrator(agent.id)) return { refused: issueWording().orchestratorNotHelper };
       if (!agent.enabled) return { refused: issueWording().disabled(agent.name) };
       for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: issueWording().cannotSend(agent.name, i.text) };
       const where = project.trim() || (agent.workdir ?? "").trim();
@@ -540,7 +539,7 @@ export const make = (options: IssueOptions = {}) =>
     /** said: the owner's words with it, when it is asked again. */
     const start = Effect.fn("Issues.start")(function* (id: string, channel: string, by?: RunTrigger, said?: string): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
-      if (Option.isSome(mine) && isForOrchestrator(mine.value)) {
+      if (Option.isSome(mine) && isForOrchestrator(mine.value, store.isOrchestrator)) {
         yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, undefined, said);
         return {};
       }
@@ -620,7 +619,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!issue) {
         const project = s.project ?? (channel.project || undefined);
         const made = yield* Effect.result(
-          add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? defaultOrchestrator }, s.id),
+          add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? chat.orchestratorOf(channel.id) }, s.id),
         );
         if (made._tag === "Failure")
           return yield* chat.notice(channel.id, issueWording().recurrenceNoIssue(s.name, reasonOf(made.failure)), "recurrence_refused");
@@ -630,7 +629,7 @@ export const make = (options: IssueOptions = {}) =>
       const t = issue;
       const result = yield* Effect.result(
         Effect.gen(function* () {
-          if (isForOrchestrator(t)) return yield* toOrchestrator(t, channel.id, by, s);
+          if (isForOrchestrator(t, store.isOrchestrator)) return yield* toOrchestrator(t, channel.id, by, s);
           if (!found || t.status === "backlog" || t.status === "todo") return yield* Effect.asVoid(start(t.id, channel.id, by));
           if (isClosed(t.status)) return yield* Effect.asVoid(reopen(t.id, text, channel.id, by));
           const d = yield* sessions.deliver(t.sessions.at(-1)!, text, by);
@@ -758,7 +757,7 @@ export const make = (options: IssueOptions = {}) =>
       const n = `#${t.number}`;
       switch (p.move) {
         case "start": {
-          if (isForOrchestrator(t)) return [issueWording().does.toOrchestrator(n)];
+          if (isForOrchestrator(t, store.isOrchestrator)) return [issueWording().does.toOrchestrator(n)];
           const [, agent, project] = yield* readyOf(p.taker ? { ...t, assignee: p.taker.id } : t);
           const full = sessions.noRoom(agent.runtime, project);
           return full
@@ -910,10 +909,11 @@ export const make = (options: IssueOptions = {}) =>
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) });
     // An in-process run on its issues stopped with the server: one still going is lost; one that ended still waits on the owner.
-    for (const r of yield* db(q.openOf({ assignee: defaultOrchestrator }))) {
-      const run = column.run(r.last_run);
-      if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
-    }
+    for (const o of store.orchestrators())
+      for (const r of yield* db(q.openOf({ assignee: o.id }))) {
+        const run = column.run(r.last_run);
+        if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
+      }
 
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
@@ -1132,7 +1132,7 @@ export const make = (options: IssueOptions = {}) =>
       cancel,
       review: Effect.fn("Issues.review")(function* (id, req) {
         const t = yield* get(id);
-        const why = isForOrchestrator(t)
+        const why = isForOrchestrator(t, store.isOrchestrator)
           ? issueWording().orchestratorAnswers
           : t.graph || t.task
             ? issueWording().graphAcceptance
@@ -1160,9 +1160,10 @@ export const make = (options: IssueOptions = {}) =>
       }),
       refine: draft,
       talkWith: Effect.fn("Issues.talkWith")(function* (ref) {
-        const agent = store.named(ref.trim()) ?? store.agent(ref);
+        const agent = store.named(ref.trim()) ?? store.agent(ref) ?? store.orchestrators().find((o) => o.name === ref.trim());
         if (!agent) return yield* Effect.fail(missing(issueWording().noProfileNamed(ref), [lookIn.agent]));
-        if (agent.id === defaultOrchestrator) return chat.orchestratorDirect();
+        // An orchestrator answers in its own direct channel; a helper profile's is its talk issue's thread.
+        if (store.isOrchestrator(agent.id)) return yield* chat.openDirect({ id: agent.id, name: agent.name });
         const channel = yield* chat.openDirect({ id: agent.id, name: agent.name });
         if (!(yield* one(q.talkOf({ talk: channel })))) {
           const made = yield* add({ title: issueWording().talkTitle(agent.name), assignee: agent.id, deliver: "answer" }, undefined, channel);
@@ -1183,7 +1184,7 @@ export const make = (options: IssueOptions = {}) =>
       templates: Effect.fn("Issues.templates")(function* (name) {
         const stack = yield* projects.stack(name);
         if (!stack) return yield* Effect.fail(missing(issueWording().projectRef(name), [lookIn.project]));
-        return { project: name, stack, recent: sentTitles(yield* list, name), kinds: filledKinds(templateCatalog(), stack) };
+        return { project: name, stack, recent: sentTitles(yield* list, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
       }),
       hire,
       ran,

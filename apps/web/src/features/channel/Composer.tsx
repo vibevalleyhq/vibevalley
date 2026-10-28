@@ -86,7 +86,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     box.onKey(e);
   };
   let picker: HTMLInputElement | undefined;
-  const stop = () => api.orchestrator.stop().catch((e) => toast(reasonOf(e), "bad"));
+  const stop = () => api.orchestrator.stop({}).catch((e) => toast(reasonOf(e), "bad"));
 
   return (
     <div class="border-t border-line px-4 pt-3 pb-4">

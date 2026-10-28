@@ -249,7 +249,7 @@ describe("templates", () => {
       issue("零", "app", 0),
       issue("负", "app", -1),
     ];
-    expect(sentTitles(all, "app")).toEqual(["加 打卡", "修登录", "三", "二", "零"]);
-    expect(sentTitles(all, "none")).toEqual([]);
+    expect(sentTitles(all, "app", (id) => id === defaultOrchestrator)).toEqual(["加 打卡", "修登录", "三", "二", "零"]);
+    expect(sentTitles(all, "none", (id) => id === defaultOrchestrator)).toEqual([]);
   });
 });

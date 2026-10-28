@@ -178,6 +178,41 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  it.live("several orchestrators: each answers in its own direct channel, the channels it looks after and where it is named", () => {
+    const config = testConfig();
+    const f = farm(respond, config);
+    return Effect.gen(function* () {
+      const agents = yield* Agents;
+      const issues = yield* Issues;
+      const orchestrator = yield* Orchestrator;
+      const { in: saidIn } = yield* Said;
+      const chat = yield* Channels;
+      const lead = yield* agents.createAgent({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
+      const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
+      const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
+
+      const direct = yield* issues.talkWith(lead.name);
+      expect(direct).not.toBe(chat.orchestratorDirect(defaultOrchestrator));
+      yield* orchestrator.say("私下问你", {}, direct, "");
+      expect((yield* until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");
+      expect(asked("私下问你")[0]!.system).toContain("你是管家「阿青」");
+      expect(readFileSync(join(config.home, "agent", lead.id, `${lead.id}.jsonl`), "utf8")).toContain("私下问你");
+
+      const notes = (yield* chat.openChannel("notes-room", "", "")).id;
+      yield* chat.updateChannel(notes, { orchestrator: lead.id });
+      expect(chat.orchestratorOf(notes)).toBe(lead.id);
+      yield* orchestrator.say("这边怎么样", {}, notes, "");
+      yield* until(() => from(notes, lead.id)[0], "the answer from the one that looks after the channel");
+      yield* orchestrator.say(`@${lead.id} 你也看看`, {}, undefined, "");
+      yield* until(() => from(chat.defaultChannel(), lead.id)[0], "the answer from the one named");
+      yield* orchestrator.say("默认频道里随便说", {}, undefined, "");
+      yield* until(() => from(chat.defaultChannel(), defaultOrchestrator)[0], "the default one's answer");
+      expect(asked("默认频道里随便说")[0]!.system).not.toContain("你是管家");
+      expect(from(chat.defaultChannel(), lead.id)).toHaveLength(1);
+      expect((yield* Effect.flip(chat.updateChannel(notes, { orchestrator: "lab" })))._tag).toBe("Refused");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("keeps its inputs with where they came from", () => {
     const config = testConfig();
     const f = farm(respond, config);

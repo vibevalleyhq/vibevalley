@@ -1,4 +1,4 @@
-import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus, defaultOrchestrator } from "@vibevalley/protocol";
+import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
@@ -101,4 +101,5 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
 /** The findings still open: a failed acceptance's, until the next acceptance passes. */
 export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.resolved).length;
 
-export const isForOrchestrator = (t: Issue) => t.assignee === defaultOrchestrator;
+/** Assigned to an orchestrator (orchestrator: whether a profile id is one's): it answers it, no session works it. */
+export const isForOrchestrator = (t: Issue, orchestrator: (id: string) => boolean) => orchestrator(t.assignee ?? "");

@@ -243,6 +243,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   type: ChannelType,
   default: Schema.optionalKey(Schema.Boolean),
   peer: Schema.optionalKey(Schema.String),
+  orchestrator: Schema.optionalKey(Schema.String),
   parent: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   position: Schema.optionalKey(Schema.Number),
@@ -1436,6 +1437,7 @@ export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   before: Schema.optionalKey(Schema.String),
+  orchestrator: Schema.optionalKey(Schema.String),
 });
 
 export const RecurrenceRequest: Codec<T.RecurrenceRequest> = Schema.Struct({

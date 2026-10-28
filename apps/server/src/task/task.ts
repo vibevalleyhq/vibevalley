@@ -538,7 +538,7 @@ export const make = (options: TaskOptions = {}) =>
         const state = core.state();
         const session = sessionOf(state, sessionId);
         const issue = session?.issue ? (state.issues ?? []).find((t) => t.id === session.issue) : undefined;
-        const why = issueSplitRefusal(session, issue);
+        const why = issueSplitRefusal(session, issue, store.isOrchestrator);
         if (why) return yield* Effect.fail(refused(why));
         const tasks = steps.map(freshTask);
         const problems = graphProblems(tasks);

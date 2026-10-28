@@ -27,7 +27,7 @@ import { layer as llm } from "./ai/llm.ts";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
 import { layer as tool } from "./tool/tool.ts";
 import { layer as mcp, type McpOptions } from "./mcp/mcp.ts";
-import { layer as defaultOrchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
+import { layer as orchestrators, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { layer as game, start as gameStart } from "./game/game.ts";
 import { layer as lan, type LanOptions } from "./lan/lan.ts";
 import { layer as voice, type VoiceOptions } from "./voice/voice.ts";
@@ -111,7 +111,7 @@ export const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pip
 export const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(tool), on(defaultOrchestrator(o.orchestrator)));
+    below.pipe(on(tool), on(orchestrators(o.orchestrator)));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(game));

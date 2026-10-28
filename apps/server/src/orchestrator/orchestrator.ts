@@ -168,7 +168,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const by = clock.currentTimeMillisUnsafe() + withinMs;
         return recurrence.list().some((s) => {
           const next = nextRun(s);
-          return next !== undefined && (s.agent ? s.agent === id : id === defaultOrchestrator) && next <= by;
+          return next !== undefined && (s.agent || chat.orchestratorOf(s.channel)) === id && next <= by;
         });
       };
       const profile = store.agent(id);
@@ -339,7 +339,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
           ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
           : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
-      await take({ source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
+      await take({ to: n.agent, source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
     };
 
     // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
@@ -352,7 +352,9 @@ export const make = (options: OrchestratorOptions = {}) =>
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";
         line = lineWords.recurrence(s.name, missed, s.text, channel.name, s.id);
       }
-      await take({ source: s ? "recurrence" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
+      // The issue's assignee is the orchestrator it is for; a recurrence that names none is its channel's orchestrator's.
+      const to = w.issue.assignee || chat.orchestratorOf(channel.id);
+      await take({ to, source: s ? "recurrence" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
     };
 
     // One answer streams at a time, the call's or chat/completions', from the default orchestrator: a newer line ends the
@@ -391,7 +393,9 @@ export const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(
         Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
           Effect.flatMap(chat.topOf(o.channel), (c) =>
-            handled("the patrol", (line: string) => take({ source: "patrol", line, channel: o.channel }))(patrolText(c.name, o.notes)),
+            handled("the patrol", (line: string) => take({ to: chat.orchestratorOf(o.channel), source: "patrol", line, channel: o.channel }))(
+              patrolText(c.name, o.notes),
+            ),
           ),
         ),
       );

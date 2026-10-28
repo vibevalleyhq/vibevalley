@@ -147,11 +147,18 @@ const recentTitles = 5;
 /** A title longer than this is a long instruction, not one to send again. */
 const recentTitleLength = 60;
 
-export function sentTitles(all: readonly Issue[], project: string): string[] {
+/** orchestrator: whether a profile id is an orchestrator's. */
+export function sentTitles(all: readonly Issue[], project: string, orchestrator: (id: string) => boolean): string[] {
   const mine = all
     .filter(
       (i) =>
-        i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.recurrence === undefined && !isForOrchestrator(i),
+        i.project === project &&
+        i.sessions.length > 0 &&
+        !i.graph &&
+        !i.task &&
+        i.parent === undefined &&
+        i.recurrence === undefined &&
+        !isForOrchestrator(i, orchestrator),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];

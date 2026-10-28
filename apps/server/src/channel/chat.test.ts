@@ -10,6 +10,7 @@ import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { type Config, Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
+import { layer as agentLayer } from "../agent/agent.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
 import { newsOf } from "../session/session.ts";
 import { sessionOnIssue } from "../session/state.ts";
@@ -125,6 +126,7 @@ const world = (x: FakeSessions, config: Config = testConfig()) => {
   return fakeHelpers(x).pipe(
     Layer.provideMerge(channelLayer),
     Layer.provideMerge(said),
+    Layer.provideMerge(agentLayer),
     Layer.provideMerge(coreLayer.pipe(Layer.provide(projection))),
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),

@@ -95,7 +95,7 @@ export function refinement(d: RefinementDeps) {
   const draft = Effect.fn("Issues.draft")(
     function* (id: string, word: string, channel: string) {
       const t = yield* unsent(id);
-      if (isForOrchestrator(t)) return yield* Effect.fail(refused(issueWording().draft.orchestrator));
+      if (isForOrchestrator(t, store.isOrchestrator)) return yield* Effect.fail(refused(issueWording().draft.orchestrator));
       if (t.status !== "backlog") return yield* Effect.fail(refused(issueWording().draft.onlyBacklog));
       if (t.refining) return yield* Effect.fail(refused(issueWording().draft.drafting(t.refining.name)));
       const chosen = yield* refiner(t);
