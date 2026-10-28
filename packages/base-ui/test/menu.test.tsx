@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Menu, type MenuOpenChangeReason } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Menu, type MenuOpenChangeReason } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const view = (ran: string[], said: MenuOpenChangeReason[] = []) => (
   <>

@@ -2,9 +2,9 @@
 // focus inside and makes the page behind inert, and the browser gives the focus back to what had it when it closes.
 // Escape and (for a Dialog, not an AlertDialog) a press on the backdrop ask to close; whether it is open is the Root's.
 
-import type { JSX } from "@solidjs/web";
+import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, flag, openAttrs, refs } from "./internal/state.ts";
+import { type ButtonProps, buttonType, call, createControllable, flag, openAttrs, refs, type Renderable } from "./internal/state";
 
 export type DialogCloseReason = "escape" | "outside" | "close" | "trigger";
 
@@ -57,17 +57,18 @@ const makeRoot = (alert: boolean) =>
     return <Context value={ctx}>{props.children}</Context>;
   };
 
-function Trigger(props: ButtonProps) {
+function Trigger(props: ButtonProps & Renderable) {
   const c = use();
-  const rest = omit(props, "onClick");
+  const rest = omit(props, "render", "onClick");
+  const El = dynamic(() => props.render ?? "button");
   return (
-    <button
-      type="button"
+    <El
+      type={buttonType(props.render)}
       {...rest}
       aria-haspopup="dialog"
       aria-expanded={c.open() ? "true" : "false"}
       data-popup-open={flag(c.open())}
-      onClick={(e) => {
+      onClick={(e: MouseEvent) => {
         call(props.onClick, e);
         if (!e.defaultPrevented) c.setOpen(!c.open(), "trigger");
       }}
@@ -130,14 +131,15 @@ function Description(props: JSX.HTMLAttributes<HTMLParagraphElement>) {
   return <p {...props} id={c.descriptionId} />;
 }
 
-function Close(props: ButtonProps) {
+function Close(props: ButtonProps & Renderable) {
   const c = use();
-  const rest = omit(props, "onClick");
+  const rest = omit(props, "render", "onClick");
+  const El = dynamic(() => props.render ?? "button");
   return (
-    <button
-      type="button"
+    <El
+      type={buttonType(props.render)}
       {...rest}
-      onClick={(e) => {
+      onClick={(e: MouseEvent) => {
         call(props.onClick, e);
         if (!e.defaultPrevented) c.setOpen(false, "close");
       }}

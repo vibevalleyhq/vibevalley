@@ -3,9 +3,9 @@
 // several be pressed at once, else pressing one releases the others.
 
 import { createContext, createSignal, omit, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, type DivProps, flag, refs } from "./internal/state.ts";
-import type { Orientation } from "./internal/composite.ts";
-import { itemsIn, roveFocus } from "./internal/roving.ts";
+import { type ButtonProps, call, createControllable, type DivProps, flag, refs } from "./internal/state";
+import type { Orientation } from "./internal/composite";
+import { itemsIn, roveFocus } from "./internal/roving";
 
 interface GroupCtx {
   readonly value: () => readonly string[];
@@ -89,7 +89,6 @@ export function ToggleGroup(props: ToggleGroupProps) {
           root = el;
           queueMicrotask(() => setFirst(itemsIn(el, "[data-base-toggle]")[0]?.dataset.value));
         })}
-        aria-orientation={props.orientation ?? "horizontal"}
         data-orientation={props.orientation ?? "horizontal"}
         data-disabled={flag(Boolean(props.disabled))}
         onKeyDown={(e) => {

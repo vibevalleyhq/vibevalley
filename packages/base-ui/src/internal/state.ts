@@ -46,3 +46,22 @@ export function refs<T>(given: unknown, own: (el: T) => void) {
 export type DivProps = JSX.HTMLAttributes<HTMLDivElement>;
 export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement>;
 export type SpanProps = JSX.HTMLAttributes<HTMLSpanElement>;
+
+/**
+ * What a part renders as (Base UI's render): its own element by default, another tag, or a component that is given
+ * the part's props, ref and handlers included, to spread on its own element.
+ */
+export type Render = "button" | "span" | "div" | "a" | ((props: RenderProps) => JSX.Element);
+
+/** What a component in `render` is given: an element's attributes, whichever element it makes. */
+export type RenderProps = Omit<JSX.HTMLAttributes<HTMLElement>, "ref"> & {
+  // A plain callback, so the props spread onto any element's own ref type.
+  ref?: ((el: HTMLElement) => void) | undefined;
+};
+
+export interface Renderable {
+  render?: Render | undefined;
+}
+
+/** A button's type when the part is its own button; a component given in `render` sets its own. */
+export const buttonType = (render: Render | undefined) => (render === undefined || render === "button" ? "button" : undefined);

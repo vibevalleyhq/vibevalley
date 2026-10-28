@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { AlertDialog, Dialog, type DialogCloseReason } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { AlertDialog, Dialog, type DialogCloseReason } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const view = (said: [boolean, DialogCloseReason][]) => (
   <Dialog.Root onOpenChange={(open, why) => said.push([open, why])}>

@@ -1,3 +1,4 @@
+import { Tabs } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // 图鉴: every drawing the farm uses, its pointers and its sounds, and the workbench's own kit. /catalog is the drawings,
 // /catalog/<name> one of them large, /catalog/cursors, /catalog/sounds and /catalog/kit the other shelves.
@@ -69,24 +70,25 @@ const shelfTabs = [
 export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" || props.rest === "sounds" || props.rest === "kit" ? props.rest : "sprites");
   const tabs = () => (
-    <div role="tablist" aria-label={t("web.catalog.shelves")} class="flex gap-0.5 rounded-lg bg-hover p-0.5">
-      <For each={shelfTabs}>
-        {(t) => (
-          <A
-            href={t.to}
-            role="tab"
-            data-key={t.id}
-            aria-selected={aria(t.id === shelf())}
-            class={[
-              "flex h-[26px] flex-1 items-center justify-center rounded-md text-sm",
-              t.id === shelf() ? "bg-page font-medium shadow-raise" : "text-muted hover:bg-hover",
-            ]}
-          >
-            {t.label}
-          </A>
-        )}
-      </For>
-    </div>
+    <Tabs.Root value={shelf()}>
+      <Tabs.List aria-label={t("web.catalog.shelves")} class="flex gap-0.5 rounded-lg bg-hover p-0.5">
+        <For each={shelfTabs}>
+          {(t) => (
+            <Tabs.Tab
+              value={t.id}
+              render={(p) => <A {...p} href={t.to} />}
+              data-key={t.id}
+              class={[
+                "flex h-[26px] flex-1 items-center justify-center rounded-md text-sm",
+                t.id === shelf() ? "bg-page font-medium shadow-raise" : "text-muted hover:bg-hover",
+              ]}
+            >
+              {t.label}
+            </Tabs.Tab>
+          )}
+        </For>
+      </Tabs.List>
+    </Tabs.Root>
   );
   return (
     <div class="h-full p-3">

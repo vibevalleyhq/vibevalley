@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Popover, type PopoverOpenChangeReason } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Popover, type PopoverOpenChangeReason } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const view = (said: PopoverOpenChangeReason[], side?: "top" | "bottom") => (
   <>
@@ -91,4 +91,26 @@ test("a controlled popover opens only when its owner says so", async () => {
   await userEvent.click($("[data-testid=trigger]"));
   await settle();
   expect([said, document.querySelector("[data-testid=popup]")]).toEqual([[true], null]);
+});
+
+test("a trigger rendered by a component gets the part's props, ref and handlers", async () => {
+  mount(() => (
+    <Popover.Root>
+      <Popover.Trigger render={(p) => <button {...p} data-testid="own" class="mine" />}>display</Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner>
+          <Popover.Popup data-testid="popup">inside</Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  ));
+  const own = $("[data-testid=own]");
+  await userEvent.click(own);
+  await settle();
+  expect([own.className, own.textContent, own.getAttribute("aria-expanded"), $("[data-testid=positioner], [data-testid=popup]") !== null]).toEqual([
+    "mine",
+    "display",
+    "true",
+    true,
+  ]);
 });

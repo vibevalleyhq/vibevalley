@@ -3,12 +3,12 @@
 // over disabled ones), letters jump to an item, Enter or Space or a click runs it and closes the menu. Escape, choosing
 // an item and Tab give the focus back to the trigger; a press outside leaves it where the press put it.
 
-import type { JSX } from "@solidjs/web";
+import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, useContext } from "solid-js";
-import { createDismiss } from "./internal/dismiss.ts";
-import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating.tsx";
-import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving.ts";
-import { type ButtonProps, call, type DivProps, flag, openAttrs, refs } from "./internal/state.ts";
+import { createDismiss } from "./internal/dismiss";
+import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
+import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
+import { type ButtonProps, buttonType, call, type DivProps, flag, openAttrs, refs, type Renderable } from "./internal/state";
 
 export type MenuOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 
@@ -41,12 +41,13 @@ function Root(props: MenuRootProps) {
   return <Context value={ctx}>{props.children}</Context>;
 }
 
-function Trigger(props: ButtonProps) {
+function Trigger(props: ButtonProps & Renderable) {
   const c = use();
-  const rest = omit(props, "onClick", "onKeyDown", "ref");
+  const rest = omit(props, "render", "onClick", "onKeyDown", "ref");
+  const El = dynamic(() => props.render ?? "button");
   return (
-    <button
-      type="button"
+    <El
+      type={buttonType(props.render)}
       {...rest}
       ref={refs(props.ref, c.setTrigger)}
       id={c.triggerId}
@@ -54,14 +55,14 @@ function Trigger(props: ButtonProps) {
       aria-expanded={c.open() ? "true" : "false"}
       aria-controls={c.open() ? c.popupId : undefined}
       data-popup-open={flag(c.open())}
-      onKeyDown={(e) => {
+      onKeyDown={(e: KeyboardEvent) => {
         call(props.onKeyDown, e);
         if (e.defaultPrevented || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
         e.preventDefault();
         c.setStart(e.key === "ArrowDown" ? "first" : "last");
         c.setOpen(true, "trigger");
       }}
-      onClick={(e) => {
+      onClick={(e: MouseEvent) => {
         call(props.onClick, e);
         if (e.defaultPrevented) return;
         // detail 0: Enter or Space, not a pointer.

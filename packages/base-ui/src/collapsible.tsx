@@ -2,7 +2,7 @@
 // and which panel it controls; the panel is unmounted while closed unless keepMounted, then only hidden.
 
 import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, type DivProps, flag, openAttrs } from "./internal/state.ts";
+import { type ButtonProps, call, createControllable, type DivProps, flag, openAttrs } from "./internal/state";
 
 interface Ctx {
   readonly open: () => boolean;

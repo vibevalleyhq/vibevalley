@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Tabs } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Tabs } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const tabs = (activate = false, onValueChange?: (v: string) => void) => (
   <Tabs.Root onValueChange={onValueChange}>
@@ -54,4 +54,25 @@ test("with activateOnFocus the arrows select as they move", async () => {
   await userEvent.keyboard("{ArrowRight}");
   await settle();
   expect($("[role=tabpanel]").textContent).toBe("second");
+});
+
+test("tabs with no panels claim none, and a tab rendered as a link keeps its address", async () => {
+  mount(() => (
+    <Tabs.Root defaultValue="b">
+      <Tabs.List aria-label="shelves">
+        <Tabs.Tab value="a" render={(p) => <a {...p} href="#a" />}>
+          a
+        </Tabs.Tab>
+        <Tabs.Tab value="b" render={(p) => <a {...p} href="#b" />}>
+          b
+        </Tabs.Tab>
+      </Tabs.List>
+    </Tabs.Root>
+  ));
+  await settle();
+  const a = $("[data-value=a]");
+  expect([a.tagName, a.getAttribute("href"), a.hasAttribute("aria-controls"), a.hasAttribute("type")]).toEqual(["A", "#a", false, false]);
+  await userEvent.click(a);
+  await settle();
+  expect(a.getAttribute("aria-selected")).toBe("true");
 });

@@ -2,7 +2,7 @@
 // indicator is shown only while checked or indeterminate, unless keepMounted.
 
 import { createContext, omit, Show, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, flag, type SpanProps } from "./internal/state.ts";
+import { type ButtonProps, call, createControllable, flag, type SpanProps } from "./internal/state";
 
 interface Ctx {
   readonly checked: () => boolean;

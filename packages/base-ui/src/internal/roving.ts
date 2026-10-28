@@ -1,7 +1,7 @@
 // Roving focus over a composite's items in the DOM: the arrow keys move the focus among the elements that match `item`
 // inside `root`, in document order, passing over disabled ones.
 
-import { moveIndex, type Orientation, typeahead, typeaheadMs } from "./composite.ts";
+import { moveIndex, type Orientation, typeahead, typeaheadMs } from "./composite";
 
 export const itemsIn = (root: HTMLElement, item: string) => [...root.querySelectorAll<HTMLElement>(item)];
 

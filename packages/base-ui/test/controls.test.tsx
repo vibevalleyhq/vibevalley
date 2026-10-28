@@ -1,8 +1,8 @@
 import { createSignal } from "solid-js";
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Checkbox, Switch, Toggle, ToggleGroup } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Checkbox, Switch, Toggle, ToggleGroup } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const has = (el: Element, attr: string) => el.hasAttribute(attr);
 

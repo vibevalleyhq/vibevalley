@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Select } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Select } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const items = { pi: "Pi", codex: "Codex", claude: "Claude Code", gemini: "Gemini" };
 

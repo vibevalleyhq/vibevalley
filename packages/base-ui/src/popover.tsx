@@ -1,11 +1,11 @@
 // Popover (Base UI's): a popup against its trigger with content to read or use, not modal. Opening gives it the focus;
 // Escape and the close button give it back to the trigger, a press outside leaves it where the press put it.
 
-import type { JSX } from "@solidjs/web";
+import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, onSettled, useContext } from "solid-js";
-import { createDismiss } from "./internal/dismiss.ts";
-import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner, tabbable } from "./internal/floating.tsx";
-import { type ButtonProps, call, type DivProps, flag, openAttrs, refs } from "./internal/state.ts";
+import { createDismiss } from "./internal/dismiss";
+import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner, tabbable } from "./internal/floating";
+import { type ButtonProps, buttonType, call, type DivProps, flag, openAttrs, refs, type Renderable } from "./internal/state";
 
 export type PopoverOpenChangeReason = "trigger" | "escape" | "outside" | "close";
 
@@ -40,19 +40,20 @@ function Root(props: PopoverRootProps) {
   return <Context value={ctx}>{props.children}</Context>;
 }
 
-function Trigger(props: ButtonProps) {
+function Trigger(props: ButtonProps & Renderable) {
   const c = use();
-  const rest = omit(props, "onClick", "ref");
+  const rest = omit(props, "render", "onClick", "ref");
+  const El = dynamic(() => props.render ?? "button");
   return (
-    <button
-      type="button"
+    <El
+      type={buttonType(props.render)}
       {...rest}
       ref={refs(props.ref, c.setTrigger)}
       aria-haspopup="dialog"
       aria-expanded={c.open() ? "true" : "false"}
       aria-controls={c.open() ? c.popupId : undefined}
       data-popup-open={flag(c.open())}
-      onClick={(e) => {
+      onClick={(e: MouseEvent) => {
         call(props.onClick, e);
         if (!e.defaultPrevented) c.setOpen(!c.open(), "trigger");
       }}
@@ -93,14 +94,15 @@ function Description(props: JSX.HTMLAttributes<HTMLParagraphElement>) {
   return <p {...props} id={id} />;
 }
 
-function Close(props: ButtonProps) {
+function Close(props: ButtonProps & Renderable) {
   const c = use();
-  const rest = omit(props, "onClick");
+  const rest = omit(props, "render", "onClick");
+  const El = dynamic(() => props.render ?? "button");
   return (
-    <button
-      type="button"
+    <El
+      type={buttonType(props.render)}
       {...rest}
-      onClick={(e) => {
+      onClick={(e: MouseEvent) => {
         call(props.onClick, e);
         if (!e.defaultPrevented) c.setOpen(false, "close");
       }}

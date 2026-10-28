@@ -4,8 +4,8 @@
 
 import { Portal as SolidPortal, type JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show } from "solid-js";
-import { type Align, createAnchored, type Side } from "./anchored.ts";
-import { createControllable, type DivProps, openAttrs, refs } from "./state.ts";
+import { type Align, createAnchored, type Side } from "./anchored";
+import { createControllable, type DivProps, openAttrs, refs } from "./state";
 
 export interface FloatingRootProps<R extends string> {
   open?: boolean | undefined;
@@ -60,7 +60,7 @@ export function createFloating<R extends string>(props: FloatingRootProps<R>, fi
 
 export interface PortalProps {
   children?: JSX.Element;
-  /** Where to put it; the body by default. */
+  /** Where to put it; by default the modal dialog the trigger is in, else the body. */
   container?: HTMLElement | undefined;
 }
 
@@ -69,7 +69,8 @@ export function makePortal(use: () => FloatingParts) {
     const c = use();
     return (
       <Show when={c.open()}>
-        <SolidPortal mount={props.container ?? document.body}>{props.children}</SolidPortal>
+        {/* In a modal dialog: the page outside it is inert and under its top layer, so the popup goes inside it. */}
+        <SolidPortal mount={props.container ?? c.trigger()?.closest("dialog") ?? document.body}>{props.children}</SolidPortal>
       </Show>
     );
   };

@@ -4,9 +4,9 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, omit, onCleanup, useContext } from "solid-js";
-import { createDismiss } from "./internal/dismiss.ts";
-import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating.tsx";
-import { call, type DivProps, flag, openAttrs, refs } from "./internal/state.ts";
+import { createDismiss } from "./internal/dismiss";
+import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
+import { buttonType, call, type DivProps, flag, openAttrs, type Render, refs } from "./internal/state";
 
 export type TooltipOpenChangeReason = "hover" | "focus" | "press" | "escape" | "outside";
 
@@ -38,13 +38,13 @@ function Root(props: TooltipRootProps) {
 }
 
 export interface TooltipTriggerProps extends JSX.HTMLAttributes<HTMLElement> {
-  /** The element it is; a button by default, a span to wrap something that is focusable itself. */
-  as?: "button" | "span" | "div" | "a" | undefined;
+  /** A button by default; a span to wrap something that is focusable itself, or a component. */
+  render?: Render | undefined;
 }
 
 function Trigger(props: TooltipTriggerProps) {
   const c = use();
-  const rest = omit(props, "as", "ref", "onPointerEnter", "onPointerLeave", "onPointerDown", "onFocusIn", "onFocusOut");
+  const rest = omit(props, "render", "ref", "onPointerEnter", "onPointerLeave", "onPointerDown", "onFocusIn", "onFocusOut");
   let timer: ReturnType<typeof setTimeout> | undefined;
   const later = (ms: number, run: () => void) => {
     clearTimeout(timer);
@@ -76,10 +76,10 @@ function Trigger(props: TooltipTriggerProps) {
     clearTimeout(timer);
     track(false);
   });
-  const El = dynamic(() => props.as ?? "button");
+  const El = dynamic(() => props.render ?? "button");
   return (
     <El
-      type={(props.as ?? "button") === "button" ? "button" : undefined}
+      type={buttonType(props.render)}
       {...rest}
       ref={refs(props.ref, c.setTrigger)}
       aria-describedby={c.open() ? c.popupId : undefined}

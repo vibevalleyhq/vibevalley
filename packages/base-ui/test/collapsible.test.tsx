@@ -1,8 +1,8 @@
 import { createSignal } from "solid-js";
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Collapsible } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Collapsible } from "../src/index";
+import { $, mount, settle } from "./render";
 
 test("the trigger opens and closes its panel, saying so in ARIA and data attributes", async () => {
   mount(() => (

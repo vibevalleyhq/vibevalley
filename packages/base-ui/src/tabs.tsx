@@ -2,10 +2,11 @@
 // (Home, End, wrapping), and Enter or Space selects, or the focus selects too with activateOnFocus. With no value given
 // the first tab is selected. Tabs and panels find each other by value: tab's aria-controls, panel's aria-labelledby.
 
+import { dynamic } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
-import type { Orientation } from "./internal/composite.ts";
-import { roveFocus } from "./internal/roving.ts";
-import { type ButtonProps, call, createControllable, type DivProps, flag, refs } from "./internal/state.ts";
+import type { Orientation } from "./internal/composite";
+import { roveFocus } from "./internal/roving";
+import { type ButtonProps, buttonType, call, createControllable, type DivProps, flag, type Renderable, refs } from "./internal/state";
 
 interface Ctx {
   readonly value: () => string | undefined;
@@ -14,6 +15,9 @@ interface Ctx {
   readonly tabId: (value: string) => string;
   readonly panelId: (value: string) => string;
   readonly register: (value: string) => () => void;
+  /** A panel for the value is in the page: only then does its tab say it controls one. */
+  readonly hasPanel: (value: string) => boolean;
+  readonly registerPanel: (value: string) => () => void;
 }
 
 const Context = createContext<Ctx>();
@@ -34,6 +38,7 @@ function Root(props: TabsRootProps) {
     onChange: (v) => v !== undefined && props.onValueChange?.(v),
   });
   const [tabs, setTabs] = createSignal<readonly string[]>([]);
+  const [panels, setPanels] = createSignal<readonly string[]>([]);
   const base = createUniqueId();
   const ctx: Ctx = {
     value: () => chosen() ?? tabs()[0],
@@ -44,6 +49,11 @@ function Root(props: TabsRootProps) {
     register: (v) => {
       setTabs((t) => [...t, v]);
       return () => setTabs((t) => t.filter((x) => x !== v));
+    },
+    hasPanel: (v) => panels().includes(v),
+    registerPanel: (v) => {
+      setPanels((p) => [...p, v]);
+      return () => setPanels((p) => p.filter((x) => x !== v));
     },
   };
   return (
@@ -83,30 +93,32 @@ function List(props: TabsListProps) {
   );
 }
 
-export interface TabProps extends ButtonProps {
+export interface TabProps extends ButtonProps, Renderable {
   value: string;
 }
 
+/** A tab; render it as a link (`render`) where selecting a tab goes to an address. */
 function Tab(props: TabProps) {
   const c = use();
-  const rest = omit(props, "value", "onClick");
+  const rest = omit(props, "value", "onClick", "render");
+  const El = dynamic(() => props.render ?? "button");
   // Registered once mounted: Solid 2 refuses a write while the component is being made.
   onSettled(() => c.register(props.value));
   const selected = () => c.value() === props.value;
   return (
-    <button
-      type="button"
+    <El
+      type={buttonType(props.render)}
       role="tab"
       {...rest}
       id={c.tabId(props.value)}
       data-value={props.value}
       aria-selected={selected() ? "true" : "false"}
-      aria-controls={c.panelId(props.value)}
+      aria-controls={c.hasPanel(props.value) ? c.panelId(props.value) : undefined}
       tabindex={selected() ? 0 : -1}
       data-selected={flag(selected())}
       data-disabled={flag(Boolean(props.disabled))}
       data-orientation={c.orientation()}
-      onClick={(e) => {
+      onClick={(e: MouseEvent) => {
         call(props.onClick, e);
         if (!e.defaultPrevented) c.select(props.value);
       }}
@@ -124,6 +136,7 @@ function Panel(props: TabsPanelProps) {
   const c = use();
   const rest = omit(props, "value", "keepMounted");
   const selected = () => c.value() === props.value;
+  onSettled(() => c.registerPanel(props.value));
   return (
     <Show when={selected() || props.keepMounted}>
       <div

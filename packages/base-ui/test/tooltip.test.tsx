@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { Tooltip, type TooltipOpenChangeReason } from "../src/index.ts";
-import { $, mount, settle } from "./render.tsx";
+import { Tooltip, type TooltipOpenChangeReason } from "../src/index";
+import { $, mount, settle } from "./render";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const tip = () => document.querySelector("[role=tooltip]");
@@ -76,7 +76,7 @@ test("a press hides it, and once one has shown the next shows without its delay"
 test("as a span it wraps what is focusable itself", async () => {
   mount(() => (
     <Tooltip.Root delay={0}>
-      <Tooltip.Trigger as="span" data-testid="wrap">
+      <Tooltip.Trigger render="span" data-testid="wrap">
         <input aria-label="key" />
       </Tooltip.Trigger>
       <Tooltip.Portal>
