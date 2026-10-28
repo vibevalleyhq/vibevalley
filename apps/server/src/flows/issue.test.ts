@@ -14,7 +14,7 @@ import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { Runtimes } from "../runtime/runtime.ts";
-import { Recurrences } from "../recurrence/recurrence.ts";
+import { Crons } from "../cron/cron.ts";
 import { Sessions, type SessionsInside } from "../session/session.ts";
 import { write } from "../testing/git.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
@@ -247,16 +247,16 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("of a recurrence is one, told again and reopened", () => {
+  it.live("of a cron is one, told again and reopened", () => {
     let now = Date.now();
     const f = farm({ clock: () => now });
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      const recurrences = yield* Recurrences;
+      const crons = yield* Crons;
       yield* (yield* Agents).saveAgent({ ...lab(), enabled: true });
-      const made = yield* recurrences.add(
+      const made = yield* crons.add(
         {
           name: "巡检",
           text: "看一眼",
@@ -268,30 +268,30 @@ describe("an issue", () => {
       );
       const due = () => {
         now += 5 * 60_000 + 1;
-        return recurrences.tick;
+        return crons.tick;
       };
-      const ofRecurrence = () => Effect.map(issues.ofRecurrence(made.id), (i) => i!);
-      const runs = () => Effect.flatMap(ofRecurrence(), (i) => sessions.runs(i.id));
+      const ofCron = () => Effect.map(issues.ofCron(made.id), (i) => i!);
+      const runs = () => Effect.flatMap(ofCron(), (i) => sessions.runs(i.id));
       yield* due();
       yield* w.nextReport;
-      const first = yield* ofRecurrence();
+      const first = yield* ofCron();
       expect(first.sessions).toHaveLength(1);
 
       yield* due();
       yield* w.nextReport;
-      expect((yield* ofRecurrence()).id).toBe(first.id);
-      expect((yield* ofRecurrence()).sessions).toHaveLength(1);
+      expect((yield* ofCron()).id).toBe(first.id);
+      expect((yield* ofCron()).sessions).toHaveLength(1);
       const two = yield* await_(runs, (r) => r.length === 2 && r[1]!.endedAt !== undefined, "a second run");
-      expect(two[1]!.triggeredBy.kind).toBe("recurrence");
+      expect(two[1]!.triggeredBy.kind).toBe("cron");
 
       yield* issues.merge(first.id);
-      yield* await_(ofRecurrence, (i) => i.status === "done", "merged");
+      yield* await_(ofCron, (i) => i.status === "done", "merged");
       yield* due();
       yield* w.nextReport;
-      expect((yield* ofRecurrence()).id).toBe(first.id);
-      expect((yield* ofRecurrence()).sessions).toHaveLength(2);
+      expect((yield* ofCron()).id).toBe(first.id);
+      expect((yield* ofCron()).sessions).toHaveLength(2);
       const three = yield* await_(runs, (r) => r.length === 3, "a third run");
-      expect(three[2]!.triggeredBy.kind).toBe("recurrence");
+      expect(three[2]!.triggeredBy.kind).toBe("cron");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

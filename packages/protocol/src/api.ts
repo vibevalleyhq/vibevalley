@@ -105,13 +105,13 @@ export interface Handlers<R = never> {
   readonly "setting.update": (a: T.SettingsUpdate) => Effect.Effect<T.SettingsStatus, ApiError, R>;
   readonly "channel.message.send": (a: T.SayRequest) => Effect.Effect<void, ApiError, R>;
   readonly "channel.create": (a: T.ChannelRequest) => Effect.Effect<string, ApiError, R>;
-  readonly "recurrence.create": (a: T.RecurrenceRequest) => Effect.Effect<T.Recurrence, ApiError, R>;
-  readonly "recurrence.list": () => Effect.Effect<T.Recurrence[], ApiError, R>;
+  readonly "cron.create": (a: T.CronRequest) => Effect.Effect<T.Cron, ApiError, R>;
+  readonly "cron.list": () => Effect.Effect<T.Cron[], ApiError, R>;
   /** Only what the body gives changes. */
-  readonly "recurrence.update": (a: { readonly id: string } & T.RecurrenceUpdate) => Effect.Effect<void, ApiError, R>;
-  readonly "recurrence.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  readonly "cron.update": (a: { readonly id: string } & T.CronUpdate) => Effect.Effect<void, ApiError, R>;
+  readonly "cron.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
-  readonly "recurrence.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "cron.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "channel.update": (a: { readonly id: string } & T.ChannelUpdate) => Effect.Effect<void, ApiError, R>;
   /** The channel what names none goes to from now on: a connector's, a call's. */
   readonly "channel.default.set": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
@@ -337,7 +337,7 @@ const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.
   Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
 
 /** The inputs an op and its dry run share: the dry run takes exactly what the op takes. */
-const recurrenceDeleteInput = input({ id: Schema.String });
+const cronDeleteInput = input({ id: Schema.String });
 const issueDeleteInput = input({ id: Schema.String });
 /** A message, or a channel, by its id. */
 const messageInput = input({ id: Schema.String });
@@ -406,38 +406,38 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "recurrence.create",
+    op: "cron.create",
     about: [],
-    input: S.RecurrenceRequest,
-    result: S.Recurrence,
+    input: S.CronRequest,
+    result: S.Cron,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "recurrence.list",
+    op: "cron.list",
     about: [],
     input: undefined,
-    result: Schema.mutable(Schema.Array(S.Recurrence)),
+    result: Schema.mutable(Schema.Array(S.Cron)),
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "recurrence.update",
+    op: "cron.update",
     about: ["id"],
-    input: input({ id: Schema.String }, S.RecurrenceUpdate),
+    input: input({ id: Schema.String }, S.CronUpdate),
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "recurrence.delete",
+    op: "cron.delete",
     about: ["id"],
-    input: recurrenceDeleteInput,
+    input: cronDeleteInput,
     result: undefined,
     can: ["owner", "remote", "orchestrator"],
-    dryRun: "recurrence.previewDelete",
+    dryRun: "cron.previewDelete",
   },
   {
-    op: "recurrence.previewDelete",
+    op: "cron.previewDelete",
     about: ["id"],
-    input: recurrenceDeleteInput,
+    input: cronDeleteInput,
     result: S.Preview,
     can: ["owner", "remote", "orchestrator"],
   },

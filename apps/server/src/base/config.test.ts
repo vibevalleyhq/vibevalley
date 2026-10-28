@@ -32,7 +32,7 @@ test("the defaults, then the file, then the environment", async () => {
   expect(c.deepseek.apiKey).toBe("sk-env");
   expect(c.gitEmails).toEqual(["a@x", "b@x"]);
   expect(dbDir(c)).toBe("memory");
-  expect(c.recurrence.tickMs).toBe(20_000);
+  expect(c.cron.tickMs).toBe(20_000);
   expect((await load("", { ...env, VIBEVALLEY_GIT_EMAILS: "c@x, d@x,e@x" })).gitEmails).toEqual(["c@x", "d@x", "e@x"]);
   expect((await load("", { ...env, VIBEVALLEY_DEEPSEEK_API_KEY: "sk-farm" })).deepseek.apiKey).toBe("sk-farm");
   expect((await load("", { ...env, VIBEVALLEY_GIT_EMAILS: "" })).gitEmails).toEqual([]);

@@ -8,7 +8,7 @@ Status: proposed
 
 - **入口至少 7 条，各走各的**：频道投递（`channel/chat.ts` 的 `kicked`）、工单交给管家（`orchestrator/orchestrator.ts` 的 `forOrchestrator`）、定时（`issue/issue.ts` 的 `scheduled`，忙着的帮工直接 `session.Deliver`，绕开频道）、巡查（`orchestrator/orchestrator.ts`）、计划（`tool/tool.ts` 的 `tellOrchestrator`）、连接器（落库后重新走 `channel.Say`）、电话和听写（`orchestrator.Call`，直接插进管家，频道里只留记录）。
 - **「插话还是排到这一轮之后」写了三遍，判断依据各不相同**：频道给帮工的（`session.Deliver` → oar 的 `steerOrQueue`，看农机能不能插话）、频道给管家的（`heardInChat`：只有主人的话插话）、管家的脑子（`orchestrator.sendInput` 在 `brain.Send` 和 `brain.Later` 里二选一）。
-- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`orchestrator/orchestrator.ts`）、定时每 20 秒看一次（`recurrence`）、排队的工单每 5 秒找一次空地（`issue/issue.ts`）、管家把这期间的汇报和农场现状拼进一条输入（`orchestrator.news`、`situationNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
+- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`orchestrator/orchestrator.ts`）、定时每 20 秒看一次（`cron`）、排队的工单每 5 秒找一次空地（`issue/issue.ts`）、管家把这期间的汇报和农场现状拼进一条输入（`orchestrator.news`、`situationNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
 - **管家和帮工收话是两套**：帮工经频道投递（`channel_delivery` 表记着谁该收、收没收到），管家经五个 `base.Hub` 订阅，什么也不存，重启前没处理的就没了（巡查过后会再报，计划和工单的消息不会）。
 
 结果：想改一条节奏规则（比如「主人的话总是插话」「帮工忙时别一条一条打断它」），要先找到它在哪几处各写了一份；加一个新入口（比如再接一家聊天软件，或者让领班收到它派出去的工单的进展），又要再写一遍「叫不叫、什么时候叫、怎么叫」。
@@ -91,7 +91,7 @@ Status: proposed
 - 同时干活的上限（工作区、农机、项目三层）留在 `session`：这是开工的规则。
 - 排队的工单找空地（`issue` 每 5 秒）留在 `issue`：那是派活，不是交话。
 - agent 自己的 Task 里帮手做完了交回结果，是 `packages/agent` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
-- 定时的时钟（`recurrence` 每 20 秒）留在 `recurrence`：到点只是投一封信。
+- 定时的时钟（`cron` 每 20 秒）留在 `cron`：到点只是投一封信。
 - 巡查留着它的「过了宽限期才报」的规则，只把报的方式换成投信；以后可以只是一种 `digest`。
 
 ### 6. 存不存
@@ -118,7 +118,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- `channel`、`orchestrator`、`issue`、`recurrence`、`task`、`connector`、`voice` 里没有直接叫醒 agent 的代码：都投信；`session.Deliver` 和管家的 `ask`、`send` 只被 `mailbox` 调。
+- `channel`、`orchestrator`、`issue`、`cron`、`task`、`connector`、`voice` 里没有直接叫醒 agent 的代码：都投信；`session.Deliver` 和管家的 `ask`、`send` 只被 `mailbox` 调。
 - 「插话、排队、攒一批、打断」只在 `mailbox` 的一个纯函数里决定，有表驱动的测试覆盖默认表的每一格；加一个 `Source` 不处理时测试失败（照「封闭的联合穷尽处理」）。
 - 冷却、跳数、熔断、攒一批的参数在一处，对管家和帮工都生效，有测试。
 - 管家有正在跑的子活时，`interrupt` 变成 `queue`，有测试。

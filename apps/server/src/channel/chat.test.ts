@@ -344,8 +344,8 @@ describe("the chat", () => {
         yield* f.chat.markUnread(a, said.number);
         expect([f.channel(a)?.read, f.channel(a)?.unread]).toEqual([said.number - 1, 2]);
 
-        // A recurrence of the recurrence module's, as its table has it.
-        yield* f.sql`insert into recurrence (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', ${a}, '{}', 'UTC', 0)`.pipe(
+        // A cron of the cron module's, as its table has it.
+        yield* f.sql`insert into cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', ${a}, '{}', 'UTC', 0)`.pipe(
           Effect.orDie,
         );
         expect(yield* Effect.flip(f.chat.removeChannel(a))).toMatchObject({ reason: expect.stringContaining("定时") });
@@ -515,7 +515,7 @@ describe("the chat", () => {
         yield* f.chat.orchestratorSays(general, "好的，我叫 @w11 去看看", "", defaultOrchestrator);
         expect(ours().map((m) => [m.text, m.mentions])).toEqual([["好的，我叫 @w11 去看看", ["w11"]]]);
         yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
-        yield* f.chat.notice(general, "定时到了", "recurrence");
+        yield* f.chat.notice(general, "定时到了", "cron");
         const last = f.messagesOf(general).at(-1)!;
         expect([last.kind, last.from]).toEqual(["notice", "system"]);
         expect((yield* Effect.promise(() => f.deliveries("w11"))).at(-1)?.message_id).not.toBe(last.id);

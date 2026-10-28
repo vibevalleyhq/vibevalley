@@ -20,7 +20,7 @@ export type Source =
   /** A channel or a thread with a helper's words in it. */
   | "chat"
   | "issue"
-  | "recurrence"
+  | "cron"
   | "patrol"
   | "graph";
 
@@ -31,7 +31,7 @@ export const intake: Readonly<Record<Source, { readonly head: string; readonly n
   owner: { head: sourceHead.owner, now: true, trigger: "comment" },
   chat: { head: sourceHead.chat, now: false, trigger: "comment" },
   issue: { head: sourceHead.issue, now: false, trigger: "issue" },
-  recurrence: { head: sourceHead.recurrence, now: false, trigger: "recurrence" },
+  cron: { head: sourceHead.cron, now: false, trigger: "cron" },
   // The patrol's and the task graphs' lines are the farm's own.
   patrol: { head: sourceHead.patrol, now: false, trigger: "runtime" },
   graph: { head: sourceHead.graph, now: false, trigger: "runtime" },

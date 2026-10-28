@@ -22,7 +22,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [notice.md](docs/subsystems/notice.md) | 通知：Inbox、刚来的、巡查，经通话、手机、系统通知送到主人 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 管家：收什么话、现状、工具、谁能让它合并、巡查、评测 |
-| [schedule.md](docs/subsystems/recurrence.md) | 定时：一张工单的触发：间隔和 cron、补跑、回头看 |
+| [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [task.md](docs/subsystems/task.md) | 计划：带子工单的父工单、按图推进；agent 自己的任务 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [doc.md](docs/subsystems/doc.md) | 文档：按块存、按 op 改、一批一个事务、Markdown 导入导出 |
@@ -63,7 +63,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 管家 | manager | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认管家 | 工头、主 agent |
 | 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，工单不换 | 工人、子 agent、worker |
 | 在场 | here | `presentSessions`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
-| 一次干活 | a round of work | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己 | 一轮、turn |
+| 一次干活 | a round of work | run | 一次触发到一次汇报：派出去、带话、计划、定时任务、农机自己 | 一轮、turn |
 | 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家或帮工 | 帮工档案、角色 |
 | 农机 | machine | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
@@ -96,7 +96,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 私聊 | direct message | direct | 你和管家两个人说话的地方，帮工不在 | 私信 |
 | 频道 | channel | channel | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
-| 定时 | schedule | recurrence（`Recurrence`） | 一张工单的一种触发：到点开它的一次干活，派给帮工或管家 | cron |
+| 定时任务 | scheduled task | cron（`Cron`） | 一张工单的一种触发：到点开它的一次干活，派给帮工或管家 | 定时、schedule、recurrence |
 | 来电 | inbox | inbox | 要你处理的事 | 通知 |
 | 巡查 | patrol | patrol | 定时看 Inbox，放久了叫醒管家 | |
 | 连接到本机 | connect to this machine | lan | 让局域网里的设备用这台电脑上的 VibeValley 的监听，默认关 | 远程模式 |

@@ -36,7 +36,7 @@
   "deletesChannel": "Delete {target}, with its {threads} threads and {said} messages",
   "inUse": "Cannot delete it: {why}. It can be archived",
   "helpersThere": "helpers still work in this channel",
-  "recurrencesThere": "{n} recurrences are here",
+  "cronsThere": "{n} scheduled tasks are here",
   "connectorsThere": "a connector is bound to it",
   "queuedThere": "{n} tickets wait in the queue to start here",
   "issuesThere": "{n} tickets were worked here",

@@ -82,7 +82,7 @@ update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id
 
 -- name: ChannelInUse :one
 -- What still points at a channel, so deleting it would take it from under them.
-select (select count(*) from recurrence r where r.channel_id = sqlc.arg(id))::int as recurrences,
+select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as crons,
        (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
        (select count(*) from issue_queue q where q.channel = sqlc.arg(id))::int as queued,
        (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;

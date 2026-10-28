@@ -148,12 +148,12 @@ function gathered(state: WorkspaceState): Unworded[] {
     }
   }
 
-  for (const sc of state.recurrences ?? []) {
+  for (const sc of state.crons ?? []) {
     if (!sc.pending) continue;
     out.push({
       item: {
         id: sc.id + ":ask",
-        kind: "recurrence-ask",
+        kind: "cron-ask",
         from: orchestrator,
         text: cut(sc.name, 40),
         at: sc.created,
@@ -161,7 +161,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       },
       channel: sc.channel,
       since: sc.created,
-      brief: patrolBrief.recurrence(sc.name, sc.id),
+      brief: patrolBrief.cron(sc.name, sc.id),
     });
   }
 
@@ -299,12 +299,12 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
       };
     case "mention":
       return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text };
-    case "recurrence-ask":
+    case "cron-ask":
       return {
-        label: t("server.notice.item.recurrence-ask.label"),
-        title: t("server.notice.item.recurrence-ask.title"),
-        body: t("server.notice.item.recurrence-ask.body", { text }),
-        tray: t("server.notice.item.recurrence-ask.tray", { text }),
+        label: t("server.notice.item.cron-ask.label"),
+        title: t("server.notice.item.cron-ask.title"),
+        body: t("server.notice.item.cron-ask.body", { text }),
+        tray: t("server.notice.item.cron-ask.tray", { text }),
       };
   }
 }

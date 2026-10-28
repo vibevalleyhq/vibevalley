@@ -17,7 +17,7 @@ type LookIn =
   | "agent"
   | "skill"
   | "template"
-  | "recurrence"
+  | "cron"
   | "device"
   | "archive"
   | "channel"
@@ -46,7 +46,7 @@ export const lookIn = {
   agent: listed("agent", commandOf("agent.list")),
   skill: listed("skill", commandOf("skill.list")),
   template: listed("template", commandOf("agent.template.list")),
-  recurrence: listed("recurrence", commandOf("recurrence.list")),
+  cron: listed("cron", commandOf("cron.list")),
   device: listed("device", commandOf("lan.get")),
   archive: listed("archive", commandOf("orchestrator.archive.list")),
   channel: listed("channel", commandOf("channel.list")),

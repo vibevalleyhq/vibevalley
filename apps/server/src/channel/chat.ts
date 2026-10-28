@@ -1352,7 +1352,7 @@ export const make = Effect.gen(function* () {
       return yield* Effect.fail(refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") })));
     const used = yield* db(qc.channelInUse({ id }));
     const why = [
-      used.recurrences ? t("server.channel.recurrencesThere", { n: used.recurrences }) : "",
+      used.crons ? t("server.channel.cronsThere", { n: used.crons }) : "",
       used.connectors ? t("server.channel.connectorsThere") : "",
       used.queued ? t("server.channel.queuedThere", { n: used.queued }) : "",
       used.issue_threads ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",

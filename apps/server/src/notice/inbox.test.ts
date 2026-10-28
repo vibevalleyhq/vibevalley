@@ -70,12 +70,8 @@ test("each item is worded for every route: the phone, the system notice, the tra
     lastRun: { outcome: "completed", summary: "打卡\n  写好了", at: 2 },
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [], attention: { state: "reviewing", acts: [] } } as unknown as Issue;
-  const recurrence = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<
-    WorkspaceState["recurrences"]
-  >[number];
-  const [handedBack, asked] = [...inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue], recurrences: [recurrence] })].sort(
-    (a, b) => a.at - b.at,
-  );
+  const cron = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<WorkspaceState["crons"]>[number];
+  const [handedBack, asked] = [...inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue], crons: [cron] })].sort((a, b) => a.at - b.at);
   expect([handedBack!.who, handedBack!.words]).toEqual(["小吴", { label: "等你看", title: "小吴 做完了", body: "打卡 写好了", tray: "小吴 做完了，等你看" }]);
   expect([asked!.who, asked!.words]).toEqual([
     "管家",

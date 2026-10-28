@@ -12,7 +12,7 @@ import { Agents } from "../agent/agent.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { reasonOf } from "../errors.ts";
-import { Recurrences } from "../recurrence/recurrence.ts";
+import { Crons } from "../cron/cron.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
@@ -554,7 +554,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("a queued recurrence keeps its trigger and that it was missed", () => {
+  it.live("a queued cron keeps its trigger and that it was missed", () => {
     const clock = { now: 1_800_000_000_000 };
     const c = config();
     return Effect.gen(function* () {
@@ -562,20 +562,20 @@ describe("issues", () => {
       const core = yield* Core;
       const chat = yield* Channels;
       const sessions = yield* Sessions;
-      const recurrences = yield* Recurrences;
+      const crons = yield* Crons;
       yield* (yield* Agents).saveAgent(lab());
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
-      const sc = yield* recurrences.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
+      const sc = yield* crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
       clock.now += 10 * 60_000;
-      yield* recurrences.tick;
-      let issue = yield* issues.ofRecurrence(sc.id);
-      yield* until(async () => (issue = await Effect.runPromise(issues.ofRecurrence(sc.id)))?.queuedAt !== undefined, "the recurrence queued");
+      yield* crons.tick;
+      let issue = yield* issues.ofCron(sc.id);
+      yield* until(async () => (issue = await Effect.runPromise(issues.ofCron(sc.id)))?.queuedAt !== undefined, "the cron queued");
       yield* core.apply({ type: "left", id: sessionId("occupied") });
       yield* issues.tryQueued;
       yield* until(() => Effect.runPromise(sessions.runs(issue!.id)).then((r) => r.length > 0), "the scheduled run");
       const [run] = yield* sessions.runs(issue!.id);
-      expect(run!.triggeredBy).toEqual({ kind: "recurrence", recurrence: sc.id, missed: true });
+      expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true });
       expect((yield* sessions.get(run!.session))?.channel).toBe(channel.id);
     }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"], clock: () => clock.now })));
   });

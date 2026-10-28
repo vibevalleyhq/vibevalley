@@ -77,7 +77,7 @@ export const catalogs = {
         agent: "列出档案，找它的 id",
         skill: "列出技能，找它的 id",
         template: "列出模板，找它的 id",
-        recurrence: "列出定时，找它的 id",
+        cron: "列出定时任务，找它的 id",
         device: "看连着的设备，找它的 id",
         archive: "列出管家的旧账",
         channel: "列出频道，找它的 id",
@@ -159,7 +159,7 @@ export const catalogs = {
       deletesChannel: "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
       inUse: "删不了：{why}。可以归档它",
       helpersThere: "还有帮工在这个频道里干活",
-      recurrencesThere: "还有 {n} 个定时在这里",
+      cronsThere: "还有 {n} 个定时任务在这里",
       connectorsThere: "接着连接器",
       queuedThere: "还有 {n} 张工单排着队要在这里开工",
       issuesThere: "这里派过 {n} 张工单的活",
@@ -286,6 +286,45 @@ export const catalogs = {
       },
       digest: "你不在的时候有 {n} 条消息：\n{lines}\n\n完整的在默认频道里。",
     },
+    "server.cron": {
+      weekdays: { "0": "日", "1": "一", "2": "二", "3": "三", "4": "四", "5": "五", "6": "六" },
+      when: {
+        once: "{clock} 一次",
+        hours: "每 {n} 小时",
+        minutes: "每 {n} 分钟",
+        daily: "每天 {time}",
+        weekdays: "工作日 {time}",
+        weekend: "周末 {time}",
+        monthly: "每月 {day} 号 {time}",
+        hourly: "每小时第 {minute} 分",
+        cron: "cron {expr}",
+        weekly: "每周{days} {time}",
+      },
+      next: { never: "不会再到点", pending: "等主人同意", done: "做过了", off: "关着" },
+      expr: {
+        fields: { "0": "分钟", "1": "小时", "2": "日", "3": "月", "4": "周几" },
+        badField: "cron 的{name}写错了：{field}",
+        fiveFields: "cron 要五段：分 时 日 月 周几，比如 0 9 * * 1-5",
+        never: "这个 cron 永远不会到点：{expr}",
+      },
+      problem: {
+        noName: "定时任务要有个名字",
+        noText: "定时任务要写到点了做什么",
+        zone: "不认识这个时区：{tz}",
+        past: "一次性的时间要在以后",
+        every: "间隔至少 {min} 分钟",
+        time: "时间写成 HH:MM，比如 09:00：{time}",
+        days: "每周的哪几天：0 到 6，0 是周日",
+        kind: "不认识这种定时任务",
+      },
+      due: "{missed, select, true {⏰ 定时任务「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时任务「{name}」到点了：{text}}}",
+      noCron: "没有 {id} 号定时任务",
+      noChannel: "没有 {name} 这个频道",
+      noProfile: "没有叫 {name} 的档案",
+      noProject: "#{channel} 没有默认项目：直接派给帮工的定时任务要写 project",
+      remove: "删掉定时任务「{name}」：以后不再到点开工，它开过的工单留着",
+      removeWhen: "删掉定时任务「{name}」（{when}）：以后不再到点开工，它开过的工单留着",
+    },
     "server.doc": {
       doc: "文档 {id}",
       untitled: "没起名的文档",
@@ -377,8 +416,8 @@ export const catalogs = {
       stillOpen: "这张工单还开着：挪回待办就是再来一轮",
       stillWorking: "{name} 还在做这张工单：直接给它带话",
       senderGone: "派它的档案 {id} 不在了",
-      recurrenceNoIssue: "定时「{name}」写不了工单：{why}",
-      recurrenceNoStart: "定时「{name}」开不了工：{why}",
+      cronNoIssue: "定时任务「{name}」写不了工单：{why}",
+      cronNoStart: "定时任务「{name}」开不了工：{why}",
       closedReopen: "这张工单关上了：带一句话重开它",
       noProfileNamed: "没有叫 {key} 的档案",
       handOverOnTodo: "换人是挪到待办时的事：挪到待办，填上谁来接手",
@@ -470,7 +509,7 @@ export const catalogs = {
         start: "开工",
         restart: "重开，接着做",
         graph: "照计划开工",
-        recurrence: "{missed, select, true {定时开工（补跑）} other {定时开工}}",
+        cron: "{missed, select, true {定时开工（补跑）} other {定时开工}}",
         runtime: "农机自己接着做",
         refined: "起草好了",
         reported: "交回来了",
@@ -566,7 +605,7 @@ export const catalogs = {
         "graph-ready": { label: "计划做完了", title: "计划「{text}」都做完了", body: "看看改动，合进主分支", tray: "计划「{text}」等你合进主分支" },
         "task-failed": { label: "计划卡住了", title: "计划卡住了：{text}", body: "重试、改工单，或者跳过", tray: "计划「{text}」没做成" },
         mention: { label: "找你", title: "{who} 叫你" },
-        "recurrence-ask": { label: "定时等你同意", title: "管家想定一个定时", body: "「{text}」：同意了才开始", tray: "定时「{text}」等你同意" },
+        "cron-ask": { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「{text}」：同意了才开始", tray: "定时任务「{text}」等你同意" },
       },
     },
     "server.orchestrator": {
@@ -642,45 +681,6 @@ export const catalogs = {
       mergeTree: "git merge-tree 出错（{code}）",
       moreLines: "… 还有 {n} 行没显示",
       conflict: "合进 {base} 有冲突",
-    },
-    "server.recurrence": {
-      weekdays: { "0": "日", "1": "一", "2": "二", "3": "三", "4": "四", "5": "五", "6": "六" },
-      when: {
-        once: "{clock} 一次",
-        hours: "每 {n} 小时",
-        minutes: "每 {n} 分钟",
-        daily: "每天 {time}",
-        weekdays: "工作日 {time}",
-        weekend: "周末 {time}",
-        monthly: "每月 {day} 号 {time}",
-        hourly: "每小时第 {minute} 分",
-        cron: "cron {expr}",
-        weekly: "每周{days} {time}",
-      },
-      next: { never: "不会再到点", pending: "等主人同意", done: "做过了", off: "关着" },
-      cron: {
-        fields: { "0": "分钟", "1": "小时", "2": "日", "3": "月", "4": "周几" },
-        badField: "cron 的{name}写错了：{field}",
-        fiveFields: "cron 要五段：分 时 日 月 周几，比如 0 9 * * 1-5",
-        never: "这个 cron 永远不会到点：{expr}",
-      },
-      problem: {
-        noName: "定时要有个名字",
-        noText: "定时要写到点了做什么",
-        zone: "不认识这个时区：{tz}",
-        past: "一次性的时间要在以后",
-        every: "间隔至少 {min} 分钟",
-        time: "时间写成 HH:MM，比如 09:00：{time}",
-        days: "每周的哪几天：0 到 6，0 是周日",
-        kind: "不认识这种定时",
-      },
-      due: "{missed, select, true {⏰ 定时「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时「{name}」到点了：{text}}}",
-      noRecurrence: "没有 {id} 号定时",
-      noChannel: "没有 {name} 这个频道",
-      noProfile: "没有叫 {name} 的档案",
-      noProject: "#{channel} 没有默认项目：直接派给帮工的定时要写 project",
-      remove: "删掉定时「{name}」：以后不再到点开工，它开过的工单留着",
-      removeWhen: "删掉定时「{name}」（{when}）：以后不再到点开工，它开过的工单留着",
     },
     "server.runtime": {
       date: "{month} 月 {day} 日 {time}",
@@ -1003,9 +1003,9 @@ export const catalogs = {
         channel_list: "频道",
         channel_create: "开频道",
         channel_update: "改频道",
-        recurrence_create: "定时",
-        recurrence_list: "看定时",
-        recurrence_delete: "取消定时",
+        cron_create: "新建定时任务",
+        cron_list: "看定时任务",
+        cron_delete: "取消定时任务",
         issue_review: "验收",
         issue_diff_get: "看改动",
         session_list: "花名册",
@@ -1510,7 +1510,7 @@ export const catalogs = {
       },
     },
     "web.channel": {
-      tab: { chat: "聊天", jobs: "任务", recurrences: "定时" },
+      tab: { chat: "聊天", jobs: "任务", crons: "定时任务" },
       defaultProject: "默认项目 {project}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、管家和帮工都在这儿",
@@ -1551,20 +1551,20 @@ export const catalogs = {
         save: "保存",
       },
       jobs: { empty: "这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。", thread: "工单串" },
-      recurrences: {
-        empty: "这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。",
+      crons: {
+        empty: "这个频道还没有定时任务。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。",
         next: "下次 {next}",
         direct: "直接派 {agent}",
         byOrchestrator: "管家定的",
-        label: "定时「{name}」",
+        label: "定时任务「{name}」",
         on: "开着",
         off: "关着",
         remove: "删掉",
-        removeWhich: "删掉定时「{name}」",
+        removeWhich: "删掉定时任务「{name}」",
         sure: "确定删？",
-        approveWhich: "同意定时「{name}」",
+        approveWhich: "同意定时任务「{name}」",
         approve: "同意",
-        refuseWhich: "不要定时「{name}」",
+        refuseWhich: "不要定时任务「{name}」",
         refuse: "不要",
       },
       messages: {
@@ -2094,7 +2094,7 @@ export const catalogs = {
         directs: "私聊",
         projectTag: "项目 {project}",
         newChannel: "开新频道",
-        pageAndSchedules: "频道页和定时",
+        pageAndSchedules: "频道页和定时任务",
         settingsLink: "设置",
         back2: "返回",
         newChannelLine: "一件长期的事、一个项目，单独一个地方说话、派活。在这里叫管家，活就派在这里。",
@@ -2521,7 +2521,7 @@ export const catalogs = {
         orchestratorStuck: "管家这一轮没答成：在频道里看它说了什么",
         job: "要做的",
         from: "来自",
-        fromRecurrence: "定时：每次到点交给管家，答完等你看",
+        fromCron: "定时任务：每次到点交给管家，答完等你看",
         answered: "在它的频道里",
         evidence: "依据",
         unsure: "拿不准的",
@@ -2632,8 +2632,8 @@ export const catalogs = {
         comment: "带话",
         commentNumbered: "带话（#{id}）",
         task: "计划",
-        recurrence: "定时",
-        missed: "定时（补跑）",
+        cron: "定时任务",
+        missed: "定时任务（补跑）",
         refine: "起草",
         runtime: "农机自己",
       },
@@ -2643,7 +2643,7 @@ export const catalogs = {
         refining: "{name}在起草",
         draft: "草稿",
         queued: "排队中",
-        recurrence: "定时",
+        cron: "定时任务",
         noHelper: "还没选帮工",
         pickFirst: "没选帮工或项目，开工前要选好",
         waiting: "等空位，{ago}排上的",
@@ -3591,7 +3591,7 @@ export const catalogs = {
         agent: "List the profiles and find its id",
         skill: "List the skills and find its id",
         template: "List the templates and find its id",
-        recurrence: "List the schedules and find its id",
+        cron: "List the scheduled tasks and find its id",
         device: "See the connected devices and find its id",
         archive: "List the manager's archive",
         channel: "List the channels and find its id",
@@ -3673,7 +3673,7 @@ export const catalogs = {
       deletesChannel: "Delete {target}, with its {threads} threads and {said} messages",
       inUse: "Cannot delete it: {why}. It can be archived",
       helpersThere: "helpers still work in this channel",
-      recurrencesThere: "{n} recurrences are here",
+      cronsThere: "{n} scheduled tasks are here",
       connectorsThere: "a connector is bound to it",
       queuedThere: "{n} tickets wait in the queue to start here",
       issuesThere: "{n} tickets were worked here",
@@ -3800,6 +3800,45 @@ export const catalogs = {
       },
       digest: "{n} messages while you were away:\n{lines}\n\nThe whole of them is in the default channel.",
     },
+    "server.cron": {
+      weekdays: { "0": "Sun", "1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat" },
+      when: {
+        once: "once at {clock}",
+        hours: "{n, plural, one {every hour} other {every # hours}}",
+        minutes: "every {n} minutes",
+        daily: "every day at {time}",
+        weekdays: "weekdays at {time}",
+        weekend: "weekends at {time}",
+        monthly: "on day {day} of every month at {time}",
+        hourly: "every hour at minute {minute}",
+        cron: "cron {expr}",
+        weekly: "every {days} at {time}",
+      },
+      next: { never: "never again", pending: "waiting for your approval", done: "done", off: "off" },
+      expr: {
+        fields: { "0": "minute", "1": "hour", "2": "day", "3": "month", "4": "weekday" },
+        badField: "the cron {name} is wrong: {field}",
+        fiveFields: "cron takes five fields: minute hour day month weekday, such as 0 9 * * 1-5",
+        never: "this cron never comes due: {expr}",
+      },
+      problem: {
+        noName: "A scheduled task needs a name",
+        noText: "A scheduled task needs what to do when it is due",
+        zone: "Unknown time zone: {tz}",
+        past: "A one-off time must be in the future",
+        every: "The interval is at least {min} minutes",
+        time: "Write the time as HH:MM, such as 09:00: {time}",
+        days: "Which days of the week: 0 to 6, 0 is Sunday",
+        kind: "Unknown kind of scheduled task",
+      },
+      due: '{missed, select, true {⏰ The scheduled task "{name}" is due (missed while the server was off, made up once): {text}} other {⏰ The scheduled task "{name}" is due: {text}}}',
+      noCron: "There is no scheduled task {id}",
+      noChannel: "There is no channel {name}",
+      noProfile: "There is no profile called {name}",
+      noProject: "#{channel} has no default project: a scheduled task sent straight to a helper needs a project",
+      remove: 'Delete the scheduled task "{name}": it no longer starts work when due; the tickets it opened stay',
+      removeWhen: 'Delete the scheduled task "{name}" ({when}): it no longer starts work when due; the tickets it opened stay',
+    },
     "server.doc": {
       doc: "document {id}",
       untitled: "Untitled document",
@@ -3891,8 +3930,8 @@ export const catalogs = {
       stillOpen: "This ticket is still open: moving it back to To do is another round",
       stillWorking: "{name} is still on this ticket: tell it directly",
       senderGone: "The profile it was sent to, {id}, is gone",
-      recurrenceNoIssue: 'The schedule "{name}" could not write its ticket: {why}',
-      recurrenceNoStart: 'The schedule "{name}" could not start: {why}',
+      cronNoIssue: 'The scheduled task "{name}" could not write its ticket: {why}',
+      cronNoStart: 'The scheduled task "{name}" could not start: {why}',
       closedReopen: "This ticket is closed: reopen it with a few words",
       noProfileNamed: "There is no profile called {key}",
       handOverOnTodo: "Handing over happens when moving to To do: move it there and say who takes over",
@@ -3984,7 +4023,7 @@ export const catalogs = {
         start: "Started",
         restart: "Reopened, carrying on",
         graph: "Started by the plan",
-        recurrence: "{missed, select, true {Started on schedule (made up)} other {Started on schedule}}",
+        cron: "{missed, select, true {Started on schedule (made up)} other {Started on schedule}}",
         runtime: "The machine carried on by itself",
         refined: "Drafted",
         reported: "Handed back",
@@ -4095,11 +4134,11 @@ export const catalogs = {
         },
         "task-failed": { label: "Plan stuck", title: "A plan is stuck: {text}", body: "Retry, edit the ticket, or skip it", tray: 'The plan "{text}" failed' },
         mention: { label: "Calling you", title: "{who} is calling you" },
-        "recurrence-ask": {
-          label: "A schedule to approve",
-          title: "The manager wants to set a schedule",
+        "cron-ask": {
+          label: "A scheduled task to approve",
+          title: "The manager wants to set a scheduled task",
           body: '"{text}": it starts once you approve',
-          tray: 'The schedule "{text}" waits for your approval',
+          tray: 'The scheduled task "{text}" waits for your approval',
         },
       },
     },
@@ -4189,45 +4228,6 @@ export const catalogs = {
       mergeTree: "git merge-tree failed ({code})",
       moreLines: "… {n} more lines not shown",
       conflict: "merging into {base} conflicts",
-    },
-    "server.recurrence": {
-      weekdays: { "0": "Sun", "1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat" },
-      when: {
-        once: "once at {clock}",
-        hours: "{n, plural, one {every hour} other {every # hours}}",
-        minutes: "every {n} minutes",
-        daily: "every day at {time}",
-        weekdays: "weekdays at {time}",
-        weekend: "weekends at {time}",
-        monthly: "on day {day} of every month at {time}",
-        hourly: "every hour at minute {minute}",
-        cron: "cron {expr}",
-        weekly: "every {days} at {time}",
-      },
-      next: { never: "never again", pending: "waiting for your approval", done: "done", off: "off" },
-      cron: {
-        fields: { "0": "minute", "1": "hour", "2": "day", "3": "month", "4": "weekday" },
-        badField: "the cron {name} is wrong: {field}",
-        fiveFields: "cron takes five fields: minute hour day month weekday, such as 0 9 * * 1-5",
-        never: "this cron never comes due: {expr}",
-      },
-      problem: {
-        noName: "A schedule needs a name",
-        noText: "A schedule needs what to do when it is due",
-        zone: "Unknown time zone: {tz}",
-        past: "A one-off time must be in the future",
-        every: "The interval is at least {min} minutes",
-        time: "Write the time as HH:MM, such as 09:00: {time}",
-        days: "Which days of the week: 0 to 6, 0 is Sunday",
-        kind: "Unknown kind of schedule",
-      },
-      due: '{missed, select, true {⏰ The schedule "{name}" is due (missed while the server was off, made up once): {text}} other {⏰ The schedule "{name}" is due: {text}}}',
-      noRecurrence: "There is no schedule {id}",
-      noChannel: "There is no channel {name}",
-      noProfile: "There is no profile called {name}",
-      noProject: "#{channel} has no default project: a schedule sent straight to a helper needs a project",
-      remove: 'Delete the schedule "{name}": it no longer starts work when due; the tickets it opened stay',
-      removeWhen: 'Delete the schedule "{name}" ({when}): it no longer starts work when due; the tickets it opened stay',
     },
     "server.runtime": {
       date: "{month}/{day} {time}",
@@ -4563,9 +4563,9 @@ export const catalogs = {
         channel_list: "Channels",
         channel_create: "Open a channel",
         channel_update: "Change a channel",
-        recurrence_create: "Schedule",
-        recurrence_list: "See the schedules",
-        recurrence_delete: "Cancel a schedule",
+        cron_create: "New scheduled task",
+        cron_list: "See the scheduled tasks",
+        cron_delete: "Cancel a scheduled task",
         issue_review: "Review",
         issue_diff_get: "See the changes",
         session_list: "Helper roster",
@@ -5104,7 +5104,7 @@ export const catalogs = {
       },
     },
     "web.channel": {
-      tab: { chat: "Chat", jobs: "Jobs", recurrences: "Schedules" },
+      tab: { chat: "Chat", jobs: "Jobs", crons: "Scheduled tasks" },
       defaultProject: "default project {project}",
       channels: "Channels",
       defaultHint: "The default channel: you, the manager and the helpers are all here",
@@ -5148,21 +5148,21 @@ export const catalogs = {
         empty: "No jobs in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the job is listed here.",
         thread: "Ticket thread",
       },
-      recurrences: {
+      crons: {
         empty:
-          'No schedules in this channel yet. Tell the manager "run the tests at nine every morning" and it schedules it here; when due, a line appears in the channel and the work is sent.',
+          'No scheduled tasks in this channel yet. Tell the manager "run the tests at nine every morning" and it schedules it here; when due, a line appears in the channel and the work is sent.',
         next: "next {next}",
         direct: "straight to {agent}",
         byOrchestrator: "set by the manager",
-        label: 'Schedule "{name}"',
+        label: 'Scheduled task "{name}"',
         on: "On",
         off: "Off",
         remove: "Delete",
-        removeWhich: 'Delete the schedule "{name}"',
+        removeWhich: 'Delete the scheduled task "{name}"',
         sure: "Delete it?",
-        approveWhich: 'Approve the schedule "{name}"',
+        approveWhich: 'Approve the scheduled task "{name}"',
         approve: "Approve",
-        refuseWhich: 'Refuse the schedule "{name}"',
+        refuseWhich: 'Refuse the scheduled task "{name}"',
         refuse: "Refuse",
       },
       messages: {
@@ -5714,7 +5714,7 @@ export const catalogs = {
         directs: "Direct messages",
         projectTag: "project {project}",
         newChannel: "New channel",
-        pageAndSchedules: "Channel page and schedules",
+        pageAndSchedules: "Channel page and scheduled tasks",
         settingsLink: "Settings",
         back2: "Back",
         newChannelLine: "A long-running matter or a project gets a place of its own to talk and send work. Call the manager here and the work is sent here.",
@@ -6183,7 +6183,7 @@ export const catalogs = {
         orchestratorStuck: "The manager did not finish answering this round: see what it said in its channel",
         job: "To do",
         from: "From",
-        fromRecurrence: "A schedule: each time it is due it goes to the manager, and its answer waits for you",
+        fromCron: "A scheduled task: each time it is due it goes to the manager, and its answer waits for you",
         answered: "In its channel",
         evidence: "Evidence",
         unsure: "Not sure about",
@@ -6294,8 +6294,8 @@ export const catalogs = {
         comment: "a word passed on",
         commentNumbered: "a word passed on (#{id})",
         task: "plan",
-        recurrence: "schedule",
-        missed: "schedule (made up)",
+        cron: "scheduled task",
+        missed: "scheduled task (made up)",
         refine: "drafting",
         runtime: "the machine itself",
       },
@@ -6305,7 +6305,7 @@ export const catalogs = {
         refining: "{name} is drafting",
         draft: "Draft",
         queued: "Queued",
-        recurrence: "Schedule",
+        cron: "Scheduled task",
         noHelper: "No helper yet",
         pickFirst: "No helper or project picked: pick them before starting",
         waiting: "waiting for a free spot, queued {ago}",
@@ -7325,6 +7325,7 @@ export interface Messages {
   "server.channel.channelName": undefined;
   "server.channel.channelTaken": { readonly name: string | number };
   "server.channel.connectorsThere": undefined;
+  "server.channel.cronsThere": { readonly n: string | number };
   "server.channel.defaultIsChannel": undefined;
   "server.channel.defaultStays": undefined;
   "server.channel.deletes": {
@@ -7371,7 +7372,6 @@ export interface Messages {
   "server.channel.notOrchestrator": { readonly id: string | number };
   "server.channel.notYours": undefined;
   "server.channel.queuedThere": { readonly n: string | number };
-  "server.channel.recurrencesThere": { readonly n: string | number };
   "server.channel.sendKeyLong": undefined;
   "server.channel.threadOnlyInChannel": undefined;
   "server.channel.threadOnlyTitle": undefined;
@@ -7474,6 +7474,50 @@ export interface Messages {
   "server.connector.weixin.qrExpiredTimes": undefined;
   "server.connector.weixin.taken": undefined;
   "server.connector.weixin.tooLong": undefined;
+  "server.cron.due": { readonly missed: boolean; readonly name: string | number; readonly text: string | number };
+  "server.cron.expr.badField": { readonly field: string | number; readonly name: string | number };
+  "server.cron.expr.fields.0": undefined;
+  "server.cron.expr.fields.1": undefined;
+  "server.cron.expr.fields.2": undefined;
+  "server.cron.expr.fields.3": undefined;
+  "server.cron.expr.fields.4": undefined;
+  "server.cron.expr.fiveFields": undefined;
+  "server.cron.expr.never": { readonly expr: string | number };
+  "server.cron.next.done": undefined;
+  "server.cron.next.never": undefined;
+  "server.cron.next.off": undefined;
+  "server.cron.next.pending": undefined;
+  "server.cron.noChannel": { readonly name: string | number };
+  "server.cron.noCron": { readonly id: string | number };
+  "server.cron.noProfile": { readonly name: string | number };
+  "server.cron.noProject": { readonly channel: string | number };
+  "server.cron.problem.days": undefined;
+  "server.cron.problem.every": { readonly min: string | number };
+  "server.cron.problem.kind": undefined;
+  "server.cron.problem.noName": undefined;
+  "server.cron.problem.noText": undefined;
+  "server.cron.problem.past": undefined;
+  "server.cron.problem.time": { readonly time: string | number };
+  "server.cron.problem.zone": { readonly tz: string | number };
+  "server.cron.remove": { readonly name: string | number };
+  "server.cron.removeWhen": { readonly name: string | number; readonly when: string | number };
+  "server.cron.weekdays.0": undefined;
+  "server.cron.weekdays.1": undefined;
+  "server.cron.weekdays.2": undefined;
+  "server.cron.weekdays.3": undefined;
+  "server.cron.weekdays.4": undefined;
+  "server.cron.weekdays.5": undefined;
+  "server.cron.weekdays.6": undefined;
+  "server.cron.when.cron": { readonly expr: string | number };
+  "server.cron.when.daily": { readonly time: string | number };
+  "server.cron.when.hourly": { readonly minute: string | number };
+  "server.cron.when.hours": { readonly n: number };
+  "server.cron.when.minutes": { readonly n: string | number };
+  "server.cron.when.monthly": { readonly day: string | number; readonly time: string | number };
+  "server.cron.when.once": { readonly clock: string | number };
+  "server.cron.when.weekdays": { readonly time: string | number };
+  "server.cron.when.weekend": { readonly time: string | number };
+  "server.cron.when.weekly": { readonly days: string | number; readonly time: string | number };
   "server.doc.badBlockType": { readonly types: string | number };
   "server.doc.demo.0.heading": undefined;
   "server.doc.demo.0.paragraphs.0": undefined;
@@ -7529,6 +7573,8 @@ export interface Messages {
   "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
   "server.issue.closed": undefined;
   "server.issue.closedReopen": undefined;
+  "server.issue.cronNoIssue": { readonly name: string | number; readonly why: string | number };
+  "server.issue.cronNoStart": { readonly name: string | number; readonly why: string | number };
   "server.issue.disabled": { readonly name: string | number };
   "server.issue.does.cancel": { readonly n: string | number };
   "server.issue.does.cancelLeaves": { readonly helper: string | number };
@@ -7624,8 +7670,6 @@ export interface Messages {
   "server.issue.queuedBack": { readonly title: string | number; readonly why: string | number };
   "server.issue.queuedStarted": { readonly session: string | number; readonly title: string | number };
   "server.issue.queuedStuck": { readonly title: string | number; readonly why: string | number };
-  "server.issue.recurrenceNoIssue": { readonly name: string | number; readonly why: string | number };
-  "server.issue.recurrenceNoStart": { readonly name: string | number; readonly why: string | number };
   "server.issue.refinement.canceled": { readonly title: string | number; readonly why: string | number };
   "server.issue.refinement.drafting": { readonly name: string | number };
   "server.issue.refinement.files": undefined;
@@ -7658,9 +7702,9 @@ export interface Messages {
   "server.issue.template.done": { readonly done: string | number; readonly title: string | number };
   "server.issue.timeline.accepted": undefined;
   "server.issue.timeline.asked": { readonly questions: string | number };
+  "server.issue.timeline.cron": { readonly missed: boolean };
   "server.issue.timeline.graph": undefined;
   "server.issue.timeline.opened": undefined;
-  "server.issue.timeline.recurrence": { readonly missed: boolean };
   "server.issue.timeline.refine": undefined;
   "server.issue.timeline.refined": undefined;
   "server.issue.timeline.rejected": { readonly lines: string | number };
@@ -7697,13 +7741,13 @@ export interface Messages {
   "server.lookIn.agent": undefined;
   "server.lookIn.archive": undefined;
   "server.lookIn.channel": undefined;
+  "server.lookIn.cron": undefined;
   "server.lookIn.device": undefined;
   "server.lookIn.doc": undefined;
   "server.lookIn.graph": undefined;
   "server.lookIn.issue": undefined;
   "server.lookIn.memories": undefined;
   "server.lookIn.project": undefined;
-  "server.lookIn.recurrence": undefined;
   "server.lookIn.runtime": undefined;
   "server.lookIn.session": undefined;
   "server.lookIn.skill": undefined;
@@ -7737,6 +7781,10 @@ export interface Messages {
   "server.notice.item.conflict.label": undefined;
   "server.notice.item.conflict.title": { readonly who: string | number };
   "server.notice.item.conflict.tray": { readonly who: string | number };
+  "server.notice.item.cron-ask.body": { readonly text: string | number };
+  "server.notice.item.cron-ask.label": undefined;
+  "server.notice.item.cron-ask.title": undefined;
+  "server.notice.item.cron-ask.tray": { readonly text: string | number };
   "server.notice.item.fix.label": undefined;
   "server.notice.item.fix.title": { readonly who: string | number };
   "server.notice.item.fix.tray": { readonly who: string | number };
@@ -7755,10 +7803,6 @@ export interface Messages {
   "server.notice.item.quiet.label": undefined;
   "server.notice.item.quiet.title": { readonly who: string | number };
   "server.notice.item.quiet.tray": { readonly who: string | number };
-  "server.notice.item.recurrence-ask.body": { readonly text: string | number };
-  "server.notice.item.recurrence-ask.label": undefined;
-  "server.notice.item.recurrence-ask.title": undefined;
-  "server.notice.item.recurrence-ask.tray": { readonly text: string | number };
   "server.notice.item.review.label": undefined;
   "server.notice.item.review.title": { readonly who: string | number };
   "server.notice.item.review.tray": { readonly who: string | number };
@@ -7844,50 +7888,6 @@ export interface Messages {
   "server.project.tokeiFailed": { readonly why: string | number };
   "server.project.tokeiUnread": undefined;
   "server.projectRef": { readonly id: string | number };
-  "server.recurrence.cron.badField": { readonly field: string | number; readonly name: string | number };
-  "server.recurrence.cron.fields.0": undefined;
-  "server.recurrence.cron.fields.1": undefined;
-  "server.recurrence.cron.fields.2": undefined;
-  "server.recurrence.cron.fields.3": undefined;
-  "server.recurrence.cron.fields.4": undefined;
-  "server.recurrence.cron.fiveFields": undefined;
-  "server.recurrence.cron.never": { readonly expr: string | number };
-  "server.recurrence.due": { readonly missed: boolean; readonly name: string | number; readonly text: string | number };
-  "server.recurrence.next.done": undefined;
-  "server.recurrence.next.never": undefined;
-  "server.recurrence.next.off": undefined;
-  "server.recurrence.next.pending": undefined;
-  "server.recurrence.noChannel": { readonly name: string | number };
-  "server.recurrence.noProfile": { readonly name: string | number };
-  "server.recurrence.noProject": { readonly channel: string | number };
-  "server.recurrence.noRecurrence": { readonly id: string | number };
-  "server.recurrence.problem.days": undefined;
-  "server.recurrence.problem.every": { readonly min: string | number };
-  "server.recurrence.problem.kind": undefined;
-  "server.recurrence.problem.noName": undefined;
-  "server.recurrence.problem.noText": undefined;
-  "server.recurrence.problem.past": undefined;
-  "server.recurrence.problem.time": { readonly time: string | number };
-  "server.recurrence.problem.zone": { readonly tz: string | number };
-  "server.recurrence.remove": { readonly name: string | number };
-  "server.recurrence.removeWhen": { readonly name: string | number; readonly when: string | number };
-  "server.recurrence.weekdays.0": undefined;
-  "server.recurrence.weekdays.1": undefined;
-  "server.recurrence.weekdays.2": undefined;
-  "server.recurrence.weekdays.3": undefined;
-  "server.recurrence.weekdays.4": undefined;
-  "server.recurrence.weekdays.5": undefined;
-  "server.recurrence.weekdays.6": undefined;
-  "server.recurrence.when.cron": { readonly expr: string | number };
-  "server.recurrence.when.daily": { readonly time: string | number };
-  "server.recurrence.when.hourly": { readonly minute: string | number };
-  "server.recurrence.when.hours": { readonly n: number };
-  "server.recurrence.when.minutes": { readonly n: string | number };
-  "server.recurrence.when.monthly": { readonly day: string | number; readonly time: string | number };
-  "server.recurrence.when.once": { readonly clock: string | number };
-  "server.recurrence.when.weekdays": { readonly time: string | number };
-  "server.recurrence.when.weekend": { readonly time: string | number };
-  "server.recurrence.when.weekly": { readonly days: string | number; readonly time: string | number };
   "server.runtime.balanceGone": { readonly provider: string | number };
   "server.runtime.budget": { readonly budget: string | number; readonly spent: string | number };
   "server.runtime.cannotDrive": { readonly runtime: string | number };
@@ -8206,6 +8206,9 @@ export interface Messages {
   "server.tool.labels.channel_message_send": undefined;
   "server.tool.labels.channel_unread_list": undefined;
   "server.tool.labels.channel_update": undefined;
+  "server.tool.labels.cron_create": undefined;
+  "server.tool.labels.cron_delete": undefined;
+  "server.tool.labels.cron_list": undefined;
   "server.tool.labels.doc_block_create": undefined;
   "server.tool.labels.doc_block_update": undefined;
   "server.tool.labels.doc_get": undefined;
@@ -8228,9 +8231,6 @@ export interface Messages {
   "server.tool.labels.memory_create": undefined;
   "server.tool.labels.memory_search": undefined;
   "server.tool.labels.project_list": undefined;
-  "server.tool.labels.recurrence_create": undefined;
-  "server.tool.labels.recurrence_delete": undefined;
-  "server.tool.labels.recurrence_list": undefined;
   "server.tool.labels.remember": undefined;
   "server.tool.labels.rewrite_memory": undefined;
   "server.tool.labels.search_archive": undefined;
@@ -8792,6 +8792,20 @@ export interface Messages {
   "web.channel.composer.stopHint": undefined;
   "web.channel.composer.uploadFailed": { readonly why: string | number };
   "web.channel.composer.who": undefined;
+  "web.channel.crons.approve": undefined;
+  "web.channel.crons.approveWhich": { readonly name: string | number };
+  "web.channel.crons.byOrchestrator": undefined;
+  "web.channel.crons.direct": { readonly agent: string | number };
+  "web.channel.crons.empty": undefined;
+  "web.channel.crons.label": { readonly name: string | number };
+  "web.channel.crons.next": { readonly next: string | number };
+  "web.channel.crons.off": undefined;
+  "web.channel.crons.on": undefined;
+  "web.channel.crons.refuse": undefined;
+  "web.channel.crons.refuseWhich": { readonly name: string | number };
+  "web.channel.crons.remove": undefined;
+  "web.channel.crons.removeWhich": { readonly name: string | number };
+  "web.channel.crons.sure": undefined;
   "web.channel.defaultHint": undefined;
   "web.channel.defaultProject": { readonly project: string | number };
   "web.channel.dialog.cancel": undefined;
@@ -8916,20 +8930,6 @@ export interface Messages {
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
-  "web.channel.recurrences.approve": undefined;
-  "web.channel.recurrences.approveWhich": { readonly name: string | number };
-  "web.channel.recurrences.byOrchestrator": undefined;
-  "web.channel.recurrences.direct": { readonly agent: string | number };
-  "web.channel.recurrences.empty": undefined;
-  "web.channel.recurrences.label": { readonly name: string | number };
-  "web.channel.recurrences.next": { readonly next: string | number };
-  "web.channel.recurrences.off": undefined;
-  "web.channel.recurrences.on": undefined;
-  "web.channel.recurrences.refuse": undefined;
-  "web.channel.recurrences.refuseWhich": { readonly name: string | number };
-  "web.channel.recurrences.remove": undefined;
-  "web.channel.recurrences.removeWhich": { readonly name: string | number };
-  "web.channel.recurrences.sure": undefined;
   "web.channel.replies": { readonly n: number };
   "web.channel.reply": undefined;
   "web.channel.sayInThread": { readonly name: string | number };
@@ -8944,8 +8944,8 @@ export interface Messages {
   "web.channel.switcher.open": undefined;
   "web.channel.switcher.title": undefined;
   "web.channel.tab.chat": undefined;
+  "web.channel.tab.crons": undefined;
   "web.channel.tab.jobs": undefined;
-  "web.channel.tab.recurrences": undefined;
   "web.channel.thread": undefined;
   "web.channel.threadEmpty": undefined;
   "web.channel.threadList.archive": { readonly title: string | number };
@@ -9670,6 +9670,7 @@ export interface Messages {
   "web.issue.boardLabels.stage.work": undefined;
   "web.issue.boardLabels.view.board": undefined;
   "web.issue.boardLabels.view.list": undefined;
+  "web.issue.card.cron": undefined;
   "web.issue.card.draft": undefined;
   "web.issue.card.graph": { readonly title: string | number };
   "web.issue.card.lost": undefined;
@@ -9683,7 +9684,6 @@ export interface Messages {
   "web.issue.card.pickFirst": undefined;
   "web.issue.card.queued": undefined;
   "web.issue.card.quiet": { readonly took: string | number };
-  "web.issue.card.recurrence": undefined;
   "web.issue.card.refining": { readonly name: string | number };
   "web.issue.card.turn": { readonly n: string | number };
   "web.issue.card.turns": { readonly n: number };
@@ -9728,7 +9728,7 @@ export interface Messages {
   "web.issue.detail.evidence": undefined;
   "web.issue.detail.fileCount": { readonly n: string | number };
   "web.issue.detail.from": undefined;
-  "web.issue.detail.fromRecurrence": undefined;
+  "web.issue.detail.fromCron": undefined;
   "web.issue.detail.full": undefined;
   "web.issue.detail.graphStep": { readonly graph: string | number };
   "web.issue.detail.helper": undefined;
@@ -9969,9 +9969,9 @@ export interface Messages {
   "web.issue.todo.whichProject": undefined;
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
+  "web.issue.trigger.cron": undefined;
   "web.issue.trigger.issue": undefined;
   "web.issue.trigger.missed": undefined;
-  "web.issue.trigger.recurrence": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
   "web.issue.trigger.task": undefined;

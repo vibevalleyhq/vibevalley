@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, Show } from "solid-js";
-import type { Channel, Recurrence } from "@vibevalley/protocol";
+import type { Channel, Cron } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { chatPath, jobThreadOf, phaseText } from "./rules";
 import { toast } from "../../ui/toasts";
@@ -59,23 +59,23 @@ export function Jobs(props: { channel: Channel }) {
   );
 }
 
-export function Recurrences(props: { channel: Channel }) {
+export function Crons(props: { channel: Channel }) {
   const core = useCore();
-  const recurrences = () => (core()?.recurrences ?? []).filter((s) => s.channel === props.channel.id);
+  const crons = () => (core()?.crons ?? []).filter((s) => s.channel === props.channel.id);
   return (
-    <Show when={recurrences().length > 0} fallback={<Empty icon="clock">{t("web.channel.recurrences.empty")}</Empty>}>
+    <Show when={crons().length > 0} fallback={<Empty icon="clock">{t("web.channel.crons.empty")}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
-        <For each={recurrences()}>{(s) => <RecurrenceCard s={s} />}</For>
+        <For each={crons()}>{(s) => <CronCard s={s} />}</For>
       </div>
     </Show>
   );
 }
 
-function RecurrenceCard(props: { s: Recurrence }) {
+function CronCard(props: { s: Cron }) {
   const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
-  const setEnabled = (enabled: boolean) => act(api.recurrence.update({ id: props.s.id, enabled }));
-  const remove = () => act(api.recurrence.delete({ id: props.s.id }));
+  const setEnabled = (enabled: boolean) => act(api.cron.update({ id: props.s.id, enabled }));
+  const remove = () => act(api.cron.delete({ id: props.s.id }));
   // The second press deletes; a press anywhere else takes the first back.
   createEffect(deleting, (on) => {
     if (!on) return;
@@ -89,16 +89,16 @@ function RecurrenceCard(props: { s: Recurrence }) {
   const meta = () =>
     [
       props.s.whenText ?? "",
-      props.s.pending ? (props.s.nextText ?? "") : t("web.channel.recurrences.next", { next: props.s.nextText ?? "" }),
-      ...(props.s.agent ? [t("web.channel.recurrences.direct", { agent: props.s.agent })] : []),
-      ...(props.s.by === "orchestrator" ? [t("web.channel.recurrences.byOrchestrator")] : []),
+      props.s.pending ? (props.s.nextText ?? "") : t("web.channel.crons.next", { next: props.s.nextText ?? "" }),
+      ...(props.s.agent ? [t("web.channel.crons.direct", { agent: props.s.agent })] : []),
+      ...(props.s.by === "orchestrator" ? [t("web.channel.crons.byOrchestrator")] : []),
     ].join(" · ");
   return (
     <div
-      data-testid="recurrence"
+      data-testid="cron"
       data-key={props.s.id}
       class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]}
-      aria-label={t("web.channel.recurrences.label", { name: props.s.name })}
+      aria-label={t("web.channel.crons.label", { name: props.s.name })}
     >
       <Icon name="clock" size={20} class="mt-0.5" />
       <div class="flex min-w-0 flex-1 flex-col">
@@ -117,11 +117,11 @@ function RecurrenceCard(props: { s: Recurrence }) {
           <div class="flex gap-2">
             <Button
               tone={props.s.enabled ? "primary" : "plain"}
-              data-testid="recurrence-toggle"
+              data-testid="cron-toggle"
               aria-pressed={aria(props.s.enabled)}
               onClick={() => void setEnabled(!props.s.enabled)}
             >
-              {props.s.enabled ? t("web.channel.recurrences.on") : t("web.channel.recurrences.off")}
+              {props.s.enabled ? t("web.channel.crons.on") : t("web.channel.crons.off")}
             </Button>
             <Show
               when={deleting()}
@@ -129,30 +129,25 @@ function RecurrenceCard(props: { s: Recurrence }) {
                 <Button
                   icon="delete"
                   data-testid="delete"
-                  title={t("web.channel.recurrences.remove")}
-                  aria-label={t("web.channel.recurrences.removeWhich", { name: props.s.name })}
+                  title={t("web.channel.crons.remove")}
+                  aria-label={t("web.channel.crons.removeWhich", { name: props.s.name })}
                   onClick={() => setDeleting(true)}
                 />
               }
             >
               <Button tone="danger" data-testid="delete-sure" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
-                {t("web.channel.recurrences.sure")}
+                {t("web.channel.crons.sure")}
               </Button>
             </Show>
           </div>
         }
       >
         <div class="flex gap-2">
-          <Button
-            tone="primary"
-            icon="check"
-            aria-label={t("web.channel.recurrences.approveWhich", { name: props.s.name })}
-            onClick={() => void setEnabled(true)}
-          >
-            {t("web.channel.recurrences.approve")}
+          <Button tone="primary" icon="check" aria-label={t("web.channel.crons.approveWhich", { name: props.s.name })} onClick={() => void setEnabled(true)}>
+            {t("web.channel.crons.approve")}
           </Button>
-          <Button icon="cross" aria-label={t("web.channel.recurrences.refuseWhich", { name: props.s.name })} onClick={() => void remove()}>
-            {t("web.channel.recurrences.refuse")}
+          <Button icon="cross" aria-label={t("web.channel.crons.refuseWhich", { name: props.s.name })} onClick={() => void remove()}>
+            {t("web.channel.crons.refuse")}
           </Button>
         </div>
       </Show>

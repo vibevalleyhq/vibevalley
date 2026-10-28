@@ -111,9 +111,9 @@ describe("the command line", () => {
       const doc = (r: { out: string }) => JSON.parse(r.out) as { id: string; does: string[] } & Record<string, unknown>;
       const list = (args: string[]) => Effect.map(run(args), (r) => JSON.parse(r.out) as unknown);
 
-      const recurrence = doc(yield* run(["recurrence", "create"], { name: "早上看看", text: "看看昨天的改动", when: { kind: "daily", time: "09:00" } }));
-      expect(doc(yield* run(["recurrence", "delete", recurrence.id, "--dry-run"])).does[0]).toContain("删掉定时「早上看看」");
-      expect(JSON.stringify(yield* list(["recurrence", "list"]))).toContain(recurrence.id);
+      const cron = doc(yield* run(["cron", "create"], { name: "早上看看", text: "看看昨天的改动", when: { kind: "daily", time: "09:00" } }));
+      expect(doc(yield* run(["cron", "delete", cron.id, "--dry-run"])).does[0]).toContain("删掉定时「早上看看」");
+      expect(JSON.stringify(yield* list(["cron", "list"]))).toContain(cron.id);
 
       const skill = doc(yield* run(["skill", "create"], { id: "", name: "写测试", description: "先写测试", body: "先写测试再改" }));
       const agents = (yield* list(["agent", "list"])) as { id: string; name: string }[];
@@ -137,7 +137,7 @@ describe("the command line", () => {
       for (const args of [
         ["agent", "delete", "nobody"],
         ["skill", "delete", "nothing"],
-        ["recurrence", "delete", "never"],
+        ["cron", "delete", "never"],
         ["memory", "delete", "docs", "nothing"],
         ["lan", "device", "delete", "nowhere"],
       ]) {

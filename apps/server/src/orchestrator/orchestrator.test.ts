@@ -16,7 +16,7 @@ import type { Config } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
-import { Recurrences } from "../recurrence/recurrence.ts";
+import { Crons } from "../cron/cron.ts";
 import { Notices } from "../notice/notice.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -490,7 +490,7 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("lets a recurrence it sets unasked wait for the owner", () => {
+  it.live("lets a cron it sets unasked wait for the owner", () => {
     const daily = { name: "每日测试", text: "跑一遍测试", when: { kind: "daily", time: "09:00" } };
     let offset = 0;
     const f = farm(
@@ -498,26 +498,26 @@ describe("the orchestrator", () => {
         const result = answeredWith(c);
         if (result !== undefined) return answer("定时：" + result);
         const line = lastLine(c);
-        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("recurrence_create", daily)]);
+        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
         return respond(c);
       },
       testConfig(),
       () => Date.now() + offset,
     );
     return Effect.gen(function* () {
-      const recurrences = yield* Recurrences;
+      const crons = yield* Crons;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
-      // Woken by a recurrence, not the owner: what it sets to come back daily waits.
-      yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
+      // Woken by a cron, not the owner: what it sets to come back daily waits.
+      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
       offset = 100;
-      yield* recurrences.tick;
+      yield* crons.tick;
       yield* until(() => words().some((w) => w.startsWith("定时：定好了，等主人同意才生效")), "the orchestrator told it waits");
-      const mine = (enabled: boolean) => recurrences.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
+      const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
       expect(mine(false)).toMatchObject([{ pending: true, by: "orchestrator" }]);
       yield* orchestrator.say("每天九点跑一遍测试", {}, undefined, "");
-      const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's recurrence on");
+      const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's cron on");
       expect(on[0]).toMatchObject({ by: "orchestrator" });
       expect(on[0]!.pending ?? false).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -528,14 +528,14 @@ describe("the orchestrator", () => {
     let offset = 0;
     const f = farm(respond, testConfig(), () => Date.now() + offset);
     return Effect.gen(function* () {
-      const recurrences = yield* Recurrences;
+      const crons = yield* Crons;
       const issues = yield* Issues;
-      const s = yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
+      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
       offset = 100;
-      yield* recurrences.tick;
+      yield* crons.tick;
       const core = yield* Core;
-      const handed = yield* until(() => core.state().issues?.find((t) => t.recurrence === s.id && t.status === "in_review"), "handed back");
+      const handed = yield* until(() => core.state().issues?.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
       const id = handed.id;
       expect(handed.closedAt).toBeUndefined();
       expect([handed.deliver, handed.lastRun?.outcome]).toEqual(["answer", "completed"]);

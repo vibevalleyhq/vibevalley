@@ -58,11 +58,11 @@ Status: proposed
 | `look` | 看工单、帮工、改动、项目、频道（只读） |
 | `issue` | 建工单、改、挪状态、开工、换人、叫停、验收 |
 | `graph` | 种植计划 |
-| `recurrence` | 定时 |
+| `cron` | 定时 |
 | `channel` | 开频道、改频道设置 |
 | `coding` | 读写文件、跑命令、抓网页（只有 VibeValley 自己的 agent 有这组；外部农机自带） |
 
-- 默认值是 `agent` 模块的规则：管家是 `chat`、`memory`、`look`、`issue`、`graph`、`recurrence`、`channel`；帮工是 `chat`、`memory`、`look`、`coding`。给一个帮工加上 `issue`，它就是能拆子工单的领班。
+- 默认值是 `agent` 模块的规则：管家是 `chat`、`memory`、`look`、`issue`、`graph`、`cron`、`channel`；帮工是 `chat`、`memory`、`look`、`coding`。给一个帮工加上 `issue`，它就是能拆子工单的领班。
 - 只有主人能改（`agent.update` 从主人的入口来）；工具不能改任何档案的 `toolsets`。
 - 管家的工具表和 `/mcp` 的工具表都按调用者档案的 `toolsets` 过滤，执行时再查一次：干活时被改小，下一次调用就拒。
 - 接口的 `can` 只剩 `owner`、`remote` 和「agent 能调」这一档；哪个 agent 能调由 `toolsets` 定。

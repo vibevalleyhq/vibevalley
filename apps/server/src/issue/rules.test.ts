@@ -241,7 +241,7 @@ describe("templates", () => {
       issue("别的项目", "web", 9),
       issue("没派过", "app", 8, { sessions: [] }),
       issue("计划里的一步", "app", 8, { parent: issueId("g") }),
-      issue("定时", "app", 8, { recurrence: "s1" }),
+      issue("定时", "app", 8, { cron: "s1" }),
       issue("给管家", "app", 8, { assignee: defaultOrchestrator }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),

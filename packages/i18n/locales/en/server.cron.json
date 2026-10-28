@@ -26,7 +26,7 @@
     "done": "done",
     "off": "off"
   },
-  "cron": {
+  "expr": {
     "fields": {
       "0": "minute",
       "1": "hour",
@@ -39,20 +39,20 @@
     "never": "this cron never comes due: {expr}"
   },
   "problem": {
-    "noName": "A schedule needs a name",
-    "noText": "A schedule needs what to do when it is due",
+    "noName": "A scheduled task needs a name",
+    "noText": "A scheduled task needs what to do when it is due",
     "zone": "Unknown time zone: {tz}",
     "past": "A one-off time must be in the future",
     "every": "The interval is at least {min} minutes",
     "time": "Write the time as HH:MM, such as 09:00: {time}",
     "days": "Which days of the week: 0 to 6, 0 is Sunday",
-    "kind": "Unknown kind of schedule"
+    "kind": "Unknown kind of scheduled task"
   },
-  "due": "{missed, select, true {⏰ The schedule \"{name}\" is due (missed while the server was off, made up once): {text}} other {⏰ The schedule \"{name}\" is due: {text}}}",
-  "noRecurrence": "There is no schedule {id}",
+  "due": "{missed, select, true {⏰ The scheduled task \"{name}\" is due (missed while the server was off, made up once): {text}} other {⏰ The scheduled task \"{name}\" is due: {text}}}",
+  "noCron": "There is no scheduled task {id}",
   "noChannel": "There is no channel {name}",
   "noProfile": "There is no profile called {name}",
-  "noProject": "#{channel} has no default project: a schedule sent straight to a helper needs a project",
-  "remove": "Delete the schedule \"{name}\": it no longer starts work when due; the tickets it opened stay",
-  "removeWhen": "Delete the schedule \"{name}\" ({when}): it no longer starts work when due; the tickets it opened stay"
+  "noProject": "#{channel} has no default project: a scheduled task sent straight to a helper needs a project",
+  "remove": "Delete the scheduled task \"{name}\": it no longer starts work when due; the tickets it opened stay",
+  "removeWhen": "Delete the scheduled task \"{name}\" ({when}): it no longer starts work when due; the tickets it opened stay"
 }
