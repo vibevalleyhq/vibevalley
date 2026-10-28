@@ -14,7 +14,7 @@ export default defineConfig({
     testTimeout: 20_000,
     env: { TZ: "Asia/Shanghai" },
     isolate: false,
-    reporters: [...configDefaults.reporters, "./src/testing/budgets.ts"],
+    reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"],
   },
   // The cache sees the files a run reads but not its environment: these change what the tests do (golden.ts writes the
   // golden data on update; the live evals run on the real model), so a run with them set never replays one without.

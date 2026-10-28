@@ -19,15 +19,15 @@
 
 - **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；现状、频道的汇报、听巡查和计划的消息；向 `Sessions.host` 要一个 `AgentHost`，配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 27 个工具和帮工经 `/mcp` 的 10 个各定义一次（`tool.ts`）。**一个工具就是一个接口给模型的那一面**：工具由接口声明，名字由接口名推出（`channel.message.send` 是 `channel_message_send`，`schemas.ts` 的 `toolName`），参数用接口的字段（工单是 `id`，派给谁是 `assignee`），接口里没有、只对模型有意义的写进 `agentOnly`（比如发话前先看没读过的 `anyway`、`confirm`）；接口的 `can` 有 `orchestrator` 的进管家的表，有 `session` 的进帮工的表，能力表的「管家」「帮工」两列就是这两张表。说明、默认值（不写频道就是自己的工单串）、人读的写法（`#41`、`#clock-in`、`@w3`）和回话的句子是工具自己手写的。`tool.test.ts` 查四件事：名字由接口推出、`can` 有调用者、参数是接口的字段或 `agentOnly`、标了 `orchestrator`、`session` 的接口（试跑的除外）都有工具。参数在 `schemas.ts` 写成 Effect 的 Schema：工具的参数类型由它推出，模型拿到的参数先由它读，给模型看的 JSON Schema 也由它生成；管家那张表的顺序和每个工具参数的字节是提示开头的一部分，`testdata/parameters.json` 守着它们（`requiredOrder` 只为保住原来的次序）。
-- **跑它的 agent**：`apps/server/src/ai`、`agent/loop`、`agent/brain`，见 [VibeValley 自己的 agent](docs/subsystems/brain.md)。管家的大脑由 `session/host.ts` 的 `AgentHost` 起，不带编码工具、帮手、技能目录和提醒。
+- **跑它的 agent**：`packages/ai`、`packages/agent/src/core`、`packages/agent`，见 [VibeValley 自己的 agent](docs/subsystems/brain.md)。管家的大脑由 `session/host.ts` 的 `AgentHost` 起，不带编码工具、帮手、技能目录和提醒。
 - **`apps/server/src/agent`**：档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；默认管家从内置的模板 `agent/templates/orchestrator` 装上，`roleProblem` 是角色的规则。
 - **家目录是档案的**：每个管家一个 `$VIBEVALLEY_HOME/agent/<档案 id>/`（`base/config.ts` 的 `agentHome`）：对话 `<档案 id>.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
-- **接口**：`orchestrator.stop`、`voice.hear`、`orchestrator.eval.create`、`orchestrator.archive.list`、`orchestrator.archive.get`，记性走 `memory.*`（档案 `orchestrator`）；`POST /v1/chat/completions`（`http/mcp.ts` 挂 `agent/brain/openai.ts`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley orchestrator …`。
+- **接口**：`orchestrator.stop`、`voice.hear`、`orchestrator.eval.create`、`orchestrator.archive.list`、`orchestrator.archive.get`，记性走 `memory.*`（档案 `orchestrator`）；`POST /v1/chat/completions`（`http/mcp.ts` 挂 `orchestrator/openai.ts`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley orchestrator …`。
 - **页面**：管家页 `apps/web/src/features/orchestrator/OrchestratorPage.tsx`（记性、轨迹、旧账，默认管家还有声音；`/orchestrator/<页签>` 是默认管家的，`/orchestrator/<档案 id>/<页签>` 是别的，[界面清单](docs/reference/farm-ui.md#界面清单)）；管家的档案页 `features/agent/OrchestratorProfile.tsx`（名字、职责、人设、模型、长相）；频道的输入框（农场的 `farm/chat/Composer.tsx`、聊天页的 `features/channel/Composer.tsx`）在照看那处的管家说话时有停止键（`orchestrator.stop { agent }`）。
 
 ## 模型和不变量
 
-- **管家是角色是 `orchestrator` 的档案，只在 VibeValley 自己的 agent 上跑。** 「是不是管家」一律问角色（`Agents.isOrchestrator`、`orchestrators()`），只有「没指明时给谁」才用默认管家。默认管家（档案 `orchestrator`）每个农场都有：加载时没有就补上，删它拒绝（「默认管家删不了：每个农场至少有一个管家」），改成帮工拒绝；别的管家能删。保存一份管家档案时农机不是 `vibevalley` 就拒绝。派活用的档案（`agents()`、`named`）只有帮工；全部档案（`all()`）和按 id 取的含管家。模型从档案读（`vibevalley agent save <id> --json …` 改），只接 DeepSeek：写成 `deepseek/<模型>` 或直接写模型名，别家的拒绝；没写是 `deepseek-flash`（`agent/brain/config.ts` 的 `defaultModel`）。模型在大脑起来时读，改了下次起来用上。
+- **管家是角色是 `orchestrator` 的档案，只在 VibeValley 自己的 agent 上跑。** 「是不是管家」一律问角色（`Agents.isOrchestrator`、`orchestrators()`），只有「没指明时给谁」才用默认管家。默认管家（档案 `orchestrator`）每个农场都有：加载时没有就补上，删它拒绝（「默认管家删不了：每个农场至少有一个管家」），改成帮工拒绝；别的管家能删。保存一份管家档案时农机不是 `vibevalley` 就拒绝。派活用的档案（`agents()`、`named`）只有帮工；全部档案（`all()`）和按 id 取的含管家。模型从档案读（`vibevalley agent save <id> --json …` 改），只接 DeepSeek：写成 `deepseek/<模型>` 或直接写模型名，别家的拒绝；没写是 `deepseek-flash`（`@vibevalley/ai/client` 的 `defaultModel`）。模型在大脑起来时读，改了下次起来用上。
 - **每个管家一份**：`Orchestrator` 按档案各起一个宿主（`instanceOf`，第一句话到了才起来，`Sessions.host`，名字是档案 id），各有自己的排队、自己「上次给模型看的现状」（`shown`）和「起不来的原因只说一次」（`cannot`）。提示开头照旧；别的管家在后面接一句它是谁和它的人设（`identityNote`），默认管家没有，开头和评测样例的一样。名字和人设在大脑起来时读。开机时每个管家被关掉打断的那一轮各自接着做完。电话、`chat/completions`、听写和计划的消息只给默认管家（`answer`、`brief`、`heard`）。
 - **谁接哪条话**：一条输入带着给哪个管家（`Intake.to`，不是管家的或没写的给默认管家）。
 
@@ -100,7 +100,7 @@
 - **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完）。`brief` 可带 `AbortSignal`，只结束这次等回答的 listener，不取消大家共享的 run；提交失败会拒绝这次 `brief`，不会变成未处理的 rejection。
 - **定时（`recurrence`）**：管家的 `recurrence_create` 工具经 `Recurrence.Add(req, orchestrator, owner)`；`wakeSoon` 读定时决定空闲时压不压。
 - **计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_act`、`graph_task_update`、`graph_task_delete`、`graph_task_act` 调它。
-- **记性（`memory`）**：`agentHome` 定每个管家的家目录；管家页的记性（`memory.*`，`agent` 是管家的档案 id）和旧账接口（`orchestrator.archive.*`，带 `agent`）读写它的 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`agent/brain/memory.ts`）。
+- **记性（`memory`）**：`agentHome` 定每个管家的家目录；管家页的记性（`memory.*`，`agent` 是管家的档案 id）和旧账接口（`orchestrator.archive.*`，带 `agent`）读写它的 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`packages/agent/src/memory.ts`）。
 - **农机和额度（`runtime`）**：`assess` 给每个档案能不能派、额度和花费，写进现状。
 - **设置（`setting`）**：`deepseekAPIKey`。
 - **语音（`voice`）**：电话里的话经 `answerer("phone")`，本机的 `/v1/chat/completions` 经 `answerer("api")`：认不认这个模型名、电话里的话要不要先记进频道，都由管家定；转来的字幕经 `heard`（[语音](docs/subsystems/voice.md)）。
@@ -134,7 +134,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/orchestrator/orchestrator.test.ts`（照脚本回答的模型，`ai/testing.ts`）：只接 DeepSeek 的模型；好几个管家各在自己的私聊、照看的频道和被 @ 的地方回答，各有自己的对话文件和提示；派活、在频道听主人的话（电话里的也是）；输入带着从哪来；字流给电话；起不来的原因只说一次；同一个 `sendKey` 只听一次；听到播种袋选的档案；长汇报截了再听；只在主人开口时合并；自己定的定时等主人同意；巡查只报一次；主人标做错的一轮存成样例。
+- `apps/server/src/orchestrator/orchestrator.test.ts`（照脚本回答的模型，`@vibevalley/ai/testing`）：只接 DeepSeek 的模型；好几个管家各在自己的私聊、照看的频道和被 @ 的地方回答，各有自己的对话文件和提示；派活、在频道听主人的话（电话里的也是）；输入带着从哪来；字流给电话；起不来的原因只说一次；同一个 `sendKey` 只听一次；听到播种袋选的档案；长汇报截了再听；只在主人开口时合并；自己定的定时等主人同意；巡查只报一次；主人标做错的一轮存成样例。
 - `orchestrator/rules.test.ts`：现状的差异（大半变了就给全文）；截别人的长话、不截主人的；用量那一行字；每个来源的开头；巡查的说法和黄金数据。
 - 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter @vibevalley/server evals`，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)）。重放时农场的工具只回答样例录下的同一个调用（同一个工具、同样的参数），每个一次，别的调用都回「评测里没有这个工具的结果」（`evals.ts` 的 `stubbed`）：录下的是做错的那一轮，它对一个模型这次没再做的调用的回答（比如没让开工的开工）会让模型以为自己做了。
 - `tool/tool.test.ts`：管家和帮工每个工具生成的参数逐字节对照 `testdata/parameters.json`；钱的说法；轨迹里工具的名字和说法。

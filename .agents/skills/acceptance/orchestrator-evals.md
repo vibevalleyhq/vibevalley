@@ -1,11 +1,11 @@
 # 验收管家的评测
 
-[验收](.agents/skills/acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用照脚本回答的模型（`ai/testing.ts`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
+[验收](.agents/skills/acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用照脚本回答的模型（`@vibevalley/ai/testing`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
 
 ## 什么时候用
 
 - 改了 `systemPrompt`、`agentPrompt`、`apps/server/src/tool` 里管家工具的名字、描述、参数或顺序。
-- 改了 `apps/server/src/agent/brain` 里系统提示怎么拼、对话怎么压缩（`agent.ts`、`prefix.ts`、`compaction.ts`）。
+- 改了 `packages/agent` 里系统提示怎么拼、对话怎么压缩（`agent.ts`、`prefix.ts`、`compaction.ts`）。
 - 往 `apps/server/src/orchestrator/testdata/evals/` 加了样例。
 
 不用它：只改了管家的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/orchestrator` 就够。

@@ -1,0 +1,17 @@
+{
+  "name": "@vibevalley/ai",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
+    "vite-plus": "catalog:"
+  }
+}

@@ -1,10 +1,10 @@
-import { assistantMessage, toolCall } from "../ai/testing.ts";
-import type { BrainMessage } from "../agent/brain/messages.ts";
+import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
+import type { BrainMessage } from "@vibevalley/agent/messages";
 import { describe, expect, it } from "vite-plus/test";
 import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf, stubbed } from "./evals.ts";
 import { noResult } from "./prompts.ts";
 import { Effect } from "effect";
-import type { Tool } from "../agent/loop/agent.ts";
+import type { Tool } from "@vibevalley/agent/core/loop";
 
 const call = assistantMessage([toolCall("issue_create", { title: "加个 README", project: "demo", start: true }, "c1")]);
 const turn: BrainMessage[] = [

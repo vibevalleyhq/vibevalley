@@ -4,7 +4,7 @@
 // VIBEVALLEY_EVAL_ONLY (names, comma-separated) replays only those cases: after a prompt is mended for one, only it is paid for.
 
 import { standaloneLlm } from "../cli/llm.ts";
-import type { Tool } from "../agent/loop/agent.ts";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import { orchestrator } from "../base/actor.ts";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect } from "effect";
@@ -12,10 +12,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
-import { openBrain, standaloneOwner } from "../agent/brain/agent.ts";
-import { deepseek } from "../agent/brain/config.ts";
-import { memoryFile } from "../agent/brain/memory.ts";
-import { type BrainMessage, transcript } from "../agent/brain/messages.ts";
+import { openBrain, standaloneOwner } from "@vibevalley/agent/brain";
+import { deepseek } from "@vibevalley/ai/client";
+import { memoryFile } from "@vibevalley/agent/memory";
+import { type BrainMessage, transcript } from "@vibevalley/agent/messages";
 import { world } from "../testing/world.ts";
 import { Tools } from "../tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "./evals.ts";

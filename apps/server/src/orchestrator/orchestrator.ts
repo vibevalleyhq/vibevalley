@@ -19,10 +19,11 @@ import { graphText } from "../task/prompts.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { traitsOf } from "../agent/prompts.ts";
-import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
-import { Llm } from "../ai/llm.ts";
+import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
+import { modelClient, noDeepSeekKey } from "../agent/model.ts";
+import { Llm } from "@vibevalley/ai/llm";
 import { localeMinute } from "../base/time.ts";
-import { selfTools } from "../agent/brain/self.ts";
+import { selfTools } from "@vibevalley/agent/self";
 import { agentHome, projectsDir, Settings } from "../base/config.ts";
 import { Channels, type OrchestratorNews, type SayMore } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -32,7 +33,7 @@ import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
-import type { Answer } from "../agent/brain/openai.ts";
+import type { Answer } from "./openai.ts";
 import { type AgentHost, Caller } from "../session/host.ts";
 import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
@@ -102,7 +103,7 @@ export class Orchestrator extends Context.Service<Orchestrator, OrchestratorShap
 
 export interface OrchestratorOptions {
   /** The model; absent, DeepSeek with the key in settings. */
-  readonly llm?: () => LLM;
+  readonly llm?: () => ModelClient;
   /** Whether it hears the farm; a test without a model does not, so nothing reaches a model. */
   readonly listen?: boolean;
 }
@@ -159,10 +160,10 @@ export const make = (options: OrchestratorOptions = {}) =>
       const had = instances.get(id);
       if (had) return had;
       const home = agentHome(config, id);
-      const llmOf = (): LLM => {
+      const llmOf = (): ModelClient => {
         if (options.llm) return options.llm();
         // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-        return deepseek(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
+        return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
       };
       // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
       const wakeSoon = (withinMs: number) => {

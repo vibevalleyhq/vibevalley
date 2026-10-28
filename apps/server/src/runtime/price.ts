@@ -3,7 +3,7 @@
 // built-in list, which is pi's own. No other runtime is priced.
 
 import { getBuiltinModel, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
-import { getModel } from "../ai/models.ts";
+import { getModel } from "@vibevalley/ai/models";
 import { piSettings } from "./pi.ts";
 
 export interface Price {

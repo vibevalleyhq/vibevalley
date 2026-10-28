@@ -35,7 +35,7 @@ Status: proposed
 
 - 技能书从 `config.json` 搬到文件夹：照「内部不留兼容」，旧的 `skills` 段作废，不搬数据。`skill.*` 接口改成按名字（`name` 照 Agent Skills 的规矩：小写字母、数字、`-`）。
 - `skill.list` 给合起来的目录：每份的名字、说明、来源、路径、哪些农机自己就看得见它。目录每次现扫（和模板目录一样），不缓存。
-- VibeValley 自己的 agent 的 `skills.ts`（扫目录、读 frontmatter、`load_skill`）搬进这个模块，大脑只拿「这个 agent 能用哪些」的一份清单。
+- 读一份 `SKILL.md`（frontmatter、正文）和 `load_skill` 留在 `packages/agent` 的 `skills.ts`：包不认识农场。`skill` 模块定这个 agent 能用哪些，交给大脑一份清单（名字、说明、路径），不再让大脑自己扫目录。
 
 ### 2. 技能怎么交给 agent：只给目录，正文按需读
 

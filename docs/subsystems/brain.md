@@ -1,42 +1,45 @@
 # VibeValley 自己的 agent
 
-VibeValley 自己的 agent（代码里是 `Brain`，在 `apps/server/src/agent/brain`）是农场里唯一一个从模型请求到工具循环都由我们自己写的 agent。它只接 DeepSeek 的 `chat/completions`，跑在服务端进程里。同一份代码有四种用法：管家（[管家](docs/subsystems/orchestrator.md)）、农机 `vibevalley` 上的帮工（[帮工](docs/subsystems/session.md)）、命令行里直接聊、它自己派出的帮手。别的农机（claude、codex、pi……）是别家的程序，农场经 oar 驱动它们，它们的内部不在本篇。
+VibeValley 自己的 agent（代码里是 `Brain`）是农场里唯一一个从模型请求到工具循环都由我们自己写的 agent，在两个包里：`packages/ai`（`@vibevalley/ai`，模型）和 `packages/agent`（`@vibevalley/agent`，循环和 Brain）。它只接 DeepSeek 的 `chat/completions`，跑在服务端进程里，服务端只组装它。同一份代码有四种用法：管家（[管家](docs/subsystems/orchestrator.md)）、农机 `vibevalley` 上的帮工（[帮工](docs/subsystems/session.md)）、命令行里直接聊、它自己派出的帮手。别的农机（claude、codex、pi……）是别家的程序，农场经 oar 驱动它们，它们的内部不在本篇。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 向模型发请求、读回流（`ai`） | 用哪个模型、钥匙从哪来（档案和设置：[档案和农机](docs/subsystems/agent.md)、[设置](docs/subsystems/setting.md)） |
-| 一轮的循环：问模型、跑工具、再问；插话、追问、叫停（`agent/loop`） | 一条输入什么时候交进来、算不算主人的话（宿主：管家的意图表、oar 的会话） |
+| 向模型发请求、读回流（`@vibevalley/ai`） | 用哪个模型、钥匙从哪来（档案和设置：[档案和农机](docs/subsystems/agent.md)、[设置](docs/subsystems/setting.md)） |
+| 一轮的循环：问模型、跑工具、再问；插话、追问、叫停（`@vibevalley/agent/core/loop`） | 一条输入什么时候交进来、算不算主人的话（宿主：管家的意图表、oar 的会话） |
 | 对话文件、提示的开头、压缩、接着做被打断的一轮 | 一轮记成 Run 和日志、话写进哪个频道（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 自己带的工具：技能、记性、旧账、帮手、提醒、自己的任务、编码工具、MCP 客户端 | 农场的工具（派活、工单、频道……，`tool`，[管家](docs/subsystems/orchestrator.md)） |
 | 记性文件 `MEMORY.md` 和旧账 `archive/` 的读写 | 帮工档案的记性、外面的记性来源（[记性](docs/subsystems/memory.md)） |
-| 包成 oar 的农机 `vibevalley`、OpenAI 协议的入口 | 农机的探测、额度、花费（[档案和农机](docs/subsystems/agent.md)、[帮工](docs/subsystems/session.md)） |
+| | 包成 oar 的农机 `vibevalley`（server 的 `runtime/vibevalley.ts`）、`/v1/chat/completions`（`orchestrator/openai.ts`）、自己的任务存进库（`agent/taskStore.ts`）、给主人看的话；农机的探测、额度、花费（[档案和农机](docs/subsystems/agent.md)、[帮工](docs/subsystems/session.md)） |
 
 ## 在哪
 
-分三层，下层不认识上层：
+三层，下层不认识上层，lint 的 `no-restricted-imports` 查（根目录 `vite.config.ts`）：`packages/ai` 不 import `@vibevalley/agent`；两个包都不 import 应用、`@vibevalley/i18n`、`@vibevalley/protocol`；`core/` 不 import Brain 的文件。
 
 ```
-宿主         orchestrator/（管家，经 session/host.ts 的 AgentHost）
-             agent/brain/runtime.ts（农机 vibevalley：帮工）
-             cli/chat.ts（命令行）      agent/brain/openai.ts（/v1/chat/completions）
+apps/server  组装和适配（不在包里）：
+             session/host.ts 的 AgentHost（管家）  runtime/vibevalley.ts（农机 vibevalley：帮工）
+             cli/chat.ts（命令行）                 orchestrator/openai.ts（/v1/chat/completions）
+             agent/taskStore.ts（自己的任务存进库）  agent/model.ts（缺钥匙时对主人说的话）
                │ openBrain(owner, BrainOptions)
-agent/brain  Brain：对话文件、提示开头、压缩、自己的工具、帮手、提醒、自己的任务
-               │ make(…)
-agent/loop   一轮的循环：模型 ⇄ 工具，steer / followUp / abort
+packages/agent  Brain：对话文件、提示开头、压缩、自己的工具、帮手、提醒、自己的任务
+               │
+packages/agent/src/core  一轮的循环：模型 ⇄ 工具，steer / followUp / abort；Tool 和建工具的函数
                │ Llm.stream / complete
-ai           DeepSeek chat/completions：请求体、流、工具参数
+packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型表、ModelClient
 ```
 
-- **`apps/server/src/ai`**：`models.ts` 模型表和价格；`llm.ts` 的 `Llm` 服务发请求、读流；`request.ts` 拼请求、`response.ts` 读流，都是纯函数；`messages.ts` 消息和事件的形状，照 pi-ai；`tools.ts` 由 Effect Schema 生成给模型看的 JSON Schema（`parametersOf`），先改正模型给的参数类型（`coerceArguments`）再交给 Schema 读。`testing.ts` 是照脚本回答的 `Llm`。
-- **`apps/server/src/agent/loop/agent.ts`**：循环（`make`）。一轮是 agent 作用域里的一条纤程。叫停是一个 `Deferred`，模型的流、`prepareRequest` 和工具都和它赛跑；一次回答里的几个工具同时跑。事件的种类和次序照 pi-agent-core 的 `Agent`。
-- **`apps/server/src/agent/brain`**：
-  - `agent.ts`：`Brain`，以及给 Promise 代码用的 `openBrain`、`BrainHandle`、`standaloneOwner`。
-  - `session.ts`：对话文件。`compaction.ts`：压缩。`prefix.ts`：开头按段算哈希。`messages.ts`：自己加的两种消息（`custom`、`compactionSummary`）。`run.ts`：一轮的用量和字。
-  - 自己的工具：`self.ts`（`load_skill`、`remember`、`rewrite_memory`、`search_archive`、`spawn_agent`），`skills.ts`，`memory.ts`，`mcp.ts`（MCP 客户端），`reminders.ts`（`reminder`、`list_reminders`、`cancel_reminder`），`agentTask.ts`、`agentTaskStore.ts`、`agentTaskTools.ts`（`todo_add`、`todo_update`、`todo_list`），`coding.ts`（`read_file`、`write_file`、`edit_file`、`list_dir`、`grep`、`bash`、`web_fetch`）。`tool.ts` 把 Schema 写的工具接到循环上。
-  - 适配：`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议；`config.ts` 是模型（`deepseek`、`defaultModel`）和 MCP 配置（`readMcpConfig`）。
-  - `prompts.ts`：对模型说的全部的话，中文。
+两个包都按文件导出（`package.json` 的 `"./*": "./src/*.ts"`）：`@vibevalley/ai/messages`、`@vibevalley/agent/core/loop`、`@vibevalley/agent/brain`。
+
+- **`packages/ai`**：`models.ts` 模型表和价格；`client.ts` 的 `ModelClient`（模型、传输的服务、每次请求前现取的钥匙）、`deepseek`、`complete`、`defaultModel`，没钥匙时抛 `MissingKey`（服务端的 `agent/model.ts` 把它说成主人看得懂的话）；`llm.ts` 的 `Llm` 服务发请求、读流；`request.ts` 拼请求、`response.ts` 读流，都是纯函数；`messages.ts` 消息和事件的形状，照 pi-ai；`tools.ts` 由 Effect Schema 生成给模型看的 JSON Schema（`parametersOf`），先改正模型给的参数类型（`coerceArguments`）再交给 Schema 读。`testing.ts` 是照脚本回答的 `Llm`。黄金数据在 `testdata/`。
+- **`packages/agent/src/core`**：`loop.ts` 是循环（`make`）。一轮是 agent 作用域里的一条纤程。叫停是一个 `Deferred`，模型的流、`prepareRequest` 和工具都和它赛跑；一次回答里的几个工具同时跑。事件的种类和次序照 pi-agent-core 的 `Agent`。`tool.ts` 把 Schema 写的工具接到循环上（`schemaTool`、`effectTool`），农场的工具表（`tool`）也用它。
+- **`packages/agent/src`**：
+  - `brain.ts`：`Brain`，以及给 Promise 代码用的 `openBrain`、`BrainHandle`、`standaloneOwner`。
+  - `session.ts`：对话文件。`compaction.ts`：压缩。`prefix.ts`：开头按段算哈希。`messages.ts`：自己加的两种消息（`custom`、`compactionSummary`）。`run.ts`：一轮的用量和字（`RunResult` 只带模型自己说的错，主人看的话由宿主说）。
+  - 自己的工具：`self.ts`（`load_skill`、`remember`、`rewrite_memory`、`search_archive`、`spawn_agent`），`skills.ts`，`memory.ts`，`mcp.ts`（MCP 客户端和 `mcpServers` 配置），`reminders.ts`（`reminder`、`list_reminders`、`cancel_reminder`），`agentTask.ts`、`agentTaskStore.ts`（接口和内存里的存储）、`agentTaskTools.ts`（`todo_add`、`todo_update`、`todo_list`），`coding.ts`（`read_file`、`write_file`、`edit_file`、`list_dir`、`grep`、`bash`、`web_fetch`）。`coding.ts`、`mcp.ts` 要起子进程，只用 `core` 的地方不加载它们。
+  - `dag.ts`：先后的规则（查环、分层），种植计划（`task/graph.ts`）也用。`realTime.ts`：杀子进程和 MCP 超时用的真实时间，包里唯一能碰墙上时钟的文件。
+  - `prompts.ts`：对模型说的话，中文；`core/prompts.ts` 是工具结果的那几句。`testing.ts`：照脚本回答的大脑（`withAgent`、`scriptedLLM`）。
 - **家目录**（`BrainOptions.home`）：对话 `<session>.jsonl`、`MEMORY.md`、`archive/`、`reminders.json`、管家的 `evals/`。管家的在 `$VIBEVALLEY_HOME/agent/<档案 id>/`（`agentHome`），帮工的在 `$VIBEVALLEY_HOME/helpers/`（对话按 oar 的会话 id 分文件，不带记性），命令行的在 `~/.vibevalley/agent/<名字>/`。
 
 ## 模型和不变量
@@ -110,26 +113,27 @@ ai           DeepSeek chat/completions：请求体、流、工具参数
 
 ## 怎么走
 
-**一条输入**：宿主调 `send` 或 `later` → 循环开一轮或把它排进这一轮 → 每次请求前 `prepare`：需要时压缩，取开头和工具表，比较开头的哈希 → `ai` 发请求、读流，事件一条条交给宿主（字边长边给） → 模型调了工具就跑，结果进对话，再问 → 模型不再调工具，或到了步数上限 → `agent_settled`。
+**一条输入**：宿主调 `send` 或 `later` → 循环开一轮或把它排进这一轮 → 每次请求前 `prepare`：需要时压缩，取开头和工具表，比较开头的哈希 → `@vibevalley/ai` 发请求、读流，事件一条条交给宿主（字边长边给） → 模型调了工具就跑，结果进对话，再问 → 模型不再调工具，或到了步数上限 → `agent_settled`。
 
-**农机 `vibevalley` 上的一个帮工**（`runtime.ts`）：oar 每开一个会话，`start` 取当时的钥匙和模型（`llm(model)`，存了的钥匙马上生效），拒绝它接不了的选项（`launchArgs`、`serviceTier`，和不在 `high`、`max` 里的思考强度），起一个大脑；oar 的 `prompt`、`steer`、`queue`、`withdraw`、`abort` 对到 `send` 和自己的排队上；大脑的事件写成 oar 的事件（字、想法、工具的始末、压缩、用量）；一轮结束是 `agent_settled`。
+**农机 `vibevalley` 上的一个帮工**（server 的 `runtime/vibevalley.ts`）：oar 每开一个会话，`start` 取当时的钥匙和模型（`llm(model)`，存了的钥匙马上生效），拒绝它接不了的选项（`launchArgs`、`serviceTier`，和不在 `high`、`max` 里的思考强度），起一个大脑；oar 的 `prompt`、`steer`、`queue`、`withdraw`、`abort` 对到 `send` 和自己的排队上；大脑的事件写成 oar 的事件（字、想法、工具的始末、压缩、用量）；一轮结束是 `agent_settled`。
 
-**OpenAI 的协议**（`openai.ts`，挂在 `POST /v1/chat/completions`）：只读最后一条 `user` 的话，对话由 agent 自己记着；只回字，不带用量。谁能问由挂它的一方定（[管家](docs/subsystems/orchestrator.md)）。
+**OpenAI 的协议**（server 的 `orchestrator/openai.ts`，挂在 `POST /v1/chat/completions`）：只读最后一条 `user` 的话，对话由 agent 自己记着；只回字，不带用量。谁能问由挂它的一方定（[管家](docs/subsystems/orchestrator.md)）。
 
 ## 和谁打交道
 
 - **宿主**：管家经 `AgentHost`（[帮工](docs/subsystems/session.md)），农机 `vibevalley` 经 oar，命令行经 `standaloneOwner`。宿主给说明、工具、MCP、家目录和工作目录，订阅事件（`subscribe`），决定输入怎么交、什么时候 `resume`。
-- **`ai`**：`Llm` 服务。钥匙每次请求前现取（`LLM.apiKey`）。
+- **`@vibevalley/ai`**：`Llm` 服务。钥匙每次请求前现取（`ModelClient.apiKey`）。
 - **农场的工具**：管家的来自 `tool`；帮工的经 MCP 从 `/mcp` 来，和别的农机上的帮工一样。
 - **库**：只有自己的任务（`agent_task`）。对话、记性、提醒是家目录里的文件。
 
 ## 为什么这样
 
-- **自己写 agent，管家和帮工用同一份代码，模型和循环也自己写。** 只用一家模型（DeepSeek 的 `chat/completions`）和一个循环，所以照 pi-ai、pi-agent-core 的接口、形状和事件次序，用 Effect 重写成 `ai` 和 `agent/loop`：叫停、插话、等一轮完是纤程和 `Deferred`，不用在库的回调里对齐时机；测试用照脚本回答的 `Llm`。和 pi 的一致由从 pi 录下的黄金数据（请求体、流读出的消息、参数的改法）和钉住循环的 `loop.test.ts` 守着；代价是 DeepSeek 的新东西要自己跟。pi-ai 只剩 `runtime/price.ts` 给 pi 农机算钱用它的价目。放弃的路：
+- **自己写 agent，管家和帮工用同一份代码，模型和循环也自己写。** 只用一家模型（DeepSeek 的 `chat/completions`）和一个循环，所以照 pi-ai、pi-agent-core 的接口、形状和事件次序，用 Effect 重写成 `@vibevalley/ai` 和 `@vibevalley/agent/core`：叫停、插话、等一轮完是纤程和 `Deferred`，不用在库的回调里对齐时机；测试用照脚本回答的 `Llm`。和 pi 的一致由从 pi 录下的黄金数据（请求体、流读出的消息、参数的改法）和钉住循环的 `loop.test.ts` 守着；代价是 DeepSeek 的新东西要自己跟。pi-ai 只剩 `runtime/price.ts` 给 pi 农机算钱用它的价目。放弃的路：
   - 包一层 Effect、把 pi 留在里面：中间的适配一直要维护，叫停和插话的时机还是库的。
   - Effect 自带的 `effect/ai` 和 `@effect/ai-openai-compat`：标着 unstable；compat 不发 DeepSeek 的 `thinking`、`reasoning_effort`，不读 `prompt_cache_hit_tokens`；`LanguageModel` 默认替你跑工具；`Chat` 的历史和我们的压缩、提示开头互相冲突。
   - 照搬整个 pi-ai：十几家模型、OAuth、价目表，只是多维护。
   - nanobot（Python，自己的总线和渠道会和频道、连接器重复），Vercel AI SDK、LangChain.js（压缩、前缀缓存和取消都要绕过它们）。
+- **模型和 agent 各是一个包，服务端只组装。** 服务端有几处只要模型（工具参数的 JSON Schema、价目），不要 agent，所以 `ai` 单独一个包；循环和 Brain 在一个包里，用子路径 `core` 和 lint 分开，不再多一个包。包里不 import 农场的任何东西（应用、给主人看的话、和页面的契约），给主人看的话由服务端说（`MissingKey`、`RunResult.failed`）。放弃了留在 `apps/server/src` 里靠约定（外溢没有检查挡）；放弃了把 `openai.ts`、存进库的任务存储、oar 的适配放进包（它们是管家的入口、农场的库和农场驱动农机的方式）。测试共用的黄金数据、等待和测试金字塔在 `packages/testkit`，金字塔跟着 `@vibevalley/*` 的 import 进包里，服务端的测试经包碰到子进程照样算模块测试。
 - **大脑放在服务端进程里。** 它要和档案、计划、频道一起长；管家常驻、电话里插话、提示开头不变，外部农机做不到。
 - **一份 `BrainOptions` 配出四种用法，不写四个 agent。** 管家和帮工的差别是带什么（工具、记性、帮手、提醒），不是两套循环。按档案配工具集（`toolsets`）以后也落在这里。
 - **提示开头在两次压缩之间不变。** 系统提示里放秒级时间、每次重读的记性、现状，每次请求都从第一段起命不中。放弃了「时间改成到天」（现状和记性照样常变）；放弃了「现状做成每次请求都换、不存下的最后一条」（一轮里每调一次工具就全价带一遍完整现状）。
@@ -145,7 +149,7 @@ ai           DeepSeek chat/completions：请求体、流、工具参数
 
 ## 怎么验证
 
-- `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；提醒到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。
-- `agent/brain/loop.test.ts`：循环的事件次序、截断的调用、没有的工具和不收的参数、一轮一句、一起跑的工具的次序。`agent/loop/agent.test.ts`：同样的情形，外加流里、工具里、准备请求时叫停，模型出错、回答被截断、请求被拒，跑着时再开一轮被拒。
-- `agent/brain/runtime.test.ts`、`run.test.ts`：农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败。`openai.test.ts`：只取最新一句、照 OpenAI 的格式分块和结束。`agentTask.test.ts`：自己的任务。`declared.test.ts`、`tools.test.ts`：工具参数的 JSON Schema 逐字节不变。
-- `ai/deepseek.test.ts`、`ai/tools.test.ts`：请求体、流读出的消息、参数的改法，逐字对照从 pi-ai 录下的黄金数据（`ai/testdata`）；`ai/llm.test.ts`：钥匙和地址、被拒的状态、断掉的流。
+- `packages/agent/src/brain.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；提醒到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。
+- `packages/agent/src/loop.test.ts`：循环的事件次序、截断的调用、没有的工具和不收的参数、一轮一句、一起跑的工具的次序。`core/loop.test.ts`：同样的情形，外加流里、工具里、准备请求时叫停，模型出错、回答被截断、请求被拒，跑着时再开一轮被拒。
+- `run.test.ts`：一轮的用量、字和失败。server 的 `runtime/vibevalley.test.ts`：农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败；`orchestrator/openai.test.ts`：只取最新一句、照 OpenAI 的格式分块和结束；`agent/taskStore.test.ts`：自己的任务存进库。`agentTask.test.ts`：自己的任务。`declared.test.ts`、`tools.test.ts`：工具参数的 JSON Schema 逐字节不变。
+- `packages/ai`：`deepseek.test.ts`、`tools.test.ts` 的请求体、流读出的消息、参数的改法，逐字对照从 pi-ai 录下的黄金数据（`testdata`，`vp run golden:update -- ai` 重写）；`llm.test.ts`：钥匙和地址、被拒的状态、断掉的流。

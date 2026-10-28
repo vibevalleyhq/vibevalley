@@ -9,7 +9,7 @@ import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
-import { remember, rewriteMemory } from "../agent/brain/memory.ts";
+import { remember, rewriteMemory } from "@vibevalley/agent/memory";
 import { agentHome, Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { layer as settingLayer } from "../setting/setting.ts";

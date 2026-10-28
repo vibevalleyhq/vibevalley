@@ -17,7 +17,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
-- `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `ai/models.ts`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentProblems`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
+- `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentProblems`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
 - 接口：`session.list`、`session.get`、`session.event.list`、`session.stop`、`issue.run.list`、`issue.history.list`、`runtime.*`、`agent.check`（[capabilities.md](docs/reference/capabilities.md)）。
@@ -77,7 +77,7 @@
 **额度和花费**（`runtime`）：
 
 - 有套餐的农机读 oar 的账户用量；pi 用它自己配置的 DeepSeek 钥匙读 `GET /user/balance`（只读）；VibeValley 自己的农机不报额度。开机读一遍，之后每 5 分钟读一次；一轮结束后 20 秒再读一次（几轮共用一次）。剩不到 15%（`quotaLow`）的，管家的「农场现状」标「快用完了」，管家尽量换人。
-- 花费按价目折成人民币（估算，汇率 `cny_per_usd`）：pi 按 pi-ai 自带的价目（不含 pi 配置里自加的模型），VibeValley 自己的农机和 dsh 的 DeepSeek 模型按 `ai/models.ts` 的价格；claude、codex 等按套餐计费的只记 token，没有每日预算。今天每台农机花了多少在 `spend.json`（写盘合并 1 秒，推给页面合并 3 秒）。读回时校验日期和每台农机的有限数值；读不了、形状不对或日期不是今天的，从今天的空账开始，不拿 Infinity 绕过预算。pi 的 settings/auth/models 和 DeepSeek 余额回答也按形状读；本机配置读不了按缺省处理，余额形状不对回「没读到 DeepSeek 余额」，不在解析成功以后才炸开。
+- 花费按价目折成人民币（估算，汇率 `cny_per_usd`）：pi 按 pi-ai 自带的价目（不含 pi 配置里自加的模型），VibeValley 自己的农机和 dsh 的 DeepSeek 模型按 `@vibevalley/ai/models` 的价格；claude、codex 等按套餐计费的只记 token，没有每日预算。今天每台农机花了多少在 `spend.json`（写盘合并 1 秒，推给页面合并 3 秒）。读回时校验日期和每台农机的有限数值；读不了、形状不对或日期不是今天的，从今天的空账开始，不拿 Infinity 绕过预算。pi 的 settings/auth/models 和 DeepSeek 余额回答也按形状读；本机配置读不了按缺省处理，余额形状不对回「没读到 DeepSeek 余额」，不在解析成功以后才炸开。
 
 ## 怎么走
 

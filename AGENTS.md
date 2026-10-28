@@ -8,8 +8,8 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
                            （Context.Service）：core、setting、agent、project、memory、doc、runtime、session、channel、recurrence、issue、
                            task、notice、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
-                           规则，组装时交给 core）；agent/brain 是 VibeValley 自己的 agent（搭在
-                           agent/loop 上，也是 oar 的 vibevalley runtime）；base 是地基，services.ts 按次序把它们组装起来，
+                           规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
+                           oar 的 vibevalley runtime）；base 是地基，services.ts 按次序把它们组装起来，
                            handlers.ts 是全部接口的处理，http/ 是路由、流和 /mcp；cli.ts 是命令行（农场的每个接口、和农机直接聊、
                            自己的 agent）
 apps/server/db/            库（PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
@@ -27,6 +27,10 @@ packages/protocol/         契约：形状（src/shapes.ts）、它们的 Schema
                            向桌面壳、手机壳要的东西（通知、托盘、全局快捷键、通话的线路），和手机壳的桥
 packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟、按整数倍放大
 packages/i18n/             对主人说的话：locales/<语言>/<宿主.模块>.json 的词典，代码里 t("key")；src/catalogs.ts 由 i18n:gen 写出
+packages/ai/               模型：DeepSeek 的请求和流、消息形状、模型表和价格、工具参数的 Schema、照脚本回答的测试模型
+packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具，其余是 Brain（对话、压缩、技能、记性、帮手、自己的任务）；
+                           不认识农场，lint 查方向（ai ← agent ← apps/server）
+packages/testkit/          测试共用的：黄金数据、在真实时间上等条件、测试金字塔（只在 devDependencies）
 site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 apps/web/public 的
 design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
@@ -45,9 +49,9 @@ vp check                                                        # 改完任何�
 vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
 vp run --filter @vibevalley/server cli issue list                # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
-vp run server:check                                             # 改完服务端或 packages/protocol：类型（vp check）、规则的测试、查询是否最新、vitest
+vp run server:check                                             # 改完服务端、packages/protocol、ai、agent、testkit：类型（vp check）、规则的测试、查询是否最新、vitest
 vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：用 effect-sqlc 重写 db/generated
-vp run golden:update                                            # 有意改了规则：用现在的结果重写各处的黄金数据，再看 diff（后面加 <模块> 只重写那一处，核心状态的是 core）
+vp run golden:update                                            # 有意改了规则：用现在的结果重写各处的黄金数据，再看 diff（后面加 <模块> 只重写那一处，核心状态的是 core，模型的是 ai）
 vp run --filter @vibevalley/server evals                         # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；acceptance 的管家评测分册）
 vp run web:check                                                # 改完 apps/、packages/：类型（vp check），engine、宿主的桥、手机壳和页面规则的测试，页面能构建
 vp run --filter @vibevalley/web e2e                              # 改完页面：构建，再 Playwright 对着真的服务端（每个 worker 一个，临时家目录，环境里没有钥匙）
@@ -108,7 +112,7 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - **工具链**：Vite+（`vp`）管装依赖、格式、lint、类型、测试和任务，配置在根目录 `vite.config.ts`（[Vite+ 的 monorepo 指南](https://viteplus.dev/guide/monorepo)）：格式和 lint 只在根目录配，包之间的差别写成 `overrides`，各包的 `vite.config.ts` 只放 Vite、Vitest 和任务；依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog，`package.json` 写 `catalog:`（[地基](docs/subsystems/foundation.md)）；`vp check` 查格式（oxfmt，160 列；Markdown、生成的和数据不排）、oxlint（带类型的规则）和全部包的类型，`vp check --fix` 改格式，各包不另跑 `tsc`。任务一律 `vp run`：检查（测试、构建、`server:check`、`docs:verify`）写成 `vite.config.ts` 的任务，带缓存，什么都没改时重放结果，先后用 `dependsOn`；会写文件或一直跑的（`golden:update`、`api:client`、`desktop:dev`、`e2e`）留在 `package.json`，不缓存。测试用 `vp test`（vitest，跑在 Node 上，测试从 `vite-plus/test` import；服务端另用 `@effect/vitest`），每个包的 `vite.config.ts` 写它的 `test`（哪些文件、时区）；界面和整个应用用 Playwright（`e2e`）；脚本用 `vpx` 直接跑 `.ts`，都不带构建。
 - **话放在哪**：对主人说的话（界面、帧里的说法、通知、拒绝、田头的系统消息、命令行）写进词典 `packages/i18n/locales/{zh,en}/<宿主.模块>.json`，代码里写 `t("key")`，改完 `vp run i18n:gen`，键和参数有类型，`vpx scripts/i18n.ts check` 查漏翻、没人用的和占位；对模型说的写进模块的 `prompts.ts`，用中文，加一句用主人的语言回答；别处的中文由 lint `vibevalley/no-cjk-literal` 拦下（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
 - **代码风格**：代码和接口用实际的概念，界面上的叫法照[用语表](docs/README.md#用语)；工单的状态和动作在哪里都用工单自己的词（完成、改动、问题、计划，词典的 `shared` 命名空间），种地的词（收获、缺肥、种植计划……）只在农场的皮里，`stale-names.ts` 查（[状态和用语](docs/subsystems/issue.md#状态和用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
-- **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用照脚本回答的 `Llm`（`ai/testing.ts`，大脑经 `agent/brain/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/helper.ts`）；纯函数的规则直接测；页面的 Playwright 对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、项目、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试。测试分六层（规则、模块、流程、页面、整个应用、真模型），一层从一个接缝进、有预算，层和边界由检查认，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
+- **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用照脚本回答的 `Llm`（`@vibevalley/ai/testing`，大脑经 `packages/agent/src/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/helper.ts`）；纯函数的规则直接测；页面的 Playwright 对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、项目、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试。测试分六层（规则、模块、流程、页面、整个应用、真模型），一层从一个接缝进、有预算，层和边界由检查认，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
 - **改完要验证**：先跑最窄的检查；改了接口、服务、页面或手机壳，照 [acceptance](.agents/skills/acceptance/SKILL.md) 找到对应的分册，在真的程序上看一遍，汇报时附上它要的证据；一类改动没有分册，又花了工夫才验证完，就照 `create-verification-skill` 补一份（[.agents/skills](.agents/skills/README.md)）。
 - **分支、提交和 PR**：`main` 只经 PR、squash 合并，CI 全过才能合；分支 `<类>/<主题>`，提交和 PR 的标题、正文用英文，标题一句话说改完以后的行为、最多 100 字，不带 agent 署名；commit-msg hook 和 CI 查，开、改、合照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[规矩](docs/development.md#分支提交和-pr)）。
 - **文档和 Note**：改了行为就在同一个改动里改文档；有子系统文档（`docs/subsystems/`）的，改它，不在 `reference/` 另写一份；非平凡的工作先写计划 Note（行为、模块边界、共享约定、持久化格式、流程、测试策略），做完把仍然成立的沉淀进子系统、删掉 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。

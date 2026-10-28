@@ -48,7 +48,7 @@
 | 档案、技能书、档案模板 | `Agents`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
 | 农机 | `Runtimes` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
 | 记性 | `Memories` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
-| 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
+| 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
 | 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
 | 计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
 | 帮工 | `Sessions`（`session/session.ts`） | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |

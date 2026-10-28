@@ -99,7 +99,7 @@ jobs:
       # server:check without db:check: effect-sqlc (the generator) is not published, so only a clone with ../effect-sqlc
       # can tell whether db/generated is current. The rest runs against the committed db/generated.
       - if: matrix.shard == 1
-        run: vp run --filter @vibevalley/protocol test
+        run: vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test
       # The test task with the shard as its argument: cached per shard.
       - run: vp run --filter @vibevalley/server test --shard=${{ matrix.shard }}/3
 

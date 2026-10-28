@@ -1,0 +1,19 @@
+{
+  "name": "@vibevalley/agent",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@vibevalley/ai": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
+    "vite-plus": "catalog:"
+  }
+}

@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 电话：签 RTC 令牌、请语音管家进出频道、续签、挂断 | 管家怎么想、怎么派活，`answerer`、`heard` 的提示（[管家](docs/subsystems/orchestrator.md)） |
-| 语音线路：单独的回环监听、每通电话一把钥匙、隧道 | OpenAI `chat/completions` 的协议本身（`agent/brain/openai.ts`，[管家](docs/subsystems/orchestrator.md)「OpenAI 的协议」） |
+| 语音线路：单独的回环监听、每通电话一把钥匙、隧道 | OpenAI `chat/completions` 的协议本身（`orchestrator/openai.ts`，[管家](docs/subsystems/orchestrator.md)「OpenAI 的协议」） |
 | 两种字幕的接受和分流（按通话建立时的模式） | 字幕怎么留在频道、不叫醒谁（`channel` 的 `spoken`，[频道](docs/subsystems/channel.md)） |
 | 听写：把录音转给主人填的转写地址 | 设置的存取、优先级、钥匙只给提示（`setting`，[设置](docs/subsystems/setting.md)） |
 | 语音设置的形状、默认值和保存前的检查 | 「连接到本机」放哪些接口（[连接到本机](docs/subsystems/lan.md)）；语音接通在账本上记一笔（`game`） |
@@ -64,7 +64,7 @@
 
 1. 监听开在 `voice.line.port`（默认 8788，只听 127.0.0.1）；端口被占时只记日志，农场照常，打给管家的电话回原因。
 2. 隧道：设了 `voice.line.url` 就用它（去掉结尾的 `/`），地址固定、第一通不用等，比如 Tailscale Funnel（`tailscale funnel --bg 8788`，把它给的 `https://<机器>.<tailnet>.ts.net` 设成 `voice.line.url`；只放这条线路的端口，农场的 8787 不放）；没设时第一通电话开 cloudflared 临时隧道（`cloudflared tunnel --url`），30 秒内给不出 `trycloudflare.com` 地址就失败，没装就提示 `brew install cloudflared` 或设 `voice.line.url`；拿到地址后每 2 秒探一次，最多 60 秒，线路回 401 算通了，到时还不通也接着打，只记日志。最后一通挂了 10 分钟后关隧道，其间再打就复用。
-3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `agent/brain/openai.ts` 处理：只取 `messages` 里最后一条 `user`，交给 `Orchestrator.answerer("phone")`（先记进默认频道，再带「电话里说的、要口语」的提示问管家），管家的字边长边以 SSE 流回去念。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
+3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `orchestrator/openai.ts` 处理：只取 `messages` 里最后一条 `user`，交给 `Orchestrator.answerer("phone")`（先记进默认频道，再带「电话里说的、要口语」的提示问管家），管家的字边长边以 SSE 流回去念。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
 4. Agora 在主人插话时挂掉请求：请求断了就不再送字；同一通电话的新一句结束上一句的流；管家这一轮照常跑完。
 
 **管家打电话找主人**：
@@ -99,7 +99,7 @@
 
 - **实时通话用 Agora 的 ConvoAI，照官方示例搬。** RTC 传输、回声消除、断句、插话打断和把识别、想、合成串成实时链路是难点，自己做成本远超需要；放弃了自己接识别和合成。Agora 的 SDK 参数多、变得快，照能跑通的 `agent-quickstart-nextjs` 搬，比凭记忆写快；服务端用声网的 `agora-agents`，页面用它的 Web SDK。
 - **只把「想」换成我们的管家，经一个只有一个接口的监听。** 声网能接 OpenAI 兼容的自定义大模型，所以识别、断句、合成照用，管家在电话里就是田头上那个，看得到地里、自己派活。放弃了用隧道转发整个服务端：帮工能执行任意命令，派活、改配置的接口都会上公网。放弃了给托管模型塞农场上下文（它调不了我们的工具）和用 Agora 的 think 接口塞指令（措辞不进管家自己的历史）。代价是本机多一个对外口子，只认带钥匙的请求。
-- **协议只取最后一句，历史以管家的会话为准。** 照 OpenAI 的语义读全部 `messages`，管家的会话和 Agora 那边的历史会是两份：插话时没念完的字、频道里说的话 Agora 都不知道。协议放在 `agent/brain`，不留在 `voice`：主服务的本机接口也用它。
+- **协议只取最后一句，历史以管家的会话为准。** 照 OpenAI 的语义读全部 `messages`，管家的会话和 Agora 那边的历史会是两份：插话时没念完的字、频道里说的话 Agora 都不知道。协议放在 `packages/agent`，不留在 `voice`：主服务的本机接口也用它。
 - **Agora 是供应商，不是概念，不开一个 `agora` 模块。** 声网的 SDK 只在 `voice/voice.ts` 和页面的 `features/voice/call.ts` 里用，翻译设置的适配就在 `voice.ts`。页面的 `VoiceCall` 直接持有声网的 client，不拆出只有一个实现的接口；也不抽 `Transport`、`TTS` 接口，第二家真要接时再抽，能换平台靠 OpenAI 协议。
 - **听写不走 Agora，转给主人填的 OpenAI 兼容地址。** 走 Agora 要开一通按分钟计费的会话、请一个 agent 进频道，能选的识别也接不上中文准的国内厂商；听写不需要断句和打断。经服务端转一手是为了 key 留在服务端、「连接到本机」进来的手机也能用 Mac 上的本地模型。放弃了服务端打包并拉起本机识别（要管约 1 GB 的模型和它的生命周期）。字去输入框、不叫醒管家；放弃了让管家整理听写：每段草稿都会进管家的会话、叫醒它一轮。
 - **RTC 授予拥有这通电话的应用身份。** 三个请求各读一次当前凭据时，拿令牌后改 App ID 会让启动或续签指向另一个应用，而已经加入频道的 client 换不了身份。现有的 `channel + uid` 已由服务端生成，足以标识授予，不另加 grant id；没启动的授予用令牌的期限，不另设较短的，免得令牌还有效 `start` 却拒绝。

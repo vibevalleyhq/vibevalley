@@ -18,6 +18,8 @@
     "@electric-sql/pglite": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@vibevalley/agent": "workspace:*",
+    "@vibevalley/ai": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "agora-agents": "catalog:",
@@ -29,6 +31,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"

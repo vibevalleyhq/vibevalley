@@ -12,17 +12,18 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
-import { type BrainEvent, openBrain, standaloneOwner } from "../agent/brain/agent.ts";
-import { codingTools } from "../agent/brain/coding.ts";
-import { deepseek, readMcpConfig } from "../agent/brain/config.ts";
-import { userMessage } from "../agent/brain/messages.ts";
-import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
+import { type BrainEvent, openBrain, standaloneOwner } from "@vibevalley/agent/brain";
+import { codingTools } from "@vibevalley/agent/coding";
+import { readMcpConfig } from "@vibevalley/agent/mcp";
+import { modelClient } from "../agent/model.ts";
+import { userMessage } from "@vibevalley/agent/messages";
+import { vibevalleyRuntimeOf } from "../runtime/vibevalley.ts";
 import { NodeServices } from "@effect/platform-node";
 import { Effect } from "effect";
 import { loadConfig } from "../base/config.ts";
 import { dshRuntime } from "../runtime/dsh.ts";
 import { registryOf } from "../runtime/runtime.ts";
-import { memoryStore } from "../agent/brain/agentTaskStore.ts";
+import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { wallTime } from "../base/time.ts";
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
@@ -95,7 +96,7 @@ export interface OwnChat {
 /** The conversation with VibeValley's own agent. */
 export async function ownChat(values: OwnChat) {
   const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const llm = deepseek(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
+  const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const home = join(homedir(), ".vibevalley", "agent", values.name);
   const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
@@ -191,7 +192,7 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
   const registry = registryOf([
     vibevalleyRuntimeOf({
       home: () => config.home,
-      llm: (model) => deepseek(model, config.deepseek.apiKey, service),
+      llm: (model) => modelClient(model, config.deepseek.apiKey, service),
       time: wallTime,
       owner: standaloneOwner(),
     }),

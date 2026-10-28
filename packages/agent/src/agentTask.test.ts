@@ -1,0 +1,103 @@
+import { describe, expect, it } from "@effect/vitest";
+import { add, begin, finished, readyTasks, requeue, settle, type AgentTask, AgentTaskError, text, update } from "./agentTask.ts";
+
+const ids = (g: readonly AgentTask[]) => g.map((t) => t.id);
+
+const three = () => {
+  const [g, problems] = add(
+    [],
+    [
+      { id: "read", brief: "读 auth 的代码" },
+      { id: "fix", brief: "改 token 过期的判断", after: ["read"] },
+      { id: "test", brief: "跑 auth 的测试", after: ["fix"] },
+    ],
+  );
+  expect(problems).toEqual([]);
+  return g;
+};
+
+describe("an agent's own tasks", () => {
+  it("added tasks wait, and the first is ready", () => {
+    const g = three();
+    expect(ids(readyTasks(g))).toEqual(["read"]);
+    expect([g[0]!.by, g[0]!.title, g[0]!.after]).toEqual(["self", "读 auth 的代码", []]);
+  });
+
+  it("a batch with any problem changes nothing", () => {
+    const g = three();
+    for (const [more, want] of [
+      [[{ id: "read", brief: "再读一遍" }], "id「read」重复了"],
+      [[{ id: "x", brief: "b", after: ["x"] }], "「x」不能等自己"],
+      [[{ id: "x", brief: "b", after: ["nope"] }], "「x」要等的「nope」不存在"],
+      [[{ id: "读代码", brief: "b" }], "不能当 id"],
+      [[{ id: "x" }], "没有写要做什么"],
+      [[], "一件任务都没有"],
+    ] as const) {
+      const [next, problems] = add(g, more);
+      expect(problems.join("；")).toContain(want);
+      expect(ids(next)).toEqual(ids(g));
+    }
+    expect(
+      add(
+        [],
+        [
+          { id: "a", brief: "b", after: ["b"] },
+          { id: "b", brief: "b", after: ["a"] },
+        ],
+      )[1],
+    ).toEqual(["这几件互相等，成了一个圈：a、b"]);
+  });
+
+  it("done or skipped lets the next start", () => {
+    let g = update(three(), "read", { state: "done", result: "token 在 auth/jwt.go 里判断" });
+    expect(ids(readyTasks(g))).toEqual(["fix"]);
+    g = update(g, "fix", { state: "skipped" });
+    expect(ids(readyTasks(g))).toEqual(["test"]);
+    expect(finished(g)).toBe(false);
+    expect(finished(update(g, "test", { state: "done" }))).toBe(true);
+  });
+
+  it("what a task may become", () => {
+    let g = update(three(), "read", { state: "failed", result: "没权限读" });
+    g = update(g, "read", { state: "waiting", brief: "用 sudo 读" });
+    expect([g[0]!.tries, g[0]!.brief]).toEqual([1, "用 sudo 读"]);
+    g = update(g, "read", { state: "done" });
+    expect(() => update(g, "read", { brief: "再读" })).toThrow(/做完了/);
+    expect(() => update(g, "read", { state: "waiting" })).toThrow(AgentTaskError);
+    expect(() => update(g, "nope", { state: "done" })).toThrow(AgentTaskError);
+    expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/);
+  });
+
+  it("the graph as the model reads it", () => {
+    const g = update(three(), "read", { state: "done", result: "在\n  jwt.go" });
+    expect(text(g)).toBe(
+      [
+        "任务（3 件，1 件可以做）：",
+        "- [做完了] read 读 auth 的代码 → 在 jwt.go",
+        "- [可以做] fix 改 token 过期的判断（等 read）",
+        "- [等着] test 跑 auth 的测试（等 fix）",
+      ].join("\n"),
+    );
+    expect(text([])).toBe("现在没有任务。");
+  });
+
+  it("a subagent's task goes out and comes back", () => {
+    let [g] = add(
+      [],
+      [
+        { id: "a", brief: "查 A", by: "subagent" },
+        { id: "b", brief: "查 B", by: "subagent", after: ["a"] },
+      ],
+    );
+    g = begin(g, "a");
+    expect([g[0]!.state, readyTasks(g).length]).toEqual(["working", 0]);
+    g = settle(g, "a", "超时了", true);
+    expect([g[0]!.state, g[0]!.tries]).toEqual(["waiting", 1]);
+    g = settle(begin(g, "a"), "a", "还是超时", true);
+    expect(g[0]!.state).toBe("failed");
+    g = update(g, "a", { state: "waiting" });
+    g = settle(begin(g, "a"), "a", "A 在 x.go", false);
+    expect([g[0]!.state, g[0]!.result, ids(readyTasks(g))]).toEqual(["done", "A 在 x.go", ["b"]]);
+    expect(requeue(begin(g, "b"), ["b"])[1]!.state).toBe("waiting");
+  });
+});

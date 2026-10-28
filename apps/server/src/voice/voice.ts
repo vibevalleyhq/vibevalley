@@ -14,7 +14,7 @@ import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
 import { Clock, Context, Effect, FiberSet, Layer, Schema, Stream } from "effect";
-import { chatCompletions } from "../agent/brain/openai.ts";
+import { chatCompletions } from "../orchestrator/openai.ts";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
