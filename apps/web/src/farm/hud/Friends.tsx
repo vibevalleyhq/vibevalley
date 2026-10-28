@@ -73,7 +73,12 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
         </Show>
       </button>
       <Show when={open()}>
-        <div class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px" role="dialog" aria-label={props.agent.name}>
+        <div
+          data-testid="friend-card"
+          class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px"
+          role="dialog"
+          aria-label={props.agent.name}
+        >
           <div class="flex items-center gap-3">
             <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={60} muted={!props.agent.enabled} />
             <div class="min-w-0">

@@ -127,10 +127,11 @@ function Layer(props: { o: FarmOverlay }) {
 
 const pets = ["dog", "ragdoll", "bluecat"];
 
-function Tile(props: { chosen: boolean; ready: boolean; onClick: () => void; children: JSX.Element }) {
+function Tile(props: { item: string; chosen: boolean; ready: boolean; onClick: () => void; children: JSX.Element }) {
   return (
     <button
       type="button"
+      data-key={props.item}
       aria-pressed={aria(props.chosen)}
       disabled={!props.ready}
       onClick={() => props.onClick()}
@@ -170,7 +171,7 @@ function OrchestratorLooks() {
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <For each={orchestratorLooks}>
           {(look) => (
-            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
+            <Tile item={look.id} chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
               <span class="h-28">
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
@@ -187,7 +188,7 @@ function OrchestratorLooks() {
         <For each={pets}>
           {(p) => (
             <div class="flex-1 bg-cream-100">
-              <Tile chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
+              <Tile item={p} chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
                 <span class="h-16">
                   <Show when={has(`${p}-awake`)}>
                     <SpriteIcon name={`${p}-awake`} size={64} />
