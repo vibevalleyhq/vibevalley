@@ -147,7 +147,6 @@ const zh = {
     drag: "拖到另一个频道上，排在它前面",
   },
   threadList: {
-    open: "串",
     title: "这个频道的串",
     none: "这个频道还没有串",
     archived: (n: number) => `已归档的串（${n}）`,
@@ -357,7 +356,6 @@ const en: typeof zh = {
     drag: "Drop on another channel to place it before that one",
   },
   threadList: {
-    open: "Threads",
     title: "This channel's threads",
     none: "No threads in this channel yet",
     archived: (n) => `Archived threads (${n})`,

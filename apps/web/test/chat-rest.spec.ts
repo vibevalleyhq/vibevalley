@@ -53,7 +53,9 @@ test("a thread is listed under its channel, renamed and archived there", async (
   const [said] = await api.channel.message.list({ id });
   await api.channel.thread.create({ id: said!.id });
   await page.goto(`/chat/${id}`);
-  await page.getByRole("button", { name: "串", exact: true }).click();
+  // A thread on no issue, with no replies yet, is a thread, not an issue's.
+  await expect(page.getByRole("log", { name: "消息" }).getByRole("button", { name: /^串/ })).toBeVisible();
+  await page.getByRole("button", { name: "这个频道的串" }).click();
   const list = page.getByRole("dialog", { name: "这个频道的串" });
   await expect(list.getByText("这件事开个串")).toBeVisible();
   await list.getByRole("button", { name: /^给「这件事开个串」改名$/ }).click();
@@ -215,6 +217,11 @@ test("a reaction can be any emoji, picked from the toolbar or beside the reactio
   await expect(log.getByRole("button", { name: /🌻\s*1/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("dialog", { name: "表情" })).toHaveCount(0);
 
+  // Beside the reactions only on the message under the pointer.
+  await page.mouse.move(0, 0);
+  await expect(log.getByRole("button", { name: "更多表情" })).toHaveCSS("opacity", "0");
+  await said.hover();
+  await expect(log.getByRole("button", { name: "更多表情" })).toHaveCSS("opacity", "1");
   await log.getByRole("button", { name: "更多表情" }).click();
   await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🍀" }).click();
   await expect(log.getByRole("button", { name: /🍀\s*1/ })).toBeVisible();

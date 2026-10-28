@@ -381,7 +381,11 @@ function ThreadPreview(props: { thread: Channel }) {
       <span class="flex w-full items-center gap-1.5">
         <Icon name="button-thread" size={16} />
         <span class="text-sm font-semibold text-accent">
-          {props.thread.replies > 0 ? chatWording().replies(props.thread.replies) : chatWording().jobs.thread}
+          {props.thread.replies > 0
+            ? chatWording().replies(props.thread.replies)
+            : props.thread.subjectKind === "issue"
+              ? chatWording().jobs.thread
+              : chatWording().names.thread}
         </span>
         <Show when={unread() > 0}>
           <Tag label={chatWording().messages.unread(unread())} fill="#b4cb7c" />

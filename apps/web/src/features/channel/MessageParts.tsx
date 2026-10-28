@@ -71,7 +71,7 @@ const shownAs = (type: string) =>
 
 export function Attachments(props: { files: readonly Attachment[] }) {
   return (
-    <div class="mt-1 flex flex-wrap gap-2">
+    <div class="mt-1 flex flex-wrap items-start gap-2">
       <For each={props.files} keyed={(f) => f.id}>
         {(f) => {
           // Keyed by its id, which names its bytes: a file never changes.
@@ -187,7 +187,11 @@ function AddReaction(props: { id: string }) {
         title={chatWording().emoji.more}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
-        class="flex cursor-pointer items-center rounded-full border border-line bg-page px-2 py-0.5 text-xs hover:bg-hover"
+        // Only on the message under the pointer or the focus, as the toolbar: every message has a 👀 to sit beside.
+        class={[
+          "flex cursor-pointer items-center rounded-full border border-line bg-page px-2 py-0.5 text-xs hover:bg-hover",
+          open() ? "" : "opacity-0 group-focus-within/m:opacity-100 group-hover/m:opacity-100 focus-visible:opacity-100",
+        ]}
       >
         <Icon name="button-add" size={12} />
       </button>
