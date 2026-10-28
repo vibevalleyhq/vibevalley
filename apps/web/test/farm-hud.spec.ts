@@ -79,7 +79,7 @@ test("a project's farm names it on the sign; an empty plot sows in it, and 草�
   await expect(sow.getByRole("button", { name: "开始" })).toBeVisible();
   await sow.getByRole("button", { name: "草稿" }).click();
   await expect(page).toHaveURL(/\/issues\/.+/);
-  const made = (await api.issue.list()).find((i) => i.title.includes("夜间模式"));
+  const made = (await api.issue.list({})).find((i) => i.title.includes("夜间模式"));
   expect(made?.project).toBe("farm-hud");
   expect(made?.status).toBe("backlog");
   await page.goto("/farm/farm-hud");

@@ -550,10 +550,10 @@ describe("the chat", () => {
         yield* f.chat.consumed({ session: orchestratorAgent, messages: [digest[0]!.id] });
         expect(yield* f.chat.orchestratorDigest()).toEqual([]);
         yield* f.chat.say("大家看一下", f.chat.defaultChannel(), "");
-        const inbox = yield* f.chat.inbox("w12");
-        expect(inbox).toEqual([{ target: "#general", unread: 2, mentionsYou: true, latest: "主人" }]);
+        const unread = yield* f.chat.unread("w12");
+        expect(unread).toEqual([{ channel: "#general", unread: 2, mentionsYou: true, latest: "主人" }]);
         yield* f.chat.read("w12", { target: "#general" });
-        expect(yield* f.chat.inbox("w12")).toEqual([]);
+        expect(yield* f.chat.unread("w12")).toEqual([]);
       }),
     ),
   );

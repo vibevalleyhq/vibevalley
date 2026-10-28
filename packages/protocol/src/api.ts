@@ -128,7 +128,12 @@ export interface Handlers<R = never> {
   readonly "session.event.list": (a: { readonly id: string; readonly run?: string }) => Effect.Effect<T.SessionEvent[], ApiError, R>;
   /** One joined read of issues and their real sessions, including explicit missing records. */
   readonly "issue.history.list": () => Effect.Effect<T.IssueHistory[], ApiError, R>;
-  readonly "issue.list": () => Effect.Effect<T.Issue[], ApiError, R>;
+  /** The open issues by default, the newest first; the filter narrows them. */
+  readonly "issue.list": (a: T.IssueFilter) => Effect.Effect<T.Issue[], ApiError, R>;
+  /** A verdict on what was handed back; a pass only makes it ready, completing it is issue.status.update to done. */
+  readonly "issue.review": (a: { readonly id: string } & T.IssueReviewRequest) => Effect.Effect<T.Issue, ApiError, R>;
+  /** The issue becomes a task graph's parent and its tasks the issues under it, started at once. */
+  readonly "issue.split": (a: { readonly id: string } & T.IssueSplitRequest) => Effect.Effect<string, ApiError, R>;
   readonly "issue.get": (a: { readonly id: string }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.run.list": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
   /** The issue's milestones, newest first, and what all its runs cost. */
@@ -186,8 +191,15 @@ export interface Handlers<R = never> {
   readonly "channel.direct.create": (a: { readonly agent: string }) => Effect.Effect<string, ApiError, R>;
   /** The owner's read moved back to just before this message. */
   readonly "channel.markUnread": (a: { readonly id: string } & T.ChatReadRequest) => Effect.Effect<void, ApiError, R>;
+  /** Every channel and direct channel, the default first. */
+  readonly "channel.list": () => Effect.Effect<T.Channel[], ApiError, R>;
+  /** The places the caller has not read all of, the newest first. */
+  readonly "channel.unread.list": () => Effect.Effect<T.ChannelUnread[], ApiError, R>;
   readonly "graph.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   readonly "graph.event.list": (a: { readonly id: string }) => Effect.Effect<T.GraphEvent[], ApiError, R>;
+  /** Every task graph, as the board has them. */
+  readonly "graph.list": () => Effect.Effect<T.TaskGraph[], ApiError, R>;
+  readonly "graph.get": (a: { readonly id: string }) => Effect.Effect<T.TaskGraph, ApiError, R>;
   readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
   readonly "game.title.set": (a: T.ChooseTitleRequest) => Effect.Effect<void, ApiError, R>;
   readonly "runtime.list": () => Effect.Effect<T.RuntimeInfo[], ApiError, R>;
@@ -210,6 +222,8 @@ export interface Handlers<R = never> {
   /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
   readonly "memory.recall": (a: { readonly agent: string; readonly project?: string; readonly text?: string }) => Effect.Effect<T.RecallPreview, ApiError, R>;
   readonly "memory.create": (a: { readonly agent: string } & T.MemoryRequest) => Effect.Effect<T.Memory, ApiError, R>;
+  /** Memories whose words match, from every source the agent has; none named is every profile's. */
+  readonly "memory.search": (a: { readonly agent?: string; readonly project?: string; readonly text?: string }) => Effect.Effect<T.MemorySearch, ApiError, R>;
   readonly "memory.delete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "memory.previewDelete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<T.Preview, ApiError, R>;
@@ -265,6 +279,9 @@ export interface Handlers<R = never> {
   readonly "doc.get": (a: { readonly id: string }) => Effect.Effect<T.DocSnapshot, ApiError, R>;
   /** A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time. */
   readonly "doc.submit": (a: { readonly id: string } & T.DocSubmit) => Effect.Effect<T.DocAck, ApiError, R>;
+  /** One block appended, as one batch of one op. */
+  readonly "doc.block.create": (a: { readonly id: string } & T.DocBlockCreate) => Effect.Effect<T.DocOpResult, ApiError, R>;
+  readonly "doc.block.update": (a: { readonly id: string } & T.DocBlockUpdate) => Effect.Effect<T.DocOpResult, ApiError, R>;
   readonly "doc.markdown.get": (a: { readonly id: string }) => Effect.Effect<T.DocMarkdown, ApiError, R>;
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
    * one already running is refused. */
@@ -364,7 +381,7 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: S.SayRequest,
     result: undefined,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "session"],
   },
   {
     op: "channel.create",
@@ -456,7 +473,7 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: input({ agent: Schema.optionalKey(Schema.String) }),
     result: Schema.mutable(Schema.Array(S.Session)),
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator", "session"],
   },
   {
     op: "session.get",
@@ -477,21 +494,35 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: undefined,
     result: Schema.mutable(Schema.Array(S.IssueHistory)),
-    can: ["owner", "remote", "orchestrator"],
+    can: ["owner", "remote"],
   },
   {
     op: "issue.list",
     about: [],
-    input: undefined,
+    input: S.IssueFilter,
     result: Schema.mutable(Schema.Array(S.Issue)),
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.review",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueReviewRequest),
+    result: S.Issue,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.split",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueSplitRequest),
+    result: Schema.String,
+    can: ["owner", "remote", "session"],
   },
   {
     op: "issue.get",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.Issue,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.run.list",
@@ -512,14 +543,14 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: S.IssueRequest,
     result: S.Issue,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.update",
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueUpdate),
     result: S.Issue,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.delete",
@@ -541,7 +572,7 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: issueStatusUpdateInput,
     result: S.Issue,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
     dryRun: "issue.status.previewUpdate",
   },
   {
@@ -549,7 +580,7 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: issueStatusUpdateInput,
     result: S.Preview,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.refine",
@@ -606,7 +637,7 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: Schema.String, before: Schema.optionalKey(Schema.Number), limit: Schema.optionalKey(Schema.Number) }),
     result: Schema.mutable(Schema.Array(S.ChatMessage)),
-    can: ["owner", "remote", "orchestrator"],
+    can: ["owner", "remote", "orchestrator", "session"],
   },
   {
     op: "channel.markRead",
@@ -642,7 +673,7 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: S.MessageSearch,
     result: Schema.mutable(Schema.Array(S.MessageHit)),
-    can: ["owner", "remote", "orchestrator"],
+    can: ["owner", "remote"],
   },
   {
     op: "channel.reaction.toggle",
@@ -663,7 +694,7 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: messageInput,
     result: Schema.mutable(Schema.Array(S.ChatMessage)),
-    can: ["owner", "remote", "orchestrator"],
+    can: ["owner", "remote"],
   },
   {
     op: "channel.thread.create",
@@ -716,6 +747,20 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
+    op: "channel.list",
+    about: [],
+    input: undefined,
+    result: Schema.mutable(Schema.Array(S.Channel)),
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "channel.unread.list",
+    about: [],
+    input: undefined,
+    result: Schema.mutable(Schema.Array(S.ChannelUnread)),
+    can: ["owner", "remote", "session"],
+  },
+  {
     op: "channel.attachment.create",
     about: [],
     input: S.AttachmentUpload,
@@ -735,6 +780,20 @@ export const endpoints: readonly Endpoint[] = [
     input: input({ id: Schema.String }),
     result: Schema.mutable(Schema.Array(S.GraphEvent)),
     can: ["owner", "remote"],
+  },
+  {
+    op: "graph.list",
+    about: [],
+    input: undefined,
+    result: Schema.mutable(Schema.Array(S.TaskGraph)),
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "graph.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.TaskGraph,
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "game.achievement.list",
@@ -804,7 +863,7 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: S.Agent,
     result: S.Agent,
-    can: ["owner", "orchestrator"],
+    can: ["owner"],
   },
   {
     op: "agent.update",
@@ -847,7 +906,14 @@ export const endpoints: readonly Endpoint[] = [
     about: ["agent"],
     input: input({ agent: Schema.String }, S.MemoryRequest),
     result: S.Memory,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "memory.search",
+    about: [],
+    input: input({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String), text: Schema.optionalKey(Schema.String) }),
+    result: S.MemorySearch,
+    can: ["owner", "remote", "orchestrator", "session"],
   },
   {
     op: "memory.delete",
@@ -869,7 +935,7 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: input({ q: Schema.optionalKey(Schema.String) }),
     result: S.ArchiveListing,
-    can: ["owner", "remote", "orchestrator"],
+    can: ["owner", "remote"],
   },
   {
     op: "orchestrator.archive.get",
@@ -897,7 +963,7 @@ export const endpoints: readonly Endpoint[] = [
     about: [],
     input: S.Skill,
     result: S.Skill,
-    can: ["owner", "orchestrator"],
+    can: ["owner"],
   },
   {
     op: "skill.update",
@@ -1145,7 +1211,7 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.DocSnapshot,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "session"],
   },
   {
     op: "doc.submit",
@@ -1153,6 +1219,20 @@ export const endpoints: readonly Endpoint[] = [
     input: input({ id: Schema.String }, S.DocSubmit),
     result: S.DocAck,
     can: ["owner", "remote"],
+  },
+  {
+    op: "doc.block.create",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.DocBlockCreate),
+    result: S.DocOpResult,
+    can: ["owner", "remote", "session"],
+  },
+  {
+    op: "doc.block.update",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.DocBlockUpdate),
+    result: S.DocOpResult,
+    can: ["owner", "remote", "session"],
   },
   {
     op: "doc.markdown.get",

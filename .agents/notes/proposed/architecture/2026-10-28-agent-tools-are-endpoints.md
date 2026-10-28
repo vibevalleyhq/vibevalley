@@ -55,7 +55,7 @@ Status: proposed
 | `changes` | `issue_diff_get` | `issue.diff.get` |
 | `roster` | `session_list` | `session.list` |
 | `stop` | `session_stop` | `session.stop`（`id` 收帮工或工单） |
-| `dismiss` | `session_dismiss` | 新：`session.dismiss` |
+| `dismiss` | `issue_status_update`（`status` 是 `canceled`） | `issue.status.update`：请走帮工就是取消它的工单，两条路做的是同一件事 |
 | `read_chat` | `channel_message_list` | `channel.message.list`（只给 agent：`unread`） |
 | `graph_split` | `graph_split` | `graph.split` |
 | `graphs` | `graph_list`、`graph_get` | 新：`graph.list`、`graph.get` |

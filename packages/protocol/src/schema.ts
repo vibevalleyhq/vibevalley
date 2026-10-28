@@ -1263,7 +1263,8 @@ export const ArchiveListing: Codec<T.ArchiveListing> = Schema.Struct({
 
 export const MemoryKind: Codec<T.MemoryKind> = Schema.Literals(T.MemoryKindValues);
 
-export const Memory: Codec<T.Memory> = Schema.Struct({
+/** A memory's fields; a found one (MemoryFound) has them and more. */
+const memoryFields = {
   id: Schema.String,
   agent: Schema.String,
   kind: MemoryKind,
@@ -1276,11 +1277,26 @@ export const Memory: Codec<T.Memory> = Schema.Struct({
   recalledAt: Schema.optionalKey(Schema.Number),
   fading: Schema.optionalKey(Schema.Boolean),
   source: Schema.optionalKey(Schema.String),
-});
+};
+
+export const Memory: Codec<T.Memory> = Schema.Struct(memoryFields);
 
 export const MemoryRequest: Codec<T.MemoryRequest> = Schema.Struct({
   text: Schema.String,
   project: Schema.optionalKey(Schema.String),
+});
+
+export const MemoryScope: Codec<T.MemoryScope> = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("global") }),
+  Schema.Struct({ kind: Schema.Literal("project"), project: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal("unknown") }),
+]);
+
+export const MemoryFound: Codec<T.MemoryFound> = Schema.Struct({ ...memoryFields, source: Schema.String, score: Schema.Number, scope: MemoryScope });
+
+export const MemorySearch: Codec<T.MemorySearch> = Schema.Struct({
+  found: Schema.mutable(Schema.Array(MemoryFound)),
+  coverage: Schema.mutable(Schema.Array(Schema.String)),
 });
 
 export const MemorySourceInfo: Codec<T.MemorySourceInfo> = Schema.Struct({
@@ -1863,10 +1879,41 @@ export const RecurrenceUpdate: Codec<T.RecurrenceUpdate> = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
 });
 
+export const IssueReviewRequest: Codec<T.IssueReviewRequest> = Schema.Struct({
+  pass: Schema.Boolean,
+  findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  text: Schema.optionalKey(Schema.String),
+});
+
+export const IssueFilter: Codec<T.IssueFilter> = Schema.Struct({
+  status: Schema.optionalKey(IssueStatus),
+  text: Schema.optionalKey(Schema.String),
+  project: Schema.optionalKey(Schema.String),
+  limit: Schema.optionalKey(Schema.Number),
+  closed: Schema.optionalKey(Schema.Boolean),
+  wantsOwner: Schema.optionalKey(Schema.Boolean),
+});
+
+export const TaskDraft: Codec<T.TaskDraft> = Schema.Struct({
+  id: Schema.String,
+  title: Schema.optionalKey(Schema.String),
+  brief: Schema.String,
+  needs: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  agent: Schema.optionalKey(Schema.String),
+  check: Schema.optionalKey(Schema.String),
+  scope: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  acceptance: Schema.optionalKey(Schema.Boolean),
+});
+
+export const IssueSplitRequest: Codec<T.IssueSplitRequest> = Schema.Struct({
+  title: Schema.optionalKey(Schema.String),
+  tasks: Schema.mutable(Schema.Array(TaskDraft)),
+});
+
 export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
-  agent: Schema.optionalKey(Schema.String),
+  assignee: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
 });
 
@@ -2105,6 +2152,18 @@ export const DocSubmit: Codec<T.DocSubmit> = Schema.Struct({
 
 export const DocOpStatus: Codec<T.DocOpStatus> = Schema.Literals(T.DocOpStatusValues);
 
+export const DocBlockCreate: Codec<T.DocBlockCreate> = Schema.Struct({
+  type: Schema.optionalKey(Schema.String),
+  level: Schema.optionalKey(Schema.Number),
+  text: Schema.String,
+});
+
+export const DocBlockUpdate: Codec<T.DocBlockUpdate> = Schema.Struct({
+  block: Schema.String,
+  baseRev: Schema.Number,
+  text: Schema.String,
+});
+
 export const DocOpResult: Codec<T.DocOpResult> = Schema.Struct({
   status: DocOpStatus,
   blockId: Schema.String,
@@ -2134,5 +2193,12 @@ export const ReactionToggle: Codec<T.ReactionToggle> = Schema.Struct({ id: Schem
 export const AttachmentUpload: Codec<T.AttachmentUpload> = Schema.Struct({ name: Schema.String, type: Schema.String, data: Schema.String });
 
 export const MessageSearch: Codec<T.MessageSearch> = Schema.Struct({ text: Schema.String, channel: Schema.optionalKey(Schema.String) });
+
+export const ChannelUnread: Codec<T.ChannelUnread> = Schema.Struct({
+  channel: Schema.String,
+  unread: Schema.Number,
+  mentionsYou: Schema.Boolean,
+  latest: Schema.optionalKey(Schema.String),
+});
 
 export const MessageHit: Codec<T.MessageHit> = Schema.Struct({ message: ChatMessage, channel: Schema.String, address: Schema.String });

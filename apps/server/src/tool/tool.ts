@@ -342,10 +342,10 @@ export const make = Effect.gen(function* () {
       descriptions.channelInbox,
       Effect.fn("Tools.channel_inbox")(function* () {
         const c = yield* callerOf(who);
-        const rows = yield* chat.inbox(participant(c));
+        const rows = yield* chat.unread(participant(c));
         if (rows.length === 0) return answers.channelInbox.empty;
-        const lines = rows.map((r) => answers.channelInbox.row(r.target, r.unread, r.mentionsYou, r.latest ?? ""));
-        lines.push(answers.channelInbox.nextStep(rows[0]!.target));
+        const lines = rows.map((r) => answers.channelInbox.row(r.channel, r.unread, r.mentionsYou, r.latest ?? ""));
+        lines.push(answers.channelInbox.nextStep(rows[0]!.channel));
         return lines.join("\n");
       }),
     );
@@ -561,7 +561,7 @@ export const make = Effect.gen(function* () {
                 if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
-              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, agent ? { agent } : {});
+              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, agent ? { assignee: agent } : {});
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);

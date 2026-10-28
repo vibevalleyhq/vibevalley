@@ -92,6 +92,8 @@ export class VibeValleyApi {
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/channel/previewDelete", a) as Promise<T.Preview>,
     /** The owner's read moved back to just before this message. */
     markUnread: (a: { id: string } & T.ChatReadRequest): Promise<void> => this.call("/api/v1/channel/markUnread", a) as Promise<void>,
+    /** Every channel and direct channel, the default first. */
+    list: (): Promise<T.Channel[]> => this.call("/api/v1/channel/list", undefined) as Promise<T.Channel[]>,
     message: {
       send: (a: T.SayRequest): Promise<void> => this.call("/api/v1/channel/message/send", a) as Promise<void>,
       list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> =>
@@ -132,6 +134,10 @@ export class VibeValleyApi {
     notify: {
       set: (a: T.NotifyRequest): Promise<void> => this.call("/api/v1/channel/notify/set", a) as Promise<void>,
     },
+    unread: {
+      /** The places the caller has not read all of, the newest first. */
+      list: (): Promise<T.ChannelUnread[]> => this.call("/api/v1/channel/unread/list", undefined) as Promise<T.ChannelUnread[]>,
+    },
     attachment: {
       create: (a: T.AttachmentUpload): Promise<T.Attachment> => this.call("/api/v1/channel/attachment/create", a) as Promise<T.Attachment>,
     },
@@ -164,7 +170,12 @@ export class VibeValleyApi {
   };
 
   readonly issue = {
-    list: (): Promise<T.Issue[]> => this.call("/api/v1/issue/list", undefined) as Promise<T.Issue[]>,
+    /** The open issues by default, the newest first; the filter narrows them. */
+    list: (a: T.IssueFilter): Promise<T.Issue[]> => this.call("/api/v1/issue/list", a) as Promise<T.Issue[]>,
+    /** A verdict on what was handed back; a pass only makes it ready, completing it is issue.status.update to done. */
+    review: (a: { id: string } & T.IssueReviewRequest): Promise<T.Issue> => this.call("/api/v1/issue/review", a) as Promise<T.Issue>,
+    /** The issue becomes a task graph's parent and its tasks the issues under it, started at once. */
+    split: (a: { id: string } & T.IssueSplitRequest): Promise<string> => this.call("/api/v1/issue/split", a) as Promise<string>,
     get: (a: { id: string }): Promise<T.Issue> => this.call("/api/v1/issue/get", a) as Promise<T.Issue>,
     create: (a: T.IssueRequest): Promise<T.Issue> => this.call("/api/v1/issue/create", a) as Promise<T.Issue>,
     update: (a: { id: string } & T.IssueUpdate): Promise<T.Issue> => this.call("/api/v1/issue/update", a) as Promise<T.Issue>,
@@ -216,6 +227,9 @@ export class VibeValleyApi {
   readonly graph = {
     split: (a: T.GraphSplitRequest): Promise<string> => this.call("/api/v1/graph/split", a) as Promise<string>,
     act: (a: { id: string } & T.GraphActRequest): Promise<string> => this.call("/api/v1/graph/act", a) as Promise<string>,
+    /** Every task graph, as the board has them. */
+    list: (): Promise<T.TaskGraph[]> => this.call("/api/v1/graph/list", undefined) as Promise<T.TaskGraph[]>,
+    get: (a: { id: string }): Promise<T.TaskGraph> => this.call("/api/v1/graph/get", a) as Promise<T.TaskGraph>,
     task: {
       update: (a: { id: string; task: string } & T.TaskEdit): Promise<string> => this.call("/api/v1/graph/task/update", a) as Promise<string>,
       delete: (a: { id: string; task: string }): Promise<string> => this.call("/api/v1/graph/task/delete", a) as Promise<string>,
@@ -273,6 +287,9 @@ export class VibeValleyApi {
     recall: (a: { agent: string; project?: string; text?: string }): Promise<T.RecallPreview> =>
       this.call("/api/v1/memory/recall", a) as Promise<T.RecallPreview>,
     create: (a: { agent: string } & T.MemoryRequest): Promise<T.Memory> => this.call("/api/v1/memory/create", a) as Promise<T.Memory>,
+    /** Memories whose words match, from every source the agent has; none named is every profile's. */
+    search: (a: { agent?: string; project?: string; text?: string }): Promise<T.MemorySearch> =>
+      this.call("/api/v1/memory/search", a) as Promise<T.MemorySearch>,
     delete: (a: { agent: string; memory: string }): Promise<void> => this.call("/api/v1/memory/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> => this.call("/api/v1/memory/previewDelete", a) as Promise<T.Preview>,
@@ -350,6 +367,11 @@ export class VibeValleyApi {
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
      * one already running is refused. */
     demo: (a: { id: string }): Promise<void> => this.call("/api/v1/doc/demo", a) as Promise<void>,
+    block: {
+      /** One block appended, as one batch of one op. */
+      create: (a: { id: string } & T.DocBlockCreate): Promise<T.DocOpResult> => this.call("/api/v1/doc/block/create", a) as Promise<T.DocOpResult>,
+      update: (a: { id: string } & T.DocBlockUpdate): Promise<T.DocOpResult> => this.call("/api/v1/doc/block/update", a) as Promise<T.DocOpResult>,
+    },
     markdown: {
       get: (a: { id: string }): Promise<T.DocMarkdown> => this.call("/api/v1/doc/markdown/get", a) as Promise<T.DocMarkdown>,
     },

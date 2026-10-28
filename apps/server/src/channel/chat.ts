@@ -10,6 +10,7 @@ import { channelWording } from "./words.ts";
 import {
   type Chat,
   type ChatMessage,
+  type ChannelUnread,
   type Channel,
   type ChannelType,
   everyone,
@@ -345,7 +346,10 @@ export interface ChannelShape {
   /** code names the kind, for dropping repeats. */
   readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
-  readonly inbox: (who: string) => Effect.Effect<UnreadRow[]>;
+  /** The places who has not read all of, the newest first, by their addresses. */
+  readonly unread: (who: string) => Effect.Effect<ChannelUnread[]>;
+  /** Every channel and direct channel as a page lists them, the default first. */
+  readonly list: () => Effect.Effect<Channel[]>;
   readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<ChatMessage[]>;
   /** A message's durable location; the recent state may hold neither the message nor its thread. */
   readonly messageLocation: (id: string) => Effect.Effect<{ readonly channel: Channel; readonly top: string } | undefined>;
@@ -1619,8 +1623,14 @@ export const make = Effect.gen(function* () {
           return { target, messages: rows.map((m) => inboxOf(m, target)), older };
         }),
       ),
-    inbox: (who) =>
-      locked(inboxRows(who).pipe(Effect.catchCause((c) => Effect.as(Effect.logWarning(`chat: inbox of ${who}: ${String(c)}`), [] as UnreadRow[])))),
+    unread: (who) =>
+      locked(
+        inboxRows(who).pipe(
+          Effect.map((rows) => rows.map(({ target, ...r }): ChannelUnread => ({ channel: target, ...r }))),
+          Effect.catchCause((c) => Effect.as(Effect.logWarning(`chat: unread of ${who}: ${String(c)}`), [] as ChannelUnread[])),
+        ),
+      ),
+    list: () => Effect.forEach([...model.channels("channel"), ...model.channels("direct")], counted),
     history: (channel, before, limit) =>
       Effect.map(db(qm.messagesBefore({ channel_id: channel, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) })), (rows) =>
         [...rows].reverse().map(toMessage),

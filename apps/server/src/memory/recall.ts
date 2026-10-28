@@ -3,7 +3,7 @@
 
 import { memoryWording } from "./words.ts";
 import { recallWords } from "./prompts.ts";
-import { dayMs, type Memory, type MemoryKind, memoryKeep, type Outcome } from "@vibevalley/protocol";
+import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";
 import { termsInCommon, termsOf } from "./terms.ts";
 
 export const recallCount = 8;
@@ -142,23 +142,14 @@ export interface SearchQuery {
   readonly limit: number;
 }
 
-/** One memory a search found, with where it lives and how good a match it is within that source. */
-export type MemoryScope = { readonly kind: "global" } | { readonly kind: "project"; readonly project: string } | { readonly kind: "unknown" };
-
-export interface Found extends Memory {
-  readonly source: string;
-  readonly score: number;
-  readonly scope: MemoryScope;
-}
+/** One memory a search found, with where it lives and how good a match it is within that source: the wire's shape. */
+export type Found = MemoryFound;
+export type SearchResult = MemorySearch;
+export type { MemoryScope };
 
 export interface SourceSearch {
   readonly found: Found[];
   readonly coverage?: string;
-}
-
-export interface SearchResult {
-  readonly found: Found[];
-  readonly coverage: string[];
 }
 
 export const inProject = (scope: MemoryScope, project: string) =>
