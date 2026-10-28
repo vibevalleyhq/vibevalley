@@ -375,7 +375,7 @@ describe("the orchestrator", () => {
       expect(spoken.kind).toBe("sent");
       const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(intake.chat.head + "【群聊】")), "the orchestrator asked");
       expect(line).not.toContain("长".repeat(797));
-      expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 read_chat 读 " + spoken.target + "）");
+      expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 channel_message_list 读 " + spoken.target + "）");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

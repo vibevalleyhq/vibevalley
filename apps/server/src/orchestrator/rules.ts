@@ -102,7 +102,7 @@ export function situationDelta(before: string, now: string): string {
   return out.join("\n");
 }
 
-/** In UTF-16 units: enough for a report's conclusion; the rest stays in the chat for read_chat. */
+/** In UTF-16 units: enough for a report's conclusion; the rest stays in the chat for channel_message_list. */
 export const lineMax = 800;
 
 /** As inboxLines, but what others said past lineMax is cut, with where to read it whole. The owner's words stay whole. */

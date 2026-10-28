@@ -17,7 +17,7 @@ export const mergeNeedsOwner = "合进主分支要主人说一声。这一轮不
 export const graphNews = {
   head: "【计划】",
   notSplit: (id: string, title: string, why: string) => id + "「" + title + "」没拆成：" + why + "。问主人要不要换个说法再拆。",
-  drafted: (id: string, graph: string) => id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graph,
+  drafted: (id: string, graph: string) => id + " 拆好了，等主人看过再开工（graph_act start）。用一两句话告诉主人拆成了哪几步。\n" + graph,
   stepFailed: (id: string, title: string, step: string, stepId: string, why: string) =>
     id +
     "「" +
@@ -28,9 +28,9 @@ export const graphNews = {
     stepId +
     "）没做成：" +
     why +
-    "。它后面的步骤在等；问主人是重试（task_action retry）、改工单，还是跳过（task_action skip）。",
+    "。它后面的步骤在等；问主人是重试（graph_task_act retry）、改工单，还是跳过（graph_task_act skip）。",
   ready: (id: string, title: string, graph: string) =>
-    id + "「" + title + "」都做完了，等主人合进主分支（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graph,
+    id + "「" + title + "」都做完了，等主人合进主分支（graph_act merge）。用两三句话告诉主人做成了什么。\n" + graph,
   split: (name: string, id: string, n: number, graph: string) => `${name} 把工单 ${id} 拆成了 ${n} 步，直接开工了。\n${graph}`,
 };
 
