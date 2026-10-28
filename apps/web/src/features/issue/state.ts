@@ -123,8 +123,8 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     taskText: !graph
       ? t("web.issue.issue.inGraph")
       : !node
-        ? t("web.issue.issue.splitting", { plan: graph.title })
-        : t("web.issue.issue.planStep", { plan: graph.title, step: node.title }),
+        ? t("web.issue.issue.splitting", { graph: graph.title })
+        : t("web.issue.issue.graphStep", { graph: graph.title, step: node.title }),
     ask: ownerQuestion(attention, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
     lead: attention.lead,

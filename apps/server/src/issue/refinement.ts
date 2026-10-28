@@ -51,7 +51,7 @@ export function refinement(d: RefinementDeps) {
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
     const chosen = chooseAgent(candidates, draftMatch(issue.title), named, "");
-    if (!chosen) return yield* Effect.fail(refused(t("server.issue.draft.noDrafter"), [lookIn.agent]));
+    if (!chosen) return yield* Effect.fail(refused(t("server.issue.refinement.noDrafter"), [lookIn.agent]));
     return chosen;
   });
 
@@ -96,12 +96,12 @@ export function refinement(d: RefinementDeps) {
   const draft = Effect.fn("Issues.draft")(
     function* (id: string, word: string, channel: string) {
       const item = yield* unsent(id);
-      if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.draft.orchestrator")));
-      if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.draft.onlyBacklog")));
-      if (item.refining) return yield* Effect.fail(refused(t("server.issue.draft.drafting", { name: item.refining.name })));
+      if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));
+      if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.refinement.onlyBacklog")));
+      if (item.refining) return yield* Effect.fail(refused(t("server.issue.refinement.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);
       const where = item.project ?? (chosen.workdir ?? "").trim();
-      if (!where) return yield* Effect.fail(refused(t("server.issue.draft.noProject")));
+      if (!where) return yield* Effect.fail(refused(t("server.issue.refinement.noProject")));
       const said = word.trim();
       const brief = refinementBrief(item, said, where);
       yield* beforeRefinement(item, said, chosen.id, where);
@@ -128,9 +128,9 @@ export function refinement(d: RefinementDeps) {
     const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
-      if (!d) yield* tell(t("server.issue.draft.unread", { name: h.name, problem }));
+      if (!d) yield* tell(t("server.issue.refinement.unread", { name: h.name, problem }));
       else yield* refined(id, d, f.questions);
-    } else yield* tell(t("server.issue.draft.unfinished", { name: h.name, summary: f.summary }));
+    } else yield* tell(t("server.issue.refinement.unfinished", { name: h.name, summary: f.summary }));
     yield* sessions.dismiss(f.id, "discard");
     yield* publish(id);
   });
@@ -139,7 +139,7 @@ export function refinement(d: RefinementDeps) {
     if (issue.refining) yield* sessions.dismiss(issue.refining.session, "discard");
     if (issue.project) {
       const kept = yield* sessions.clearWorkplace(issue.id, issue.project, issue.number);
-      if (kept.kept) yield* core.notice("warn", t("server.issue.draft.canceled", { title: cut(issue.title, 40), why: kept.reason }));
+      if (kept.kept) yield* core.notice("warn", t("server.issue.refinement.canceled", { title: cut(issue.title, 40), why: kept.reason }));
       return kept;
     }
     return { kept: false };

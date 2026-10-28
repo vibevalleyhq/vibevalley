@@ -114,26 +114,6 @@
     "moveTo": "挪到{status}",
     "roundWithText": "{say}：{command}，--json 带 status「{to}」和这一轮要它做什么的 text"
   },
-  "draft": {
-    "noDrafter": "没有能派的帮工来起草",
-    "orchestrator": "这是派给管家的工单：管家自己会看",
-    "onlyBacklog": "只有备选里的工单能起草：先挪回备选",
-    "drafting": "{name} 正在起草：等它交回来",
-    "noProject": "没说在哪个项目里做：先选一个项目",
-    "unread": "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
-    "unfinished": "{name} 没起草完（{summary}），工单没动：再起草一次",
-    "canceled": "「{title}」取消了：{why}",
-    "noBlock": "没找到草稿：要用一个 json 代码块给出",
-    "notObject": "要是一个对象",
-    "unreadable": "json 读不了：{why}",
-    "noTitle": "草稿没有标题",
-    "lines": "{field}：要是字符串或字符串的数组",
-    "text": "{field}：要是字符串",
-    "why": "为什么：",
-    "todo": "要做的：",
-    "notDoing": "不做的：",
-    "files": "可能涉及："
-  },
   "template": {
     "commands": {
       "test": "测试",
@@ -162,5 +142,25 @@
   "merge": {
     "tellFailed": "\n给帮工带话失败：{why}",
     "merged": "{name} 的活合进去了：{text}"
+  },
+  "refinement": {
+    "noDrafter": "没有能派的帮工来起草",
+    "orchestrator": "这是派给管家的工单：管家自己会看",
+    "onlyBacklog": "只有备选里的工单能起草：先挪回备选",
+    "drafting": "{name} 正在起草：等它交回来",
+    "noProject": "没说在哪个项目里做：先选一个项目",
+    "unread": "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
+    "unfinished": "{name} 没起草完（{summary}），工单没动：再起草一次",
+    "canceled": "「{title}」取消了：{why}",
+    "noBlock": "没找到草稿：要用一个 json 代码块给出",
+    "notObject": "要是一个对象",
+    "unreadable": "json 读不了：{why}",
+    "noTitle": "草稿没有标题",
+    "lines": "{field}：要是字符串或字符串的数组",
+    "text": "{field}：要是字符串",
+    "why": "为什么：",
+    "todo": "要做的：",
+    "notDoing": "不做的：",
+    "files": "可能涉及："
   }
 }

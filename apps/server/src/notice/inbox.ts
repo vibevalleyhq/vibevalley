@@ -132,7 +132,7 @@ function gathered(state: WorkspaceState): Unworded[] {
               id,
               kind: "task-failed",
               from: orchestrator,
-              text: cut(t("server.notice.step", { plan: graph.title, step: task.title }), 40),
+              text: cut(t("server.notice.step", { graph: graph.title, step: task.title }), 40),
               at: graph.createdAt,
               target,
             },

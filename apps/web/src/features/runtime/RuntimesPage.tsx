@@ -286,7 +286,7 @@ function Usage(props: { info: RuntimeInfo }) {
                     {(u) => (
                       <>
                         <Show when={u().subscription}>
-                          <p class="text-sm text-muted">{t("web.runtime.subscription", { plan: u().subscription ?? "" })}</p>
+                          <p class="text-sm text-muted">{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</p>
                         </Show>
                         <For each={u().windows}>{(w) => <Window window={w} />}</For>
                       </>

@@ -12,7 +12,7 @@ import { graphsOf } from "../task/issues.ts";
 import { canEditTask, canRemoveTask, graphActions, taskActions } from "../task/graph.ts";
 import { viewOf } from "../game/view.ts";
 
-/** Every plan action in words, for the page to say any of them. */
+/** Every graph action in words, for the page to say any of them. */
 const graphActionText = () => Object.fromEntries(GraphActionValues.map((a) => [a, t(`server.task.graphAction.${a}`)])) as Record<GraphAction, string>;
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): StateFrame {
   const graphs = graphsOf(state).map((g) => {

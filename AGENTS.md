@@ -25,7 +25,8 @@ apps/mobile/               手机壳（Expo、React Native）：扫码配对，W
 packages/protocol/         契约：形状（src/shapes.ts）、它们的 Schema（schema.ts）、接口（api.ts）、订阅的 RPC（rpc.ts）和两边都跑的规则
                            （src/rules）：服务端和页面都用；只有服务端跑的规则在 apps/server/src 各自的模块里。宿主接口（host.ts）：页面能
                            向桌面壳、手机壳要的东西（通知、托盘、全局快捷键、通话的线路），和手机壳的桥
-packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟
+packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟、按整数倍放大
+packages/i18n/             对主人说的话：locales/<语言>/<宿主.模块>.json 的词典，代码里 t("key")；src/catalogs.ts 由 i18n:gen 写出
 site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 apps/web/public 的
 design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
@@ -58,6 +59,7 @@ vp run --filter @vibevalley/mobile test                          # 改完手机�
 vp run package:mac                                              # macOS 应用和 .dmg（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
 vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
+vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
 vp run docs:verify                                              # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接、旧名字
 vp run site:check && vp run site:build                          # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
@@ -93,7 +95,7 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、执行、项目、群聊……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。
 - **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/shapes.ts` 里加字段或事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
 - **`packages/protocol` 只放契约**：线上的形状写在 `shapes.ts`，每个形状在 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在 `api.ts`；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `vp run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
-- **生成的不手改**：`apps/server/db/generated` 由 effect-sqlc 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`docs:verify` 查它（[理由](docs/subsystems/foundation.md)）。
+- **生成的不手改**：`apps/server/db/generated` 由 effect-sqlc 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/base/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到主人的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
@@ -104,8 +106,8 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - **图标分两套**：工作台的按钮和标记用 reicon 的线条图标，一个意思一个图，写在 `apps/web/src/ui/icons.ts`，`<Icon name>` 只收表里的名字；像素皮（农场、记忆树、`ui/pixel`）用 `design/pixel` 生成的贴图（`SpriteIcon`；形状照 Hugeicons）；头像、农机的 logo 和插画在哪都是像素图；都不用 ▶、■、✓ 这类字符代替（[客户端](docs/subsystems/app.md)）。
 - **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
 - **工具链**：Vite+（`vp`）管装依赖、格式、lint、类型、测试和任务，配置在根目录 `vite.config.ts`（[Vite+ 的 monorepo 指南](https://viteplus.dev/guide/monorepo)）：格式和 lint 只在根目录配，包之间的差别写成 `overrides`，各包的 `vite.config.ts` 只放 Vite、Vitest 和任务；依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog，`package.json` 写 `catalog:`（[地基](docs/subsystems/foundation.md)）；`vp check` 查格式（oxfmt，160 列；Markdown、生成的和数据不排）、oxlint（带类型的规则）和全部包的类型，`vp check --fix` 改格式，各包不另跑 `tsc`。任务一律 `vp run`：检查（测试、构建、`server:check`、`docs:verify`）写成 `vite.config.ts` 的任务，带缓存，什么都没改时重放结果，先后用 `dependsOn`；会写文件或一直跑的（`golden:update`、`api:client`、`desktop:dev`、`e2e`）留在 `package.json`，不缓存。测试用 `vp test`（vitest，跑在 Node 上，测试从 `vite-plus/test` import；服务端另用 `@effect/vitest`），每个包的 `vite.config.ts` 写它的 `test`（哪些文件、时区）；界面和整个应用用 Playwright（`e2e`）；脚本用 `vpx` 直接跑 `.ts`，都不带构建。
-- **话放在哪**：对主人说的话（界面、帧里的说法、通知、拒绝、田头的系统消息、命令行）写进词表 `words.ts`，中英各一份，英文少一条编不过；对模型说的写进模块的 `prompts.ts`，用中文，加一句用主人的语言回答；别处的中文由 lint `vibevalley/no-cjk-literal` 拦下（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
-- **代码风格**：代码和接口用实际的概念，界面上的叫法照[用语表](docs/README.md#用语)；工单的状态和动作在哪里都用工单自己的词（完成、改动、问题、计划，词表在 `packages/protocol/src/words`），种地的词（收获、缺肥、种植计划……）只在农场的皮里，`stale-names.ts` 查（[状态和用语](docs/subsystems/issue.md#状态和用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
+- **话放在哪**：对主人说的话（界面、帧里的说法、通知、拒绝、田头的系统消息、命令行）写进词典 `packages/i18n/locales/{zh,en}/<宿主.模块>.json`，代码里写 `t("key")`，改完 `vp run i18n:gen`，键和参数有类型，`vpx scripts/i18n.ts check` 查漏翻、没人用的和占位；对模型说的写进模块的 `prompts.ts`，用中文，加一句用主人的语言回答；别处的中文由 lint `vibevalley/no-cjk-literal` 拦下（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
+- **代码风格**：代码和接口用实际的概念，界面上的叫法照[用语表](docs/README.md#用语)；工单的状态和动作在哪里都用工单自己的词（完成、改动、问题、计划，词典的 `shared` 命名空间），种地的词（收获、缺肥、种植计划……）只在农场的皮里，`stale-names.ts` 查（[状态和用语](docs/subsystems/issue.md#状态和用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
 - **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用照脚本回答的 `Llm`（`ai/testing.ts`，大脑经 `agent/brain/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/helper.ts`）；纯函数的规则直接测；页面的 Playwright 对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、项目、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试。测试分六层（规则、模块、流程、页面、整个应用、真模型），一层从一个接缝进、有预算，层和边界由检查认，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
 - **改完要验证**：先跑最窄的检查；改了接口、服务、页面或手机壳，照 [acceptance](.agents/skills/acceptance/SKILL.md) 找到对应的分册，在真的程序上看一遍，汇报时附上它要的证据；一类改动没有分册，又花了工夫才验证完，就照 `create-verification-skill` 补一份（[.agents/skills](.agents/skills/README.md)）。
 - **分支、提交和 PR**：`main` 只经 PR、squash 合并，CI 全过才能合；分支 `<类>/<主题>`，提交和 PR 的标题、正文用英文，标题一句话说改完以后的行为、最多 100 字，不带 agent 署名；commit-msg hook 和 CI 查，开、改、合照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[规矩](docs/development.md#分支提交和-pr)）。

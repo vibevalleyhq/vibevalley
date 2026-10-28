@@ -37,7 +37,7 @@
   "signedOut": "没登录。在这台机器上运行 {runtime} 登录一次。",
   "unreadable": "读不到：{why}",
   "balance": "{enough, select, true {按量计费，这里是 {provider} 账户余额。} other {按量计费，这里是 {provider} 账户余额，不够用了。}}",
-  "subscription": "套餐：{plan}",
+  "subscription": "套餐：{tier}",
   "left": "剩 {pct}%",
   "windowLeft": "{label} 剩 {pct}%",
   "resets": "{moment} 重置",

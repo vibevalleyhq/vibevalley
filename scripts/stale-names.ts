@@ -6,7 +6,7 @@
  * `t.Helper`, the farm's helpers on screen and the game's harvest are not stale; an issue's state in farm words is.
  */
 
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -179,7 +179,7 @@ const RULES: readonly Rule[] = [
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|Attention|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/,
-    says: "the protocol's word tables (packages/protocol/src/words: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
+    says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/(rules|words)\//,
   },
 
@@ -240,19 +240,32 @@ const RULES: readonly Rule[] = [
 const wordTable = /(?:^|\/)words(?:\.ts$|\/)|^apps\/web\/test\/english\.spec\.ts$/;
 const han = /\p{Script=Han}/u;
 
+/** Where a catalog's words were said before they moved to packages/i18n: web.farm.phone is apps/web/src/farm/phone's,
+ * web.setting apps/web/src/features/setting's, shared the protocol's. The rules about a place's words look there. */
+function placeOf(ns: string): string {
+  if (ns === "shared") return "packages/protocol/src/words/zh.ts";
+  const [host, ...parts] = ns.split(".");
+  const feature = `apps/${host}/src/features/${parts[0]}`;
+  return parts.length > 0 && existsSync(resolve(root, feature))
+    ? `${feature}/${parts.slice(1).concat("words.ts").join("/")}`
+    : `apps/${host}/src/${[...parts, "words.ts"].join("/")}`;
+}
+
+const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).sort();
 const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).sort();
 const hits: string[] = [];
-for (const file of files) {
-  const lines = readFileSync(resolve(root, file), "utf8").split("\n");
+for (const source of [...files, ...catalogs]) {
+  const lines = readFileSync(resolve(root, source), "utf8").split("\n");
+  const file = source.startsWith("packages/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
       if (rule.except?.test(file)) continue;
       if (wordTable.test(file) && !han.test(rule.pattern.source)) continue;
-      if (rule.pattern.test(line)) hits.push(`${file}:${i + 1}: ${rule.name} — ${rule.says}`);
+      if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }
 }
 for (const hit of hits) console.error(`stale names: ${hit}`);
 if (hits.length > 0) process.exit(1);
-console.log(`stale names: ${files.length} files ok`);
+console.log(`stale names: ${files.length} files and ${catalogs.length} catalogs ok`);

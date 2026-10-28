@@ -114,26 +114,6 @@
     "moveTo": "Move to {status}",
     "roundWithText": "{say}: {command}, with --json status \"{to}\" and the text of what to do this round"
   },
-  "draft": {
-    "noDrafter": "No helper can be sent to draft it",
-    "orchestrator": "This ticket is the manager's: the manager reads it itself",
-    "onlyBacklog": "Only a ticket in Backlog can be drafted: move it back to Backlog first",
-    "drafting": "{name} is drafting it: wait for it to come back",
-    "noProject": "No project was named: pick a project first",
-    "unread": "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
-    "unfinished": "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
-    "canceled": "\"{title}\" was canceled: {why}",
-    "noBlock": "No draft found: it goes in a json code block",
-    "notObject": "it must be an object",
-    "unreadable": "the json cannot be read: {why}",
-    "noTitle": "the draft has no title",
-    "lines": "{field}: must be a string or an array of strings",
-    "text": "{field}: must be a string",
-    "why": "Why:",
-    "todo": "To do:",
-    "notDoing": "Not doing:",
-    "files": "May touch:"
-  },
   "template": {
     "commands": {
       "test": "the tests",
@@ -162,5 +142,25 @@
   "merge": {
     "tellFailed": "\nCould not tell the helper: {why}",
     "merged": "{name}'s work is merged: {text}"
+  },
+  "refinement": {
+    "noDrafter": "No helper can be sent to draft it",
+    "orchestrator": "This ticket is the manager's: the manager reads it itself",
+    "onlyBacklog": "Only a ticket in Backlog can be drafted: move it back to Backlog first",
+    "drafting": "{name} is drafting it: wait for it to come back",
+    "noProject": "No project was named: pick a project first",
+    "unread": "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
+    "unfinished": "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
+    "canceled": "\"{title}\" was canceled: {why}",
+    "noBlock": "No draft found: it goes in a json code block",
+    "notObject": "it must be an object",
+    "unreadable": "the json cannot be read: {why}",
+    "noTitle": "the draft has no title",
+    "lines": "{field}: must be a string or an array of strings",
+    "text": "{field}: must be a string",
+    "why": "Why:",
+    "todo": "To do:",
+    "notDoing": "Not doing:",
+    "files": "May touch:"
   }
 }

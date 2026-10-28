@@ -40,7 +40,7 @@ test/               Playwright against a real server per worker (fixtures.ts)
   (`src/layers.test.ts`). A piece two features both need (a word, a format, a query) goes down to the layer under both,
   or each keeps its own copy of a word; it does not make one feature reach into the other. The skins read features; no
   feature or piece knows a skin. Why: docs/subsystems/app.md, 为什么这样.
-- **Words** are in the feature's `words.ts` (Chinese and English), following the glossary (docs/README.md#用语);
+- **Words** are in `packages/i18n/locales/{zh,en}/web.<feature>.json`, read as `t("web.<feature>.…")`, following the glossary (docs/README.md#用语);
   farm words only in the skins and `ui/pixel`.
 - **Icons come in two sets.** The workbench's are reicon's line icons, one picture to a meaning in `src/ui/icons.ts`
   (`<Icon name="issues" />` takes only names from that table). The pixel skins (`farm`, `tree`, `ui/pixel`) draw theirs

@@ -436,26 +436,6 @@ export const catalogs = {
         moveTo: "挪到{status}",
         roundWithText: "{say}：{command}，--json 带 status「{to}」和这一轮要它做什么的 text",
       },
-      draft: {
-        noDrafter: "没有能派的帮工来起草",
-        orchestrator: "这是派给管家的工单：管家自己会看",
-        onlyBacklog: "只有备选里的工单能起草：先挪回备选",
-        drafting: "{name} 正在起草：等它交回来",
-        noProject: "没说在哪个项目里做：先选一个项目",
-        unread: "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
-        unfinished: "{name} 没起草完（{summary}），工单没动：再起草一次",
-        canceled: "「{title}」取消了：{why}",
-        noBlock: "没找到草稿：要用一个 json 代码块给出",
-        notObject: "要是一个对象",
-        unreadable: "json 读不了：{why}",
-        noTitle: "草稿没有标题",
-        lines: "{field}：要是字符串或字符串的数组",
-        text: "{field}：要是字符串",
-        why: "为什么：",
-        todo: "要做的：",
-        notDoing: "不做的：",
-        files: "可能涉及：",
-      },
       template: { commands: { test: "测试", lint: "代码检查", build: "构建" }, done: "{title}\n做到什么程度算完：{done}" },
       timeline: {
         opened: "开单",
@@ -475,6 +455,26 @@ export const catalogs = {
         rejectedSeparator: "；",
       },
       merge: { tellFailed: "\n给帮工带话失败：{why}", merged: "{name} 的活合进去了：{text}" },
+      refinement: {
+        noDrafter: "没有能派的帮工来起草",
+        orchestrator: "这是派给管家的工单：管家自己会看",
+        onlyBacklog: "只有备选里的工单能起草：先挪回备选",
+        drafting: "{name} 正在起草：等它交回来",
+        noProject: "没说在哪个项目里做：先选一个项目",
+        unread: "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
+        unfinished: "{name} 没起草完（{summary}），工单没动：再起草一次",
+        canceled: "「{title}」取消了：{why}",
+        noBlock: "没找到草稿：要用一个 json 代码块给出",
+        notObject: "要是一个对象",
+        unreadable: "json 读不了：{why}",
+        noTitle: "草稿没有标题",
+        lines: "{field}：要是字符串或字符串的数组",
+        text: "{field}：要是字符串",
+        why: "为什么：",
+        todo: "要做的：",
+        notDoing: "不做的：",
+        files: "可能涉及：",
+      },
     },
     "server.lan": {
       aDevice: "一台设备",
@@ -528,7 +528,7 @@ export const catalogs = {
     "server.notice": {
       orchestrator: "管家",
       conflictFiles: "{files} 个文件和主分支冲突",
-      step: "{plan}：{step}",
+      step: "{graph}：{step}",
       item: {
         review: { label: "等你看", title: "{who} 做完了", tray: "{who} 做完了，等你看" },
         ask: { label: "有问题问你", title: "{who} 有问题问你" },
@@ -2353,8 +2353,6 @@ export const catalogs = {
         reopen: "重开",
       },
       detail: {
-        planStep: "计划「{plan}」的一步",
-        backToPlan: "回到计划",
         now: "现在怎样",
         yours: "要你做的",
         rejectWhere: "哪里没过，一行一条",
@@ -2426,6 +2424,8 @@ export const catalogs = {
         unsure: "拿不准的",
         next: "建议接着做",
         conflict: "合进 {base} 会冲突：{files}",
+        graphStep: "计划「{graph}」的一步",
+        backToGraph: "回到计划",
       },
       task: {
         label: "计划",
@@ -2572,8 +2572,7 @@ export const catalogs = {
         canceled: "已取消",
         reopenLine: "要它接着做就重开：写一句这次要做什么。",
         inGraph: "这是计划里的一步，跟着计划走。",
-        splitting: "在拆计划「{plan}」：只读代码，不改文件。",
-        planStep: "计划「{plan}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
+        splitting: "在拆计划「{graph}」：只读代码，不改文件。",
         editing: "{who}在改代码",
         history: "{n} 次：{line}",
         historyItem: "{name}（{id}）",
@@ -2590,6 +2589,7 @@ export const catalogs = {
         whoRuntime: "{name}（{runtime}）",
         changes: "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
+        graphStep: "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
       },
     },
     "web.lan": {
@@ -2882,7 +2882,7 @@ export const catalogs = {
       signedOut: "没登录。在这台机器上运行 {runtime} 登录一次。",
       unreadable: "读不到：{why}",
       balance: "{enough, select, true {按量计费，这里是 {provider} 账户余额。} other {按量计费，这里是 {provider} 账户余额，不够用了。}}",
-      subscription: "套餐：{plan}",
+      subscription: "套餐：{tier}",
       left: "剩 {pct}%",
       windowLeft: "{label} 剩 {pct}%",
       resets: "{moment} 重置",
@@ -3738,26 +3738,6 @@ export const catalogs = {
         moveTo: "Move to {status}",
         roundWithText: '{say}: {command}, with --json status "{to}" and the text of what to do this round',
       },
-      draft: {
-        noDrafter: "No helper can be sent to draft it",
-        orchestrator: "This ticket is the manager's: the manager reads it itself",
-        onlyBacklog: "Only a ticket in Backlog can be drafted: move it back to Backlog first",
-        drafting: "{name} is drafting it: wait for it to come back",
-        noProject: "No project was named: pick a project first",
-        unread: "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
-        unfinished: "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
-        canceled: '"{title}" was canceled: {why}',
-        noBlock: "No draft found: it goes in a json code block",
-        notObject: "it must be an object",
-        unreadable: "the json cannot be read: {why}",
-        noTitle: "the draft has no title",
-        lines: "{field}: must be a string or an array of strings",
-        text: "{field}: must be a string",
-        why: "Why:",
-        todo: "To do:",
-        notDoing: "Not doing:",
-        files: "May touch:",
-      },
       template: { commands: { test: "the tests", lint: "the linter", build: "the build" }, done: "{title}\nDone when: {done}" },
       timeline: {
         opened: "Opened",
@@ -3777,6 +3757,26 @@ export const catalogs = {
         rejectedSeparator: "; ",
       },
       merge: { tellFailed: "\nCould not tell the helper: {why}", merged: "{name}'s work is merged: {text}" },
+      refinement: {
+        noDrafter: "No helper can be sent to draft it",
+        orchestrator: "This ticket is the manager's: the manager reads it itself",
+        onlyBacklog: "Only a ticket in Backlog can be drafted: move it back to Backlog first",
+        drafting: "{name} is drafting it: wait for it to come back",
+        noProject: "No project was named: pick a project first",
+        unread: "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
+        unfinished: "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
+        canceled: '"{title}" was canceled: {why}',
+        noBlock: "No draft found: it goes in a json code block",
+        notObject: "it must be an object",
+        unreadable: "the json cannot be read: {why}",
+        noTitle: "the draft has no title",
+        lines: "{field}: must be a string or an array of strings",
+        text: "{field}: must be a string",
+        why: "Why:",
+        todo: "To do:",
+        notDoing: "Not doing:",
+        files: "May touch:",
+      },
     },
     "server.lan": {
       aDevice: "A device",
@@ -3830,7 +3830,7 @@ export const catalogs = {
     "server.notice": {
       orchestrator: "The manager",
       conflictFiles: "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
-      step: "{plan}: {step}",
+      step: "{graph}: {step}",
       item: {
         review: { label: "For you to see", title: "{who} is done", tray: "{who} is done, for you to see" },
         ask: { label: "A question for you", title: "{who} has a question for you" },
@@ -5790,8 +5790,6 @@ export const catalogs = {
         reopen: "Reopen",
       },
       detail: {
-        planStep: 'A step of the plan "{plan}"',
-        backToPlan: "Back to the plan",
         now: "Where it is",
         yours: "For you to do",
         rejectWhere: "What did not pass, one per line",
@@ -5864,6 +5862,8 @@ export const catalogs = {
         unsure: "Not sure about",
         next: "Suggested next",
         conflict: "Merging into {base} would conflict: {files}",
+        graphStep: 'A step of the plan "{graph}"',
+        backToGraph: "Back to the plan",
       },
       task: {
         label: "Plan",
@@ -6010,8 +6010,7 @@ export const catalogs = {
         canceled: "Canceled",
         reopenLine: "To have it carry on, reopen it: write a line on what to do this time.",
         inGraph: "This is a step of a plan, and goes with the plan.",
-        splitting: 'Splitting the plan "{plan}": reading code only, changing no files.',
-        planStep: 'A step of the plan "{plan}": {step}. When done it merges into the plan\'s branch by itself, and reaches main when the whole plan does.',
+        splitting: 'Splitting the plan "{graph}": reading code only, changing no files.',
         editing: "{who} is changing the code",
         history: "{n} times: {line}",
         historyItem: "{name} ({id})",
@@ -6028,6 +6027,7 @@ export const catalogs = {
         whoRuntime: "{name} ({runtime})",
         changes: "{branch} → {base} · {commits} commits · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
+        graphStep: 'A step of the plan "{graph}": {step}. When done it merges into the plan\'s branch by itself, and reaches main when the whole plan does.',
       },
     },
     "web.lan": {
@@ -6332,7 +6332,7 @@ export const catalogs = {
       unreadable: "Cannot be read: {why}",
       balance:
         "{enough, select, true {Pay as you go: this is the {provider} account's balance.} other {Pay as you go: this is the {provider} account's balance, and it is running out.}}",
-      subscription: "Plan: {plan}",
+      subscription: "Plan: {tier}",
       left: "{pct}% left",
       windowLeft: "{label}: {pct}% left",
       resets: "resets {moment}",
@@ -7100,24 +7100,6 @@ export interface Messages {
   "server.issue.does.thisTime": { readonly said: string | number };
   "server.issue.does.toOrchestrator": { readonly n: string | number };
   "server.issue.does.unqueue": { readonly n: string | number };
-  "server.issue.draft.canceled": { readonly title: string | number; readonly why: string | number };
-  "server.issue.draft.drafting": { readonly name: string | number };
-  "server.issue.draft.files": undefined;
-  "server.issue.draft.lines": { readonly field: string | number };
-  "server.issue.draft.noBlock": undefined;
-  "server.issue.draft.noDrafter": undefined;
-  "server.issue.draft.noProject": undefined;
-  "server.issue.draft.noTitle": undefined;
-  "server.issue.draft.notDoing": undefined;
-  "server.issue.draft.notObject": undefined;
-  "server.issue.draft.onlyBacklog": undefined;
-  "server.issue.draft.orchestrator": undefined;
-  "server.issue.draft.text": { readonly field: string | number };
-  "server.issue.draft.todo": undefined;
-  "server.issue.draft.unfinished": { readonly name: string | number; readonly summary: string | number };
-  "server.issue.draft.unread": { readonly name: string | number; readonly problem: string | number };
-  "server.issue.draft.unreadable": { readonly why: string | number };
-  "server.issue.draft.why": undefined;
   "server.issue.drafting": { readonly name: string | number };
   "server.issue.failNeedsFindings": undefined;
   "server.issue.graphAcceptance": undefined;
@@ -7181,6 +7163,24 @@ export interface Messages {
   "server.issue.queuedStuck": { readonly title: string | number; readonly why: string | number };
   "server.issue.recurrenceNoIssue": { readonly name: string | number; readonly why: string | number };
   "server.issue.recurrenceNoStart": { readonly name: string | number; readonly why: string | number };
+  "server.issue.refinement.canceled": { readonly title: string | number; readonly why: string | number };
+  "server.issue.refinement.drafting": { readonly name: string | number };
+  "server.issue.refinement.files": undefined;
+  "server.issue.refinement.lines": { readonly field: string | number };
+  "server.issue.refinement.noBlock": undefined;
+  "server.issue.refinement.noDrafter": undefined;
+  "server.issue.refinement.noProject": undefined;
+  "server.issue.refinement.noTitle": undefined;
+  "server.issue.refinement.notDoing": undefined;
+  "server.issue.refinement.notObject": undefined;
+  "server.issue.refinement.onlyBacklog": undefined;
+  "server.issue.refinement.orchestrator": undefined;
+  "server.issue.refinement.text": { readonly field: string | number };
+  "server.issue.refinement.todo": undefined;
+  "server.issue.refinement.unfinished": { readonly name: string | number; readonly summary: string | number };
+  "server.issue.refinement.unread": { readonly name: string | number; readonly problem: string | number };
+  "server.issue.refinement.unreadable": { readonly why: string | number };
+  "server.issue.refinement.why": undefined;
   "server.issue.roundNeedsWords": undefined;
   "server.issue.sendFailed": undefined;
   "server.issue.senderGone": { readonly id: string | number };
@@ -7304,7 +7304,7 @@ export interface Messages {
   "server.notice.item.task-failed.title": { readonly text: string | number };
   "server.notice.item.task-failed.tray": { readonly text: string | number };
   "server.notice.orchestrator": undefined;
-  "server.notice.step": { readonly plan: string | number; readonly step: string | number };
+  "server.notice.step": { readonly graph: string | number; readonly step: string | number };
   "server.orchestrator.cannotStart": { readonly why: string | number };
   "server.orchestrator.label": undefined;
   "server.orchestrator.noKey": undefined;
@@ -9162,7 +9162,7 @@ export interface Messages {
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
-  "web.issue.detail.backToPlan": undefined;
+  "web.issue.detail.backToGraph": undefined;
   "web.issue.detail.branch": undefined;
   "web.issue.detail.changedFiles": undefined;
   "web.issue.detail.changesUnread": undefined;
@@ -9176,6 +9176,7 @@ export interface Messages {
   "web.issue.detail.from": undefined;
   "web.issue.detail.fromRecurrence": undefined;
   "web.issue.detail.full": undefined;
+  "web.issue.detail.graphStep": { readonly graph: string | number };
   "web.issue.detail.helper": undefined;
   "web.issue.detail.job": undefined;
   "web.issue.detail.made": undefined;
@@ -9190,7 +9191,6 @@ export interface Messages {
   "web.issue.detail.now": undefined;
   "web.issue.detail.opened": undefined;
   "web.issue.detail.orchestratorStuck": undefined;
-  "web.issue.detail.planStep": { readonly plan: string | number };
   "web.issue.detail.profile": undefined;
   "web.issue.detail.progress": undefined;
   "web.issue.detail.rejectLabel": undefined;
@@ -9276,6 +9276,7 @@ export interface Messages {
   "web.issue.issue.doingLabel": { readonly action: string | number; readonly label: string | number };
   "web.issue.issue.editing": { readonly who: string | number };
   "web.issue.issue.failed": undefined;
+  "web.issue.issue.graphStep": { readonly graph: string | number; readonly step: string | number };
   "web.issue.issue.handedBack": { readonly who: string | number };
   "web.issue.issue.history": { readonly line: string | number; readonly n: string | number };
   "web.issue.issue.historyItem": { readonly id: string | number; readonly name: string | number };
@@ -9283,14 +9284,13 @@ export interface Messages {
   "web.issue.issue.interrupted": undefined;
   "web.issue.issue.main": undefined;
   "web.issue.issue.noSteps": undefined;
-  "web.issue.issue.planStep": { readonly plan: string | number; readonly step: string | number };
   "web.issue.issue.quiet": { readonly who: string | number };
   "web.issue.issue.quietLine": undefined;
   "web.issue.issue.ran": { readonly n: number };
   "web.issue.issue.reopenLine": undefined;
   "web.issue.issue.reviewed": undefined;
   "web.issue.issue.since": { readonly span: string | number };
-  "web.issue.issue.splitting": { readonly plan: string | number };
+  "web.issue.issue.splitting": { readonly graph: string | number };
   "web.issue.issue.stepsGone": undefined;
   "web.issue.issue.stuck": undefined;
   "web.issue.issue.used": { readonly span: string | number };
@@ -9792,7 +9792,7 @@ export interface Messages {
   "web.runtime.spentToday": { readonly spent: string | number };
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
   "web.runtime.steer": undefined;
-  "web.runtime.subscription": { readonly plan: string | number };
+  "web.runtime.subscription": { readonly tier: string | number };
   "web.runtime.title": undefined;
   "web.runtime.tools": undefined;
   "web.runtime.unlimited": undefined;

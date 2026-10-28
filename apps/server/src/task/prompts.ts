@@ -9,7 +9,7 @@ import { isForOrchestrator } from "../issue/state.ts";
 import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf } from "./graph.ts";
 import { acceptanceChecks, frozenOf } from "./rules.ts";
 
-/** A plan's and a step's state as the model reads them (only in Chinese: prompts are). */
+/** A graph's and a step's state as the model reads them (only in Chinese: prompts are). */
 const graphStateText: Record<GraphState, string> = {
   splitting: "在拆",
   draft: "等你看过再开工",

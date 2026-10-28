@@ -37,7 +37,7 @@
   "signedOut": "Not signed in. Run {runtime} on this computer and sign in once.",
   "unreadable": "Cannot be read: {why}",
   "balance": "{enough, select, true {Pay as you go: this is the {provider} account's balance.} other {Pay as you go: this is the {provider} account's balance, and it is running out.}}",
-  "subscription": "Plan: {plan}",
+  "subscription": "Plan: {tier}",
   "left": "{pct}% left",
   "windowLeft": "{label}: {pct}% left",
   "resets": "resets {moment}",

@@ -86,13 +86,13 @@ function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v];
   if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
-  throw new Error(t("server.issue.draft.lines", { field }));
+  throw new Error(t("server.issue.refinement.lines", { field }));
 }
 
 function textOf(v: unknown, field: string): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v;
-  throw new Error(t("server.issue.draft.text", { field }));
+  throw new Error(t("server.issue.refinement.text", { field }));
 }
 
 const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
@@ -100,13 +100,13 @@ const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
   const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: t("server.issue.draft.noBlock") };
+  if (blocks.length === 0) return { problem: t("server.issue.refinement.noBlock") };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let d: IssueRefinement;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.issue.draft.notObject"));
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.issue.refinement.notObject"));
       d = {
         title: textOf(raw.title, "title"),
         why: textOf(raw.why, "why"),
@@ -116,12 +116,12 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
         files: linesOf(raw.files, "files"),
       };
     } catch (e) {
-      problem = t("server.issue.draft.unreadable", { why: e instanceof Error ? e.message : String(e) });
+      problem = t("server.issue.refinement.unreadable", { why: e instanceof Error ? e.message : String(e) });
       continue;
     }
     const title = clip(d.title, 80);
     if (!title) {
-      problem = t("server.issue.draft.noTitle");
+      problem = t("server.issue.refinement.noTitle");
       continue;
     }
     return { draft: { ...d, title }, problem: "" };
@@ -132,11 +132,11 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
 export function refinementDescription(d: IssueRefinement): string {
   const parts: string[] = [];
   const why = d.why.trim();
-  if (why) parts.push(t("server.issue.draft.why") + "\n" + why);
+  if (why) parts.push(t("server.issue.refinement.why") + "\n" + why);
   for (const [head, lines] of [
-    [t("server.issue.draft.todo"), kept(d.todo)],
-    [t("server.issue.draft.notDoing"), kept(d.notDoing)],
-    [t("server.issue.draft.files"), kept(d.files)],
+    [t("server.issue.refinement.todo"), kept(d.todo)],
+    [t("server.issue.refinement.notDoing"), kept(d.notDoing)],
+    [t("server.issue.refinement.files"), kept(d.files)],
   ] as const)
     if (lines.length > 0) parts.push(head + "\n- " + lines.join("\n- "));
   return parts.join("\n\n");

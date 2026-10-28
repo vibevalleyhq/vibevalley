@@ -54,7 +54,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ## 用语
 
-叫法分两张表。下面这张是活本身的叫法：工作台、命令行、管家、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列，不用最右一列；代码和讲服务端的文档按实际的概念来（[concepts.md](docs/concepts.md)）。界面上的字写在词表里，中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `packages/protocol/src/words`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。
+叫法分两张表。下面这张是活本身的叫法：工作台、命令行、管家、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列，不用最右一列；代码和讲服务端的文档按实际的概念来（[concepts.md](docs/concepts.md)）。界面上的字写在词典里（`packages/i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `packages/protocol/src/words`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。
 
 | 叫法 | English | 代码里 | 意思 | 不用 |
 |---|---|---|---|---|

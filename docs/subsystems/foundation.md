@@ -12,7 +12,7 @@
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
 | 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件（[architecture.md](docs/architecture.md#存了什么)）和配置键（[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 测试的地基：`src/testing`、黄金数据、oar 的 `scriptedRuntime`；旧名字和能力表的检查 | 接口的处理（`handlers.ts`）、页面的分层（[客户端](docs/subsystems/app.md)） |
-| 话放在哪：词表、`prompts.ts`、主人的语言怎么传到每个进程 | 某一句怎么说（说它的模块）；用哪个词（[用语表](docs/README.md#用语)） |
+| 话放在哪：词典（`packages/i18n`）、`prompts.ts`、主人的语言怎么传到每个进程 | 某一句怎么说（说它的模块）；用哪个词（[用语表](docs/README.md#用语)） |
 
 ## 在哪
 
@@ -23,7 +23,7 @@
 - **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/state.ts`、`channel/rules.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`ai/testing.ts`（照脚本回答的模型，大脑经 `agent/brain/testing.ts` 用它）。
-- **话**：两边都说的在 `packages/protocol/src/words`（`zh.ts`、`en.ts`，`localized`、`setLocale`、`currentLocale`），服务端每个模块的在它的 `words.ts`，对模型说的在它的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；页面的每个 feature 一份 `words.ts`（`features/<概念>/`），另有 `base/`、`ui/pixel/`、`farm/`、`farm/phone/`、`tree/` 各一份；一个 feature 不为借一个字去依赖另一个，复制一份进自己的表（设置页列出它挂的各栏，读的是那几栏自己的标题），桌面壳、手机壳各一份；种子和工单模板是 `agent/seeds.json`、`template_catalog.json` 和各自的 `.en.json`。
+- **话**：对主人说的都在 `packages/i18n`（`@vibevalley/i18n`）：词典是 `locales/<语言>/<命名空间>.json`，命名空间是「宿主.模块」（`web.setting`、`server.issue`、`desktop`、`mobile`，两边都说的是 `shared`）；代码里写 `t("web.setting.keys.saved")`、`t("server.issue.does.merge", { base, commits, helper })`，按一个值取、值可能不对应词条时用 `maybe()`，列表用 `list()`；`src/catalogs.ts` 由 `vp run i18n:gen` 从词典写出（词条连同每条的参数类型）；语言是 `currentLocale`、`setLocale`。命令行 `vpx scripts/i18n.ts`：`scan` 列出每个键在哪用，`check`（在 `docs:verify` 里）查用到却没有的、没人用的、英文缺或多的、占位对不上的、英文里有汉字的、中英一字不差的（`same.json` 列出有意一样的，比如「中文」），`find <文字>` 按文字找键，`migrate` 是把旧的词表搬进来用的。对模型说的在模块的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；种子和工单模板是 `agent/seeds.json`、`template_catalog.json` 和各自的 `.en.json`。
 - **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`vp run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
 
 ## 模型和不变量
@@ -98,12 +98,12 @@
 
 ### 话放在哪
 
-- **对主人的话进词表，对模型的话进 `prompts.ts`。** 主人看得到的（界面上的字、写进帧的说法、通知、拒绝的理由、频道里的系统消息、以主人的名义写进串里的话、命令行和连接器的输出）写在词表里，中英各一份；模型读的（系统提示、工具说明、交给帮工的活、巡查和管家的输入）写在模块的 `prompts.ts`，只有中文，另加一句用主人的语言说话。两边都读的照谁先读归：拒绝的理由主人和管家都读，进词表。日志是英文，不进词表。
-- **一张表的样子**：`const zh = {…}`，`const en: typeof zh = {…}`，`export const xWording = localized({ zh, en })`；键是概念（`attention.reviewing`），要填值的写成函数，参数由类型查；英文少一条或参数对不上就编不过。用的时候每次取（`xWording().…`），不在模块顶上存一份句子。
+- **对主人的话进词典，对模型的话进 `prompts.ts`。** 主人看得到的（界面上的字、写进帧的说法、通知、拒绝的理由、频道里的系统消息、以主人的名义写进串里的话、命令行和连接器的输出）写在 `packages/i18n/locales`，中英各一份；模型读的（系统提示、工具说明、交给帮工的活、巡查和管家的输入）写在模块的 `prompts.ts`，只有中文，另加一句用主人的语言说话。两边都读的照谁先读归：拒绝的理由主人和管家都读，进词典。日志是英文，不进词典。
+- **一条词条的样子**：键是概念（`server.issue.does.merge`）；值是一句话，`{名字}` 是填进去的值，数一个数用 `{n, plural, one {…} other {…}}`（`#` 是那个数），第几次用 `{n, selectordinal, …}`，按一个开关选用 `{flag, select, true {…} other {…}}`。中文是源头：`gen` 照中文写出每个键要哪些参数（plural 是数，select 是开关），写错键、少传或多传参数编不过；别的语言少一条运行时用中文兜底，`check` 在 CI 里报。一句话有可选的一截（有就说，没有就不说），写成两条，调用处选；不在词条里写逻辑。用的时候每次调 `t`，不在模块顶上存一份句子。
 - **语言是农场的，一个进程一个**：存在设置里（`settings.json` 的 `locale`，默认 `zh`），服务端读出和保存时 `setLocale`；页面从服务端发的 `index.html` 上的 `data-locale` 读，换了语言重新打开；命令行和桌面壳开机读同一个 `settings.json`，桌面壳再听页面经宿主接口说的（`host.locale`），菜单栏和灵动岛跟着变；手机壳说手机自己的语言。存进库的话（频道里的消息、时间线）是写下那时的语言，换了不回头翻。
-- **频道的名字不翻**：开机建的默认频道叫 `general`（`firstChannelName`），名字存下来，地址和给模型的话都写它；农场把默认频道画成词表里的「田头」，工作台写它的名字。
+- **频道的名字不翻**：开机建的默认频道叫 `general`（`firstChannelName`），名字存下来，地址和给模型的话都写它；农场把默认频道画成词典里的「田头」，工作台写它的名字。
 - **模型写的记号不翻**：提示要帮工照原样写「结论：」「要问主人：」「标准 N：」「记住：」；读的时候英文的写法（Conclusion、Ask the owner、Criterion N、Remember）也认。
-- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；词表、`prompts.ts`、测试和测试数据、记忆树的假数据不查；正则不查。对模型说的话也只在 `prompts.ts`：VibeValley 自己的 agent 在 `agent/brain/prompts.ts`，管家和帮工用的工具（说明、参数、回给模型的话）在 `tool/prompts.ts`，模块里的代码只引用它们。
+- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；生成的 `packages/i18n/src/catalogs.ts`、`prompts.ts`、测试和测试数据、记忆树的假数据不查；正则不查。对模型说的话也只在 `prompts.ts`：VibeValley 自己的 agent 在 `agent/brain/prompts.ts`，管家和帮工用的工具（说明、参数、回给模型的话）在 `tool/prompts.ts`，模块里的代码只引用它们。
 
 ## 怎么走
 
@@ -159,7 +159,7 @@
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
 - **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)、`acceptance/server.md`）。
 - **一套工具管格式、lint、构建和测试。** Vite+ 把 Vite、Vitest、oxlint、oxfmt 收在一个 `vp` 里，设置写在一个 `vite.config.ts`；oxlint 的带类型规则（没处理的 promise、数字不带比较函数的 `sort`、没用上的组件）在落地前就报出来。放弃了各装一份 ESLint、Prettier：两份设置、两套插件，慢一个量级。几条规则关掉，因为这里是有意的写法：`[...text]` 按码点切字、改之前先拷一份再遍历、`Effect.gen` 前的 `const self = this`。规则一条一条开、只开成 error：开之前在仓库上量一遍命中，一处不剩的直接开、锁住；几十处以内的同一个改动里改完再开；几百上千处的（非空断言、`strict-boolean-expressions`、没核过的 `as`）多半和这里的写法相冲，不开。整类（pedantic、style、restriction）不开：一开几千到几万处，真问题淹在里面。上线的代码不让 `any` 流过（`no-unsafe-*`，只在 `apps/*/src`、`packages/*/src`）：JSON、库、`getPrototypeOf` 给的在进来的地方定类型；测试和脚本读的是自己写的 JSON，不管。`no-unnecessary-condition` 试过不开（188 处）：死掉的 `?? []`、`?.` 是真的，可四十来处「总是真、总是假」几乎都是 `signal.aborted`、`closed`、`disposed` 这种在 `await` 或回调里被别处改掉的标志，TypeScript 的收窄看不见那一下，照它删就是把竞态的守卫删了。
-- **词表是普通的 TS 对象，不用 i18next。** 两种语言、一个主人、本机一个进程：它擅长的按需加载、识别浏览器语言、复数规则都用不上；它要的带类型的源头和进仓库的翻译，普通对象加 `typeof zh` 就有。放弃了 `{{var}}` 字符串插值（参数不查类型）和英文做源头（产品先是中文的，中文写得最准）。
+- **话在一个 i18n 包里，按键取，词典按语言分文件。** 以前是 42 张 TS 对象（`words.ts`，`typeof zh` 查英文）：类型挡住了漏翻，可话和代码绑在一起，按文字找不到一句在哪，没人用的词条、英文里混进的中文没人报，加一种语言要复制 42 份对象。现在词典是 JSON，代码写 `t("key")`，`scripts/i18n.ts` 照 x18n 的路子扫键、查问题、按文字找，词典能单独交给翻译或 agent。类型没丢：`gen` 从中文写出每个键和参数，写错照样编不过。搬的时候查出 70 条早就没人用的词条，删了。`catalogs.ts` 把词典写成数据而不是 import JSON：Metro、esbuild、Vite 和 Node 读 `.ts` 都一样，读 JSON 要的 import 属性各家支持不一。放弃了直接用 x18n（我们只要五个命令，自己写更好控制，CI 不依赖外部；词典格式标准，以后要接随时能接）、i18next 这类库（运行时、按需加载、后端都用不上，`t` 只要取值和替换占位）、一种语言一个大文件（并行的分支几乎每次都冲突）、英文做源头（产品先是中文的，中文写得最准）。
 - **服务端写好话再发，页面不拼。** 帮工在干什么、工单等什么、通知怎么说由服务端写进帧，桌面的菜单栏、灵动岛、命令行、连接器也要同一句；放弃了只发结构、各处自己拼，那会每处各拼一遍。代价是语言跟着进程：服务端换了语言，新算的帧才是新语言，所以页面换语言时整页重开。
 - **提示词不翻。** 管家的行为和评测绑在中文提示上，写法是调出来的；模型读中文、用主人的语言回答没有问题。放弃了逐句翻译提示：要重调、重跑付费评测，换来的只是提示本身的语言。
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 oar、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用编辑器的重命名和 `tsc`，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。

@@ -107,8 +107,6 @@
     "reopen": "重开"
   },
   "detail": {
-    "planStep": "计划「{plan}」的一步",
-    "backToPlan": "回到计划",
     "now": "现在怎样",
     "yours": "要你做的",
     "rejectWhere": "哪里没过，一行一条",
@@ -183,7 +181,9 @@
     "evidence": "依据",
     "unsure": "拿不准的",
     "next": "建议接着做",
-    "conflict": "合进 {base} 会冲突：{files}"
+    "conflict": "合进 {base} 会冲突：{files}",
+    "graphStep": "计划「{graph}」的一步",
+    "backToGraph": "回到计划"
   },
   "task": {
     "label": "计划",
@@ -355,8 +355,7 @@
     "canceled": "已取消",
     "reopenLine": "要它接着做就重开：写一句这次要做什么。",
     "inGraph": "这是计划里的一步，跟着计划走。",
-    "splitting": "在拆计划「{plan}」：只读代码，不改文件。",
-    "planStep": "计划「{plan}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
+    "splitting": "在拆计划「{graph}」：只读代码，不改文件。",
     "editing": "{who}在改代码",
     "history": "{n} 次：{line}",
     "historyItem": "{name}（{id}）",
@@ -385,6 +384,7 @@
     "who": "{name}",
     "whoRuntime": "{name}（{runtime}）",
     "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
-    "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交"
+    "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
+    "graphStep": "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。"
   }
 }

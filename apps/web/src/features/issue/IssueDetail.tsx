@@ -93,7 +93,7 @@ export function IssueDetail(props: {
       <Show when={s().inTask ? props.onTask : undefined}>
         {(onTask) => (
           <button type="button" onClick={() => onTask()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
-            ‹ {parent()?.title ? t("web.issue.detail.planStep", { plan: parent()!.title }) : t("web.issue.detail.backToPlan")}
+            ‹ {parent()?.title ? t("web.issue.detail.graphStep", { graph: parent()!.title }) : t("web.issue.detail.backToGraph")}
           </button>
         )}
       </Show>
