@@ -61,7 +61,8 @@ const statusOf = (r: RuntimeInfo) => {
   }
 };
 
-const levelInk = { plenty: "#5a8234", low: "#e5a93c", gold: "#c8a02e", empty: "#c84a3a", unknown: "#9b7550" } as const;
+/** A cell's colour by how much is left: the palette's, so the bar follows the theme. */
+const levelInk = { plenty: "bg-accent", low: "bg-wheat", gold: "bg-wheat", empty: "bg-berry", unknown: "bg-bark" } as const;
 
 /** The quota as a row of cells, filled to what is left. */
 function Stamina(props: { quota: Quota; cells?: number; width: number; height: number }) {
@@ -76,7 +77,7 @@ function Stamina(props: { quota: Quota; cells?: number; width: number; height: n
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
-        {(i) => <span class="flex-1 rounded-[1px]" style={{ background: i < lit() ? levelInk[props.quota.level] : "#fffaf022" }} />}
+        {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-on-rail/13"]} />}
       </For>
     </span>
   );

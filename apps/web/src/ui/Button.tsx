@@ -19,7 +19,8 @@ export function Button(props: { tone?: Tone; icon?: IconName; children?: JSX.Ele
       type="button"
       {...rest}
       class={[
-        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm whitespace-nowrap disabled:cursor-default disabled:opacity-50",
+        // Pressed, it sinks a pixel: the press answers under the finger, at the pointer's speed.
+        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm whitespace-nowrap transition-[background-color,border-color,translate] duration-120 active:translate-y-px disabled:cursor-default disabled:opacity-50 disabled:active:translate-y-0",
         tones[props.tone ?? "plain"],
         props.class,
       ]}

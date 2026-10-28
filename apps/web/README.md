@@ -46,6 +46,9 @@ test/               Playwright against a real server per worker (fixtures.ts)
   (`<Icon name="issues" />` takes only names from that table). The pixel skins (`farm`, `tree`, `ui/pixel`) draw theirs
   from `public/pixel` with `SpriteIcon` (the site uses the same files). Faces, runtime logos and illustrations are pixel
   drawings everywhere. No characters stand in for icons.
+- **Design tokens.** The workbench's colours, corners, type sizes, shadows, motion and layers are the tokens in
+  `src/style.css` (lint: `vibevalley/no-hex-color`, `vibevalley/design-tokens`); which one to pick, the atoms' looks and
+  the checklist before handing a page in are in docs/style/design.md. The pixel skins and faces are drawn and keep theirs.
 - **App icons** are in `public/icons/`: `app-32.png`, `app-64.png` and `app-256.png`. The site build copies these packaged
   files; it does not keep another set.
 - **The host** (`@vibevalley/protocol/host`, found by `currentHost()` in `src/base/host.ts`) is the only way to the machine; a capability that is null is not drawn.

@@ -146,7 +146,7 @@ function LaneView(props: {
         props.drag.setDragging(null);
       }}
       class={[
-        "min-w-[220px] flex-1 flex-col rounded-[10px] border px-2 pt-1.5 pb-2",
+        "min-w-[220px] flex-1 flex-col rounded-lg border px-2 pt-1.5 pb-2",
         props.shownNarrow ? "flex" : "hidden @min-[700px]:flex",
         over() ? "border-leaf bg-leaf/15" : "border-transparent bg-hover",
       ]}
@@ -255,12 +255,12 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         }}
         class={[
           "group cursor-pointer rounded-lg border px-2.5 pt-2 pb-2 transition-colors",
-          props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-ink/18 hover:shadow-[0_1px_3px_#2f1f1314]",
+          props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-ink/18 hover:shadow-raise",
           { "opacity-40": props.drag.dragging()?.id === props.card.id },
         ]}
       >
         <Show when={where()}>
-          <div class="truncate text-[11px] leading-[14px] text-muted">{where()}</div>
+          <div class="truncate text-2xs leading-[14px] text-muted">{where()}</div>
         </Show>
         <div class="mt-0.5 line-clamp-2 text-sm font-medium break-words">{look().title}</div>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">

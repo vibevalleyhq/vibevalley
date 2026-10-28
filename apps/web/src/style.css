@@ -38,6 +38,8 @@
   --wb-code-bg: #2f1f13;
   --wb-code-ink: #eedcb2;
   --wb-float: #2f1f1326;
+  /* What lies on the surface it is on, a hair above it: a segmented control's thumb, a card under the pointer. */
+  --wb-raise: #2f1f131a;
 }
 
 [data-theme="dark"] {
@@ -68,6 +70,7 @@
   --wb-code-bg: #120e0a;
   --wb-code-ink: #eedcb2;
   --wb-float: #00000066;
+  --wb-raise: #00000059;
 }
 
 @theme inline static {
@@ -96,6 +99,8 @@
   --color-idle: var(--wb-idle);
   --color-code-bg: var(--wb-code-bg);
   --color-code-ink: var(--wb-code-ink);
+  /* Two heights only (docs/style/design.md): raise lies on its surface, float is over the page (menus, dialogs, toasts). */
+  --shadow-raise: 0 1px 2px var(--wb-raise);
   --shadow-float: 0 8px 24px var(--wb-float);
 }
 
@@ -103,6 +108,9 @@
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --font-mono: Menlo, ui-monospace, monospace;
 
+  /* The type ladder (docs/style/design.md): 2xs is for counts, badges and key caps, nothing longer. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
   --text-xs: 12px;
   --text-xs--line-height: 16px;
   --text-sm: 13px;
@@ -113,6 +121,26 @@
   --text-lg--line-height: 24px;
   --text-xl: 20px;
   --text-xl--line-height: 28px;
+
+  /* Corners by what they round: xs a mark inside a line (a key cap, an @name), md a control, lg a card, panel or
+     dialog, xl a large sheet, full a pill, an avatar or a dot. */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Motion says what caused what, briefly (docs/style/design.md): out for what comes in and most changes, in for what
+     leaves, in-out for what moves there and back, spring only for a small thing that pops up. Three durations: 120ms
+     under the pointer (hover, press), 180ms the default, 280ms a panel or a dialog coming or going. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --default-transition-duration: 180ms;
+  --default-transition-timing-function: var(--ease-out);
+  --animate-pop-in: pop-in 280ms var(--ease-out) both;
+  --animate-fade-in: fade-in 180ms var(--ease-out) both;
 
   /* The farm's pixel skin: bg-cream-100, border-bark-900, text-leaf-600, font-pixel… */
   --font-pixel: "FusionPixel", "PingFang SC", sans-serif;
@@ -170,6 +198,8 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
+  /* Digits all one width: counts, times, quotas and money line up and do not jitter as they change. */
+  font-variant-numeric: tabular-nums;
 }
 /* In the base layer, so a utility wins over it: a field drawn in a box that shows the focus itself (outline-none,
    focus-within on the box) gets no second ring inside. */
@@ -178,6 +208,71 @@ body {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
   }
+}
+
+/* What comes over the page (a dialog, a menu, a popover) grows out of where it is, a little. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Less motion, asked for by the system: the workbench's transitions and its looping marks stop. The pixel skin's own
+   animations say for themselves (each has its reduced-motion rule) and the farm's canvas reads the same query. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after,
+  ::backdrop {
+    transition-duration: 0.01ms !important;
+  }
+  .animate-pulse,
+  .animate-bounce,
+  .animate-spin,
+  .animate-pop-in,
+  .animate-fade-in {
+    animation: none !important;
+  }
+}
+
+/* A list that scrolls fades out at the edge it can still scroll toward, by 16px, and not at an end it has reached: the
+   fades follow the scroll position on the compositor (a scroll timeline), with no script. Where scroll timelines are not
+   known (Safari) nothing fades. */
+@property --fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade-y {
+  from {
+    --fade-top: 0px;
+    --fade-bottom: 16px;
+  }
+  10%,
+  90% {
+    --fade-top: 16px;
+    --fade-bottom: 16px;
+  }
+  to {
+    --fade-top: 16px;
+    --fade-bottom: 0px;
+  }
+}
+@utility scroll-fade-y {
+  mask-image: linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent);
+  animation: scroll-fade-y linear both;
+  animation-timeline: scroll(self y);
 }
 
 /* The yard's signs hop a pixel now and then: one beat in nine of 350 ms. */

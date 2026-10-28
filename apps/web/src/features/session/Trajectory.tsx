@@ -371,7 +371,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   return (
     <div class="flex" style={{ height: `${lane * 3 + gap * 2}px` }}>
       <div class={[gutterW, "flex shrink-0 flex-col justify-between pl-2"]}>
-        <For each={lanes}>{(l) => <span class="text-[11px] leading-none text-muted">{laneNames[l]}</span>}</For>
+        <For each={lanes}>{(l) => <span class="text-2xs leading-none text-muted">{laneNames[l]}</span>}</For>
       </div>
       <div ref={(el) => (box = el)} class="relative min-w-0 flex-1 overflow-hidden">
         <For each={[0, 1, 2]}>

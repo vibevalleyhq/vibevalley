@@ -92,7 +92,7 @@ export function SettingsPage(props: { rest: string }) {
                 )}
               </For>
             </nav>
-            <div class="min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
+            <div class="scroll-fade-y min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />

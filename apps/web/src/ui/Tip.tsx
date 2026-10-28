@@ -11,7 +11,7 @@ export function Tip(props: { text: string; children: JSX.Element; class?: string
       <span
         id={props.id}
         role="tooltip"
-        class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 hidden w-max max-w-72 -translate-x-1/2 rounded-md bg-ink px-2 py-1 text-xs leading-snug font-normal whitespace-normal text-page shadow-float group-focus-within/tip:block group-hover/tip:block"
+        class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 hidden animate-fade-in w-max max-w-72 -translate-x-1/2 rounded-md bg-ink px-2 py-1 text-xs leading-snug font-normal whitespace-normal text-page shadow-float group-focus-within/tip:block group-hover/tip:block"
       >
         {props.text}
       </span>

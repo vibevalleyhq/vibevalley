@@ -30,7 +30,7 @@ function Slot(props: { to: string; label: string; current?: boolean; fill?: stri
       title={props.label}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
-      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px] text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
+      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
       style={props.current ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
     >
       {props.children}

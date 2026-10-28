@@ -140,7 +140,7 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
           </div>
           <div class="flex max-w-md min-w-50 flex-col gap-2">
             <p class="text-sm">{t("web.lan.lan.scan")}</p>
-            <p class="font-mono text-[11.5px] break-all select-all">{props.pairing.link}</p>
+            <p class="font-mono text-2xs break-all select-all">{props.pairing.link}</p>
             <p class="text-xs text-muted">{t("web.lan.lan.left", { s: left() })}</p>
             <div class="flex flex-wrap gap-2 pt-1">
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
