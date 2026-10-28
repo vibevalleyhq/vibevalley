@@ -35,20 +35,20 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
   return (
     <Show when={from()}>
       {(f) => (
-        <p class="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <p data-testid="from-template" data-key={f().template} data-version={f().version} class="flex flex-wrap items-center gap-2 text-xs text-muted">
           {t("web.agent.templates.from", { name: template()?.name ?? f().template, version: f().version })}
           <Show when={newer()}>
             {(v) => (
               <Show
                 when={sure()}
                 fallback={
-                  <Button title={t("web.agent.templates.updateHint")} onClick={() => setSure(true)}>
+                  <Button data-testid="template-update" title={t("web.agent.templates.updateHint")} onClick={() => setSure(true)}>
                     {t("web.agent.templates.update", { version: v() })}
                   </Button>
                 }
               >
                 <span>{t("web.agent.templates.updateHint")}</span>
-                <Button tone="primary" onClick={() => void update()}>
+                <Button tone="primary" data-testid="template-update-sure" onClick={() => void update()}>
                   {t("web.agent.templates.update", { version: v() })}
                 </Button>
                 <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>

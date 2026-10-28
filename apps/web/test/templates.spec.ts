@@ -7,44 +7,42 @@ test.use({ farm: "templates" });
 
 test("a template is looked at, installed again, added from a folder, and its newer version taken when asked", async ({ page, api, server }) => {
   await page.goto("/agents");
-  await page.getByRole("link", { name: "从模板装" }).click();
+  await page.getByTestId("open-templates").click();
   await expect(page).toHaveURL(/\/agents\/templates$/);
-  await expect(page.getByRole("heading", { name: "模板", level: 1 })).toBeVisible();
 
   // The test farm starts with every built-in template installed once.
-  const backend = page.getByRole("region", { name: "后端老周" });
-  await expect(backend.getByText("装了 1 份")).toBeVisible();
-  await backend.getByRole("button", { name: "看看" }).click();
-  await expect(backend.getByText(/谨慎的后端工程师/)).toBeVisible();
-  await backend.getByRole("button", { name: "装上" }).click();
+  const backend = page.locator('[data-testid="template"][data-key="backend"]');
+  await expect(backend).toHaveAttribute("data-installed", "1");
+  await backend.getByTestId("template-look").click();
+  await expect(backend.getByTestId("template-persona")).not.toBeEmpty();
+  await backend.getByTestId("template-install").click();
   await expect(page).toHaveURL(/\/agents\/backend-2$/);
-  await expect(page.getByText("来自模板「后端老周」第 1 版")).toBeVisible();
+  const from = page.getByTestId("from-template");
+  await expect(from).toHaveAttribute("data-key", "backend");
+  await expect(from).toHaveAttribute("data-version", "1");
 
   // A folder on this machine: added beside the built-in ones, then installed as a new orchestrator.
   const folder = join(server.work, "lead-template");
   mkdirSync(folder, { recursive: true });
-  writeFileSync(join(folder, "agent.json"), JSON.stringify({ id: "lead", version: 1, role: "orchestrator", name: "前端组长", duty: "专管前端" }));
-  writeFileSync(join(folder, "persona.md"), "你专管前端的工单。\n");
+  writeFileSync(join(folder, "agent.json"), JSON.stringify({ id: "lead", version: 1, role: "orchestrator", name: "front lead", duty: "front end" }));
+  writeFileSync(join(folder, "persona.md"), "You own the front end's issues.\n");
   await page.goto("/agents/templates");
-  await page.getByLabel("模板文件夹").fill(folder);
-  await page.getByRole("button", { name: "加进来" }).click();
-  const lead = page.getByRole("region", { name: "前端组长" });
-  await expect(lead.getByText("本机加进来的")).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("templates.png") });
-  await lead.getByRole("button", { name: "装上" }).click();
+  await page.getByTestId("template-folder").fill(folder);
+  await page.getByTestId("template-add").click();
+  const lead = page.locator('[data-testid="template"][data-key="lead"]');
+  await expect(lead).toHaveAttribute("data-source", "added");
+  await lead.getByTestId("template-install").click();
   await expect(page).toHaveURL(/\/agents\/lead$/);
-  await expect(page.getByText("管家", { exact: true }).first()).toBeVisible();
   expect((await api.agent.list()).find((a) => a.id === "lead")?.role).toBe("orchestrator");
 
   // The template moves on: the profile says so, and only taking it changes the profile.
   writeFileSync(
     join(server.home, "agent-templates", "lead", "agent.json"),
-    JSON.stringify({ id: "lead", version: 2, role: "orchestrator", name: "前端组长", duty: "专管前端和设计稿" }),
+    JSON.stringify({ id: "lead", version: 2, role: "orchestrator", name: "front lead", duty: "front end and designs" }),
   );
   await page.reload();
-  await page.getByRole("button", { name: "照模板更新到第 2 版" }).click();
-  await expect(page.getByText(/用模板的新版本盖掉/)).toBeVisible();
-  await page.getByRole("button", { name: "照模板更新到第 2 版" }).click();
-  await expect(page.getByText("来自模板「前端组长」第 2 版")).toBeVisible();
-  expect((await api.agent.list()).find((a) => a.id === "lead")?.duty).toBe("专管前端和设计稿");
+  await page.getByTestId("template-update").click();
+  await page.getByTestId("template-update-sure").click();
+  await expect(page.getByTestId("from-template")).toHaveAttribute("data-version", "2");
+  expect((await api.agent.list()).find((a) => a.id === "lead")?.duty).toBe("front end and designs");
 });

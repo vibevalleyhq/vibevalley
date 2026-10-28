@@ -49,6 +49,7 @@ function AgentsPage() {
           <span class="flex flex-wrap items-center gap-2">
             <A
               href="/agents/templates"
+              data-testid="open-templates"
               title={t("web.agent.templates.openLine")}
               class="inline-flex h-7 items-center gap-1.5 rounded-md border border-line px-2.5 text-sm hover:bg-hover"
             >

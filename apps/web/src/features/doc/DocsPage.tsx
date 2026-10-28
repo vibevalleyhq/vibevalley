@@ -85,12 +85,13 @@ export function DocsPage(props: { rest: string }) {
           }}
         >
           <TextInput
+            data-testid="new-doc-title"
             aria-label={t("web.doc.docs.newTitle")}
             placeholder={t("web.doc.docs.newTitle")}
             value={title()}
             onInput={(e) => setTitle(e.currentTarget.value)}
           />
-          <Button type="submit" tone="primary" icon="add">
+          <Button type="submit" tone="primary" icon="add" data-testid="new-doc">
             {t("web.doc.docs.new")}
           </Button>
         </form>
@@ -203,10 +204,18 @@ function DocView(props: { id: string }) {
   };
   const doc = () => (version(), editor.doc);
   return (
-    <article aria-label={doc()?.title ?? t("web.doc.docs.doc")} class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2">
+    <article
+      aria-label={doc()?.title ?? t("web.doc.docs.doc")}
+      data-testid="doc"
+      data-key={doc()?.id}
+      data-state={(version(), editor.error ? "error" : editor.busy ? "saving" : "saved")}
+      data-blocks={(version(), editor.blocks.length)}
+      data-writing={(version(), editor.othersWriting) ? "" : undefined}
+      class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2"
+    >
       <div class="flex items-start gap-2 pb-1 pl-[35px]">
         <h1 class="min-w-0 flex-1 text-2xl font-semibold">{doc()?.title ?? ""}</h1>
-        <Button icon="play" onClick={() => void editor.demo()}>
+        <Button icon="play" data-testid="doc-demo" onClick={() => void editor.demo()}>
           {t("web.doc.docs.demo")}
         </Button>
       </div>
@@ -218,7 +227,13 @@ function DocView(props: { id: string }) {
           {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} />}
         </For>
         {/* Below the last block: a click starts a new paragraph. */}
-        <button type="button" aria-label={t("web.doc.docs.append")} class="block h-16 w-full cursor-text" onClick={() => editor.append()} />
+        <button
+          type="button"
+          data-testid="doc-append"
+          aria-label={t("web.doc.docs.append")}
+          class="block h-16 w-full cursor-text"
+          onClick={() => editor.append()}
+        />
       </div>
     </article>
   );
@@ -271,7 +286,12 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
             ? "issue"
             : "text";
   return (
-    <div data-block={r().block.id} class={["flex items-start pb-0.5", r().type === blockHeading ? "pt-2.5" : "pt-0.5"]}>
+    <div
+      data-block={r().block.id}
+      data-type={r().type}
+      data-writing={r().writing ? "" : undefined}
+      class={["flex items-start pb-0.5", r().type === blockHeading ? "pt-2.5" : "pt-0.5"]}
+    >
       <span class="w-[22px] shrink-0 pt-[3px]">
         <Show when={r().showFace}>
           <AgentFace agentId={r().updatedBy} look={props.agent?.look} runtime={props.agent?.runtime} size={18} />

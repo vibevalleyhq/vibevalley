@@ -54,13 +54,14 @@ export function TemplatesPage() {
           }}
         >
           <TextInput
+            data-testid="template-folder"
             aria-label={t("web.agent.templates.folder")}
             placeholder={t("web.agent.templates.folderHint")}
             value={path()}
             onInput={(e) => setPath(e.currentTarget.value)}
             class="min-w-0 flex-1"
           />
-          <Button type="submit" disabled={adding() || !path().trim()}>
+          <Button type="submit" data-testid="template-add" disabled={adding() || !path().trim()}>
             {t("web.agent.templates.add")}
           </Button>
         </form>
@@ -107,7 +108,14 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
     }
   };
   return (
-    <section aria-label={template().name} class="flex flex-col gap-3 rounded-lg border border-line bg-page p-4">
+    <section
+      aria-label={template().name}
+      data-testid="template"
+      data-key={template().id}
+      data-installed={template().installed.length}
+      data-source={template().source}
+      class="flex flex-col gap-3 rounded-lg border border-line bg-page p-4"
+    >
       <div class="flex items-start gap-3">
         <span class="flex size-16 shrink-0 items-center justify-center rounded-lg bg-hover">
           <Show when={orchestrator()} fallback={<AgentFace agentId={template().id} runtime={template().runtime} look={template().look} size={56} />}>
@@ -130,7 +138,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
         </span>
       </div>
       <Show when={open()}>
-        <div class="flex flex-col gap-2 rounded-md bg-hover p-3 text-sm">
+        <div data-testid="template-persona" class="flex flex-col gap-2 rounded-md bg-hover p-3 text-sm">
           <Show when={template().tags.length > 0}>
             <p class="text-muted">
               {t("web.agent.tags")}
@@ -147,7 +155,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
           {template().installed.length > 0 ? t("web.agent.templates.installed", { n: template().installed.length }) : ""}
           {template().source === "added" ? t("web.agent.templates.addedHere") : ""}
         </span>
-        <Button aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
+        <Button data-testid="template-look" aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
           {open() ? t("web.agent.templates.fold") : t("web.agent.templates.look")}
         </Button>
         <Show when={template().source === "added"}>
@@ -157,7 +165,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
             </Button>
           </Show>
         </Show>
-        <Button tone="primary" disabled={busy()} onClick={() => void install()}>
+        <Button tone="primary" data-testid="template-install" disabled={busy()} onClick={() => void install()}>
           {t("web.agent.templates.install")}
         </Button>
       </div>
