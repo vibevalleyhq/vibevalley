@@ -3,14 +3,14 @@ import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
+import { Icon, type IconSize } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
 export { Dot } from "../../ui/Dot";
 
-export function PhaseGlyph(props: { phase: Phase; size?: number }) {
+export function PhaseGlyph(props: { phase: Phase; size?: IconSize }) {
   return (
     <Show
       when={phaseIcon(props.phase)}

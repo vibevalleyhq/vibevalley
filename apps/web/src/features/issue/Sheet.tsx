@@ -67,7 +67,7 @@ export function More(props: { children: JSX.Element }) {
   return (
     <div class="mt-1">
       <button type="button" onClick={() => setOpen(!open())} class="flex cursor-pointer items-center gap-1.5 py-1 text-xs text-muted hover:text-ink">
-        <Icon name="expand" size={8} class={{ "rotate-90": open() }} />
+        <Icon name="expand" size={10} class={{ "rotate-90": open() }} />
         {open() ? t("web.issue.sheet.less") : t("web.issue.sheet.more")}
       </button>
       <Show when={open()}>
