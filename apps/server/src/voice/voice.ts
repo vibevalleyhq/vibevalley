@@ -823,7 +823,7 @@ export const make = (options: VoiceOptions = {}) =>
       mossLine: (page) => relay(page, settings.mossKey(), options.moss),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
-        if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "call"));
+        if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
         const format = given.trim().replace(/^\./, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
@@ -856,7 +856,7 @@ export const make = (options: VoiceOptions = {}) =>
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
               signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
-          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: message(e) }), "call"),
+          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: message(e) }), "dictation"),
         });
         const raw = (yield* Effect.tryPromise({
           try: () => res.text(),

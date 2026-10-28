@@ -30,9 +30,9 @@
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrence/…` |
 | 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/project/template/list` |
 | 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/notice/inbox.ts` 从核心状态现算） | |
-| 连接器 | 连接器 | `/settings/connectors`（`features/connector/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connector/…` |
-| （不画） | 连接到本机 | `/settings/lan`（`features/lan/LanPage.tsx`）、连进来的设备的 `/pair`（`features/lan/PairPage.tsx`） | `LanStatus`、`LanDevice` | `/api/v1/lan/…` |
-| 语音 | 麦克风 | `/settings/voice`（`features/voice/VoiceForm.tsx`）、`features/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
+| 连接器 | 连接器 | `/settings/chat`（`features/connector/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connector/…` |
+| （不画） | 连接到本机 | `/settings/devices`（`features/lan/LanPage.tsx`）、连进来的设备的 `/pair`（`features/lan/PairPage.tsx`） | `LanStatus`、`LanDevice` | `/api/v1/lan/…` |
+| 语音 | 麦克风 | `/settings/call`、`/settings/moss`、`/settings/dictation`（`features/voice/VoiceForm.tsx`）、`features/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/panels/Achievements.tsx` | `Progress`、`LedgerEntry`、`WorkspaceState.progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievement.list` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.level` | |
 | 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 干活地点是服务端 `Workplace`；开 worktree 时分支由 `issueBranch` 给出，目录是 `worktrees/<项目>.<工单号>`，否则直接在项目目录且 `branch` 为空；`FarmView.plots` 按帮工的 id 做键（服务端 `game/view.ts` 的 `viewOf`）；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/channel/message/send` 的 `station` |

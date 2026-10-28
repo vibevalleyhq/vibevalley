@@ -47,7 +47,7 @@ export function TitleScreen() {
         return canContinue() ? farm.closeTitle() : undefined;
       case "settings":
         farm.closeTitle();
-        return router.navigate("/settings");
+        return router.navigate("/settings/models");
     }
   };
 

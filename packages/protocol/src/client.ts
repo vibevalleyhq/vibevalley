@@ -1,6 +1,7 @@
 // Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
 import type { ApiError } from "./api";
+import { VoiceFixValues } from "./shapes";
 import type * as T from "./shapes";
 import { t } from "@vibevalley/i18n";
 
@@ -37,7 +38,7 @@ function apiErrorOf(value: unknown): ApiError | undefined {
     case "Missing":
       return typeof value.what === "string" && validNext(value.next) ? (value as unknown as ApiError) : undefined;
     case "VoiceUnavailable":
-      return validReason(value) && (value.settings === undefined || ["deepseek", "voice"].includes(value.settings as string))
+      return validReason(value) && (value.settings === undefined || (VoiceFixValues as readonly unknown[]).includes(value.settings))
         ? (value as unknown as ApiError)
         : undefined;
     case "VoiceAgentFailed":

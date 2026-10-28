@@ -19,7 +19,7 @@ test("a new farm: 继续游戏 is off, 开始游戏 asks for the key first, 设�
   await page.keyboard.press("Enter");
   await expect(title.getByRole("status")).toContainText("先填钥匙");
   await title.getByRole("button", { name: "设置" }).click();
-  await expect(page).toHaveURL(/\/settings\/deepseek$/);
+  await expect(page).toHaveURL(/\/settings\/models$/);
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await expect(title).toHaveCount(0);

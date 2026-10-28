@@ -66,7 +66,9 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **首页**：只在这台设备第一次打开农场时出来（`localStorage` 的 `vibevalley.title.seen`），之后直接进农场，菜单的「回到首页」能回去。
 
-**工作台的路由**（`base/router.ts`、`app/App.tsx`）：`/` 打开工作台的第一个地方（聊天），农场是一个皮、点一下就到；`/farm/<项目>` 是这个项目的农场，`/farm` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/orchestrator` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回工作台。
+**工作台的路由**（`base/router.ts`、`app/App.tsx`）：`/` 打开工作台的第一个地方（聊天），或这台设备在「设置 › 通用」选的农场（`base/prefs.ts` 的 `start`）；`/farm/<项目>` 是这个项目的农场，`/farm` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/orchestrator` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到「通用」；带 id 的路径打开同一页的详情；不认识的路径回工作台。
+
+**外观**（`base/appearance.ts`，页面一开就跟着）：主题和界面大小是这台设备的偏好（`base/prefs.ts`，`localStorage`），不进 `settings.json`：手机和电脑常常想要不一样的。主题写成 `<html data-theme>`（`light`、`dark`；「跟随系统」时照 `prefers-color-scheme` 算，系统变了跟着变），再经宿主接口的 `theme` 告诉桌面壳（`nativeTheme.themeSource`），菜单、滚动条一起变。工作台的颜色全在 `style.css` 的调色板里，按用途起名（`page`、`ink`、`ok-soft`、`warn-ink`、`scrim`、`rail`……），浅色和深色各一套 `--wb-*` 值，`@theme inline static` 把颜色名接到它们上；类名里写死颜色（`bg-[#…]`）由 lint `vibevalley/no-hex-color` 拦下，农场、记忆树、像素组件和头像是画出来的，不查，它们的根元素写 `data-theme="light"`，深色进不去。界面大小（90%–125%）是 `--workbench-zoom`，只有 `Shell` 用 CSS `zoom` 缩放；农场按整数倍放大，不跟着变。
 
 **通知和菜单栏**（`src/features/notice/Follow.tsx`，挂在每一页上）：
 
@@ -80,7 +82,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 手机的每条通话线路在桥上带自己的身份；静音、续期、挂断和字幕只归这一条。原生宿主（`apps/mobile/src/host.ts`）属于当前加载的页面；重新加载、返回配对或换农场时关闭宿主，连还在等麦克风权限、等入线的电话一起取消。原生声网只有一个引擎，`rtc.ts` 在下一次入线前结束旧尝试，按频道和本机用户号认回调；旧权限答复、旧频道排队的事件和迟到的挂断不能碰新线路。异步入线失败只认带连接身份的失败状态，不把引擎的全局错误当作某条电话的结果。锁屏不关闭页面宿主，通话继续。
 
-**打包**：`vp run package:mac` 构建页面和壳，把 `apps/server` 连同生产依赖放进 `dist/stage/server`（`packages/protocol` 拷成真的文件夹），electron-builder 打出 `apps/desktop/dist` 里的 `.app` 和 `.dmg`，`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。没有签名和公证。
+**打包**：`vp run package:mac` 构建页面和壳，把 `apps/server` 连同生产依赖放进 `dist/stage/server`（服务端用到的每个 workspace 包拷成真的文件夹，`src/workspace.ts` 照 `package.json` 找），electron-builder 打出 `apps/desktop/dist` 里的 `.app` 和 `.dmg`，`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。没有签名和公证。
 
 ## 和谁打交道
 
@@ -92,6 +94,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 ## 为什么这样
 
+- **设置按用途分组，一行一项，厂商名只在组里。** 原来九个分区平铺，有的是厂商（DeepSeek、GitHub）、有的是功能（语言），加一家厂商就多一个分区；现在「选项」「帮工」「语音」「连接」四组，同一种东西（钥匙、开关）在哪一页都是同一种行，搜索才能按行找到。放弃了页内页签（语音、连接两组的几页）：页签藏在页里，搜不到，也不能直接链过去。
+- **主题是这台设备的，颜色先收进调色板再换。** 一处写死的颜色在深色里就是一块错的，照抄的人越多越难改；所以先把 28 处写死的颜色改成按用途起名的调色板，再加 lint，深色只是换一套值。放弃了只改根字号做缩放：工作台里大量像素字号不跟着变。
 - **手机是 React Native 壳加 WebView，不重写页面。** 扫码、钥匙串、锁屏不断的通话、系统通知这几样浏览器做不好，所以壳是原生的；其余是 WebView 里同一份页面，规则和画面不写第二遍。放弃了只用浏览器（PWA）：iOS 上推送受限、锁屏后通话会断、扫码要先开相机 app 再跳浏览器；放弃了 Tauri 的手机端：多一门 Rust，打电话还是要写原生插件。通话交给壳的原生 SDK，页面只换一层 `Rtc`：会话、字幕、和管家的往来照旧在页面里，桥上只走一条线该做的几件事。
 - **一份页面，三个宿主。** 桌面、浏览器、手机各写一份界面时，规则和画面都要写几遍；一份页面由服务端提供，宿主只补它没有的能力。放弃了留在 Flutter（规则在 Go 和 Dart 写两遍，形状靠生成器搬）和 Tauri（多一门 Rust，系统 WebView 回到 WKWebView 的语音问题）。
 - **页面用 Solid 2。** 帧来得密：React 每来一帧，读它的组件全部重渲染；Solid 的组件只跑一次，帧按 id 合并进 store 后只更新读了变动字段的地方，不用手写选择器和 `memo`，也没有依赖数组和为闭包读旧值写的 ref。Pixi 舞台、声网通话、两条流都是外面自己会变的东西，接成信号比 `useSyncExternalStore` 加 ref 直接。放弃了留在 React 加选择器（解决了重渲染，依赖数组和 ref 还在）、Solid 1.9（2.0 改得多，等于再迁一次）和长期两种框架并存（两套写法，agent 不知道该抄哪个）。代价是 2.0 还是 RC：`solid-js`、`@solidjs/web`、`@tanstack/solid-query`、`@solidjs/vite-plugin` 钉死在具体版本，升级单独做；模型多半只会写 1.x，`eslint-plugin-solid` 的 v2 规则（经 oxlint 的 JS 插件）挡住删掉的 API、一个参数的 effect、解构的 props 和提前 `return` 的组件，语义变了、名字没变的写法（写完马上读到旧值、读窄化的值）靠 Playwright。
