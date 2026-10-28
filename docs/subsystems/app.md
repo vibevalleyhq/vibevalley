@@ -52,13 +52,13 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 **开机（桌面）**
 
 1. Electron 拿单实例锁；拿不到就退出，让已经开着的那个出来。
-2. 马上开窗口，先放页面文件里的 `opening.html`（`apps/web/public`，从应用自己的文件读，不经服务端）：一条在走的条和「叫醒农场……」，样子和农场的「进村」条一样，窗口底色是页面的地色。
+2. 马上开窗口，先放页面文件里的 `opening.html`（`apps/web/public`，从应用自己的文件读，不经服务端）：工作台的地色（跟着系统的主题），过一会儿淡出头像、一根细条和「叫醒农场……」；窗口底色是工作台在当前主题下的页面色，页面换主题时跟着换，所以刷新时窗口不会闪出别的颜色。
 3. 问登录 shell 要 PATH（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的），因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。
 4. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
 5. 等收据：服务端开始答 HTTP 以后在 stdout 写一行 JSON（`url`、`pid`）。40 秒没有、或子进程先退出，就停掉它，窗口换成同一页带着原因（`?problem=`，「农场起不来：……，日志在 ……」），关掉窗口应用退出；窗口已经被关掉时弹框说。
 6. 窗口换到那个地址；注册 ⌥⇧Space（被别的程序占了也照常开，页面的通话按钮还能用）。
 
-**打开页面**：`index.html` 构建时嵌进 `opening.html` 里同一段条（`apps/web/vite.config.ts` 的 `opening`），所以页面的脚本还没跑起来时就是这条；`Root` 的 `<Loading>` 第一次安定下来时把它拿掉，农场自己的「进村」条在同一个位置接着走。
+**打开页面**：`index.html` 构建时嵌进 `opening.html` 里同一段盖子（`apps/web/vite.config.ts` 的 `opening`），所以页面的脚本还没跑起来时就是它。它在页面的脚本之前按地址和主人的选择（`localStorage` 里 `base/prefs.ts` 的那份）定样子：农场的路径是村子的地色和「进村」条，`Root` 第一次安定下来时就拿掉，农场自己的条在同一个位置接着走；其余是工作台的地色，主题也在这时写上 `<html>`，`base/opening.ts` 等第一帧、这一页的读请求和图都齐了（最多 2 秒）再让它淡出，盖着时进来的动效直接到终点（[打开和刷新](docs/style/design.md#打开和刷新)）。
 
 **灵动岛（macOS）**：服务端起来后，桌面壳起 `VibeValleyIsland`（开发时是 `apps/island/.build/release`，`scripts/build.ts` 编它；打包的应用在 `Contents/Resources/island`），带上页面的像素字；不是 macOS 或没编出来就只是不显示。桌面壳的主进程自己订阅 `/api/v1/state`（断了一秒后重连），每一帧用 `glanceOf` 算成一份摘要：在做、等你回答、等你验收、卡住了的工单各一行，等你的在前；在做的写帮工和它这一刻在干什么（`phaseText`），等你的写等什么（词表的 `attention`、`stuck`）；刘海两边的两句也写在摘要里（`strip`，桌面壳的词表）。摘要变了才写一行 `{"glance": …}` 到岛的 stdin。岛贴着内置屏的刘海（`safeAreaInsets` 和刘海两边的菜单栏算出位置），没有内置屏时挂在主屏菜单栏正中；收起时刘海左边是在干几个，右边是等你几个；指针移上去展开成一行一张工单（最多 6 行）；点一行，岛在 stdout 写 `{"open": "<工单>"}`，桌面壳把窗口叫到前面、开到 `/issues/<工单>`。没有在做也没有等你的，岛不出来。窗口不抢焦点，所有桌面上都有，全屏的应用上不出现。桌面壳退出时关掉岛的 stdin，岛跟着退出。
 
