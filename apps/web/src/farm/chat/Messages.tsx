@@ -16,8 +16,6 @@ import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
 import { PxMarkdown, SpriteIcon } from "../../ui/pixel";
 
-import { usePrefs } from "../../base/prefs";
-
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
 /** A message's text; a long one shows its first lines until opened. */
@@ -62,7 +60,6 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
   const session = () => core()?.sessions.find((s) => s.id === (props.m.session ?? props.m.from));
   const agentId = () => props.m.agent ?? session()?.agent ?? props.m.from;
   const agent = () => props.agents.get(agentId());
-  const look = usePrefs((p) => p.orchestratorLook);
   const size = () => props.size ?? 30;
   return (
     <Switch fallback={<AgentFace agentId={agentId()} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={size()} />}>
@@ -70,7 +67,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
         <OwnerFace size={size()} />
       </Match>
       <Match when={props.m.fromKind === "orchestrator"}>
-        <OrchestratorFace size={size()} look={look()} />
+        <OrchestratorFace size={size()} agent={props.m.from} />
       </Match>
     </Switch>
   );

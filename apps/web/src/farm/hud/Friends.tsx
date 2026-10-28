@@ -4,7 +4,7 @@
 
 import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
-import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
+import type { Agent } from "@vibevalley/protocol";
 import { bottleSprite, quotaOf } from "../../features/runtime";
 import { statusOf, type FriendStatus } from "./friendStatus";
 import { farm } from "../store";
@@ -127,7 +127,7 @@ export function Friends(props: { height: number }) {
   const frames = useFrames();
   const open = useFarm((s) => s.friendsOpen);
   const sorted = () => {
-    const work = ready(agents, []).filter((a) => a.id !== defaultOrchestrator);
+    const work = ready(agents, []).filter((a) => a.role === "worker");
     return [...work.filter((a) => a.enabled), ...work.filter((a) => !a.enabled)];
   };
   const statuses = () => {

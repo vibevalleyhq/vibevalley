@@ -295,8 +295,9 @@ export interface Channel {
   default?: boolean;
   /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
-  /** The orchestrator that looks after a channel, by its profile id: the owner's words there go to it. Absent is the
-   * default one (defaultOrchestrator). */
+  /** The orchestrator that looks after the place, by its profile id, as the server resolves it: a channel's own (the
+   * default one when it has none), a thread's channel's, a direct channel's peer when that is an orchestrator. The
+   * owner's words there go to it. */
   orchestrator?: string;
   /** A thread's channel. */
   parent?: string;
@@ -1098,6 +1099,8 @@ export interface Agent {
 export interface Look {
   species?: Species;
   outfit?: Outfit;
+  /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A worker has none. */
+  manager?: ManagerLook;
   build: Build;
   head: Head;
   body: string;
@@ -1111,6 +1114,9 @@ export type Head = (typeof HeadValues)[number];
 
 export const BuildValues = ["biped", "treads", "wheel", "hopper", "hover"] as const;
 export type Build = (typeof BuildValues)[number];
+
+export const ManagerLookValues = ["farmer", "foreman", "auntie", "grandpa", "gardener", "robot"] as const;
+export type ManagerLook = (typeof ManagerLookValues)[number];
 
 export const OutfitValues = ["farmer", "gardener", "rain", "winter"] as const;
 export type Outfit = (typeof OutfitValues)[number];

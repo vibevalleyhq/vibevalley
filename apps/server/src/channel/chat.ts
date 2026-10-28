@@ -601,7 +601,7 @@ export const make = Effect.gen(function* () {
       type: channelType(row.type),
       ...(row.is_default ? { default: true } : {}),
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
-      ...(row.orchestrator !== null ? { orchestrator: row.orchestrator } : {}),
+      orchestrator: orchestratorOfRow(row),
       ...(row.category !== null ? { category: row.category } : {}),
       ...(row.position !== null ? { position: row.position } : {}),
       ...(row.archived_at !== null ? { archived: row.archived_at } : {}),
@@ -1801,6 +1801,8 @@ export const make = Effect.gen(function* () {
           model.patched(id, { name, category, orchestrator });
           for (const [position, each] of (order ?? []).entries()) model.patched(each, { position });
           for (const each of order ?? [id]) yield* publishChannel(each);
+          // Its threads are looked after by the same orchestrator: they show the new one too.
+          if (orchestrator !== row.orchestrator) for (const t of model.threadsOf(id)) yield* publishChannel(t.id);
         }),
       ),
     archive: (id) =>

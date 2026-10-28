@@ -1,7 +1,7 @@
 import { issuesWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { defaultOrchestrator } from "@vibevalley/protocol";
+import { useOrchestrators } from "../../base/agents";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
 import { type BoardCard, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
 import { closedShown, laneLabel, laneStatus } from "./rules";
@@ -30,10 +30,11 @@ export function IssueList(props: {
   const [folded, setFolded] = createSignal<ReadonlySet<string>>(new Set());
   const [adding, setAdding] = createSignal<string | null>(null);
   const nameOf = useNameOf();
+  const orchestrators = useOrchestrators();
+  const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
 
   // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the orchestrator's), or the one group.
-  const canAdd = (g: RowGroup<BoardCard>) =>
-    props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? g.key !== defaultOrchestrator : true;
+  const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
   const add = (g: RowGroup<BoardCard>, text: string) => {
     setAdding(null);
     props.onAdd(text, props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
@@ -74,7 +75,13 @@ export function IssueList(props: {
                 case "project":
                   return <Icon name="button-folder" size={14} />;
                 case "agent":
-                  return !key ? <NoFaceMark size={14} /> : key === defaultOrchestrator ? <OrchestratorFace size={16} /> : <AgentFaceOf agent={key} size={16} />;
+                  return !key ? (
+                    <NoFaceMark size={14} />
+                  ) : isOrchestrator(key) ? (
+                    <OrchestratorFace size={16} agent={key} />
+                  ) : (
+                    <AgentFaceOf agent={key} size={16} />
+                  );
                 default:
                   return null;
               }

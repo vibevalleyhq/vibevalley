@@ -45,6 +45,7 @@ import { Toggle } from "../../ui/layout";
 import { MemoryPanel } from "../memory";
 import { useSkills } from "../runtime";
 import { TrajectoryList } from "../session";
+import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;
@@ -103,6 +104,9 @@ export function AgentPage(props: { id: string }) {
             {agentsWording().backToAll}
           </A>
         </p>
+      </Match>
+      <Match when={(saved()?.role ?? (search().get("role") === "orchestrator" ? "orchestrator" : "worker")) === "orchestrator" && loaded()}>
+        {(all) => <OrchestratorProfile saved={saved()} start={untrack(() => saved() ?? newOrchestrator())} all={all()} />}
       </Match>
       <Match when={loaded()}>
         {(all) => <Creator saved={saved()} start={untrack(() => saved() ?? newAgent(search().get("runtime") ?? "claude", ready(runtimes, [])))} all={all()} />}

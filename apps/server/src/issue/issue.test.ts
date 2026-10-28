@@ -617,7 +617,7 @@ describe("issues", () => {
       const refused = (to: "done" | "todo", agent: string) =>
         Effect.map(Effect.flip(issues.setStatus(issue.id, to, "", chat.defaultChannel(), owner, { assignee: agent })), reasonOf);
       expect(yield* refused("done", "lab2")).toContain("换人是挪到待办时的事");
-      expect(yield* refused("todo", "nobody")).toContain("没有叫 nobody 的帮工档案");
+      expect(yield* refused("todo", "nobody")).toContain("没有叫 nobody 的档案");
 
       const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.defaultChannel(), owner, { assignee: "Lab Two" });
       expect([handed.assignee, handed.sessions.length, handed.closedAt]).toEqual(["lab2", 2, undefined]);

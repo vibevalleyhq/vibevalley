@@ -3,16 +3,7 @@
 import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { closedText } from "@vibevalley/protocol/rules";
-import {
-  type WorkspaceState,
-  type Issue,
-  type IssueStatus,
-  defaultOrchestrator,
-  type Run,
-  type RunTrigger,
-  type Session,
-  type TaskGraph,
-} from "@vibevalley/protocol";
+import { type WorkspaceState, type Issue, type IssueStatus, type Run, type RunTrigger, type Session, type TaskGraph } from "@vibevalley/protocol";
 
 /** Where a dispatched issue is on the board: not sent yet, in the works, waiting on the owner, or closed. */
 export type IssueTag = "queued" | "working" | "waiting" | "closed";
@@ -37,7 +28,8 @@ export const tagOpen = (t: IssueTag) => t !== "closed";
 /** The tag in words: the status while open, what its close says after. */
 export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? wording().status[issue.status] : closedText(issue));
 
-export const isForOrchestrator = (issue: Issue) => issue.assignee === defaultOrchestrator;
+/** Assigned to an orchestrator (orchestrators: their profile ids): it answers it, no helper works it. */
+export const isForOrchestrator = (issue: Issue, orchestrators: ReadonlySet<string>) => orchestrators.has(issue.assignee ?? "");
 
 export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
   const job = issue.title.trim();

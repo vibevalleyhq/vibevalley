@@ -10,8 +10,8 @@ const state = (orchestrator: OrchestratorState, where?: string): WorkspaceState 
 });
 
 test("the orchestrator's dots show only in the channel it thinks or writes in", () => {
-  expect(orchestratorTyping(state("thinking", "c1"), at("c1"))).toBe("thinking");
-  expect(orchestratorTyping(state("speaking", "c1"), at("c1"))).toBe("speaking");
+  expect(orchestratorTyping(state("thinking", "c1"), at("c1"))).toEqual({ agent: "orchestrator", mood: "thinking" });
+  expect(orchestratorTyping(state("speaking", "c1"), at("c1"))).toEqual({ agent: "orchestrator", mood: "speaking" });
   expect(orchestratorTyping(state("thinking", "c1"), at("c2"))).toBeUndefined();
   expect(orchestratorTyping(state("thinking"), at("c1"))).toBeUndefined();
   expect(orchestratorTyping(state("listening", "c1"), at("c1"))).toBeUndefined();
@@ -21,7 +21,7 @@ test("the orchestrator's dots show only in the channel it thinks or writes in", 
     sessions: [],
     orchestrators: { orchestrator: { state: "listening" }, lead: { state: "speaking", channel: "c2" } },
   };
-  expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, "speaking"]);
+  expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking" }]);
 });
 
 test("the sidebar lists the default first, then by place, grouped in the order the groups first come", () => {

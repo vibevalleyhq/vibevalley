@@ -5,6 +5,7 @@ import { chatWording } from "./words";
 import { appWording } from "../../base/words";
 import { wording } from "@vibevalley/protocol/words";
 import {
+  type Agent,
   type Chat,
   type ChatMessage,
   type Channel,
@@ -208,10 +209,13 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
 }
 
 /** An orchestrator's dots in a channel: one is thinking or writing its answer there, as the server says. */
-export function orchestratorTyping(state: WorkspaceState | undefined, channel: Channel | undefined): "thinking" | "speaking" | undefined {
+export function orchestratorTyping(
+  state: WorkspaceState | undefined,
+  channel: Channel | undefined,
+): { readonly agent: string; readonly mood: "thinking" | "speaking" } | undefined {
   if (!channel) return undefined;
-  for (const now of Object.values(state?.orchestrators ?? {}))
-    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking")) return now.state;
+  for (const [agent, now] of Object.entries(state?.orchestrators ?? {}))
+    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking")) return { agent, mood: now.state };
   return undefined;
 }
 
@@ -294,14 +298,25 @@ export interface Nameable {
   name: string;
   note: string;
   session?: Session;
+  /** An orchestrator's profile id. */
+  orchestrator?: string;
 }
 
 export const menuMax = 6;
 
-/** Everyone only when there is more than one helper. */
-export const nameables = (sessions: Session[], now: number): Nameable[] => [
+/** The place's orchestrator (here) is @管家, every other orchestrator its @<profile id>; everyone only when there is
+ * more than one helper. */
+export const nameables = (sessions: Session[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  { token: mentionOf[defaultOrchestrator]!, name: appWording().orchestrator, note: chatWording().names.orchestratorNote },
+  {
+    token: mentionOf[defaultOrchestrator]!,
+    name: orchestrators.find((a) => a.id === here)?.name || appWording().orchestrator,
+    note: chatWording().names.orchestratorNote,
+    orchestrator: here,
+  },
+  ...orchestrators
+    .filter((a) => a.id !== here)
+    .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || chatWording().names.orchestratorNote, orchestrator: a.id })),
   ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: chatWording().names.everyone, note: chatWording().names.everyoneNote }] : []),
 ];
 

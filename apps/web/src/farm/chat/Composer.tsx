@@ -138,7 +138,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
               type="button"
               aria-label={farmWording().chat.stop}
               title={farmWording().chat.stopHint}
-              onClick={() => void api.orchestrator.stop({}).catch(() => {})}
+              onClick={() => void api.orchestrator.stop({ agent: box.here() }).catch(() => {})}
               class="cursor-pointer p-1"
             >
               <SpriteIcon name="button-stop" size={24} />

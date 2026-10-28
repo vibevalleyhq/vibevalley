@@ -13,7 +13,6 @@ import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../../ui/pixel";
 
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
-import { usePrefs } from "../../base/prefs";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [wording().outcome.completed, "#efcf92", "#2f1f13"],
@@ -28,7 +27,6 @@ type Row = { kind: "said" | "report"; message: ChatMessage };
 
 export function FarmLog() {
   const core = useCore();
-  const look = usePrefs((p) => p.orchestratorLook);
   const general = useFollowed(() => defaultOf(core()?.chat)?.id);
   const reports = useReports();
   const rows = (): Row[] =>
@@ -53,7 +51,7 @@ export function FarmLog() {
                   when={row().kind === "said"}
                   fallback={<Report r={row().message} issue={issueOfSession(core(), row().message.session ?? row().message.from)} />}
                 >
-                  <Said m={row().message} look={look()} />
+                  <Said m={row().message} />
                 </Show>
               </div>
             </div>
@@ -64,11 +62,11 @@ export function FarmLog() {
   );
 }
 
-function Said(props: { m: ChatMessage; look: string }) {
+function Said(props: { m: ChatMessage }) {
   const you = () => props.m.fromKind === "owner";
   return (
     <>
-      <Show when={you()} fallback={<OrchestratorFace size={32} look={props.look} />}>
+      <Show when={you()} fallback={<OrchestratorFace size={32} agent={props.m.from} />}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">{farmWording().log.you}</span>
       </Show>
       <div class="min-w-0 flex-1">

@@ -32,7 +32,7 @@ import { useMarkRead } from "./data";
 import { editingId, setEditingId } from "./draft";
 import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "../session";
-import { useAgent } from "../../base/agents";
+import { useAgent, useOrchestrators } from "../../base/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {
   completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "icon-harvest" },
@@ -101,6 +101,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
   const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
   const typing = () => orchestratorTyping(core(), props.channel);
+  const orchestrators = useOrchestrators();
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
@@ -171,15 +172,17 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
           )}
         </For>
         <Show when={typing()}>
-          <Frame
-            face={<OrchestratorFace size={36} />}
-            name={chatWording().orchestrator}
-            meta={typing() === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
-          >
-            <div class="flex h-5 items-center">
-              <ThinkingDots />
-            </div>
-          </Frame>
+          {(t) => (
+            <Frame
+              face={<OrchestratorFace size={36} agent={t().agent} />}
+              name={orchestrators().find((a) => a.id === t().agent)?.name || chatWording().orchestrator}
+              meta={t().mood === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
+            >
+              <div class="flex h-5 items-center">
+                <ThinkingDots />
+              </div>
+            </Frame>
+          )}
         </Show>
       </div>
     </div>
@@ -277,12 +280,14 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
   const core = useCore();
   const editing = () => editingId() === props.m.id;
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
+  const orchestrators = useOrchestrators();
   const nameOf = (who: string) =>
     who === ownerId
       ? chatWording().messages.owner
-      : who === defaultOrchestrator
-        ? chatWording().orchestrator
-        : ((core()?.sessions ?? []).find((h) => h.id === who)?.name ?? who);
+      : (orchestrators().find((a) => a.id === who)?.name ??
+        (who === defaultOrchestrator ? chatWording().orchestrator : undefined) ??
+        (core()?.sessions ?? []).find((h) => h.id === who)?.name ??
+        who);
   const meta = () =>
     [props.where ? chatWording().messages.inThread(props.where) : "", props.m.pinned !== undefined ? chatWording().messages.pinned : ""]
       .filter(Boolean)
@@ -355,7 +360,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
         )}
       </Show>
       <Show when={props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
-        <TurnSteps session={defaultOrchestrator} run={props.m.run} orchestrator />
+        <TurnSteps session={props.m.from} run={props.m.run} orchestrator />
       </Show>
       <Show when={props.m.fromKind === "session" && props.m.kind === "report"}>
         <TurnSteps session={props.m.from} run={props.m.run} />

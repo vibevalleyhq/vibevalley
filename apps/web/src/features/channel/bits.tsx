@@ -47,7 +47,7 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
         <OwnerFace size={props.size ?? 36} />
       </Match>
       <Match when={props.m.fromKind === "orchestrator"}>
-        <OrchestratorFace size={props.size ?? 36} />
+        <OrchestratorFace size={props.size ?? 36} agent={props.m.from} />
       </Match>
       <Match when={props.m.fromKind === "session" || props.m.fromKind === "system"}>
         <HelperFace agent={props.m.agent ?? session()?.agent ?? props.m.from} runtime={session()?.runtime} size={props.size ?? 36} />

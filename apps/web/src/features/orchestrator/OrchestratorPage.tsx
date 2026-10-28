@@ -1,10 +1,12 @@
-// 管家: who the orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong),
-// 旧账 (the conversation it folded away) and 声音 (what it says on a call); /orchestrator/<tab>.
+// 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
+// folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
+// the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
 
 import { orchestratorWording } from "./words";
-import { For, Match, Switch } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { api } from "../../base/api";
+import { useAgent } from "../../base/agents";
 import { orchestratorLooks } from "./looks";
 import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
@@ -13,7 +15,6 @@ import { OrchestratorFace } from "../../ui/Face";
 import { ArchivePanel, OrchestratorMemoryPanel } from "../memory";
 import { VoiceForm } from "../voice";
 import { TrajectoryLog } from "../session";
-import { usePrefs } from "../../base/prefs";
 
 const tabs = [
   { id: "memory", label: orchestratorWording().orchestrator.tab.memory },
@@ -21,39 +22,66 @@ const tabs = [
   { id: "archive", label: orchestratorWording().orchestrator.tab.archive },
   { id: "voice", label: orchestratorWording().orchestrator.tab.voice },
 ] as const;
+type Tab = (typeof tabs)[number]["id"];
+
+/** Which orchestrator and tab a path after /orchestrator/ is: a tab alone is the default orchestrator's. */
+export function orchestratorPath(rest: string): { readonly agent: string; readonly tab: Tab } {
+  const [first = "", second = ""] = rest.split("/").map(decodeURIComponent);
+  const tabOf = (t: string): Tab => tabs.find((x) => x.id === t)?.id ?? "memory";
+  if (!first || tabs.some((t) => t.id === first)) return { agent: defaultOrchestrator, tab: tabOf(first) };
+  return { agent: first, tab: tabOf(second) };
+}
+
+/** The page of an orchestrator's tab. */
+export const orchestratorHref = (agent: string, tab: Tab = "memory") =>
+  agent === defaultOrchestrator ? `/orchestrator/${tab}` : `/orchestrator/${encodeURIComponent(agent)}/${tab}`;
 
 /** `rest` is the path after /orchestrator/. */
 export function OrchestratorPage(props: { rest: string }) {
-  const at = () => tabs.find((t) => t.id === props.rest)?.id ?? "memory";
+  const where = () => orchestratorPath(props.rest);
+  return (
+    <Show when={where().agent} keyed>
+      {(agent) => <OrchestratorOf agent={agent} tab={where().tab} />}
+    </Show>
+  );
+}
+
+function OrchestratorOf(props: { agent: string; tab: Tab }) {
   const router = useRouter();
-  const chosen = usePrefs((p) => p.orchestratorLook);
-  const look = () => orchestratorLooks.find((l) => l.id === chosen());
+  const profile = useAgent(() => props.agent);
+  // Only the default orchestrator is on the phone: the voice is its.
+  const shown = () => tabs.filter((t) => t.id !== "voice" || props.agent === defaultOrchestrator);
+  const at = () => (shown().some((t) => t.id === props.tab) ? props.tab : "memory");
+  const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.manager ?? "farmer"));
   const head = () => (
     <div class="flex items-center gap-4 pt-4">
       <span class="flex size-18 shrink-0 items-center justify-center rounded-lg bg-hover">
-        <OrchestratorFace size={64} look={chosen()} />
+        <OrchestratorFace size={64} agent={props.agent} />
       </span>
       <div class="flex min-w-0 flex-col gap-0.5">
         <A href="/agents" class="text-xs text-muted hover:underline">
           {orchestratorWording().orchestrator.all}
         </A>
-        <h1 class="text-2xl font-semibold">{orchestratorWording().orchestrator.title}</h1>
+        <h1 class="text-2xl font-semibold">{profile()?.name || orchestratorWording().orchestrator.title}</h1>
         <p class="text-sm text-muted">
           {orchestratorWording().orchestrator.intro}
-          {look() ? orchestratorWording().orchestrator.look(look()!.name) : ""}
+          {look() ? orchestratorWording().orchestrator.look(look()!.name) : ""}{" "}
+          <A href={`/agents/${encodeURIComponent(props.agent)}`} class="underline">
+            {orchestratorWording().orchestrator.profile}
+          </A>
         </p>
       </div>
     </div>
   );
   const bar = () => (
     <div role="tablist" aria-label={orchestratorWording().orchestrator.tabs} class="flex gap-1 border-b border-line pb-2">
-      <For each={tabs}>
+      <For each={shown()}>
         {(t) => (
           <button
             type="button"
             role="tab"
             aria-selected={aria(t.id === at())}
-            onClick={() => router.navigate(`/orchestrator/${t.id}`)}
+            onClick={() => router.navigate(orchestratorHref(props.agent, t.id))}
             class={["h-8 cursor-pointer rounded-md px-3 text-base", t.id === at() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
           >
             {t.label}
@@ -71,12 +99,12 @@ export function OrchestratorPage(props: { rest: string }) {
           {bar()}
           <div class="min-h-0 flex-1">
             <TrajectoryLog
-              id={defaultOrchestrator}
+              id={props.agent}
               asked={orchestratorWording().orchestrator.heard}
               empty={orchestratorWording().orchestrator.quiet}
               title={orchestratorWording().orchestrator.trajectory}
               about={orchestratorWording().orchestrator.about}
-              onMarkWrong={(on, want) => api.orchestrator.eval.create({ on, want })}
+              onMarkWrong={(on, want) => api.orchestrator.eval.create({ agent: props.agent, on, want })}
             />
           </div>
         </div>
@@ -88,10 +116,10 @@ export function OrchestratorPage(props: { rest: string }) {
             {bar()}
             <Switch>
               <Match when={at() === "memory"}>
-                <OrchestratorMemoryPanel />
+                <OrchestratorMemoryPanel agent={props.agent} />
               </Match>
               <Match when={at() === "archive"}>
-                <ArchivePanel />
+                <ArchivePanel agent={props.agent} />
               </Match>
               <Match when={at() === "voice"}>
                 <VoiceForm part="agent" />

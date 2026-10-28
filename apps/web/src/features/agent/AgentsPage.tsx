@@ -1,23 +1,24 @@
-// 帮工: the orchestrator and every profile as cards; a card opens its profile, the last card
-// makes a new one. /agents/<id> is a profile, /agents/new a new one.
+// 档案: every profile as a card, the orchestrators first and then the workers; an orchestrator's card opens its page, a
+// worker's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
+// new worker, /agents/new?role=orchestrator a new orchestrator.
 
 import { agentsWording } from "./words";
 import { createMemo, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
-import type { Agent, AgentTally, RuntimeInfo } from "@vibevalley/protocol";
+import { type Agent, type AgentTally, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { hexColor } from "../../ui/cast";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
-import { useAgentProblems, useWorkAgents } from "../../base/agents";
+import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../base/agents";
 import { useCore } from "../../base/frame";
 import { ready, useRuntimes } from "../../base/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useSkills } from "../runtime";
 import { AgentPage } from "./AgentPage";
-import { usePrefs } from "../../base/prefs";
+import { orchestratorHref } from "../orchestrator";
 
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {
@@ -30,6 +31,7 @@ export function AgentsRoute(props: { rest: string }) {
 
 function AgentsPage() {
   const agents = useWorkAgents();
+  const orchestrators = useOrchestrators();
   const core = useCore();
   const runtimes = useRuntimes();
   const allSkills = useSkills();
@@ -40,9 +42,7 @@ function AgentsPage() {
       <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-8 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div class="flex max-w-xl flex-col gap-1">
-            <h1 class="text-2xl font-semibold">
-              {agentsWording().list.title} <span class="text-base font-normal text-muted">{agentsWording().list.profiles}</span>
-            </h1>
+            <h1 class="text-2xl font-semibold">{agentsWording().list.title}</h1>
             <p class="text-sm text-muted">{agentsWording().list.intro}</p>
           </div>
           <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
@@ -50,8 +50,20 @@ function AgentsPage() {
             {agentsWording().list.make}
           </A>
         </div>
+        <h2 class="text-sm font-semibold text-muted">{agentsWording().list.orchestrators}</h2>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <OrchestratorCard />
+          <For each={orchestrators()}>{(a) => <OrchestratorCard agent={a} />}</For>
+          <A
+            href="/agents/new?role=orchestrator"
+            aria-label={agentsWording().list.makeOrchestrator}
+            class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-[#3f6427]"
+          >
+            <Icon name="button-add" size={28} />
+            {agentsWording().list.makeOrchestrator}
+          </A>
+        </div>
+        <h2 class="text-sm font-semibold text-muted">{agentsWording().list.workers}</h2>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <For each={agents()}>
             {(a) => (
               <AgentCard
@@ -97,23 +109,25 @@ function CardShell(props: { to: string; label: string; muted?: boolean; corner?:
 
 const footer = "mt-auto flex items-center gap-3 border-t border-line pt-3 text-xs text-muted";
 
-function OrchestratorCard() {
-  const look = usePrefs((p) => p.orchestratorLook);
+function OrchestratorCard(props: { agent: Agent }) {
+  const main = () => props.agent.id === defaultOrchestrator;
   return (
-    <CardShell to="/orchestrator" label={agentsWording().list.orchestrator}>
+    <CardShell to={orchestratorHref(props.agent.id)} label={props.agent.name}>
       <div class="flex items-start gap-3 pb-3">
         <span class="flex size-20 shrink-0 items-center justify-center rounded-lg bg-hover">
-          <OrchestratorFace size={68} look={look()} />
+          <OrchestratorFace size={68} agent={props.agent.id} />
         </span>
         <span class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-base font-semibold">{agentsWording().list.orchestrator}</span>
-          <span class="line-clamp-2 text-sm text-muted">{agentsWording().list.orchestratorLine}</span>
+          <span class="text-base font-semibold">{props.agent.name}</span>
+          <span class="line-clamp-2 text-sm text-muted">{props.agent.duty || agentsWording().list.orchestratorLine}</span>
         </span>
       </div>
       <div class={footer}>
         <span>{agentsWording().tab.memory}</span>
         <span>{agentsWording().list.ledger}</span>
-        <span>{agentsWording().list.voice}</span>
+        <Show when={main()}>
+          <span>{agentsWording().list.voice}</span>
+        </Show>
       </div>
     </CardShell>
   );

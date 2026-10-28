@@ -13,7 +13,7 @@ const zh = {
   coverage: {
     failed: "读取失败、已取消或超时，未包含此来源",
     everosAcross: "不支持跨项目检索，请指定一个项目；本次未包含 EverOS",
-    everosAgent: "此查询需要指定帮工档案，本次未包含 EverOS",
+    everosAgent: "此查询需要指定档案，本次未包含 EverOS",
     unconfirmed: "有命中的项目范围未经确认，已从本项目检索中排除",
     note: (source: string, note: string) => `${source}：${note}`,
   },
@@ -39,7 +39,7 @@ const en: typeof zh = {
   coverage: {
     failed: "reading failed, was canceled or timed out; this source is not included",
     everosAcross: "searching across projects is not supported: name a project; EverOS is not included this time",
-    everosAgent: "this search needs a helper profile; EverOS is not included this time",
+    everosAgent: "this search needs a profile; EverOS is not included this time",
     unconfirmed: "some hits' project could not be confirmed and were left out of this project's search",
     note: (source, note) => `${source}: ${note}`,
   },

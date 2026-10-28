@@ -43,12 +43,12 @@ export const cardProject = (c: BoardCard) => (c.kind === "task" ? c.graph.projec
 export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : c.issue.assignee);
 
 /** A task is its own card; a step of one is on the board once a helper has worked it. */
-export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefined, graphs: TaskGraph[]): BoardCard[] {
+export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefined, graphs: TaskGraph[], orchestrators: ReadonlySet<string>): BoardCard[] {
   const cards: BoardCard[] = [];
   for (const row of rows) {
     const issue = row.issue;
     const base = { id: issue.id, lane: laneOf(issue.status), issue };
-    if (isForOrchestrator(issue)) cards.push({ kind: "orchestrator", ...base });
+    if (isForOrchestrator(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
     else if (issue.graph === undefined && (issue.parent === undefined || issue.sessions.length > 0)) {
       if (issue.sessions.length === 0) cards.push({ kind: "todo", ...base, lane: "todo" });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });

@@ -108,7 +108,7 @@ const zh = {
     editHint: "回车存下 · Esc 不改了",
   },
   pins: { open: "置顶的消息", title: "置顶", none: "这里还没有置顶的消息" },
-  members: { open: "成员", title: "成员", owner: "主人", here: "在这里", none: "这里还没有帮工" },
+  members: { open: "成员", title: "成员", owner: "主人", here: "在这里", none: "这里还没有帮工", looksAfter: "照看这里的管家" },
   composer: {
     notSent: (why: string) => `没发出去：${why}`,
     who: "叫谁",
@@ -130,6 +130,8 @@ const zh = {
     titleHint: "空着就照它挂在下面的那条消息",
     category: "分组（可不填）",
     categoryHint: "侧栏里按分组列频道",
+    orchestrator: "照看的管家",
+    orchestratorHint: "你在这个频道里说话、没 @ 别人时，是它回答",
     notify: "提醒",
     notifyAll: "全部",
     notifyMentions: "只在 @主人 时",
@@ -182,7 +184,7 @@ const zh = {
   direct: {
     add: "开一个私聊",
     pick: "和谁私聊",
-    none: "还没有帮工档案",
+    none: "还没有档案",
     open: (name: string) => `和${name}私聊`,
   },
   emoji: {
@@ -317,7 +319,7 @@ const en: typeof zh = {
     editHint: "Enter saves · Esc cancels",
   },
   pins: { open: "Pinned messages", title: "Pinned", none: "Nothing is pinned here yet" },
-  members: { open: "Members", title: "Members", owner: "Owner", here: "Here", none: "No helpers here yet" },
+  members: { open: "Members", title: "Members", owner: "Owner", here: "Here", none: "No helpers here yet", looksAfter: "The manager looking after this" },
   composer: {
     notSent: (why) => `Not sent: ${why}`,
     who: "Who",
@@ -339,6 +341,8 @@ const en: typeof zh = {
     titleHint: "Empty takes the message it hangs under",
     category: "Group (optional)",
     categoryHint: "The sidebar lists channels by group",
+    orchestrator: "Looked after by",
+    orchestratorHint: "When you speak here without @ anyone, this manager answers",
     notify: "Notify",
     notifyAll: "All",
     notifyMentions: "Only @owner",
@@ -391,7 +395,7 @@ const en: typeof zh = {
   direct: {
     add: "New direct message",
     pick: "Talk with",
-    none: "No helper profiles yet",
+    none: "No profiles yet",
     open: (name) => `Talk with ${name}`,
   },
   emoji: {

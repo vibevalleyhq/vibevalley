@@ -1,8 +1,10 @@
+import type { ManagerLook } from "@vibevalley/protocol";
 import { orchestratorWording } from "./words";
-// The orchestrator's looks and the pets the owner can pick (base/prefs.ts keeps the choice), and their sprites.
+// The orchestrators' looks (an orchestrator's profile keeps its own) and the pets the owner can pick (base/prefs.ts
+// keeps the choice), and their sprites.
 
-/** The orchestrator's looks: sprite manager-<id>, the plain one is farmer. */
-export const orchestratorLooks: readonly { readonly id: string; readonly name: string; readonly blurb: string }[] = [
+/** The orchestrators' looks: sprite manager-<id>, the plain one is farmer. */
+export const orchestratorLooks: readonly { readonly id: ManagerLook; readonly name: string; readonly blurb: string }[] = [
   { id: "farmer", name: orchestratorWording().looks.farmer.name, blurb: orchestratorWording().looks.farmer.blurb },
   { id: "foreman", name: orchestratorWording().looks.foreman.name, blurb: orchestratorWording().looks.foreman.blurb },
   { id: "auntie", name: orchestratorWording().looks.auntie.name, blurb: orchestratorWording().looks.auntie.blurb },
