@@ -4,11 +4,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { helperInstructions, vibevalleyRuntimeOf } from "./runtime.ts";
-import { answer, text as words, toolCall } from "../../ai/testing.ts";
-import { standaloneOwner } from "./agent.ts";
-import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until } from "./testing.ts";
-import { wallTime } from "../../base/time.ts";
+import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
+import { answer, text as words, toolCall } from "../ai/testing.ts";
+import { standaloneOwner } from "../agent/brain/agent.ts";
+import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until } from "../agent/brain/testing.ts";
+import { wallTime } from "../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {

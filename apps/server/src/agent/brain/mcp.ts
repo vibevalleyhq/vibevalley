@@ -9,7 +9,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "./config.ts";
 import { textTool } from "./tool.ts";
 import type { JsonSchema } from "../../ai/tools.ts";
-import { afterRealTime } from "../../base/time.ts";
+import { afterRealTime } from "./realTime.ts";
 import { mcp as mcpWords } from "./prompts.ts";
 
 /** Also for connecting. */

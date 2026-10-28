@@ -5,7 +5,7 @@
 
 import { Effect, FiberSet, Schema, type Scope } from "effect";
 import type { Tool } from "../loop/agent.ts";
-import { head } from "../../base/text.ts";
+import { head } from "./text.ts";
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";

@@ -7,7 +7,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { schemaTool, stopped } from "./tool.ts";
 import { Schema } from "effect";
-import { afterRealTime } from "../../base/time.ts";
+import { afterRealTime } from "./realTime.ts";
 import { coding as words } from "./prompts.ts";
 
 export interface CodingOptions {

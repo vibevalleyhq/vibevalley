@@ -11,12 +11,12 @@ import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, Ru
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
-import { deepseek } from "../agent/brain/config.ts";
+import { modelClient } from "../agent/model.ts";
 import { Llm } from "../ai/llm.ts";
-import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
+import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";
-import { dbStores } from "../agent/brain/agentTaskStore.ts";
+import { dbStores } from "../agent/taskStore.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { jsonOrNone } from "../base/json.ts";
@@ -564,7 +564,7 @@ export const layer = (options: RuntimeOptions = {}) =>
       // fibers, in scopes of its own: they end with it at the latest.
       const own = vibevalleyRuntimeOf({
         home: () => config.home,
-        llm: (model) => deepseek(model, keys.deepseekApiKey, service),
+        llm: (model) => modelClient(model, keys.deepseekApiKey, service),
         time,
         owner: { run: yield* FiberSet.makeRuntimePromise<never>(), scope: yield* Effect.scope },
         tasks: yield* dbStores,

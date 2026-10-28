@@ -6,14 +6,14 @@ import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, typ
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { models, type ThinkingLevel } from "../../ai/models.ts";
-import type { AgentTaskStore } from "./agentTaskStore.ts";
-import { type BrainEvent, type BrainOwner, openBrain } from "./agent.ts";
-import { codingTools } from "./coding.ts";
-import { defaultModel, type LLM, type McpServer } from "./config.ts";
-import { messageText, userMessage } from "./messages.ts";
+import { models, type ThinkingLevel } from "../ai/models.ts";
+import type { AgentTaskStore } from "../agent/brain/agentTaskStore.ts";
+import { type BrainEvent, type BrainOwner, openBrain } from "../agent/brain/agent.ts";
+import { codingTools } from "../agent/brain/coding.ts";
+import { defaultModel, type LLM, type McpServer } from "../agent/brain/config.ts";
+import { messageText, userMessage } from "../agent/brain/messages.ts";
 import { helperInstructions } from "./prompts.ts";
-import type { Time } from "../../base/time.ts";
+import type { Time } from "../base/time.ts";
 
 export const vibevalleyRuntime = "vibevalley";
 
@@ -160,7 +160,13 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
           frame("vibevalley/tasks", { tasks: e.tasks });
           break;
         case "agent_settled":
-          end(e.run.aborted ? { kind: "aborted" } : e.run.error ? { kind: "failed", failure: "unknown", reason: e.run.error } : { kind: "completed" });
+          end(
+            e.run.aborted
+              ? { kind: "aborted" }
+              : e.run.failed
+                ? { kind: "failed", failure: "unknown", reason: e.run.error || t("server.agent.modelFailed") }
+                : { kind: "completed" },
+          );
           break;
         default:
           break;

@@ -5,7 +5,6 @@ import type { Tool } from "../loop/agent.ts";
 import { Cron, Result, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { jsonOf } from "../../base/json.ts";
 import { schemaTool } from "./tool.ts";
 import { reminders as reminderWords } from "./prompts.ts";
 
@@ -95,7 +94,7 @@ export class Reminders {
 
   private load(): Reminder[] {
     if (!existsSync(this.file)) return [];
-    return jsonOf(Schema.mutable(Schema.Array(ReminderSchema)))(readFileSync(this.file, "utf8"));
+    return Schema.decodeUnknownSync(Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderSchema))))(readFileSync(this.file, "utf8"));
   }
 
   private store(reminders: readonly Reminder[]) {

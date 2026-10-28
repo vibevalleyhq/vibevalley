@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // What a run cost and said. One run takes in its tool turns and the inputs that came while it went on.
 
 import { type AssistantMessage, type Usage, zeroUsage } from "../../ai/messages.ts";
@@ -11,7 +10,8 @@ export interface RunResult {
   readonly contextTokens: number;
   readonly text: string;
   readonly aborted: boolean;
-  /** "" when none. */
+  /** The model's request failed; error is what it said of it, "" when it said nothing. */
+  readonly failed: boolean;
   readonly error: string;
   readonly settled: boolean;
 }
@@ -46,6 +46,7 @@ const blank = (id: number): RunResult => ({
   contextTokens: 0,
   text: "",
   aborted: false,
+  failed: false,
   error: "",
   settled: false,
 });
@@ -81,7 +82,8 @@ export class RunAccounting {
       usage: addUsage(this.current.usage, m.usage ?? zeroUsage()),
       contextTokens: contextOf(m),
       text: text !== "" ? text : this.current.text,
-      error: m.stopReason === "error" ? m.errorMessage || t("server.agent.modelFailed") : "",
+      failed: m.stopReason === "error",
+      error: m.stopReason === "error" ? (m.errorMessage ?? "") : "",
       aborted: m.stopReason === "aborted",
     };
   }

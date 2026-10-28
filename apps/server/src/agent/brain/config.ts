@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // The model the agent talks to, and MCP servers in the shape Claude Code and Cursor use:
 // { "mcpServers": { name: { command, args, env } | { url } } }.
 
@@ -12,8 +11,13 @@ import { mcpConfig } from "./prompts.ts";
 
 export const defaultModel = "deepseek-flash";
 
-/** Said for the command line; the farm says where to put one in the app. */
-export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
+/** No key to ask the model with; the host says where to put one. */
+export class MissingKey extends Error {
+  constructor() {
+    super("no DeepSeek API key");
+    this.name = "MissingKey";
+  }
+}
 
 export interface LLM {
   readonly model: Model;
@@ -25,7 +29,7 @@ export interface LLM {
 /** id empty is defaultModel; the key is the caller's to find. */
 export function deepseek(id: string, key: string | (() => string | undefined), service: LlmShape): LLM {
   const apiKey = typeof key === "string" ? () => key : key;
-  if (!apiKey()) throw new Error(noDeepSeekKey());
+  if (!apiKey()) throw new MissingKey();
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
   const model = known ?? { ...models.find((m) => m.id === defaultModel)!, id: name, name };

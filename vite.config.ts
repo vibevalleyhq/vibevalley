@@ -125,9 +125,15 @@ export default defineConfig({
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
       {
-        // base/time.ts is where the wall clock is allowed (wallTime, the real-time deadlines); tests drive time as they
-        // need.
-        files: ["apps/server/src/base/time.ts", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/agent/brain/testing.ts"],
+        // base/time.ts and the agent's realTime.ts are where the wall clock is allowed (wallTime, the real-time
+        // deadlines); tests drive time as they need.
+        files: [
+          "apps/server/src/base/time.ts",
+          "apps/server/src/agent/brain/realTime.ts",
+          "apps/server/src/**/*.test.ts",
+          "apps/server/src/testing/**",
+          "apps/server/src/agent/brain/testing.ts",
+        ],
         rules: { "vibevalley/no-wall-clock": "off" },
       },
       {

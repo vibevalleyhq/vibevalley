@@ -509,7 +509,7 @@ export class Brain {
       self.waiters = [];
       yield* self.publish({ type: "agent_settled", run: result });
       for (const w of waiters) yield* Deferred.succeed(w, result);
-      if (self.tasks && !result.aborted && !result.error && alive()) {
+      if (self.tasks && !result.aborted && !result.failed && alive()) {
         const text = yield* self.tasks.nudge;
         if (text) yield* self.later(taskMessage(text, self.now()));
       }

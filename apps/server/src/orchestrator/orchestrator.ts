@@ -19,7 +19,8 @@ import { graphText } from "../task/prompts.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { traitsOf } from "../agent/prompts.ts";
-import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
+import { defaultModel, type LLM } from "../agent/brain/config.ts";
+import { modelClient, noDeepSeekKey } from "../agent/model.ts";
 import { Llm } from "../ai/llm.ts";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
@@ -162,7 +163,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       const llmOf = (): LLM => {
         if (options.llm) return options.llm();
         // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-        return deepseek(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
+        return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
       };
       // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
       const wakeSoon = (withinMs: number) => {
