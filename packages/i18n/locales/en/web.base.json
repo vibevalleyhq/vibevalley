@@ -188,7 +188,8 @@
       "names": "Hold to name everything in the yard",
       "farmMenu": "Put the tool down, or open the menu",
       "debug": "Debug console",
-      "voice": "Talk to the manager (changeable in settings)"
+      "voice": "Talk to the manager (changeable in settings)",
+      "command": "Commands: a ticket, remember, stop, a direct message"
     }
   }
 }

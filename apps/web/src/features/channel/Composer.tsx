@@ -43,6 +43,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       setProblem(reason);
       toast(t("web.channel.composer.notSent", { why: reason }), "bad");
     },
+    told: (say) => toast(say),
     edited: (value) => {
       setProblem(undefined);
       if (at) drafts.text(at, value);

@@ -1412,6 +1412,7 @@ export const catalogs = {
           farmMenu: "放下农具，或打开菜单",
           debug: "调试台",
           voice: "跟管家说话（在设置里能换）",
+          command: "命令：记工单、让管家记住、叫停、私聊",
         },
       },
     },
@@ -1658,6 +1659,13 @@ export const catalogs = {
         everyoneNote: "叫醒在场的每个帮工",
       },
       threadWidth: "串的宽窄（拖动，双击回默认）",
+      commands: {
+        issue: { name: "记一张工单", note: "/issue 标题：记进备选，在这个频道的项目里", needs: "/issue 后面写工单的标题" },
+        remember: { name: "让管家记住", note: "/remember 一句话：记进照看这里的管家的记性", needs: "/remember 后面写要它记住的话" },
+        stop: { name: "叫停管家", note: "照看这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
+        dm: { name: "私聊", note: "/dm 名字：打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
+        done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了" },
+      },
     },
     "web.connector": {
       connectors: {
@@ -4958,6 +4966,7 @@ export const catalogs = {
           farmMenu: "Put the tool down, or open the menu",
           debug: "Debug console",
           voice: "Talk to the manager (changeable in settings)",
+          command: "Commands: a ticket, remember, stop, a direct message",
         },
       },
     },
@@ -5212,6 +5221,17 @@ export const catalogs = {
         everyoneNote: "wakes every helper here",
       },
       threadWidth: "Thread width (drag; double-click for the default)",
+      commands: {
+        issue: { name: "Write a ticket", note: "/issue title: into the backlog, in this channel's project", needs: "Write the ticket's title after /issue" },
+        remember: {
+          name: "Have the manager remember",
+          note: "/remember a sentence: into the memory of the manager looking after this",
+          needs: "Write what it should remember after /remember",
+        },
+        stop: { name: "Stop the manager", note: "The manager looking after this stops its round; helpers it sent keep working", needs: "" },
+        dm: { name: "Direct message", note: "/dm name: open the direct channel with that profile", needs: "Write the profile's name or id after /dm" },
+        done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped" },
+      },
     },
     "web.connector": {
       connectors: {
@@ -8511,6 +8531,7 @@ export interface Messages {
   "web.base.shortcuts.place.lists": undefined;
   "web.base.shortcuts.place.pictures": undefined;
   "web.base.shortcuts.say.close": undefined;
+  "web.base.shortcuts.say.command": undefined;
   "web.base.shortcuts.say.debug": undefined;
   "web.base.shortcuts.say.dropReply": undefined;
   "web.base.shortcuts.say.editLast": undefined;
@@ -8633,6 +8654,21 @@ export interface Messages {
   "web.channel.channels": undefined;
   "web.channel.channelsTitle": undefined;
   "web.channel.closeThread": undefined;
+  "web.channel.commands.dm.name": undefined;
+  "web.channel.commands.dm.needs": undefined;
+  "web.channel.commands.dm.note": undefined;
+  "web.channel.commands.done.issue": { readonly n: string | number };
+  "web.channel.commands.done.remember": undefined;
+  "web.channel.commands.done.stop": undefined;
+  "web.channel.commands.issue.name": undefined;
+  "web.channel.commands.issue.needs": undefined;
+  "web.channel.commands.issue.note": undefined;
+  "web.channel.commands.remember.name": undefined;
+  "web.channel.commands.remember.needs": undefined;
+  "web.channel.commands.remember.note": undefined;
+  "web.channel.commands.stop.name": undefined;
+  "web.channel.commands.stop.needs": undefined;
+  "web.channel.commands.stop.note": undefined;
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.mention": undefined;

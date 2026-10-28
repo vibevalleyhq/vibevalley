@@ -24,6 +24,7 @@ export const shortcuts = [
   { id: "send", place: "composer", keys: ["enter"] },
   { id: "newline", place: "composer", keys: ["shift", "enter"] },
   { id: "mention", place: "composer", keys: ["@"] },
+  { id: "command", place: "composer", keys: ["/"] },
   { id: "editLast", place: "composer", keys: ["up"] },
   { id: "dropReply", place: "composer", keys: ["esc"] },
   { id: "move", place: "lists", keys: ["up", "down"] },
