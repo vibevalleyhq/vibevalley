@@ -185,7 +185,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       // 恢复默认 puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
         <Show when={props.part === "agent" || props.view === "call"}>
-          <Button tone="quiet" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
+          <Button tone="quiet" data-testid="reset" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
             {t("web.base.form.reset")}
           </Button>
         </Show>
@@ -249,6 +249,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 <Cols>
                   <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
                     <TextInput
+                      data-testid="agora-app-id"
                       aria-label="Agora App ID"
                       class="font-mono"
                       placeholder={t("web.voice.voice.hex")}
@@ -439,6 +440,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
           <Cols>
             <Labeled label={t("web.voice.voice.persona.greeting")} hint={t("web.voice.voice.persona.greetingHint")}>
               <TextInput
+                data-testid="greeting"
                 aria-label={t("web.voice.voice.persona.greeting")}
                 value={draft().greeting}
                 onInput={(e) => set({ ...draft(), greeting: e.currentTarget.value })}

@@ -232,7 +232,13 @@ export function ChatWindow() {
             </Show>
             <For each={items()} keyed={(item) => item.message.id}>
               {(item, i) => (
-                <div data-testid="message" data-key={item().message.id} data-from={item().message.fromKind} data-kind={item().message.kind}>
+                <div
+                  data-testid="message"
+                  data-key={item().message.id}
+                  data-from={item().message.from}
+                  data-from-kind={item().message.fromKind}
+                  data-kind={item().message.kind}
+                >
                   <Item
                     m={item().message}
                     thread={item().thread}
@@ -245,7 +251,7 @@ export function ChatWindow() {
             </For>
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
-                <div class="opacity-70" aria-label={t("web.farm.chat.sending")} data-testid="message" data-from="owner" data-state="sending">
+                <div class="opacity-70" aria-label={t("web.farm.chat.sending")} data-testid="message" data-from-kind="owner" data-state="sending">
                   <ChatRow mine first title={t("web.farm.chat.sending")}>
                     <span class="whitespace-pre-line">{p().text}</span>
                   </ChatRow>

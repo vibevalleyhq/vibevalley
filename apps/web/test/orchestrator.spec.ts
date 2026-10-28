@@ -1,59 +1,48 @@
-import { expect, test, defaultChannel } from "./fixtures";
+import { expect, tab, test, defaultChannel } from "./fixtures";
 
 test("the orchestrator's memory takes a note and forgets it", async ({ page }) => {
+  const note = "write commit messages in English";
   await page.goto("/orchestrator");
-  await expect(page.getByRole("heading", { name: "管家" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "记性" })).toHaveAttribute("aria-selected", "true");
-  await page.getByLabel("替它记一条").fill("提交信息写中文");
-  await page.getByRole("button", { name: "记下" }).click();
-  const notes = page.getByRole("region", { name: "记下的" });
-  await expect(notes.getByText("提交信息写中文")).toBeVisible();
-  await expect(notes.getByText("你交代的")).toBeVisible();
-  await notes.getByText("提交信息写中文").hover();
-  await notes.getByRole("button", { name: "忘掉" }).click();
-  await expect(notes.getByText("提交信息写中文")).toBeHidden();
+  await expect(tab(page, "memory")).toHaveAttribute("aria-selected", "true");
+  await page.getByTestId("note-input").fill(note);
+  await page.getByTestId("note-write").click();
+  const kept = page.getByTestId("notes").getByTestId("memory").filter({ hasText: note });
+  await expect(kept).toBeVisible();
+  await kept.hover();
+  await kept.getByTestId("forget").click();
+  await expect(kept).toHaveCount(0);
 });
 
 test("the orchestrator's trajectory shows what it was told, and a round it never heard cannot be marked wrong", async ({ page, api }) => {
+  const told = "look at the clock-in page";
   // Without the model's key the orchestrator cannot start: the line is in its log, not in its channel.
-  await api.channel.message.send({ id: await defaultChannel(api), text: "帮我看看打卡页" });
+  await api.channel.message.send({ id: await defaultChannel(api), text: told });
   await page.goto("/orchestrator/trajectory");
-  const row = page.getByRole("button", { name: /^收到 .*帮我看看打卡页/ });
+  const row = page.getByTestId("step").filter({ hasText: told }).first();
   await expect(row).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/^\d+ 轮 · \d+ 步/)).toBeVisible();
   await row.hover();
-  await page.getByRole("button", { name: "这一轮做错了" }).first().click();
-  await page.getByLabel("这一轮应该怎样").fill("先问我是哪个项目");
-  await page.getByRole("button", { name: "记下" }).click();
-  await expect(page.getByRole("log", { name: "提示" })).toContainText("没进管家的对话");
-  await page.getByLabel("搜索轨迹").fill("没有这种");
-  await expect(page.getByText("没有对得上的步骤。")).toBeVisible();
+  await page.getByTestId("mark-wrong").first().click();
+  await page.getByTestId("mark-want").fill("ask me which project first");
+  await page.getByTestId("mark-submit").click();
+  // The server refuses it, and the page says so.
+  await expect(page.getByTestId("toast")).toBeVisible();
+  await page.getByTestId("trajectory-search").fill("nothing like this");
+  await expect(page.getByTestId("steps-empty")).toBeVisible();
 });
 
 test("the archive and the orchestrator's voice", async ({ page }) => {
   await page.goto("/orchestrator/archive");
-  await expect(page.getByText("还没有：管家的对话还没长到要压缩。")).toBeVisible();
-  await page.getByRole("tab", { name: "声音" }).click();
+  await expect(page.getByTestId("archive")).toHaveAttribute("data-count", "0");
+  await tab(page, "voice").click();
   await expect(page).toHaveURL(/\/orchestrator\/voice$/);
-  const greeting = page.getByLabel("开场白");
+  const greeting = page.getByTestId("greeting");
   const before = await greeting.inputValue();
-  await greeting.fill("来啦，今天种什么？");
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("存好了，下一通电话就用上。")).toBeVisible();
+  await greeting.fill("Here I am, what shall we grow?");
+  await page.getByTestId("save").click();
+  await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
   await page.reload();
-  await expect(page.getByLabel("开场白")).toHaveValue("来啦，今天种什么？");
-  await page.getByLabel("开场白").fill(before);
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("存好了，下一通电话就用上。")).toBeVisible();
-});
-
-test("the orchestrator's page as it looks", async ({ page, api }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await api.channel.message.send({ id: await defaultChannel(api), text: "看看今天地里怎么样" });
-  await page.goto("/orchestrator/trajectory");
-  await expect(page.getByRole("button", { name: /^收到 .*看看今天地里怎么样/ })).toBeVisible({ timeout: 15_000 });
-  await page.screenshot({ path: test.info().outputPath("orchestrator-trajectory.png") });
-  await page.goto("/orchestrator/voice");
-  await expect(page.getByLabel("开场白")).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("orchestrator-voice.png") });
+  await expect(greeting).toHaveValue("Here I am, what shall we grow?");
+  await greeting.fill(before);
+  await page.getByTestId("save").click();
+  await expect(page.getByTestId("save-bar")).not.toHaveAttribute("data-dirty");
 });

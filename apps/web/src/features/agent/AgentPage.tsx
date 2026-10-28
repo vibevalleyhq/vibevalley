@@ -102,7 +102,7 @@ export function AgentPage(props: { id: string }) {
         </p>
       </Match>
       <Match when={!isNew() && !saved()}>
-        <p class="p-8 text-sm text-muted">
+        <p data-testid="agent-missing" class="p-8 text-sm text-muted">
           {t("web.agent.noSuch")}
           <A href="/agents" class="underline">
             {t("web.agent.backToAll")}
@@ -153,8 +153,12 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
   };
 
   const bar = () => (
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
-      <A href="/agents" class="text-sm text-muted hover:underline">
+    <div
+      data-testid="profile-bar"
+      data-state={isNew ? "new" : dirty() ? "dirty" : "saved"}
+      class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3"
+    >
+      <A href="/agents" data-testid="back" class="text-sm text-muted hover:underline">
         {t("web.agent.all")}
       </A>
       <span class="text-sm text-faint">/</span>
@@ -171,6 +175,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
               <DeleteButton agent={saved()} />
               <Button
                 icon="thread"
+                data-testid="talk"
                 onClick={() =>
                   void api.channel.direct
                     .create({ agent: saved().id })
@@ -181,12 +186,14 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
                 {t("web.agent.talk")}
               </Button>
               <Show when={dirty()}>
-                <Button onClick={() => setDraft(saved())}>{t("web.agent.discard")}</Button>
+                <Button data-testid="discard" onClick={() => setDraft(saved())}>
+                  {t("web.agent.discard")}
+                </Button>
               </Show>
             </>
           )}
         </Show>
-        <Button tone="primary" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
+        <Button tone="primary" data-testid="save" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
           {saving() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
         </Button>
       </span>
@@ -269,10 +276,17 @@ function DeleteButton(props: { agent: Agent }) {
     }
   };
   return (
-    <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.agent.remove")}</Button>}>
+    <Show
+      when={sure()}
+      fallback={
+        <Button data-testid="delete" onClick={() => setSure(true)}>
+          {t("web.agent.remove")}
+        </Button>
+      }
+    >
       <span class="flex items-center gap-2">
         <span class="text-sm text-muted">{t("web.agent.removeWhich", { name: props.agent.name })}</span>
-        <Button tone="danger" onClick={() => void remove()}>
+        <Button tone="danger" data-testid="delete-sure" onClick={() => void remove()}>
           {t("web.agent.remove")}
         </Button>
         <Button onClick={() => setSure(false)}>{t("web.agent.never")}</Button>
@@ -456,6 +470,7 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
             </Labeled>
             <Labeled label={t("web.agent.duty")} tip={t("web.agent.dutyTip")}>
               <TextInput
+                data-testid="agent-duty"
                 aria-label={t("web.agent.duty")}
                 placeholder={t("web.agent.roleHint")}
                 value={draft().duty}
@@ -688,6 +703,7 @@ function Persona(props: { draft: Agent; facts: RuntimeFacts; patch: Patch }) {
     <>
       <Labeled label={t("web.agent.tab.persona")} tip={t("web.agent.personaTip")}>
         <TextArea
+          data-testid="agent-persona"
           aria-label={t("web.agent.tab.persona")}
           rows={9}
           placeholder={t("web.agent.personaHint")}

@@ -121,6 +121,13 @@ export async function settled(page: Page) {
 /** A tab by what it is (its data-key), not by what it says. */
 export const tab = (scope: Page | Locator, key: string) => scope.locator(`[role="tab"][data-key="${key}"]`);
 
+/** The workbench composer's field once the composer is on this channel: typed into earlier, a draft is replaced by the
+ * channel's own when it comes. */
+export async function composerOn(scope: Page | Locator, channel: string) {
+  await expect(scope.getByTestId("composer")).toHaveAttribute("data-key", channel);
+  return scope.getByTestId("composer").getByTestId("composer-input");
+}
+
 /** A gate a route waits at until the test opens it: a slow server is slow until the test has seen what it wanted. */
 export function gate() {
   let open = () => {};

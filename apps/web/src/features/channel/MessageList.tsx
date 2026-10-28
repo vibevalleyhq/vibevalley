@@ -149,7 +149,8 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             <div
               data-testid="message"
               data-key={item().message.id}
-              data-from={item().message.fromKind}
+              data-from={item().message.from}
+              data-from-kind={item().message.fromKind}
               data-kind={item().message.kind}
               data-number={item().message.channel === id() ? item().message.number : undefined}
               class={[

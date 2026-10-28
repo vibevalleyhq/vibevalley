@@ -36,6 +36,7 @@ export function Select(props: {
   placeholder?: string;
   label: string;
   class?: string;
+  testid?: string;
 }) {
   const ref = useSelectValue(
     () => props.value,
@@ -44,6 +45,7 @@ export function Select(props: {
   return (
     <select
       ref={ref}
+      data-testid={props.testid}
       aria-label={props.label}
       value={props.value}
       onChange={(e) => props.onChange(e.currentTarget.value)}

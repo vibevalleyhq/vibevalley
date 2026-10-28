@@ -89,7 +89,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const stop = () => api.orchestrator.stop({ agent: box.here() }).catch((e) => toast(reasonOf(e), "bad"));
 
   return (
-    <div data-testid="composer" class="border-t border-line px-4 pt-3 pb-4">
+    <div data-testid="composer" data-key={props.channel?.id} class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
         <div role="listbox" aria-label={t("web.channel.composer.who")} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
           <For each={box.offered()} keyed={(n) => n.token}>

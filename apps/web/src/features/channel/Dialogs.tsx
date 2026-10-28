@@ -21,6 +21,7 @@ function ProjectInput(props: { value: string; onChange: (v: string) => void }) {
   return (
     <>
       <TextInput
+        data-testid="channel-project"
         value={props.value}
         onInput={(e) => props.onChange(e.currentTarget.value)}
         placeholder={t("web.channel.dialog.projectExample")}
@@ -52,10 +53,18 @@ function Form(props: {
       }}
     >
       {props.children}
-      <Show when={props.error}>{(error) => <p class="text-sm text-berry">{error()}</p>}</Show>
+      <Show when={props.error}>
+        {(error) => (
+          <p role="alert" class="text-sm text-berry">
+            {error()}
+          </p>
+        )}
+      </Show>
       <div class="flex justify-end gap-3 pt-2">
-        <Button onClick={() => props.onCancel()}>{t("web.channel.dialog.cancel")}</Button>
-        <Button type="submit" tone="primary" disabled={props.busy || !ok()}>
+        <Button data-testid="cancel" onClick={() => props.onCancel()}>
+          {t("web.channel.dialog.cancel")}
+        </Button>
+        <Button type="submit" tone="primary" data-testid="submit" disabled={props.busy || !ok()}>
           {props.submit}
         </Button>
       </div>
@@ -66,7 +75,7 @@ function Form(props: {
 /** onCreated gets the new channel's id. */
 export function NewChannelDialog(props: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.newChannel")}>
+    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.newChannel")} testid="new-channel-dialog">
       <NewChannelForm onClose={() => props.onClose()} onCreated={(id) => props.onCreated(id)} />
     </Dialog>
   );
@@ -85,6 +94,7 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
       <Field label={t("web.channel.dialog.name")} hint={t("web.channel.dialog.nameHint")}>
         <TextInput
           ref={autofocus()}
+          data-testid="channel-name"
           required
           value={form.name()}
           placeholder={t("web.channel.dialog.nameExample")}
@@ -93,6 +103,7 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
       </Field>
       <Field label={t("web.channel.dialog.description")}>
         <TextArea
+          data-testid="channel-description"
           rows={3}
           value={form.description()}
           onInput={(e) => form.setDescription(e.currentTarget.value)}
@@ -108,7 +119,12 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
 
 export function ChannelSettingsDialog(props: { channel: Channel; open: boolean; onClose: () => void; onGone: () => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.dialog.settingsOf", { name: channelName(props.channel) })}>
+    <Dialog
+      open={props.open}
+      onClose={() => props.onClose()}
+      title={t("web.channel.dialog.settingsOf", { name: channelName(props.channel) })}
+      testid="channel-settings-dialog"
+    >
       <ChannelSettingsForm channel={props.channel} onClose={() => props.onClose()} onGone={() => props.onGone()} />
     </Dialog>
   );
@@ -136,10 +152,11 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
       <Form submit={t("web.channel.dialog.save")} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
         <Show when={top()}>
           <Field label={t("web.channel.manage.name")} hint={t("web.channel.dialog.nameHint")}>
-            <TextInput required value={form.name()} onInput={(e) => form.setName(e.currentTarget.value)} />
+            <TextInput data-testid="channel-name" required value={form.name()} onInput={(e) => form.setName(e.currentTarget.value)} />
           </Field>
           <Field label={t("web.channel.dialog.description")}>
             <TextArea
+              data-testid="channel-description"
               rows={3}
               value={form.description()}
               onInput={(e) => form.setDescription(e.currentTarget.value)}
@@ -153,6 +170,7 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
             <Field label={t("web.channel.manage.orchestrator")} hint={t("web.channel.manage.orchestratorHint")}>
               <Select
                 label={t("web.channel.manage.orchestrator")}
+                testid="channel-orchestrator"
                 value={form.orchestrator()}
                 onChange={(v) => form.setOrchestrator(v)}
                 options={orchestrators().map((a) => ({ value: a.id, label: a.name }))}
@@ -160,14 +178,14 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
             </Field>
           </Show>
           <Field label={t("web.channel.manage.category")} hint={t("web.channel.manage.categoryHint")}>
-            <TextInput value={form.category()} onInput={(e) => form.setCategory(e.currentTarget.value)} list="chat-categories" />
+            <TextInput data-testid="channel-category" value={form.category()} onInput={(e) => form.setCategory(e.currentTarget.value)} list="chat-categories" />
             <datalist id="chat-categories">
               <For each={categories()}>{(c) => <option value={c} />}</For>
             </datalist>
           </Field>
         </Show>
         <Field label={t("web.channel.manage.notify")} hint={t("web.channel.manage.notifyHint")}>
-          <Segmented label={t("web.channel.manage.notify")} value={form.notify()} options={notifyOptions()} onChange={form.setNotify} />
+          <Segmented label={t("web.channel.manage.notify")} testid="channel-notify" value={form.notify()} options={notifyOptions()} onChange={form.setNotify} />
         </Field>
       </Form>
       <Show when={top() && !props.channel.default}>
@@ -204,18 +222,18 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
   return (
     <div class="flex flex-col gap-2 border-t border-line pt-4">
       <div class="flex flex-wrap items-center gap-2">
-        <Button disabled={busy()} onClick={() => void act("archive")} title={t("web.channel.manage.archiveHint")}>
+        <Button data-testid="channel-archive" disabled={busy()} onClick={() => void act("archive")} title={t("web.channel.manage.archiveHint")}>
           {props.channel.archived !== undefined ? t("web.channel.manage.unarchive") : t("web.channel.manage.archive")}
         </Button>
         <Show
           when={does()}
           fallback={
-            <Button tone="danger" disabled={busy()} onClick={() => void act("preview")}>
+            <Button tone="danger" data-testid="channel-remove" disabled={busy()} onClick={() => void act("preview")}>
               {t("web.channel.manage.remove")}
             </Button>
           }
         >
-          <Button tone="danger" disabled={busy()} onClick={() => void act("delete")}>
+          <Button tone="danger" data-testid="channel-remove-sure" disabled={busy()} onClick={() => void act("delete")}>
             {t("web.channel.manage.removeSure")}
           </Button>
         </Show>

@@ -72,12 +72,13 @@ export function KeyField(props: {
 /** Save and undo, shown while there is something to save; `left` says what went wrong. */
 export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => void; onUndo: () => void; left?: JSX.Element; extra?: JSX.Element }) {
   return (
-    <div class="sticky bottom-0 flex items-center gap-2 border-t border-line bg-page py-2.5">
+    <div data-testid="save-bar" data-dirty={props.dirty ? "" : undefined} class="sticky bottom-0 flex items-center gap-2 border-t border-line bg-page py-2.5">
       <div class="min-w-0 flex-1 text-sm">{props.left}</div>
       {props.extra}
       <Show when={props.dirty}>
         <button
           type="button"
+          data-testid="undo"
           onClick={() => props.onUndo()}
           class="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted hover:bg-hover hover:text-ink"
         >
@@ -87,6 +88,7 @@ export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => vo
       </Show>
       <button
         type="submit"
+        data-testid="save"
         disabled={!props.dirty || props.busy}
         onClick={(e) => {
           e.preventDefault();

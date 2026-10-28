@@ -56,7 +56,11 @@ function AgentsPage() {
               <Icon name="folder" size={14} />
               {t("web.agent.templates.open")}
             </A>
-            <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
+            <A
+              href="/agents/new"
+              data-testid="new-agent"
+              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf"
+            >
               <Icon name="add" size={14} />
               {t("web.agent.list.make")}
             </A>
@@ -67,6 +71,7 @@ function AgentsPage() {
           <For each={orchestrators()}>{(a) => <OrchestratorCard agent={a} />}</For>
           <A
             href="/agents/new?role=orchestrator"
+            data-testid="new-orchestrator"
             aria-label={t("web.agent.list.makeOrchestrator")}
             class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-ok-ink"
           >
@@ -174,6 +179,8 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
       corner={
         <button
           type="button"
+          data-testid="toggle"
+          data-state={props.agent.enabled ? "on" : "off"}
           onClick={() => void toggle()}
           aria-label={t("web.agent.list.toggle", {
             act: props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"),

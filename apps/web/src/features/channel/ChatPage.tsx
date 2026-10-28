@@ -127,7 +127,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
     [props.channel?.description, props.channel?.project ? t("web.channel.defaultProject", { project: props.channel.project }) : ""].filter(Boolean).join(" · ");
   return (
     <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
-      <header class={[head, "gap-3 px-4"]}>
+      <header data-testid="channel-head" data-key={props.channel?.id} class={[head, "gap-3 px-4"]}>
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={18} />
         </button>
@@ -145,6 +145,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <Icon name="search" size={14} />
             <input
               ref={autofocus()}
+              data-testid="message-search"
               value={search() ?? ""}
               onInput={(e) => setSearch(e.currentTarget.value)}
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
@@ -157,6 +158,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <button
           type="button"
           class={[iconButton, { "bg-selected": search() !== undefined }]}
+          data-testid="message-search-toggle"
           aria-label={t("web.channel.findMessages")}
           aria-pressed={aria(search() !== undefined)}
           title={t("web.channel.findMessages")}
@@ -173,6 +175,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               <button
                 type="button"
                 class={[iconButton, { "bg-selected": threadsOpen() }]}
+                data-testid="threads-toggle"
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
                 title={t("web.channel.threadList.title")}
@@ -190,6 +193,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           <button
             type="button"
             class={[iconButton, { "bg-selected": pinsOpen() }]}
+            data-testid="pins-toggle"
             aria-label={t("web.channel.pins.open")}
             aria-expanded={aria(pinsOpen())}
             title={t("web.channel.pins.open")}
@@ -204,6 +208,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           type="button"
           // The members panel is beside the list, which a phone has no room for.
           class={[iconButton, "w-auto px-2 text-sm max-md:hidden", { "bg-selected": membersOpen() }]}
+          data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
           onClick={() => setMembersOpen(!membersOpen())}
@@ -213,6 +218,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <button
           type="button"
           class={iconButton}
+          data-testid="channel-settings-open"
           aria-label={t("web.channel.settings")}
           title={t("web.channel.settings")}
           disabled={!props.channel}
@@ -305,12 +311,13 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
     />
   );
   return (
-    <aside aria-label={t("web.channel.side")} class="flex w-full flex-col border-r border-line bg-side">
+    <aside aria-label={t("web.channel.side")} data-testid="channels-side" class="flex w-full flex-col border-r border-line bg-side">
       <div class={[head, "gap-2 px-5"]}>
         <span class="flex-1 text-xl font-semibold">{t("web.channel.tab.chat")}</span>
         <button
           type="button"
           class={iconButton}
+          data-testid="farm-search-open"
           aria-label={t("web.channel.farmSearch.open")}
           title={t("web.channel.farmSearch.open")}
           onClick={() => props.onSearch()}
@@ -321,6 +328,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
       <div class="flex-1 overflow-y-auto p-3">
         <button
           type="button"
+          data-testid="switcher-open"
           onClick={() => switcher.show()}
           class="mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2.5 text-left text-sm text-muted hover:bg-hover"
         >
@@ -334,6 +342,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
             <button
               type="button"
               class={[iconButton, "size-6"]}
+              data-testid="new-channel"
               aria-label={t("web.channel.newChannel")}
               title={t("web.channel.newChannel")}
               onClick={() => props.onNew()}
@@ -362,6 +371,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
               <button
                 type="button"
                 class={[iconButton, "size-6"]}
+                data-testid="new-direct"
                 aria-label={t("web.channel.direct.add")}
                 title={t("web.channel.direct.add")}
                 aria-expanded={aria(picking())}
@@ -413,6 +423,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
   return (
     <div
       role="menu"
+      data-testid="direct-picker"
       aria-label={t("web.channel.direct.pick")}
       class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
     >
@@ -425,6 +436,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
           <button
             type="button"
             role="menuitem"
+            data-key={a().id}
             class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-hover"
             onClick={() => void open(a().id)}
           >
@@ -475,6 +487,10 @@ function ChannelRow(props: {
   return (
     <button
       type="button"
+      data-testid="channel-row"
+      data-key={props.channel.id}
+      data-type={props.channel.type}
+      data-unread={props.unread}
       onClick={() => props.onClick?.()}
       aria-current={props.here ? "page" : undefined}
       draggable={props.movable ? "true" : "false"}
@@ -664,7 +680,12 @@ function OrchestratorLine(props: { agent: string }) {
   const profile = useAgent(() => props.agent);
   const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
   return (
-    <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={t("web.channel.orchestrator")}>
+    <div
+      data-testid="channel-orchestrator-line"
+      data-key={props.agent}
+      class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm"
+      aria-label={t("web.channel.orchestrator")}
+    >
       <OrchestratorFace size={32} agent={props.agent} />
       {profile()?.name || t("web.channel.orchestrator")}
       <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
