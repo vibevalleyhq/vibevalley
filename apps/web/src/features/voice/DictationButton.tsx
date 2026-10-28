@@ -54,7 +54,11 @@ export function DictationButton(props: {
           });
         })
       }
-      class={["shrink-0 cursor-pointer p-1 disabled:cursor-default disabled:opacity-40", { "animate-pulse": phase() === "recording" }, props.class]}
+      class={[
+        "inline-flex shrink-0 cursor-pointer items-center justify-center p-1 disabled:cursor-default disabled:opacity-40",
+        { "animate-pulse": phase() === "recording" },
+        props.class,
+      ]}
     >
       <Icon name={look()[0]} size={props.size ?? 20} />
     </button>
