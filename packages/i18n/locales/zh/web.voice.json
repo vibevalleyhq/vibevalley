@@ -81,6 +81,12 @@
       "noSample": "没有样音",
       "stop": "停下 {name}",
       "play": "试听 {name}"
+    },
+    "moss": {
+      "console": "MOSS 开放平台",
+      "check": "测一下能不能接通",
+      "checking": "在接…",
+      "ok": "接通了"
     }
   },
   "choices": {

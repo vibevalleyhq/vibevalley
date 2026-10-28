@@ -1,0 +1,54 @@
+import { t } from "@vibevalley/i18n";
+// Whether MOSS Live takes the key: the one typed in, or the saved one. The server attaches a session and closes it
+// (voice.moss.check); the answer is a mark, its reason on hover.
+
+import { createSignal, Match, Switch } from "solid-js";
+import { api, reasonOf } from "../../base/api";
+import { Icon } from "../../ui/Icon";
+import { IconButton } from "../../ui/IconButton";
+import { Tip } from "../../ui/Tip";
+
+type Result = { readonly ok: true } | { readonly ok: false; readonly why: string };
+
+const said = (r: Result) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
+
+export function MossCheck(props: { typed: () => string }) {
+  const [busy, setBusy] = createSignal(false);
+  const [result, setResult] = createSignal<Result>();
+  const check = async () => {
+    setBusy(true);
+    setResult(undefined);
+    try {
+      const key = props.typed().trim();
+      const r = await api.voice.moss.check(key ? { key } : {});
+      setResult(r.problem ? { ok: false, why: r.problem } : { ok: true });
+    } catch (e) {
+      setResult({ ok: false, why: reasonOf(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div class="flex items-center gap-1.5">
+      <IconButton icon="plug" label={t("web.voice.voice.moss.check")} disabled={busy()} onClick={() => void check()} />
+      <Switch>
+        <Match when={busy()}>
+          <Tip text={t("web.voice.voice.moss.checking")}>
+            <span role="status" aria-label={t("web.voice.voice.moss.checking")}>
+              <Icon name="wait" size={14} />
+            </span>
+          </Tip>
+        </Match>
+        <Match when={result()}>
+          {(r) => (
+            <Tip text={said(r())}>
+              <span role="status" aria-label={said(r())}>
+                <Icon name={r().ok ? "check" : "warn"} size={14} />
+              </span>
+            </Tip>
+          )}
+        </Match>
+      </Switch>
+    </div>
+  );
+}

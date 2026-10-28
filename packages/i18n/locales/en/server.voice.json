@@ -41,5 +41,12 @@
     "cut": "The dictation answer broke off halfway: {why}",
     "status": "The dictation address answered {status}: {detail}",
     "shape": "The dictation address did not answer in OpenAI's transcription format"
+  },
+  "moss": {
+    "noKey": "No MOSS Live API key yet",
+    "refused": "MOSS Live refused the key: {why}",
+    "unreachable": "Cannot reach MOSS Live: {why}",
+    "failed": "MOSS Live did not connect: {why}",
+    "silent": "MOSS Live did not answer within 8 seconds"
   }
 }

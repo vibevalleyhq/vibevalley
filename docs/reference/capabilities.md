@@ -78,6 +78,7 @@
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
 | `voice.hear` | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
+| `voice.moss.check` | `/api/v1/voice/moss/check` | ✓ | ✓ |   |   |
 | `voice.session.create` | `/api/v1/voice/session/create` | ✓ | ✓ |   |   |
 | `voice.session.renew` | `/api/v1/voice/session/renew` | ✓ | ✓ |   |   |
 | `voice.agent.start` | `/api/v1/voice/agent/start` | ✓ | ✓ |   |   |

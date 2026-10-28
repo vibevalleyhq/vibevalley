@@ -157,6 +157,10 @@ export class VibeValleyApi {
     /** A line heard on the call that is on, without its id: refused unless one call is. */
     hear: (a: { text: string; agent?: string; sendKey?: string }): Promise<void> => this.call("/api/v1/voice/hear", a) as Promise<void>,
     dictate: (a: T.DictateRequest): Promise<T.Dictated> => this.call("/api/v1/voice/dictate", a) as Promise<T.Dictated>,
+    moss: {
+      /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
+      check: (a: T.MossCheckRequest): Promise<T.Check> => this.call("/api/v1/voice/moss/check", a) as Promise<T.Check>,
+    },
     session: {
       create: (): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/create", undefined) as Promise<T.AgoraGrant>,
       renew: (a: T.RenewRequest): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/renew", a) as Promise<T.AgoraGrant>,

@@ -105,6 +105,24 @@ describe("settings", () => {
     );
   });
 
+  it.effect("a MOSS Live key is a hint, kept until cleared", () => {
+    const config = testConfig();
+    return run(
+      config,
+      Effect.gen(function* () {
+        const s = yield* Setting;
+        expect([s.status().mossKey, s.mossKey()]).toEqual([{}, ""]);
+        const after = yield* s.save({ mossKey: " sk-moss-live-key-6b9c " });
+        expect(after.mossKey).toEqual({ source: "settings", hint: "…6b9c" });
+        expect(JSON.stringify(after)).not.toContain("sk-moss");
+        expect(s.mossKey()).toBe("sk-moss-live-key-6b9c");
+        expect(s.check({ mossKey: "sk with space" }).problem).toBeDefined();
+        expect((yield* s.save({ mossKey: "" })).mossKey).toEqual({});
+        expect(s.mossKey()).toBe("");
+      }),
+    );
+  });
+
   it.effect("a memory source keeps its key until cleared", () => {
     const config = testConfig();
     const nowledge = { kind: "nowledge", url: " http://127.0.0.1:14242/mcp/ ", enabled: true, read: true, write: true, key: "nmem-secret-9876" } as const;

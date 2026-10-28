@@ -39,6 +39,7 @@ const Stored = Schema.Struct({
   voice: Schema.optionalKey(S.SettingsUpdateVoice),
   dictationKey: Schema.optionalKey(Schema.String),
   dictation: Schema.optionalKey(S.Dictation),
+  mossKey: Schema.optionalKey(Schema.String),
   memorySources: Schema.optionalKey(Schema.Array(MemorySourceConfig)),
 });
 type Stored = typeof Stored.Type;
@@ -78,6 +79,8 @@ export interface SettingShape {
   readonly voice: () => VoiceSettings;
   /** Undefined when no address is set. */
   readonly dictation: () => DictationConfig | undefined;
+  /** "" when none is saved. */
+  readonly mossKey: () => string;
   readonly memorySources: () => readonly MemorySourceConfig[];
   readonly voiceConfig: () => VoiceConfig;
 }
@@ -135,6 +138,7 @@ export const make = Effect.gen(function* () {
       ttsKey: secret(s.ttsKey, "settings"),
       dictation: s.dictation ?? { url: "", model: "" },
       dictationKey: secret(s.dictationKey, "settings"),
+      mossKey: secret(s.mossKey, "settings"),
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
         enabled: !!m.enabled,
@@ -149,7 +153,7 @@ export const make = Effect.gen(function* () {
     const problem = settingsProblem(u);
     if (problem) return yield* new SettingRefused({ message: problem });
     const next: Record<string, unknown> = { ...stored };
-    for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
+    for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey", "mossKey"] as const) {
       const given = u[key];
       if (given !== undefined) next[key] = given.trim();
     }
@@ -188,6 +192,7 @@ export const make = Effect.gen(function* () {
     },
     voice: () => voiceOf(stored),
     dictation: () => (stored.dictation?.url ? { ...stored.dictation, key: stored.dictationKey ?? "" } : undefined),
+    mossKey: () => stored.mossKey ?? "",
     memorySources: () => [...(stored.memorySources ?? [])],
     voiceConfig: () => ({
       voice: voiceOf(stored),

@@ -9,7 +9,8 @@ import { noticeLine, onCallLine } from "./prompts.ts";
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { type AgoraGrant, type Area, type Dictated, defaultOrchestrator, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
+import { type AgoraGrant, type Area, type Check, type Dictated, defaultOrchestrator, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
+import { checkMoss, type MossTransport } from "./moss.ts";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
@@ -270,6 +271,8 @@ export interface VoiceShape {
   readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
   readonly said: (agentId: string, text: string) => Effect.Effect<void, ApiError>;
   readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
+  /** Whether MOSS Live takes the key given, or the saved one: the reason it does not, in the owner's words. */
+  readonly checkMoss: (key: string) => Effect.Effect<Check>;
   /** The keys of the lines open now, by call. */
   readonly lines: () => number;
   /** Words read out on the call that is on, queued after what is being said; false when no call is on. */
@@ -308,6 +311,8 @@ export interface VoiceOptions {
   readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
+  /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
+  readonly moss?: MossTransport;
 }
 
 const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
@@ -791,6 +796,23 @@ export const make = (options: VoiceOptions = {}) =>
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
         if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""));
+      }),
+      checkMoss: Effect.fn("Voice.checkMoss")(function* (given) {
+        const key = given.trim() || settings.mossKey();
+        if (key === "") return { problem: t("server.voice.moss.noKey") };
+        const r = yield* checkMoss(key, options.moss);
+        switch (r.kind) {
+          case "ok":
+            return {};
+          case "refused":
+            return { problem: t("server.voice.moss.refused", { why: r.why }) };
+          case "unreachable":
+            return { problem: t("server.voice.moss.unreachable", { why: r.why }) };
+          case "failed":
+            return { problem: t("server.voice.moss.failed", { why: r.why }) };
+          case "silent":
+            return { problem: t("server.voice.moss.silent") };
+        }
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();

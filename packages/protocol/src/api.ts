@@ -266,6 +266,8 @@ export interface Handlers<R = never> {
   readonly "voice.agent.hear": (a: T.VoiceHeard) => Effect.Effect<void, ApiError, R>;
   readonly "voice.agent.say": (a: T.VoiceSaid) => Effect.Effect<void, ApiError, R>;
   readonly "voice.dictate": (a: T.DictateRequest) => Effect.Effect<T.Dictated, ApiError, R>;
+  /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
+  readonly "voice.moss.check": (a: T.MossCheckRequest) => Effect.Effect<T.Check, ApiError, R>;
   readonly "connector.list": () => Effect.Effect<T.ConnectorStatus[], ApiError, R>;
   readonly "connector.login": (a: { readonly id: T.ConnectorID } & T.ConnectorLogin) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
   readonly "connector.verify": (a: { readonly id: T.ConnectorID } & T.VerifyRequest) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
@@ -1083,6 +1085,13 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.ProjectActivity,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "voice.moss.check",
+    about: [],
+    input: S.MossCheckRequest,
+    result: S.Check,
     can: ["owner", "remote"],
   },
   {

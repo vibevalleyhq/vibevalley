@@ -59,6 +59,7 @@ export const handlers = Effect.gen(function* () {
     "voice.agent.hear": (body) => voice.heard(body.agentId, body.text, body.agent ?? "", body.sendKey ?? ""),
     "voice.agent.say": (body) => voice.said(body.agentId, body.text),
     "voice.dictate": (body) => voice.dictate(body.audio, body.format),
+    "voice.moss.check": (body) => voice.checkMoss(body.key ?? ""),
     "voice.hear": (body) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
     "connector.list": () => connectors.list(),
     "connector.login": ({ id, ...body }) => connectors.login(id, body),

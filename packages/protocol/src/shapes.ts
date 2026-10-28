@@ -1541,6 +1541,8 @@ export interface SettingsStatus {
   ttsKey: KeyStatus;
   dictation: Dictation;
   dictationKey: KeyStatus;
+  /** MOSS Live (wss://api.mosi.cn/v1/realtime): a realtime voice model the server connects to. */
+  mossKey: KeyStatus;
   memorySources: MemorySource[];
 }
 
@@ -1607,7 +1609,13 @@ export interface SettingsUpdate {
   ttsKey?: string;
   dictation?: Dictation;
   dictationKey?: string;
+  mossKey?: string;
   memorySources?: MemorySourceUpdate[];
+}
+
+/** A MOSS Live key to try; the saved one when absent. */
+export interface MossCheckRequest {
+  key?: string;
 }
 
 export interface Health {

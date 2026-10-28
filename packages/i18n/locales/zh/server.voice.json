@@ -41,5 +41,12 @@
     "cut": "听写的回答读到一半断了：{why}",
     "status": "听写的地址回了 {status}：{detail}",
     "shape": "听写的地址回的不是 OpenAI 的转写格式"
+  },
+  "moss": {
+    "noKey": "还没填 MOSS Live 的 API Key",
+    "refused": "MOSS Live 不认这个 Key：{why}",
+    "unreachable": "连不上 MOSS Live：{why}",
+    "failed": "MOSS Live 没接通：{why}",
+    "silent": "MOSS Live 8 秒内没回应"
   }
 }
