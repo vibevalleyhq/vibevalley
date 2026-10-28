@@ -58,6 +58,9 @@ test("the desktop app shows the live board and sends a notice", async () => {
         () => (window as unknown as { vibevalleyHost: { voiceShortcut: { accelerator: string } | null } }).vibevalleyHost.voiceShortcut?.accelerator,
       ),
     ).toBe("Alt+Shift+Space");
+    // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
+    const titleBar = await page.evaluate(() => (window as unknown as { vibevalleyHost: { titleBar: { left: number } | null } }).vibevalleyHost.titleBar);
+    if (titleBar) expect((await page.getByRole("navigation", { name: "工作台" }).boundingBox())?.width).toBeGreaterThan(titleBar.left);
 
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
   } finally {
