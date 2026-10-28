@@ -1,9 +1,10 @@
 // Development only (vp run desktop:dev sets VIBEVALLEY_DEV=1, never a packaged app): the window reloads when the page
 // is built again (vp build --watch writes apps/web/dist), and the server starts again, on the same port, when its code
-// or the protocol's changes; the window then comes back on the place it showed.
+// or a workspace package it runs on changes; the window then comes back on the place it showed.
 
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
+import { workspaceClosure } from "./workspace.ts";
 
 /** A build writes many files; one reload once they are all there. */
 const settleMs = 400;
@@ -33,9 +34,10 @@ export function watchForDev(h: DevHooks): () => void {
     // One restart at a time; a change during one restarts again after it.
     restarting = restarting.then(h.restartServer).catch((e: unknown) => console.error("vibevalley dev: the server did not start again:", e));
   });
-  for (const dir of ["apps/server/src", "apps/server/db", "packages/protocol/src"])
+  const packages = [...workspaceClosure(h.repo, join(h.repo, "apps/server")).values()].map((dir) => join(dir, "src"));
+  for (const dir of [join(h.repo, "apps/server/src"), join(h.repo, "apps/server/db"), ...packages])
     watchers.push(
-      watch(join(h.repo, dir), { recursive: true }, (_event, file) => {
+      watch(dir, { recursive: true }, (_event, file) => {
         // The tests' own files and the golden data do not change what runs.
         if (file && (file.endsWith(".test.ts") || file.includes("testdata"))) return;
         server();
