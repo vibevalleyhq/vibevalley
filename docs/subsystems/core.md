@@ -139,7 +139,7 @@
 ## 还没做的
 
 - 按概念分模块、农场只画它们的整体方向：[概念先行，农场是皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
-- `can` 只留 `owner`、`remote`，agent 能调什么写在档案上；管家派活先写工单、满了排队：[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md)。
+- `can` 只留 `owner`、`remote`，agent 能调什么写在档案上；管家派活先写工单、满了排队：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 
 ## 怎么验证
 

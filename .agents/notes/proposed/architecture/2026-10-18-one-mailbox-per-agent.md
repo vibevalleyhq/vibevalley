@@ -79,7 +79,7 @@ Status: proposed
 交给谁由收件人定，信箱不知道 agent 怎么跑：
 
 - **Session**：开一轮、插话、排到这一轮之后，都经 `session.Service`（现在的 `Deliver` 拆成这三个动作）；能不能开（同时干活的上限）仍由 Session 定，开不了的信留在信箱里，有空地了再交。
-- **管家**：常驻（[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md) 第 4 节的「常驻」），管家包在开机时把自己的三个动作交给编排层（`mailbox` 排在 `orchestrator` 前面，往上走 `base.Hub` 或注册一个收件的接口）。`orchestrator.ask`、`send`、`heardInChat`、`onWork` 和那五个 Hub 订阅都不要了。
+- **管家**：常驻（[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md) 第 4 节的「常驻」），管家包在开机时把自己的三个动作交给编排层（`mailbox` 排在 `orchestrator` 前面，往上走 `base.Hub` 或注册一个收件的接口）。`orchestrator.ask`、`send`、`heardInChat`、`onWork` 和那五个 Hub 订阅都不要了。
 
 ### 5. 节流和熔断都搬进编排层
 

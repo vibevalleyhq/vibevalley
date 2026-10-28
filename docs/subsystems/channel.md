@@ -172,7 +172,7 @@
 
 - 给 agent 的话从哪几条路来、什么时候交给它收成一处（每个 agent 一个信箱）：[编排层：每个 agent 一个信箱](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
 - 不接受 MCP 的农机用的命令行版说话工具：[其他农机](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[管家也是一个 agent](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md)。
+- 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 - 连接器（微信）和电话落在私聊：现在都在默认频道（或连接器接的频道）；已经接到某个频道的账号怎么办、电话的字幕给谁看还没定。
 - 语音频道（`voice`）：多一种 `type`，还没有提案。
 - 链接预览的地址检查和请求之间名字重新解析（DNS rebinding）还挡不住；预览里的图不经服务端转。
