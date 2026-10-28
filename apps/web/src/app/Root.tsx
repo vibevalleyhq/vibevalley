@@ -5,6 +5,7 @@ import { createFrames, FramesContext } from "../base/frame";
 import { queries } from "../base/query";
 import { createFarmUi, FarmUiContext } from "../farm/state";
 import { createRouter, RouterContext } from "../base/router";
+import { reveal } from "../base/opening";
 
 /** What every page has around it: the router, the state frames, the farm's own state, the query cache. */
 export function Root(props: { children: JSX.Element }) {
@@ -25,8 +26,8 @@ export function Root(props: { children: JSX.Element }) {
   );
 }
 
-/** The page is up: the bar index.html started on (public/opening.html) goes; until then it covers the empty page. */
+/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (base/opening.ts). */
 function Opened() {
-  onSettled(() => document.getElementById("opening")?.remove());
+  onSettled(() => void reveal());
   return null;
 }

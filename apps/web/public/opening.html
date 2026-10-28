@@ -4,7 +4,8 @@
   starts and the server is still coming up. The part between the opening markers is also written into index.html
   when the page is built (vite.config.ts), so the served page starts on the same bar until it is mounted (app/Root.tsx);
   the farm's own bar (farm/canvas/VillageCanvas.tsx, Entering) takes over in the same place. Colors are the page's
-  tokens (style.css): ground, bark-900, leaf-500, cream-100, cream-200.
+  tokens (style.css): the farm's ground, bark-900, leaf-500, cream-100, cream-200; the workbench's page, muted, line and
+  accent in either theme. Which one shows is worked out below from the address and the owner's choices.
 -->
 <html lang="zh-Hans">
   <head>
@@ -20,7 +21,6 @@
       body {
         margin: 0;
         height: 100%;
-        background: #2b3320;
       }
     </style>
   </head>
@@ -33,9 +33,6 @@
         z-index: 2147483647;
         display: grid;
         place-items: center;
-        background: #2b3320;
-        font: 12px "FusionPixel", "PingFang SC", sans-serif;
-        color: #eedcb2;
         user-select: none;
       }
       #opening .column {
@@ -49,6 +46,23 @@
         box-sizing: border-box;
         position: relative;
         overflow: hidden;
+      }
+      #opening .fill {
+        position: absolute;
+        animation: opening-walk 1.4s steps(14) infinite;
+      }
+      #opening .problem {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        text-align: center;
+      }
+      /* The farm: the village's ground and its 进村 bar, which the farm's own takes over in the same place. */
+      #opening[data-look="farm"] {
+        background: #2b3320;
+        font: 12px "FusionPixel", "PingFang SC", sans-serif;
+        color: #eedcb2;
+      }
+      #opening[data-look="farm"] .bar {
         width: 256px;
         height: 16px;
         padding: 2px;
@@ -56,19 +70,64 @@
         background: #2f1f1399;
         box-shadow: 2px 2px 0 0 #3a2a1899;
       }
-      #opening .fill {
-        position: absolute;
+      #opening[data-look="farm"] .fill {
         top: 2px;
         bottom: 2px;
         width: 30%;
         background: #74a046;
-        animation: opening-walk 1.4s steps(14) infinite;
       }
-      #opening .problem {
+      #opening[data-look="farm"] .face,
+      #opening[data-look="farm"] .problem {
         color: #e2c995;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        text-align: center;
+      }
+      #opening[data-look="farm"] .face {
+        display: none;
+      }
+      /* The workbench: its own page, so a quick load shows nothing but the ground; only a slow one shows the face and a
+         bar, after a moment. */
+      #opening[data-look="desk"] {
+        background: #fffaf0;
+        font: 12px -apple-system, "PingFang SC", sans-serif;
+        color: #7f5b3b;
+      }
+      #opening[data-look="desk"][data-theme="dark"] {
+        background: #1d1813;
+        color: #bfa88c;
+      }
+      #opening[data-look="desk"] .column {
+        gap: 12px;
+        opacity: 0;
+        animation: opening-in 240ms cubic-bezier(0.2, 0, 0, 1) 400ms forwards;
+      }
+      #opening[data-look="desk"] .face {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        image-rendering: pixelated;
+      }
+      #opening[data-look="desk"] .bar {
+        width: 120px;
+        height: 3px;
+        border-radius: 2px;
+        background: #2f1f131f;
+      }
+      #opening[data-look="desk"][data-theme="dark"] .bar {
+        background: #f1e7d621;
+      }
+      #opening[data-look="desk"] .fill {
+        top: 0;
+        bottom: 0;
+        width: 30%;
+        border-radius: 2px;
+        background: #567c31;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      #opening[data-look="desk"][data-theme="dark"] .fill {
+        background: #7fae4f;
+      }
+      #opening .column:has(.problem) {
+        opacity: 1;
+        animation: none;
       }
       @keyframes opening-walk {
         from {
@@ -78,15 +137,24 @@
           left: 100%;
         }
       }
+      @keyframes opening-in {
+        to {
+          opacity: 1;
+        }
+      }
       @media (prefers-reduced-motion: reduce) {
         #opening .fill {
           animation: none;
           left: 2px;
         }
+        #opening[data-look="desk"] .column {
+          animation-duration: 0s;
+        }
       }
     </style>
     <div id="opening">
       <div class="column">
+        <img class="face" alt="" />
         <div class="bar" role="progressbar"><div class="fill"></div></div>
         <span class="words"></span>
       </div>
@@ -99,6 +167,24 @@
       const said = openingWords[openingLocale] ?? openingWords.zh;
       document.querySelector("#opening .bar").setAttribute("aria-label", said.label);
       document.querySelector("#opening .words").textContent = said.waking;
+      // Which page this is and how it looks, before any of its scripts: the farm's paths (and / when the owner opens on
+      // the farm, 设置 › 通用) or the workbench in its theme. The choices are base/prefs.ts's, under the same key; the
+      // theme goes on <html> now as base/appearance.ts would, so the page under the cover is already in it.
+      const openingPrefs = (() => {
+        try {
+          return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {};
+        } catch {
+          return {};
+        }
+      })();
+      const openingFarm = /^\/(farm|tree)(\/|$)/.test(location.pathname) || (location.pathname === "/" && openingPrefs.start === "farm");
+      const openingDark = openingPrefs.theme === "dark" || (openingPrefs.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+      const openingCover = document.getElementById("opening");
+      openingCover.dataset.look = openingFarm ? "farm" : "desk";
+      openingCover.dataset.theme = openingDark ? "dark" : "light";
+      if (location.protocol !== "file:") document.documentElement.dataset.theme = openingCover.dataset.theme;
+      // From the app's files (the desktop app) the icons are beside this page; served, they are at the root.
+      document.querySelector("#opening .face").src = (location.protocol === "file:" ? "" : "/") + "icons/app-64.png";
     </script>
     <!-- /opening -->
     <script>

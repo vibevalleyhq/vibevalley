@@ -41,8 +41,9 @@ let server: RunningServer | undefined;
 let starting: Promise<RunningServer> | undefined;
 let window: BrowserWindow | undefined;
 
-/** The page's ground (apps/web style.css): what the window is painted with between one page and the next. */
-const ground = "#2b3320";
+/** The workbench's page in either theme (apps/web style.css): what the window is painted with between one page and the
+ * next, so a reload goes from the page to the same ground (apps/web public/opening.html) and back. */
+const ground = () => (nativeTheme.shouldUseDarkColors ? "#1d1813" : "#fffaf0");
 
 /** The smallest window: twice the farm. */
 const minSize = { w: farmFraming.picture.w * 2, h: farmFraming.picture.h * 2 };
@@ -60,7 +61,7 @@ function windowNow(): BrowserWindow {
     minHeight: minSize.h,
     title: "VibeValley",
     show: false,
-    backgroundColor: ground,
+    backgroundColor: ground(),
     // The page reaches the top edge; it leaves the strip the host says (preload titleBar) to drag the window by.
     ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: trafficLights } : {}),
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
@@ -134,6 +135,7 @@ ipcMain.handle("host:reveal", (_event, path: string) => {
 // The window's own parts (menus, scroll bars, the title strip) follow the theme the page chose.
 ipcMain.handle("host:theme", (_event, theme: string) => {
   nativeTheme.themeSource = theme === "light" || theme === "dark" ? theme : "system";
+  window?.setBackgroundColor(ground());
 });
 
 ipcMain.handle("host:locale", (_event, locale: string) => {
