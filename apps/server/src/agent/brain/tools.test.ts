@@ -49,9 +49,9 @@ const fails = async (p: Promise<string>) => {
 describe("the task tools", () => {
   it("task and mark the agent's own tasks", async () => {
     const tools = taskTools(memoryStore(), false, Effect.void);
-    expect(await call(tools, "task_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/);
-    expect(await fails(call(tools, "task_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/);
-    const added = await call(tools, "task_add", {
+    expect(await call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/);
+    expect(await fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/);
+    const added = await call(tools, "todo_add", {
       tasks: [
         { id: "read", brief: "读代码" },
         { id: "fix", title: "改 auth", brief: "改", after: ["read"] },
@@ -59,11 +59,11 @@ describe("the task tools", () => {
     });
     expect(added).toMatch(/任务（2 件，1 件可以做）/);
     expect(added).toMatch(/\[等着\] fix 改 auth（等 read）/);
-    expect(await call(tools, "task_update", { id: "read", state: "done", result: "在 jwt.go" })).toMatch(/\[可以做\] fix/);
-    expect(await fails(call(tools, "task_update", { id: "read", state: "waiting" }))).toMatch(/不能改成/);
-    expect(await call(tools, "task_graph", {})).toMatch(/read 读代码 → 在 jwt.go/);
-    expect(await call(tools, "task_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/);
-    expect(await call(tools, "task_graph", {})).toBe("现在没有任务。");
+    expect(await call(tools, "todo_update", { id: "read", state: "done", result: "在 jwt.go" })).toMatch(/\[可以做\] fix/);
+    expect(await fails(call(tools, "todo_update", { id: "read", state: "waiting" }))).toMatch(/不能改成/);
+    expect(await call(tools, "todo_list", {})).toMatch(/read 读代码 → 在 jwt.go/);
+    expect(await call(tools, "todo_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/);
+    expect(await call(tools, "todo_list", {})).toBe("现在没有任务。");
   });
 });
 

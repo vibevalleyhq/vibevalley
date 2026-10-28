@@ -87,7 +87,7 @@ Status: proposed
 1. 接口：加新接口和字段、改 `assignee`、标 `can`；主人的处理函数；能力表加「帮工」列；重写 `client.ts` 和命令行的黄金数据。
 2. 工具：按接口声明、改名改参数、拆 `task_edit` 和 `issues`、合 `roster`；检查；`parameters.json` 重写。
 3. 提到工具名的提示和词：管家的提示、频道规矩、私聊和派活的话、页面里过程面板的工具名。
-4. agent 自己的手：待办改 `todo_*`；管家的记性只留一套（`memory_create` 和 `remember` 写的是同一个文件，留一个）。
+4. agent 自己的手：待办改 `todo_*`。管家的记性不用改：`memory_create` 替帮工档案记，名字是管家自己时拒绝、让它用 `remember`，两条路不重。
 5. 管家评测的样例：样例里记着的工具名和参数照改名表改，`want` 里提到的也改。
 6. 文档：频道、管家、计划、执行、地基的子系统文档和能力表；本篇沉淀后删掉，[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md) 里和本篇相反的第 3 节删掉。
 7. 真模型重放管家的评测（花钱，先问主人）。

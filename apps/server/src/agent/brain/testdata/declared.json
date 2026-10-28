@@ -84,34 +84,34 @@
  ],
  "tasks": [
   {
-   "name": "task_add",
-   "description": "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
+   "name": "todo_add",
+   "description": "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 todo_update 标上。",
    "parameters": "{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"by\":{\"type\":\"string\",\"enum\":[\"self\",\"subagent\"]}},\"additionalProperties\":true,\"required\":[\"id\",\"brief\"]}}},\"additionalProperties\":true,\"required\":[\"tasks\"]}"
   },
   {
-   "name": "task_update",
+   "name": "todo_update",
    "description": "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
    "parameters": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"state\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\",\"skipped\",\"waiting\"]},\"result\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\":true,\"required\":[\"id\"]}"
   },
   {
-   "name": "task_graph",
+   "name": "todo_list",
    "description": "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
    "parameters": "{\"type\":\"object\",\"properties\":{}}"
   }
  ],
  "tasks on its own": [
   {
-   "name": "task_add",
-   "description": "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
+   "name": "todo_add",
+   "description": "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 todo_update 标上。",
    "parameters": "{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"by\":{\"type\":\"string\",\"enum\":[\"self\"]}},\"additionalProperties\":true,\"required\":[\"id\",\"brief\"]}}},\"additionalProperties\":true,\"required\":[\"tasks\"]}"
   },
   {
-   "name": "task_update",
+   "name": "todo_update",
    "description": "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
    "parameters": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"state\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\",\"skipped\",\"waiting\"]},\"result\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\":true,\"required\":[\"id\"]}"
   },
   {
-   "name": "task_graph",
+   "name": "todo_list",
    "description": "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
    "parameters": "{\"type\":\"object\",\"properties\":{}}"
   }

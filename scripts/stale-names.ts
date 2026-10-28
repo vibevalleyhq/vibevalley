@@ -74,8 +74,8 @@ const RULES: readonly Rule[] = [
   {
     name: "an agent tool under its name before it was its endpoint's",
     pattern:
-      /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_recurrences|cancel_recurrence|issue_status|graph_action|task_action|task_edit|memory_add|doc_read|doc_append|doc_update|wants_owner|all_projects|base_rev)\b/,
-    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, recurrence_list, recurrence_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; fields as the endpoint's (wantsOwner, project, baseRev)",
+      /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_recurrences|cancel_recurrence|issue_status|graph_action|task_action|task_edit|task_add|task_update|task_graph|memory_add|doc_read|doc_append|doc_update|wants_owner|all_projects|base_rev)\b/,
+    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, recurrence_list, recurrence_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsOwner, project, baseRev)",
     // Nowledge Mem's own tools, which the memory source calls.
     except: /^apps\/server\/src\/memory\/(nowledge|outside)(\.test)?\.ts$/,
   },

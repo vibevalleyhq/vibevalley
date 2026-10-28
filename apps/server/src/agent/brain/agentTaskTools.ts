@@ -23,7 +23,7 @@ export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTas
 /** changed runs after every change the model makes, so that what became ready goes out. */
 export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effect.Effect<void>): Tool[] {
   const task = schemaEffectTool({
-    name: "task_add",
+    name: "todo_add",
     description: words.addDescription,
     parameters: Schema.Struct({
       tasks: Schema.Array(
@@ -50,7 +50,7 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
       }),
   });
   const update = schemaEffectTool({
-    name: "task_update",
+    name: "todo_update",
     description: words.updateDescription,
     parameters: Schema.Struct({
       id: Schema.String,
@@ -74,7 +74,7 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
       }),
   });
   const list = schemaEffectTool({
-    name: "task_graph",
+    name: "todo_list",
     description: words.graphDescription,
     parameters: Schema.Struct({}),
     run: () => Effect.map(store.load, engine.text),
