@@ -249,7 +249,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               />
             </Show>
           </div>
-          <DictationButton field={() => input} value={box.text()} onValue={box.edit} size={16} class="rounded-md hover:bg-hover" />
+          <DictationButton field={() => input} value={box.text()} onValue={box.edit} size={16} class="size-7 rounded-md hover:bg-hover" />
           <Show when={box.stoppable()}>
             <button
               type="button"
@@ -258,7 +258,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               title={t("web.channel.composer.stopHint")}
               class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
             >
-              <Icon name="stop" size={14} />
+              <Icon name="stop" size={16} />
             </button>
           </Show>
           <button
@@ -272,7 +272,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               box.canSend() ? "border-accent bg-accent hover:bg-leaf" : "border-transparent opacity-50",
             ]}
           >
-            <Icon name="send" size={14} />
+            <Icon name="send" size={16} />
           </button>
         </div>
       </div>
