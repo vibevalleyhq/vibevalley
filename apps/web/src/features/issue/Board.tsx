@@ -32,6 +32,7 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
       value={text()}
       onInput={(e) => setText(e.currentTarget.value)}
       onKeyDown={submit}
+      data-testid="quick-add"
       placeholder={t("web.issue.board.add")}
       aria-label={t("web.issue.board.addLabel")}
       class="h-8 w-full rounded-md border border-dashed border-line bg-page/70 px-2.5 text-sm outline-none placeholder:text-faint hover:border-faint focus:border-solid focus:border-focus focus:bg-page"

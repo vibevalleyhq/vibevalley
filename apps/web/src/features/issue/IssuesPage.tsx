@@ -290,6 +290,7 @@ function Toolbar(props: {
           <label class="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
             <Icon name="search" size={14} />
             <input
+              data-testid="issue-search"
               value={props.filter.query}
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
               placeholder={t("web.issue.page.find")}
@@ -316,7 +317,7 @@ function Toolbar(props: {
           />
           <Show when={filterAny(props.filter)}>
             <span class="text-xs text-muted">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
-            <button type="button" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
+            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
               {t("web.issue.page.clear")}
             </button>
           </Show>

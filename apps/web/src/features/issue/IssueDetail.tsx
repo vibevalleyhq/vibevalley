@@ -106,7 +106,7 @@ export function IssueDetail(props: {
           {[s().project, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
         </span>
       </div>
-      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")}>
+      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().attention.state}>
         <Dot tone={tone()} />
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
       </div>
@@ -117,7 +117,7 @@ export function IssueDetail(props: {
     <>
       <Show when={s().ask}>
         {(ask) => (
-          <section aria-label={t("web.issue.detail.yours")} class="mb-5">
+          <section aria-label={t("web.issue.detail.yours")} data-testid="issue-ask" class="mb-5">
             <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
@@ -132,6 +132,8 @@ export function IssueDetail(props: {
             </Note>
             <Show when={s().attention.state === "asking" || s().attention.state === "canceled" || box()}>
               <TextArea
+                data-testid="issue-words"
+                data-box={box()}
                 class="mt-2.5"
                 rows={box() === "reject" ? 3 : 2}
                 value={text()}
@@ -198,7 +200,7 @@ export function IssueDetail(props: {
         </section>
       </Show>
 
-      <section aria-label={t("web.issue.detail.progress")}>
+      <section aria-label={t("web.issue.detail.progress")} data-testid="issue-progress" data-met={s().met} data-total={s().criteria.length}>
         <SheetLabel>
           {t("web.issue.detail.progress")}
           <Show when={s().criteria.length > 0}>
@@ -225,7 +227,7 @@ export function IssueDetail(props: {
         </Show>
       </section>
 
-      <section aria-label={t("web.issue.detail.made")}>
+      <section aria-label={t("web.issue.detail.made")} data-testid="issue-made">
         <SheetLabel>{t("web.issue.detail.made")}</SheetLabel>
         <Switch
           fallback={
@@ -271,7 +273,7 @@ export function IssueDetail(props: {
         </Show>
       </section>
 
-      <section aria-label={t("web.issue.detail.story")}>
+      <section aria-label={t("web.issue.detail.story")} data-testid="issue-story">
         <SheetLabel>{t("web.issue.detail.story")}</SheetLabel>
         <Show when={timeline()} fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? t("web.issue.reading") : t("web.issue.detail.unread")}</p>}>
           {(line) => <Story milestones={line().milestones} />}
@@ -330,6 +332,7 @@ export function IssueDetail(props: {
         <Property label={t("web.issue.detail.deliver")}>
           <Pick
             label={t("web.issue.detail.deliver")}
+            testid="issue-deliver"
             value={props.issue.deliver}
             disabled={busy() || !s().open}
             onChange={(v) => {
@@ -389,7 +392,7 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
         <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
           <For each={props.ask.options}>
             {(o) => (
-              <Button disabled={props.busy} onClick={() => props.onPick(o)}>
+              <Button data-testid="answer-option" data-key={o} disabled={props.busy} onClick={() => props.onPick(o)}>
                 {o}
               </Button>
             )}
@@ -425,6 +428,8 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             <Show when={props.checking}>
               <input
                 type="checkbox"
+                data-testid="criterion-tick"
+                data-key={i()}
                 aria-label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
@@ -453,7 +458,7 @@ function Story(props: { milestones: Milestone[] }) {
     <ol class="flex flex-col">
       <For each={props.milestones}>
         {(m) => (
-          <li class="flex gap-3 py-1 text-sm">
+          <li data-testid="milestone" data-kind={m.kind} class="flex gap-3 py-1 text-sm">
             <span class="w-16 shrink-0 text-muted">{wallClockText(m.at)}</span>
             <span class={["min-w-0 flex-1 break-words", { "text-berry": m.kind === "failed" || m.kind === "rejected", "font-semibold": m.kind === "asked" }]}>
               <Show when={m.who}>

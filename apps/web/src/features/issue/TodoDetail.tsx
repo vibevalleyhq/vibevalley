@@ -165,6 +165,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </div>
       </Show>
       <input
+        data-testid="issue-title"
         value={d().title}
         onInput={(e) => edit({ title: e.currentTarget.value })}
         placeholder={t("web.issue.todo.titleHint")}
@@ -177,6 +178,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const main = (
     <>
       <textarea
+        data-testid="issue-description"
         value={d().description}
         onInput={(e) => edit({ description: e.currentTarget.value })}
         rows={6}
@@ -259,6 +261,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Property label={t("web.issue.detail.helper")}>
         <Pick
           label={t("web.issue.detail.helper")}
+          testid="issue-helper"
           value={d().agent}
           placeholder={t("web.issue.todo.pickForMe")}
           onChange={(v) => edit({ agent: v })}
@@ -268,6 +271,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Property label={t("web.issue.task.project")}>
         <Pick
           label={t("web.issue.task.project")}
+          testid="issue-project"
           value={d().project}
           placeholder={t("web.issue.todo.whichProject")}
           onChange={(v) => edit({ project: v })}
@@ -280,6 +284,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Property label={t("web.issue.todo.priority")}>
         <Pick
           label={t("web.issue.todo.priority")}
+          testid="issue-priority"
           value={d().priority}
           onChange={(v) => edit({ priority: v as Priority })}
           options={PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) }))}
@@ -288,6 +293,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Property label={t("web.issue.detail.deliver")}>
         <Pick
           label={t("web.issue.detail.deliver")}
+          testid="issue-deliver"
           value={d().deliver}
           onChange={(v) => edit({ deliver: v as Deliverable })}
           options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
@@ -310,6 +316,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         <Show when={backlog()}>
           <Button
             tone={refined() ? "primary" : "plain"}
+            data-testid="issue-start"
             disabled={!startable()}
             title={d().agent ? undefined : t("web.issue.todo.pickHelper")}
             onClick={() => void start()}
@@ -318,6 +325,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </Button>
         </Show>
         <Button
+          data-testid="issue-save"
           disabled={!canSave() || !edited()}
           onClick={() => {
             const id = props.item.id;
@@ -327,7 +335,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         >
           {t("web.issue.todo.save")}
         </Button>
-        <Button tone="quiet" disabled={busy()} onClick={() => void remove()}>
+        <Button tone="quiet" data-testid="issue-remove" disabled={busy()} onClick={() => void remove()}>
           {t("web.issue.todo.remove")}
         </Button>
       </div>

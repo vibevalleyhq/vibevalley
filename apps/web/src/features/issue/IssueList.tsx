@@ -89,7 +89,7 @@ export function IssueList(props: {
               }
             };
             return (
-              <section aria-label={label()} class="mb-1">
+              <section aria-label={label()} data-testid="issue-group" data-key={g().key} class="mb-1">
                 <header class="sticky top-0 z-10 mt-1.5 flex h-[34px] items-center rounded-md bg-side pr-1">
                   <button
                     type="button"
@@ -146,6 +146,9 @@ function Row(props: { card: BoardCard; selected: boolean; showProject: boolean; 
     <div
       role="button"
       tabindex={0}
+      data-testid="issue-card"
+      data-key={props.card.id}
+      data-kind={props.card.kind}
       aria-label={look().title}
       aria-current={props.selected ? "true" : undefined}
       title={look().detail}
