@@ -91,11 +91,17 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   return (
     <div data-testid="composer" data-key={props.channel?.id} class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
-        <div role="listbox" aria-label={t("web.channel.composer.who")} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
+        <div
+          role="listbox"
+          aria-label={t("web.channel.composer.who")}
+          data-testid="mentions"
+          class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float"
+        >
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
                 role="option"
+                data-key={n().token}
                 aria-selected={aria(i() === box.active())}
                 onMouseEnter={() => box.setActive(i())}
                 // Keeps the focus in the input.

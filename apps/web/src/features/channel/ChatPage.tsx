@@ -683,6 +683,7 @@ function OrchestratorLine(props: { agent: string }) {
     <div
       data-testid="channel-orchestrator-line"
       data-key={props.agent}
+      data-state={now()}
       class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm"
       aria-label={t("web.channel.orchestrator")}
     >
