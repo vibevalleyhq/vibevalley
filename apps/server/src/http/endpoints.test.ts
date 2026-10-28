@@ -53,4 +53,59 @@ describe("the endpoints the agents' tools stand on", () => {
       expect(yield* refusal(() => api.doc.block.create({ id: doc.doc.id, type: "divider", text: "" }))).toBe("Refused");
     }).pipe(Effect.scoped),
   );
+
+  it.live("take a doc's block in the editor's shape: the new block's content and place, the rest filled in", () =>
+    Effect.gen(function* () {
+      const api = yield* farm;
+      const before = Date.now();
+      const made = yield* call(() => api.doc.create({ title: "插入" }));
+      const inserted = crypto.randomUUID();
+      yield* call(() =>
+        api.doc.submit({
+          id: made.doc.id,
+          batchId: crypto.randomUUID(),
+          lastSeq: 0,
+          ops: [{ op: "insert_block", block: { id: inserted, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
+        }),
+      );
+      const saved = (yield* call(() => api.doc.get({ id: made.doc.id }))).blocks[0]!;
+      expect(saved).toMatchObject({ id: inserted, docId: made.doc.id, rev: 1, updatedBy: "owner", text: [{ t: "你好世界", marks: {} }] });
+      expect(saved.updated).toBeGreaterThanOrEqual(before);
+      expect(saved.deleted).toBeUndefined();
+
+      const imported = yield* call(() => api.doc.import({ title: "拆分", markdown: "你好世界" }));
+      const source = imported.blocks[0]!;
+      const split = crypto.randomUUID();
+      yield* call(() =>
+        api.doc.submit({
+          id: imported.doc.id,
+          batchId: crypto.randomUUID(),
+          lastSeq: imported.doc.seq,
+          ops: [
+            {
+              op: "split_block",
+              blockId: source.id,
+              baseRev: source.rev,
+              offset: 2,
+              newBlock: { id: split, orderKey: "W", type: "paragraph", attrs: {}, text: [] },
+            },
+          ],
+        }),
+      );
+      const after = yield* call(() => api.doc.get({ id: imported.doc.id }));
+      expect(after.blocks.map((b) => b.text.map((x) => x.t).join(""))).toEqual(["你好", "世界"]);
+      expect(after.blocks[1]).toMatchObject({ id: split, docId: imported.doc.id, rev: 1, updatedBy: "owner" });
+    }).pipe(Effect.scoped),
+  );
+
+  // The issue's page sends what the owner changed but has not saved with the button they pressed.
+  it.live("save an issue's unsaved fields before its act is tried, even when the act is refused", () =>
+    Effect.gen(function* () {
+      const api = yield* farm;
+      const made = yield* call(() => api.issue.create({ title: "带着改动开工之前" }));
+      expect(yield* refusal(() => api.issue.status.update({ id: made.id, status: "todo", edit: { title: "带着改动开工", priority: "high" } }))).toBe("Refused");
+      const got = yield* call(() => api.issue.get({ id: made.id }));
+      expect([got.title, got.priority, got.status]).toEqual(["带着改动开工", "high", "backlog"]);
+    }).pipe(Effect.scoped),
+  );
 });

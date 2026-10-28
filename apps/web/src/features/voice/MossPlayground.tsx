@@ -41,7 +41,7 @@ export function MossPlayground() {
   const [instructions, setInstructions] = createSignal(t("web.voice.moss.defaultInstructions"));
   const idle = () => line().phase === "idle";
   return (
-    <div class="flex max-w-4xl flex-col gap-3">
+    <div class="flex max-w-4xl flex-col gap-3" data-testid="moss-line" data-state={line().phase}>
       <Card title={t("web.voice.moss.tryIt")} action={<span class="text-xs text-muted">{t("web.voice.moss.notInChat")}</span>}>
         <div class="flex flex-col gap-3 p-4">
           <label class="flex flex-col gap-1 text-xs font-medium text-muted">
@@ -62,12 +62,17 @@ export function MossPlayground() {
             <Show
               when={idle()}
               fallback={
-                <Button tone="danger" icon="stop" onClick={() => mossLine.end()}>
+                <Button tone="danger" icon="stop" data-testid="moss-hang-up" onClick={() => mossLine.end()}>
                   {line().phase === "connecting" ? t("web.voice.moss.connecting") : t("web.voice.moss.hangUp")}
                 </Button>
               }
             >
-              <Button tone="primary" icon="record" onClick={() => void mossLine.start({ persona: persona(), instructions: instructions() })}>
+              <Button
+                tone="primary"
+                icon="record"
+                data-testid="moss-talk"
+                onClick={() => void mossLine.start({ persona: persona(), instructions: instructions() })}
+              >
                 {t("web.voice.moss.talk")}
               </Button>
             </Show>
@@ -82,11 +87,17 @@ export function MossPlayground() {
               <Level value={line().mossLevel} label="MOSS" />
             </Show>
           </div>
-          <Show when={line().problem}>{(p) => <p class="text-sm text-berry">{p()}</p>}</Show>
+          <Show when={line().problem}>
+            {(p) => (
+              <p role="alert" class="text-sm text-berry">
+                {p()}
+              </p>
+            )}
+          </Show>
         </div>
       </Card>
       <Card title={t("web.voice.moss.qos.title")} action={<Hint text={t("web.voice.moss.qos.hint")} />}>
-        <div class="flex flex-wrap gap-2 p-4" role="group" aria-label={t("web.voice.moss.qos.title")}>
+        <div class="flex flex-wrap gap-2 p-4" role="group" aria-label={t("web.voice.moss.qos.title")} data-testid="moss-qos">
           <Stat
             label={t("web.voice.moss.qos.reply")}
             value={line().qos.replyMs === undefined ? "—" : t("web.voice.moss.qos.ms", { last: line().qos.replyMs!, mean: line().qos.replyMeanMs! })}
@@ -124,7 +135,7 @@ export function MossPlayground() {
         </div>
       </Card>
       <Card title={t("web.voice.moss.said")}>
-        <div class="flex flex-col gap-2 p-4" role="log" aria-label={t("web.voice.moss.said")}>
+        <div class="flex flex-col gap-2 p-4" role="log" aria-label={t("web.voice.moss.said")} data-testid="moss-said">
           <Show when={line().turns.length > 0} fallback={<p class="text-sm text-muted">{t("web.voice.moss.nothingSaid")}</p>}>
             <For each={line().turns}>
               {(turn) => (
@@ -139,7 +150,7 @@ export function MossPlayground() {
         </div>
       </Card>
       <Card title={t("web.voice.moss.events")} action={<Hint text={t("web.voice.moss.eventsHint")} />}>
-        <ol class="max-h-72 overflow-y-auto p-3 font-mono text-xs" aria-label={t("web.voice.moss.events")}>
+        <ol class="max-h-72 overflow-y-auto p-3 font-mono text-xs" aria-label={t("web.voice.moss.events")} data-testid="moss-events">
           <For each={line().events}>
             {(e) => (
               <li class="truncate" title={e.text}>

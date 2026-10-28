@@ -78,7 +78,7 @@ const SmallFace = (props: { children: JSX.Element }) => (
 
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
+    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
       <span class="phone-blink">{t("web.farm.phone.ringing")}</span>
       <span class="mt-3">
         <BigFace shake>
@@ -91,16 +91,16 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
       </p>
       <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
       <div class="mt-auto mb-5 flex gap-8">
-        <RoundKey answer={false} label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
-        <RoundKey answer label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
+        <RoundKey answer={false} testid="decline" label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
+        <RoundKey answer testid="answer" label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
       </div>
     </div>
   );
 }
 
-function RoundKey(props: { answer: boolean; label: string; onClick: () => void }) {
+function RoundKey(props: { answer: boolean; testid: string; label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={() => props.onClick()} class="flex cursor-pointer flex-col items-center gap-1">
+    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} class="flex cursor-pointer flex-col items-center gap-1">
       <span
         class="grid size-11 place-items-center"
         style={{ background: props.answer ? answerGreen : declineRed, "box-shadow": `inset 0 0 0 2px ${bark}, inset -3px -3px 0 0 #00000040` }}
@@ -126,6 +126,7 @@ function CallOrchestrator(props: { onCall: () => void }) {
   return (
     <button
       type="button"
+      data-testid="call-orchestrator"
       onClick={() => props.onCall()}
       class="m-2 flex cursor-pointer items-center justify-center gap-2 py-1.5 hover:brightness-110"
       style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
@@ -140,7 +141,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
   const phone = phoneState();
   const missed = () => missedOf(phone());
   const empty = (text: string) => (
-    <li class="px-3 py-6 text-center" style={{ color: lcd.dark }}>
+    <li data-testid="calls-empty" class="px-3 py-6 text-center" style={{ color: lcd.dark }}>
       {text}
     </li>
   );
@@ -153,6 +154,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           {(s) => (
             <button
               type="button"
+              data-key={s}
               onClick={() => props.onScreen(s)}
               aria-pressed={aria(props.screen === s)}
               class={["flex-1 cursor-pointer py-1", { "hover:bg-lcd-light": props.screen !== s }]}
@@ -170,7 +172,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
             <Show when={phone().log.length > 0} fallback={empty(t("web.farm.phone.noCalls"))}>
               <For each={phone().log} keyed={(e) => `${e.call.id}-${e.at}`}>
                 {(e) => (
-                  <li class={row} style={rule}>
+                  <li data-testid="call-log" data-key={e().call.id} data-answered={e().answered ? "" : undefined} class={row} style={rule}>
                     <SmallFace>
                       <CallerFace call={e().call} size={28} />
                     </SmallFace>
@@ -192,6 +194,8 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                 <li style={rule}>
                   <button
                     type="button"
+                    data-testid="missed-call"
+                    data-key={c().id}
                     onClick={() => props.onAnswer(c())}
                     aria-label={t("shared.join.labeled", { label: c().who, text: c().words.label })}
                     class={[row, "cursor-pointer hover:bg-lcd-light"]}
@@ -241,7 +245,12 @@ export function OrchestratorScreen() {
   };
   const on = () => phase() === "live" || phase() === "connecting";
   return (
-    <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
+    <div
+      data-testid="orchestrator-line"
+      data-state={phase()}
+      data-problem={call().problem ? "" : undefined}
+      class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center"
+    >
       <BigFace shake={phase() === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
@@ -252,6 +261,7 @@ export function OrchestratorScreen() {
       <div class="mt-auto mb-5">
         <RoundKey
           answer={!on()}
+          testid="line-key"
           label={on() ? t("web.farm.phone.hangUp") : t("web.farm.phone.callOrchestrator")}
           onClick={() => void (on() ? voiceCall.end() : voiceCall.start())}
         />
@@ -261,6 +271,7 @@ export function OrchestratorScreen() {
 }
 
 interface App {
+  readonly id: string;
   readonly label: string;
   readonly icon: () => JSX.Element;
   readonly badge?: () => number;
@@ -275,11 +286,11 @@ const SokobanIcon = () => (
 
 /** The games, in one folder on the home screen. */
 const games = (open: (app: PhoneApp) => void): App[] => [
-  { label: t("web.farm.phone.game.blocks"), icon: () => <BlocksIcon />, go: () => open("blocks") },
-  { label: t("web.farm.phone.game.sokoban"), icon: SokobanIcon, go: () => open("sokoban") },
-  { label: t("web.farm.phone.game.dino"), icon: () => <DinoIcon />, go: () => open("dino") },
-  { label: t("web.farm.phone.game.bugs"), icon: () => <BugSnakeIcon />, go: () => open("bugs") },
-  { label: t("web.farm.phone.game.merge"), icon: () => <MergeIcon />, go: () => open("merge") },
+  { id: "blocks", label: t("web.farm.phone.game.blocks"), icon: () => <BlocksIcon />, go: () => open("blocks") },
+  { id: "sokoban", label: t("web.farm.phone.game.sokoban"), icon: SokobanIcon, go: () => open("sokoban") },
+  { id: "dino", label: t("web.farm.phone.game.dino"), icon: () => <DinoIcon />, go: () => open("dino") },
+  { id: "bugs", label: t("web.farm.phone.game.bugs"), icon: () => <BugSnakeIcon />, go: () => open("bugs") },
+  { id: "merge", label: t("web.farm.phone.game.merge"), icon: () => <MergeIcon />, go: () => open("merge") },
 ];
 
 /** The games folder's icon: four of them small, as a folder shows what is in it. */
@@ -302,16 +313,17 @@ export function HomeScreen(props: {
 }) {
   const apps: App[] = [
     {
+      id: "missed",
       label: t("web.farm.phone.app.missed"),
       icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />,
       badge: () => props.missed,
       go: () => props.onOpen("missed"),
     },
-    { label: t("web.farm.phone.log"), icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: t("web.farm.phone.manager"), icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
-    { label: t("web.farm.phone.app.channels"), icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
-    { label: t("web.farm.phone.app.graphs"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
-    { label: t("web.farm.phone.app.games"), icon: GamesIcon, go: () => props.onOpen("games") },
+    { id: "log", label: t("web.farm.phone.log"), icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
+    { id: "orchestrator", label: t("web.farm.phone.manager"), icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
+    { id: "channels", label: t("web.farm.phone.app.channels"), icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
+    { id: "graphs", label: t("web.farm.phone.app.graphs"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { id: "games", label: t("web.farm.phone.app.games"), icon: GamesIcon, go: () => props.onOpen("games") },
   ];
   return <AppGrid apps={apps} />;
 }
@@ -325,7 +337,7 @@ function AppGrid(props: { apps: readonly App[] }) {
     <div class="grid grid-cols-3 content-start gap-y-3 px-2 pt-4">
       <For each={props.apps}>
         {(a) => (
-          <button type="button" onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
+          <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
             <span
               class="relative grid size-11 place-items-center bg-lcd-pale group-hover:bg-lcd-pale-hover group-active:translate-y-px"
               style={{ "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}

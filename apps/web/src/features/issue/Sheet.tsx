@@ -125,6 +125,7 @@ export function Pick(props: {
   placeholder?: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  testid?: string;
 }) {
   const ref = useSelectValue(
     () => props.value,
@@ -133,6 +134,7 @@ export function Pick(props: {
   return (
     <select
       ref={ref}
+      data-testid={props.testid}
       aria-label={props.label}
       value={props.value}
       disabled={props.disabled}

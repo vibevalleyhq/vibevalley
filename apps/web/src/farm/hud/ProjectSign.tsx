@@ -20,6 +20,8 @@ export function ProjectSign() {
       {(at) => (
         <button
           type="button"
+          data-testid="project-sign"
+          data-key={project()}
           aria-label={t("web.farm.sign.label", { project: project() || t("web.farm.sign.noProject") })}
           title={t("web.farm.sign.hint")}
           onClick={() => {

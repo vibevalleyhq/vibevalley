@@ -62,7 +62,7 @@ export function Count(props: { n: number }) {
 
 export function Empty(props: { icon: IconName; children: JSX.Element }) {
   return (
-    <div class="flex h-full items-center justify-center p-6">
+    <div data-testid="tab-empty" class="flex h-full items-center justify-center p-6">
       <div class="flex max-w-96 flex-col items-center gap-3 text-center text-sm text-muted">
         <Icon name={props.icon} size={48} class="opacity-80" />
         {props.children}

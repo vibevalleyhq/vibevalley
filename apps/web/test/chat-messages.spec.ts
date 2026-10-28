@@ -1,83 +1,87 @@
-import { attachmentPath } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
+import { attachmentPath, type VibeValleyApi } from "@vibevalley/protocol";
+import { composerOn, expect, test } from "./fixtures";
 
 // The smallest PNG there is: one transparent pixel.
 const pixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 
+const row = (page: Page, id: string) => page.getByTestId("messages").locator(`[data-testid="message"][data-key="${id}"]`);
+const idOf = async (api: VibeValleyApi, channel: string, text: string) => (await api.channel.message.list({ id: channel })).find((m) => m.text === text)!.id;
+
+/** A tool over a message, shown while it is hovered. */
+async function tool(page: Page, id: string, key: string) {
+  await row(page, id).hover();
+  await row(page, id).locator(`[data-testid="message-tool"][data-key="${key}"]`).click();
+}
+
 test("a message is answered, changed, reacted to, pinned and deleted from the tools over it", async ({ page, api }) => {
-  const id = await api.channel.create({ name: "说话" });
-  await api.channel.message.send({ id, text: "苹果要浇水" });
+  const id = await api.channel.create({ name: "talk" });
+  await api.channel.message.send({ id, text: "water the apples" });
+  const first = await idOf(api, id, "water the apples");
   await page.goto(`/chat/${id}`);
-  const log = page.getByRole("log", { name: "消息" });
-  // By its paragraph: a reply quotes the same words.
-  const first = log.locator("p", { hasText: /^苹果要(多)?浇水$/ });
-  await expect(first).toBeVisible();
-  await expect(log.getByRole("button", { name: /👀/ })).toBeVisible();
-  const tools = page.getByRole("toolbar", { name: "这条消息能做的" });
+  await expect(row(page, first)).toBeVisible();
 
-  await first.hover();
-  await tools.getByRole("button", { name: "回复" }).click();
-  await expect(page.getByText("回复 主人：苹果要浇水")).toBeVisible();
-  const box = page.getByRole("textbox", { name: "发送消息至 #说话" });
-  await box.fill("好的，我来");
+  await tool(page, first, "reply");
+  const replying = page.getByTestId("replying");
+  await expect(replying).toBeVisible();
+  const box = await composerOn(page, id);
+  await box.fill("on it");
   await box.press("Enter");
-  const answer = log.locator("p", { hasText: "好的，我来" });
-  await expect(answer).toBeVisible();
-  await expect(page.getByText("回复 主人：苹果要浇水")).toHaveCount(0);
+  await expect.poll(async () => (await api.channel.message.list({ id })).some((m) => m.text === "on it")).toBe(true);
+  const answer = await idOf(api, id, "on it");
+  await expect(row(page, answer)).toBeVisible();
+  await expect(replying).toHaveCount(0);
 
-  await first.hover();
-  await tools.getByRole("button", { name: "改" }).click();
-  const editing = log.getByRole("textbox", { name: "改" });
-  await editing.fill("苹果要多浇水");
+  await tool(page, first, "edit");
+  const editing = row(page, first).getByTestId("message-edit");
+  await editing.fill("water the apples more");
   await editing.press("Enter");
-  await expect(log.getByText("苹果要多浇水")).toHaveCount(2);
-  await expect(log.getByText("（已编辑）")).toBeVisible();
+  await expect(row(page, first)).toHaveAttribute("data-edited", "");
+  await expect(row(page, first)).toContainText("water the apples more");
 
-  await answer.hover();
-  await tools.getByRole("button", { name: "回应" }).click();
-  await tools.getByRole("button", { name: "🎉" }).click();
-  await expect(log.getByRole("button", { name: /🎉\s*1/ })).toHaveAttribute("aria-pressed", "true");
+  await tool(page, answer, "react");
+  await row(page, answer).locator('[data-testid="quick-reaction"][data-key="🎉"]').click();
+  const party = row(page, answer).locator('[data-testid="reaction"][data-key="🎉"]');
+  await expect(party).toHaveAttribute("data-count", "1");
+  await expect(party).toHaveAttribute("aria-pressed", "true");
 
-  await answer.hover();
-  await tools.getByRole("button", { name: "置顶" }).click();
-  await page.getByRole("button", { name: "置顶的消息" }).click();
-  await expect(page.getByRole("dialog", { name: "置顶" }).getByText("好的，我来")).toBeVisible();
-  await page.getByRole("button", { name: "置顶的消息" }).click();
+  await tool(page, answer, "pin");
+  await expect(row(page, answer)).toHaveAttribute("data-pinned", "");
+  await page.getByTestId("pins-toggle").click();
+  await expect(page.getByTestId("pins").locator(`[data-testid="pin"][data-key="${answer}"]`)).toBeVisible();
+  await page.getByTestId("pins-toggle").click();
 
-  await page.getByRole("button", { name: "成员" }).click();
-  const members = page.getByRole("complementary", { name: "成员" });
-  await expect(members.getByText("主人")).toBeVisible();
-  await expect(members.getByText("管家", { exact: true })).toBeVisible();
-  await expect(members.getByText("照看这里的管家")).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("chat-messages.png") });
+  await page.getByTestId("members-toggle").click();
+  await expect(page.getByTestId("members").getByTestId("member-orchestrator")).toBeVisible();
 
-  await answer.hover();
-  await tools.getByRole("button", { name: "删掉" }).click();
-  await tools.getByRole("button", { name: "再点一次删掉" }).click();
-  await expect(log.getByText("这条消息已删除")).toBeVisible();
-  await expect(log.getByText("好的，我来")).toHaveCount(0);
+  await tool(page, answer, "delete");
+  const remove = row(page, answer).locator('[data-testid="message-tool"][data-key="delete"]');
+  await expect(remove).toHaveAttribute("data-sure", "");
+  await remove.click();
+  await expect(row(page, answer)).toHaveAttribute("data-deleted", "");
+  await expect(row(page, answer)).not.toContainText("on it");
 });
 
 test("a change made elsewhere reaches the page as it happens", async ({ page, api }) => {
-  const id = await api.channel.create({ name: "别处" });
-  await api.channel.message.send({ id, text: "看看这个" });
+  const id = await api.channel.create({ name: "elsewhere" });
+  await api.channel.message.send({ id, text: "look at this" });
+  const said = await idOf(api, id, "look at this");
   await page.goto(`/chat/${id}`);
-  const log = page.getByRole("log", { name: "消息" });
-  await expect(log.getByText("看看这个")).toBeVisible();
-  const [said] = await api.channel.message.list({ id });
-  await api.channel.reaction.toggle({ id: said!.id, emoji: "👍" });
-  await expect(log.getByRole("button", { name: /👍\s*1/ })).toBeVisible();
-  await api.channel.message.update({ id: said!.id, text: "看看这个吧" });
-  await expect(log.getByText("看看这个吧")).toBeVisible();
+  await expect(row(page, said)).toBeVisible();
+  await api.channel.reaction.toggle({ id: said, emoji: "👍" });
+  await expect(row(page, said).locator('[data-testid="reaction"][data-key="👍"]')).toHaveAttribute("data-count", "1");
+  await api.channel.message.update({ id: said, text: "look at this, please" });
+  await expect(row(page, said)).toContainText("look at this, please");
 });
 
 test("a picture picked for a message shows in it and opens at its own address", async ({ page, api, server }) => {
-  const id = await api.channel.create({ name: "贴图" });
+  const id = await api.channel.create({ name: "pictures" });
   await page.goto(`/chat/${id}`);
-  await page.locator('input[type="file"]').setInputFiles({ name: "截图.png", mimeType: "image/png", buffer: pixel });
-  await expect(page.getByRole("button", { name: "去掉 截图.png" })).toBeVisible();
-  await page.getByRole("textbox", { name: "发送消息至 #贴图" }).press("Enter");
-  const image = page.getByRole("log", { name: "消息" }).getByRole("img", { name: "截图.png" });
+  const box = await composerOn(page, id);
+  await page.locator('input[type="file"]').setInputFiles({ name: "shot.png", mimeType: "image/png", buffer: pixel });
+  await expect(page.locator('[data-testid="pending-file"][data-key="shot.png"]')).toBeVisible();
+  await box.press("Enter");
+  const image = page.getByTestId("messages").locator('[data-testid="attachment"][data-kind="image"] img');
   await expect(image).toBeVisible();
   const src = await image.getAttribute("src");
   const [said] = await api.channel.message.list({ id });
@@ -85,9 +89,10 @@ test("a picture picked for a message shows in it and opens at its own address", 
   const res = await fetch(server.url + src);
   expect([res.status, res.headers.get("content-type")]).toEqual([200, "image/png"]);
   // Clicked, it opens over the page with the original a tab away, and Escape closes it.
-  await page.getByRole("log", { name: "消息" }).getByRole("button", { name: "截图.png" }).click();
-  const shown = page.getByRole("dialog", { name: "截图.png" });
-  await expect(shown.getByRole("link", { name: "打开原图" })).toHaveAttribute("href", src!);
+  await page.getByTestId("messages").locator('[data-testid="attachment"][data-kind="image"]').click();
+  const shown = page.getByTestId("lightbox");
+  await expect(shown).toHaveAttribute("data-key", "shot.png");
+  await expect(shown.getByTestId("lightbox-original")).toHaveAttribute("href", src!);
   await page.keyboard.press("Escape");
   await expect(shown).toBeHidden();
 });

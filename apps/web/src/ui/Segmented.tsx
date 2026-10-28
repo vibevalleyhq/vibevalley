@@ -16,6 +16,7 @@ export function Segmented<T extends string>(props: {
   onChange: (v: T) => void;
   label: string;
   block?: boolean;
+  testid?: string;
 }) {
   let track!: HTMLDivElement;
   const [thumb, setThumb] = createSignal<Place>();
@@ -45,6 +46,7 @@ export function Segmented<T extends string>(props: {
       ref={(el) => (track = el)}
       role="group"
       aria-label={props.label}
+      data-testid={props.testid}
       class={["relative inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}
     >
       <Show when={thumb()}>
@@ -60,6 +62,7 @@ export function Segmented<T extends string>(props: {
         {(o) => (
           <button
             type="button"
+            data-key={o.value}
             aria-pressed={aria(o.value === props.value)}
             disabled={o.disabled}
             title={o.title}

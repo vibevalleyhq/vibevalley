@@ -8,7 +8,8 @@ export type PxSize = "md" | "sm" | "icon" | "custom";
 
 const tones: Record<PxTone, string> = {
   plain: "bg-cream-50 enabled:hover:bg-cream-hover text-bark-900",
-  primary: "bg-leaf-500 enabled:hover:bg-leaf-hover text-cream-50",
+  // Bark on leaf, as accent is bark on wheat: cream on leaf reads at 2.5:1, under WCAG AA.
+  primary: "bg-leaf-500 enabled:hover:bg-leaf-hover text-bark-900",
   // berry at 95 %.
   danger: "bg-berry enabled:hover:bg-berry-hover text-cream-50",
   accent: "bg-wheat enabled:hover:bg-wheat-hover text-bark-900",

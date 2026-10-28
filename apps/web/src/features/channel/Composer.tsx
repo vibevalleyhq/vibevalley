@@ -94,17 +94,19 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const stop = () => api.orchestrator.stop({ agent: box.here() }).catch((e) => toast(reasonOf(e), "bad"));
 
   return (
-    <div class="border-t border-line px-4 pt-3 pb-4">
+    <div data-testid="composer" data-key={props.channel?.id} class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
         <div
           role="listbox"
           aria-label={t("web.channel.composer.who")}
+          data-testid="mentions"
           class="mb-1.5 flex origin-bottom animate-pop-in flex-col rounded-lg border border-line bg-page p-1 shadow-float"
         >
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
                 role="option"
+                data-key={n().token}
                 aria-selected={aria(i() === box.active())}
                 onMouseEnter={() => box.setActive(i())}
                 // Keeps the focus in the input.
@@ -127,10 +129,16 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </For>
         </div>
       </Show>
-      <Show when={problem()}>{(p) => <p class="mb-1.5 text-xs text-berry">{p()}</p>}</Show>
+      <Show when={problem()}>
+        {(p) => (
+          <p role="alert" data-testid="chat-problem" class="mb-1.5 text-xs text-berry">
+            {p()}
+          </p>
+        )}
+      </Show>
       <Show when={draft().reply}>
         {(m) => (
-          <div class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
+          <div data-testid="replying" data-key={m().number} class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />
             <span class="min-w-0 flex-1 truncate">
               {t("shared.join.labeled", {
@@ -141,6 +149,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             <button
               type="button"
               class="cursor-pointer rounded p-0.5 hover:bg-page"
+              data-testid="cancel-reply"
               aria-label={t("web.channel.composer.cancelReply")}
               title={t("web.channel.composer.cancelReply")}
               onClick={() => drafts.reply(props.channel!.id, undefined)}
@@ -153,7 +162,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       <Show when={draft().files.length > 0 || uploading().length > 0}>
         <div class="mb-1.5 flex flex-wrap gap-1.5">
           <For each={draft().files} keyed={(f) => f.id}>
-            {(f) => <AttachmentTile file={f()} onRemove={() => drafts.drop(props.channel!.id, f().id)} />}
+            {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => drafts.drop(props.channel!.id, f().id)} />}
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (
@@ -177,6 +186,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           ref={(el) => (input = el)}
           value={box.text()}
           rows={2}
+          data-testid="composer-input"
           aria-label={props.placeholder}
           placeholder={props.placeholder}
           onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
@@ -213,6 +223,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           />
           <button
             type="button"
+            data-testid="attach"
             onClick={() => picker?.click()}
             disabled={!props.channel}
             aria-label={t("web.channel.composer.attach")}
@@ -225,6 +236,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             <button
               type="button"
               ref={(el) => (emojiButton = el)}
+              data-testid="emoji"
               onClick={() => setEmoji(!emoji())}
               disabled={!props.channel}
               aria-label={t("web.channel.emoji.open")}
@@ -249,6 +261,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           <Show when={box.stoppable()}>
             <button
               type="button"
+              data-testid="stop"
               onClick={() => void stop()}
               aria-label={t("web.channel.composer.stop")}
               title={t("web.channel.composer.stopHint")}
@@ -259,6 +272,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </Show>
           <button
             type="button"
+            data-testid="send"
             onClick={() => void box.send()}
             disabled={!box.canSend()}
             aria-label={t("web.channel.composer.send")}
@@ -301,7 +315,10 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
     >
       {props.children}
       <Show when={over()}>
-        <div class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent">
+        <div
+          data-testid="drop-hint"
+          class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent"
+        >
           {t("web.channel.media.drop")}
         </div>
       </Show>

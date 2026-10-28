@@ -19,10 +19,14 @@ export const sizeText = (bytes: number) =>
  * A file as a tile (docs/style/design.md, 附件): a picture's thumbnail or the icon of its kind, its name and its size.
  * onRemove: a file not sent yet, which the owner may take back.
  */
-export function AttachmentTile(props: { file: Attachment; onRemove?: () => void }) {
+export function AttachmentTile(props: { file: Attachment; onRemove?: () => void; testid?: string }) {
   const kind = () => fileKind(props.file.type);
   return (
-    <span class="flex max-w-64 items-center gap-2 rounded-md border border-line bg-page py-1 pr-1 pl-1 text-xs">
+    <span
+      data-testid={props.testid}
+      data-key={props.file.name}
+      class="flex max-w-64 items-center gap-2 rounded-md border border-line bg-page py-1 pr-1 pl-1 text-xs"
+    >
       <span class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-hover text-muted">
         <Show when={kind() === "image"} fallback={<Icon name={kindIcon[kind()]} size={16} />}>
           <img src={attachmentPath(props.file.id)} alt="" class="size-full object-cover" loading="lazy" />

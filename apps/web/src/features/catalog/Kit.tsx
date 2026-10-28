@@ -252,7 +252,13 @@ function Kit(props: { theme: "light" | "dark" }) {
             <IconButton icon="search" label={t("web.catalog.kit.plain")} onClick={() => undefined} />
             <IconButton icon="pin" label={t("web.catalog.kit.pressed")} pressed onClick={() => undefined} />
             <IconButton icon="delete" label={t("web.catalog.kit.danger")} tone="danger" onClick={() => undefined} />
-            <ConfirmButton label={t("web.catalog.kit.delete")} question={t("web.catalog.kit.question")} tone="danger" onConfirm={() => undefined} />
+            <ConfirmButton
+              label={t("web.catalog.kit.delete")}
+              question={t("web.catalog.kit.question")}
+              tone="danger"
+              testid="kit-confirm"
+              onConfirm={() => undefined}
+            />
           </div>
           <div class="flex flex-wrap items-center gap-3">
             <Segmented
@@ -332,7 +338,7 @@ function Pixel() {
       <div class="flex flex-wrap items-center gap-2">
         <For each={pxTones}>
           {(tone) => (
-            <PxButton tone={tone} onClick={() => undefined}>
+            <PxButton tone={tone} data-key={tone} onClick={() => undefined}>
               {tone}
             </PxButton>
           )}

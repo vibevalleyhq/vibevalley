@@ -37,7 +37,7 @@ export function PxSegmented<T extends string | number | boolean>(props: {
               pxRing,
               pxFocus,
               "h-7 cursor-pointer px-3 whitespace-nowrap enabled:active:translate-x-px enabled:active:translate-y-px disabled:cursor-default disabled:opacity-35",
-              o.value === props.value ? "bg-leaf-500 text-cream-50" : "text-bark-800 enabled:hover:bg-cream-300",
+              o.value === props.value ? "bg-leaf-500 text-bark-900" : "text-bark-800 enabled:hover:bg-cream-300",
             ]}
           >
             {o.label}
@@ -59,6 +59,7 @@ export function PxPick(props: {
   label?: string;
   clearable?: boolean;
   id?: string;
+  testid?: string;
 }) {
   const listId = createUniqueId();
   let wrap!: HTMLDivElement;
@@ -90,6 +91,7 @@ export function PxPick(props: {
     <div ref={(el) => (wrap = el)} class="relative w-full">
       <button
         id={props.id}
+        data-testid={props.testid}
         type="button"
         disabled={props.disabled}
         aria-label={props.label}
@@ -136,6 +138,7 @@ export function PxPick(props: {
                 <li
                   id={`${listId}-${i()}`}
                   role="option"
+                  data-key={o.value}
                   aria-selected={aria(o.value === props.value)}
                   onMouseEnter={() => setHighlight(i())}
                   // Down, not click: the trigger keeps the focus.

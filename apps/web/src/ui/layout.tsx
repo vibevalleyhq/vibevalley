@@ -21,9 +21,9 @@ export function Split(props: { list: JSX.Element; children: JSX.Element }) {
 }
 
 /** A titled list of rows; aria-label names it for the reader. */
-export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element }) {
+export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string }) {
   return (
-    <section aria-label={props.label ?? props.title} class="flex flex-col rounded-lg border border-line bg-page">
+    <section aria-label={props.label ?? props.title} data-testid={props.testid} class="flex flex-col rounded-lg border border-line bg-page">
       <header class="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
         <h2 class="flex-1 truncate text-sm font-semibold">{props.title}</h2>
         {props.action}
@@ -34,11 +34,13 @@ export function ListCard(props: { title: string; label?: string; action?: JSX.El
 }
 
 /** A row: a link to its detail, marked when it is the open one. */
-export function ListRow(props: { to: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
+export function ListRow(props: { to: string; item?: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
   return (
     <li>
       <A
         href={props.to}
+        data-testid="list-row"
+        data-key={props.item}
         aria-current={props.active ? "page" : undefined}
         class={[
           "flex items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus",
@@ -59,9 +61,9 @@ export function ListRow(props: { to: string; active?: boolean; title: string; li
 }
 
 /** The open thing's card: a title, what sits beside it, and its body. */
-export function Card(props: { title?: JSX.Element; action?: JSX.Element; children: JSX.Element; class?: string }) {
+export function Card(props: { title?: JSX.Element; action?: JSX.Element; children: JSX.Element; class?: string; testid?: string; item?: string }) {
   return (
-    <section class={["flex flex-col rounded-lg border border-line bg-page", props.class]}>
+    <section data-testid={props.testid} data-key={props.item} class={["flex flex-col rounded-lg border border-line bg-page", props.class]}>
       <Show when={props.title !== undefined}>
         <header class="flex min-h-12 items-center gap-2 border-b border-line px-4 py-2">
           <h2 class="min-w-0 flex-1 truncate text-base font-semibold">{props.title}</h2>
@@ -88,12 +90,14 @@ export function Toggle(props: {
   checked: boolean;
   onChange: (on: boolean) => void;
   disabled?: boolean;
+  testid?: string;
 }) {
   return (
     <label class={["flex items-start gap-2", props.disabled ? "opacity-50" : "cursor-pointer"]}>
       <button
         type="button"
         role="switch"
+        data-testid={props.testid}
         aria-checked={aria(props.checked)}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
@@ -124,6 +128,8 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
       <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-9 font-mono", props.class]} />
       <button
         type="button"
+        data-testid="reveal"
+        aria-pressed={aria(shown())}
         class="absolute inset-y-0 right-1 my-auto inline-flex size-7 cursor-pointer items-center justify-center rounded text-faint hover:bg-hover hover:text-ink"
         aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}

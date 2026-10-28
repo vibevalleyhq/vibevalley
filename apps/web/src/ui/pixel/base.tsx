@@ -3,9 +3,20 @@ import type { JSX } from "@solidjs/web";
 import { pxText, pxWindow } from "./style";
 
 /** `border` draws a second edge inside the frame. `paper` is a bg-* class. */
-export function PxWindow(props: { children?: JSX.Element; paper?: string; border?: boolean; class?: JSX.ClassValue; style?: JSX.CSSProperties }) {
+export function PxWindow(props: {
+  children?: JSX.Element;
+  paper?: string;
+  border?: boolean;
+  class?: JSX.ClassValue;
+  style?: JSX.CSSProperties;
+  testid?: string;
+}) {
   return (
-    <div class={[props.paper ?? "bg-cream-50", pxWindow, { "border-2 border-bark-500": !!props.border }, "text-bark-900", props.class]} style={props.style}>
+    <div
+      data-testid={props.testid}
+      class={[props.paper ?? "bg-cream-50", pxWindow, { "border-2 border-bark-500": !!props.border }, "text-bark-900", props.class]}
+      style={props.style}
+    >
       {props.children}
     </div>
   );

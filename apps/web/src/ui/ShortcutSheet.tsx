@@ -27,11 +27,11 @@ export function ShortcutSheet() {
     return () => window.removeEventListener("keydown", key);
   });
   return (
-    <Dialog open={open()} onClose={() => setOpen(false)} title={t("web.base.shortcuts.title")}>
+    <Dialog open={open()} onClose={() => setOpen(false)} title={t("web.base.shortcuts.title")} testid="shortcuts">
       <div class="flex flex-col gap-4">
         <For each={shortcutPlaces}>
           {(place) => (
-            <section aria-label={t(`web.base.shortcuts.place.${place}`)} class="flex flex-col gap-1">
+            <section aria-label={t(`web.base.shortcuts.place.${place}`)} data-testid="shortcut-place" data-key={place} class="flex flex-col gap-1">
               <h3 class="text-xs font-semibold text-muted">{t(`web.base.shortcuts.place.${place}`)}</h3>
               <For each={shortcuts.filter((s) => s.place === place)}>
                 {(s) => (

@@ -54,7 +54,7 @@ export function IssueView() {
   return (
     <Show when={session()}>
       {(s) => (
-        <FarmDialog title={t("web.farm.plotOf", { name: s().name })} size="lg" onClose={() => farm.select(null)}>
+        <FarmDialog title={t("web.farm.plotOf", { name: s().name })} size="lg" testid="plot" onClose={() => farm.select(null)}>
           <PlotDetail session={s()} onDone={() => farm.select(null)} />
         </FarmDialog>
       )}
@@ -168,7 +168,12 @@ function IssueBody(props: {
     return acts.act(() => api.issue.update({ id, deliver: d }));
   }; /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
-    <PxButton tone={lead() ? "primary" : a === "close" || acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>
+    <PxButton
+      data-act={a}
+      tone={lead() ? "primary" : a === "close" || acts.rejecting(a) ? "danger" : "plain"}
+      disabled={acts.disabled(a)}
+      onClick={() => go(a)}
+    >
       {acts.label(a)}
     </PxButton>
   );
@@ -193,7 +198,13 @@ function IssueBody(props: {
             <span class={xs}>{s().project}</span>
           </Show>
         </div>
-        <p class="mt-1 text-[13px]" style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label={t("web.farm.plot.now")}>
+        <p
+          class="mt-1 text-[13px]"
+          style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }}
+          aria-label={t("web.farm.plot.now")}
+          data-testid="issue-now"
+          data-state={s().attention.state}
+        >
           {s().statusLine(now(), timeline()?.spent?.cny)}
         </p>
 
@@ -520,6 +531,8 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
           >
             <button
               type="button"
+              data-testid="criterion-tick"
+              data-key={i()}
               aria-pressed={aria(ticked().has(i()))}
               aria-label={r().text}
               onClick={() => setTicked((was) => (was.has(i()) ? new Set([...was].filter((x) => x !== i())) : new Set([...was, i()])))}
@@ -551,6 +564,7 @@ function Fold(props: { label: string; children: JSX.Element }) {
     <div class="border-t border-cream-300">
       <button
         type="button"
+        data-testid="fold"
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
         class="group flex w-full cursor-pointer items-center gap-1.5 py-2 text-left"

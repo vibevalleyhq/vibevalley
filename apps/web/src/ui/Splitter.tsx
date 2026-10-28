@@ -19,6 +19,8 @@ export function Splitter(props: { pane: string; side: "left" | "right"; width: n
   return (
     <div
       role="separator"
+      data-testid="splitter"
+      data-key={props.pane}
       aria-orientation="vertical"
       aria-label={props.label}
       aria-valuenow={props.width}

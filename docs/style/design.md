@@ -35,6 +35,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxText` 给；读的长文字（汇报、说明）用 `pxText.read`，是系统字体。
 - **框和影**：`pxWindow`（窗）、`pxFrame`（厚框）、`pxRing`（框里一圈 2px）、`pxInset`（凹下去的井）、`pxDrop` 和 `shadow-px`（浮在板子上的投影）、`shadow-px-shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
 - **焦点**只有一种：`pxFocus`，叶色的 2px 外框，离边一个像素。
+- **叶和麦上的字是树皮色**（`text-bark-900`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
 - **动效**走帧：关键帧用 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
 ## 令牌

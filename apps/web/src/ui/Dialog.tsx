@@ -3,7 +3,7 @@ import type { JSX } from "@solidjs/web";
 import { createModal } from "./modal";
 
 /** A modal over the page (the native <dialog>: focus trap, Escape closes). Open while `open`. */
-export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean }) {
+export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {
   const m = createModal(
     () => props.open,
     () => props.onClose(),
@@ -12,6 +12,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
     <dialog
       ref={m.ref}
       aria-label={props.title}
+      data-testid={props.testid}
       onCancel={m.onCancel}
       onClose={m.onClose}
       onClick={m.onClick}

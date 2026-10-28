@@ -13,11 +13,13 @@ export function IconButton(props: {
   tone?: "danger";
   pressed?: boolean;
   disabled?: boolean;
+  testid?: string;
 }) {
   return (
     <Tip text={props.label}>
       <button
         type="button"
+        data-testid={props.testid}
         aria-label={props.label}
         aria-pressed={props.pressed === undefined ? undefined : props.pressed ? "true" : "false"}
         disabled={props.disabled}

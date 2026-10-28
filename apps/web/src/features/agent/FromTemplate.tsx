@@ -33,7 +33,7 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
   return (
     <Show when={from()}>
       {(f) => (
-        <p class="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <p data-testid="from-template" data-key={f().template} data-version={f().version} class="flex flex-wrap items-center gap-2 text-xs text-muted">
           {t("web.agent.templates.from", { name: template()?.name ?? f().template, version: f().version })}
           <Show when={newer()}>
             {(v) => (
@@ -42,6 +42,7 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
                 title={t("web.agent.templates.updateHint")}
                 question={t("web.agent.templates.updateHint")}
                 tone="primary"
+                testid="template-update"
                 onConfirm={update}
               />
             )}

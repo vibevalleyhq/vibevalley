@@ -68,28 +68,34 @@ function Layer(props: { o: FarmOverlay }) {
     <Switch>
       <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={t("web.farm.panel.harvest", { name: s().name })} icon="icon-harvest" size="lg" onClose={() => farm.review(null)}>
+          <FarmDialog title={t("web.farm.panel.harvest", { name: s().name })} icon="icon-harvest" size="lg" testid="harvest" onClose={() => farm.review(null)}>
             <Keyed key={s().id}>{() => <HarvestReview session={s()} onDone={() => farm.review(null)} />}</Keyed>
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "sow" ? props.o : undefined}>
         {(o) => (
-          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
+          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" testid="sow" onClose={() => farm.sow(null)}>
             <SowForm station={o().station} onDone={() => farm.sow(null)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" onClose={() => farm.water(null)}>
+          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" testid="water" onClose={() => farm.water(null)}>
             <WaterForm session={s()} onDone={() => farm.water(null)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "panel" ? (props.o as { panel: FarmPanel }).panel : undefined}>
         {(panel) => (
-          <FarmDialog title={panelTitle[panel()][0]} icon={panelTitle[panel()][1]} size={panelTitle[panel()][2]} onClose={() => farm.panel(null)}>
+          <FarmDialog
+            title={panelTitle[panel()][0]}
+            icon={panelTitle[panel()][1]}
+            size={panelTitle[panel()][2]}
+            testid={panel()}
+            onClose={() => farm.panel(null)}
+          >
             <Switch fallback={<TaskBoard />}>
               <Match when={panel() === "warehouse"}>
                 <Warehouse />
@@ -111,7 +117,7 @@ function Layer(props: { o: FarmOverlay }) {
         )}
       </Match>
       <Match when={props.o.kind === "menu"}>
-        <FarmDialog title={t("web.farm.panel.menu")} icon="icon-wrench" size="md" onClose={() => farm.menu(false)}>
+        <FarmDialog title={t("web.farm.panel.menu")} icon="icon-wrench" size="md" testid="menu" onClose={() => farm.menu(false)}>
           <Menu />
         </FarmDialog>
       </Match>
@@ -121,10 +127,11 @@ function Layer(props: { o: FarmOverlay }) {
 
 const pets = ["dog", "ragdoll", "bluecat"];
 
-function Tile(props: { chosen: boolean; ready: boolean; onClick: () => void; children: JSX.Element }) {
+function Tile(props: { item: string; chosen: boolean; ready: boolean; onClick: () => void; children: JSX.Element }) {
   return (
     <button
       type="button"
+      data-key={props.item}
       aria-pressed={aria(props.chosen)}
       disabled={!props.ready}
       onClick={() => props.onClick()}
@@ -164,7 +171,7 @@ function OrchestratorLooks() {
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <For each={orchestratorLooks}>
           {(look) => (
-            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
+            <Tile item={look.id} chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
               <span class="h-28">
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
@@ -181,7 +188,7 @@ function OrchestratorLooks() {
         <For each={pets}>
           {(p) => (
             <div class="flex-1 bg-cream-100">
-              <Tile chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
+              <Tile item={p} chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
                 <span class="h-16">
                   <Show when={has(`${p}-awake`)}>
                     <SpriteIcon name={`${p}-awake`} size={64} />

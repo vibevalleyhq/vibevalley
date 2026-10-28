@@ -38,7 +38,7 @@ for (const [width, height] of [
     await page.setViewportSize({ width, height });
     for (const path of places) {
       await page.goto(path);
-      await expect(page.getByRole("status")).toHaveText("已连上");
+      await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
       await expect.poll(() => page.evaluate(pastTheEdge), { message: path }).toEqual([]);
     }
   });

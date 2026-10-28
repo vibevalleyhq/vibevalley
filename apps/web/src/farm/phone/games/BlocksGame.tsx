@@ -112,7 +112,11 @@ export function BlocksGame(props: { big?: boolean }) {
   );
 
   return (
-    <div class={["flex min-h-0 flex-1 px-2 pt-2", props.big ? "gap-4" : "gap-2"]}>
+    <div
+      data-testid="blocks"
+      data-state={!g() ? "ready" : g()!.over ? "over" : playing() ? "playing" : "paused"}
+      class={["flex min-h-0 flex-1 px-2 pt-2", props.big ? "gap-4" : "gap-2"]}
+    >
       <div class="relative shrink-0 self-start" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
           ref={(el) => (canvas = el)}

@@ -35,13 +35,15 @@ function seedsOf(bag: ProjectTemplates | undefined) {
   };
 }
 
-function Chip(props: { text: string; on: boolean; onClick: () => void }) {
+function Chip(props: { text: string; on: boolean; onClick: () => void; testid: string; item?: string }) {
   return (
     <button
       type="button"
+      data-testid={props.testid}
+      data-key={props.item}
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      class={["cursor-pointer px-3 py-1 text-[12px]", props.on ? "bg-leaf-500 text-cream-50" : "bg-cream-200 text-bark-800 hover:bg-cream-300"]}
+      class={["cursor-pointer px-3 py-1 text-[12px]", props.on ? "bg-leaf-500 text-bark-900" : "bg-cream-200 text-bark-800 hover:bg-cream-300"]}
     >
       {props.text}
     </button>
@@ -121,17 +123,17 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     <Show
       when={project()}
       fallback={
-        <div class="flex flex-col items-start gap-2.5">
+        <div data-testid="sow-homeless" class="flex flex-col items-start gap-2.5">
           <p class="text-[14px] text-bark-900">{t("web.farm.sow.homeless")}</p>
           <p class={xs}>{projects().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noProjects")}</p>
-          <PxButton tone="primary" onClick={() => (props.onDone(), router.navigate("/projects"))}>
+          <PxButton tone="primary" data-testid="sow-to-map" onClick={() => (props.onDone(), router.navigate("/projects"))}>
             {projects().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeProject")}
           </PxButton>
         </div>
       }
     >
       {(p) => (
-        <div class="flex flex-col">
+        <div data-testid="sow-form" data-project={p()} class="flex flex-col">
           <div class="flex items-center gap-2">
             <p class="min-w-0 flex-1 truncate text-[14px] text-bark-900">
               {t("web.farm.sow.plantIn", { project: p() })}
@@ -148,11 +150,11 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               <Match when={templates.error}>
                 {(e) => (
                   <div class="mt-2.5 flex flex-wrap items-center gap-2">
-                    <p class="text-[12px] text-berry">
+                    <p role="alert" class="text-[12px] text-berry">
                       {t("web.farm.sow.noSeeds")}
                       {reasonOf(e())}
                     </p>
-                    <PxButton size="sm" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
+                    <PxButton size="sm" data-testid="seeds-retry" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
                       {t("web.farm.sow.retry")}
                     </PxButton>
                   </div>
@@ -162,18 +164,19 @@ export function SowForm(props: { station: number; onDone: () => void }) {
             <Show when={seeds().recent.length > 0}>
               <p class={["mt-2.5", xs]}>{t("web.farm.sow.recent")}</p>
               <div class="mt-1.5 flex flex-wrap gap-1.5">
-                <For each={seeds().recent}>{(r) => <Chip text={r} on={text() === r} onClick={() => take(r)} />}</For>
+                <For each={seeds().recent}>{(r) => <Chip testid="seed-recent" text={r} on={text() === r} onClick={() => take(r)} />}</For>
               </div>
             </Show>
             <Show when={seeds().kinds.length > 0}>
               <p class={["mt-2.5", xs]}>{t("web.farm.sow.kinds")}</p>
               {/* One kind at a time: its tab, then its seeds. */}
-              <div role="tablist" aria-label={t("web.farm.sow.kinds")} class="mt-1.5 flex flex-wrap gap-1">
+              <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" class="mt-1.5 flex flex-wrap gap-1">
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
                   {(k) => (
                     <button
                       type="button"
                       role="tab"
+                      data-key={k().kind.id}
                       aria-selected={aria(k().kind.id === kind()?.kind.id)}
                       onClick={() => setKindId(k().kind.id)}
                       class={[
@@ -193,7 +196,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 {(k) => (
                   <div role="tabpanel" aria-label={k().kind.name} class="mt-1.5 flex flex-wrap gap-1.5">
                     <For each={k().templates} keyed={(s) => s.id}>
-                      {(s) => <Chip text={s().title} on={text() === s().text} onClick={() => take(s().text, s().blank)} />}
+                      {(s) => <Chip testid="seed" item={s().id} text={s().title} on={text() === s().text} onClick={() => take(s().text, s().blank)} />}
                     </For>
                   </div>
                 )}
@@ -226,10 +229,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
             </div>
             <div class="mt-3 flex items-center gap-2">
               <p class={["min-w-0 flex-1", xs]}>{t("web.farm.sow.how", { project: p() })}</p>
-              <PxButton disabled={!canSow()} onClick={() => void write()}>
+              <PxButton data-testid="sow-draft" disabled={!canSow()} onClick={() => void write()}>
                 {t("web.farm.sow.draft")}
               </PxButton>
-              <PxButton tone="primary" disabled={!canSow()} onClick={sow}>
+              <PxButton tone="primary" data-testid="sow-start" disabled={!canSow()} onClick={sow}>
                 {t("web.farm.sow.start")}
               </PxButton>
             </div>
@@ -269,7 +272,7 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
       <p class={["mt-1", xs]}>{t("web.farm.water.thread")}</p>
       <p class={["mt-1", xs]}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
       <div class="mt-3 flex flex-wrap gap-1.5">
-        <For each={dropsOfAdvice}>{(s) => <Chip text={s} on={text() === s} onClick={() => setText(s)} />}</For>
+        <For each={dropsOfAdvice}>{(s) => <Chip testid="water-advice" text={s} on={text() === s} onClick={() => setText(s)} />}</For>
       </div>
       <div class="mt-3 flex items-end gap-2">
         <div class="flex-1">

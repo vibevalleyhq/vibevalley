@@ -85,8 +85,12 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
   return (
     <div class="h-full overflow-y-auto px-4 pb-8">
       <div class="mx-auto flex max-w-3xl flex-col gap-4">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
-          <A href="/agents" class="text-sm text-muted hover:underline">
+        <div
+          data-testid="profile-bar"
+          data-state={isNew ? "new" : dirty() ? "dirty" : "saved"}
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3"
+        >
+          <A href="/agents" data-testid="back" class="text-sm text-muted hover:underline">
             {t("web.agent.all")}
           </A>
           <span class="text-sm text-faint">/</span>
@@ -102,18 +106,25 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
               {(saved) => (
                 <>
                   <Show when={saved().id !== defaultOrchestrator}>
-                    <ConfirmButton label={t("web.agent.remove")} question={t("web.agent.removeWhich", { name: saved().name })} onConfirm={remove} />
+                    <ConfirmButton
+                      label={t("web.agent.remove")}
+                      question={t("web.agent.removeWhich", { name: saved().name })}
+                      testid="delete"
+                      onConfirm={remove}
+                    />
                   </Show>
-                  <Button icon="thread" onClick={talk}>
+                  <Button icon="thread" data-testid="talk" onClick={talk}>
                     {t("web.agent.talk")}
                   </Button>
                   <Show when={dirty()}>
-                    <Button onClick={() => setDraft(saved())}>{t("web.agent.discard")}</Button>
+                    <Button data-testid="discard" onClick={() => setDraft(saved())}>
+                      {t("web.agent.discard")}
+                    </Button>
                   </Show>
                 </>
               )}
             </Show>
-            <Button tone="primary" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
+            <Button tone="primary" data-testid="save" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
               {saving() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
             </Button>
           </span>
@@ -131,7 +142,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
         </p>
         <div class="grid gap-4 sm:grid-cols-2">
           <Field label={t("web.agent.name")} hint={nameTaken() ? t("web.agent.nameTaken") : t("web.agent.orchestrator.nameTip")}>
-            <TextInput aria-label={t("web.agent.name")} value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
+            <TextInput data-testid="agent-name" aria-label={t("web.agent.name")} value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
           </Field>
           <Field label={t("web.agent.orchestrator.model")} hint={t("web.agent.orchestrator.modelTip")}>
             <TextInput
@@ -143,7 +154,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
           </Field>
         </div>
         <Field label={t("web.agent.duty")} hint={t("web.agent.orchestrator.dutyTip")}>
-          <TextInput aria-label={t("web.agent.duty")} value={draft().duty} onInput={(e) => patch({ duty: e.currentTarget.value })} />
+          <TextInput data-testid="agent-duty" aria-label={t("web.agent.duty")} value={draft().duty} onInput={(e) => patch({ duty: e.currentTarget.value })} />
         </Field>
         <Field label={t("web.agent.personaLabel")} hint={t("web.agent.orchestrator.personaTip")}>
           <TextArea
@@ -162,6 +173,7 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
                 <button
                   type="button"
                   role="radio"
+                  data-key={look.id}
                   aria-checked={aria((draft().look.orchestrator ?? "farmer") === look.id)}
                   title={look.blurb}
                   onClick={() => setLook(look.id)}

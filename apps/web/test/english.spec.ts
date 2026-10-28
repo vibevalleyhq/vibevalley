@@ -6,20 +6,20 @@ test.use({ farm: "english" });
 test("the farm speaks English once the owner picks it, and Chinese again", async ({ page, api }) => {
   await api.issue.create({ title: "Add paging to clock-in" });
   await page.goto("/settings/general");
-  await page.getByRole("button", { name: "English" }).click();
+  const language = page.getByTestId("language");
+  await language.locator('[data-key="en"]').click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
   const nav = page.getByRole("navigation", { name: "Workbench" });
   for (const label of ["Chat", "Tickets", "Docs", "Profiles", "Machines", "Projects", "Catalog", "Settings"])
     await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `) })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Connected");
-  await expect(page.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
+  await expect(language.locator('[data-key="en"]')).toHaveAttribute("aria-pressed", "true");
 
   // The board's lanes are the page's words; a card's status is the server's, in the same language.
   await nav.getByRole("link", { name: /^Tickets · / }).click();
   await expect(page.getByText("Add paging to clock-in")).toBeVisible();
   for (const lane of ["To do", "In progress", "For you to see", "Closed"]) await expect(page.getByText(lane, { exact: true }).first()).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("issues-en.png") });
 
   // The server's own words follow: the voice line's default greeting, the machines' blurbs.
   const settings = await api.setting.get();
@@ -31,9 +31,9 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   await expect(page.getByRole("region", { name: "Machines" })).toBeVisible();
 
   await page.goto("/settings/general");
-  await page.getByRole("button", { name: "中文" }).click();
+  await language.locator('[data-key="zh"]').click();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
-  await expect(page.getByRole("navigation", { name: "工作台" })).toBeVisible();
+  await expect(page.getByTestId("rail")).toBeVisible();
 });
 
 // Every page, in English, has no Chinese left but what the owner stored (the profiles a farm starts with are written in the

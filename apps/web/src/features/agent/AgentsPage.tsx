@@ -49,13 +49,18 @@ function AgentsPage() {
           <span class="flex flex-wrap items-center gap-2">
             <A
               href="/agents/templates"
+              data-testid="open-templates"
               title={t("web.agent.templates.openLine")}
               class="inline-flex h-7 items-center gap-1.5 rounded-md border border-line px-2.5 text-sm hover:bg-hover"
             >
               <Icon name="folder" size={14} />
               {t("web.agent.templates.open")}
             </A>
-            <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
+            <A
+              href="/agents/new"
+              data-testid="new-agent"
+              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf"
+            >
               <Icon name="add" size={14} />
               {t("web.agent.list.make")}
             </A>
@@ -66,6 +71,7 @@ function AgentsPage() {
           <For each={orchestrators()}>{(a) => <OrchestratorCard agent={a} />}</For>
           <A
             href="/agents/new?role=orchestrator"
+            data-testid="new-orchestrator"
             aria-label={t("web.agent.list.makeOrchestrator")}
             class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-ok-ink"
           >
@@ -109,9 +115,9 @@ function AgentsPage() {
   );
 }
 
-function CardShell(props: { to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
+function CardShell(props: { agent: Agent; to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
   return (
-    <div class={["group relative", { "opacity-60": !!props.muted }]}>
+    <div data-testid="agent-card" data-key={props.agent.id} data-role={props.agent.role} class={["group relative", { "opacity-60": !!props.muted }]}>
       <A
         href={props.to}
         aria-label={props.label}
@@ -131,7 +137,7 @@ const footer = "mt-auto flex items-center gap-3 border-t border-line pt-3 text-x
 function OrchestratorCard(props: { agent: Agent }) {
   const main = () => props.agent.id === defaultOrchestrator;
   return (
-    <CardShell to={orchestratorHref(props.agent.id)} label={props.agent.name}>
+    <CardShell agent={props.agent} to={orchestratorHref(props.agent.id)} label={props.agent.name}>
       <div class="flex items-start gap-3 pb-3">
         <span class="flex size-20 shrink-0 items-center justify-center rounded-lg bg-hover">
           <OrchestratorFace size={68} agent={props.agent.id} />
@@ -166,12 +172,15 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
   };
   return (
     <CardShell
+      agent={props.agent}
       to={`/agents/${encodeURIComponent(props.agent.id)}`}
       label={props.agent.name}
       muted={!props.agent.enabled}
       corner={
         <button
           type="button"
+          data-testid="toggle"
+          data-state={props.agent.enabled ? "on" : "off"}
           onClick={() => void toggle()}
           aria-label={t("web.agent.list.toggle", {
             act: props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"),

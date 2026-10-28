@@ -70,7 +70,7 @@ export function TitleScreen() {
   });
 
   return (
-    <div class="absolute inset-0 z-[60] overflow-hidden bg-dusk-800 font-pixel" role="dialog" aria-label={t("web.farm.title.label")}>
+    <div class="absolute inset-0 z-[60] overflow-hidden bg-dusk-800 font-pixel" role="dialog" aria-label={t("web.farm.title.label")} data-testid="title">
       <TitleStage scene={startScene()} />
       <div class="absolute inset-y-0 left-0 w-[min(46rem,70vw)] bg-gradient-to-r from-dusk-900/75 via-dusk-900/35 to-transparent" />
       <div class="relative flex h-full flex-col justify-center gap-8 overflow-y-auto px-[6vw] py-8 sm:gap-10">
@@ -89,6 +89,8 @@ export function TitleScreen() {
               return (
                 <button
                   type="button"
+                  data-key={item().id}
+                  data-picked={on() ? "" : undefined}
                   disabled={!item().enabled}
                   onMouseEnter={() => item().enabled && setPicked(item().id)}
                   onClick={() => choose(item().id)}

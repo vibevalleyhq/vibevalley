@@ -114,11 +114,12 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   return (
     <aside
       aria-label={t("web.farm.debug.title")}
+      data-testid="debug"
       class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-ink-950/96 p-3 font-mono text-[12px] text-paper shadow-px"
     >
       <header class="flex items-center gap-2">
         <span class="flex-1 text-[13px] text-hat">{t("web.farm.debug.title")}</span>
-        <button type="button" class={btn()} onClick={() => props.onClose()}>
+        <button type="button" data-testid="debug-close" class={btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
@@ -165,6 +166,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
               {([speed, label]) => (
                 <button
                   type="button"
+                  data-key={speed}
                   aria-pressed={aria((speed === 0 && day().paused) || (!day().paused && day().speed === speed))}
                   class={[btn(), "aria-pressed:bg-hat aria-pressed:text-ink-950"]}
                   onClick={() => clock.setSpeed(speed)}
@@ -177,7 +179,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
           <div class="flex gap-1.5">
-            <button type="button" class={btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
+            <button type="button" data-testid="debug-level-up" class={btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
               {t("web.farm.debug.levelUp")}
             </button>
             <button
@@ -287,7 +289,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           <ol class="flex flex-col gap-0.5">
             <For each={props.log.entries().slice(-200).reverse()} keyed={(e) => e.seq}>
               {(e) => (
-                <li class="flex gap-2">
+                <li data-testid="debug-frame" data-type={e().type} class="flex gap-2">
                   <span class="w-8 shrink-0 text-right text-ink-500">{e().seq}</span>
                   <span class="w-12 shrink-0 text-hat">{e().type}</span>
                   <span class="min-w-0 break-all text-ink-100">{e().summary}</span>

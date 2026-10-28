@@ -52,9 +52,10 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
   const tally = () => core()?.progress?.agents?.[props.agent.id];
   const box = useClickAway(open, () => setOpen(false));
   return (
-    <div ref={box} class="relative">
+    <div ref={box} class="relative" data-testid="friend" data-key={props.agent.id} data-state={props.st} data-picked={picked() ? "" : undefined}>
       <button
         type="button"
+        data-testid="friend-open"
         aria-label={t("shared.join.and", { a: props.agent.name, b: status[props.st].label })}
         aria-expanded={aria(open())}
         onClick={() => setOpen(!open())}
@@ -72,7 +73,12 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
         </Show>
       </button>
       <Show when={open()}>
-        <div class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px" role="dialog" aria-label={props.agent.name}>
+        <div
+          data-testid="friend-card"
+          class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px"
+          role="dialog"
+          aria-label={props.agent.name}
+        >
           <div class="flex items-center gap-3">
             <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={60} muted={!props.agent.enabled} />
             <div class="min-w-0">
@@ -100,13 +106,14 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
           <div class="mt-3 flex items-center gap-2">
             <div class="flex-1">
               <Show when={props.agent.enabled} fallback={<span class="text-[13px] text-bark-600">{t("web.farm.friends.disabled")}</span>}>
-                <PxButton tone={picked() ? "plain" : "primary"} onClick={() => setPick(picked() ? "auto" : props.agent.id)}>
+                <PxButton tone={picked() ? "plain" : "primary"} data-testid="friend-pick" onClick={() => setPick(picked() ? "auto" : props.agent.id)}>
                   {picked() ? t("web.farm.friends.unpick") : t("web.farm.friends.pick")}
                 </PxButton>
               </Show>
             </div>
             <Show when={webRoutes.includes("/agents")}>
               <PxButton
+                data-testid="friend-profile"
                 onClick={() => {
                   setOpen(false);
                   router.navigate(`/agents/${encodeURIComponent(props.agent.id)}`);
@@ -144,7 +151,7 @@ export function Friends(props: { height: number }) {
   const attention = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
   const box = useClickAway(open, () => farm.friendsOpen(false));
   return (
-    <div ref={box} class="pointer-events-auto relative" aria-label={t("web.farm.friends.helpers")} role="group">
+    <div ref={box} class="pointer-events-auto relative" aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
       <Show when={open()}>
         {/* As wide as the helpers in a row (the button under it is narrower), wrapping only past the cap. */}
         <div class="absolute bottom-full left-0 mb-1 w-max max-w-[min(640px,90vw)]">
@@ -159,6 +166,7 @@ export function Friends(props: { height: number }) {
       </Show>
       <button
         type="button"
+        data-testid="friends-toggle"
         aria-label={t("web.farm.friends.helpers")}
         aria-expanded={aria(open())}
         onClick={() => farm.friendsOpen(!open())}
@@ -176,7 +184,7 @@ export function Friends(props: { height: number }) {
           </span>
           <span>{t("web.farm.friends.helpers")}</span>
           <Show when={busy() > 0}>
-            <span class="flex h-4 min-w-4 items-center justify-center bg-leaf-500 px-1 text-[10px] leading-none text-cream-50">{busy()}</span>
+            <span class="flex h-4 min-w-4 items-center justify-center bg-leaf-500 px-1 text-[10px] leading-none text-bark-900">{busy()}</span>
           </Show>
           <SpriteIcon name="button-next" size={12} class={open() ? "-rotate-90" : "rotate-90"} />
         </HudCard>

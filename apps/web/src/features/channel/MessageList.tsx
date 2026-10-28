@@ -132,6 +132,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       <Show when={awayFrom() !== undefined}>
         <button
           type="button"
+          data-testid="to-latest"
           onClick={toLatest}
           class="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 animate-pop-in cursor-pointer items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 text-xs text-ink shadow-float transition-colors duration-120 hover:bg-hover"
         >
@@ -145,6 +146,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         class="scroll-fade-y flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
         role="log"
         aria-label={t("web.channel.messages.label")}
+        data-testid="messages"
       >
         <div class="flex flex-col px-4 pt-3 pb-4">
           <div class="flex justify-center pb-2">
@@ -173,11 +175,22 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             )}
           </Show>
           <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
-            <p class="py-8 text-center text-sm text-muted">{searching() ? t("web.channel.messages.notFound") : props.emptyText}</p>
+            <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
+              {searching() ? t("web.channel.messages.notFound") : props.emptyText}
+            </p>
           </Show>
           <For each={items()} keyed={(item) => item.message.id}>
             {(item) => (
               <div
+                data-testid="message"
+                data-key={item().message.id}
+                data-from={item().message.from}
+                data-from-kind={item().message.fromKind}
+                data-edited={item().message.edited !== undefined ? "" : undefined}
+                data-deleted={item().message.deleted !== undefined ? "" : undefined}
+                data-pinned={item().message.pinned !== undefined ? "" : undefined}
+                data-kind={item().message.kind}
+                data-lit={lit() === item().message.number && item().message.channel === id() ? "" : undefined}
                 data-number={item().message.channel === id() ? item().message.number : undefined}
                 class={[
                   "rounded-md transition-[opacity,translate,background-color] duration-280",
@@ -423,6 +436,9 @@ function ThreadPreview(props: { thread: Channel }) {
   return (
     <button
       type="button"
+      data-testid="thread-preview"
+      data-key={props.thread.id}
+      data-subject={props.thread.subjectKind}
       onClick={() => router.navigate(chatPath(props.thread))}
       class="group/t mt-2 flex w-full max-w-xl cursor-pointer flex-col gap-1 rounded-lg border border-line px-3 py-2 text-left hover:bg-hover focus-visible:border-focus"
     >

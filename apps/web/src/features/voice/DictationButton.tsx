@@ -36,6 +36,8 @@ export function DictationButton(props: {
   return (
     <button
       type="button"
+      data-testid="dictate"
+      data-state={off() ? "unset" : phase()}
       aria-label={phase() === "recording" ? t("web.voice.dictation.stop") : t("web.voice.dictation.label")}
       title={look()[1]}
       disabled={off() || phase() === "transcribing"}

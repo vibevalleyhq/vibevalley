@@ -26,6 +26,8 @@ export function PhoneButton(props: { height: number }) {
   return (
     <button
       type="button"
+      data-testid="phone-button"
+      data-state={ringing() ? "ringing" : count() > 0 ? "missed" : unread() > 0 ? "unread" : "idle"}
       title={t("web.farm.phone.phone")}
       aria-label={
         ringing()

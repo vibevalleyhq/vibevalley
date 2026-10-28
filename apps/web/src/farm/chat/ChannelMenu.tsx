@@ -32,6 +32,8 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
     <div ref={box} class="relative min-w-0">
       <button
         type="button"
+        data-testid="channel-menu"
+        data-key={props.current?.id}
         aria-label={t("web.farm.chat.channel", { channel: farmChannelLabel(props.current) })}
         aria-expanded={aria(open())}
         onClick={() => {
@@ -48,7 +50,12 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         <SpriteIcon name="button-next" size={10} class="rotate-90" />
       </button>
       <Show when={open()}>
-        <div class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px" role="dialog" aria-label={t("web.farm.chat.channels")}>
+        <div
+          class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px"
+          role="dialog"
+          aria-label={t("web.farm.chat.channels")}
+          data-testid="channels"
+        >
           <Switch>
             <Match when={mode() === "list"}>
               <div class="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
@@ -59,16 +66,31 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
                 </Show>
               </div>
               <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-cream-200 pt-1.5 text-[12px] text-leaf-700">
-                <button type="button" onClick={() => setMode("create")} class="flex cursor-pointer items-center gap-1 hover:underline">
+                <button
+                  type="button"
+                  data-testid="new-channel"
+                  onClick={() => setMode("create")}
+                  class="flex cursor-pointer items-center gap-1 hover:underline"
+                >
                   <SpriteIcon name="button-add" size={12} />
                   {t("web.farm.chat.newChannel")}
                 </button>
-                <button type="button" onClick={() => router.navigate(chatPath(props.current))} class="flex cursor-pointer items-center gap-1 hover:underline">
+                <button
+                  type="button"
+                  data-testid="channel-page"
+                  onClick={() => router.navigate(chatPath(props.current))}
+                  class="flex cursor-pointer items-center gap-1 hover:underline"
+                >
                   <SpriteIcon name="button-open" size={12} />
                   {t("web.farm.chat.pageAndSchedules")}
                 </button>
                 <Show when={props.current?.type === "channel"}>
-                  <button type="button" onClick={() => setMode("settings")} class="flex cursor-pointer items-center gap-1 hover:underline">
+                  <button
+                    type="button"
+                    data-testid="channel-settings"
+                    onClick={() => setMode("settings")}
+                    class="flex cursor-pointer items-center gap-1 hover:underline"
+                  >
                     <SpriteIcon name="button-settings" size={12} />
                     {t("web.farm.chat.settingsLink")}
                   </button>
@@ -97,6 +119,7 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
   return (
     <button
       type="button"
+      data-key={c().id}
       aria-current={here() ? "true" : undefined}
       onClick={() => {
         props.onPick();
@@ -120,10 +143,10 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
 function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: () => void }) {
   return (
     <div class="mt-2 flex items-center justify-end gap-2">
-      <button type="button" onClick={() => props.onBack()} class="cursor-pointer text-[12px] text-leaf-700 hover:underline">
+      <button type="button" data-testid="form-back" onClick={() => props.onBack()} class="cursor-pointer text-[12px] text-leaf-700 hover:underline">
         {t("web.farm.chat.back2")}
       </button>
-      <PxButton tone="primary" size="sm" disabled={!props.onSubmit} onClick={props.onSubmit && (() => props.onSubmit?.())}>
+      <PxButton tone="primary" size="sm" data-testid="form-submit" disabled={!props.onSubmit} onClick={props.onSubmit && (() => props.onSubmit?.())}>
         {props.submit}
       </PxButton>
     </div>
@@ -145,7 +168,14 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
     <div class="flex flex-col gap-1.5">
       <p class="text-[13px]">{t("web.farm.chat.newChannel")}</p>
       <p class="text-[12px] text-bark-500">{t("web.farm.chat.newChannelLine")}</p>
-      <PxTextInput value={form.name()} onChange={form.setName} placeholder={t("web.farm.chat.nameHint")} label={t("web.farm.chat.name")} autoFocus />
+      <PxTextInput
+        testid="channel-name"
+        value={form.name()}
+        onChange={form.setName}
+        placeholder={t("web.farm.chat.nameHint")}
+        label={t("web.farm.chat.name")}
+        autoFocus
+      />
       <PxTextInput
         value={form.description()}
         onChange={form.setDescription}

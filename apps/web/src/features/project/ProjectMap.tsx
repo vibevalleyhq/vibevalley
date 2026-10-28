@@ -288,6 +288,8 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
       <div class="relative" style={{ width: `${pic().w * s()}px`, height: `${props.cellHeight * s()}px` }}>
         <button
           type="button"
+          data-testid="island"
+          data-key={props.island.project}
           aria-label={t("shared.join.labeled", { label: props.island.project, text: islandText(props.island) })}
           onClick={open}
           class="absolute inset-x-0 bottom-0 cursor-pointer"
@@ -393,7 +395,14 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
           }}
         </For>
       </div>
-      <button type="button" onClick={enter} aria-label={t("web.project.map.enter", { project: props.island.project })} class="group cursor-pointer">
+      <button
+        type="button"
+        data-testid="enter-island"
+        data-key={props.island.project}
+        onClick={enter}
+        aria-label={t("web.project.map.enter", { project: props.island.project })}
+        class="group cursor-pointer"
+      >
         <PixelCard
           center
           maxWidth={pic().w * s() - 24}

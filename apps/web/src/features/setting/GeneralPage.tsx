@@ -19,6 +19,7 @@ export function GeneralPage() {
         <SettingRow label={t("web.setting.general.start")} hint={t("web.setting.general.startHint")}>
           <Segmented
             label={t("web.setting.general.start")}
+            testid="start"
             value={start()}
             options={StartValues.map((s) => ({ value: s, label: t(`web.setting.general.starts.${s}`) }))}
             onChange={setStart}

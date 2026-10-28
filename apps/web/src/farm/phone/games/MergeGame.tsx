@@ -303,6 +303,8 @@ export function MergeGame() {
       </div>
       <div
         role="img"
+        data-testid="merge-board"
+        data-count={g() ? board().filter((c) => c).length : undefined}
         aria-label={
           g()
             ? t("web.farm.phone.merge.field", { n: board().filter((c) => c).length, top: mergeStageName(Math.max(reached(), 1)) })

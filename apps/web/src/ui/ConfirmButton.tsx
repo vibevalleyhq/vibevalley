@@ -16,6 +16,8 @@ export function ConfirmButton(props: {
   icon?: IconName;
   title?: string;
   disabled?: boolean;
+  /** The first press's test id; the confirming one's is it with -sure. */
+  testid?: string;
   onConfirm: () => unknown;
 }) {
   const [armed, setArmed] = createSignal(false);
@@ -23,7 +25,7 @@ export function ConfirmButton(props: {
     <Show
       when={armed()}
       fallback={
-        <Button icon={props.icon} title={props.title} disabled={props.disabled} onClick={() => setArmed(true)}>
+        <Button icon={props.icon} title={props.title} disabled={props.disabled} data-testid={props.testid} onClick={() => setArmed(true)}>
           {props.label}
         </Button>
       }
@@ -41,6 +43,7 @@ export function ConfirmButton(props: {
         <Button
           tone={props.tone ?? "danger"}
           disabled={props.disabled}
+          data-testid={props.testid && `${props.testid}-sure`}
           ref={(el) => queueMicrotask(() => el.focus())}
           onClick={() => {
             setArmed(false);

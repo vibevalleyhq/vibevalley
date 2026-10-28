@@ -114,12 +114,12 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
       </Show>
       <div class="mt-3 flex flex-wrap gap-2">
         <Show when={acts().includes("complete")}>
-          <PxButton tone="primary" onClick={() => fire(take())}>
+          <PxButton tone="primary" data-act="complete" onClick={() => fire(take())}>
             {empty() ? t("web.farm.harvest.letGo") : t("web.farm.harvest.take", { base: props.changes.base })}
           </PxButton>
         </Show>
         <Show when={acts().includes("resolve")}>
-          <PxButton tone="danger" onClick={() => fire(resolve())}>
+          <PxButton tone="danger" data-act="resolve" onClick={() => fire(resolve())}>
             {t("web.farm.harvest.resolve")}
           </PxButton>
         </Show>

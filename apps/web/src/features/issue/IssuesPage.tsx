@@ -258,10 +258,11 @@ function Overlay(props: { onClose: () => void; children: JSX.Element }) {
         role="dialog"
         aria-modal="true"
         aria-label={t("web.issue.page.sheet")}
+        data-testid="issue"
         class="relative h-fit w-full max-w-[1080px] animate-pop-in rounded-xl border border-line bg-page px-6 py-5 shadow-float"
       >
         <div class="absolute top-3 right-3">
-          <IconButton icon="close" label={t("web.issue.page.close")} onClick={props.onClose} />
+          <IconButton icon="close" label={t("web.issue.page.close")} testid="issue-close" onClick={props.onClose} />
         </div>
         {props.children}
       </div>
@@ -289,6 +290,7 @@ function Toolbar(props: {
           <label class="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
             <Icon name="search" size={14} />
             <input
+              data-testid="issue-search"
               value={props.filter.query}
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
               placeholder={t("web.issue.page.find")}
@@ -315,7 +317,7 @@ function Toolbar(props: {
           />
           <Show when={filterAny(props.filter)}>
             <span class="text-xs text-muted">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
-            <button type="button" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
+            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
               {t("web.issue.page.clear")}
             </button>
           </Show>
@@ -323,6 +325,7 @@ function Toolbar(props: {
         <div class="ml-auto flex items-center gap-1.5">
           <Segmented
             label={t("web.issue.page.view")}
+            testid="issue-view"
             value={props.look.view}
             onChange={(view) => props.onLook({ ...props.look, view })}
             options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}

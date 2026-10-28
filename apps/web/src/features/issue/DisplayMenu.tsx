@@ -32,19 +32,21 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
     ].filter(Boolean);
   return (
     <div ref={(el) => (box = el)} class="relative">
-      <Button tone="quiet" icon="settings" aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
+      <Button tone="quiet" icon="settings" data-testid="display" aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
         {t("web.issue.display.show")}
       </Button>
       <Show when={open()}>
         <div
           role="dialog"
           aria-label={t("web.issue.display.show")}
+          data-testid="display-menu"
           class="absolute top-full right-0 z-30 mt-1.5 w-[min(340px,calc(100vw-24px))] origin-top-right animate-pop-in rounded-lg border border-line bg-page p-3 shadow-float"
         >
           <div class="flex items-center gap-2">
             <span class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.group")}</span>
             <Segmented
               label={t("web.issue.display.group")}
+              testid="grouping"
               block
               value={props.look.grouping}
               onChange={(grouping) => props.onChange({ ...props.look, grouping })}
@@ -55,6 +57,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
             <span class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.order")}</span>
             <Segmented
               label={t("web.issue.display.order")}
+              testid="ordering"
               block
               value={props.look.ordering}
               onChange={(ordering) => props.onChange({ ...props.look, ordering })}
@@ -67,6 +70,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
           <Show when={changed()}>
             <button
               type="button"
+              data-testid="display-reset"
               onClick={() => props.onChange({ ...props.look, grouping: defaultLook.grouping, ordering: defaultLook.ordering })}
               class="mt-2 cursor-pointer text-sm text-water hover:underline"
             >

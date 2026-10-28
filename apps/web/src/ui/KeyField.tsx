@@ -23,7 +23,15 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
         : t("web.base.form.unset");
   return (
     <Tip text={text()}>
-      <span role="img" aria-label={text()} tabindex={0} class="inline-flex rounded outline-none focus-visible:outline-2 focus-visible:outline-focus">
+      <span
+        role="img"
+        data-testid="key-mark"
+        data-state={props.removing ? "removing" : (props.status.source ?? "unset")}
+        data-hint={props.status.hint}
+        aria-label={text()}
+        tabindex={0}
+        class="inline-flex rounded outline-none focus-visible:outline-2 focus-visible:outline-focus"
+      >
         <Show when={props.removing || props.status.source} fallback={<span class="m-[3px] block size-2 rounded-full border border-faint" aria-hidden="true" />}>
           <Icon name={props.removing ? "cross" : "check"} size={14} />
         </Show>
@@ -72,12 +80,13 @@ export function KeyField(props: {
 /** Save and undo, shown while there is something to save; `left` says what went wrong. */
 export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => void; onUndo: () => void; left?: JSX.Element; extra?: JSX.Element }) {
   return (
-    <div class="sticky bottom-0 flex items-center gap-2 border-t border-line bg-page py-2.5">
+    <div data-testid="save-bar" data-dirty={props.dirty ? "" : undefined} class="sticky bottom-0 flex items-center gap-2 border-t border-line bg-page py-2.5">
       <div class="min-w-0 flex-1 text-sm">{props.left}</div>
       {props.extra}
       <Show when={props.dirty}>
         <button
           type="button"
+          data-testid="undo"
           onClick={() => props.onUndo()}
           class="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted hover:bg-hover hover:text-ink"
         >
@@ -87,6 +96,7 @@ export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => vo
       </Show>
       <button
         type="submit"
+        data-testid="save"
         disabled={!props.dirty || props.busy}
         onClick={(e) => {
           e.preventDefault();

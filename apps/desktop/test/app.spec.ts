@@ -37,11 +37,11 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/, { timeout: 45_000 });
     server = new URL(page.url()).origin;
     await page.goto(server + "/issues");
-    await expect(page.getByRole("status")).toHaveText("已连上");
+    await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
 
     const api = new VibeValleyApi(server);
-    await api.issue.create({ title: "桌面版看到我了" });
-    await expect(page.getByText("桌面版看到我了")).toBeVisible();
+    const seen = await api.issue.create({ title: "the desktop app sees me" });
+    await expect(page.locator(`[data-testid="issue-card"][data-key="${seen.id}"]`)).toBeVisible();
 
     const host = await page.evaluate(async () => {
       const h = (window as unknown as { vibevalleyHost: { name: string; notify: (n: Notice) => Promise<void> } }).vibevalleyHost;
@@ -74,7 +74,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await expect.poll(menu).toContain("编辑");
     // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
     const titleBar = await page.evaluate(() => (window as unknown as { vibevalleyHost: { titleBar: { left: number } | null } }).vibevalleyHost.titleBar);
-    if (titleBar) expect((await page.getByRole("navigation", { name: "工作台" }).boundingBox())?.width).toBeGreaterThan(titleBar.left);
+    if (titleBar) expect((await page.getByTestId("rail").boundingBox())?.width).toBeGreaterThan(titleBar.left);
     // Between two whole scales the farm would have bars around it: when a resize ends, the window takes the nearest size
     // it fills.
     const resized = await app.evaluate(({ BrowserWindow }) => {
@@ -108,11 +108,10 @@ test("the window opens on the bar at once, and says there why the server could n
   try {
     const page = await app.firstWindow();
     await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/);
-    await expect(page.getByText(/^农场起不来：/)).toBeVisible();
+    await expect(page.getByRole("alert")).toBeVisible();
     await expect(page.getByRole("progressbar")).toHaveCount(0);
     // The window shows on its first ready-to-show, which may come after the page is drawn hidden: wait for it.
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
-    await page.screenshot({ path: test.info().outputPath("problem.png") });
   } finally {
     writeFileSync(test.info().outputPath("electron.log"), said.join(""));
     await app.close();
@@ -160,7 +159,7 @@ test("the island follows the issues in flight and opens one", async () => {
 
     await app.evaluate((_, id) => (globalThis as { vibevalleyIsland?: { open: (issue: string) => void } }).vibevalleyIsland?.open(id), made.id);
     await page.waitForURL(new RegExp(`/issues/${made.id}$`));
-    await expect(page.getByRole("dialog", { name: "工单" })).toBeVisible();
+    await expect(page.getByTestId("issue")).toBeVisible();
   } finally {
     await app.close();
   }
