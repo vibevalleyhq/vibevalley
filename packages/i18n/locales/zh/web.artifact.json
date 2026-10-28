@@ -20,11 +20,9 @@
     "deleteAsk": "删掉这个产出和它的每一版？对话里的卡片还在。",
     "deleted": "删掉了「{title}」",
     "gone": "这个产出已经删掉了，或者没有这个产出。",
-    "back": "回到对话",
     "frame": "「{title}」第 {version} 版"
   },
   "talk": {
-    "title": "对话",
     "atMessage": "在对话里",
     "reply": "回复这一版",
     "replyHint": "写给做它的帮工：哪里要改",

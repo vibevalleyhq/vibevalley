@@ -1347,10 +1347,9 @@ export const catalogs = {
         deleteAsk: "删掉这个产出和它的每一版？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
         gone: "这个产出已经删掉了，或者没有这个产出。",
-        back: "回到对话",
         frame: "「{title}」第 {version} 版",
       },
-      talk: { title: "对话", atMessage: "在对话里", reply: "回复这一版", replyHint: "写给做它的帮工：哪里要改", send: "回复", sent: "回复了第 {version} 版" },
+      talk: { atMessage: "在对话里", reply: "回复这一版", replyHint: "写给做它的帮工：哪里要改", send: "回复", sent: "回复了第 {version} 版" },
       issue: { title: "产出" },
     },
     "web.base": {
@@ -4952,11 +4951,9 @@ export const catalogs = {
         deleteAsk: "Delete this artifact and every version? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
         gone: "This artifact was deleted, or there is no such artifact.",
-        back: "Back to the conversation",
         frame: '"{title}" version {version}',
       },
       talk: {
-        title: "Conversation",
         atMessage: "In the conversation",
         reply: "Reply to this version",
         replyHint: "For the helper who made it: what to change",
@@ -8615,7 +8612,6 @@ export interface Messages {
   "web.artifact.issue.title": undefined;
   "web.artifact.kind.html": undefined;
   "web.artifact.kind.markdown": undefined;
-  "web.artifact.page.back": undefined;
   "web.artifact.page.by": { readonly name: string | number };
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": undefined;
@@ -8632,7 +8628,6 @@ export interface Messages {
   "web.artifact.talk.replyHint": undefined;
   "web.artifact.talk.send": undefined;
   "web.artifact.talk.sent": { readonly version: string | number };
-  "web.artifact.talk.title": undefined;
   "web.base.big": { readonly n: string | number };
   "web.base.cast.outfit.farmer": undefined;
   "web.base.cast.outfit.gardener": undefined;

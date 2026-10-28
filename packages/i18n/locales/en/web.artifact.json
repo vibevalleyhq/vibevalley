@@ -20,11 +20,9 @@
     "deleteAsk": "Delete this artifact and every version? Its cards stay in the conversation.",
     "deleted": "Deleted \"{title}\"",
     "gone": "This artifact was deleted, or there is no such artifact.",
-    "back": "Back to the conversation",
     "frame": "\"{title}\" version {version}"
   },
   "talk": {
-    "title": "Conversation",
     "atMessage": "In the conversation",
     "reply": "Reply to this version",
     "replyHint": "For the helper who made it: what to change",
