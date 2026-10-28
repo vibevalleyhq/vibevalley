@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
 
 const dir = join(import.meta.dirname, "../test");
-const allowed = /^(\.\/[\w-]+|@playwright\/test(\/reporter)?|@vibevalley\/protocol(\/schema)?|node:[\w/]+)$/;
+const allowed = /^(\.\/[\w-]+|@playwright\/test(\/reporter)?|@axe-core\/playwright|@vibevalley\/protocol(\/schema)?|node:[\w/]+)$/;
 
 test("page tests reach the system only through the browser, Playwright and the protocol", () => {
   const crossing = readdirSync(dir)
