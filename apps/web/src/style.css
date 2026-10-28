@@ -1,26 +1,107 @@
 @import "tailwindcss";
 
-/* The workbench's palette: the farm's colours, so the
-   two skins stay one place. */
+/* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (base/appearance.ts sets
+   <html data-theme>). Light is the farm's colours, so the two skins stay one place. The pixel skin (the farm, the
+   memory tree, ui/pixel) is drawn and keeps its colours: its root sets data-theme="light" again. A colour written into
+   a class instead (bg-[#…]) would not follow: vibevalley/no-hex-color refuses it. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --wb-page: #fffaf0;
+  --wb-side: #f1ebe0;
+  --wb-ink: #2f1f13;
+  --wb-muted: #7f5b3b;
+  --wb-faint: #9b7550;
+  --wb-line: #2f1f131f;
+  --wb-hover: #2f1f130f;
+  --wb-selected: #2f1f131a;
+  --wb-focus: #74a046;
+  --wb-accent: #5a8234;
+  --wb-leaf: #74a046;
+  --wb-wheat: #e5a93c;
+  --wb-berry: #c84a3a;
+  --wb-water: #4f8fbd;
+  --wb-bark: #7f5b3b;
+  /* A mark that something is ready, missing or to be looked at: its tint and its words. */
+  --wb-ok-soft: #e3efd2;
+  --wb-ok-ink: #3f6427;
+  --wb-bad-soft: #f6ddd8;
+  --wb-warn-ink: #b8682a;
+  /* Under a dialog. */
+  --wb-scrim: #2f1f1340;
+  /* The rail and what is on it: dark in both themes. */
+  --wb-rail: #46301d;
+  --wb-on-rail: #fffaf0;
+  /* Nobody at work. */
+  --wb-idle: #c8a46e;
+  /* A command or its output: dark in both themes. */
+  --wb-code-bg: #2f1f13;
+  --wb-code-ink: #eedcb2;
+  --wb-float: #2f1f1326;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --wb-page: #1d1813;
+  --wb-side: #262019;
+  --wb-ink: #f1e7d6;
+  --wb-muted: #bfa88c;
+  --wb-faint: #937c64;
+  --wb-line: #f1e7d621;
+  --wb-hover: #f1e7d610;
+  --wb-selected: #f1e7d61c;
+  --wb-focus: #8dbb5c;
+  --wb-accent: #7fae4f;
+  --wb-leaf: #8dbb5c;
+  --wb-wheat: #e5a93c;
+  --wb-berry: #e0705f;
+  --wb-water: #6fa8d4;
+  --wb-bark: #bfa88c;
+  --wb-ok-soft: #2f3f22;
+  --wb-ok-ink: #b7d98f;
+  --wb-bad-soft: #4a2620;
+  --wb-warn-ink: #e6a565;
+  --wb-scrim: #00000080;
+  --wb-rail: #14100c;
+  --wb-on-rail: #f1e7d6;
+  --wb-idle: #8a7354;
+  --wb-code-bg: #120e0a;
+  --wb-code-ink: #eedcb2;
+  --wb-float: #00000066;
+}
+
+@theme inline static {
+  --color-page: var(--wb-page);
+  --color-side: var(--wb-side);
+  --color-ink: var(--wb-ink);
+  --color-muted: var(--wb-muted);
+  --color-faint: var(--wb-faint);
+  --color-line: var(--wb-line);
+  --color-hover: var(--wb-hover);
+  --color-selected: var(--wb-selected);
+  --color-focus: var(--wb-focus);
+  --color-accent: var(--wb-accent);
+  --color-leaf: var(--wb-leaf);
+  --color-wheat: var(--wb-wheat);
+  --color-berry: var(--wb-berry);
+  --color-water: var(--wb-water);
+  --color-bark: var(--wb-bark);
+  --color-ok-soft: var(--wb-ok-soft);
+  --color-ok-ink: var(--wb-ok-ink);
+  --color-bad-soft: var(--wb-bad-soft);
+  --color-warn-ink: var(--wb-warn-ink);
+  --color-scrim: var(--wb-scrim);
+  --color-rail: var(--wb-rail);
+  --color-on-rail: var(--wb-on-rail);
+  --color-idle: var(--wb-idle);
+  --color-code-bg: var(--wb-code-bg);
+  --color-code-ink: var(--wb-code-ink);
+  --shadow-float: 0 8px 24px var(--wb-float);
+}
+
 @theme {
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --font-mono: Menlo, ui-monospace, monospace;
-
-  --color-page: #fffaf0;
-  --color-side: #f1ebe0;
-  --color-ink: #2f1f13;
-  --color-muted: #7f5b3b;
-  --color-faint: #9b7550;
-  --color-line: #2f1f131f;
-  --color-hover: #2f1f130f;
-  --color-selected: #2f1f131a;
-  --color-focus: #74a046;
-  --color-accent: #5a8234;
-  --color-leaf: #74a046;
-  --color-wheat: #e5a93c;
-  --color-berry: #c84a3a;
-  --color-water: #4f8fbd;
-  --color-bark: #7f5b3b;
 
   --text-xs: 12px;
   --text-xs--line-height: 16px;
@@ -32,8 +113,6 @@
   --text-lg--line-height: 24px;
   --text-xl: 20px;
   --text-xl--line-height: 28px;
-
-  --shadow-float: 0 8px 24px #2f1f1326;
 
   /* The farm's pixel skin: bg-cream-100, border-bark-900, text-leaf-600, font-pixel… */
   --font-pixel: "FusionPixel", "PingFang SC", sans-serif;

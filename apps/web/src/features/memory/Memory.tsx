@@ -438,7 +438,7 @@ function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string
         <span class="flex flex-wrap gap-x-2 text-xs text-muted">
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>
-            <span class="text-[#b8682a]">{props.warning}</span>
+            <span class="text-warn-ink">{props.warning}</span>
           </Show>
         </span>
       </div>

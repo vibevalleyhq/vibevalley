@@ -342,7 +342,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
             <Show when={shown().hx !== undefined && shown().hy !== undefined}>
               <span
                 title={t("web.catalog.head")}
-                class="absolute border-2 border-[#0ea5e9]"
+                class="absolute border-2 border-water"
                 style={{ left: `${shown().hx! * scale() - 5}px`, top: `${shown().hy! * scale() - 5}px`, width: "10px", height: "10px" }}
               />
             </Show>
@@ -373,7 +373,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
                 step={1}
                 value={fps()}
                 onInput={(e) => setFps(Number(e.currentTarget.value))}
-                class="w-24 accent-[#74a046]"
+                class="w-24 accent-leaf"
               />
               <span class="w-14 text-xs text-muted">{t("web.catalog.perSecond", { n: fps() })}</span>
             </div>

@@ -67,7 +67,7 @@ function AgentsPage() {
           <A
             href="/agents/new?role=orchestrator"
             aria-label={t("web.agent.list.makeOrchestrator")}
-            class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-[#3f6427]"
+            class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-ok-ink"
           >
             <Icon name="add" size={28} />
             {t("web.agent.list.makeOrchestrator")}
@@ -98,7 +98,7 @@ function AgentsPage() {
           <A
             href="/agents/new"
             aria-label={t("web.agent.list.make")}
-            class="flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-[#3f6427]"
+            class="flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-ok-ink"
           >
             <Icon name="add" size={28} />
             {t("web.agent.list.make")}
@@ -115,7 +115,7 @@ function CardShell(props: { to: string; label: string; muted?: boolean; corner?:
       <A
         href={props.to}
         aria-label={props.label}
-        class="flex h-full flex-col rounded-lg border border-line bg-page p-4 transition-colors hover:border-ink/20 hover:bg-[#fffbf2] focus-visible:outline-2 focus-visible:outline-focus"
+        class="flex h-full flex-col rounded-lg border border-line bg-page p-4 transition-colors hover:border-ink/20 hover:bg-page focus-visible:outline-2 focus-visible:outline-focus"
       >
         {props.children}
       </A>
@@ -177,7 +177,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
             act: props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"),
             name: props.agent.name,
           })}
-          class="cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium text-muted opacity-0 group-hover:opacity-100 hover:bg-[#f6eedd] hover:text-ink focus-visible:opacity-100"
+          class="cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium text-muted opacity-0 group-hover:opacity-100 hover:bg-side hover:text-ink focus-visible:opacity-100"
         >
           {props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable")}
         </button>
@@ -216,7 +216,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
           {t("web.agent.list.hired")} <span class="font-medium text-ink">{Math.round(props.tally?.hired ?? 0)}</span>
         </span>
         <span>
-          {t("web.agent.list.merged")} <span class="font-medium text-[#3f6427]">{Math.round(props.tally?.harvested ?? 0)}</span>
+          {t("web.agent.list.merged")} <span class="font-medium text-ok-ink">{Math.round(props.tally?.harvested ?? 0)}</span>
         </span>
         <Show when={props.errors.length > 0} fallback={<span class="min-w-0 flex-1 truncate text-right">{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
           <span class="min-w-0 flex-1 truncate text-right text-berry" title={props.errors.join("\n")}>

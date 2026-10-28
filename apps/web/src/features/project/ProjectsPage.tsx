@@ -267,11 +267,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
         fallback={
           <>
             {/* The bed itself, soil under the crops: it keeps the farm's brown. */}
-            <div
-              role="img"
-              aria-label={list(shares().map((s) => `${s.label} ${percent(s.share)}`))}
-              class="flex h-14 overflow-hidden rounded-md bg-[#7a5a3a] p-1"
-            >
+            <div role="img" aria-label={list(shares().map((s) => `${s.label} ${percent(s.share)}`))} class="flex h-14 overflow-hidden rounded-md bg-bark p-1">
               <For each={shares()}>
                 {(s) => (
                   <span

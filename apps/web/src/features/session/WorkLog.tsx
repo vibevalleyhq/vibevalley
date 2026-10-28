@@ -110,7 +110,7 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
       </button>
       <Show when={props.round.asked}>
         {(asked) => (
-          <div class="rounded-md bg-[#e5a93c24] px-3 py-2">
+          <div class="rounded-md bg-wheat/15 px-3 py-2">
             <Folded text={asked().text} lines={4} />
           </div>
         )}
@@ -120,7 +120,7 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
       </Show>
       <For each={shown()} keyed={(s) => s.seq}>
         {(s) => (
-          <div class={s().under !== undefined ? "ml-5 border-l-2 border-[#74a04680] pl-2.5" : ""}>
+          <div class={s().under !== undefined ? "ml-5 border-l-2 border-leaf/50 pl-2.5" : ""}>
             <Step step={s()} now={props.now} />
           </div>
         )}
@@ -276,7 +276,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         <div class="flex flex-col gap-1.5 pt-1 pr-2 pb-2 pl-8">
           {props.step.tool && <span class="text-xs text-muted">{t("web.session.log.tool", { name: props.step.tool })}</span>}
           <Show when={input()}>
-            {(text) => <pre class="max-h-40 overflow-auto rounded-md bg-ink px-2.5 py-2 font-mono text-xs whitespace-pre-wrap text-[#eedcb2]">{text()}</pre>}
+            {(text) => <pre class="max-h-40 overflow-auto rounded-md bg-code-bg px-2.5 py-2 font-mono text-xs whitespace-pre-wrap text-code-ink">{text()}</pre>}
           </Show>
           <Show
             when={props.step.output}

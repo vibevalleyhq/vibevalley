@@ -75,8 +75,9 @@ export function TreePage() {
     return Math.max(1, Math.round(days * until()));
   };
 
+  // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div class="fixed inset-0 overflow-hidden bg-ground font-pixel text-bark-900 select-none" data-testid="memory-tree">
+    <div data-theme="light" class="fixed inset-0 overflow-hidden bg-ground font-pixel text-bark-900 select-none" data-testid="memory-tree">
       <Scene
         tree={tree}
         filter={filter()}

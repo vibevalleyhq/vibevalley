@@ -129,7 +129,7 @@ export function MossPlayground() {
             <For each={line().turns}>
               {(turn) => (
                 <div class={["flex", turn.who === "owner" ? "justify-end" : "justify-start"]}>
-                  <p class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "owner" ? "bg-[#e3efd2]" : "bg-hover", { "opacity-60": !turn.done }]}>
+                  <p class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "owner" ? "bg-ok-soft" : "bg-hover", { "opacity-60": !turn.done }]}>
                     {turn.text}
                   </p>
                 </div>

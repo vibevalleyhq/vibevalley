@@ -21,6 +21,10 @@
  *   catalogs; so is Chinese punctuation joining words in code (list() joins a list). A regular expression is not: it
  *   reads what people and models write.
  *
+ *   no-hex-color: the workbench's colours are the palette's in apps/web/src/style.css, named by what they are for, so
+ *   they follow the theme (设置 › 外观); a colour written into a class (bg-[#…]) would stay as it is. The pixel skin and
+ *   the avatars are drawn and keep theirs; vite.config.ts says where the rule runs.
+ *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
@@ -83,6 +87,27 @@ const noCommentDivider = defineRule({
       Program() {
         for (const comment of context.sourceCode.getAllComments())
           if (/[─━═]{2}/.test(comment.value) || /^[-=*#~_/\s]{4,}$/.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
+      },
+    };
+  },
+});
+
+/** A colour written into a class (bg-[#e3efd2], text-[#3f6427]/50). */
+const hexClass = /-\[#[0-9a-fA-F]{3,8}\]/;
+
+const noHexColor = defineRule({
+  meta: {
+    messages: {
+      hex: "the workbench's colours are the palette's (apps/web/src/style.css: bg-ok-soft, text-warn-ink, bg-ink/20…), so they follow 设置 › 外观; add one there for a new purpose",
+    },
+  },
+  create(context) {
+    return {
+      Literal(node) {
+        if (typeof node.value === "string" && hexClass.test(node.value)) context.report({ node, messageId: "hex" });
+      },
+      TemplateLiteral(node) {
+        if (node.quasis.some((q) => hexClass.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "hex" });
       },
     };
   },
@@ -181,6 +206,7 @@ export default definePlugin({
     "no-test-sleep": noTestSleep,
     "no-comment-divider": noCommentDivider,
     "no-cjk-literal": noCjkLiteral,
+    "no-hex-color": noHexColor,
     "page-layers": pageLayersRule,
   },
 });

@@ -231,7 +231,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             </Show>
             <Show when={props.view === "call"}>
               <div class="flex max-w-4xl items-center gap-2 px-1">
-                <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-[#e3efd2] text-[#3f6427]" : "bg-[#f6ddd8] text-berry"]}>
+                <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-ok-soft text-ok-ink" : "bg-bad-soft text-berry"]}>
                   {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
                 </span>
                 <Hint

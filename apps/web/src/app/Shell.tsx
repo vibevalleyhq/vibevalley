@@ -30,8 +30,8 @@ function Slot(props: { to: string; label: string; current?: boolean; fill?: stri
       title={props.label}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
-      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px] text-[#fffaf0b3] hover:bg-[#fffaf022] hover:text-page aria-[current=page]:text-page focus-visible:outline-2 focus-visible:outline-focus"
-      style={props.current ? { background: props.fill ?? "#fffaf033" } : undefined}
+      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px] text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
+      style={props.current ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
     >
       {props.children}
     </A>
@@ -44,14 +44,14 @@ function Rail(props: { here?: Place }) {
   return (
     <nav
       aria-label={t("web.base.rail")}
-      class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3 md:w-20"
+      class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-rail pb-3 md:w-20"
       // The window's buttons sit over the rail's top: it is at least as wide as they reach, and a little.
       style={titleBar.left > 0 ? { "min-width": `${titleBar.left + 8}px` } : undefined}
     >
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
-        <Slot to="/farm" label={t("web.base.farm")} current fill="#e5a93c">
+        <Slot to="/farm" label={t("web.base.farm")} current fill="var(--wb-wheat)">
           <OrchestratorFace size={38} />
         </Slot>
       </div>
