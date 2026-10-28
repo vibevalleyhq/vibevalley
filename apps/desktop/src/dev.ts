@@ -1,6 +1,7 @@
 // Development only (vp run desktop:dev sets VIBEVALLEY_DEV=1, never a packaged app): the window reloads when the page
 // is built again (vp build --watch writes apps/web/dist), and the server starts again, on the same port, when its code
-// or a workspace package it runs on changes; the window then comes back on the place it showed.
+// or a workspace package it runs on changes; the window then comes back on the place it showed. A restart waits while a
+// helper is working: it would cut the round off (the farm working on its own code is changing that code).
 
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
@@ -8,6 +9,9 @@ import { workspaceClosure } from "./workspace.ts";
 
 /** A build writes many files; one reload once they are all there. */
 const settleMs = 400;
+
+/** How often a restart held back by working helpers asks again. */
+const busyPollMs = 5_000;
 
 function debounce(f: () => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -23,6 +27,19 @@ export interface DevHooks {
   repo: string;
   reloadPage: () => void;
   restartServer: () => Promise<void>;
+  /** How many helpers are working now; 0 when that cannot be asked (the server is down). */
+  working: () => Promise<number>;
+}
+
+/** Restarts the server once no helper is working, asking again every busyPollMs. */
+export async function restartWhenIdle(h: Pick<DevHooks, "working" | "restartServer">, sleep: (ms: number) => Promise<void>): Promise<void> {
+  let said = false;
+  for (let n = await h.working(); n > 0; n = await h.working()) {
+    if (!said) console.log(`vibevalley dev: the server's code changed; restarting once ${n} working helper(s) are done`);
+    said = true;
+    await sleep(busyPollMs);
+  }
+  await h.restartServer();
 }
 
 export function watchForDev(h: DevHooks): () => void {
@@ -32,7 +49,9 @@ export function watchForDev(h: DevHooks): () => void {
   let restarting = Promise.resolve();
   const server = debounce(() => {
     // One restart at a time; a change during one restarts again after it.
-    restarting = restarting.then(h.restartServer).catch((e: unknown) => console.error("vibevalley dev: the server did not start again:", e));
+    restarting = restarting
+      .then(() => restartWhenIdle(h, (ms) => new Promise((r) => setTimeout(r, ms))))
+      .catch((e: unknown) => console.error("vibevalley dev: the server did not start again:", e));
   });
   const packages = [...workspaceClosure(h.repo, join(h.repo, "apps/server")).values()].map((dir) => join(dir, "src"));
   for (const dir of [join(h.repo, "apps/server/src"), join(h.repo, "apps/server/db"), ...packages])
