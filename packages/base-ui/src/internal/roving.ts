@@ -1,7 +1,7 @@
 // Roving focus over a composite's items in the DOM: the arrow keys move the focus among the elements that match `item`
 // inside `root`, in document order, passing over disabled ones.
 
-import { moveIndex, type Orientation } from "./composite.ts";
+import { moveIndex, type Orientation, typeahead, typeaheadMs } from "./composite.ts";
 
 export const itemsIn = (root: HTMLElement, item: string) => [...root.querySelectorAll<HTMLElement>(item)];
 
@@ -16,4 +16,29 @@ export function roveFocus(e: KeyboardEvent, root: HTMLElement, item: string, o: 
   e.preventDefault();
   items[at]!.focus();
   return items[at];
+}
+
+/** Typing letters moves the focus to the next item whose text starts with them; returns that item. */
+export function createTypeahead() {
+  let typed = "";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return (e: KeyboardEvent, root: HTMLElement, item: string): HTMLElement | undefined => {
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return undefined;
+    // A space while typing continues the word; alone it presses the item.
+    if (e.key === " " && typed === "") return undefined;
+    clearTimeout(timer);
+    typed += e.key;
+    timer = setTimeout(() => (typed = ""), typeaheadMs);
+    const items = itemsIn(root, item);
+    const at = typeahead(
+      items.map((el) => el.dataset.label ?? el.textContent ?? ""),
+      items.indexOf(document.activeElement as HTMLElement),
+      typed,
+      (i) => !disabled(items[i]!),
+    );
+    if (at === undefined) return undefined;
+    e.preventDefault();
+    items[at]!.focus();
+    return items[at];
+  };
 }
