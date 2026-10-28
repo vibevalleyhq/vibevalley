@@ -8,7 +8,7 @@
     "agent": "List the profiles and find its id",
     "skill": "List the skills and find its id",
     "template": "List the templates and find its id",
-    "recurrence": "List the schedules and find its id",
+    "cron": "List the scheduled tasks and find its id",
     "device": "See the connected devices and find its id",
     "archive": "List the manager's archive",
     "channel": "List the channels and find its id",

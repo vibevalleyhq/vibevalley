@@ -1,16 +1,16 @@
 import { list, t } from "@vibevalley/i18n";
-// When a recurrence runs and how it is said. The next run is
+// When a cron runs and how it is said. The next run is
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
-import { Cron, DateTime, Option } from "effect";
-import type { Recurrence, RecurrenceWhen } from "@vibevalley/protocol";
+import { Cron as EffectCron, DateTime, Option } from "effect";
+import type { Cron, CronWhen } from "@vibevalley/protocol";
 
 /** A day of the week by its number, Sunday 0. */
-const weekday = (d: number) => t(`server.recurrence.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
+const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
 export const minEveryMinutes = 1;
 
-export const recurrenceTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+export const cronTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 const givenOffset = /^(?:GMT)?([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/;
 
@@ -31,15 +31,15 @@ export function givenZone(tz: string): DateTime.TimeZone | undefined {
  * the same time before the change (02:30 on a spring-forward night is 03:30), a repeated one is its first occurrence;
  * none at all (30 February) is undefined.
  */
-export function nextOf(cron: Cron.Cron, from: number): number | undefined {
+export function nextOf(cron: EffectCron.Cron, from: number): number | undefined {
   try {
-    return Cron.next(cron, new Date(from)).getTime();
+    return EffectCron.next(cron, new Date(from)).getTime();
   } catch {
     return undefined;
   }
 }
 
-export function nextRun(s: Recurrence): number | undefined {
+export function nextRun(s: Cron): number | undefined {
   if (!s.enabled) return undefined;
   const from = s.lastRun ?? s.created;
   const w = s.when;
@@ -60,12 +60,12 @@ export function nextRun(s: Recurrence): number | undefined {
 }
 
 export function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
-  const m = recurrenceTime.exec(at);
+  const m = cronTime.exec(at);
   const timeZone = givenZone(tz);
   if (!m || !timeZone) return undefined;
   // Cron reads only 0 to 7 (7 is Sunday again); anything else is no cron.
   if (days.some((d) => d < 0 || d > 7)) return undefined;
-  const cron = Cron.make({ minutes: [Number(m[2])], hours: [Number(m[1])], days: [], months: [], weekdays: days.map((d) => d % 7), tz: timeZone });
+  const cron = EffectCron.make({ minutes: [Number(m[2])], hours: [Number(m[1])], days: [], months: [], weekdays: days.map((d) => d % 7), tz: timeZone });
   return nextOf(cron, from);
 }
 
@@ -76,17 +76,17 @@ function clock(at: number, tz: string): string {
   return `${w.month}/${w.day} ${two(w.hour)}:${two(w.minute)}`;
 }
 
-export function whenText(when: RecurrenceWhen, tz: string): string {
+export function whenText(when: CronWhen, tz: string): string {
   switch (when.kind) {
     case "once":
-      return t("server.recurrence.when.once", { clock: clock(when.at, tz) });
+      return t("server.cron.when.once", { clock: clock(when.at, tz) });
     case "every":
-      return when.minutes % 60 === 0 ? t("server.recurrence.when.hours", { n: when.minutes / 60 }) : t("server.recurrence.when.minutes", { n: when.minutes });
+      return when.minutes % 60 === 0 ? t("server.cron.when.hours", { n: when.minutes / 60 }) : t("server.cron.when.minutes", { n: when.minutes });
     case "daily":
-      return t("server.recurrence.when.daily", { time: when.time });
+      return t("server.cron.when.daily", { time: when.time });
     case "weekly": {
       const days = [...new Set(when.days ?? [])].sort((a, b) => a - b);
-      return t("server.recurrence.when.weekly", { days: list(days.map((d) => (d >= 0 && d < 7 ? weekday(d) : String(d)))), time: when.time });
+      return t("server.cron.when.weekly", { days: list(days.map((d) => (d >= 0 && d < 7 ? weekday(d) : String(d)))), time: when.time });
     }
     case "cron":
       return cronText(when.expr);
@@ -94,13 +94,13 @@ export function whenText(when: RecurrenceWhen, tz: string): string {
   return "";
 }
 
-export function nextText(s: Recurrence): string {
+export function nextText(s: Cron): string {
   const next = nextRun(s);
   if (next !== undefined) return clock(next, s.tz);
-  if (s.enabled) return t("server.recurrence.next.never");
-  if (s.pending) return t("server.recurrence.next.pending");
-  if (s.when.kind === "once" && s.lastRun !== undefined) return t("server.recurrence.next.done");
-  return t("server.recurrence.next.off");
+  if (s.enabled) return t("server.cron.next.never");
+  if (s.pending) return t("server.cron.next.pending");
+  if (s.when.kind === "once" && s.lastRun !== undefined) return t("server.cron.next.done");
+  return t("server.cron.next.off");
 }
 
 /** The fields as sets; the day fields are both due (and) when either starts with *, else either one is. */
@@ -113,7 +113,7 @@ interface CronSpec {
   readonly and: boolean;
 }
 
-/** The bounds of the five fields; server.recurrence.cron.fields names them, in this order. */
+/** The bounds of the five fields; server.cron.expr.fields names them, in this order. */
 const cronFields = [
   { min: 0, max: 59 },
   { min: 0, max: 23 },
@@ -134,7 +134,7 @@ export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u20
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi } = cronFields[i]!;
-  const bad = t("server.recurrence.cron.badField", { name: t(`server.recurrence.cron.fields.${i as 0 | 1 | 2 | 3 | 4}`), field });
+  const bad = t("server.cron.expr.badField", { name: t(`server.cron.expr.fields.${i as 0 | 1 | 2 | 3 | 4}`), field });
   const bits = new Set<number>();
   for (const item of field.split(",")) {
     const slash = item.indexOf("/");
@@ -166,7 +166,7 @@ function cronField(field: string, i: number): Set<number> | string {
 
 export function parseCron(expr: string): CronSpec | string {
   const f = fields(expr);
-  if (f.length !== 5) return t("server.recurrence.cron.fiveFields");
+  if (f.length !== 5) return t("server.cron.expr.fiveFields");
   const bits: Set<number>[] = [];
   for (let i = 0; i < 5; i++) {
     const b = cronField(f[i]!, i);
@@ -182,43 +182,43 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
   const spec = parseCron(expr);
   const timeZone = givenZone(tz);
   if (typeof spec === "string" || !timeZone) return undefined;
-  return nextOf(Cron.make({ ...spec, tz: timeZone }), from);
+  return nextOf(EffectCron.make({ ...spec, tz: timeZone }), from);
 }
 
 /** The common shapes in words, the rest as the expression itself. */
 export function cronText(expr: string): string {
   const f = fields(expr);
-  if (typeof parseCron(expr) === "string") return t("server.recurrence.when.cron", { expr });
+  if (typeof parseCron(expr) === "string") return t("server.cron.when.cron", { expr });
   const mi = atoi(f[0]!);
   const h = atoi(f[1]!);
   const clock = mi !== undefined && h !== undefined ? String(100 + h).slice(1) + ":" + String(100 + mi).slice(1) : "";
   if (clock !== "" && f[2] === "*" && f[3] === "*") {
     switch (f[4]) {
       case "*":
-        return t("server.recurrence.when.daily", { time: clock });
+        return t("server.cron.when.daily", { time: clock });
       case "1-5":
-        return t("server.recurrence.when.weekdays", { time: clock });
+        return t("server.cron.when.weekdays", { time: clock });
       case "0,6":
       case "6,0":
       case "6,7":
       case "6-7":
-        return t("server.recurrence.when.weekend", { time: clock });
+        return t("server.cron.when.weekend", { time: clock });
       case undefined:
         break;
     }
     const days: number[] = [];
     for (const d of f[4]!.split(",")) {
       const n = atoi(d);
-      if (n === undefined) return t("server.recurrence.when.cron", { expr });
+      if (n === undefined) return t("server.cron.when.cron", { expr });
       days.push(n % 7);
     }
     const sorted = [...new Set(days)].sort((a, b) => a - b);
-    return t("server.recurrence.when.weekly", { days: list(sorted.map(weekday)), time: clock });
+    return t("server.cron.when.weekly", { days: list(sorted.map(weekday)), time: clock });
   }
   if (clock !== "" && f[3] === "*" && f[4] === "*") {
     const d = atoi(f[2]!);
-    return d !== undefined ? t("server.recurrence.when.monthly", { day: d, time: clock }) : t("server.recurrence.when.cron", { expr });
+    return d !== undefined ? t("server.cron.when.monthly", { day: d, time: clock }) : t("server.cron.when.cron", { expr });
   }
-  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return t("server.recurrence.when.hourly", { minute: mi });
-  return t("server.recurrence.when.cron", { expr });
+  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return t("server.cron.when.hourly", { minute: mi });
+  return t("server.cron.when.cron", { expr });
 }

@@ -14,7 +14,7 @@ export const modules: readonly Module[] = [
   { name: "Source Control", parts: ["project"] },
   { name: "Collaboration", parts: ["channel", "doc", "artifact"] },
   { name: "Agent Sessions", parts: ["session"] },
-  { name: "Issues", parts: ["issue", "task", "recurrence"] },
+  { name: "Issues", parts: ["issue", "task", "cron"] },
   { name: "Notifications", parts: ["notice"] },
   { name: "Orchestrator", parts: ["orchestrator", "tool"] },
   { name: "Gamification", parts: ["game"] },

@@ -28,7 +28,7 @@
 - **工作目录**（`Config.workRoot`，环境变量 `VIBEVALLEY_WORK_ROOT`）：`projects/<名字>` 是项目，`worktrees/` 是 worktree，根上的 `AGENTS.md` 是这台机器上所有项目的约定（`houseRules`），派活时附在帮工的规矩后面。默认是 `~/vibevalley-dev`，桌面版和终端里跑的服务端一样。
 - **一个项目是 `projects/` 的一个直接子文件夹**：名字以字母或数字开头，只含字母、数字、`-`、`_`、`.`，最多 64 个字符（`projectProblem`）；以 `.` 开头的、正在新建的不列出；解析符号链接以后不在 `projects/` 里的拒绝（项目不能链接到外面）。
 - **派到不存在的项目就新建**（`ensure`）：`git init -b main`，没有 `.gitignore` 就写一份（依赖、构建目录、`.env`、缓存），空文件夹加一个 `README.md`，做初始提交；已经是仓库但没有提交的，补一个空的初始提交。机器没有 git 用户时用 `vibevalley <vibevalley@localhost>` 提交。
-- **一张工单一个 worktree、一条分支**（`issueBranch`）：`worktrees/<项目>.<工单号>`，分支 `vibevalley/issue-<工单号>`。worktree 在就复用；只剩分支就在原分支上重建 worktree；都没有就从基分支新开：计划给的基分支，或项目在 `github.pr_projects` 里且能提 PR 时先快进的主分支，否则 `HEAD`。即时派活也先取得工单号，不按帮工编号或时间创建另一种工作区。档案关掉 worktree（`Agent.worktree`）时帮工直接在项目文件夹里干活，没有分支，也就没有可合的。
+- **一张工单一个 worktree、一条分支**（`issueBranch`）：`worktrees/<项目>.<工单号>`，分支 `vibevalley/issue-<工单号>`。worktree 在就复用；只剩分支就在原分支上重建 worktree；都没有就从基分支新开：计划给的基分支，或项目在 `github.pr_projects` 里且能提 PR 时先快进的主分支，否则 `HEAD`。新开的 worktree 在锁外跑一次仓库里的 `.vibevalley/setup`（比如装依赖；限时和检查一样，失败只记一条警告，帮工照常开工），帮工一来就能跑检查。即时派活也先取得工单号，不按帮工编号或时间创建另一种工作区。档案关掉 worktree（`Agent.worktree`）时帮工直接在项目文件夹里干活，没有分支，也就没有可合的。
 - **同一个项目里改仓库的操作串行**（`serially`，每个项目一把锁）：新建、开 worktree、合并、清理、开分支、结束 PR。检查在锁外跑，进锁以后再核对。
 - **释放回执区分现场是否仍在**（`WorkplaceRelease`）：`release`、`clear` 返回 `kept`，保留时带原因。未合的改动、分支或删除失败都不能被调用方当作已释放；工单只在现场释放后才能删掉身份。`clear` 默认丢弃工作区里的未提交文件，`preserve` 用在工单换项目前，未提交的也保留；两种都不丢弃未合的提交。
 - **留着和清掉**（`release`，帮工离开或派不出去时）：worktree 里有没提交的改动就整个留着；否则清掉 worktree；分支上有主分支没有的提交就留着，没有就删掉。合并成功以后强制删掉 worktree 和分支；删不掉只是一条警告，跟着成功的回执走，不把完成变成失败。起草完的 worktree 由执行停止写入后 `reset`：在锁里把工单分支 `checkout -f -B` 回主分支、`git clean -fd`，改的和提交的都不留，项目文件夹本身不重置；没开工就取消或删掉的工单 `clear`：强制删掉它的 worktree，分支上没有主分支没有的提交就删掉分支。
@@ -60,7 +60,7 @@
 
 **合进计划分支**（`mergeInto`，计划的一件做完）：同样锁外检查、进锁核对和查冲突，但不检出任何分支：`merge-tree --write-tree` 写出树，`commit-tree` 做合并提交（能快进就快进），`update-ref` 只从原来的位置挪，目标分支同时被挪过就不覆盖。`mergeBranch` 把计划分支合进主分支并删掉它；`openBranch` 从 `HEAD` 开计划分支。
 
-**提 PR**（`submitPullRequest`）：分支必须是这张工单的分支；锁外提交、查冲突、检查；进锁核对分支没变、origin 是 GitHub、主分支没有冲突；`git push -u origin <分支>`；工单已有开着的 PR 就只推；否则先 `gh pr list --head <分支> --base <主分支> --state open` 找回开过但回执没存下的，再 `gh pr create`，正文是「工单 #号」、帮工的结论和检查结果（没有 `.vibevalley/check` 就写没跑检查）。每一步失败都返回能重试的原因。`PullRequestState` 用 `gh pr view --json state,mergedAt` 读成 `open`、`merged`、`closed`。 gh 的 `--json` 回答按 Schema 读，不是要的形状就当没读到，返回能重试的原因，不当成一个 PR。
+**提 PR**（`submitPullRequest`）：分支必须是这张工单的分支；锁外提交、查冲突、检查；进锁核对分支没变、origin 是 GitHub、主分支没有冲突；`git push -u origin <分支>`；工单已有开着的 PR 就只推；否则先 `gh pr list --head <分支> --base <主分支> --state open` 找回开过但回执没存下的，再 `gh pr create`。标题和正文是帮工写的：走 PR 的项目，帮工的规矩里多一条，交回来以前照项目的 PR 约定把标题和正文写进 worktree 的 git 目录里的 `vibevalley-pr.md`（`git rev-parse --git-path vibevalley-pr.md`；第一行是标题，空一行是正文；`shapes.ts` 的 `pullRequestText` 读它），它不进提交；没写就用工单的标题，正文是「工单 #号」、帮工的结论和检查结果（没有 `.vibevalley/check` 就写没跑检查）。每一步失败都返回能重试的原因。`PullRequestState` 用 `gh pr view --json state,mergedAt` 读成 `open`、`merged`、`closed`。 gh 的 `--json` 回答按 Schema 读，不是要的形状就当没读到，返回能重试的原因，不当成一个 PR。
 
 **结束 PR**（`finishPullRequest`）：进锁，能提 PR 的先快进主分支，再强制删掉工单的 worktree 和本地分支；远端分支不动。
 

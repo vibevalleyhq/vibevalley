@@ -1,19 +1,19 @@
-// The recurrence and cron tests: the golden files have no cron, and these pin the clock changes. A recurrence is made Monday 2026-10-12 08:00 in Shanghai.
+// The cron and cron tests: the golden files have no cron, and these pin the clock changes. A cron is made Monday 2026-10-12 08:00 in Shanghai.
 
 process.env.TZ = "Asia/Shanghai";
 
 import { expect, test } from "vite-plus/test";
-import type { Recurrence, RecurrenceRequest, RecurrenceWhen } from "@vibevalley/protocol";
+import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "../core/core.ts";
 import { nextRun, nextText, whenText } from "./when.ts";
 import { reduce } from "../projection/reduce.ts";
 import { frameOf } from "../projection/frame.ts";
-import { recurrenceProblem } from "./rules.ts";
+import { cronProblem } from "./rules.ts";
 
 const sh = "Asia/Shanghai";
 const at = (iso: string) => Date.parse(iso + "+08:00");
 
-const make = (change: Partial<Recurrence> = {}): Recurrence => ({
+const make = (change: Partial<Cron> = {}): Cron => ({
   id: "c1",
   name: "测试",
   text: "跑一遍测试",
@@ -26,7 +26,7 @@ const make = (change: Partial<Recurrence> = {}): Recurrence => ({
   ...change,
 });
 
-const cron = (expr: string, change: Partial<Recurrence> = {}) => make({ when: { kind: "cron", expr }, ...change });
+const cron = (expr: string, change: Partial<Cron> = {}) => make({ when: { kind: "cron", expr }, ...change });
 
 test("daily and weekly", () => {
   expect(nextRun(make())).toBe(at("2026-10-12T09:00:00"));
@@ -37,7 +37,7 @@ test("daily and weekly", () => {
 });
 
 test("every and once", () => {
-  const every: RecurrenceWhen = { kind: "every", minutes: 30 };
+  const every: CronWhen = { kind: "every", minutes: 30 };
   expect(nextRun(make({ when: every }))).toBe(at("2026-10-12T08:30:00"));
   expect(nextRun(make({ when: every, lastRun: at("2026-10-12T10:00:00") }))).toBe(at("2026-10-12T10:30:00"));
   const once = make({ when: { kind: "once", at: at("2026-10-12T12:00:00") } });
@@ -48,8 +48,8 @@ test("every and once", () => {
   expect(nextRun(make({ enabled: false }))).toBeUndefined();
 });
 
-test("every accepted spelling of a fixed time zone runs the same calendar recurrence", () => {
-  const times: RecurrenceWhen[] = [
+test("every accepted spelling of a fixed time zone runs the same calendar cron", () => {
+  const times: CronWhen[] = [
     { kind: "daily", time: "09:00" },
     { kind: "weekly", days: [1], time: "09:00" },
     { kind: "cron", expr: "0 9 * * 1" },
@@ -57,29 +57,29 @@ test("every accepted spelling of a fixed time zone runs the same calendar recurr
   for (const when of times) {
     for (const tz of ["+08:00", "+0800", "+08", "GMT+08:00"]) {
       const s = make({ when, tz });
-      expect(recurrenceProblem(s, s.created)).toBe("");
+      expect(cronProblem(s, s.created)).toBe("");
       expect([when.kind, tz, nextRun(s), nextText(s)]).toEqual([when.kind, tz, at("2026-10-12T09:00:00"), "10/12 09:00"]);
     }
   }
 });
 
-test("what a recurrence asked for gets wrong", () => {
+test("what a cron asked for gets wrong", () => {
   const now = at("2026-10-12T08:00:00");
-  const req = (change: Partial<RecurrenceRequest> = {}): RecurrenceRequest => ({
+  const req = (change: Partial<CronRequest> = {}): CronRequest => ({
     name: "测试",
     text: "跑测试",
     when: { kind: "daily", time: "09:00" },
     ...change,
   });
-  expect(recurrenceProblem(req(), now)).toBe("");
-  expect(recurrenceProblem(req({ when: { kind: "daily", time: "9点" } }), now)).toMatch(/HH:MM/);
-  expect(recurrenceProblem(req({ when: { kind: "once", at: now - 1 } }), now)).toMatch(/以后/);
-  expect(recurrenceProblem(req({ when: { kind: "every", minutes: 0.2 } }), now)).toMatch(/至少/);
-  expect(recurrenceProblem(req({ when: { kind: "weekly", days: [7], time: "09:00" } }), now)).toMatch(/0 到 6/);
-  expect(recurrenceProblem(req({ tz: "Mars/Base" }), now)).toMatch(/时区/);
-  expect(recurrenceProblem(req({ text: " " }), now)).toMatch(/做什么/);
-  expect(recurrenceProblem(req({ tz: "+08:00" }), now)).toBe("");
-  expect(recurrenceProblem(req({ tz: "Local" }), now)).toMatch(/时区/);
+  expect(cronProblem(req(), now)).toBe("");
+  expect(cronProblem(req({ when: { kind: "daily", time: "9点" } }), now)).toMatch(/HH:MM/);
+  expect(cronProblem(req({ when: { kind: "once", at: now - 1 } }), now)).toMatch(/以后/);
+  expect(cronProblem(req({ when: { kind: "every", minutes: 0.2 } }), now)).toMatch(/至少/);
+  expect(cronProblem(req({ when: { kind: "weekly", days: [7], time: "09:00" } }), now)).toMatch(/0 到 6/);
+  expect(cronProblem(req({ tz: "Mars/Base" }), now)).toMatch(/时区/);
+  expect(cronProblem(req({ text: " " }), now)).toMatch(/做什么/);
+  expect(cronProblem(req({ tz: "+08:00" }), now)).toBe("");
+  expect(cronProblem(req({ tz: "Local" }), now)).toMatch(/时区/);
 });
 
 test("when it runs, in words", () => {
@@ -92,15 +92,15 @@ test("when it runs, in words", () => {
 
 test("the fold keeps the facts; the words are the frame's", () => {
   const s = make();
-  const [one] = reduce(emptyWorkspaceState(), { type: "recurrence", at: 1, recurrence: s });
-  expect(one.recurrences).toEqual([s]);
-  expect(frameOf(one).state.recurrences).toEqual([{ ...s, whenText: "每天 09:00", nextText: "10/12 09:00" }]);
-  expect(reduce(one, { type: "recurrence", at: 2, recurrence: s })[1]).toBe(false);
-  const [off] = reduce(one, { type: "recurrence", at: 3, recurrence: { ...s, enabled: false } });
-  expect(frameOf(off).state.recurrences?.[0]?.nextText).toBe("关着");
-  const [gone] = reduce(off, { type: "recurrenceGone", at: 4, id: "c1" });
-  expect(gone.recurrences).toEqual([]);
-  expect(reduce(emptyWorkspaceState(), { type: "recurrenceGone", at: 5, id: "c9" })[1]).toBe(false);
+  const [one] = reduce(emptyWorkspaceState(), { type: "cron", at: 1, cron: s });
+  expect(one.crons).toEqual([s]);
+  expect(frameOf(one).state.crons).toEqual([{ ...s, whenText: "每天 09:00", nextText: "10/12 09:00" }]);
+  expect(reduce(one, { type: "cron", at: 2, cron: s })[1]).toBe(false);
+  const [off] = reduce(one, { type: "cron", at: 3, cron: { ...s, enabled: false } });
+  expect(frameOf(off).state.crons?.[0]?.nextText).toBe("关着");
+  const [gone] = reduce(off, { type: "cronGone", at: 4, id: "c1" });
+  expect(gone.crons).toEqual([]);
+  expect(reduce(emptyWorkspaceState(), { type: "cronGone", at: 5, id: "c9" })[1]).toBe(false);
 });
 
 test("cron's next run", () => {
@@ -145,7 +145,7 @@ test("a cron the old kinds can say runs when they do, across clock changes too",
 
 test("what a cron gets wrong", () => {
   const now = at("2026-10-12T08:00:00");
-  const problem = (expr: string) => recurrenceProblem({ name: "n", text: "t", when: { kind: "cron", expr }, tz: sh }, now);
+  const problem = (expr: string) => cronProblem({ name: "n", text: "t", when: { kind: "cron", expr }, tz: sh }, now);
   for (const [expr, pattern] of [
     ["0 9 * * 1-5", /^$/],
     ["*/5 * * * *", /^$/],

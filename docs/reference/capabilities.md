@@ -63,15 +63,15 @@
 | `channel.unread.list` | `/api/v1/channel/unread/list` | ✓ | ✓ |   | ✓ |
 | `channel.attachment.create` | `/api/v1/channel/attachment/create` | ✓ | ✓ |   |   |
 
-## recurrence
+## cron
 
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
-| `recurrence.create` | `/api/v1/recurrence/create` | ✓ | ✓ | ✓ |   |
-| `recurrence.list` | `/api/v1/recurrence/list` | ✓ | ✓ | ✓ |   |
-| `recurrence.update` | `/api/v1/recurrence/update` | ✓ | ✓ |   |   |
-| `recurrence.delete` | `/api/v1/recurrence/delete` | ✓ | ✓ | ✓ |   |
-| `recurrence.previewDelete` | `/api/v1/recurrence/previewDelete` | ✓ | ✓ | ✓ |   |
+| `cron.create` | `/api/v1/cron/create` | ✓ | ✓ | ✓ |   |
+| `cron.list` | `/api/v1/cron/list` | ✓ | ✓ | ✓ |   |
+| `cron.update` | `/api/v1/cron/update` | ✓ | ✓ |   |   |
+| `cron.delete` | `/api/v1/cron/delete` | ✓ | ✓ | ✓ |   |
+| `cron.previewDelete` | `/api/v1/cron/previewDelete` | ✓ | ✓ | ✓ |   |
 
 ## voice
 

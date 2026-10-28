@@ -579,8 +579,8 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
             <span class="text-base">{props.issue.description}</span>
           </Property>
         </Show>
-        <Show when={props.issue.recurrence}>
-          <Property label={t("web.issue.detail.from")}>{t("web.issue.detail.fromRecurrence")}</Property>
+        <Show when={props.issue.cron}>
+          <Property label={t("web.issue.detail.from")}>{t("web.issue.detail.fromCron")}</Property>
         </Show>
         <Property label={t("web.issue.detail.opened")}>{wallClockText(props.issue.createdAt)}</Property>
         <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>

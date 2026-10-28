@@ -115,15 +115,15 @@ test("search keeps the messages that contain it, and Escape brings the rest back
   await expect(bananas).toBeVisible();
 });
 
-test("the recurrences tab turns a recurrence off and deletes it on the second press", async ({ page, api }) => {
+test("the crons tab turns a cron off and deletes it on the second press", async ({ page, api }) => {
   const id = await newChannel(api, "timers");
-  const made = await api.recurrence.create({ name: "run tests", text: "run the tests", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } });
+  const made = await api.cron.create({ name: "run tests", text: "run the tests", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } });
   await page.goto(`/chat/${id}`);
   await tab(page, "jobs").click();
   await expect(page.getByTestId("tab-empty")).toBeVisible();
-  await tab(page, "recurrences").click();
-  const card = page.locator(`[data-testid="recurrence"][data-key="${made.id}"]`);
-  const toggle = card.getByTestId("recurrence-toggle");
+  await tab(page, "crons").click();
+  const card = page.locator(`[data-testid="cron"][data-key="${made.id}"]`);
+  const toggle = card.getByTestId("cron-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");

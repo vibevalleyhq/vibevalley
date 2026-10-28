@@ -2,7 +2,7 @@
   "tab": {
     "chat": "聊天",
     "jobs": "任务",
-    "recurrences": "定时"
+    "crons": "定时任务"
   },
   "defaultProject": "默认项目 {project}",
   "channels": "频道列表",
@@ -52,20 +52,20 @@
     "empty": "这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。",
     "thread": "工单串"
   },
-  "recurrences": {
-    "empty": "这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。",
+  "crons": {
+    "empty": "这个频道还没有定时任务。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。",
     "next": "下次 {next}",
     "direct": "直接派 {agent}",
     "byOrchestrator": "管家定的",
-    "label": "定时「{name}」",
+    "label": "定时任务「{name}」",
     "on": "开着",
     "off": "关着",
     "remove": "删掉",
-    "removeWhich": "删掉定时「{name}」",
+    "removeWhich": "删掉定时任务「{name}」",
     "sure": "确定删？",
-    "approveWhich": "同意定时「{name}」",
+    "approveWhich": "同意定时任务「{name}」",
     "approve": "同意",
-    "refuseWhich": "不要定时「{name}」",
+    "refuseWhich": "不要定时任务「{name}」",
     "refuse": "不要"
   },
   "messages": {

@@ -36,7 +36,7 @@
   "deletesChannel": "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
   "inUse": "删不了：{why}。可以归档它",
   "helpersThere": "还有帮工在这个频道里干活",
-  "recurrencesThere": "还有 {n} 个定时在这里",
+  "cronsThere": "还有 {n} 个定时任务在这里",
   "connectorsThere": "接着连接器",
   "queuedThere": "还有 {n} 张工单排着队要在这里开工",
   "issuesThere": "这里派过 {n} 张工单的活",

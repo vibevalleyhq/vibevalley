@@ -12,7 +12,7 @@ import {
   type Issue,
   IssueStatusValues,
   defaultOrchestrator,
-  type RecurrenceWhen,
+  type CronWhen,
   type TaskEdit,
 } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
@@ -34,7 +34,7 @@ import { type ApiError, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
-import { Recurrences } from "../recurrence/recurrence.ts";
+import { Crons } from "../cron/cron.ts";
 import type { ToolStart } from "../session/facts.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { type Roster, Sessions } from "../session/session.ts";
@@ -54,7 +54,7 @@ import {
   ownerAgentWord,
   parseTime,
   priorityOf,
-  recurrenceLine,
+  cronLine,
   sessionLine,
   statusOf,
 } from "./prompts.ts";
@@ -142,7 +142,7 @@ export const make = Effect.gen(function* () {
   const run = yield* Sessions;
   const runtimes = yield* Runtimes;
   const chat = yield* Channels;
-  const recurrence = yield* Recurrences;
+  const cron = yield* Crons;
   const issue = yield* Issues;
   const tasks = yield* Tasks;
   const artifacts = yield* Artifacts;
@@ -710,25 +710,25 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const recurrenceCreate = (who: Who) =>
+  const cronCreate = (who: Who) =>
     tool(
-      "recurrence.create",
-      descriptions["recurrence.create"],
-      Effect.fn("Tools.recurrenceCreate")(
-        function* (p: Orchestrator<"recurrence.create">) {
+      "cron.create",
+      descriptions["cron.create"],
+      Effect.fn("Tools.cronCreate")(
+        function* (p: Orchestrator<"cron.create">) {
           const c = yield* callerOf(who);
           let channel = yield* chat.topOf(c.here);
           if (p.channel) {
             const byName = yield* chat.channelByName(p.channel);
-            if (!byName) return yield* refuse(answers.recurrence.noChannelShort(p.channel));
+            if (!byName) return yield* refuse(answers.cron.noChannelShort(p.channel));
             channel = byName;
           }
           const w = p.when;
-          let when: RecurrenceWhen;
+          let when: CronWhen;
           switch (w.kind) {
             case "once": {
               const at = parseTime(w.at ?? "");
-              if (at === undefined) return yield* refuse(answers.recurrence.badTime(w.at ?? ""));
+              if (at === undefined) return yield* refuse(answers.cron.badTime(w.at ?? ""));
               when = { kind: "once", at };
               break;
             }
@@ -744,7 +744,7 @@ export const make = Effect.gen(function* () {
             case "weekly":
               when = { kind: "weekly", days: (w.days ?? []).map((d) => Math.trunc(d)), time: w.time ?? "" };
           }
-          const made = yield* recurrence.add(
+          const made = yield* cron.add(
             {
               name: p.name,
               text: p.text,
@@ -756,26 +756,26 @@ export const make = Effect.gen(function* () {
             },
             c.actor,
           );
-          if (made.pending) return answers.recurrence.pending(recurrenceLine(made, channel.name));
-          return answers.recurrence.confirmed(recurrenceLine(made, channel.name));
+          if (made.pending) return answers.cron.pending(cronLine(made, channel.name));
+          return answers.cron.confirmed(cronLine(made, channel.name));
         },
         (e) => answered(e),
       ),
     );
 
-  const recurrenceList = tool(
-    "recurrence.list",
-    descriptions["recurrence.list"],
-    Effect.fn("Tools.recurrenceList")(function* () {
-      const all = recurrence.list();
-      if (all.length === 0) return answers.listRecurrences.none;
+  const cronList = tool(
+    "cron.list",
+    descriptions["cron.list"],
+    Effect.fn("Tools.cronList")(function* () {
+      const all = cron.list();
+      if (all.length === 0) return answers.listCrons.none;
       const names = new Map((yield* chat.channels()).map((c) => [c.id, c.name]));
-      return all.map((s) => recurrenceLine(s, names.get(s.channel) ?? "?")).join("\n");
+      return all.map((s) => cronLine(s, names.get(s.channel) ?? "?")).join("\n");
     }),
   );
 
-  const recurrenceDelete = tool("recurrence.delete", descriptions["recurrence.delete"], (p: Orchestrator<"recurrence.delete">) =>
-    answered(Effect.map(recurrence.remove(p.id), (s) => answers.cancelRecurrence.canceled(s.name))),
+  const cronDelete = tool("cron.delete", descriptions["cron.delete"], (p: Orchestrator<"cron.delete">) =>
+    answered(Effect.map(cron.remove(p.id), (s) => answers.cancelCron.canceled(s.name))),
   );
 
   const channelCreate = tool(
@@ -998,9 +998,9 @@ export const make = Effect.gen(function* () {
       channelCreate,
       channelUpdate,
       projectList,
-      recurrenceCreate(who),
-      recurrenceList,
-      recurrenceDelete,
+      cronCreate(who),
+      cronList,
+      cronDelete,
       graphSplit(who),
       graphList,
       graphGet,

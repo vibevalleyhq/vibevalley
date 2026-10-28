@@ -24,12 +24,15 @@ for key in $(env | cut -d= -f1); do
     esac
 done
 
+# The same checks AGENTS.md asks for, narrowest first: a fresh worktree may not have installed yet.
+vp install
+vp check
 if "$server"; then
-    pnpm run server:check
+    vp run server:check
 fi
 if "$web"; then
-    pnpm run web:check
+    vp run web:check
 fi
 if "$docs"; then
-    pnpm run docs:verify
+    vp run docs:verify
 fi

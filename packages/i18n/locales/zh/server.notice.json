@@ -53,11 +53,11 @@
       "label": "找你",
       "title": "{who} 叫你"
     },
-    "recurrence-ask": {
-      "label": "定时等你同意",
-      "title": "管家想定一个定时",
+    "cron-ask": {
+      "label": "定时任务等你同意",
+      "title": "管家想定一个定时任务",
       "body": "「{text}」：同意了才开始",
-      "tray": "定时「{text}」等你同意"
+      "tray": "定时任务「{text}」等你同意"
     }
   }
 }

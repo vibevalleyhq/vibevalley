@@ -616,16 +616,16 @@ export interface ProgressNews {
 }
 
 /** Told apart by `kind`. */
-export type RecurrenceWhen = RecurrenceWhenOnce | RecurrenceWhenEvery | RecurrenceWhenDaily | RecurrenceWhenWeekly | RecurrenceWhenCron;
+export type CronWhen = CronWhenOnce | CronWhenEvery | CronWhenDaily | CronWhenWeekly | CronWhenExpr;
 
-export interface Recurrence {
+export interface Cron {
   id: string;
   name: string;
   text: string;
   channel: string;
   agent?: string;
   project?: string;
-  when: RecurrenceWhen;
+  when: CronWhen;
   tz: string;
   enabled: boolean;
   created: number;
@@ -669,7 +669,7 @@ export interface WorkspaceState {
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
-  recurrences?: Recurrence[];
+  crons?: Cron[];
   issues?: Issue[];
   /** Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json. */
   connectors?: ConnectorStatus[];
@@ -796,7 +796,7 @@ export const InboxKindValues = [
   "graph-ready",
   "task-failed",
   "mention",
-  "recurrence-ask",
+  "cron-ask",
 ] as const;
 export type InboxKind = (typeof InboxKindValues)[number];
 
@@ -1343,7 +1343,7 @@ export interface Issue {
   blockedBy?: string[];
   graph?: IssueGraph;
   task?: IssueTask;
-  recurrence?: string;
+  cron?: string;
   status: IssueStatus;
   moves: IssueStatus[];
   pullRequest?: PullRequest;
@@ -1549,13 +1549,13 @@ export type IssueCanceled = (typeof IssueCanceledValues)[number];
 export const SessionCloseValues = ["merged", "completed", "dismissed", "lost"] as const;
 export type SessionClose = (typeof SessionCloseValues)[number];
 
-export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "refine", "runtime"] as const;
+export const RunTriggerKindValues = ["issue", "comment", "task", "cron", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 
 export interface RunTrigger {
   kind: RunTriggerKind;
   message?: string;
-  recurrence?: string;
+  cron?: string;
   missed?: boolean;
 }
 
@@ -1604,13 +1604,13 @@ export interface ChannelUpdate {
   orchestrator?: string;
 }
 
-export interface RecurrenceRequest {
+export interface CronRequest {
   name: string;
   text: string;
   channel?: string;
   agent?: string;
   project?: string;
-  when: RecurrenceWhen;
+  when: CronWhen;
   tz?: string;
 }
 
@@ -1777,28 +1777,28 @@ export interface ProgressTitle {
   tier: number;
 }
 
-export interface RecurrenceWhenOnce {
+export interface CronWhenOnce {
   kind: "once";
   at: number;
 }
 
-export interface RecurrenceWhenEvery {
+export interface CronWhenEvery {
   kind: "every";
   minutes: number;
 }
 
-export interface RecurrenceWhenDaily {
+export interface CronWhenDaily {
   kind: "daily";
   time: string;
 }
 
-export interface RecurrenceWhenWeekly {
+export interface CronWhenWeekly {
   kind: "weekly";
   days: number[];
   time: string;
 }
 
-export interface RecurrenceWhenCron {
+export interface CronWhenExpr {
   kind: "cron";
   expr: string;
 }
@@ -2158,8 +2158,8 @@ export type Fact =
   | FactIssue
   | FactIssueGone
   | FactProgress
-  | FactRecurrence
-  | FactRecurrenceGone
+  | FactCron
+  | FactCronGone
   | FactConnector;
 
 export interface FactCall {
@@ -2325,14 +2325,14 @@ export interface FactConnector {
   status: ConnectorStatus;
 }
 
-export interface FactRecurrence {
-  type: "recurrence";
+export interface FactCron {
+  type: "cron";
   at: number;
-  recurrence: Recurrence;
+  cron: Cron;
 }
 
-export interface FactRecurrenceGone {
-  type: "recurrenceGone";
+export interface FactCronGone {
+  type: "cronGone";
   at: number;
   id: string;
 }
@@ -2359,8 +2359,8 @@ export type SideEvent =
   | FactIssue
   | FactIssueGone
   | FactProgress
-  | FactRecurrence
-  | FactRecurrenceGone
+  | FactCron
+  | FactCronGone
   | FactConnector
   | SideEventSnapshot
   | SideEventSessionEvent
@@ -2393,7 +2393,7 @@ export interface SideEventRuntime {
   info: RuntimeInfo;
 }
 
-export interface RecurrenceUpdate {
+export interface CronUpdate {
   enabled?: boolean;
 }
 

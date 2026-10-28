@@ -10,9 +10,9 @@ select * from issue where id = sqlc.arg(id);
 select * from issue where number = sqlc.arg(number);
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, deliver, talk)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, cron, deliver, talk)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(deliver), sqlc.narg(talk));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(cron), sqlc.arg(deliver), sqlc.narg(talk));
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
@@ -83,9 +83,9 @@ on conflict (id) do update set
 -- name: GraphIDs :many
 select id from issue where graph is not null;
 
--- name: LatestOfRecurrence :one
--- A recurrence's issue: the one it made last.
-select * from issue where recurrence = sqlc.arg(recurrence) order by created_at desc, id desc limit 1;
+-- name: LatestOfCron :one
+-- A cron's issue: the one it made last.
+select * from issue where cron = sqlc.arg(cron) order by created_at desc, id desc limit 1;
 
 -- name: AssignIssue :exec
 -- Who does it is the profile its latest session works as: another one when it was handed over.

@@ -1,5 +1,5 @@
 // The golden files (testdata, first recorded from the server's Go version) hold the core state's rules to their answers:
-// runs of facts folded from an empty farm, the shared rules' calls, and the task graphs', recurrences' and patrol's cases.
+// runs of facts folded from an empty farm, the shared rules' calls, and the task graphs', crons' and patrol's cases.
 // Each is compared as JSON. Times of day are read in Asia/Shanghai (vite.config.ts sets it).
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -8,7 +8,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { phaseText, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { emptyWorkspaceState } from "./core.ts";
 import { targetOf } from "../channel/state.ts";
-import { nextRun, nextText, whenText } from "../recurrence/when.ts";
+import { nextRun, nextText, whenText } from "../cron/when.ts";
 import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf } from "../task/graph.ts";
 import { attentionOf } from "../issue/attention.ts";
 import { effectsOf, viewOf } from "../game/view.ts";
@@ -16,10 +16,10 @@ import { inbox } from "../notice/inbox.ts";
 import { reduce } from "../projection/reduce.ts";
 import { acceptanceChecks, readyTasks } from "../task/rules.ts";
 import { graphText } from "../task/prompts.ts";
-import { recurrenceProblem } from "../recurrence/rules.ts";
+import { cronProblem } from "../cron/rules.ts";
 import { yuan } from "../runtime/money.ts";
 import { graphChanges, graphEventText } from "../task/changes.ts";
-import type { Channel, WorkspaceState, Fact, Issue, Recurrence, RecurrenceRequest, Session, TaskGraph } from "@vibevalley/protocol";
+import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, TaskGraph } from "@vibevalley/protocol";
 
 const testdata = new URL("./testdata/", import.meta.url);
 
@@ -142,7 +142,7 @@ describe("the golden files", () => {
     await f.done();
   });
 
-  test("play: task graphs, recurrences and the patrol", async () => {
+  test("play: task graphs, crons and the patrol", async () => {
     const rows = await lines("play.jsonl.gz");
     const f = failures("play.jsonl.gz", rows);
     const seen: Record<string, number> = {};
@@ -183,12 +183,12 @@ describe("the golden files", () => {
           );
           break;
         }
-        case "recurrence": {
-          const s = input.s as Recurrence;
+        case "cron": {
+          const s = input.s as Cron;
           same("next", nextRun(s) ?? null);
           if (!JSON.stringify(want.nextText).includes('"thrown"')) same("nextText", nextText(s));
           if (!JSON.stringify(want.whenText).includes('"thrown"')) same("whenText", whenText(s.when, s.tz));
-          same("problem", recurrenceProblem(input.req as RecurrenceRequest, input.now as number) || null);
+          same("problem", cronProblem(input.req as CronRequest, input.now as number) || null);
           break;
         }
         case "patrol":
@@ -198,7 +198,7 @@ describe("the golden files", () => {
           throw new Error(`line ${line}: no kind ${kind}`);
       }
     });
-    for (const kind of ["task", "recurrence", "patrol"]) expect(seen[kind] ?? 0).toBeGreaterThan(20);
+    for (const kind of ["task", "cron", "patrol"]) expect(seen[kind] ?? 0).toBeGreaterThan(20);
     await f.done();
   });
 });

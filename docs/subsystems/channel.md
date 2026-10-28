@@ -11,7 +11,7 @@
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session/rules.ts` 的 `summaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_message_send`、`channel_message_list`、`channel_unread_list`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Sessions.who`） |
 | 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`orchestrator`）；连接器把话交给 `orchestrator.Say`，管家照频道的规则被叫醒 |
-| | Inbox 和巡查（[通知](docs/subsystems/notice.md)）；定时到点在频道里说的那句（[定时](docs/subsystems/recurrence.md)） |
+| | Inbox 和巡查（[通知](docs/subsystems/notice.md)）；定时任务到点在频道里说的那句（[定时任务](docs/subsystems/cron.md)） |
 | | 频道、私聊和串在界面上的样子（[farm-ui.md](docs/reference/farm-ui.md)、`apps/web/src/farm/chat`、`apps/web/src/features/channel`） |
 
 ## 在哪
@@ -36,12 +36,12 @@
 - **只放农场自己的页面**：WebSocket 不受 CORS 管，别的网页也能连本机的端口。upgrade 之前，`Host` 要是回环地址（`127.0.0.1`、`localhost`、`[::1]`），`Origin` 有的话要和 `Host` 同源；只查 `Origin` 不够，一个被解析到本机的名字（DNS rebinding）就是它自己的源。经「连接到本机」转来的带设备头，由那一头查过（[连接到本机](docs/subsystems/lan.md)）。
 - **一处一列消息号**：主键是 uuidv7，`number` 在每个频道和串里从 1 数，对外的消息号就是它。地址是 `#<频道>`、`#<频道>:<消息号>`（默认频道是它自己的名字，比如 `#general`），私聊是 `@owner`（管家读写它和主人的私聊时写，`@主人` 也认）；频道名 1–24 个字母、数字、汉字、`_`、`-`，不能重名，这样地址能读回来。
 - **channel 三种（`type`），照 Discord**：频道（`channel`，有名字，可以带说明、默认项目和分组）、私聊（`direct`，主人和一个对面 `peer`：一个管家（它的档案 id），或一个帮工的档案 `profile:<档案>`；没有名字，列表里用对面的名字 `title`）、串（`thread`，挂在 `parent` 频道的一条消息 `root` 下，`subject_kind` 是 `issue`、`talk`）。
-- **默认频道是一条数据**：`channel.is_default`，协议里是 `Channel.default`；没写频道的话（连接器、电话、定时、提醒）去那里，代码只认这个标记，不认名字、不认类型。开机时一个频道都没有就建一个 `general`（`firstChannelName`）设成默认；`channel.default.set` 换一个，在同一个事务里清掉旧的。名字存下来、写进地址，不随语言变；农场的皮把它画成「田头」（`farmChannelLabel`）。
-- **私聊在开机时建好**：和每个管家的那一个（`peer` 是它的档案 id），一个对面只有一个（`on conflict do nothing`）；开机以后新建的管家在第一次 `channel.direct.create` 时建。和帮工的档案的私聊在主人第一次点「私聊」时建（`channel.direct.create { agent }`），它挂着这个档案的私聊工单（`subject` 是工单，下一条），所以它也是那张工单的串。它不放活：从私聊里记的工单、定的定时落在默认频道（`topOf`），帮工也不在私聊里。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
+- **默认频道是一条数据**：`channel.is_default`，协议里是 `Channel.default`；没写频道的话（连接器、电话、定时任务、提醒）去那里，代码只认这个标记，不认名字、不认类型。开机时一个频道都没有就建一个 `general`（`firstChannelName`）设成默认；`channel.default.set` 换一个，在同一个事务里清掉旧的。名字存下来、写进地址，不随语言变；农场的皮把它画成「田头」（`farmChannelLabel`）。
+- **私聊在开机时建好**：和每个管家的那一个（`peer` 是它的档案 id），一个对面只有一个（`on conflict do nothing`）；开机以后新建的管家在第一次 `channel.direct.create` 时建。和帮工的档案的私聊在主人第一次点「私聊」时建（`channel.direct.create { agent }`），它挂着这个档案的私聊工单（`subject` 是工单，下一条），所以它也是那张工单的串。它不放活：从私聊里记的工单、定的定时任务落在默认频道（`topOf`），帮工也不在私聊里。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
 - **一张工单一个串**：重开、换帮工都还是这一个串，前后几个帮工的派活、汇报、主人的话都在里面。串的主人是这张工单现在在干活的帮工（`sessionOnIssue`），每次写消息时按工单现算，不存；没有帮工在干时串没有主人。从帮工找串只走一个函数（`threadOfSession`：先找它的工单，再找串），不拿帮工的 id 去找工单串。核心状态里 `message` 事实的 `thread` 是工单的 id。页面的串标题是工单标题，帮工走了也对（`apps/web/src/features/channel/rules.ts` 的 `threadTitle`、`threadOwnerOf`）。
 - **谁在频道里**：主人和每个管家在每个频道里（管家是参与者，id 是它的档案 id，名字是档案的名字，说话前照档案更新），私聊里只有主人和它的 `peer`；参与者的种类和别处记「谁做的」是同一组词（`ActorKind`：`owner`、`orchestrator`、`session`、`system`），一条消息的 `fromKind` 就是说话的人的种类，主人的 id 是 `owner`（protocol 的 `ownerId`，`@主人` 指它）；帮工在它的活所在的频道里，在哪个频道派的活，工单串就开在哪个频道下面。帮工派出来时加入（`channel_participant`），离开时打上 `left_at`，说过的话留着，给它没交完的投递作废（`dropped`）。
 - **和帮工的档案私聊是一张藏起来的工单**：每个档案一张私聊工单（`issue.talk` 是私聊的 id，交付物 `answer`，派给这个档案），不在看板、不在管家的 `issue_list` 里，没有要主人按的按钮。主人在私聊里说话，就是在这张工单的串里说话：有执行在做它就交给它；没有就派一个（`Issues.talkOn`），交给它的活是只读的私聊规矩加私聊里最近的 12 条（`talkJob`、`talkContext`），在工单的项目里，没有就在档案的工作目录，再没有就在最近干过活的那个项目。它占一个同时干活的名额；每一轮交回来就把它改的清掉（`discardWork`），它说的话和汇报都写在私聊里；交回来以后闲 10 分钟（`talkIdleMs`）就收工，下次再说就派新的一个。要改代码，它或主人把这件事记成工单，照常派、看、合。
-- **频道自己能改**：`channel.update` 改名（频道照旧不重名、能写进地址；串可以起一个标题，空着就是它挂着的那条消息的开头）、照看它的管家（`orchestrator`，要是管家的档案，空或默认管家都存成没设，库里 `channel.orchestrator`）、分组（`category`，空是不分组）和位置（`before`：排在哪个频道前面，服务端给全部频道重排 `position`）。侧栏按分组、按位置列，拖一个频道到另一个上就排在它前面、进它的组。归档（`channel.archive.toggle`）的频道和串不在侧栏、串列表里，消息和地址照旧在；默认频道不能归档。删除（`channel.delete`，先试跑 `channel.previewDelete`）只删没人用的：默认频道、还有帮工在那里干活、有定时、接着连接器、有排队的工单、挂着工单串的都拒绝，说是哪一样；删频道连它的串、消息、跟帖和已读一起删，施加 `channelGone`。
+- **频道自己能改**：`channel.update` 改名（频道照旧不重名、能写进地址；串可以起一个标题，空着就是它挂着的那条消息的开头）、照看它的管家（`orchestrator`，要是管家的档案，空或默认管家都存成没设，库里 `channel.orchestrator`）、分组（`category`，空是不分组）和位置（`before`：排在哪个频道前面，服务端给全部频道重排 `position`）。侧栏按分组、按位置列，拖一个频道到另一个上就排在它前面、进它的组。归档（`channel.archive.toggle`）的频道和串不在侧栏、串列表里，消息和地址照旧在；默认频道不能归档。删除（`channel.delete`，先试跑 `channel.previewDelete`）只删没人用的：默认频道、还有帮工在那里干活、有定时任务、接着连接器、有排队的工单、挂着工单串的都拒绝，说是哪一样；删频道连它的串、消息、跟帖和已读一起删，施加 `channelGone`。
 - **提醒级别**（`notify`）：每个频道和串一个，`all`（默认）、`mentions`（只有 @主人 的算）、`none`；串没设时照它的频道（`notifyOf`）。`none` 的不算未读、不进 Inbox 的 @ 提醒、不转到连接器；`mentions` 的未读只数没处理的 @主人。`channel.notify.set` 改它。
 - **列出来**：`channel.list` 是全部频道和私聊，默认的在前（管家的 `channel_list`）；`channel.unread.list` 是调用者自己没读完的地方，最新的在前，每处带地址、几条、有没有提到它（帮工的 `channel_unread_list`，主人调就是主人的）。
 - **标成未读**：`channel.markUnread { id, number }` 把主人在那里的已读退到这一条之前；页面在主人离开那里之前不再自动标成已读。
@@ -133,7 +133,7 @@
 - **管家（`orchestrator`）**：订阅 `forOrchestrator`（叫醒它的话，按频道分批）和 `orchestratorDigest`（只让它知道的汇报）；用 `orchestratorSays` 说话、`spoken` 记下通话里的话。主人的话经 `orchestrator.Say` 进频道，管家照频道的规则被叫醒。
 - **主人在串里的话**：`ownerInThread` 把主人在任何一个串里说完的话（不管经哪条路进来）告诉订阅的人；工单靠它知道主人在工单串里说了话。
 - **工单（`issue`）**：带话、验收意见、冲突和检查失败经 `tellSession`；首次派活时记下频道（`channelOf`）。
-- **定时（`recurrence`）、计划**：到点时用 `notice` 在频道里说一句再派活；派活工具按 `channelByName`、`channelOf` 取频道和它的默认项目。
+- **定时任务（`cron`）、计划**：到点时用 `notice` 在频道里说一句再派活；派活工具按 `channelByName`、`channelOf` 取频道和它的默认项目。
 - **工具（`tool`、`mcp`）**：管家和帮工的说话工具都调 `speak`、`read`、`Inbox`；`/mcp` 用每个会话自己的令牌认出是谁在说话，令牌只用来分清人，不用来防人。
 - **语音（`voice`）**：电话里说的和回答经 `spoken` 留在默认频道，不叫醒谁，管家在电话里已经听过。
 - **连接器 → 管家、频道**：收进来的话交给 `orchestrator.Say`；送出去的读核心事件里的 `message`，只读不改频道。主人在外面说话也让农场开门（通话状态成 `live`）。

@@ -15,7 +15,7 @@ import { Docs } from "./doc/doc.ts";
 import { Issues } from "./issue/issue.ts";
 import { Memories } from "./memory/memory.ts";
 import { Runtimes } from "./runtime/runtime.ts";
-import { Recurrences } from "./recurrence/recurrence.ts";
+import { Crons } from "./cron/cron.ts";
 import { Sessions } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
 import { Tasks } from "./task/task.ts";
@@ -39,7 +39,7 @@ export const handlers = Effect.gen(function* () {
   const sessions = yield* Sessions;
   const channels = yield* Channels;
   const artifacts = yield* Artifacts;
-  const recurrences = yield* Recurrences;
+  const crons = yield* Crons;
   const issues = yield* Issues;
   const tasks = yield* Tasks;
   const orchestrator = yield* Orchestrator;
@@ -189,11 +189,11 @@ export const handlers = Effect.gen(function* () {
     "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
-    "recurrence.create": (body) => recurrences.add(body, owner),
-    "recurrence.list": () => Effect.sync(recurrences.list),
-    "recurrence.update": ({ id, ...body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(recurrences.setEnabled(id, body.enabled))),
-    "recurrence.delete": ({ id }) => Effect.asVoid(recurrences.remove(id)),
-    "recurrence.previewDelete": ({ id }) => recurrences.previewRemove(id),
+    "cron.create": (body) => crons.add(body, owner),
+    "cron.list": () => Effect.sync(crons.list),
+    "cron.update": ({ id, ...body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(crons.setEnabled(id, body.enabled))),
+    "cron.delete": ({ id }) => Effect.asVoid(crons.remove(id)),
+    "cron.previewDelete": ({ id }) => crons.previewRemove(id),
     "issue.list": (filter) => issues.query(filter),
     "issue.review": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
     "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => tasks.splitIssueOf(id, body.title ?? "", body.tasks)),

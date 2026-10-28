@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { orchestrator, owner } from "../base/actor.ts";
-import type { Recurrence, RecurrenceRequest, RecurrenceWhen } from "@vibevalley/protocol";
-import { RecurrenceWhenWeekly } from "@vibevalley/protocol/schema";
+import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
+import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 import { nextText } from "./when.ts";
 import { Effect, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -13,16 +13,16 @@ import { checkCases, goldenCases } from "../testing/golden.ts";
 import { testConfig } from "../testing/layers.ts";
 import { aTurn } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
-import { afterRun, dueRecurrences, isMissed, needsOK } from "./rules.ts";
-import { type Due, Recurrences } from "./recurrence.ts";
-import * as q from "../../db/generated/recurrence.sql.ts";
+import { afterRun, dueCrons, isMissed, needsOK } from "./rules.ts";
+import { type Due, Crons } from "./cron.ts";
+import * as q from "../../db/generated/cron.sql.ts";
 
 test("the recorded cases", () => {
-  const cases = goldenCases("recurrence");
+  const cases = goldenCases("cron");
   expect(new Set(cases.map((c) => c.fn))).toEqual(new Set(["due"]));
   const failed = checkCases(cases, (c) => {
-    const i = c.in as { s: Recurrence; now: number };
-    return { due: dueRecurrences([i.s], i.now).length, missed: isMissed(i.s, i.now) };
+    const i = c.in as { s: Cron; now: number };
+    return { due: dueCrons([i.s], i.now).length, missed: isMissed(i.s, i.now) };
   });
   expect(failed).toEqual([]);
 });
@@ -41,19 +41,19 @@ test("due once, missed, and run", () => {
     created: at("2026-10-01T08:00:00"),
     lastRun: at("2026-10-09T09:00:00"),
     by: "owner",
-  } as Recurrence;
+  } as Cron;
   const now = at("2026-10-12T11:00:00");
-  expect(dueRecurrences([s], now)).toEqual([s]);
+  expect(dueCrons([s], now)).toEqual([s]);
   expect(isMissed(s, now)).toBe(true);
-  expect(dueRecurrences([afterRun(s, now)], now)).toEqual([]);
+  expect(dueCrons([afterRun(s, now)], now)).toEqual([]);
   expect(isMissed(s, at("2026-10-10T09:00:20"))).toBe(false);
   expect(afterRun({ ...s, when: { kind: "once", at: at("2026-10-12T12:00:00") } }, now).enabled).toBe(false);
 });
 
 test("what waits for the owner's yes", () => {
-  const once: RecurrenceWhen = { kind: "once", at: at("2026-10-12T12:00:00") };
-  const daily: RecurrenceWhen = { kind: "daily", time: "09:00" };
-  const req = (when: RecurrenceWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as RecurrenceRequest;
+  const once: CronWhen = { kind: "once", at: at("2026-10-12T12:00:00") };
+  const daily: CronWhen = { kind: "daily", time: "09:00" };
+  const req = (when: CronWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as CronRequest;
   expect(needsOK(req(daily, "lab"), owner)).toBe(false);
   expect(needsOK(req(daily, "lab"), orchestrator(true))).toBe(false);
   expect(needsOK(req(once), orchestrator(false))).toBe(false);
@@ -62,44 +62,44 @@ test("what waits for the owner's yes", () => {
   expect(needsOK(req(once, " "), orchestrator(false))).toBe(false);
 });
 
-/** The farm with recurrences on a clock turned by hand. */
+/** The farm with crons on a clock turned by hand. */
 const farm = (config: Config, clock: { now: number }) => world({ config, clock: () => clock.now });
 
 const collect = Effect.gen(function* () {
   const got: Due[] = [];
-  yield* Effect.forkScoped(Stream.runForEach(yield* (yield* Recurrences).due, (d) => Effect.sync(() => got.push(d))));
+  yield* Effect.forkScoped(Stream.runForEach(yield* (yield* Crons).due, (d) => Effect.sync(() => got.push(d))));
   return got;
 });
 
 /** What a tick makes due is published before the tick returns: a turn lets the collecting fiber take it. */
 const drained = aTurn;
 
-const req = (name: string, text: string, when: RecurrenceWhen, more: Partial<RecurrenceRequest> = {}): RecurrenceRequest => ({ name, text, when, ...more });
+const req = (name: string, text: string, when: CronWhen, more: Partial<CronRequest> = {}): CronRequest => ({ name, text, when, ...more });
 
-describe("recurrences", () => {
+describe("crons", () => {
   it.live("come due, say so, are kept, and come back on", () => {
     const config = { ...testConfig(), db: "" };
     const clock = { now: Date.UTC(2026, 9, 13, 8) };
     let everyId = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const s = yield* Recurrences;
+        const s = yield* Crons;
         const core = yield* Core;
         const chat = yield* Channels;
         const due = yield* collect;
         const general = chat.defaultChannel();
         const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: clock.now + 150 }), owner);
         expect([made.channel, made.name, made.enabled, made.tz !== ""]).toEqual([general, "看进度", true, true]);
-        expect(core.state().recurrences?.map((x) => x.id)).toEqual([made.id]);
+        expect(core.state().crons?.map((x) => x.id)).toEqual([made.id]);
         yield* s.tick;
         yield* drained;
         expect(due).toEqual([]);
         clock.now += 200;
         yield* s.tick;
         yield* drained;
-        expect(due.map((d) => [d.recurrence.id, d.missed, d.recurrence.enabled])).toEqual([[made.id, false, false]]);
+        expect(due.map((d) => [d.cron.id, d.missed, d.cron.enabled])).toEqual([[made.id, false, false]]);
         const last = (yield* chat.history(general)).at(-1)!;
-        expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时「看进度」到点了：看看帮工们的进度"]);
+        expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时任务「看进度」到点了：看看帮工们的进度"]);
         expect(s.list()[0]!.enabled).toBe(false);
         yield* s.tick;
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), owner))).toMatchObject({
@@ -118,10 +118,10 @@ describe("recurrences", () => {
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
 
       yield* Effect.gen(function* () {
-        const s = yield* Recurrences;
+        const s = yield* Crons;
         const core = yield* Core;
         const due = yield* collect;
-        const got = core.state().recurrences ?? [];
+        const got = core.state().crons ?? [];
         expect([got.length, got[1]?.enabled, got[1]?.agent]).toEqual([2, false, "lab"]);
         clock.now += 60 * 60_000;
         const on = yield* s.setEnabled(everyId, true);
@@ -130,10 +130,10 @@ describe("recurrences", () => {
         clock.now += 60 * 60_000;
         yield* s.tick;
         yield* drained;
-        expect(due.map((d) => [d.recurrence.id, d.missed])).toEqual([[everyId, true]]);
+        expect(due.map((d) => [d.cron.id, d.missed])).toEqual([[everyId, true]]);
         yield* s.remove(everyId);
         expect((yield* Effect.flip(s.remove(everyId)))._tag).toBe("Missing");
-        expect(core.state().recurrences).toHaveLength(1);
+        expect(core.state().crons).toHaveLength(1);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });
@@ -141,33 +141,33 @@ describe("recurrences", () => {
   it.live("a run that cannot be written is not published, and runs on the next tick", () => {
     const clock = { now: 1_800_000_000_000 };
     return Effect.gen(function* () {
-      const s = yield* Recurrences;
+      const s = yield* Crons;
       const core = yield* Core;
       const sql = yield* SqlClient.SqlClient;
       const made = yield* s.add(req("retry", "work", { kind: "once", at: clock.now + 1 }), owner);
       const due = yield* collect;
       yield* sql.unsafe(`create function fail_run() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`).pipe(Effect.orDie);
-      yield* sql.unsafe(`create trigger fail_run before update of last_run on recurrence for each row execute function fail_run()`).pipe(Effect.orDie);
+      yield* sql.unsafe(`create trigger fail_run before update of last_run on cron for each row execute function fail_run()`).pipe(Effect.orDie);
       clock.now++;
       yield* s.tick;
       yield* drained;
-      const after = (core.state().recurrences ?? []).find((x) => x.id === made.id)!;
+      const after = (core.state().crons ?? []).find((x) => x.id === made.id)!;
       expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
-      yield* sql.unsafe(`drop trigger fail_run on recurrence`).pipe(Effect.orDie);
+      yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
       yield* s.tick;
       yield* drained;
-      expect(due.map((d) => d.recurrence.id)).toEqual([made.id]);
+      expect(due.map((d) => d.cron.id)).toEqual([made.id]);
     }).pipe(Effect.scoped, Effect.provide(farm(testConfig(), clock)));
   });
 
   it.live("weekly days are integers from zero to six", () => {
     const clock = { now: Date.now() };
     return Effect.gen(function* () {
-      const s = yield* Recurrences;
+      const s = yield* Crons;
       const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
       expect((yield* Effect.flip(s.add(bad, owner)))._tag).toBe("Refused");
       expect(s.list()).toEqual([]);
-      expect(Schema.decodeUnknownExit(RecurrenceWhenWeekly)(bad.when)._tag).toBe("Failure");
+      expect(Schema.decodeUnknownExit(CronWhenWeekly)(bad.when)._tag).toBe("Failure");
       expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), owner)).when).toEqual({
         kind: "weekly",
         days: [0, 6],
@@ -176,23 +176,23 @@ describe("recurrences", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(testConfig(), clock)));
   });
 
-  it.live("a cron recurrence is kept, and a bad one is refused", () => {
+  it.live("a cron cron is kept, and a bad one is refused", () => {
     const config = { ...testConfig(), db: "" };
     const clock = { now: Date.now() };
     let id = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const s = yield* Recurrences;
+        const s = yield* Crons;
         id = (yield* s.add(req("早会", "看看昨天的活", { kind: "cron", expr: "0 9 * * 1-5" }, { tz: "Asia/Shanghai" }), owner)).id;
         expect((yield* Effect.flip(s.add(req("坏的", "t", { kind: "cron", expr: "0 9 * *" }), owner)))._tag).toBe("Refused");
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        expect((yield* Recurrences).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
+        expect((yield* Crons).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });
 
-  it.live("a stored recurrence with the wrong spec is not restored beside a valid one", () => {
+  it.live("a stored cron with the wrong spec is not restored beside a valid one", () => {
     const config = { ...testConfig(), db: "" };
     const clock = { now: Date.now() };
     return Effect.gen(function* () {
@@ -203,7 +203,7 @@ describe("recurrences", () => {
           ["good", `{"kind":"daily","time":"09:00"}`],
         ] as const)
           yield* Effect.orDie(
-            q.addRecurrence({
+            q.addCron({
               id,
               name: id,
               body: "",
@@ -219,7 +219,7 @@ describe("recurrences", () => {
           );
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        expect((yield* Recurrences).list().map((r) => [r.id, r.when, r.by])).toEqual([["good", { kind: "daily", time: "09:00" }, "owner"]]);
+        expect((yield* Crons).list().map((r) => [r.id, r.when, r.by])).toEqual([["good", { kind: "daily", time: "09:00" }, "owner"]]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });
@@ -230,7 +230,7 @@ describe("recurrences", () => {
     let id = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const s = yield* Recurrences;
+        const s = yield* Crons;
         const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), orchestrator(false));
         expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "orchestrator", "等主人同意"]);
         id = made.id;
@@ -241,19 +241,19 @@ describe("recurrences", () => {
         expect(due).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        const s = yield* Recurrences;
+        const s = yield* Crons;
         expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "orchestrator"]]);
         const on = yield* s.setEnabled(id, true);
         expect([on.enabled, on.pending]).toEqual([true, undefined]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        const s = yield* Recurrences;
+        const s = yield* Crons;
         const due = yield* collect;
         expect(s.list().map((x) => [x.enabled, x.pending])).toEqual([[true, undefined]]);
         clock.now += 5 * 60_000;
         yield* s.tick;
         yield* drained;
-        expect(due.map((d) => d.recurrence.id)).toEqual([id]);
+        expect(due.map((d) => d.cron.id)).toEqual([id]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });

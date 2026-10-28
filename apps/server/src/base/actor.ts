@@ -1,7 +1,7 @@
 // Who does a thing, and on whose word: every service that changes something takes an Actor and judges by it; only the
 // entry points make one (the HTTP handlers: the owner; the orchestrator's tools: the orchestrator, for the owner when the
 // owner's words are in its run; a session's tools over /mcp: that session; timers and the patrol: the farm). What is
-// kept of it (who set a recurrence, wrote a memory, changed a task graph) is its kind.
+// kept of it (who set a cron, wrote a memory, changed a task graph) is its kind.
 
 import type { ActorKind } from "@vibevalley/protocol";
 

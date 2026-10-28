@@ -13,7 +13,7 @@ import { orchestrator } from "../base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
-import { nextRun } from "../recurrence/when.ts";
+import { nextRun } from "../cron/when.ts";
 import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/prompts.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
@@ -32,7 +32,7 @@ import { Issues, type OrchestratorWork } from "../issue/issue.ts";
 import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
-import { Recurrences } from "../recurrence/recurrence.ts";
+import { Crons } from "../cron/cron.ts";
 import type { Answer } from "./openai.ts";
 import { type AgentHost, Caller } from "../session/host.ts";
 import { Sessions } from "../session/session.ts";
@@ -76,7 +76,7 @@ interface Intake {
   readonly agent?: string;
   readonly owner?: boolean;
   readonly issue?: string;
-  /** What started its run, when the producer knows better than its source (an issue's trigger, a missed recurrence). */
+  /** What started its run, when the producer knows better than its source (an issue's trigger, a missed cron). */
   readonly by?: RunTrigger;
   readonly caller?: Caller;
 }
@@ -122,7 +122,7 @@ export const make = (options: OrchestratorOptions = {}) =>
     const issue = yield* Issues;
     const chat = yield* Channels;
     const tasks = yield* Tasks;
-    const recurrence = yield* Recurrences;
+    const cron = yield* Crons;
     const tool = yield* Tools;
     const notices = yield* Notices;
 
@@ -165,10 +165,10 @@ export const make = (options: OrchestratorOptions = {}) =>
         // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
         return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, service);
       };
-      // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
+      // One of its own crons (not a helper's) comes due within that long: it will be woken then.
       const wakeSoon = (withinMs: number) => {
         const by = clock.currentTimeMillisUnsafe() + withinMs;
-        return recurrence.list().some((s) => {
+        return cron.list().some((s) => {
           const next = nextRun(s);
           return next !== undefined && (s.agent || chat.orchestratorOf(s.channel)) === id && next <= by;
         });
@@ -349,14 +349,14 @@ export const make = (options: OrchestratorOptions = {}) =>
       const channel = await go(chat.topOf(w.channel));
       const again = w.said ? lineWords.again(w.said) : "";
       let line = lineWords.issue(w.issue.title, w.issue.description ?? "", again, channel.name);
-      const s = w.recurrence;
+      const s = w.cron;
       if (s) {
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";
-        line = lineWords.recurrence(s.name, missed, s.text, channel.name, s.id);
+        line = lineWords.cron(s.name, missed, s.text, channel.name, s.id);
       }
-      // The issue's assignee is the orchestrator it is for; a recurrence that names none is its channel's orchestrator's.
+      // The issue's assignee is the orchestrator it is for; a cron that names none is its channel's orchestrator's.
       const to = w.issue.assignee || chat.orchestratorOf(channel.id);
-      await take({ to, source: s ? "recurrence" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
+      await take({ to, source: s ? "cron" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
     };
 
     // One answer streams at a time, the call's or chat/completions', from the default orchestrator: a newer line ends the

@@ -36,7 +36,17 @@ import { jsonOf } from "../base/json.ts";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
-import { type Merged, MergeFailure, type Project, ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "./shapes.ts";
+import {
+  type Merged,
+  MergeFailure,
+  type Project,
+  ProjectError,
+  pullRequestFile,
+  pullRequestText,
+  type Workplace,
+  type WorkplaceCleanup,
+  type WorkplaceRelease,
+} from "./shapes.ts";
 import { stackFiles, stackOf } from "./stack.ts";
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
@@ -401,6 +411,15 @@ export const make = (hooks: ProjectHooks = {}) =>
         .describe(project, cwd, branch)
         .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
 
+    /** The project's own setup for a new worktree: .vibevalley/setup (installing what it needs), run outside the project's
+     * turn and with the check's time limit; one that fails is logged, and the helper starts all the same. */
+    const projectSetup = Effect.fn("Projects.projectSetup")(function* (cwd: string) {
+      const file = join(cwd, ".vibevalley", "setup");
+      if (!lexists(file)) return;
+      const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
+      if (r.code !== 0) yield* Effect.logWarning(`${file} exited ${r.code}${r.timedOut ? " (timed out)" : ""}: ${(r.stdout + r.stderr).slice(-2000)}`);
+    });
+
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
     const projectCheck = Effect.fn("Projects.projectCheck")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "check");
@@ -580,8 +599,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         }
         return out;
       }),
-      workplace: (project, issueNumber, worktree, baseBranch) =>
-        serially(
+      workplace: (project, issueNumber, worktree, baseBranch) => {
+        let made = false;
+        return serially(
           project,
           Effect.gen(function* () {
             const path = yield* ensure(project);
@@ -601,9 +621,11 @@ export const make = (hooks: ProjectHooks = {}) =>
             }
             const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
             yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+            made = true;
             return { project, cwd, branch };
           }),
-        ),
+        ).pipe(Effect.tap((place) => (made ? projectSetup(place.cwd) : Effect.void)));
+      },
       changes: (place) => describe(place.project, place.cwd, place.branch),
       branchChanges: Effect.fn("Projects.branchChanges")(function* (project, branch) {
         // An issue worked in a profile's own folder has no project, and so no issue branch: none to read.
@@ -863,6 +885,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             }
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
             const check = lexists(join(place.cwd, ".vibevalley/check")) ? t("server.project.github.checked") : t("server.project.github.noCheck");
+            // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
+            const written = yield* gitQuiet(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", pullRequestFile);
+            const given = written === "" ? undefined : pullRequestText(yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")));
             const created = yield* gh(
               "pr",
               "create",
@@ -873,9 +898,9 @@ export const make = (hooks: ProjectHooks = {}) =>
               "--base",
               main,
               "--title",
-              issue.title,
+              given?.title ?? issue.title,
               "--body",
-              t("server.project.github.body", { n: issue.number, conclusion, check }),
+              given?.body || t("server.project.github.body", { n: issue.number, conclusion, check }),
             );
             if (!created.ok) return yield* fail(t("server.project.github.createFailed"));
             const url = created.out.trim();

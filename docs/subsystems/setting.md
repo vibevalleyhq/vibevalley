@@ -53,7 +53,7 @@
 | `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
 | `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |
 | `patrol.heartbeat_minutes` | 巡查的间隔，0 是关掉 | 10 |
-| `recurrence.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
+| `cron.tick_ms` | 多久看一遍有没有到点的定时任务 | 20000 |
 | `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
 | `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
 | `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |

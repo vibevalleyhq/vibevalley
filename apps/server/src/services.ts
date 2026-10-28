@@ -22,7 +22,7 @@ import { layer as notice, start as noticeStart } from "./notice/notice.ts";
 import { layer as project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
 import { layer as session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
-import { layer as recurrence, start as recurrenceStart } from "./recurrence/recurrence.ts";
+import { layer as cron, start as cronStart } from "./cron/cron.ts";
 import { layer as setting } from "./setting/setting.ts";
 import { layer as llm } from "@vibevalley/ai/llm";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
@@ -97,9 +97,9 @@ export const collaboration =
 export const issuesBelowTaskGraphs =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(recurrence), on(issue(o.issue)));
+    below.pipe(on(cron), on(issue(o.issue)));
 
-/** Issues: the issues, their task graphs and recurrences. */
+/** Issues: the issues, their task graphs and crons. */
 export const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
@@ -127,10 +127,10 @@ export const gateway =
 export const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
-/** Issues' startup, after the sessions came back: the task graphs cut off by the stop are settled, then the recurrences start
+/** Issues' startup, after the sessions came back: the task graphs cut off by the stop are settled, then the crons start
  * coming due. */
-export const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(recurrenceStart));
-/** Issues' startup without the recurrences' clock: for a test farm that ticks them by hand. */
+export const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
+/** Issues' startup without the crons' clock: for a test farm that ticks them by hand. */
 export const taskGraphsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart));
 /** Notifications' startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
 export const notificationsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(noticeStart));

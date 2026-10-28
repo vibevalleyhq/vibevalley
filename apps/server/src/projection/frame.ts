@@ -1,13 +1,13 @@
 import { GraphActionValues, type GraphAction } from "@vibevalley/protocol";
 import { t } from "@vibevalley/i18n";
-// What the client gets. The words for people (a session's phaseText, a recurrence's
+// What the client gets. The words for people (a session's phaseText, a cron's
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
 import type { WorkspaceState, GameEffect, StateFrame } from "@vibevalley/protocol";
 import { inbox } from "../notice/inbox.ts";
 import { phaseWords } from "@vibevalley/protocol/rules";
-import { nextText, whenText } from "../recurrence/when.ts";
+import { nextText, whenText } from "../cron/when.ts";
 import { graphsOf } from "../task/issues.ts";
 import { canEditTask, canRemoveTask, graphActions, taskActions } from "../task/graph.ts";
 import { viewOf } from "../game/view.ts";
@@ -49,7 +49,6 @@ function withWords(state: WorkspaceState): WorkspaceState {
       }),
     };
   }
-  if ((state.recurrences ?? []).length > 0)
-    next = { ...next, recurrences: state.recurrences!.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
+  if ((state.crons ?? []).length > 0) next = { ...next, crons: state.crons!.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
   return next;
 }

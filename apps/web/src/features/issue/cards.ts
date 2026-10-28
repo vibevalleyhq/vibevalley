@@ -148,7 +148,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
       else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
-      if (item.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
+      if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       lines.push(item.assignee === undefined ? t("web.issue.card.noHelper") : nameOf(item.assignee));
       if (item.assignee === undefined || item.project === undefined) lines.push(t("web.issue.card.pickFirst"));
       lines.push(
@@ -174,7 +174,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
           tone: attentionTone[st.state],
         });
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
-      if (issue.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
+      if (issue.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       lines.push(head.name);
       if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(t("web.issue.card.quiet", { took: tookText(now - phase.quietSince) }));
       if (sessions.length > 1) lines.push(t("web.issue.card.nth", { n: sessions.length }));
@@ -205,7 +205,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
     }
     case "orchestrator": {
       const { issue } = c;
-      if (issue.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
+      if (issue.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const tag = issueTag(issue);
       lines.push(tagOpen(tag) ? t("web.issue.card.orchestratorWorking") : `${tagText(issue)} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
       return { number: numberOf(issue), title: issue.title, status: issue.status, priority: issue.priority, flags, detail: lines.join("\n") };

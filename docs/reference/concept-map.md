@@ -27,7 +27,7 @@
 | 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `features/issue/state.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `features/issue/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issue/act`（验收通过是 `act: "accept"`，打回是 `act: "reject"`）；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
 | 默认频道、频道、私聊 | 田头、频道 | 田头窗口和它的频道菜单（`farm/chat`）、`/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`；默认的带 `default`，私聊带 `peer`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channel/…`、`/api/v1/channel/message/send`、`/api/v1/channel/message/list` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Channel`（`type: thread`，挂在 `parent` 频道的 `root` 消息下）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channel/message/list`、`/api/v1/issue/comment/create` |
-| 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrence/…` |
+| 定时任务 | 定时任务 | 频道菜单里；它的工单在看板上，带「定时任务」标签 | `Cron`；它的工单是 `Issue.cron` 指着它的那张 | `/api/v1/cron/…` |
 | 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/project/template/list` |
 | 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/notice/inbox.ts` 从核心状态现算） | |
 | 连接器 | 连接器 | `/settings/chat`（`features/connector/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connector/…` |
@@ -56,7 +56,7 @@
 | 干活过程 | `Sessions`（`session/journal.ts`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
 | 改动、完成 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
 | 默认频道、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
-| 定时 | `Recurrences` | `recurrence` 表 | |
+| 定时任务 | `Crons` | `cron` 表 | |
 | 巡查 | `Notices`（`notice/notice.ts`；规则在 `notice/rules.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Notices`（`notice/notice.ts`、`notice/inbox.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |
 | 连接器 | `Connectors`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
@@ -66,7 +66,7 @@
 | 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |
 | 等级 | `Game` | `state.json` 里的 commit 数 | |
 | 地 | `Game`；规则在 `apps/server/src/game/play.ts` | `state.json` 里的 `play.station` | |
-| 核心状态 | `Core` | `state.json`（聊天、进度、定时和工单除外） | |
+| 核心状态 | `Core` | `state.json`（聊天、进度、定时任务和工单除外） | |
 
 ## oar 那一层
 

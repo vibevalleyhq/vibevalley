@@ -2,7 +2,7 @@
   "tab": {
     "chat": "Chat",
     "jobs": "Jobs",
-    "recurrences": "Schedules"
+    "crons": "Scheduled tasks"
   },
   "defaultProject": "default project {project}",
   "channels": "Channels",
@@ -52,20 +52,20 @@
     "empty": "No jobs in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the job is listed here.",
     "thread": "Ticket thread"
   },
-  "recurrences": {
-    "empty": "No schedules in this channel yet. Tell the manager \"run the tests at nine every morning\" and it schedules it here; when due, a line appears in the channel and the work is sent.",
+  "crons": {
+    "empty": "No scheduled tasks in this channel yet. Tell the manager \"run the tests at nine every morning\" and it schedules it here; when due, a line appears in the channel and the work is sent.",
     "next": "next {next}",
     "direct": "straight to {agent}",
     "byOrchestrator": "set by the manager",
-    "label": "Schedule \"{name}\"",
+    "label": "Scheduled task \"{name}\"",
     "on": "On",
     "off": "Off",
     "remove": "Delete",
-    "removeWhich": "Delete the schedule \"{name}\"",
+    "removeWhich": "Delete the scheduled task \"{name}\"",
     "sure": "Delete it?",
-    "approveWhich": "Approve the schedule \"{name}\"",
+    "approveWhich": "Approve the scheduled task \"{name}\"",
     "approve": "Approve",
-    "refuseWhich": "Refuse the schedule \"{name}\"",
+    "refuseWhich": "Refuse the scheduled task \"{name}\"",
     "refuse": "Refuse"
   },
   "messages": {
