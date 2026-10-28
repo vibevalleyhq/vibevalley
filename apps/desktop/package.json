@@ -12,6 +12,7 @@
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/engine": "workspace:*",
+    "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "electron": "catalog:",
     "electron-builder": "catalog:",

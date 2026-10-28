@@ -18,6 +18,7 @@
     "@electric-sql/pglite": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "agora-agents": "catalog:",
     "agora-token": "catalog:",

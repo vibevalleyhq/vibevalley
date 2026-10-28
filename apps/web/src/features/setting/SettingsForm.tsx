@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The DeepSeek key, the language and the memory sources (setting.load, setting.save), a part at a time; and what the
 // server found of gh.
 
 import { appWording } from "../../base/words";
-import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import {
   type GitHubStatus,
@@ -136,7 +136,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
       setDeepseek("");
       setRemoving(false);
       setSources(draftsOf(now));
-      toast(settingsWording().keys.saved);
+      toast(t("web.setting.keys.saved"));
     } catch (e) {
       setError(reasonOf(e));
     } finally {
@@ -162,7 +162,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         >
           <SecretInput
             aria-label="DeepSeek API Key"
-            placeholder={settingsWording().keys.deepseekHint}
+            placeholder={t("web.setting.keys.deepseekHint")}
             value={deepseek()}
             onInput={(e) => setDeepseek(e.currentTarget.value)}
           />
@@ -192,10 +192,10 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
 function SourceMark(props: { draft: SourceDraft }) {
   const text = () =>
     !props.draft.saved
-      ? settingsWording().source.off
+      ? t("web.setting.source.off")
       : props.draft.saved.enabled
-        ? `${settingsWording().source.on} · ${props.draft.saved.url}`
-        : settingsWording().source.closed;
+        ? `${t("web.setting.source.on")} · ${props.draft.saved.url}`
+        : t("web.setting.source.closed");
   return (
     <Tip text={text()}>
       <span role="img" aria-label={text()} tabindex={0} class="inline-flex p-1 outline-none focus-visible:outline-2 focus-visible:outline-focus">
@@ -214,14 +214,14 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
         <SourceMark draft={props.draft} />
         <span class="flex-1" />
         <Toggle
-          label={settingsWording().source.enabled}
-          ariaLabel={settingsWording().source.enable(label())}
+          label={t("web.setting.source.enabled")}
+          ariaLabel={t("web.setting.source.enable", { label: label() })}
           checked={props.draft.enabled}
           onChange={(enabled) => props.set({ enabled, open: props.draft.open || (enabled && !props.draft.url) })}
         />
         <IconButton
           icon="settings"
-          label={settingsWording().source.configure(label())}
+          label={t("web.setting.source.configure", { label: label() })}
           pressed={props.draft.open}
           onClick={() => props.set({ open: !props.draft.open }, false)}
         />
@@ -229,7 +229,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
       <Show when={props.draft.open}>
         <div class="flex flex-col gap-3 border-t border-line p-3">
           <TextInput
-            aria-label={settingsWording().source.address(label())}
+            aria-label={t("web.setting.source.address", { label: label() })}
             class="font-mono"
             placeholder={sourceAddress[props.draft.kind]}
             value={props.draft.url}
@@ -240,40 +240,40 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
             status={props.draft.saved?.key ?? {}}
             removing={props.draft.keyCleared}
             onRemove={(keyCleared) => props.set({ keyCleared })}
-            tip={settingsWording().source.noKey}
+            tip={t("web.setting.source.noKey")}
           >
             <SecretInput
-              aria-label={settingsWording().source.key(label())}
-              placeholder={settingsWording().source.keyHint}
+              aria-label={t("web.setting.source.key", { label: label() })}
+              placeholder={t("web.setting.source.keyHint")}
               value={props.draft.key}
               onInput={(e) => props.set({ key: e.currentTarget.value })}
             />
           </KeyField>
           <Show when={props.draft.kind === "everos"}>
             <TextInput
-              aria-label={settingsWording().source.user(label())}
-              placeholder={settingsWording().source.userHint}
+              aria-label={t("web.setting.source.user", { label: label() })}
+              placeholder={t("web.setting.source.userHint")}
               value={props.draft.user}
               onInput={(e) => props.set({ user: e.currentTarget.value })}
             />
           </Show>
           <div class="flex flex-wrap gap-x-6 gap-y-2.5">
             <Toggle
-              label={settingsWording().source.read}
-              tip={settingsWording().source.readHint}
+              label={t("web.setting.source.read")}
+              tip={t("web.setting.source.readHint")}
               checked={props.draft.read}
               onChange={(read) => props.set({ read })}
             />
             <Toggle
-              label={settingsWording().source.write}
-              tip={settingsWording().source.writeHint}
+              label={t("web.setting.source.write")}
+              tip={t("web.setting.source.writeHint")}
               checked={props.draft.write}
               onChange={(write) => props.set({ write })}
             />
             <Show when={props.draft.kind === "nowledge"}>
               <Toggle
-                label={settingsWording().source.everything}
-                tip={settingsWording().source.everythingHint}
+                label={t("web.setting.source.everything")}
+                tip={t("web.setting.source.everythingHint")}
                 checked={props.draft.everything}
                 onChange={(everything) => props.set({ everything })}
               />
@@ -310,13 +310,13 @@ export function GitHub() {
           {(s) => (
             <div class="flex items-center gap-2 text-sm">
               <Icon name={s().installed && s().loggedIn ? "check" : s().installed ? "warn" : "cross"} size={16} />
-              <span class="font-mono">{s().installed ? `gh ${s().version}` : settingsWording().github.noGh}</span>
+              <span class="font-mono">{s().installed ? `gh ${s().version}` : t("web.setting.github.noGh")}</span>
               <Show when={s().loggedIn}>
                 <span class="text-muted">· {s().account}</span>
               </Show>
               <Show when={s().reason}>{(r) => <Hint text={r()} />}</Show>
               <span class="flex-1" />
-              <IconButton icon="refresh" label={settingsWording().github.recheck} disabled={busy()} onClick={() => void recheck()} />
+              <IconButton icon="refresh" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
             </div>
           )}
         </Match>
@@ -349,9 +349,9 @@ export function LanguageForm() {
     <div class="flex flex-col gap-3">
       <div>
         <Segmented
-          label={settingsWording().language.label}
+          label={t("web.setting.language.label")}
           value={currentLocale()}
-          options={LocaleValues.map((l) => ({ value: l, label: settingsWording().language[l], disabled: busy() }))}
+          options={LocaleValues.map((l) => ({ value: l, label: t(`web.setting.language.${l}`), disabled: busy() }))}
           onChange={(l) => void choose(l)}
         />
       </div>

@@ -12,6 +12,7 @@
     "./host": "./src/host.ts"
   },
   "dependencies": {
+    "@vibevalley/i18n": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -11,6 +11,7 @@
     "@solidjs/web": "catalog:",
     "@tanstack/solid-query": "catalog:",
     "@vibevalley/engine": "workspace:*",
+    "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
     "effect": "catalog:",
