@@ -728,7 +728,9 @@ export const make = (options: SessionOptionsIn = {}) =>
       const resolved = yield* Effect.result(runtimes.resolve(agent));
       if (resolved._tag === "Failure") return { refused: reasonOf(resolved.failure), retained: false };
       const r = resolved.success;
-      const text = [instructions(agent, store.skills()), workplaceRules(place, yield* projects.houseRules(), id)].filter((s) => s !== "").join("\n\n");
+      const text = [instructions(agent, store.skills()), workplaceRules(place, yield* projects.houseRules(), id, projects.usesPullRequests(place.project))]
+        .filter((s) => s !== "")
+        .join("\n\n");
       const mcp = [
         { name: "vibevalley", type: "http" as const, url: mcpUrl, headers: { authorization: "Bearer " + issueToken(id) } },
         ...(agent.mcpServers ?? []).map(toOarMcp),

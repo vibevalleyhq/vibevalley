@@ -117,6 +117,8 @@ const checkedInput = Effect.fnUntraced(function* (e: Endpoint, given: string, ar
   const text = given === "" ? "{}" : yield* bodyText(given, path);
   const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.notJson", { why: issue.message }), "InvalidJson")));
   const value = { ...(fields as Record<string, unknown>), ...args };
+  const missing = e.about.find((name) => value[name] === undefined);
+  if (missing !== undefined) return yield* Effect.fail(usage(path, t("server.cli.failure.missingArgument", { name: missing }), "MissingArgument"));
   yield* Schema.decodeUnknownEffect(e.input!)(value).pipe(
     Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))),
   );

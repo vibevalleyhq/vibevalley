@@ -255,6 +255,33 @@ describe("GitHub", () => {
     }),
   );
 
+  it.effect("the helper's own title and body, left in the worktree's git directory, open the pull request", () => {
+    let args: string[] = [];
+    return projects(
+      projectsDir(),
+      Effect.gen(function* () {
+        const p = yield* Projects;
+        const place = yield* p.workplace("sample", 1, true, "");
+        gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
+        const file = gitSync(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", "vibevalley-pr.md").trim();
+        writeFileSync(file, "# The board keeps its order\n\n## What changed\n\nIt does.\n");
+        yield* p.submitPullRequest(place, { number: 1, title: "看板不乱了" } as Issue, "done");
+        expect(args.slice(args.indexOf("--title"))).toEqual(["--title", "The board keeps its order", "--body", "## What changed\n\nIt does."]);
+        // Not committed: the tree is clean.
+        expect(gitSync(place.cwd, "status", "--porcelain").trim()).toBe("");
+      }),
+      {},
+      {
+        push: () => Effect.succeed(true),
+        gh: gh((given) => {
+          if (given[1] === "list") return { out: "[]" };
+          args = given;
+          return { out: "https://github.com/test/sample/pull/1" };
+        }),
+      },
+    );
+  });
+
   it.effect("a new issue starts from origin's main when it can be fast-forwarded to", () =>
     Effect.gen(function* () {
       for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {
