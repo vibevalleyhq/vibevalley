@@ -209,7 +209,7 @@ test("the owner talks with a helper profile alone, and its answer can be marked 
 
   await answer.hover();
   await answer.locator('[data-testid="message-tool"][data-key="more"]').click();
-  await answer.locator('[role="menuitem"][data-key="mark-unread"]').click();
+  await page.locator('[role="menuitem"][data-key="mark-unread"]').click();
   await side(page).locator('[data-testid="side-section"][data-key="channels"] [data-testid="channel-row"]').first().click();
   await expect(channelRow(page, direct)).toHaveAttribute("data-unread", /^[1-9]/);
 });

@@ -25,6 +25,7 @@ apps/mobile/               手机壳（Expo、React Native）：扫码配对，W
 packages/protocol/         契约：形状（src/shapes.ts）、它们的 Schema（schema.ts）、接口（api.ts）、订阅的 RPC（rpc.ts）和两边都跑的规则
                            （src/rules）：服务端和页面都用；只有服务端跑的规则在 apps/server/src 各自的模块里。宿主接口（host.ts）：页面能
                            向桌面壳、手机壳要的东西（通知、托盘、全局快捷键、通话的线路），和手机壳的桥
+packages/base-ui/          无样式的组件（照 Base UI 的 Solid 2 版）：键盘、焦点、ARIA、开合和选中的状态、浮层的定位；样子在 apps/web/src/ui
 packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟、按整数倍放大
 packages/i18n/             对主人说的话：locales/<语言>/<宿主.模块>.json 的词典，代码里 t("key")；src/catalogs.ts 由 i18n:gen 写出
 packages/ai/               模型：DeepSeek 的请求和流、消息形状、模型表和价格、工具参数的 Schema、照脚本回答的测试模型

@@ -1,3 +1,4 @@
+import { Menu } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
@@ -22,6 +23,8 @@ import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePat
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
 const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(reasonOf(e), "bad"));
+
+const menuItem = "cursor-pointer rounded px-2 py-1 text-left text-sm outline-none hover:bg-hover data-highlighted:bg-hover";
 
 export function ReplyQuote(props: { channel: string; number: number }) {
   const answered = useMessage(() => ({ channel: props.channel, number: props.number }));
@@ -255,8 +258,11 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   let moreEmoji: HTMLButtonElement | undefined;
   const [sure, setSure] = createSignal(false);
   const [more, setMore] = createSignal(false);
+  const unread = () => {
+    const { channel, number } = props.m;
+    run(() => markUnread(channel, number));
+  };
   const copyLink = () => {
-    setMore(false);
     const link = location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number);
     run(async () => {
       await navigator.clipboard.writeText(link);
@@ -385,49 +391,26 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           <Icon name="edit" size={14} />
         </button>
       </Show>
-      <div class="relative">
-        <button
-          type="button"
-          class={tool}
-          data-testid="message-tool"
-          data-key="more"
-          aria-label={t("web.channel.more.label")}
-          title={t("web.channel.more.label")}
-          aria-expanded={aria(more())}
-          onClick={() => setMore(!more())}
-        >
+      <Menu.Root open={more()} onOpenChange={setMore}>
+        <Menu.Trigger class={tool} data-testid="message-tool" data-key="more" aria-label={t("web.channel.more.label")} title={t("web.channel.more.label")}>
           <Icon name="more" size={14} />
-        </button>
-        <Show when={more()}>
-          <div
-            role="menu"
-            aria-label={t("web.channel.more.label")}
-            class="absolute right-0 bottom-full z-30 mb-1 flex w-44 origin-bottom-right animate-pop-in flex-col rounded-md border border-line bg-page p-1 shadow-float"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              data-key="copy-link"
-              class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover"
-              onClick={copyLink}
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner side="top" align="end" class="z-30">
+            <Menu.Popup
+              aria-label={t("web.channel.more.label")}
+              class="flex w-44 origin-bottom-right animate-pop-in flex-col rounded-md border border-line bg-page p-1 shadow-float outline-none"
             >
-              {t("web.channel.more.copyLink")}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              data-key="mark-unread"
-              class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover"
-              onClick={() => {
-                setMore(false);
-                run(() => markUnread(props.m.channel, props.m.number));
-              }}
-            >
-              {t("web.channel.more.markUnread")}
-            </button>
-          </div>
-        </Show>
-      </div>
+              <Menu.Item data-key="copy-link" class={menuItem} onClick={copyLink}>
+                {t("web.channel.more.copyLink")}
+              </Menu.Item>
+              <Menu.Item data-key="mark-unread" class={menuItem} onClick={unread}>
+                {t("web.channel.more.markUnread")}
+              </Menu.Item>
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
       <button
         type="button"
         class={[tool, { "bg-berry/15": sure() }]}

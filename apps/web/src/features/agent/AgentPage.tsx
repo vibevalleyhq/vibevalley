@@ -1,3 +1,4 @@
+import { Tabs } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // One profile, made or edited: its
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
@@ -424,22 +425,21 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
   const draft = () => props.draft;
   return (
     <div class="flex min-h-0 flex-1 flex-col">
-      <div role="tablist" aria-label={t("web.agent.tabs")} class="flex flex-wrap gap-0.5 border-b border-line px-3 py-2">
-        <For each={tabs()}>
-          {([t, label]) => (
-            <button
-              type="button"
-              role="tab"
-              data-key={t}
-              aria-selected={aria(t === tab())}
-              onClick={() => (t === "trajectories" ? props.onTrajectories() : setTab(t))}
-              class={["h-7 cursor-pointer rounded-md px-2.5 text-sm", t === tab() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
-            >
-              {label}
-            </button>
-          )}
-        </For>
-      </div>
+      <Tabs.Root value={tab()} onValueChange={(v) => (v === "trajectories" ? props.onTrajectories() : setTab(v as Tab))}>
+        <Tabs.List aria-label={t("web.agent.tabs")} class="flex flex-wrap gap-0.5 border-b border-line px-3 py-2">
+          <For each={tabs()}>
+            {([t, label]) => (
+              <Tabs.Tab
+                value={t}
+                data-key={t}
+                class={["h-7 cursor-pointer rounded-md px-2.5 text-sm", t === tab() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
+              >
+                {label}
+              </Tabs.Tab>
+            )}
+          </For>
+        </Tabs.List>
+      </Tabs.Root>
       <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <Switch>
           <Match when={tab() === "who"}>

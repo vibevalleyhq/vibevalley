@@ -1,3 +1,4 @@
+import { Tabs } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
 // folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
@@ -10,7 +11,6 @@ import { useAgent } from "../../base/agents";
 import { orchestratorLooks } from "./looks";
 import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
-import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";
 import { ArchivePanel, OrchestratorMemoryPanel } from "../memory";
 import { VoiceForm } from "../voice";
@@ -74,22 +74,21 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
     </div>
   );
   const bar = () => (
-    <div role="tablist" aria-label={t("web.orchestrator.orchestrator.tabs")} class="flex gap-1 border-b border-line pb-2">
-      <For each={shown()}>
-        {(t) => (
-          <button
-            type="button"
-            role="tab"
-            data-key={t.id}
-            aria-selected={aria(t.id === at())}
-            onClick={() => router.navigate(orchestratorHref(props.agent, t.id))}
-            class={["h-8 cursor-pointer rounded-md px-3 text-base", t.id === at() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
-          >
-            {t.label}
-          </button>
-        )}
-      </For>
-    </div>
+    <Tabs.Root value={at()} onValueChange={(v) => router.navigate(orchestratorHref(props.agent, v as Tab))}>
+      <Tabs.List aria-label={t("web.orchestrator.orchestrator.tabs")} class="flex gap-1 border-b border-line pb-2">
+        <For each={shown()}>
+          {(t) => (
+            <Tabs.Tab
+              value={t.id}
+              data-key={t.id}
+              class={["h-8 cursor-pointer rounded-md px-3 text-base", t.id === at() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
+            >
+              {t.label}
+            </Tabs.Tab>
+          )}
+        </For>
+      </Tabs.List>
+    </Tabs.Root>
   );
   // The trajectory takes the whole content area, its rows scrolling under a fixed head; the other tabs are a column.
   return (

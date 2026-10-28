@@ -1,3 +1,4 @@
+import { Switch } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
 // and the few controls their forms use.
@@ -94,18 +95,16 @@ export function Toggle(props: {
 }) {
   return (
     <label class={["flex items-start gap-2", props.disabled ? "opacity-50" : "cursor-pointer"]}>
-      <button
-        type="button"
-        role="switch"
+      <Switch.Root
         data-testid={props.testid}
-        aria-checked={aria(props.checked)}
+        checked={props.checked}
+        onCheckedChange={props.onChange}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
-        onClick={() => props.onChange(!props.checked)}
-        class={["mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors", props.checked ? "bg-accent" : "bg-selected"]}
+        class="mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full bg-selected p-0.5 transition-colors data-checked:bg-accent"
       >
-        <span class={["block size-3 rounded-full bg-page shadow transition-transform", { "translate-x-3": props.checked }]} />
-      </button>
+        <Switch.Thumb class="block size-3 rounded-full bg-page shadow transition-transform data-checked:translate-x-3" />
+      </Switch.Root>
       <span class="flex flex-col">
         <span class="flex items-center gap-1 text-sm">
           {props.label}

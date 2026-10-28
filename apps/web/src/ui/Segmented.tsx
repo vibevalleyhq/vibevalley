@@ -1,5 +1,5 @@
-import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
-import { aria } from "../base/util";
+import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
+import { createEffect, createSignal, For, Show } from "solid-js";
 
 interface Place {
   readonly x: number;
@@ -18,12 +18,13 @@ export function Segmented<T extends string>(props: {
   block?: boolean;
   testid?: string;
 }) {
-  let track!: HTMLDivElement;
+  // A signal: the group's element comes from ToggleGroup, which may make it after this component settles.
+  const [track, setTrack] = createSignal<HTMLDivElement>();
   const [thumb, setThumb] = createSignal<Place>();
   // The first place is taken where it is; only a change of choice slides.
   const [moved, setMoved] = createSignal(false);
   const place = () => {
-    const on = track.querySelector<HTMLElement>('button[aria-pressed="true"]');
+    const on = track()?.querySelector<HTMLElement>('button[aria-pressed="true"]');
     setThumb(on ? { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight } : undefined);
   };
   createEffect(
@@ -34,17 +35,20 @@ export function Segmented<T extends string>(props: {
       queueMicrotask(place);
     },
   );
-  onSettled(() => {
+  createEffect(track, (el) => {
+    if (!el) return;
     place();
     // A label that changes width (the language, the interface size) moves the choice under the thumb.
     const watch = new ResizeObserver(place);
-    watch.observe(track);
+    watch.observe(el);
     return () => watch.disconnect();
   });
   return (
-    <div
-      ref={(el) => (track = el)}
-      role="group"
+    <ToggleGroup
+      ref={setTrack}
+      value={[props.value]}
+      // Pressing the taken choice again would leave none: one is always taken.
+      onValueChange={(v) => v[0] !== undefined && props.onChange(v[0] as T)}
       aria-label={props.label}
       data-testid={props.testid}
       // w-fit: in a column (a card's body) a track would otherwise stretch to its width, the thumb small at one end.
@@ -61,13 +65,11 @@ export function Segmented<T extends string>(props: {
       </Show>
       <For each={props.options}>
         {(o) => (
-          <button
-            type="button"
+          <Toggle
+            value={o.value}
             data-key={o.value}
-            aria-pressed={aria(o.value === props.value)}
             disabled={o.disabled}
             title={o.title}
-            onClick={() => props.onChange(o.value)}
             class={[
               "relative h-6 cursor-pointer rounded-sm px-2.5 text-sm whitespace-nowrap transition-colors duration-120 disabled:cursor-default disabled:opacity-50",
               { "flex-1": !!props.block },
@@ -75,9 +77,9 @@ export function Segmented<T extends string>(props: {
             ]}
           >
             {o.label}
-          </button>
+          </Toggle>
         )}
       </For>
-    </div>
+    </ToggleGroup>
   );
 }
