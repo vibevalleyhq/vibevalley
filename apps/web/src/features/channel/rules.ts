@@ -342,7 +342,6 @@ export interface SwitchTarget {
   readonly at: number;
 }
 
-/** How many places the switcher lists at once. */
 export const switchMax = 12;
 
 /** The places for what is typed: `#` keeps channels and threads, `@` direct channels and profiles; the rest matches the
@@ -391,7 +390,7 @@ export function switchTargets(
 
 const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** A message on this farm that a message links to (its address as 复制链接 gives it). */
+/** A message on this farm that a message links to, by the address its copy-link tool gives. */
 export interface LinkedMessage {
   readonly channel: string;
   readonly number: number;
