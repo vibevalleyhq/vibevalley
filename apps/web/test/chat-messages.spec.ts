@@ -84,4 +84,10 @@ test("a picture picked for a message shows in it and opens at its own address", 
   expect(src).toBe(attachmentPath(said!.attachments![0]!.id));
   const res = await fetch(server.url + src);
   expect([res.status, res.headers.get("content-type")]).toEqual([200, "image/png"]);
+  // Clicked, it opens over the page with the original a tab away, and Escape closes it.
+  await page.getByRole("log", { name: "消息" }).getByRole("button", { name: "截图.png" }).click();
+  const shown = page.getByRole("dialog", { name: "截图.png" });
+  await expect(shown.getByRole("link", { name: "打开原图" })).toHaveAttribute("href", src!);
+  await page.keyboard.press("Escape");
+  await expect(shown).toBeHidden();
 });

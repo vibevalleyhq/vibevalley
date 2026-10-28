@@ -8,6 +8,7 @@ import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, t
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
+import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
 import { orchestratorMood } from "../../base/frame";
 import { useOrchestrators } from "../../base/agents";
 
@@ -36,6 +37,10 @@ export interface ComposerWays {
   /** The window draws pending lines (`pending`): a line shows at once and the box empties as it is sent. */
   readonly echo?: boolean;
   readonly failed: (reason: string) => void;
+  /** What a slash command came to, in words (commands.ts); a failed one goes to failed. */
+  readonly told?: (say: string) => void;
+  /** A slash command that opens a place (/dm): the window goes there. */
+  readonly opened?: (path: string) => void;
   /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
   /** Once a line went through: what it carried beside its words (a reply, files) is spent. */
@@ -64,9 +69,12 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   const orchestrators = useOrchestrators();
   /** The orchestrator that looks after the place the next line goes to. */
   const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
-  // No one else is in a direct channel to be named.
+  // A command (/ first in the box) is offered anywhere; no one else is in a direct channel to be named.
+  const commandTyping = createMemo(() => (closed() ? undefined : typedCommand(text(), caret())));
   const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
   const offered = createMemo(() => {
+    const c = commandTyping();
+    if (c) return offeredFor(commandNameables(), c.query);
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
@@ -81,7 +89,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   };
 
   const choose = (n: Nameable) => {
-    const t = typing();
+    const t = commandTyping() ?? typing();
     if (!t) return;
     const next = insertName(text(), caret(), t.start, n.token);
     edit(next.text, next.caret);
@@ -91,8 +99,28 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     });
   };
 
+  // A line that is a command runs it: the box empties once it went through, and keeps the line when it did not.
+  const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
+    sending = true;
+    setBusy(true);
+    try {
+      const done = await runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() });
+      if (disposed) return;
+      edit("", 0);
+      if ("open" in done) ways.opened?.(done.open);
+      else ways.told?.(done.say);
+    } catch (e) {
+      if (!disposed) ways.failed(reasonOf(e));
+    } finally {
+      sending = false;
+      if (!disposed) setBusy(false);
+    }
+  };
+
   const send = async () => {
     if (disposed || sending) return;
+    const asked = commandOf(text());
+    if (asked && !(ways.target().attachments?.length ?? 0)) return command(asked);
     const body = intent();
     if (!body.text && !(body.attachments?.length ?? 0)) return;
     if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };

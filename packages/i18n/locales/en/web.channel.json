@@ -91,7 +91,10 @@
     "inThread": "in {address}",
     "file": "File · {size}",
     "reactedBy": "{names} reacted with {emoji}",
-    "linked": "Go to message {number} in {where}"
+    "linked": "Go to message {number} in {where}",
+    "newBelow": "{n} new below",
+    "toLatest": "Back to the newest",
+    "roundFor": "{what} · {took}"
   },
   "tools": {
     "label": "What this message offers",
@@ -129,7 +132,6 @@
     "replying": "Replying to {name}",
     "cancelReply": "Cancel the reply",
     "attach": "Attach a file",
-    "removeFile": "Remove {name}",
     "uploadFailed": "Not uploaded: {why}"
   },
   "manage": {
@@ -226,5 +228,33 @@
     "orchestratorNote": "sends work, splits plans, answers how it goes",
     "everyone": "Everyone",
     "everyoneNote": "wakes every helper here"
+  },
+  "threadWidth": "Thread width (drag; double-click for the default)",
+  "commands": {
+    "issue": {
+      "name": "Write a ticket",
+      "note": "/issue title: into the backlog, in this channel's project",
+      "needs": "Write the ticket's title after /issue"
+    },
+    "remember": {
+      "name": "Have the manager remember",
+      "note": "/remember a sentence: into the memory of the manager looking after this",
+      "needs": "Write what it should remember after /remember"
+    },
+    "stop": {
+      "name": "Stop the manager",
+      "note": "The manager looking after this stops its round; helpers it sent keep working",
+      "needs": ""
+    },
+    "dm": {
+      "name": "Direct message",
+      "note": "/dm name: open the direct channel with that profile",
+      "needs": "Write the profile's name or id after /dm"
+    },
+    "done": {
+      "issue": "Written down as #{n}",
+      "remember": "Remembered",
+      "stop": "Stopped"
+    }
   }
 }

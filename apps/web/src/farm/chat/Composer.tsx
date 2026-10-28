@@ -4,6 +4,8 @@ import { t } from "@vibevalley/i18n";
 // the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
+import { useRouter } from "../../base/router";
+import { toasts } from "../../ui/pixel/toasts";
 import { For, Show } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -60,6 +62,8 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
         ? t("web.farm.chat.toOrchestratorAlone")
         : t("web.farm.chat.toOrchestrator");
 
+  const router = useRouter();
+
   const box = createComposer(core, () => input, {
     target: () => {
       const reply = draftOf(props.channel?.id).reply;
@@ -68,6 +72,8 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,
     failed: (reason) => props.onProblem(t("web.farm.chat.notSent", { why: reason })),
+    told: (say) => toasts.add({ title: say }),
+    opened: (path) => router.navigate(path),
     edited: () => props.onProblem(undefined),
     sent: () => {
       const id = props.channel?.id;

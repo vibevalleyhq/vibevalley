@@ -1,4 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
+import { Dot } from "../../ui/Dot";
 import type { IconName } from "../../ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
@@ -16,7 +17,6 @@ import {
 } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { createIssueActs, perform } from "./acts";
-import type { Tone } from "./cards";
 import { issueTag, runText, tagOpen, tagText } from "./rules";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "./state";
 import { closedText } from "@vibevalley/protocol/rules";
@@ -34,10 +34,6 @@ import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Shee
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
 import { useAgent } from "../../base/agents";
 import { createSessionEvents } from "../session";
-
-function Dot(props: { tone: Tone }) {
-  return <span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${props.tone})` }} />;
-}
 
 /** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
  * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the
@@ -107,7 +103,7 @@ export function IssueDetail(props: {
         </span>
       </div>
       <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")}>
-        <Dot tone={tone()} />
+        <Dot tone={tone()} size={8} ring={false} />
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
       </div>
     </div>

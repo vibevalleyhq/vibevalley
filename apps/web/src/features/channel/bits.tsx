@@ -1,25 +1,14 @@
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
-import { type DotTone, phaseIcon } from "./rules";
+import { phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
-const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-idle" };
-
-/** A phase or the orchestrator's mood: a round dot ringed in the page colour. */
-export function Dot(props: { tone: DotTone | "idle"; size?: number; class?: string }) {
-  return (
-    <span
-      class={["inline-block shrink-0 rounded-full ring-2 ring-page", dotColor[props.tone], props.class]}
-      style={{ width: `${props.size ?? 9}px`, height: `${props.size ?? 9}px` }}
-      aria-hidden="true"
-    />
-  );
-}
+export { Dot } from "../../ui/Dot";
 
 export function PhaseGlyph(props: { phase: Phase; size?: number }) {
   return (

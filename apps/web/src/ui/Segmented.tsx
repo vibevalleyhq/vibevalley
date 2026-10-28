@@ -1,6 +1,15 @@
-import { For } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { aria } from "../base/util";
 
+interface Place {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/** Two to five choices, one of them taken: a thumb on the page colour slides under the taken one (docs/style/design.md,
+ * 分段). */
 export function Segmented<T extends string>(props: {
   value: T;
   options: { value: T; label: string; disabled?: boolean; title?: string }[];
@@ -8,8 +17,45 @@ export function Segmented<T extends string>(props: {
   label: string;
   block?: boolean;
 }) {
+  let track!: HTMLDivElement;
+  const [thumb, setThumb] = createSignal<Place>();
+  // The first place is taken where it is; only a change of choice slides.
+  const [moved, setMoved] = createSignal(false);
+  const place = () => {
+    const on = track.querySelector<HTMLElement>('button[aria-pressed="true"]');
+    setThumb(on ? { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight } : undefined);
+  };
+  createEffect(
+    () => props.value,
+    (_value, was) => {
+      if (was !== undefined) setMoved(true);
+      // After the pressed button has its aria-pressed: read where it is once the page has it.
+      queueMicrotask(place);
+    },
+  );
+  onSettled(() => {
+    place();
+    // A label that changes width (the language, the interface size) moves the choice under the thumb.
+    const watch = new ResizeObserver(place);
+    watch.observe(track);
+    return () => watch.disconnect();
+  });
   return (
-    <div role="group" aria-label={props.label} class={["inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}>
+    <div
+      ref={(el) => (track = el)}
+      role="group"
+      aria-label={props.label}
+      class={["relative inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}
+    >
+      <Show when={thumb()}>
+        {(at) => (
+          <span
+            aria-hidden="true"
+            class={["pointer-events-none absolute top-0 left-0 rounded-sm bg-page shadow-raise", { "transition-[translate,width] duration-280": moved() }]}
+            style={{ translate: `${at().x}px ${at().y}px`, width: `${at().w}px`, height: `${at().h}px` }}
+          />
+        )}
+      </Show>
       <For each={props.options}>
         {(o) => (
           <button
@@ -19,9 +65,9 @@ export function Segmented<T extends string>(props: {
             title={o.title}
             onClick={() => props.onChange(o.value)}
             class={[
-              "h-6 cursor-pointer rounded px-2.5 text-sm whitespace-nowrap transition-[background-color,color,box-shadow] duration-120 disabled:cursor-default disabled:opacity-50",
+              "relative h-6 cursor-pointer rounded-sm px-2.5 text-sm whitespace-nowrap transition-colors duration-120 disabled:cursor-default disabled:opacity-50",
               { "flex-1": !!props.block },
-              o.value === props.value ? "bg-page font-medium shadow-raise" : "text-muted hover:text-ink",
+              o.value === props.value ? "font-medium text-ink" : "text-muted hover:text-ink",
             ]}
           >
             {o.label}

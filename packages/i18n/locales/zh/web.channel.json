@@ -91,7 +91,10 @@
     "inThread": "在 {address}",
     "file": "文件 · {size}",
     "reactedBy": "{names} 回应了 {emoji}",
-    "linked": "跳到 {where} 的第 {number} 条"
+    "linked": "跳到 {where} 的第 {number} 条",
+    "newBelow": "有 {n} 条新消息",
+    "toLatest": "回到最新",
+    "roundFor": "{what} · {took}"
   },
   "tools": {
     "label": "这条消息能做的",
@@ -129,7 +132,6 @@
     "replying": "回复 {name}",
     "cancelReply": "不回复了",
     "attach": "附上文件",
-    "removeFile": "去掉 {name}",
     "uploadFailed": "没传上去：{why}"
   },
   "manage": {
@@ -226,5 +228,33 @@
     "orchestratorNote": "派活、拆计划、问进度",
     "everyone": "所有人",
     "everyoneNote": "叫醒在场的每个帮工"
+  },
+  "threadWidth": "串的宽窄（拖动，双击回默认）",
+  "commands": {
+    "issue": {
+      "name": "记一张工单",
+      "note": "/issue 标题：记进备选，在这个频道的项目里",
+      "needs": "/issue 后面写工单的标题"
+    },
+    "remember": {
+      "name": "让管家记住",
+      "note": "/remember 一句话：记进照看这里的管家的记性",
+      "needs": "/remember 后面写要它记住的话"
+    },
+    "stop": {
+      "name": "叫停管家",
+      "note": "照看这里的管家停下这一轮，派出去的帮工照常干活",
+      "needs": ""
+    },
+    "dm": {
+      "name": "私聊",
+      "note": "/dm 名字：打开和这份档案的私聊",
+      "needs": "/dm 后面写档案的名字或 id"
+    },
+    "done": {
+      "issue": "记下了 #{n}",
+      "remember": "记下了",
+      "stop": "叫停了"
+    }
   }
 }

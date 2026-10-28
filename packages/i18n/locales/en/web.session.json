@@ -55,7 +55,8 @@
       "said": "Said",
       "subagentSaid": "Subagent said",
       "usage": "Usage"
-    }
+    },
+    "thoughtFor": "Thought for {took} · {n} tools"
   },
   "trajectory": {
     "lane": {

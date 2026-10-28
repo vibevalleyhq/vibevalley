@@ -280,7 +280,7 @@ export function ChatWindow() {
           <p class="px-3 py-0.5 text-[12px] text-berry">{problem()}</p>
         </Show>
         <Show when={showSuggestions()}>
-          <div class="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2 [mask-image:linear-gradient(to_right,black_85%,transparent)]">
+          <div class="flex shrink-0 gap-1.5 scroll-fade-x overflow-x-auto px-3 pb-2">
             <For each={suggestions}>
               {(line) => (
                 <button

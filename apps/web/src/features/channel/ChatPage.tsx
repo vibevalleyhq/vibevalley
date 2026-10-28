@@ -1,4 +1,6 @@
 import { t } from "@vibevalley/i18n";
+import { tookText } from "../../base/format";
+import { Splitter, usePaneWidth } from "../../ui/Splitter";
 import type { IconName } from "../../ui/icons";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -68,6 +70,7 @@ function Chat() {
   const shown = createMemo(() => channelOf(chat(), id()));
   const channel = createMemo(() => topOf(chat(), shown()) ?? topsOf(chat())[0]);
   const thread = createMemo(() => (shown()?.type === "thread" ? shown() : undefined));
+  const threadWidth = usePaneWidth("thread", 416, 320, 720);
   const [drawer, setDrawer] = createSignal(false);
   const [creating, setCreating] = createSignal(false);
   const [searching, setSearching] = createSignal(false);
@@ -94,7 +97,13 @@ function Chat() {
       </Show>
       <Show when={thread()}>
         {(shown) => (
-          <div class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 ease-out starting:translate-x-full lg:static lg:z-auto lg:w-[416px] lg:shrink-0">
+          <div
+            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 starting:translate-x-full lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0"
+            style={{ "--pane-w": `${threadWidth()}px` }}
+          >
+            <div class="hidden lg:block">
+              <Splitter pane="thread" side="left" width={threadWidth()} min={320} max={720} label={t("web.channel.threadWidth")} />
+            </div>
             <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
           </div>
         )}
@@ -662,12 +671,15 @@ function OrchestratorLine(props: { agent: string }) {
   const core = useCore();
   const profile = useAgent(() => props.agent);
   const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
+  const clock = useNow();
+  const since = () => core()?.orchestrators?.[props.agent]?.since;
   return (
     <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={t("web.channel.orchestrator")}>
       <OrchestratorFace size={32} agent={props.agent} />
       {profile()?.name || t("web.channel.orchestrator")}
       <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
       <span class="text-xs text-muted">{mood[now()]}</span>
+      <Show when={since()}>{(at) => <span class="text-xs text-faint">{tookText(Math.max(0, clock() - at()))}</span>}</Show>
       <Show when={now() === "thinking"}>
         <ThinkingDots />
       </Show>

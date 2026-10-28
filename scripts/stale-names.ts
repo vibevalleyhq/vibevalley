@@ -81,8 +81,9 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "an old protocol name",
-    pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|CanMerge|Foreman|Worker)\b/,
-    says: "CoreState, StateFrame, SideEvent, Agent, Activity, canHarvest, Manager, Session",
+    // The browser's Worker (new Worker, a value typed : Worker) is not the old name.
+    pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|CanMerge|Foreman|(?<!new |: )Worker)\b/,
+    says: "CoreState, StateFrame, SideEvent, Agent, Activity, canHarvest, Manager, Session; a Web Worker stays (new Worker)",
   },
   {
     name: "an old home file or its mover",

@@ -120,3 +120,14 @@ test("the workbench completion withdraws completing while another round is worke
   await completed;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("done");
 });
+
+test("a file's patch in the review is coloured in its language, on the palette", async ({ page, api }) => {
+  const id = await handBack(api, "review-colours");
+  await page.goto(`/issues/${id}`);
+  await page.getByRole("dialog", { name: "工单", exact: true }).getByRole("button", { name: "完成", exact: true }).click();
+  const review = page.getByRole("dialog", { name: /^关上「/ });
+  await review.getByRole("button", { name: /\.ts/ }).first().click();
+  // The keyword export comes back from the worker drawn in the palette's keyword colour.
+  await expect(review.locator('span[style*="--shiki-token-keyword"]').first()).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("patch-colours.png") });
+});

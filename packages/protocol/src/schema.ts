@@ -201,6 +201,7 @@ export const OrchestratorState: Codec<T.OrchestratorState> = Schema.Literals(T.O
 export const OrchestratorNow: Codec<T.OrchestratorNow> = Schema.Struct({
   state: OrchestratorState,
   channel: Schema.optionalKey(Schema.String),
+  since: Schema.optionalKey(Schema.Number),
 });
 
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
