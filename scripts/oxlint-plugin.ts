@@ -25,6 +25,10 @@
  *   they follow the theme (设置 › 外观); a colour written into a class (bg-[#…]) would stay as it is. The pixel skin and
  *   the avatars are drawn and keep theirs; vite.config.ts says where the rule runs.
  *
+ *   no-copy-selector: a page test finds what it clicks and reads by data-testid and state attributes, not by the
+ *   interface's words (getByText, getByRole's name, toHaveText…): words are the catalogs' to check, and a test that
+ *   reads them breaks on every rewording. vite.config.ts says where it runs.
+ *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
@@ -87,6 +91,45 @@ const noCommentDivider = defineRule({
       Program() {
         for (const comment of context.sourceCode.getAllComments())
           if (/[─━═]{2}/.test(comment.value) || /^[-=*#~_/\s]{4,}$/.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
+      },
+    };
+  },
+});
+
+/** Where a page test names what it looks for or what it expects to read. */
+const textArg = new Set(["getByText", "getByLabel", "getByPlaceholder", "getByTitle", "getByAltText", "toHaveText", "toContainText"]);
+
+/** Options that name the words: getByRole's name, filter's and locator's hasText. */
+const textOption = new Set(["name", "hasText", "hasNotText"]);
+
+type ObjectProperty = { type: string; key?: { type: string; name?: string }; value?: Parameters<typeof chineseLiteral>[0] };
+
+/** A literal with Chinese in it: a string, a template, or a regular expression's pattern. */
+const chineseLiteral = (node: { type: string; value?: unknown; regex?: { pattern: string }; quasis?: { value: { raw: string } }[] } | undefined) =>
+  !!node &&
+  ((node.type === "Literal" && typeof node.value === "string" && han.test(node.value)) ||
+    (node.type === "Literal" && node.regex !== undefined && han.test(node.regex.pattern)) ||
+    (node.type === "TemplateLiteral" && (node.quasis ?? []).some((q) => han.test(q.value.raw))));
+
+const noCopySelector = defineRule({
+  meta: {
+    messages: {
+      copy: "page tests find elements by data-testid and state attributes, and leave the words to the catalogs' checks (docs/subsystems/foundation.md): no interface words here; data the test made goes in a fixtures constant",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "MemberExpression" || c.property.type !== "Identifier") return;
+        const name = c.property.name;
+        const [first] = node.arguments as unknown as Parameters<typeof chineseLiteral>[0][];
+        if (textArg.has(name) && chineseLiteral(first)) context.report({ node, messageId: "copy" });
+        for (const arg of node.arguments as unknown as { type: string; properties?: ObjectProperty[] }[])
+          if (arg.type === "ObjectExpression")
+            for (const p of arg.properties ?? [])
+              if (p.type === "Property" && p.key?.type === "Identifier" && textOption.has(p.key.name ?? "") && chineseLiteral(p.value))
+                context.report({ node, messageId: "copy" });
       },
     };
   },
@@ -207,6 +250,7 @@ export default definePlugin({
     "no-comment-divider": noCommentDivider,
     "no-cjk-literal": noCjkLiteral,
     "no-hex-color": noHexColor,
+    "no-copy-selector": noCopySelector,
     "page-layers": pageLayersRule,
   },
 });
