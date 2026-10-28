@@ -6,7 +6,7 @@ import { voiceWording } from "./words";
 import { appWording } from "../../base/words";
 import { saveSettings } from "../../base/settings";
 import { wording } from "@vibevalley/protocol/words";
-import { createSignal, For, Match, onSettled, Show, snapshot, Switch, untrack } from "solid-js";
+import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { keepPreviousData } from "@tanstack/solid-query";
 import {
@@ -50,7 +50,11 @@ import { Button } from "../../ui/Button";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
-import { Card, Quiet, SecretInput, TextLink } from "../../ui/layout";
+import { Card, Quiet, SecretInput } from "../../ui/layout";
+import { IconLink } from "../../ui/IconButton";
+import { KeyField, SaveBar } from "../../ui/KeyField";
+import { Hint } from "../../ui/Tip";
+import { toast } from "../../ui/toasts";
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey";
 
@@ -91,15 +95,12 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
   const [secrets, setSecrets] = createSignal<Partial<Record<Key, string>>>({});
   const [cleared, setCleared] = createSignal<ReadonlySet<Key>>(new Set());
   const [error, setError] = createSignal<string>();
-  const [saved, setSaved] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   // The settings as saved now: a save answers with them, and the form keeps the draft over them.
   const [base, setBase] = createSignal(start);
 
-  const touched = () => setSaved(false);
   const set = (next: VoiceSettings) => {
     setDraft(next);
-    touched();
   };
   const voiceDirty = () => !sameVoice(draft(), base().voice);
   const appIdDirty = () => appId().trim() !== (base().agoraAppId.value ?? "");
@@ -122,7 +123,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
       setBase(now);
       setSecrets({});
       setCleared(new Set<Key>());
-      setSaved(true);
+      toast(voiceWording().voice.saved);
     } catch (e) {
       setError(reasonOf(e));
     } finally {
@@ -138,39 +139,23 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
     setError(undefined);
   };
 
-  const clearLink = (k: Key) => (
-    <TextLink
-      danger
-      onClick={() => {
-        setCleared(new Set([...cleared(), k]));
-        touched();
-      }}
-    >
-      {appWording().form.clear}
-    </TextLink>
-  );
+  const remove = (k: Key) => (on: boolean) => {
+    const next = new Set(cleared());
+    if (on) next.add(k);
+    else next.delete(k);
+    setCleared(next);
+  };
   const secret = (k: Key, label: string, current: () => KeyStatus) => (
-    <Labeled
-      label={label}
-      aside={current().source === "settings" && !cleared().has(k) ? clearLink(k) : undefined}
-      hint={
-        cleared().has(k)
-          ? appWording().form.clearOnSave
-          : current().source
-            ? appWording().form.inUse(current().hint ?? "", keyFrom[current().source!])
-            : appWording().form.none
-      }
-    >
+    <KeyField small label={label} status={current()} removing={cleared().has(k)} onRemove={remove(k)}>
       <SecretInput
         aria-label={label}
         placeholder={appWording().form.keepEmpty}
         value={secrets()[k] ?? ""}
         onInput={(e) => {
           setSecrets({ ...secrets(), [k]: e.currentTarget.value });
-          touched();
         }}
       />
-    </Labeled>
+    </KeyField>
   );
   const number = (k: VoiceNumber) => (
     <Labeled label={numberLabel[k]} hint={voiceWording().voice.range(voiceLimits[k].min, voiceLimits[k].max, base().voiceDefaults[k])}>
@@ -185,30 +170,18 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
   );
 
   const bar = () => (
-    <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-page px-4 py-2.5">
-      <Switch fallback={<p class="text-xs text-muted">{dirty() ? voiceWording().voice.dirty : voiceWording().voice.clean}</p>}>
-        <Match when={error()}>
-          <p class="text-sm text-berry">{error()}</p>
-        </Match>
-        <Match when={problem()}>
-          <p class="text-sm text-berry">{problem()}</p>
-        </Match>
-        <Match when={saved()}>
-          <p class="text-sm text-accent">{voiceWording().voice.saved}</p>
-        </Match>
-      </Switch>
-      <div class="flex gap-2">
-        <Button disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
+    <SaveBar
+      dirty={dirty()}
+      busy={busy() || !!problem()}
+      onSave={() => void submit()}
+      onUndo={undo}
+      left={<Show when={error() ?? problem()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
+      extra={
+        <Button tone="quiet" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
           {appWording().form.reset}
         </Button>
-        <Button disabled={!dirty()} onClick={undo}>
-          {voiceWording().voice.undo}
-        </Button>
-        <Button tone="primary" disabled={!dirty() || !!problem() || busy()} onClick={() => void submit()}>
-          {busy() ? voiceWording().voice.saving : appWording().form.save}
-        </Button>
-      </div>
-    </div>
+      }
+    />
   );
 
   const tts = () => draft().tts;
@@ -232,42 +205,25 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
       fallback={
         <div class="flex h-full min-h-0 flex-col gap-3">
           <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-            <div class="flex max-w-4xl flex-col gap-2 px-1 pt-1">
+            <div class="flex max-w-4xl items-center gap-2 px-1 pt-1">
               <h2 class="text-xl font-semibold">{voiceWording().voice.section.label}</h2>
-              <p class="text-sm text-muted">
-                {voiceWording().voice.intro}
-                <A class="underline" href="/orchestrator/voice">
-                  {voiceWording().voice.orchestratorPage}
-                </A>
-                。
-              </p>
-              <div class="flex flex-wrap items-center gap-2">
-                <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-[#e3efd2] text-[#3f6427]" : "bg-[#f6ddd8] text-berry"]}>
-                  {credentialsReady() ? voiceWording().voice.ready : voiceWording().voice.missing}
-                </span>
-                <span class="text-xs text-muted">{voiceWording().voice.nextCall}</span>
-                <span class="min-w-0 truncate font-mono text-xs text-muted" title={base().file}>
-                  {base().file}
-                </span>
-              </div>
+              <Hint
+                text={voiceWording().voice.intro + voiceWording().voice.orchestratorPage + voiceWording().voice.period + " " + voiceWording().voice.nextCall}
+              />
+              <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-[#e3efd2] text-[#3f6427]" : "bg-[#f6ddd8] text-berry"]}>
+                {credentialsReady() ? voiceWording().voice.ready : voiceWording().voice.missing}
+              </span>
+              <span class="flex-1" />
+              <IconLink href="/orchestrator/voice" icon="agents" label={voiceWording().voice.orchestratorPage} />
+              <Hint text={appWording().form.storedIn(base().file)} />
             </div>
             <Card
               title={voiceWording().voice.credentials}
-              action={<TextLink href="https://console.agora.io/">{voiceWording().voice.console}</TextLink>}
+              action={<IconLink href="https://console.agora.io/" label={voiceWording().voice.console} />}
               class="max-w-4xl"
             >
               <Cols>
-                <Labeled
-                  label="App ID"
-                  aside={base().agoraAppId.source === "settings" && !cleared().has("agoraAppId") ? clearLink("agoraAppId") : undefined}
-                  hint={
-                    cleared().has("agoraAppId")
-                      ? appWording().form.clearOnSave
-                      : base().agoraAppId.source
-                        ? keyFrom[base().agoraAppId.source!]
-                        : appWording().form.none
-                  }
-                >
+                <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
                   <TextInput
                     aria-label="Agora App ID"
                     class="font-mono"
@@ -275,10 +231,9 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
                     value={appId()}
                     onInput={(e) => {
                       setAppId(e.currentTarget.value);
-                      touched();
                     }}
                   />
-                </Labeled>
+                </KeyField>
                 {secret("agoraAppCertificate", "App Certificate", () => base().agoraAppCertificate)}
                 <Labeled label={voiceWording().voice.area} hint={voiceWording().voice.areaHint}>
                   <Segmented
@@ -399,7 +354,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
             </Card>
             <Card
               title={voiceWording().voice.dictation}
-              action={<TextLink href="https://github.com/soniqo/speech-swift">{voiceWording().voice.speechServer}</TextLink>}
+              action={<IconLink href="https://github.com/soniqo/speech-swift" label={voiceWording().voice.speechServer} />}
               class="max-w-4xl"
             >
               <p class="text-sm text-muted">{voiceWording().voice.dictationIntro}</p>
@@ -412,7 +367,6 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
                     value={dictation().url}
                     onInput={(e) => {
                       setDictation({ ...dictation(), url: e.currentTarget.value });
-                      touched();
                     }}
                   />
                 </Labeled>
@@ -424,7 +378,6 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
                     value={dictation().model}
                     onInput={(e) => {
                       setDictation({ ...dictation(), model: e.currentTarget.value });
-                      touched();
                     }}
                   />
                 </Labeled>
@@ -572,14 +525,13 @@ function Cols(props: { children: JSX.Element }) {
 function Labeled(props: { label: string; hint?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
     <div class="flex flex-col gap-1">
-      <div class="flex items-center gap-2">
-        <span class="flex-1 text-xs font-medium text-muted">{props.label}</span>
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-muted">{props.label}</span>
+        <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
+        <span class="flex-1" />
         {props.aside}
       </div>
       <div>{props.children}</div>
-      <Show when={props.hint}>
-        <span class="text-xs text-faint">{props.hint}</span>
-      </Show>
     </div>
   );
 }

@@ -6,25 +6,10 @@ import type { Ordering } from "./display";
 import { type BoardCard, cardLook, cardMove, cardProject, laneOrder } from "./cards";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus } from "./rules";
 import { autofocus } from "../../base/util";
-import { Icon } from "../../ui/Icon";
-import type { IconName } from "../../ui/icons";
+import { IconButton } from "../../ui/IconButton";
 import { Segmented } from "../../ui/Segmented";
 import { useGraphs, useNameOf } from "./hooks";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-
-export function IconButton(props: { icon: IconName; label: string; onClick: () => void; size?: number }) {
-  return (
-    <button
-      type="button"
-      aria-label={props.label}
-      title={props.label}
-      onClick={() => props.onClick()}
-      class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md hover:bg-selected"
-    >
-      <Icon name={props.icon} size={props.size ?? 14} />
-    </button>
-  );
-}
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
 export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {

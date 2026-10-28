@@ -390,7 +390,7 @@ export const make = (options: VoiceOptions = {}) =>
     // Asked each time: credentials saved from the title screen work without a restart.
     const creds = () => {
       const c = settings.agora();
-      return c ? Effect.succeed(c) : Effect.fail(unavailable(voiceWording().noAgora, "agora"));
+      return c ? Effect.succeed(c) : Effect.fail(unavailable(voiceWording().noAgora, "voice"));
     };
 
     // The voice line: local only, like the farm; the tunnel is the one way in from outside.

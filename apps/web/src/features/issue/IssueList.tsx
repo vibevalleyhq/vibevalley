@@ -8,7 +8,8 @@ import { closedShown, laneLabel, laneStatus } from "./rules";
 import { ago } from "../../base/format";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
-import { EmptyNote, IconButton, OlderLink, QuickAdd } from "./Board";
+import { EmptyNote, OlderLink, QuickAdd } from "./Board";
+import { IconButton } from "../../ui/IconButton";
 import { useGraphs, useNameOf } from "./hooks";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 

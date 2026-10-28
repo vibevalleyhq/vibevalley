@@ -47,6 +47,7 @@ import { useSkills } from "../runtime";
 import { TrajectoryList } from "../session";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 import { FromTemplate } from "./FromTemplate";
+import { Hint } from "../../ui/Tip";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;
@@ -515,18 +516,18 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
   );
 }
 
-/** A label, what sits at its right, the control and a hint (or what is wrong) under it. */
+/** A label with what it means behind an info icon, what sits at its right, the control, and what is wrong under it. */
 function Labeled(props: { label: string; tip?: string; hint?: string; error?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
     <div class="flex flex-col gap-1">
-      <div class="flex items-center gap-2">
-        <span class="flex-1 text-xs font-medium text-muted" title={props.tip}>
-          {props.label}
-        </span>
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-muted">{props.label}</span>
+        <Show when={props.hint ?? props.tip}>{(h) => <Hint text={h()} />}</Show>
+        <span class="flex-1" />
         {props.aside}
       </div>
       {props.children}
-      <Show when={props.error} fallback={<Show when={props.hint ?? props.tip}>{(h) => <span class="text-xs text-faint">{h()}</span>}</Show>}>
+      <Show when={props.error}>
         <span class="text-xs text-berry">{props.error}</span>
       </Show>
     </div>

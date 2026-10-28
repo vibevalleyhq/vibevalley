@@ -109,7 +109,7 @@ function apiErrorOf(value: unknown): ApiError | undefined {
     case "Missing":
       return typeof value.what === "string" && validNext(value.next) ? (value as unknown as ApiError) : undefined;
     case "VoiceUnavailable":
-      return validReason(value) && (value.settings === undefined || ["agora", "deepseek", "voice"].includes(value.settings as string))
+      return validReason(value) && (value.settings === undefined || ["deepseek", "voice"].includes(value.settings as string))
         ? (value as unknown as ApiError)
         : undefined;
     case "VoiceAgentFailed":

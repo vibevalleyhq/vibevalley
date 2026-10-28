@@ -34,6 +34,7 @@ import { Icon } from "../../ui/Icon";
 import { SpriteIcon } from "../../ui/pixel";
 import { Segmented } from "../../ui/Segmented";
 import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../../ui/layout";
+import { Hint } from "../../ui/Tip";
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: runtimesWording().capability.listModels,
@@ -380,11 +381,11 @@ function NumberInput(props: { value?: number; onChange: (n: number | undefined) 
 function Field(props: { label: string; hint?: string; children: JSX.Element }) {
   return (
     <div class="flex flex-col gap-1">
-      <span class="text-xs font-medium text-muted">{props.label}</span>
+      <span class="flex items-center gap-1.5 text-xs font-medium text-muted">
+        {props.label}
+        <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
+      </span>
       {props.children}
-      <Show when={props.hint}>
-        <span class="text-xs text-faint">{props.hint}</span>
-      </Show>
     </div>
   );
 }
@@ -429,7 +430,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
       <div class="grid gap-4 md:grid-cols-2">
         <Toggle
           label={runtimesWording().enabled}
-          hint={runtimesWording().enabledHint}
+          tip={runtimesWording().enabledHint}
           checked={draft().enabled}
           onChange={(enabled) => setDraft({ ...draft(), enabled })}
         />
@@ -452,7 +453,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
           />
         </Field>
         <Field label={runtimesWording().defaultEffort} hint={effortHint()}>
-          <div>
+          <Show when={(model()?.effortLevels.length ?? 0) > 0} fallback={<span class="text-sm text-faint">—</span>}>
             <Segmented
               label={runtimesWording().defaultEffort}
               value={draft().defaultEffort}
@@ -462,7 +463,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
               ]}
               onChange={(defaultEffort) => setDraft({ ...draft(), defaultEffort })}
             />
-          </div>
+          </Show>
         </Field>
         <Field label={runtimesWording().maxWorking} hint={runtimesWording().maxWorkingHint}>
           <NumberInput

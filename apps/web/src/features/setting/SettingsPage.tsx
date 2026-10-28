@@ -1,5 +1,5 @@
 // 设置: its parts in a menu on the left, each its own address so a link lands on it; the
-// first five are the server's settings in a card, the rest whole pages of their own.
+// first four are the server's settings in a card, the rest whole pages of their own.
 
 import { voiceWording, VoiceForm } from "../voice";
 import { runtimesWording, SkillsPage } from "../runtime";
@@ -10,12 +10,12 @@ import { For, Match, Show, Switch } from "solid-js";
 import { Navigate } from "../../ui/A";
 import { Keyed } from "../../base/util";
 import { Card, ListCard, ListRow } from "../../ui/layout";
-import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
+import { GitHub, LanguageForm, SettingsFile, SettingsForm } from "./SettingsForm";
+import { Hint } from "../../ui/Tip";
 
 export const sections = [
   { id: "deepseek", label: "DeepSeek", line: settingsWording().sections.deepseek.line },
   { id: "language", label: settingsWording().sections.language.label, line: settingsWording().sections.language.line },
-  { id: "agora", label: settingsWording().sections.agora.label, line: settingsWording().sections.agora.line },
   { id: "memory", label: settingsWording().sections.memory.label, line: "Nowledge Mem、EverOS" },
   { id: "github", label: "GitHub", line: settingsWording().sections.github.line },
   { id: "connectors", label: connectorWording().connectors.section.label, line: connectorWording().connectors.section.line },
@@ -40,18 +40,18 @@ export function SettingsPage(props: { rest: string }) {
           </div>
           <div class="min-h-0 min-w-0 flex-1 md:overflow-y-auto">
             <Switch>
-              <Match when={section().id === "deepseek" || section().id === "agora" || section().id === "memory"}>
-                <Card title={section().label} class="max-w-3xl">
-                  <Keyed key={section().id}>{() => <SettingsForm part={section().id as "deepseek" | "agora" | "memory"} />}</Keyed>
+              <Match when={section().id === "deepseek" || section().id === "memory"}>
+                <Card title={section().label} action={<SettingsFile />} class="max-w-3xl">
+                  <Keyed key={section().id}>{() => <SettingsForm part={section().id as "deepseek" | "memory"} />}</Keyed>
                 </Card>
               </Match>
               <Match when={section().id === "language"}>
-                <Card title={section().label} class="max-w-3xl">
+                <Card title={section().label} action={<Hint text={settingsWording().language.line} />} class="max-w-3xl">
                   <LanguageForm />
                 </Card>
               </Match>
               <Match when={section().id === "github"}>
-                <Card title={section().label} class="max-w-3xl">
+                <Card title={section().label} action={<Hint text={settingsWording().github.note} />} class="max-w-3xl">
                   <GitHub />
                 </Card>
               </Match>
