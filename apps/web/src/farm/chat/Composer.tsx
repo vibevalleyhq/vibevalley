@@ -127,7 +127,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
             </For>
           </div>
         </Show>
-        <div class="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_#c8a46e]">
+        <div class="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_var(--color-cream-300)]">
           <Show when={!props.thread}>
             <PickChip named />
           </Show>

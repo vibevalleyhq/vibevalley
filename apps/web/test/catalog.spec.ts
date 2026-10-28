@@ -33,3 +33,21 @@ test("a place the page does not know goes to the workbench", async ({ page }) =>
   await page.goto("/nowhere-at-all");
   await expect(page).toHaveURL(/\/chat$/);
 });
+
+test("the kit shelf draws the tokens and atoms in both themes, from the stylesheet itself", async ({ page }) => {
+  await page.goto("/catalog/kit");
+  await expect(page.locator('[role="tab"][data-key="kit"]')).toHaveAttribute("aria-selected", "true");
+  const light = page.getByTestId("kit-light");
+  const dark = page.getByTestId("kit-dark");
+  await expect(light).toHaveAttribute("data-theme", "light");
+  await expect(dark).toHaveAttribute("data-theme", "dark");
+  const ground = (pane: typeof light) => pane.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await ground(light)).not.toBe(await ground(dark));
+  // The motion curves are read off the classes the pages use, so each one draws.
+  await expect(light.getByTestId("ease")).toHaveCount(4);
+  await light.getByTestId("kit-confirm").click();
+  await expect(light.getByTestId("kit-confirm-sure")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(light.getByTestId("kit-confirm-sure")).toBeHidden();
+  await expect(page.getByTestId("kit-pixel").locator('button[data-key="primary"]')).toBeEnabled();
+});

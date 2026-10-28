@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田头的书桌，暖纸、墨棕、几样庄稼的颜色；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田头的书桌，暖纸、墨棕、几样庄稼的颜色；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在图鉴的「界面」（`/catalog/kit`，`features/catalog/Kit.tsx`）：用页面在用的类和组件，浅色、深色并排画出每个令牌和零件，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -23,9 +23,20 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 | 线和影 | 1px 的 `line`，`shadow-raise`、`shadow-float` | 2px 的树皮色框，`shadow-px` 和 `ui/pixel/style.ts` 的 `pxWindow`、`pxFrame` |
 | 动效 | 缓动和三档时长（下面「动效」） | `steps()` 走帧，一像素一像素地动 |
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
-| 令牌的检查 | `no-hex-color`、`design-tokens` | 不查：画出来的颜色和尺寸是画的一部分 |
+| 令牌的检查 | `no-hex-color`、`design-tokens` | `no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
 
 头像（`ui/Face.tsx`）、农机的 logo、项目的岛、额度瓶在工作台里也是画，照像素皮。
+
+### 像素皮的令牌
+
+像素皮不跟着主题换，但它的值和工作台一样有名字、只写在一处：
+
+- **颜色**按家族起名（`style.css` 的 `@theme`）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/cast.ts`），照原样。
+- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxText` 给；读的长文字（汇报、说明）用 `pxText.read`，是系统字体。
+- **框和影**：`pxWindow`（窗）、`pxFrame`（厚框）、`pxRing`（框里一圈 2px）、`pxInset`（凹下去的井）、`pxDrop` 和 `shadow-px`（浮在板子上的投影）、`shadow-px-shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
+- **焦点**只有一种：`pxFocus`，叶色的 2px 外框，离边一个像素。
+- **叶和麦上的字是树皮色**（`text-bark-900`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
+- **动效**走帧：关键帧用 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
 ## 令牌
 
@@ -101,7 +112,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 
 ### 图标
 
-图标跟着它旁边的字：`text-xs` 配 12px，`text-sm` 的按钮配 14px，只有图标的按钮配 16px，页面头上的配 20px。图标和字竖着居中（`items-center`），多行的字配图标时对第一行（`items-start` 加 `mt-0.5`）。图标只从 `ui/icons.ts` 那张表里按意思取，一个意思一个图。
+图标的大小只有一把梯子（`IconSize`，别的数编不过）：10px 是小记号（展开的箭头），`text-xs` 旁边配 12px，`text-sm` 的按钮配 14px，只有图标的按钮配 16px，页面头上和左边的栏配 20px，大的「新建」格子配 24px，空状态配 48px。图标和字竖着居中（`items-center`），多行的字配图标时对第一行（`items-start` 加 `mt-0.5`）。图标只从 `ui/icons.ts` 那张表里按意思取，一个意思一个图。
 
 ### 动效
 
@@ -145,8 +156,8 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - **按钮**（`ui/Button.tsx`）：`primary` 一个区域只有一个，是那里最要紧的一步；`plain` 是其余的；`quiet` 放在工具条和行里；`danger` 是字变莓色的 `plain`，不填满。只有图标的用 `IconButton`，它的名字就是悬停的提示和读屏的话。
 - **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `bg-hover`，页面色加 `shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
 - **状态点**（`ui/Dot.tsx` 的 `Dot`，`features/channel/bits.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
-- **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
-- **标签和计数**：`Tag` 只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`rounded-full`、`text-xs`）。
+- **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/modal.ts` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
+- **标签和计数**：`Tag`（`ui/Tag.tsx`）只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`rounded-full`、`text-xs`）。
 - **附件**（`ui/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `max-h-64`，一圈 `line`、`rounded-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
 - **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `text-xs text-faint`；悬停的工具条在右上，`z-10`。
 - **在想和在写**：只在服务端说它在想、在写的那个频道里画三个点（`ThinkingDots`），带着是谁和这一轮过了多久（「在想… · 12 秒」，从服务端记的 `since` 起算，不猜）；侧栏底下照看这里的管家也写着过了多久。答完，回答下面折成一行「想了 40 秒 · 用了 3 个工具」，点开是干活的经过；没用工具的回答不加这一行。
@@ -209,7 +220,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
 4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
 
-**写一个新界面之前**：先找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Tip`、`Icon`、`Dot`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。
+**写一个新界面之前**：先在图鉴的「界面」（`/catalog/kit`）看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了令牌、原子或一种 `tone`，也加进 `Kit.tsx`。
 
 **类名怎么拼**：Solid 的 `class` 直接收数组和对象（`class={["h-7 …", { "bg-selected": on }, props.class]}`），不用 clsx。原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。所以不用 tailwind-merge 去合并互相冲突的类：真有要盖的那天，再加一个按我们的令牌配好的 `cn`。
 

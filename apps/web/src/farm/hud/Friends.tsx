@@ -184,7 +184,7 @@ export function Friends(props: { height: number }) {
           </span>
           <span>{t("web.farm.friends.helpers")}</span>
           <Show when={busy() > 0}>
-            <span class="flex h-4 min-w-4 items-center justify-center bg-leaf-500 px-1 text-[10px] leading-none text-cream-50">{busy()}</span>
+            <span class="flex h-4 min-w-4 items-center justify-center bg-leaf-500 px-1 text-[10px] leading-none text-bark-900">{busy()}</span>
           </Show>
           <SpriteIcon name="button-next" size={12} class={open() ? "-rotate-90" : "rotate-90"} />
         </HudCard>

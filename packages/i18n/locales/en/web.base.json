@@ -26,7 +26,7 @@
     },
     "catalog": {
       "label": "Catalog",
-      "hint": "Assets: every picture, cursor and sound the farm uses"
+      "hint": "Assets: every picture, cursor and sound the farm uses, and the workbench's kit"
     },
     "settings": {
       "label": "Settings",

@@ -281,7 +281,7 @@ function IssueBody(props: {
 
         <FarmSection title={s().criteria.length > 0 ? t("web.farm.plot.progressMet", { met: s().met, of: s().criteria.length }) : t("web.farm.plot.progress")}>
           <Show when={s().doing}>
-            <p class={[body, "text-[#4f8fbd]"]}>{s().doing}</p>
+            <p class={[body, "text-water-500"]}>{s().doing}</p>
           </Show>
           <Show when={s().inTask}>
             <p class={xs}>{s().taskText}</p>

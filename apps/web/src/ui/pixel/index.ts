@@ -1,5 +1,5 @@
 // The farm skin's components; their classes and sizes are style.ts.
-export { cx, pxDrop, pxRing, pxText, pxWindow, readMeasure, pxInset } from "./style";
+export { cx, pxDrop, pxFocus, pxRing, pxText, pxWindow, readMeasure, pxInset } from "./style";
 export { DashedLine, PxCard, PxWindow } from "./base";
 export { PxButton, type PxSize, type PxTone } from "./button";
 export { PxPick, PxSegmented, PxSwitchField, type SegmentOption } from "./choice";

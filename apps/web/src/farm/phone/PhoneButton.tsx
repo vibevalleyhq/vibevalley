@@ -55,7 +55,7 @@ export function PhoneButton(props: { height: number }) {
         ]}
       />
       <Show when={count() > 0}>
-        <span class="absolute -top-1.5 -right-1.5 bg-[#c84a3a] px-1 font-pixel text-[10px] leading-[14px] text-[#f7e8c4]">{count()}</span>
+        <span class="absolute -top-1.5 -right-1.5 bg-berry-500 px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{count()}</span>
       </Show>
       <Show when={count() === 0 && unread() > 0}>
         <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{t("web.farm.phone.new")}</span>

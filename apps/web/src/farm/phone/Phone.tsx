@@ -208,7 +208,7 @@ function Handset(props: {
         color: lcd.ink,
       }}
     >
-      <div class="mx-auto mb-2 h-1 w-10 bg-[#1e140b]" />
+      <div class="mx-auto mb-2 h-1 w-10 bg-bark-950" />
       <div class="flex flex-col p-[2px]" style={{ height: `${screen()}px`, background: lcd.paper, "box-shadow": `${outline}, inset 3px 3px 0 0 #a8bd78` }}>
         <div class="flex items-center gap-1 px-1.5 py-0.5" style={{ "border-bottom": `2px solid ${lcd.dark}` }}>
           <Signal />
@@ -273,12 +273,12 @@ function UnfoldTab(props: { unread: number }) {
         playSound("open");
         farm.chatOpen(true);
       }}
-      class="absolute top-16 left-full flex w-8 cursor-pointer flex-col items-center gap-0.5 py-2.5 text-[13px] leading-[15px] text-[#f7e8c4] active:translate-x-px"
+      class="absolute top-16 left-full flex w-8 cursor-pointer flex-col items-center gap-0.5 py-2.5 text-[13px] leading-[15px] text-cream-50 active:translate-x-px"
       style={{ background: body, "box-shadow": `${outline}, inset -3px -3px 0 0 #4a321e, 3px 4px 0 0 #1e140a73` }}
     >
       <For each={[...t("web.farm.phone.chatTab")]}>{(c) => <span>{c}</span>}</For>
       <Show when={props.unread > 0}>
-        <span class="block size-2.5 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />
+        <span class="block size-2.5 bg-berry shadow-[inset_0_0_0_2px_var(--color-px-dent)]" />
       </Show>
     </button>
   );
@@ -361,7 +361,7 @@ function AbKey(props: { button: PadButton; label: string }) {
       onPointerUp={key.onPointerUp}
       onPointerCancel={key.onPointerCancel}
       onPointerLeave={key.onPointerLeave}
-      class="grid size-6 place-items-center leading-none text-[#f7e8c4]"
+      class="grid size-6 place-items-center leading-none text-cream-50"
       style={{
         transform: key.down() ? "translateY(1px)" : undefined,
         background: "#c84a3a",

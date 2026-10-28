@@ -22,7 +22,7 @@ const head = 66;
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
 function PlaceIcon(props: { place: Place }) {
-  return <Icon name={props.place.icon} size={22} />;
+  return <Icon name={props.place.icon} size={20} />;
 }
 
 function Slot(props: { to: string; place: string; label: string; current?: boolean; fill?: string; children: JSX.Element }) {
@@ -73,7 +73,7 @@ function Rail(props: { here?: Place }) {
           <PlaceIcon place={settings} />
         </Slot>
         <Slot to="/farm" place="farm" label={t("web.base.farm")}>
-          <Icon name="farm" size={22} />
+          <Icon name="farm" size={20} />
         </Slot>
         <span role="status" data-testid="link" data-state={frames.link} title={linkWords[frames.link]} class="flex h-4 items-center">
           <span

@@ -138,7 +138,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
     <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
       <header data-testid="channel-head" data-key={props.channel?.id} class={[head, "gap-3 px-4"]}>
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
-          <Icon name="chat" size={18} />
+          <Icon name="chat" size={20} />
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
@@ -176,7 +176,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             setTab("chat");
           }}
         >
-          <Icon name="search" size={18} />
+          <Icon name="search" size={20} />
         </button>
         <Show when={props.channel?.type === "channel" ? props.channel : undefined}>
           {(c) => (
@@ -190,7 +190,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
                 title={t("web.channel.threadList.title")}
                 onClick={() => setThreadsOpen(!threadsOpen())}
               >
-                <Icon name="thread" size={18} />
+                <Icon name="thread" size={20} />
               </button>
               <Show when={threadsOpen()}>
                 <ThreadList channel={c()} onPick={() => setThreadsOpen(false)} />
@@ -209,7 +209,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             disabled={!props.channel}
             onClick={() => setPinsOpen(!pinsOpen())}
           >
-            <Icon name="pin" size={18} />
+            <Icon name="pin" size={20} />
           </button>
           <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} onPick={() => setPinsOpen(false)} />}</Show>
         </div>
@@ -233,7 +233,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           disabled={!props.channel}
           onClick={() => setSettings(true)}
         >
-          <Icon name="settings" size={18} />
+          <Icon name="settings" size={20} />
         </button>
       </header>
       <div role="tablist" aria-label={t("web.channel.inChannel")} class="flex shrink-0 gap-1 border-b border-line px-3">

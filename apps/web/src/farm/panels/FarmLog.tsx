@@ -67,7 +67,7 @@ function Said(props: { m: ChatMessage }) {
   return (
     <>
       <Show when={you()} fallback={<OrchestratorFace size={32} agent={props.m.from} />}>
-        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">{t("web.farm.log.you")}</span>
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-bark-900">{t("web.farm.log.you")}</span>
       </Show>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">

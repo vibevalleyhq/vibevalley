@@ -3,14 +3,14 @@ import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
+import { Icon, type IconSize } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
 export { Dot } from "../../ui/Dot";
 
-export function PhaseGlyph(props: { phase: Phase; size?: number }) {
+export function PhaseGlyph(props: { phase: Phase; size?: IconSize }) {
   return (
     <Show
       when={phaseIcon(props.phase)}
@@ -58,25 +58,6 @@ export function ThinkingDots() {
 
 export function Count(props: { n: number }) {
   return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
-}
-
-/** What a tag says by its colour: done or new (ok), failed (bad), sent or stopped (wait). Its ink comes with it, so it
- * reads in both themes. */
-export type TagTone = "ok" | "bad" | "wait";
-
-const tagTones: Record<TagTone, string> = {
-  ok: "bg-ok-soft text-ok-ink",
-  bad: "bg-bad-soft text-berry",
-  wait: "bg-wheat/25 text-ink",
-};
-
-export function Tag(props: { icon?: IconName; label: string; tone: TagTone }) {
-  return (
-    <span class={["inline-flex items-center gap-1 rounded-sm px-1.5 py-px text-xs font-medium", tagTones[props.tone]]}>
-      {props.icon && <Icon name={props.icon} size={12} />}
-      {props.label}
-    </span>
-  );
 }
 
 export function Empty(props: { icon: IconName; children: JSX.Element }) {

@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 import { A } from "./A";
-import { Icon } from "./Icon";
+import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { Tip } from "./Tip";
 
@@ -9,7 +9,7 @@ export function IconButton(props: {
   icon: IconName;
   label: string;
   onClick: () => void;
-  size?: number;
+  size?: IconSize;
   tone?: "danger";
   pressed?: boolean;
   disabled?: boolean;

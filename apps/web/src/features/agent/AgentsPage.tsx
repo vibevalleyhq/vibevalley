@@ -75,7 +75,7 @@ function AgentsPage() {
             aria-label={t("web.agent.list.makeOrchestrator")}
             class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-ok-ink"
           >
-            <Icon name="add" size={28} />
+            <Icon name="add" size={24} />
             {t("web.agent.list.makeOrchestrator")}
           </A>
         </div>
@@ -106,7 +106,7 @@ function AgentsPage() {
             aria-label={t("web.agent.list.make")}
             class="flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-ok-ink"
           >
-            <Icon name="add" size={28} />
+            <Icon name="add" size={24} />
             {t("web.agent.list.make")}
           </A>
         </div>

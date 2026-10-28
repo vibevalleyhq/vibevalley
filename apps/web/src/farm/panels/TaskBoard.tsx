@@ -347,7 +347,7 @@ function SmallBtn(props: { label: string; onClick?: () => void; primary?: boolea
       onClick={() => props.onClick?.()}
       class={[
         "px-2.5 py-0.5 text-[12px] enabled:cursor-pointer disabled:opacity-40",
-        props.primary ? "bg-leaf-500 text-cream-50 enabled:hover:bg-leaf-600" : "bg-cream-50 text-bark-800 enabled:hover:bg-cream-200",
+        props.primary ? "bg-leaf-500 text-bark-900 enabled:hover:bg-leaf-hover" : "bg-cream-50 text-bark-800 enabled:hover:bg-cream-200",
       ]}
     >
       {props.label}
@@ -553,7 +553,7 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
                   type="button"
                   aria-pressed={aria(on())}
                   onClick={() => setNeeds(on() ? needs().filter((x) => x !== n.id) : [...needs(), n.id])}
-                  class={["cursor-pointer px-2 py-0.5 text-[12px]", on() ? "bg-leaf-500 text-cream-50" : "bg-cream-50 text-bark-800 hover:bg-cream-200"]}
+                  class={["cursor-pointer px-2 py-0.5 text-[12px]", on() ? "bg-leaf-500 text-bark-900" : "bg-cream-50 text-bark-800 hover:bg-cream-200"]}
                 >
                   {n.title}
                 </button>

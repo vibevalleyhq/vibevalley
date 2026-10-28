@@ -24,6 +24,9 @@ export const readMeasure = 40;
 
 export const pxDrop = "shadow-[2px_2px_0_0_var(--color-px-drop)]";
 
+/** The pixel skin's one focus ring: a leaf line a pixel off the edge, only when the keyboard got there. */
+export const pxFocus = "outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-500 focus-visible:outline-solid";
+
 /** The 2 px cream-300 line inside a box: an inset shadow, so it takes no room from what is inside. */
 export const pxRing = "shadow-[inset_0_0_0_2px_var(--color-cream-300)]";
 

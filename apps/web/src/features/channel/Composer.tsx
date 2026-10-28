@@ -5,7 +5,7 @@ import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 
-import { createSignal, For, Show, untrack } from "solid-js";
+import { createSignal, flush, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Channel } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -66,10 +66,10 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     const to = el?.selectionEnd ?? from;
     const next = box.text().slice(0, from) + emojiText + box.text().slice(to);
     box.edit(next, from + emojiText.length);
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(from + emojiText.length, from + emojiText.length);
-    });
+    // Written now, so a key typed right after lands after the emoji (composing.ts, choose).
+    flush();
+    el?.focus();
+    el?.setSelectionRange(from + emojiText.length, from + emojiText.length);
   };
   // ↑ in an empty box changes the owner's last message here; Esc lets go of the message being answered.
   const onKey = (e: KeyboardEvent) => {

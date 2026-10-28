@@ -43,7 +43,7 @@ function Chip(props: { text: string; on: boolean; onClick: () => void; testid: s
       data-key={props.item}
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      class={["cursor-pointer px-3 py-1 text-[12px]", props.on ? "bg-leaf-500 text-cream-50" : "bg-cream-200 text-bark-800 hover:bg-cream-300"]}
+      class={["cursor-pointer px-3 py-1 text-[12px]", props.on ? "bg-leaf-500 text-bark-900" : "bg-cream-200 text-bark-800 hover:bg-cream-300"]}
     >
       {props.text}
     </button>

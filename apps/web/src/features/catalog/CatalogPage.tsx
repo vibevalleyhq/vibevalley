@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
-// 图鉴: every drawing the farm uses, its pointers and its sounds. /catalog is the drawings,
-// /catalog/<name> one of them large, /catalog/cursors and /catalog/sounds the other shelves.
+// 图鉴: every drawing the farm uses, its pointers and its sounds, and the workbench's own kit. /catalog is the drawings,
+// /catalog/<name> one of them large, /catalog/cursors, /catalog/sounds and /catalog/kit the other shelves.
 
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -17,6 +17,7 @@ import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
 import { Card, Quiet, Toggle } from "../../ui/layout";
+import { KitShelf } from "./Kit";
 
 type Ground = "check" | "grass" | "night";
 const grounds: { value: Ground; label: string }[] = [
@@ -61,11 +62,12 @@ const shelfTabs = [
   { id: "sprites", label: t("web.catalog.tab.sprites"), to: "/catalog" },
   { id: "cursors", label: t("web.catalog.tab.cursors"), to: "/catalog/cursors" },
   { id: "sounds", label: t("web.catalog.tab.sounds"), to: "/catalog/sounds" },
+  { id: "kit", label: t("web.catalog.tab.kit"), to: "/catalog/kit" },
 ] as const;
 
 /** `rest` is the path after /catalog/. */
 export function CatalogPage(props: { rest: string }) {
-  const shelf = () => (props.rest === "cursors" ? "cursors" : props.rest === "sounds" ? "sounds" : "sprites");
+  const shelf = () => (props.rest === "cursors" || props.rest === "sounds" || props.rest === "kit" ? props.rest : "sprites");
   const tabs = () => (
     <div role="tablist" aria-label={t("web.catalog.shelves")} class="flex gap-0.5 rounded-lg bg-hover p-0.5">
       <For each={shelfTabs}>
@@ -94,6 +96,9 @@ export function CatalogPage(props: { rest: string }) {
         </Match>
         <Match when={shelf() === "sounds"}>
           <Sounds tabs={tabs()} />
+        </Match>
+        <Match when={shelf() === "kit"}>
+          <KitShelf tabs={tabs()} />
         </Match>
       </Switch>
     </div>

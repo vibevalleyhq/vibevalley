@@ -1,6 +1,6 @@
 import { omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { cx, pxDrop, pxText } from "./style";
+import { cx, pxDrop, pxFocus, pxText } from "./style";
 import { SpriteIcon } from "./icons";
 
 export type PxTone = "plain" | "primary" | "danger" | "accent";
@@ -8,9 +8,10 @@ export type PxSize = "md" | "sm" | "icon" | "custom";
 
 const tones: Record<PxTone, string> = {
   plain: "bg-cream-50 enabled:hover:bg-cream-hover text-bark-900",
-  primary: "bg-leaf-500 enabled:hover:bg-leaf-hover text-cream-50",
+  // Bark on leaf, as accent is bark on wheat: cream on leaf reads at 2.5:1, under WCAG AA.
+  primary: "bg-leaf-500 enabled:hover:bg-leaf-hover text-bark-900",
   // berry at 95 %.
-  danger: "bg-berry enabled:hover:bg-[#be4637] text-cream-50",
+  danger: "bg-berry enabled:hover:bg-berry-hover text-cream-50",
   accent: "bg-wheat enabled:hover:bg-wheat-hover text-bark-900",
 };
 
@@ -46,7 +47,7 @@ export function PxButton(
       class={[
         pxText.sm,
         "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap select-none",
-        "outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-500 focus-visible:outline-solid",
+        pxFocus,
         "disabled:cursor-default disabled:opacity-45",
         sizes[props.size ?? "md"],
         bare()

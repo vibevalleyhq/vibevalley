@@ -7,14 +7,14 @@ import { onSettled } from "solid-js";
 import { dictation, insertDictated } from "./dictation";
 import { createExternal } from "../../base/external";
 import { ready, useSettings } from "../../base/query";
-import { Icon } from "../../ui/Icon";
+import { Icon, type IconSize } from "../../ui/Icon";
 
 /** Tap to start talking, tap again to stop: the words go into the field at its caret, for the owner to read before sending. */
 export function DictationButton(props: {
   field: () => HTMLTextAreaElement | HTMLInputElement | undefined;
   value: string;
   onValue: (v: string, caret: number) => void;
-  size?: number;
+  size?: IconSize;
   class?: string;
 }) {
   const version = createExternal(dictation.subscribe, () => dictation.version);

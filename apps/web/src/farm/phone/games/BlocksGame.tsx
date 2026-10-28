@@ -127,7 +127,7 @@ export function BlocksGame(props: { big?: boolean }) {
           role="img"
         />
         <Show when={!g() || g()!.over || !playing()}>
-          <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
+          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
             <span>
               {g()?.over ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
