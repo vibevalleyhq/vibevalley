@@ -12,7 +12,8 @@ import { MossPlayground, VoiceForm } from "../voice";
 import { A, Navigate } from "../../ui/A";
 import { Icon } from "../../ui/Icon";
 import { TextInput } from "../../ui/Field";
-import { matches, SettingsPage as Page, SettingsSearch } from "../../ui/settings";
+import { matches } from "../../base/search";
+import { SettingsPage as Page, SettingsSearch } from "../../ui/settings";
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
@@ -53,7 +54,7 @@ export function SettingsPage(props: { rest: string }) {
   const parts = () => props.rest.split("/");
   const section = () => sections.find((s) => s.id === parts()[0]);
   const id = () => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined);
-  const shown = (g: Group) => sections.filter((s) => s.group === g && (q() === "" || matches(q(), s.label, s.words)));
+  const shown = (g: Group) => sections.filter((s) => s.group === g && matches(q(), [s.label, s.words]));
   return (
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (

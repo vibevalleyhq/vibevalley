@@ -1,3 +1,4 @@
+import { matches } from "../../base/search";
 import { list, t } from "@vibevalley/i18n";
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
@@ -14,7 +15,6 @@ import {
   type Lane,
   laneOf,
   laneStatus,
-  matchesQuery,
   moveOf,
   type Move,
   tagText,
@@ -88,7 +88,7 @@ export interface BoardFilter {
 export const noFilter: BoardFilter = { query: "", project: "", agent: "" };
 export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.project !== "" || f.agent !== "";
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
-  (f.project === "" || cardProject(c) === f.project) && (f.agent === "" || cardAgent(c) === f.agent) && matchesQuery(f.query, cardWords(c));
+  (f.project === "" || cardProject(c) === f.project) && (f.agent === "" || cardAgent(c) === f.agent) && matches(f.query, cardWords(c));
 
 const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.reviewedAt ?? 0);
 
