@@ -8,6 +8,9 @@ import { join } from "node:path";
 import { type BrainMessage, messageText } from "../agent/brain/messages.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { type Op, schemas, toolName } from "../tool/schemas.ts";
+import type { Tool } from "../agent/loop/agent.ts";
+import { Effect } from "effect";
+import { noResult } from "./prompts.ts";
 
 /** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in
  * it, each when given), notCalled (tool), silent (no words said), says (contains in the words), saysNot (contains not in
@@ -115,3 +118,34 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
 export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
 
 export const committed = join(import.meta.dirname, "testdata", "evals");
+
+/** Arguments as one string whatever order their keys came in. */
+const argsKey = (args: unknown): string =>
+  JSON.stringify(args, (_, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v,
+  );
+
+/** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once,
+ * and nothing for another: the recorded turn is the wrong one, and its answer to a call the model did not make again (a
+ * start it was told not to make) would tell the model it did. None touches the farm; its own tools (memory, archive) work
+ * on the replay's own home. */
+export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
+  const calls = new Map<string, string>();
+  for (const m of did) if (m.role === "assistant") for (const c of m.content) if (c.type === "toolCall") calls.set(c.id, c.name + " " + argsKey(c.arguments));
+  const recorded = new Map<string, Extract<BrainMessage, { role: "toolResult" }>[]>();
+  for (const m of did) {
+    if (m.role !== "toolResult") continue;
+    const key = calls.get(m.toolCallId);
+    if (key) recorded.set(key, [...(recorded.get(key) ?? []), m]);
+  }
+  return tools.map((t) => ({
+    ...t,
+    execute: (args: unknown) =>
+      Effect.suspend(() => {
+        const next = recorded.get(t.name + " " + argsKey(args))?.shift();
+        if (!next) return Effect.succeed({ content: [{ type: "text" as const, text: noResult }] });
+        if (next.isError) return Effect.fail(new Error(next.content.map((c) => (c.type === "text" ? c.text : "")).join("")));
+        return Effect.succeed({ content: next.content });
+      }),
+  }));
+}

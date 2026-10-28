@@ -1,7 +1,10 @@
 import { assistantMessage, toolCall } from "../ai/testing.ts";
 import type { BrainMessage } from "../agent/brain/messages.ts";
 import { describe, expect, it } from "vite-plus/test";
-import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf } from "./evals.ts";
+import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf, stubbed } from "./evals.ts";
+import { noResult } from "./prompts.ts";
+import { Effect } from "effect";
+import type { Tool } from "../agent/loop/agent.ts";
 
 const call = assistantMessage([toolCall("issue_create", { title: "加个 README", project: "demo", start: true }, "c1")]);
 const turn: BrainMessage[] = [
@@ -60,5 +63,28 @@ describe("the orchestrator's evals", () => {
       }
       expect({ file, missed: check(c.expect, c.did).length > 0 }).toEqual({ file, missed: true });
     }
+  });
+
+  // A replay answers a call only as the case recorded that same call: the recorded turn is the wrong one, and its answer to a
+  // start the model was told not to make would tell the model it made one.
+  it("answer in a replay only the call the case recorded, once", async () => {
+    const issueCreate: Tool = { name: "issue_create", description: "", parameters: {}, execute: () => Effect.die("not stubbed") };
+    const recorded: BrainMessage[] = [
+      assistantMessage([toolCall("issue_create", { title: "白屏", start: true }, "c1"), toolCall("issue_create", { title: "坏了" }, "c2")]),
+      { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
+      { role: "toolResult", toolCallId: "c2", toolName: "issue_create", content: [{ type: "text", text: "没记" }], isError: true, timestamp: 0 },
+    ];
+    const [tool] = stubbed([issueCreate], recorded);
+    const answer = (args: unknown) =>
+      Effect.runPromise(
+        tool!.execute(args, { id: "x" }).pipe(
+          Effect.map((r) => r.content.map((c) => (c.type === "text" ? c.text : "")).join("")),
+          Effect.catch((e: Error) => Effect.succeed("error: " + e.message)),
+        ),
+      );
+    expect(await answer({ title: "白屏" })).toBe(noResult);
+    expect(await answer({ start: true, title: "白屏" })).toBe("派了");
+    expect(await answer({ title: "白屏", start: true })).toBe(noResult);
+    expect(await answer({ title: "坏了" })).toBe("error: 没记");
   });
 });
