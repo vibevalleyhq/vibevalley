@@ -27,7 +27,7 @@ export interface Expect {
  * what the model saw when the turn began (compactions applied), the input that began it, and the turn up to the next input. */
 export interface EvalCase {
   readonly id: string;
-  readonly created: number;
+  readonly createdAt: number;
   readonly model: string;
   readonly want: string;
   /** The whole MEMORY.md when the turn was marked, not necessarily as it was in the turn. */

@@ -112,8 +112,8 @@ export const catalogs = {
       orchestratorRuntime: "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
       newAgentId: "新档案的 id 要留空；指定 id 请用保存",
       newSkillId: "新技能的 id 要留空；指定 id 请用保存",
-      deleteAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
-      deleteSkill: "删掉技能「{name}」",
+      removeAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
+      removeSkill: "删掉技能「{name}」",
       modelFailed: "模型出错了",
       noDeepSeekKey: "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
       refused: { launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数", serviceTier: "DeepSeek 没有服务档位" },
@@ -3443,7 +3443,7 @@ export const catalogs = {
           stop: "停下 {name}",
           play: "试听 {name}",
         },
-        moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
+        moss: { console: "MOSS 开放平台", verify: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
         dictationVia: "听写走哪",
         dictationOwn: "自己的地址",
         dictationMossIntro: "录音经服务端交给 MOSS 转写，用 MOSS Live 的同一把 Key。",
@@ -3648,8 +3648,8 @@ export const catalogs = {
       orchestratorRuntime: "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
       newAgentId: "Leave a new profile's id empty; to choose the id, save it instead",
       newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
-      deleteAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
-      deleteSkill: 'Delete the skill "{name}"',
+      removeAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
+      removeSkill: 'Delete the skill "{name}"',
       modelFailed: "the model failed",
       noDeepSeekKey: "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
       refused: { launchArgs: "VibeValley runs inside the server process and takes no command-line arguments", serviceTier: "DeepSeek has no service tiers" },
@@ -7149,7 +7149,7 @@ export const catalogs = {
         },
         moss: {
           console: "MOSS platform",
-          check: "Check that it connects",
+          verify: "Check that it connects",
           checking: "Connecting…",
           ok: "Connected",
           keyHint: "A key from the MOSS platform, used only by this machine's server",
@@ -7321,8 +7321,6 @@ export interface Messages {
   "mobile.unreachable": undefined;
   "mobile.waiting": undefined;
   "server.agent.defaultStaysOrchestrator": undefined;
-  "server.agent.deleteAgent": { readonly id: string | number; readonly name: string | number; readonly runtime: string | number };
-  "server.agent.deleteSkill": { readonly name: string | number };
   "server.agent.efforts": { readonly asked: string | number; readonly efforts: string | number; readonly runtime: string | number };
   "server.agent.effortsAnd": undefined;
   "server.agent.modelFailed": undefined;
@@ -7337,6 +7335,8 @@ export interface Messages {
   "server.agent.quoted": { readonly name: string | number };
   "server.agent.refused.launchArgs": undefined;
   "server.agent.refused.serviceTier": undefined;
+  "server.agent.removeAgent": { readonly id: string | number; readonly name: string | number; readonly runtime: string | number };
+  "server.agent.removeSkill": { readonly name: string | number };
   "server.agent.template.badId": { readonly file: string | number; readonly id: string | number };
   "server.agent.template.badVersion": { readonly file: string | number };
   "server.agent.template.builtIn": { readonly id: string | number };
@@ -10808,11 +10808,11 @@ export interface Messages {
   "web.voice.voice.microsoftKey": undefined;
   "web.voice.voice.missing": undefined;
   "web.voice.voice.model": undefined;
-  "web.voice.voice.moss.check": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.console": undefined;
   "web.voice.voice.moss.keyHint": undefined;
   "web.voice.voice.moss.ok": undefined;
+  "web.voice.voice.moss.verify": undefined;
   "web.voice.voice.nextCall": undefined;
   "web.voice.voice.noSettings": { readonly why: string | number };
   "web.voice.voice.orchestratorPage": undefined;

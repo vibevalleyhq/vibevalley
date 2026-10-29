@@ -21,8 +21,8 @@
   "orchestratorRuntime": "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
   "newAgentId": "Leave a new profile's id empty; to choose the id, save it instead",
   "newSkillId": "Leave a new skill's id empty; to choose the id, save it instead",
-  "deleteAgent": "Delete the profile \"{name}\" ({id}, on {runtime}): tickets already sent to it keep it",
-  "deleteSkill": "Delete the skill \"{name}\"",
+  "removeAgent": "Delete the profile \"{name}\" ({id}, on {runtime}): tickets already sent to it keep it",
+  "removeSkill": "Delete the skill \"{name}\"",
   "modelFailed": "the model failed",
   "noDeepSeekKey": "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
   "refused": {

@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Check, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { setLocale } from "@vibevalley/i18n";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
@@ -79,7 +79,7 @@ export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonl
 
 export interface SettingShape {
   readonly status: () => SettingsStatus;
-  readonly check: (u: SettingsUpdate) => Check;
+  readonly validate: (u: SettingsUpdate) => Validation;
   /** A key missing from the update is kept, an empty one cleared; nothing is saved when something cannot be right. */
   readonly save: (u: SettingsUpdate) => Effect.Effect<SettingsStatus, SettingRefused>;
   readonly deepseekApiKey: () => string;
@@ -194,7 +194,7 @@ export const make = Effect.gen(function* () {
 
   const shape: SettingShape = {
     status,
-    check: (u) => {
+    validate: (u) => {
       const problem = settingsProblem(u);
       return problem ? { problem } : {};
     },

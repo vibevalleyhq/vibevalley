@@ -17,7 +17,7 @@ export const mossTranscription = { url: "https://api.mosi.cn/v1", model: "moss-t
 /** Real time: the handshake and the first answer each come within a few hundred ms. */
 const deadlineMs = 8_000;
 
-export type MossCheck =
+export type MossVerify =
   | { readonly kind: "ok" }
   | { readonly kind: "refused"; readonly why: string }
   | { readonly kind: "unreachable"; readonly why: string }
@@ -109,7 +109,7 @@ const handshake = (key: string, transport: MossTransport) =>
   });
 
 /** Whether MOSS Live takes key. */
-export const checkMoss = (key: string, transport: MossTransport = nodeTransport): Effect.Effect<MossCheck> =>
+export const verifyMoss = (key: string, transport: MossTransport = nodeTransport): Effect.Effect<MossVerify> =>
   Effect.gen(function* () {
     const got = yield* handshake(key, transport);
     if (got === "attached") return { kind: "ok" } as const;

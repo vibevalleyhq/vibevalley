@@ -283,7 +283,7 @@ export class AgentHost<R> {
       const id = newId();
       const evalCase = {
         id,
-        created: this.time.now(),
+        createdAt: this.time.now(),
         model,
         want: w,
         memory: memoryText,

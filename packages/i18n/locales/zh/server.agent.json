@@ -21,8 +21,8 @@
   "orchestratorRuntime": "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
   "newAgentId": "新档案的 id 要留空；指定 id 请用保存",
   "newSkillId": "新技能的 id 要留空；指定 id 请用保存",
-  "deleteAgent": "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
-  "deleteSkill": "删掉技能「{name}」",
+  "removeAgent": "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
+  "removeSkill": "删掉技能「{name}」",
   "modelFailed": "模型出错了",
   "noDeepSeekKey": "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
   "refused": {

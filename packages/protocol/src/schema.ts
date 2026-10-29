@@ -23,7 +23,7 @@ export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   checkedAt: Schema.Number,
 });
 
-export const Check: Codec<T.Check> = Schema.Struct({
+export const Validation: Codec<T.Validation> = Schema.Struct({
   problem: Schema.optionalKey(Schema.String),
 });
 
@@ -121,11 +121,11 @@ export const AgentTemplate: Codec<T.AgentTemplate> = Schema.Struct({
   installed: Schema.mutable(Schema.Array(Schema.String)),
 });
 
-export const AgentCheckRequest: Codec<T.AgentCheckRequest> = Schema.Struct({
+export const AgentValidateRequest: Codec<T.AgentValidateRequest> = Schema.Struct({
   agents: Schema.mutable(Schema.Array(Agent)),
 });
 
-export const AgentCheck: Codec<T.AgentCheck> = Schema.Struct({
+export const AgentValidation: Codec<T.AgentValidation> = Schema.Struct({
   id: Schema.String,
   problems: Schema.mutable(Schema.Array(AgentProblem)),
 });
@@ -1188,7 +1188,7 @@ export const ConnectorLogin: Codec<T.ConnectorLogin> = Schema.Struct({
   secret: Schema.optionalKey(Schema.String),
 });
 
-export const VoiceAgent: Codec<T.VoiceAgent> = Schema.Struct({
+export const VoiceCall: Codec<T.VoiceCall> = Schema.Struct({
   agentId: Schema.String,
 });
 
@@ -1694,7 +1694,7 @@ export const SettingsUpdate: Codec<T.SettingsUpdate> = Schema.Struct({
   memorySources: Schema.optionalKey(Schema.mutable(Schema.Array(MemorySourceUpdate))),
 });
 
-export const MossCheckRequest: Codec<T.MossCheckRequest> = Schema.Struct({ key: Schema.optionalKey(Schema.String) });
+export const MossVerifyRequest: Codec<T.MossVerifyRequest> = Schema.Struct({ key: Schema.optionalKey(Schema.String) });
 
 export const Health: Codec<T.Health> = Schema.Struct({
   ok: Schema.Boolean,
@@ -2007,7 +2007,7 @@ export const ChooseTitleRequest: Codec<T.ChooseTitleRequest> = Schema.Struct({
 
 const renewRequestFields = { channel: Schema.String, uid: Schema.String };
 
-export const RenewRequest: Codec<T.RenewRequest> = Schema.Struct(renewRequestFields);
+export const VoiceGrantRenew: Codec<T.VoiceGrantRenew> = Schema.Struct(renewRequestFields);
 
 export const DictateRequest: Codec<T.DictateRequest> = Schema.Struct({
   audio: Schema.String,
@@ -2030,7 +2030,7 @@ export const VoiceHeard: Codec<T.VoiceHeard> = Schema.Struct({
   sendKey: Schema.optionalKey(Schema.String),
 });
 
-export const StartRequest: Codec<T.StartRequest> = Schema.Struct({ ...renewRequestFields, about: Schema.optionalKey(Schema.String) });
+export const VoiceCallStart: Codec<T.VoiceCallStart> = Schema.Struct({ ...renewRequestFields, about: Schema.optionalKey(Schema.String) });
 
 export const VerifyRequest: Codec<T.VerifyRequest> = Schema.Struct({
   code: Schema.String,

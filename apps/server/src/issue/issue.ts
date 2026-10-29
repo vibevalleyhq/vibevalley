@@ -485,7 +485,7 @@ export const make = (options: IssueOptions = {}) =>
     const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
       if (store.isOrchestrator(agent.id)) return { refused: t("server.issue.orchestratorNotHelper") };
       if (!agent.enabled) return { refused: t("server.issue.disabled", { name: agent.name }) };
-      for (const i of yield* runtimes.check(agent))
+      for (const i of yield* runtimes.problemsOf(agent))
         if (i.level === "error") return { refused: t("server.issue.cannotSend", { name: agent.name, why: i.text }) };
       const where = project.trim() || (agent.workdir ?? "").trim();
       if (!where) return { refused: t("server.issue.noProject") };
@@ -688,7 +688,7 @@ export const make = (options: IssueOptions = {}) =>
       if (to !== "todo") return yield* Effect.fail(refused(t("server.issue.handOverOnTodo")));
       if (issue.status === "in_progress") return yield* Effect.fail(refused(t("server.issue.stopFirst", { n: issue.number })));
       if (!a.enabled) return yield* Effect.fail(refused(t("server.issue.disabled", { name: a.name })));
-      for (const i of yield* runtimes.check(a))
+      for (const i of yield* runtimes.problemsOf(a))
         if (i.level === "error") return yield* Effect.fail(refused(t("server.issue.cannotSend", { name: a.name, why: i.text })));
       return a;
     });

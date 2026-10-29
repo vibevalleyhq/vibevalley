@@ -113,7 +113,7 @@ function apiErrorOf(value: unknown): ApiError | undefined {
       return validReason(value) && (value.settings === undefined || (VoiceFixValues as readonly unknown[]).includes(value.settings))
         ? (value as unknown as ApiError)
         : undefined;
-    case "VoiceAgentFailed":
+    case "VoiceCallFailed":
       return validReason(value) ? (value as unknown as ApiError) : undefined;
     default:
       return undefined;

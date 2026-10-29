@@ -12,7 +12,7 @@ import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
   type Changes,
-  type Check,
+  type Validation,
   type Conflict,
   type DayCount,
   type Author,
@@ -237,7 +237,7 @@ export interface ProjectShape {
   readonly root: string;
   readonly limit: number;
   readonly maxSessions: () => number;
-  readonly check: (req: NewProject) => Check;
+  readonly validate: (req: NewProject) => Validation;
   readonly create: (req: NewProject) => Effect.Effect<Project, ProjectError>;
   readonly list: () => Effect.Effect<Project[]>;
   readonly summary: (p: Project) => Effect.Effect<ProjectSummary>;
@@ -491,7 +491,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       root,
       limit: perProject,
       maxSessions,
-      check: (req) => {
+      validate: (req) => {
         const problem = projectProblem(req);
         return problem ? { problem } : {};
       },

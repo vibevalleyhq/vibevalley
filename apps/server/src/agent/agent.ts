@@ -251,7 +251,7 @@ export const make = Effect.gen(function* () {
       ),
     previewRemove: (id) =>
       Effect.map(deletableAgent(id), (a) => ({
-        does: [t("server.agent.deleteAgent", { name: a.name, id: a.id, runtime: a.runtime })],
+        does: [t("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })],
       })),
     saveSkill: (skill) =>
       Effect.as(
@@ -285,7 +285,7 @@ export const make = Effect.gen(function* () {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
         return {
           does: [
-            t("server.agent.deleteSkill", { name: k.name }),
+            t("server.agent.removeSkill", { name: k.name }),
             ...(holders.length > 0 ? [t("server.agent.unequip", { holders: list(holders.map((name) => t("server.agent.quoted", { name }))) })] : []),
           ],
         };

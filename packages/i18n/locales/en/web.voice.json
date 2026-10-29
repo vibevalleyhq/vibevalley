@@ -82,7 +82,7 @@
     },
     "moss": {
       "console": "MOSS platform",
-      "check": "Check that it connects",
+      "verify": "Check that it connects",
       "checking": "Connecting…",
       "ok": "Connected",
       "keyHint": "A key from the MOSS platform, used only by this machine's server"

@@ -64,7 +64,7 @@ export interface RuntimeShape {
   readonly info: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
   readonly update: (id: string, s: RuntimeSettings) => Effect.Effect<RuntimeInfo | undefined, ApiError>;
   /** The profile's problems as it would be dispatched now. */
-  readonly check: (agent: Agent) => Effect.Effect<AgentProblem[]>;
+  readonly problemsOf: (agent: Agent) => Effect.Effect<AgentProblem[]>;
   readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
   /** Every profile, and whether it can be sent now. */
   readonly candidates: Effect.Effect<Candidate[]>;
@@ -479,7 +479,7 @@ export const make = (options: RuntimeOptions = {}) =>
               refresh(id),
             )
           : Effect.succeed(undefined),
-      check: (agent) => Effect.map(assess(agent), (a) => a.problems),
+      problemsOf: (agent) => Effect.map(assess(agent), (a) => a.problems),
       assess,
       candidates,
       choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),

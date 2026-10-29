@@ -1,6 +1,6 @@
 {
   "id": "answer-from-state",
-  "created": 1792271220000,
+  "createdAt": 1792271220000,
   "model": "deepseek-flash",
   "want": "主人问哪些在等他，管家派了个帮工去查。农场自己的数据就能答：用 issue_list（wantsOwner）列出来，不建工单。",
   "memory": "",

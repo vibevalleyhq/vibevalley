@@ -498,7 +498,7 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
     setBusy(true);
     setError(undefined);
     try {
-      const problem = (await api.project.check(request)).problem;
+      const problem = (await api.project.validate(request)).problem;
       if (problem) {
         setError(problem);
         return;

@@ -49,7 +49,7 @@
 
 ## 单位、时刻和长短
 
-- 时长带单位：`stalePauseMs`、`weixinPollMs`；时刻用 `At`：`createdAt`、`closedAt`、`endedAt`。只写 `timeout`、`time` 时，读的人不知道是毫秒还是秒、是一段还是一刻。
+- 时长带单位：`stalePauseMs`、`weixinPollMs`、`idleWaitMs`；时刻用 `At`：`createdAt`、`closedAt`、`endedAt`，本身就说一刻的词（`since`、`until`）不另加。只写 `timeout`、`time` 时，读的人不知道是毫秒还是秒、是一段还是一刻。
 - 名字的长短跟作用域走：三行的回调里用 `c`、`p`、`e`，模块级的、导出的写全。
 
 ## 文件和代码的形状
@@ -83,14 +83,13 @@
 
 ## 现有的双关
 
-下面这些词在仓库里指不止一样东西。新代码只用左列的那个意思；其余的意思改名之前，写的时候带上限定（`voice.session` 而不是 `session`）。
+下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；其余的意思改名之前，写的时候带上限定。
 
 | 词 | 指的是 | 也被用来指 |
 |---|---|---|
-| session | 帮工的一次执行（`Session`、`session_run`） | 一通电话（`voice.session.create`、`voice.session.renew`） |
-| agent | 帮工的档案（`Agent`、`agent.list`） | 声网替主人说话的那个（`voice.agent.start`） |
-| check | `vp check`（格式、lint、类型） | 校验一份输入（`setting.check`、`project.check`）；试一把钥匙（`voice.moss.check`）；项目合并前跑的 `.vibevalley/check`；验收标准的结果（`CriterionCheck`） |
-| rules | 测试金字塔的规则层 | 业务的纯函数（`rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
+| rules | 测试金字塔的规则层 | 业务的纯函数（`rules.ts`，照「起不出名字就先拆」逐个拆）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
+
+已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`project.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、项目的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 
 ## 改名
 

@@ -97,7 +97,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByTestId("ringing")).toHaveAttribute("data-key", call.id);
   await expect(page.getByTestId("phone-button")).toHaveAttribute("data-state", "ringing");
   // Answering is the call to the orchestrator, the chat's call button's one.
-  const calling = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
+  const calling = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.grant.create")) && r.method() === "POST");
   await phone.getByTestId("answer").click();
   await calling;
   // The call is on the phone, unfolded to the chat where what is said shows; what called opens beside it.
@@ -124,7 +124,7 @@ test("calling the orchestrator on the phone is the chat's call: one call, the sa
   await page.getByTestId("phone-button").click();
   const phone = page.getByTestId("phone");
   const chat = page.getByTestId("farm-chat");
-  const dialed = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
+  const dialed = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.grant.create")) && r.method() === "POST");
   await phone.locator('[data-key="orchestrator"]').click();
   await dialed;
   await expect(chat).toBeVisible();
@@ -134,7 +134,7 @@ test("calling the orchestrator on the phone is the chat's call: one call, the sa
   await page.keyboard.press("Escape");
   await expect(chat).toHaveCount(0);
   // After a call that did not get through, the line's own key tries again, and unfolds the phone as it does.
-  const again = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
+  const again = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.grant.create")) && r.method() === "POST");
   await line.getByTestId("line-key").click();
   await again;
   await expect(chat).toBeVisible();

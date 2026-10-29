@@ -107,7 +107,7 @@ export interface ServerReady {
 }
 
 /** What checking a form before saving it found: the first thing that would be refused, if any. */
-export interface Check {
+export interface Validation {
   problem?: string;
 }
 
@@ -125,11 +125,11 @@ export interface AgentProblem {
   text: string;
 }
 
-export interface AgentCheckRequest {
+export interface AgentValidateRequest {
   agents: Agent[];
 }
 
-export interface AgentCheck {
+export interface AgentValidation {
   id: string;
   problems: AgentProblem[];
 }
@@ -951,7 +951,7 @@ export interface ConnectorLogin {
   secret?: string;
 }
 
-export interface VoiceAgent {
+export interface VoiceCall {
   agentId: string;
 }
 
@@ -1697,7 +1697,7 @@ export interface SettingsUpdate {
 }
 
 /** A MOSS Live key to try; the saved one when absent. */
-export interface MossCheckRequest {
+export interface MossVerifyRequest {
   key?: string;
 }
 
@@ -2432,7 +2432,7 @@ export interface ChooseTitleRequest {
   tier?: number;
 }
 
-export interface RenewRequest {
+export interface VoiceGrantRenew {
   channel: string;
   uid: string;
 }
@@ -2458,7 +2458,7 @@ export interface VoiceHeard {
   sendKey?: string;
 }
 
-export interface StartRequest extends RenewRequest {
+export interface VoiceCallStart extends VoiceGrantRenew {
   /** The call answers a ring: what rang, which the orchestrator says first instead of the greeting. */
   about?: string;
 }

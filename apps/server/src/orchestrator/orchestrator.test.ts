@@ -1,4 +1,5 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
+import type { EvalCase } from "./evals.ts";
 import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Message } from "@vibevalley/ai/messages";
@@ -585,7 +586,13 @@ describe("the orchestrator", () => {
       yield* until(() => words().length >= 1, "its words");
       const asked = yield* until(() => (sessions.events(defaultOrchestrator) ?? []).find((e) => e.type === "user/message"), "its log");
       const made = yield* orchestrator.markWrong(asked.seq, "应该先看一眼地里");
-      const saved = JSON.parse(readFileSync(made.file, "utf8")) as { want: string; input: { customType: string }; did: { role: string }[]; tools: string[] };
+      const saved = JSON.parse(readFileSync(made.file, "utf8")) as Record<keyof EvalCase, unknown> & {
+        input: { customType: string };
+        did: { role: string }[];
+        tools: string[];
+      };
+      // Written in session/host.ts, read as an EvalCase here: every field the reader expects is there.
+      expect(Object.keys(saved).sort()).toEqual(["before", "createdAt", "did", "expect", "id", "input", "memory", "model", "tools", "want"]);
       expect(saved.want).toBe("应该先看一眼地里");
       expect(saved.input.customType).toBe("orchestratorInput");
       expect(saved.did.map((m) => m.role)).toContain("assistant");

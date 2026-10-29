@@ -77,7 +77,7 @@ describe("settings", () => {
         // The page sends the voice whole: what equals the defaults is left out all the same.
         yield* s.save({ voice: wanted });
         expect(file(config).voice).toEqual({ area: "CN", silenceMs: 600, greeting: "在呢。" });
-        expect(s.check({ voice: { persona: "  " } }).problem).toBeTruthy();
+        expect(s.validate({ voice: { persona: "  " } }).problem).toBeTruthy();
         yield* s.save({ agoraAppId: appId });
         expect(s.voice().area).toBe("CN");
         const reset = yield* s.save({ voice: {} });
@@ -117,7 +117,7 @@ describe("settings", () => {
         expect(after.mossKey).toEqual({ source: "settings", hint: "…6b9c" });
         expect(JSON.stringify(after)).not.toContain("sk-moss");
         expect(s.mossKey()).toBe("sk-moss-live-key-6b9c");
-        expect(s.check({ mossKey: "sk with space" }).problem).toBeDefined();
+        expect(s.validate({ mossKey: "sk with space" }).problem).toBeDefined();
         expect((yield* s.save({ mossKey: "" })).mossKey).toEqual({});
         expect(s.mossKey()).toBe("");
       }),

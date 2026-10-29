@@ -32,7 +32,7 @@
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
 | `setting.get` | `/api/v1/setting/get` | ✓ | ✓ |   |   |
-| `setting.check` | `/api/v1/setting/check` | ✓ | ✓ |   |   |
+| `setting.validate` | `/api/v1/setting/validate` | ✓ | ✓ |   |   |
 | `setting.update` | `/api/v1/setting/update` | ✓ |   |   |   |
 
 ## channel
@@ -78,13 +78,13 @@
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
 | `voice.hear` | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
-| `voice.moss.check` | `/api/v1/voice/moss/check` | ✓ | ✓ |   |   |
-| `voice.session.create` | `/api/v1/voice/session/create` | ✓ | ✓ |   |   |
-| `voice.session.renew` | `/api/v1/voice/session/renew` | ✓ | ✓ |   |   |
-| `voice.agent.start` | `/api/v1/voice/agent/start` | ✓ | ✓ |   |   |
-| `voice.agent.stop` | `/api/v1/voice/agent/stop` | ✓ | ✓ |   |   |
-| `voice.agent.hear` | `/api/v1/voice/agent/hear` | ✓ | ✓ |   |   |
-| `voice.agent.say` | `/api/v1/voice/agent/say` | ✓ | ✓ |   |   |
+| `voice.moss.verify` | `/api/v1/voice/moss/verify` | ✓ | ✓ |   |   |
+| `voice.grant.create` | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
+| `voice.grant.renew` | `/api/v1/voice/grant/renew` | ✓ | ✓ |   |   |
+| `voice.call.start` | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |
+| `voice.call.stop` | `/api/v1/voice/call/stop` | ✓ | ✓ |   |   |
+| `voice.call.hear` | `/api/v1/voice/call/hear` | ✓ | ✓ |   |   |
+| `voice.call.say` | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
 | `voice.dictate` | `/api/v1/voice/dictate` | ✓ | ✓ |   |   |
 
 ## issue
@@ -178,7 +178,7 @@
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
 | `agent.list` | `/api/v1/agent/list` | ✓ | ✓ |   |   |
-| `agent.check` | `/api/v1/agent/check` | ✓ | ✓ |   |   |
+| `agent.validate` | `/api/v1/agent/validate` | ✓ | ✓ |   |   |
 | `agent.create` | `/api/v1/agent/create` | ✓ |   |   |   |
 | `agent.update` | `/api/v1/agent/update` | ✓ |   |   |   |
 | `agent.delete` | `/api/v1/agent/delete` | ✓ |   |   |   |
@@ -216,7 +216,7 @@
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
 | `project.list` | `/api/v1/project/list` | ✓ | ✓ | ✓ |   |
-| `project.check` | `/api/v1/project/check` | ✓ | ✓ |   |   |
+| `project.validate` | `/api/v1/project/validate` | ✓ | ✓ |   |   |
 | `project.create` | `/api/v1/project/create` | ✓ | ✓ |   |   |
 | `project.language.list` | `/api/v1/project/language/list` | ✓ | ✓ |   |   |
 | `project.template.list` | `/api/v1/project/template/list` | ✓ | ✓ |   |   |

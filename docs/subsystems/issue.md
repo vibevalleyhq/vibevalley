@@ -59,14 +59,14 @@
 - **已完成只由主人点头。** 一轮怎么结束的（`completed`、`failed`、`interrupted`）只决定工单停在哪、请主人做什么，不决定活成没成：帮工最后一轮没做成（站位「卡住了」，`stuck: failed`）时 `moves` 里没有已完成，`statusMove` 和完成都拒绝，看板、命令行、管家的工具一样；叫停的一轮还能完成。
 - **谁干活不改变工单怎么走**：派给管家的工单和帮工的工单是同一套状态、站位和挪法（`statusMove` 里没有按做活的人分的支）。工单写明交付物 `deliver`：`change`（改动，合进项目）、`branch`（改动，分支留着给主人自己收）或 `answer`（结论，留在工单上）；派给管家的默认是 `answer`，管家不改代码。帮工对 `change` 和 `branch` 干一样的活。完成的按钮跟着交付物：结论是「知道了」（`acknowledge`），改动是「完成」（`complete`）。没有帮工在做的工单（管家在自己的进程里答）由它自己的 `lastRun`（`{ startedAt, endedAt?, outcome? }`，表的 `last_run`）说站在哪：交给管家时记下开始（进 `in_progress`），这一轮结束时记下结局（进 `in_review`），不管怎么结束都等主人：没做成的不能完成，叫停的能完成；挪回待办、重开是带着主人的话再交给管家（`OrchestratorWork.said`），关上不用请谁回家。服务端开机时只把还在答的关成 `lost`，等你看的留着；接着做的那一轮结束时，`lost` 的工单重新打开、记下结局。
 - **和帮工的档案的私聊是一张工单**（`Issue.talk` 是私聊的 id）：不在看板和 `issue.list`、`issue.history.list` 里，管家的 `issue_list` 也不列它，站位没有按钮；主人在私聊里说话等于在它的串里说话，没有执行在做时派一个只读的（`talkOn`），每轮交回来清掉改动，闲 10 分钟收工（[频道](docs/subsystems/channel.md)）。
-- **交付物是结论的工单只读**（`deliver: answer`）：交给帮工的活前面写明只读代码、跑只读的命令、不改文件不提交，最后要一个 json 代码块交结论：`conclusion`、`evidence`（依据，至少一条：文件和行号、命令和输出）、`unsure`、`next`（`issueJob`）。汇报怎么读归执行：`readReport` 读最后一个读得出结论又有依据的代码块（`session/rules.ts` 的 `parseAnswer`），放进 `report` 事实的 `answer`，折进帮工的 `lastRun.answer`；工单服务把它记到 `Issue.answer`（表的 `answer`），再请执行把这张工单的 worktree 重置回主分支（`Sessions.discardWork`：帮工留着，不在干活时才重置），所以它改了什么、提交了什么都不出这张工单，完成时交付总是 `none`。做完的一轮读不出结论，站位是「卡住了」（`stuck: failed`），不能完成，「接着修」带上读不出来的原因和格式（`answerCureWords`）。交付物在工单开着时能改（`issue.update` 的 `deliver`），下一轮照新的走。
+- **交付物是结论的工单只读**（`deliver: answer`）：交给帮工的活前面写明只读代码、跑只读的命令、不改文件不提交，最后要一个 json 代码块交结论：`conclusion`、`evidence`（依据，至少一条：文件和行号、命令和输出）、`unsure`、`next`（`issueBrief`）。汇报怎么读归执行：`readReport` 读最后一个读得出结论又有依据的代码块（`session/rules.ts` 的 `parseAnswer`），放进 `report` 事实的 `answer`，折进帮工的 `lastRun.answer`；工单服务把它记到 `Issue.answer`（表的 `answer`），再请执行把这张工单的 worktree 重置回主分支（`Sessions.discardWork`：帮工留着，不在干活时才重置），所以它改了什么、提交了什么都不出这张工单，完成时交付总是 `none`。做完的一轮读不出结论，站位是「卡住了」（`stuck: failed`），不能完成，「接着修」带上读不出来的原因和格式（`answerCureWords`）。交付物在工单开着时能改（`issue.update` 的 `deliver`），下一轮照新的走。
 - **子工单**带 `parent`、`blockedBy`：计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
-- **还没派的能改、能删、能排先后**（`issue.update` 的 `before`）；派出去以后只能改交付方式。交给帮工的是标题，空一行，再是说明，最后是编了号的验收标准，要它交活时逐条写「标准 N：做到了｜没做到｜不确定」和凭据（`issueJob`）。
+- **还没派的能改、能删、能排先后**（`issue.update` 的 `before`）；派出去以后只能改交付方式。交给帮工的是标题，空一行，再是说明，最后是编了号的验收标准，要它交活时逐条写「标准 N：做到了｜没做到｜不确定」和凭据（`issueBrief`）。
 - **备选的工单是草稿**：起草的帮工（`Session.draft`）只为写这张工单来，不是工单的帮工：不进 `issue_session`，`Issue.Sessions` 一直是空的，工单一直在 `backlog`。谁在起草（`Issue.drafting`）和状态一样从核心状态里的帮工现算，不另存；起草时不能开工（`moves` 里没有待办，`ready` 也拒绝），一张工单同时只有一个起草的。
 - **验收标准**（`Issue.criteria`）：一条一个主人能照着验的点。草稿写它，主人在派出去以前用 `issue.update` 改（给一个空列表就是清掉），派活时编好号写在活的最后；验收时详情把它逐条列出来。
 - **改动跟着动作走**：起草和挪状态（`issue.refine`、`issue.status.update`）都带一个 `edit`，是主人在详情里改了还没存的那几栏；服务端先存它再做这件事，动作被拒绝时改动也已经存下。页面不先存再做。
 - **帮工的自评**（`Issue.checks`）：汇报里「标准 N：做到了 —— 凭据」这样的行（`checksOf`，N 从 1 数，同一条以最后一行为准），存成 `{ criterion, result, proof }`，`criterion` 是 `criteria` 里的下标；最近一次带了自评的汇报算数，重开时清掉。帮工不写就没有，页面只列标准。
-- **标题一行**：主人写的一句话直接成为工单时（`splitJob`），第一行太长就取它的第一句、放不下就到最后一个停顿（`shortTitle`，40 个字以内），整段放进说明；起草的标题要求 20 个字以内。
+- **标题一行**：主人写的一句话直接成为工单时（`splitBrief`），第一行太长就取它的第一句、放不下就到最后一个停顿（`shortTitle`，40 个字以内），整段放进说明；起草的标题要求 20 个字以内。
 - **排队的上下文和排队一起提交**：首次派发的频道和 `RunTrigger`（定时任务的 id、是不是补跑）写进 `issue_queue`，和 `issue.queued_at` 同一个事务；重试照它恢复来源，开工成功时同一个事务清掉。
 
 ## 怎么走

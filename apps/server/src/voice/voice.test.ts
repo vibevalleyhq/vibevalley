@@ -319,7 +319,7 @@ describe("voice", () => {
       // A failure that is not retried: the retries have their own test (retrying, below).
       capture.status = 403;
       capture.body = `{"detail":"boom"}`;
-      expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceAgentFailed" });
+      expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceCallFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
@@ -625,10 +625,10 @@ describe("voice", () => {
       capture.body = `{"detail":"stop failed"}`;
       yield* Effect.flip(voice.stop(call.agentId));
       expect(yield* Effect.flip(voice.heard(call.agentId, "late", "", ""))).toMatchObject({
-        _tag: "VoiceAgentFailed",
+        _tag: "VoiceCallFailed",
       });
       expect(yield* Effect.flip(voice.said(call.agentId, "late"))).toMatchObject({
-        _tag: "VoiceAgentFailed",
+        _tag: "VoiceCallFailed",
       });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
@@ -637,7 +637,7 @@ describe("voice", () => {
     Effect.gen(function* () {
       const voice = yield* Voice;
       expect(yield* Effect.flip(voice.heardCurrent("none", "", ""))).toMatchObject({
-        _tag: "VoiceAgentFailed",
+        _tag: "VoiceCallFailed",
       });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );

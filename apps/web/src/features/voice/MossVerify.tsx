@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 // Whether MOSS Live takes the key: the one typed in, or the saved one. The server attaches a session and closes it
-// (voice.moss.check); the answer is a mark, its reason on hover.
+// (voice.moss.verify); the answer is a mark, its reason on hover.
 
 import { createSignal, Match, Switch } from "solid-js";
 import { api, reasonOf } from "../../base/api";
@@ -8,19 +8,19 @@ import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
 import { Tip } from "../../ui/Tip";
 
-export type MossCheckResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
+export type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 
-const said = (r: MossCheckResult) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
+const said = (r: MossVerifyResult) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
 
-export function MossCheck(props: { typed: () => string }) {
+export function MossVerify(props: { typed: () => string }) {
   const [busy, setBusy] = createSignal(false);
-  const [result, setResult] = createSignal<MossCheckResult>();
+  const [result, setResult] = createSignal<MossVerifyResult>();
   const check = async () => {
     setBusy(true);
     setResult(undefined);
     try {
       const key = props.typed().trim();
-      const r = await api.voice.moss.check(key ? { key } : {});
+      const r = await api.voice.moss.verify(key ? { key } : {});
       setResult(r.problem ? { ok: false, why: r.problem } : { ok: true });
     } catch (e) {
       setResult({ ok: false, why: reasonOf(e) });
@@ -28,14 +28,14 @@ export function MossCheck(props: { typed: () => string }) {
       setBusy(false);
     }
   };
-  return <MossCheckView busy={busy()} result={result()} onCheck={() => void check()} />;
+  return <MossVerifyView busy={busy()} result={result()} onCheck={() => void check()} />;
 }
 
 /** The check as it looks: nothing yet, asking, or the answer as a mark with its reason on hover. */
-export function MossCheckView(props: { busy: boolean; result?: MossCheckResult; onCheck: () => void }) {
+export function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult; onCheck: () => void }) {
   return (
     <div class="flex items-center gap-1.5">
-      <IconButton icon="plug" label={t("web.voice.voice.moss.check")} disabled={props.busy} onClick={() => props.onCheck()} />
+      <IconButton icon="plug" label={t("web.voice.voice.moss.verify")} disabled={props.busy} onClick={() => props.onCheck()} />
       <Switch>
         <Match when={props.busy}>
           <Tip text={t("web.voice.voice.moss.checking")}>

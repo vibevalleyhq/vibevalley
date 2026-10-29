@@ -1,6 +1,6 @@
 {
   "id": "keep-branch-on-complete",
-  "created": 1792271460000,
+  "createdAt": 1792271460000,
   "model": "deepseek-flash",
   "want": "主人说 #41 就这样、先别合、分支留着，管家照常完成，把改动合进了主分支。应该先用 issue_update 把 deliver 改成 branch，再挪到已完成。",
   "memory": "",
