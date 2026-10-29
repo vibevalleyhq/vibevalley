@@ -39,14 +39,14 @@ const healthPath = pathOf("server.health.get");
 const ask = (addr: string, code: string, name: string) =>
   fetch(addr + pathOf("lan.pair"), { method: "POST", body: JSON.stringify({ code, name }) }).then((r) => r.text());
 
-const open = (lan: Lan) =>
+const open = (lan: Lan["Service"]) =>
   Effect.map(lan.setOpen(true), (s) => {
     expect(s).toMatchObject({ open: true });
     expect(s.problem).toBeUndefined();
     return s.url!;
   });
 
-const pair = (lan: Lan, addr: string, name: string) =>
+const pair = (lan: Lan["Service"], addr: string, name: string) =>
   Effect.gen(function* () {
     const s = yield* lan.startPairing();
     const link = new URL(s.pairing!.link);

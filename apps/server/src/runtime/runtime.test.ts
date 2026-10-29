@@ -9,9 +9,9 @@ import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/pr
 import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { NodeServices } from "@effect/platform-node";
 import { Effect, Fiber, Layer, Stream } from "effect";
-import { Agents, layer as agentLayer } from "../agent/agent.ts";
+import { Agents } from "../agent/agent.ts";
 import { ServerConfig } from "../base/config.ts";
-import { Core, layer as coreLayer } from "../core/core.ts";
+import { Core } from "../core/core.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { testConfig } from "../testing/layers.ts";
 import { nextTurn, whenTrue } from "../testing/until.ts";
@@ -42,8 +42,8 @@ const notFound = async (id: string): Promise<RuntimeInfo> => ({
   checkedAt: Date.now(),
 });
 
-const world = (config: ServerConfig = testConfig()) =>
-  Layer.mergeAll(coreLayer.pipe(Layer.provide(projection)), agentLayer).pipe(
+const world = (config: ServerConfig["Service"] = testConfig()) =>
+  Layer.mergeAll(Core.layer.pipe(Layer.provide(projection)), Agents.layer).pipe(
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),
     Layer.provideMerge(NodeServices.layer),
   );

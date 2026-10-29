@@ -233,42 +233,45 @@ export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitH
   return { ...installed, loggedIn: true, account };
 });
 
-export interface Projects {
-  readonly root: string;
-  readonly limit: number;
-  readonly maxSessions: () => number;
-  readonly validate: (req: NewProject) => Validation;
-  readonly create: (req: NewProject) => Effect.Effect<Project, ProjectError>;
-  readonly list: () => Effect.Effect<Project[]>;
-  readonly summary: (p: Project) => Effect.Effect<ProjectSummary>;
-  readonly summaries: () => Effect.Effect<ProjectSummary[]>;
-  readonly stack: (name: string) => Effect.Effect<ProjectStack | undefined>;
-  readonly languages: (name: string) => Effect.Effect<ProjectLanguages | undefined, ProjectError>;
-  readonly activity: (name: string) => Effect.Effect<ProjectActivity | undefined>;
-  readonly contributions: (extra: readonly string[]) => Effect.Effect<Repo[]>;
-  readonly workplace: (project: string, issueNumber: number, worktree: boolean, baseBranch: string) => Effect.Effect<Workplace, ProjectError>;
-  readonly changes: (place: Workplace) => Effect.Effect<Changes, ProjectError>;
-  readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
-  readonly changedFiles: (cwd: string, baseBranch: string) => Effect.Effect<string[], ProjectError>;
-  readonly conflict: (place: Workplace, baseBranch?: string) => Effect.Effect<Conflict | undefined>;
-  readonly merge: (place: Workplace) => Effect.Effect<Merged, MergeFailure>;
-  readonly mergeInto: (place: Workplace, target: string) => Effect.Effect<Merged, MergeFailure>;
-  readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
-  readonly release: (place: Workplace) => Effect.Effect<WorkplaceRelease>;
-  readonly reset: (place: Workplace) => Effect.Effect<void, ProjectError>;
-  readonly clear: (project: string, issueNumber: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease>;
-  readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
-  readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
-  readonly houseRules: () => Effect.Effect<string>;
-  readonly githubStatus: () => GitHubStatus;
-  readonly refreshGitHub: () => Effect.Effect<GitHubStatus>;
-  readonly usesPullRequests: (name: string) => boolean;
-  readonly submitPullRequest: (place: Workplace, issue: Issue, conclusion: string) => Effect.Effect<PullRequest, MergeFailure | ProjectError>;
-  readonly pullRequestState: (name: string, n: number) => Effect.Effect<PullRequestState, ProjectError>;
-  readonly finishPullRequest: (name: string, n: number) => Effect.Effect<Merged, ProjectError>;
+export class Projects extends Context.Service<
+  Projects,
+  {
+    readonly root: string;
+    readonly limit: number;
+    readonly maxSessions: () => number;
+    readonly validate: (req: NewProject) => Validation;
+    readonly create: (req: NewProject) => Effect.Effect<Project, ProjectError>;
+    readonly list: () => Effect.Effect<Project[]>;
+    readonly summary: (p: Project) => Effect.Effect<ProjectSummary>;
+    readonly summaries: () => Effect.Effect<ProjectSummary[]>;
+    readonly stack: (name: string) => Effect.Effect<ProjectStack | undefined>;
+    readonly languages: (name: string) => Effect.Effect<ProjectLanguages | undefined, ProjectError>;
+    readonly activity: (name: string) => Effect.Effect<ProjectActivity | undefined>;
+    readonly contributions: (extra: readonly string[]) => Effect.Effect<Repo[]>;
+    readonly workplace: (project: string, issueNumber: number, worktree: boolean, baseBranch: string) => Effect.Effect<Workplace, ProjectError>;
+    readonly changes: (place: Workplace) => Effect.Effect<Changes, ProjectError>;
+    readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
+    readonly changedFiles: (cwd: string, baseBranch: string) => Effect.Effect<string[], ProjectError>;
+    readonly conflict: (place: Workplace, baseBranch?: string) => Effect.Effect<Conflict | undefined>;
+    readonly merge: (place: Workplace) => Effect.Effect<Merged, MergeFailure>;
+    readonly mergeInto: (place: Workplace, target: string) => Effect.Effect<Merged, MergeFailure>;
+    readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
+    readonly release: (place: Workplace) => Effect.Effect<WorkplaceRelease>;
+    readonly reset: (place: Workplace) => Effect.Effect<void, ProjectError>;
+    readonly clear: (project: string, issueNumber: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease>;
+    readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
+    readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
+    readonly houseRules: () => Effect.Effect<string>;
+    readonly githubStatus: () => GitHubStatus;
+    readonly refreshGitHub: () => Effect.Effect<GitHubStatus>;
+    readonly usesPullRequests: (name: string) => boolean;
+    readonly submitPullRequest: (place: Workplace, issue: Issue, conclusion: string) => Effect.Effect<PullRequest, MergeFailure | ProjectError>;
+    readonly pullRequestState: (name: string, n: number) => Effect.Effect<PullRequestState, ProjectError>;
+    readonly finishPullRequest: (name: string, n: number) => Effect.Effect<Merged, ProjectError>;
+  }
+>()("vibevalley/Project") {
+  static readonly layer = (hooks: ProjectHooks = {}) => Layer.effect(Projects, make(hooks));
 }
-
-export const Projects = Context.Service<Projects>("vibevalley/Project");
 
 /** What tests change: gh, and git's network. */
 export interface ProjectHooks {
@@ -487,7 +490,7 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const toMergeFailure = <A, R>(e: Effect.Effect<A, unknown, R>) => Effect.mapError(e, failed);
 
-    const shape: Projects = {
+    const shape = Projects.of({
       root,
       limit: perProject,
       maxSessions,
@@ -949,7 +952,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             return { text: "", commits: 0 };
           }),
         ),
-    };
+    });
     return shape;
   });
 
@@ -977,8 +980,6 @@ function repoDirs(dir: string, depth: number): string[] {
 }
 
 export const isDir = (path: string) => existsSync(path) && statSync(path).isDirectory();
-
-export const layer = (hooks: ProjectHooks = {}) => Layer.effect(Projects, make(hooks));
 
 /** As the server starts: a first look at GitHub; the page asks again with github.refresh. */
 export const start = Layer.effectDiscard(Effect.flatMap(Projects, (p) => Effect.forkScoped(p.refreshGitHub())));

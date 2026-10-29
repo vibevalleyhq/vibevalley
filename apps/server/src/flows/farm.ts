@@ -23,7 +23,7 @@ export const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, taskGraphsStart, notificationsStart);
 
 export interface Farm {
-  readonly config: ServerConfig;
+  readonly config: ServerConfig["Service"];
   readonly turns: ScriptedTurn[];
   readonly layer: ReturnType<typeof farmLayer>;
 }
@@ -34,7 +34,7 @@ export { helper };
 
 export function farm(
   options: Omit<WorldOptions, "runtimes"> & {
-    readonly change?: (c: ServerConfig) => ServerConfig;
+    readonly change?: (c: ServerConfig["Service"]) => ServerConfig["Service"];
     readonly runtime?: Runtime;
   } = {},
 ): Farm {

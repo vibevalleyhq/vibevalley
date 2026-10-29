@@ -8,7 +8,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Channels } from "./chat.ts";
 
-const mentionIds = (core: Core) =>
+const mentionIds = (core: Core["Service"]) =>
   frameOf(core.state())
     .inbox.filter((item) => item.kind === "mention")
     .map((item) => item.id);

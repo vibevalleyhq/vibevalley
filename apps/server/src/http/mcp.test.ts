@@ -28,7 +28,7 @@ it("forwards a disconnect to the Web handler", async () => {
           Orchestrator,
           Orchestrator.of({
             answerer: () => () => undefined,
-          } as unknown as Orchestrator),
+          } as unknown as Orchestrator["Service"]),
         ),
       ),
     ),

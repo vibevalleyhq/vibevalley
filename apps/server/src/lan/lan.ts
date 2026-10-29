@@ -61,26 +61,29 @@ interface Pairing {
   wrong: number;
 }
 
-export interface Lan {
-  readonly status: () => LanStatus;
-  readonly setOpen: (open: boolean) => Effect.Effect<LanStatus, ApiError>;
-  readonly startPairing: () => Effect.Effect<LanStatus, ApiError>;
-  readonly stopPairing: () => LanStatus;
-  /** What stopPairing would do; nothing changes. */
-  readonly previewStopPairing: () => Preview;
-  /** The code is used up either way. */
-  readonly answer: (allow: boolean) => Effect.Effect<LanStatus, ApiError>;
-  readonly pair: (code: string, name: string) => Effect.Effect<LanPaired, ApiError>;
-  readonly forget: (id: string) => Effect.Effect<LanStatus, ApiError>;
-  /** What forget would do, refused as it would be; nothing changes. */
-  readonly previewForget: (id: string) => Effect.Effect<Preview, ApiError>;
-  /** The device a request through the listener came from; undefined on this machine. */
-  readonly me: (device: string | undefined) => Effect.Effect<LanDevice, ApiError>;
-  /** Where the loopback server listens, once it does. */
-  readonly setUpstream: (address: string) => void;
+export class Lan extends Context.Service<
+  Lan,
+  {
+    readonly status: () => LanStatus;
+    readonly setOpen: (open: boolean) => Effect.Effect<LanStatus, ApiError>;
+    readonly startPairing: () => Effect.Effect<LanStatus, ApiError>;
+    readonly stopPairing: () => LanStatus;
+    /** What stopPairing would do; nothing changes. */
+    readonly previewStopPairing: () => Preview;
+    /** The code is used up either way. */
+    readonly answer: (allow: boolean) => Effect.Effect<LanStatus, ApiError>;
+    readonly pair: (code: string, name: string) => Effect.Effect<LanPaired, ApiError>;
+    readonly forget: (id: string) => Effect.Effect<LanStatus, ApiError>;
+    /** What forget would do, refused as it would be; nothing changes. */
+    readonly previewForget: (id: string) => Effect.Effect<Preview, ApiError>;
+    /** The device a request through the listener came from; undefined on this machine. */
+    readonly me: (device: string | undefined) => Effect.Effect<LanDevice, ApiError>;
+    /** Where the loopback server listens, once it does. */
+    readonly setUpstream: (address: string) => void;
+  }
+>()("vibevalley/Lan") {
+  static readonly layer = (options?: LanOptions) => Layer.effect(Lan, make(options));
 }
-
-export const Lan = Context.Service<Lan>("vibevalley/Lan");
 
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -446,5 +449,3 @@ export const make = (options: LanOptions = {}) =>
       },
     });
   });
-
-export const layer = (options?: LanOptions) => Layer.effect(Lan, make(options));

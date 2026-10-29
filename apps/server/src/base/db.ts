@@ -122,29 +122,30 @@ export function causeMessage(e: unknown): string {
  * process, so a query that fails is a bug or a full disk: run makes it a defect; attempt keeps the failure for the few
  * callers that log it and go on, or tell it as a refusal.
  */
-export interface Db {
-  readonly run: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
-  readonly attempt: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E>;
-  /** The one row, or undefined when there is none. Only no row is none: a query that fails is still a defect. */
-  readonly one: <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
-  /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
-  readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-}
-
-export const Db = Context.Service<Db>("vibevalley/Db");
-
-export const DbLayer = Layer.effect(
+export class Db extends Context.Service<
   Db,
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    const attempt = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(query, SqlClient.SqlClient, sql);
-    const run = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(attempt(query));
-    return Db.of({
-      run,
-      attempt,
-      one: (query) => Effect.map(run(Effect.catchNoSuchElement(query)), Option.getOrUndefined),
-      inTx: <A, E>(work: Effect.Effect<A, E>) =>
-        sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>,
-    });
-  }),
-);
+  {
+    readonly run: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
+    readonly attempt: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E>;
+    /** The one row, or undefined when there is none. Only no row is none: a query that fails is still a defect. */
+    readonly one: <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
+    /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
+    readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+  }
+>()("vibevalley/Db") {
+  static readonly layer = Layer.effect(
+    Db,
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const attempt = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(query, SqlClient.SqlClient, sql);
+      const run = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(attempt(query));
+      return Db.of({
+        run,
+        attempt,
+        one: (query) => Effect.map(run(Effect.catchNoSuchElement(query)), Option.getOrUndefined),
+        inTx: <A, E>(work: Effect.Effect<A, E>) =>
+          sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>,
+      });
+    }),
+  );
+}

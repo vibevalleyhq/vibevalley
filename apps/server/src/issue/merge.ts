@@ -14,10 +14,10 @@ import { statusMove } from "./moves.ts";
 import { pullRequestConclusion } from "./rules.ts";
 
 export interface MergeDeps {
-  readonly core: Core;
-  readonly sessions: Sessions;
-  readonly projects: Projects;
-  readonly chat: Channels;
+  readonly core: Core["Service"];
+  readonly sessions: Sessions["Service"];
+  readonly projects: Projects["Service"];
+  readonly chat: Channels["Service"];
   readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
   readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
   readonly get: (ref: string) => Effect.Effect<Issue, ApiError>;

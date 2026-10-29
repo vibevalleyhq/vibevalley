@@ -5,10 +5,10 @@ import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 import { Channels } from "../channel/chat.ts";
-import { layer as orchestrator } from "../orchestrator/orchestrator.ts";
+import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { Connectors, layer } from "./connector.ts";
+import { Connectors } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage, SendError } from "./qq.ts";
 import { type Message as WeixinMessage, type WeixinApi, WeixinError, baseUrl } from "./weixin.ts";
@@ -161,14 +161,14 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
 
 /** The orchestrator, played: what it hears goes into the channel, and it answers 收到 at once. */
 const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
-  layer({
+  Connectors.layer({
     weixin: script.weixin,
     feishu: script.feishu,
     qq: script.qq,
     ...retry,
     say: (text, channel, chat) =>
       Effect.flatMap(chat.say(text, channel, ""), ({ message }) => chat.orchestratorSays(message.channel, "收到：**" + text + "**", "", defaultOrchestrator)),
-  }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
+  }).pipe(Layer.provideMerge(Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {

@@ -8,20 +8,20 @@ import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
-import { layer as agentLayer } from "../agent/agent.ts";
+import { Agents } from "../agent/agent.ts";
 import { remember, rewriteMemory } from "@vibevalley/agent/memory";
 import { agentHome, ServerConfig } from "../base/config.ts";
-import { Database, DbLayer } from "../base/db.ts";
-import { layer as settingLayer } from "../setting/setting.ts";
+import { Database, Db } from "../base/db.ts";
+import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Memories, make } from "./memory.ts";
 import { memoryIsNewNote, memoryJobText, memoryNotesOf, recallChars } from "./recall.ts";
 
 const world = (config = testConfig()) =>
   Layer.effect(Memories, make()).pipe(
-    Layer.provideMerge(agentLayer),
-    Layer.provideMerge(settingLayer),
-    Layer.provideMerge(DbLayer),
+    Layer.provideMerge(Agents.layer),
+    Layer.provideMerge(Setting.layer),
+    Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),

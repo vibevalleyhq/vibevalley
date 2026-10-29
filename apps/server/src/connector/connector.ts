@@ -63,15 +63,18 @@ const bridgeError = (e: unknown) => (e instanceof BridgeError ? e : new BridgeEr
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
-export interface Connectors {
-  readonly list: () => Effect.Effect<ConnectorStatus[]>;
-  readonly login: (id: ConnectorID, input: ConnectorLogin) => Effect.Effect<ConnectorStatus>;
-  readonly verify: (id: ConnectorID, code: string) => Effect.Effect<ConnectorStatus>;
-  readonly logout: (id: ConnectorID) => Effect.Effect<ConnectorStatus>;
-  readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
+export class Connectors extends Context.Service<
+  Connectors,
+  {
+    readonly list: () => Effect.Effect<ConnectorStatus[]>;
+    readonly login: (id: ConnectorID, input: ConnectorLogin) => Effect.Effect<ConnectorStatus>;
+    readonly verify: (id: ConnectorID, code: string) => Effect.Effect<ConnectorStatus>;
+    readonly logout: (id: ConnectorID) => Effect.Effect<ConnectorStatus>;
+    readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
+  }
+>()("vibevalley/Connector") {
+  static readonly layer = (options?: ConnectorOptions) => Layer.effect(Connectors, make(options));
 }
-
-export const Connectors = Context.Service<Connectors>("vibevalley/Connector");
 
 export interface ConnectorOptions {
   readonly weixin?: WeixinApi;
@@ -81,7 +84,7 @@ export interface ConnectorOptions {
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
   /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
-  readonly say?: (text: string, channel: string | undefined, chat: Channels) => Effect.Effect<void, ApiError>;
+  readonly say?: (text: string, channel: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
 /** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */
@@ -678,5 +681,3 @@ export const make = (options: ConnectorOptions = {}) =>
       }),
     });
   });
-
-export const layer = (options?: ConnectorOptions) => Layer.effect(Connectors, make(options));

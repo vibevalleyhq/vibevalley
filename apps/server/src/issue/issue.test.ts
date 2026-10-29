@@ -42,7 +42,7 @@ const noWorktree = (root: string) => {
   expect(git(dir, "branch", "--list", "vibevalley/*").trim()).toBe("");
 };
 
-const occupied = (core: Core, runtime: string) =>
+const occupied = (core: Core["Service"], runtime: string) =>
   core.apply({
     type: "hired",
     session: {

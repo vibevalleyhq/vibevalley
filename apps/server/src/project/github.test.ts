@@ -8,7 +8,7 @@ import { Effect, Layer } from "effect";
 import { ServerConfig } from "../base/config.ts";
 import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
-import { githubOrigin, type GitHubRun, layer, probeGitHub, type ProjectHooks, Projects } from "./project.ts";
+import { Projects, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 const gh =
@@ -16,10 +16,10 @@ const gh =
   (...args) =>
     Effect.sync(() => ({ ok: true, missing: false, ...answer(args) }));
 
-const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ServerConfig> = {}, hooks: ProjectHooks = {}) =>
+const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ServerConfig["Service"]> = {}, hooks: ProjectHooks = {}) =>
   body.pipe(
     Effect.provide(
-      layer({ gh: noGitHub, ...hooks }).pipe(
+      Projects.layer({ gh: noGitHub, ...hooks }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),

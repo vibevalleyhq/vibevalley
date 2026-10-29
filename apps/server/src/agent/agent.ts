@@ -79,37 +79,45 @@ export function withCast(a: Agent): Agent {
   return { ...a, look };
 }
 
-export interface Agents {
-  /** The profiles work is sent to: the workers. */
-  readonly agents: () => Agent[];
-  /** All the profiles, the orchestrators too. */
-  readonly all: () => Agent[];
-  readonly orchestrators: () => Agent[];
-  /** A profile with this id is an orchestrator. */
-  readonly isOrchestrator: (id: string) => boolean;
-  readonly agent: (id: string) => Agent | undefined;
-  /** A profile work is sent to, by its id or its name, as a person or a model says it. */
-  readonly named: (key: string) => Agent | undefined;
-  readonly skills: () => Skill[];
-  readonly settings: (runtime: string) => RuntimeSettings;
-  readonly save: (a: Agent) => Effect.Effect<Agent, ApiError>;
-  readonly create: (draft: Agent) => Effect.Effect<Agent, ApiError>;
-  readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-  /** What remove would do, refused as it would be; nothing changes. */
-  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
-  readonly saveSkill: (s: Skill) => Effect.Effect<Skill, ApiError>;
-  readonly createSkill: (draft: Skill) => Effect.Effect<Skill, ApiError>;
-  readonly removeSkill: (id: string) => Effect.Effect<void, ApiError>;
-  /** What removeSkill would do, refused as it would be; nothing changes. */
-  readonly previewRemoveSkill: (id: string) => Effect.Effect<Preview, ApiError>;
-  readonly saveSettings: (runtime: string, s: RuntimeSettings) => Effect.Effect<RuntimeSettings, ApiError>;
-  /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
-  readonly templates: () => AgentTemplate[];
-  readonly installTemplate: (id: string) => Effect.Effect<Agent, ApiError>;
-  readonly updateFromTemplate: (agent: string) => Effect.Effect<Agent, ApiError>;
-  readonly addTemplate: (path: string) => Effect.Effect<AgentTemplate, ApiError>;
-  readonly removeTemplate: (id: string) => Effect.Effect<void, ApiError>;
-  readonly previewRemoveTemplate: (id: string) => Effect.Effect<Preview, ApiError>;
+export class Agents extends Context.Service<
+  Agents,
+  {
+    /** The profiles work is sent to: the workers. */
+    readonly agents: () => Agent[];
+    /** All the profiles, the orchestrators too. */
+    readonly all: () => Agent[];
+    readonly orchestrators: () => Agent[];
+    /** A profile with this id is an orchestrator. */
+    readonly isOrchestrator: (id: string) => boolean;
+    readonly agent: (id: string) => Agent | undefined;
+    /** A profile work is sent to, by its id or its name, as a person or a model says it. */
+    readonly named: (key: string) => Agent | undefined;
+    readonly skills: () => Skill[];
+    readonly settings: (runtime: string) => RuntimeSettings;
+    readonly save: (a: Agent) => Effect.Effect<Agent, ApiError>;
+    readonly create: (draft: Agent) => Effect.Effect<Agent, ApiError>;
+    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
+    /** What remove would do, refused as it would be; nothing changes. */
+    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly saveSkill: (s: Skill) => Effect.Effect<Skill, ApiError>;
+    readonly createSkill: (draft: Skill) => Effect.Effect<Skill, ApiError>;
+    readonly removeSkill: (id: string) => Effect.Effect<void, ApiError>;
+    /** What removeSkill would do, refused as it would be; nothing changes. */
+    readonly previewRemoveSkill: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly saveSettings: (runtime: string, s: RuntimeSettings) => Effect.Effect<RuntimeSettings, ApiError>;
+    /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
+    readonly templates: () => AgentTemplate[];
+    readonly installTemplate: (id: string) => Effect.Effect<Agent, ApiError>;
+    readonly updateFromTemplate: (agent: string) => Effect.Effect<Agent, ApiError>;
+    readonly addTemplate: (path: string) => Effect.Effect<AgentTemplate, ApiError>;
+    readonly removeTemplate: (id: string) => Effect.Effect<void, ApiError>;
+    readonly previewRemoveTemplate: (id: string) => Effect.Effect<Preview, ApiError>;
+  }
+>()("vibevalley/Agent") {
+  static readonly layer = Layer.effect(
+    Agents,
+    Effect.suspend(() => make),
+  );
 }
 
 /** An id or a name not yet taken: the one wanted, else it with -2, -3… (ids) or 2, 3… (names). */
@@ -136,8 +144,6 @@ const installed = (template: AgentTemplate, beside: readonly Agent[], id?: strin
       " ",
     ),
   );
-
-export const Agents = Context.Service<Agents>("vibevalley/Agent");
 
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
@@ -215,7 +221,7 @@ export const make = Effect.gen(function* () {
     return item.source === "builtIn" ? Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : Effect.succeed(item);
   };
 
-  const shape: Agents = {
+  const shape = Agents.of({
     agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),
@@ -341,8 +347,6 @@ export const make = Effect.gen(function* () {
             : t("server.agent.template.delete", { name: item.name }),
         ],
       })),
-  };
+  });
   return shape;
 });
-
-export const layer = Layer.effect(Agents, make);

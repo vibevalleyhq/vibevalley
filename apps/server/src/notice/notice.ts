@@ -17,20 +17,26 @@ export interface Overdue {
   readonly notes: readonly PatrolNote[];
 }
 
-export interface Notices {
-  /** What came into the inbox, each item once; what stood when the farm came up is known, not news. */
-  readonly news: Effect.Effect<Stream.Stream<readonly InboxItem[]>, never, Scope.Scope>;
-  /** The patrol's findings, one per channel. */
-  readonly overdue: Effect.Effect<Stream.Stream<Overdue>, never, Scope.Scope>;
-  /** The farm's talk the owner hears off the farm, as it is said (forOwner); the chat apps carry it. */
-  readonly toOwner: Effect.Effect<Stream.Stream<ChatMessage>, never, Scope.Scope>;
-  /** One round of the patrol, now. */
-  readonly patrol: Effect.Effect<void>;
-  /** From here what the inbox holds is known: the startup's, after the sessions and issues came back. */
-  readonly prime: Effect.Effect<void>;
+export class Notices extends Context.Service<
+  Notices,
+  {
+    /** What came into the inbox, each item once; what stood when the farm came up is known, not news. */
+    readonly news: Effect.Effect<Stream.Stream<readonly InboxItem[]>, never, Scope.Scope>;
+    /** The patrol's findings, one per channel. */
+    readonly overdue: Effect.Effect<Stream.Stream<Overdue>, never, Scope.Scope>;
+    /** The farm's talk the owner hears off the farm, as it is said (forOwner); the chat apps carry it. */
+    readonly toOwner: Effect.Effect<Stream.Stream<ChatMessage>, never, Scope.Scope>;
+    /** One round of the patrol, now. */
+    readonly patrol: Effect.Effect<void>;
+    /** From here what the inbox holds is known: the startup's, after the sessions and issues came back. */
+    readonly prime: Effect.Effect<void>;
+  }
+>()("vibevalley/Notice") {
+  static readonly layer = Layer.effect(
+    Notices,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Notices = Context.Service<Notices>("vibevalley/Notice");
 
 export const make = Effect.gen(function* () {
   const core = yield* Core;
@@ -65,7 +71,7 @@ export const make = Effect.gen(function* () {
     for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
   });
 
-  const shape: Notices = {
+  const shape = Notices.of({
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
     overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
     toOwner: Effect.map(
@@ -77,11 +83,9 @@ export const make = Effect.gen(function* () {
       known = freshOf(undefined, inbox(core.state())).known;
       primed = true;
     }),
-  };
+  });
   return shape;
 });
-
-export const layer = Layer.effect(Notices, make);
 
 /** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. The first
  * round waits one interval: right after a start, what looks hanging is mostly the restart. */

@@ -38,7 +38,7 @@ const worker = (turns: ScriptedTurn[]) =>
     },
   });
 
-const phase = (core: Core, id: string) => core.session(id)?.phase._tag;
+const phase = (core: Core["Service"], id: string) => core.session(id)?.phase._tag;
 
 describe("sessions", () => {
   it.live("interrupting an opening disposes the late session and releases its allocation", () => {

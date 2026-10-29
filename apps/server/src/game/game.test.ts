@@ -11,12 +11,12 @@ import { Projects } from "../project/project.ts";
 import { gitSync, repo } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { Game, layer, start as gameStart } from "./game.ts";
+import { Game, start as gameStart } from "./game.ts";
 import { waitFor as until } from "../testing/until.ts";
 import * as q from "../../db/generated/game_ledger.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-const farm = (config = testConfig()) => layer.pipe(Layer.provideMerge(world({ config })));
+const farm = (config = testConfig()) => Game.layer.pipe(Layer.provideMerge(world({ config })));
 
 const kinds = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -150,7 +150,7 @@ describe("the game", () => {
         const projects = Layer.unwrap(
           Effect.map(Projects, (current) => Layer.succeed(Projects, Projects.of({ ...current, contributions: () => contributions }))),
         ).pipe(Layer.provideMerge(world({ config })));
-        const app = gameStart.pipe(Layer.provideMerge(layer)).pipe(Layer.provideMerge(projects));
+        const app = gameStart.pipe(Layer.provideMerge(Game.layer)).pipe(Layer.provideMerge(projects));
         yield* Effect.scoped(
           Effect.gen(function* () {
             const core = yield* Core;

@@ -63,7 +63,7 @@ test("what waits for the owner's yes", () => {
 });
 
 /** The farm with crons on a clock turned by hand. */
-const farm = (config: ServerConfig, clock: { now: number }) => world({ config, clock: () => clock.now });
+const farm = (config: ServerConfig["Service"], clock: { now: number }) => world({ config, clock: () => clock.now });
 
 const collect = Effect.gen(function* () {
   const got: Due[] = [];

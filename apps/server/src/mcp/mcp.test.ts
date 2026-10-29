@@ -26,7 +26,7 @@ interface Answer {
 }
 
 /** An MCP client of one token, straight at the handler, as a coding agent's would be over HTTP. */
-const client = (mcp: Mcp, token: string) => {
+const client = (mcp: Mcp["Service"], token: string) => {
   let id = 0;
   const post = async (body: unknown) => {
     const res = await mcp.handle(
@@ -48,7 +48,7 @@ const client = (mcp: Mcp, token: string) => {
   };
 };
 
-const hired = (core: Core, s: Partial<Session> & { id: string }) =>
+const hired = (core: Core["Service"], s: Partial<Session> & { id: string }) =>
   core.apply({
     type: "hired",
     session: {

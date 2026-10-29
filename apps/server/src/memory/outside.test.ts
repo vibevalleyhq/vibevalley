@@ -9,10 +9,10 @@ import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { layer as agentLayer } from "../agent/agent.ts";
+import { Agents } from "../agent/agent.ts";
 import { ServerConfig } from "../base/config.ts";
-import { Database, DbLayer } from "../base/db.ts";
-import { Setting, layer as settingLayer } from "../setting/setting.ts";
+import { Database, Db } from "../base/db.ts";
+import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { foundText, Memories, make } from "./memory.ts";
 import { localName } from "./recall.ts";
@@ -188,9 +188,9 @@ class FakeEveros {
 // about what a search finds is not one about its deadline (those give their own, like 100 ms).
 const world = (timeoutMs = 20_000) =>
   Layer.effect(Memories, make(undefined, timeoutMs)).pipe(
-    Layer.provideMerge(agentLayer),
-    Layer.provideMerge(settingLayer),
-    Layer.provideMerge(DbLayer),
+    Layer.provideMerge(Agents.layer),
+    Layer.provideMerge(Setting.layer),
+    Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),

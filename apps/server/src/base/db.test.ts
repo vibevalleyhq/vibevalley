@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDatabase } from "../testing/layers.ts";
-import { Db, DbLayer, setAsideStale } from "./db.ts";
+import { Db, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
   it.effect("has the schema, and the generated queries run on it", () =>
@@ -30,7 +30,7 @@ describe("the database", () => {
       yield* sql.unsafe("drop table lan").pipe(Effect.orDie);
       const failed = yield* Effect.exit(db.one(lanOpen()));
       expect(Exit.isFailure(failed) && Cause.hasDies(failed.cause)).toBe(true);
-    }).pipe(Effect.provide(DbLayer.pipe(Layer.provideMerge(testDatabase())))),
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
   // In memory a farm's database is given back and kept for the next one (db.ts): it must be as good as new.

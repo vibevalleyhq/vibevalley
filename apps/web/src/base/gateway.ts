@@ -9,24 +9,27 @@ import { Socket } from "effect/socket";
 
 const makeClient = RpcClient.make(Subscriptions);
 
-type SubscriptionsClient = Effect.Success<typeof makeClient>;
-const SubscriptionsClient = Context.Service<SubscriptionsClient>("vibevalley/web/SubscriptionsClient");
-
 // The client lives as long as the runtime: built in its layer, the socket stays open between subscriptions, and the
 // protocol reopens it (with backoff) when it drops.
-const client = Layer.effect(SubscriptionsClient, makeClient).pipe(
-  Layer.provide(RpcClient.layerProtocolSocket({ retryTransientErrors: true })),
-  Layer.provide(Socket.layerWebSocket(Effect.sync(() => `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${rpcPath}`))),
-  Layer.provide(Socket.layerWebSocketConstructorGlobal),
-  Layer.provide(RpcSerialization.layerJson),
-);
+class SubscriptionsClient extends Context.Service<SubscriptionsClient, Effect.Success<typeof makeClient>>()("vibevalley/web/SubscriptionsClient") {
+  static readonly layer = Layer.effect(SubscriptionsClient, makeClient).pipe(
+    Layer.provide(RpcClient.layerProtocolSocket({ retryTransientErrors: true })),
+    Layer.provide(Socket.layerWebSocket(Effect.sync(() => `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${rpcPath}`))),
+    Layer.provide(Socket.layerWebSocketConstructorGlobal),
+    Layer.provide(RpcSerialization.layerJson),
+  );
+}
 
 let runtime: ManagedRuntime.ManagedRuntime<SubscriptionsClient, never> | undefined;
 
 /** Each event of one subscription until stop() is called, or until it ends (the farm ended it, or the line broke): then
  * ended(), and the caller follows again from what it has. */
-function run(stream: (c: SubscriptionsClient) => Stream.Stream<ChannelEvent, unknown>, on: (e: ChannelEvent) => void, ended: () => void): () => void {
-  runtime ??= ManagedRuntime.make(client);
+function run(
+  stream: (c: SubscriptionsClient["Service"]) => Stream.Stream<ChannelEvent, unknown>,
+  on: (e: ChannelEvent) => void,
+  ended: () => void,
+): () => void {
+  runtime ??= ManagedRuntime.make(SubscriptionsClient.layer);
   let stopped = false;
   const fiber = runtime.runFork(
     Effect.gen(function* () {

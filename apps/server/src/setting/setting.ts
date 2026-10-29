@@ -77,23 +77,29 @@ export interface AgoraCredentials {
 
 export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
 
-export interface Setting {
-  readonly status: () => SettingsStatus;
-  readonly validate: (u: SettingsUpdate) => Validation;
-  /** A key missing from the update is kept, an empty one cleared; nothing is saved when something cannot be right. */
-  readonly save: (u: SettingsUpdate) => Effect.Effect<SettingsStatus, SettingRefused>;
-  readonly deepseekApiKey: () => string;
-  readonly agora: () => AgoraCredentials | undefined;
-  readonly voice: () => VoiceSettings;
-  /** Undefined when the owner's own address is chosen and not set. */
-  readonly dictation: () => DictationConfig | undefined;
-  /** "" when none is saved. */
-  readonly mossKey: () => string;
-  readonly memorySources: () => readonly MemorySourceConfig[];
-  readonly voiceConfig: () => VoiceConfig;
+export class Setting extends Context.Service<
+  Setting,
+  {
+    readonly status: () => SettingsStatus;
+    readonly validate: (u: SettingsUpdate) => Validation;
+    /** A key missing from the update is kept, an empty one cleared; nothing is saved when something cannot be right. */
+    readonly save: (u: SettingsUpdate) => Effect.Effect<SettingsStatus, SettingRefused>;
+    readonly deepseekApiKey: () => string;
+    readonly agora: () => AgoraCredentials | undefined;
+    readonly voice: () => VoiceSettings;
+    /** Undefined when the owner's own address is chosen and not set. */
+    readonly dictation: () => DictationConfig | undefined;
+    /** "" when none is saved. */
+    readonly mossKey: () => string;
+    readonly memorySources: () => readonly MemorySourceConfig[];
+    readonly voiceConfig: () => VoiceConfig;
+  }
+>()("vibevalley/Setting") {
+  static readonly layer = Layer.effect(
+    Setting,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Setting = Context.Service<Setting>("vibevalley/Setting");
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 
@@ -192,7 +198,7 @@ export const make = Effect.gen(function* () {
     return status();
   });
 
-  const shape: Setting = {
+  const shape = Setting.of({
     status,
     validate: (u) => {
       const problem = settingsProblem(u);
@@ -218,8 +224,6 @@ export const make = Effect.gen(function* () {
       keys: { asrKey: stored.asrKey ?? "", llmKey: stored.llmKey ?? "", ttsKey: stored.ttsKey ?? "" },
       deepseekApiKey: pick(stored.deepseekApiKey, fromConfig.deepseek)?.[0] ?? "",
     }),
-  };
+  });
   return shape;
 });
-
-export const layer = Layer.effect(Setting, make);

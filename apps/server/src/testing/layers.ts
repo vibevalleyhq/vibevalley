@@ -19,7 +19,7 @@ export const starter = (id: string): Agent => {
 /** Every built-in template's profile but the default orchestrator's, in their order: what a test farm starts with. */
 const starters = () => builtInIds().filter((id) => id !== defaultOrchestrator);
 
-export function testConfig(change: Partial<ServerConfig> = {}): ServerConfig {
+export function testConfig(change: Partial<ServerConfig["Service"]> = {}): ServerConfig["Service"] {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-test-"));
   const config = defaults(home);
   // Every listener on a free port: two farms in tests (or worktrees) never take each other's 8787, 8788, 8790.
@@ -36,6 +36,6 @@ export function testConfig(change: Partial<ServerConfig> = {}): ServerConfig {
   };
 }
 
-export const testSettings = (change: Partial<ServerConfig> = {}) => Layer.succeed(ServerConfig, testConfig(change));
+export const testSettings = (change: Partial<ServerConfig["Service"]> = {}) => Layer.succeed(ServerConfig, testConfig(change));
 
-export const testDatabase = (change: Partial<ServerConfig> = {}) => Database.pipe(Layer.provide(testSettings(change)));
+export const testDatabase = (change: Partial<ServerConfig["Service"]> = {}) => Database.pipe(Layer.provide(testSettings(change)));

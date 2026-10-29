@@ -81,25 +81,28 @@ interface Intake {
   readonly caller?: Caller;
 }
 
-export interface Orchestrator {
-  /** The owner's words in a channel, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
-   * the client's key for this send, a retry with the same key is the message already said. */
-  readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
-  /** A voice transcript the owner chose for the orchestrator to overhear. */
-  readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
-  /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in the default channel
-   * as always; the whole answer comes back to be read out. Aborting ends only this wait, not the shared run. */
-  readonly brief: (line: string, signal?: AbortSignal) => Promise<string>;
-  /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
-   * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
-  readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
-  /** The lines waiting for an orchestrator (the default one when none is named) are dropped with its run; the sessions
-   * it sent keep working. */
-  readonly stop: (agent?: string) => Effect.Effect<void>;
-  readonly markWrong: (on: number, want: string, agent?: string) => Effect.Effect<OrchestratorEval, ApiError>;
+export class Orchestrator extends Context.Service<
+  Orchestrator,
+  {
+    /** The owner's words in a channel, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
+     * the client's key for this send, a retry with the same key is the message already said. */
+    readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
+    /** A voice transcript the owner chose for the orchestrator to overhear. */
+    readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
+    /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in the default channel
+     * as always; the whole answer comes back to be read out. Aborting ends only this wait, not the shared run. */
+    readonly brief: (line: string, signal?: AbortSignal) => Promise<string>;
+    /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
+     * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
+    readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
+    /** The lines waiting for an orchestrator (the default one when none is named) are dropped with its run; the sessions
+     * it sent keep working. */
+    readonly stop: (agent?: string) => Effect.Effect<void>;
+    readonly markWrong: (on: number, want: string, agent?: string) => Effect.Effect<OrchestratorEval, ApiError>;
+  }
+>()("vibevalley/Orchestrator") {
+  static readonly layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));
 }
-
-export const Orchestrator = Context.Service<Orchestrator>("vibevalley/Orchestrator");
 
 export interface OrchestratorOptions {
   /** The model; absent, DeepSeek with the key in settings. */
@@ -481,5 +484,3 @@ export const make = (options: OrchestratorOptions = {}) =>
       },
     });
   });
-
-export const layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));

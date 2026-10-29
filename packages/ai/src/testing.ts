@@ -117,7 +117,7 @@ export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) 
   const script = [...steps];
   const next = yield* Ref.make(0);
   const requests: Request[] = [];
-  const llm: Llm = {
+  const llm = Llm.of({
     stream: (model, context, options) =>
       Stream.unwrap(
         Effect.gen(function* () {
@@ -148,7 +148,7 @@ export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) 
           throw new Error("a scripted stream ends with done or error");
         }),
       ),
-  };
+  });
   return {
     llm,
     requests,

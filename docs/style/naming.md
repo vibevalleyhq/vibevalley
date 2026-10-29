@@ -62,12 +62,12 @@
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
-| 服务 | 管一类东西的用复数，管一样东西的用单数；接口和服务同名（`interface Issues`、`const Issues = Context.Service<Issues>(…)`），建它的是 `make`、`layer` | `Issues`、`Channels`；`Core`、`Orchestrator` |
+| 服务 | 管一类东西的用复数，管一样东西的用单数；照 Effect 的默认写法是类，接口写在类型参数里、不另起名，`layer` 是静态成员；它的类型是 `Issues["Service"]` | `Issues`、`Channels`；`Core`、`Orchestrator` |
 | 服务的标签和 `Effect.fn` 的名字 | `vibevalley/<概念>`；`<服务>.<方法>` | `"vibevalley/Issue"`；`"Issues.edit"` |
 | 带牌子的 id | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-服务的接口不另起名：Effect 给自己的服务（`FileSystem`、`HttpClient`）就是接口和服务同名，`Context.Service<Self, Shape>` 里的 `Shape` 只是类型参数的名字。
+服务的接口不另起名：Effect 的默认写法把它写在 `Context.Service<Self, Shape>` 的类型参数里，`Shape` 只是这个参数的名字，要类型时写 `Issues["Service"]`。
 
 ## 线上和存盘的形状
 

@@ -9,15 +9,15 @@ import { wakeBreaker } from "./rules.ts";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { ServerConfig } from "../base/config.ts";
-import { Database, DbLayer } from "../base/db.ts";
-import { layer as agentLayer } from "../agent/agent.ts";
-import { Core, layer as coreLayer } from "../core/core.ts";
+import { Database, Db } from "../base/db.ts";
+import { Agents } from "../agent/agent.ts";
+import { Core } from "../core/core.ts";
 import { newsOf } from "../session/session.ts";
 import { sessionOnIssue } from "../session/state.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
-import { catchUpMax, Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
+import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { until, waitFor } from "../testing/until.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -37,13 +37,13 @@ class FakeSessions {
   last = new Map<string, string>();
   running = new Map<string, string>();
   n = 0;
-  core!: Core;
+  core!: Core["Service"];
   launches!: PubSub.PubSub<LaunchActivity>;
 
   runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
   steersOf = (id: string) => [...(this.steers.get(id) ?? [])];
   private publish = (a: LaunchActivity) => PubSub.publishUnsafe(this.launches, a);
-  private apply = (...f: Parameters<Core["apply"]>) => Effect.runSync(this.core.apply(...f));
+  private apply = (...f: Parameters<Core["Service"]["apply"]>) => Effect.runSync(this.core.apply(...f));
 
   deliver = (id: string, text: string): Delivered => {
     if (!this.core.session(id)) return { kind: "refused", reason: "不在地里" };
@@ -121,14 +121,14 @@ const fakeHelpers = (x: FakeSessions) =>
     }),
   );
 
-const world = (x: FakeSessions, config: ServerConfig = testConfig()) => {
-  const c: ServerConfig = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
+const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) => {
+  const c: ServerConfig["Service"] = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
   return fakeHelpers(x).pipe(
-    Layer.provideMerge(channelLayer),
+    Layer.provideMerge(Channels.layer),
     Layer.provideMerge(said),
-    Layer.provideMerge(agentLayer),
-    Layer.provideMerge(coreLayer.pipe(Layer.provide(projection))),
-    Layer.provideMerge(DbLayer),
+    Layer.provideMerge(Agents.layer),
+    Layer.provideMerge(Core.layer.pipe(Layer.provide(projection))),
+    Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(ServerConfig, c)),
   );
@@ -202,7 +202,10 @@ const news = (f: Farm) =>
     };
   });
 
-const run = <A, E>(body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | Scope.Scope>, config?: ServerConfig) => {
+const run = <A, E>(
+  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | Scope.Scope>,
+  config?: ServerConfig["Service"],
+) => {
   const x = new FakeSessions();
   return Effect.flatMap(farm, (f) => body(f, x)).pipe(Effect.scoped, Effect.provide(world(x, config)));
 };

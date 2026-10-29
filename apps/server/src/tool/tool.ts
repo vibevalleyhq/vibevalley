@@ -75,17 +75,23 @@ export interface Caller {
 /** A throw here is told to the model as the tool's failure. */
 export type Who = () => Caller;
 
-export interface Tools {
-  /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-  readonly orchestrator: (who: Who) => Tool[];
-  /** A session's tools, served on /mcp. */
-  readonly session: (who: Who) => Tool[];
-  /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
-  readonly start: (name: string, args: unknown) => ToolStart;
-  readonly sessionLine: (w: Roster) => string;
+export class Tools extends Context.Service<
+  Tools,
+  {
+    /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+    readonly orchestrator: (who: Who) => Tool[];
+    /** A session's tools, served on /mcp. */
+    readonly session: (who: Who) => Tool[];
+    /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
+    readonly start: (name: string, args: unknown) => ToolStart;
+    readonly sessionLine: (w: Roster) => string;
+  }
+>()("vibevalley/Tool") {
+  static readonly layer = Layer.effect(
+    Tools,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Tools = Context.Service<Tools>("vibevalley/Tool");
 
 // The fields that name what a call is about, the first one given wins: an issue's or a channel's id, a profile, a title.
 const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
@@ -1017,5 +1023,3 @@ export const make = Effect.gen(function* () {
     sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),
   });
 });
-
-export const layer = Layer.effect(Tools, make);

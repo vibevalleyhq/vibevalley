@@ -15,11 +15,14 @@ import { Sessions } from "../session/session.ts";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import { type Caller, Tools } from "../tool/tool.ts";
 
-export interface Mcp {
-  readonly handle: (request: Request) => Promise<Response>;
+export class Mcp extends Context.Service<
+  Mcp,
+  {
+    readonly handle: (request: Request) => Promise<Response>;
+  }
+>()("vibevalley/Mcp") {
+  static readonly layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));
 }
-
-export const Mcp = Context.Service<Mcp>("vibevalley/Mcp");
 
 export { unknownCaller };
 
@@ -88,5 +91,3 @@ export const make = (options: McpOptions = {}) =>
 
     return Mcp.of({ handle });
   });
-
-export const layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));

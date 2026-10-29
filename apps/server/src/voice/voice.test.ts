@@ -6,14 +6,14 @@ import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice } from "../setting/rules.ts";
 import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
-import { layer as orchestrator, Orchestrator } from "../orchestrator/orchestrator.ts";
+import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
-import { agentFor, type CallLine, clientOf, layer, retrying, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
+import { Voice, agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, vendorsFor, voiceAgentUid, voiceUnknown } from "./voice.ts";
 import { sessionId, issueId } from "@vibevalley/protocol/schema";
 import { timeHere, wallTime } from "../base/time.ts";
 import { TestClock } from "effect/testing";
@@ -174,13 +174,13 @@ const farm = (capture: Capture, brief?: (line: string, signal?: AbortSignal) => 
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
   };
-  const answering = orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)));
+  const answering = Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)));
   const chosen = brief
     ? Layer.unwrap(Effect.map(Orchestrator, (current) => Layer.succeed(Orchestrator, Orchestrator.of({ ...current, brief })))).pipe(
         Layer.provideMerge(answering),
       )
     : answering;
-  return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(chosen));
+  return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(chosen));
 };
 
 /** A helper at work on an issue, and the issue, as the core has them. */

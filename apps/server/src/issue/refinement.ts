@@ -19,11 +19,11 @@ import { isForOrchestrator } from "./state.ts";
 import { refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitBrief } from "./rules.ts";
 
 export interface RefinementDeps {
-  readonly core: Core;
-  readonly store: Agents;
-  readonly runtimes: Runtimes;
-  readonly sessions: Sessions;
-  readonly chat: Channels;
+  readonly core: Core["Service"];
+  readonly store: Agents["Service"];
+  readonly runtimes: Runtimes["Service"];
+  readonly sessions: Sessions["Service"];
+  readonly chat: Channels["Service"];
   readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
   readonly one: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
   readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;

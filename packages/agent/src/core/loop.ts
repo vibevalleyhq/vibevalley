@@ -56,7 +56,7 @@ export interface Turn<A> {
 }
 
 export interface AgentOptions<A> {
-  readonly llm: Llm;
+  readonly llm: Llm["Service"];
   readonly model: Model;
   readonly thinkingLevel?: ThinkingLevel;
   readonly tools: readonly Tool[];

@@ -57,29 +57,52 @@ export interface Resolved {
   readonly env: Record<string, string>;
 }
 
-export interface Runtimes {
-  /** Answers at once: a runtime not looked at yet comes as checking, and its probe's answer follows as a runtime event. */
-  readonly list: () => RuntimeInfo[];
-  readonly refresh: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
-  readonly info: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
-  readonly update: (id: string, s: RuntimeSettings) => Effect.Effect<RuntimeInfo | undefined, ApiError>;
-  /** The profile's problems as it would be dispatched now. */
-  readonly problemsOf: (agent: Agent) => Effect.Effect<AgentProblem[]>;
-  readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
-  /** Every profile, and whether it can be sent now. */
-  readonly candidates: Effect.Effect<Candidate[]>;
-  /** Who the farm sends for a task now: chooseAgent over the candidates. */
-  readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
-  /** Validates the effective options on every opening; availability and spending only gate new work. */
-  readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
-  readonly runtime: (id: string) => Runtime | undefined;
-  readonly quote: (id: string, model: string) => Rate | undefined;
-  readonly spend: (id: string, cny: number) => void;
-  /** Reads the runtime's quota a little after a run, several runs sharing one read. */
-  readonly usageSoon: (id: string) => void;
+export class Runtimes extends Context.Service<
+  Runtimes,
+  {
+    /** Answers at once: a runtime not looked at yet comes as checking, and its probe's answer follows as a runtime event. */
+    readonly list: () => RuntimeInfo[];
+    readonly refresh: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
+    readonly info: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
+    readonly update: (id: string, s: RuntimeSettings) => Effect.Effect<RuntimeInfo | undefined, ApiError>;
+    /** The profile's problems as it would be dispatched now. */
+    readonly problemsOf: (agent: Agent) => Effect.Effect<AgentProblem[]>;
+    readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
+    /** Every profile, and whether it can be sent now. */
+    readonly candidates: Effect.Effect<Candidate[]>;
+    /** Who the farm sends for a task now: chooseAgent over the candidates. */
+    readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
+    /** Validates the effective options on every opening; availability and spending only gate new work. */
+    readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
+    readonly runtime: (id: string) => Runtime | undefined;
+    readonly quote: (id: string, model: string) => Rate | undefined;
+    readonly spend: (id: string, cny: number) => void;
+    /** Reads the runtime's quota a little after a run, several runs sharing one read. */
+    readonly usageSoon: (id: string) => void;
+  }
+>()("vibevalley/Runtime") {
+  static readonly layer = (options: RuntimeOptions = {}) =>
+    Layer.effect(
+      Runtimes,
+      Effect.gen(function* () {
+        if (options.registry) return yield* make(options);
+        const config = yield* ServerConfig;
+        const keys = yield* Setting;
+        const time = yield* timeHere;
+        const service = yield* Llm;
+        // It reads the DeepSeek key each session, so one saved meanwhile is used. The sessions' brains run on this service's
+        // fibers, in scopes of its own: they end with it at the latest.
+        const own = vibevalleyRuntimeOf({
+          home: () => config.home,
+          llm: (model) => modelClient(model, keys.deepseekApiKey, service),
+          time,
+          owner: { run: yield* FiberSet.makeRuntimePromise<never>(), scope: yield* Effect.scope },
+          tasks: yield* dbStores,
+        });
+        return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
+      }),
+    );
 }
-
-export const Runtimes = Context.Service<Runtimes>("vibevalley/Runtime");
 
 /** What reads a runtime's account usage; tests put their own. */
 export type UsageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) => Promise<AccountUsage | null>;
@@ -439,7 +462,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
 
-    const shape: Runtimes = {
+    const shape = Runtimes.of({
       list: () =>
         runtimeIds().map((id) => {
           const hit = cache.get(id);
@@ -541,7 +564,7 @@ export const make = (options: RuntimeOptions = {}) =>
         if (closed) return;
         later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id)), usageAfterRunMs), { onlyIfMissing: true });
       },
-    };
+    });
     return Object.assign(shape, {
       refreshUsage,
       cached: cache,
@@ -551,24 +574,3 @@ export const make = (options: RuntimeOptions = {}) =>
   });
 
 /** The farm's: VibeValley's own agent among them, unless options name the runtimes. */
-export const layer = (options: RuntimeOptions = {}) =>
-  Layer.effect(
-    Runtimes,
-    Effect.gen(function* () {
-      if (options.registry) return yield* make(options);
-      const config = yield* ServerConfig;
-      const keys = yield* Setting;
-      const time = yield* timeHere;
-      const service = yield* Llm;
-      // It reads the DeepSeek key each session, so one saved meanwhile is used. The sessions' brains run on this service's
-      // fibers, in scopes of its own: they end with it at the latest.
-      const own = vibevalleyRuntimeOf({
-        home: () => config.home,
-        llm: (model) => modelClient(model, keys.deepseekApiKey, service),
-        time,
-        owner: { run: yield* FiberSet.makeRuntimePromise<never>(), scope: yield* Effect.scope },
-        tasks: yield* dbStores,
-      });
-      return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
-    }),
-  );

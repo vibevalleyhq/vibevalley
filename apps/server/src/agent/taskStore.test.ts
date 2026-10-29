@@ -1,14 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import * as q from "../../db/generated/agent_task.sql.ts";
-import { DbLayer } from "../base/db.ts";
+import { Db } from "../base/db.ts";
 import { testDatabase } from "../testing/layers.ts";
 import { add, finished, AgentTaskError, update } from "@vibevalley/agent/agentTask";
 import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { dbStores } from "./taskStore.ts";
 
 describe("an agent's own tasks, kept", () => {
-  const database = Layer.provideMerge(DbLayer, testDatabase());
+  const database = Layer.provideMerge(Db.layer, testDatabase());
   const stores = Effect.map(dbStores, (database) => ({ database, memory: (_: string) => memoryStore() }));
 
   it.effect("a store keeps the graph and puts a finished one away", () =>

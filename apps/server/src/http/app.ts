@@ -19,7 +19,7 @@ import { streams } from "./streams.ts";
 import { attachments } from "./attachment.ts";
 import { artifactContent } from "./artifact.ts";
 
-const routes = (config: ServerConfig) =>
+const routes = (config: ServerConfig["Service"]) =>
   Layer.mergeAll(
     Layer.unwrap(Effect.map(handlers, (h) => api(h))),
     streams,
@@ -48,7 +48,7 @@ const ready = (listening: (address: string) => Effect.Effect<void>) =>
 
 /** port 0 is a free one. */
 export const app = (
-  config: ServerConfig,
+  config: ServerConfig["Service"],
   port: number,
   listening: (address: string) => Effect.Effect<void> = () => Effect.void,
   options: ServiceOptions = {},
