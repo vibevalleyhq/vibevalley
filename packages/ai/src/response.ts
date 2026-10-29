@@ -346,13 +346,15 @@ function parseWithRepair(json: string): unknown {
 /** A tool call's whole arguments: an object, or {} and why not with the text that came. */
 export function toolCallArguments(json: string): { arguments: Readonly<Record<string, unknown>>; argumentsError?: string } {
   if (!json.trim()) return { arguments: {} };
+  const refused = (why: string) => ({ arguments: {}, argumentsError: `${why}\n\nReceived arguments:\n${json}` });
+  let parsed: unknown;
   try {
-    const parsed = parseWithRepair(json);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("Tool arguments must be a JSON object");
-    return { arguments: parsed as Record<string, unknown> };
+    parsed = parseWithRepair(json);
   } catch (e) {
-    return { arguments: {}, argumentsError: `${e instanceof Error ? e.message : String(e)}\n\nReceived arguments:\n${json}` };
+    return refused(e instanceof Error ? e.message : String(e));
   }
+  // Each tool reads its own fields by its Schema; here the arguments only have to be an object.
+  return Predicate.isObject(parsed) ? { arguments: parsed } : refused("Tool arguments must be a JSON object");
 }
 
 /** While the arguments stream in: what parses so far, else what last did (pi-ai guesses at the unfinished JSON; nothing
