@@ -142,13 +142,11 @@ jobs:
           key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      # web:check without its vp check, which the check job runs. The page's Playwright suite (e2e) runs on the owner's
-      # machine: vp run --filter @vibevalley/web e2e.
+      # The page's Playwright suite (e2e) runs on the owner's machine: vp run --filter @vibevalley/web e2e.
       # @vibevalley/base-ui's tests run in headless Chromium (vitest's browser mode).
       - run: node_modules/.bin/playwright install --with-deps chromium
         working-directory: packages/base-ui
-      - run: vp run --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/mobile --filter @vibevalley/web test
-      - run: vp run --filter @vibevalley/web build
+      - run: vp run web:test
       - name: Save Vite Task cache
         if: success()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

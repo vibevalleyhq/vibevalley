@@ -26,8 +26,9 @@ export default defineConfig({
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
       ],
-      "web:check": [
-        "vp check",
+      "web:check": ["vp check", "vp run web:test"],
+      // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.
+      "web:test": [
         "vp run --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/stories --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
         "vp run --filter @vibevalley/web build",
         "vp run --filter @vibevalley/web build:stories",
