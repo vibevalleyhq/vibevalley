@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田头的书桌，暖纸、墨棕、几样庄稼的颜色；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在图鉴的「界面」（`/catalog/kit`，`features/catalog/Kit.tsx`）：用页面在用的类和组件，浅色、深色并排画出每个令牌和零件，动效的曲线从样式表里读。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田头的书桌，暖纸、墨棕、几样庄稼的颜色；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -169,6 +169,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - **按钮**（`ui/Button.tsx`）：`primary` 一个区域只有一个，是那里最要紧的一步；`plain` 是其余的；`quiet` 放在工具条和行里；`danger` 是字变莓色的 `plain`，不填满。只有图标的用 `IconButton`，它的名字就是悬停的提示和读屏的话。
 - **选择框和勾选框**（`ui/Field.tsx` 的 `Select`、`ui/Checkbox.tsx`，行为来自 `@vibevalley/base-ui`）：选择框是一个按钮，显示选中的那项、右边一个向下的小箭头，列表和菜单一个样子（`rounded-lg`、`shadow-float`、选中的那项后面一个勾），至少和按钮一样宽；`quiet` 是侧栏里平时不画框的那种，`size="control"` 是工具条上 28px 高的。勾选框是 16px 的 `rounded-xs` 方块，勾上了填 `accent`。单选、滑块用 base-ui 的 `RadioGroup`、`Slider`，样子照这两个配。系统自带的 `<select>`、勾选框、单选、滑块每台机器画得不一样，深色主题里还是浅的，工作台不用（lint `vibevalley/native-control`）；像素皮画自己的。
 - **一行里的报告**（`packages/protocol/src/rules/plain.ts` 的 `plainText`，服务端和页面共用）：帮工的汇报、消息是 Markdown，放在只有一行、几行的地方（工单的「要你做的」、经过、串的预览、农场的气泡）时去掉 `#`、`**`、反引号、链接和列表的记号，连成一行，不露出原始的记号；整段看的地方才渲染 Markdown。
+- **标签页**（`ui/Tabs.tsx`）：一页里的几个视图。窗格里用 `pills`（选中的是 `bg-selected`），页面的头下面用 `line`（选中的下面一道墨色的线，可以带图标）；一个标签页是去一个地址时给它 `href`。
 - **更多**（`ui/MoreMenu.tsx`，base-ui 的 `Menu`）：一处不是主要的动作收进右上角的 ⋯（新标签页打开、复制链接、删掉……）；每项一个 16px 以内的图标加一句话，危险的放最后、前面一条分隔线、字是莓色。删掉这类收不回的，选了以后在原处问一遍（莓色的浅底一行、危险按钮、「算了」），不弹窗。
 - **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `bg-hover`，页面色加 `shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
 - **状态点**（`ui/Dot.tsx` 的 `Dot`，`features/channel/bits.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
@@ -236,14 +237,14 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
 4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
 
-**写一个新界面之前**：先在图鉴的「界面」（`/catalog/kit`）看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`MoreMenu`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了令牌、原子或一种 `tone`，也加进 `Kit.tsx`。
+**写一个新界面之前**：先在故事里看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Tabs`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`MoreMenu`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了原子或一种 `tone`，在它旁边的 `X.stories.tsx` 写上（`src/stories.test.ts` 查 `ui/` 的每个零件都有）；加了令牌，加进 `ui/tokens.stories.tsx`。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。
 
 **类名怎么拼**：Solid 的 `class` 直接收数组和对象（`class={["h-7 …", { "bg-selected": on }, props.class]}`），不用 clsx。原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。所以不用 tailwind-merge 去合并互相冲突的类：真有要盖的那天，再加一个按我们的令牌配好的 `cn`。
 
 **交之前自己查一遍**：
 
 - [ ] 颜色、圆角、字号、阴影、时长、层都是令牌（`vp check` 过了就是）。
-- [ ] 深色主题下看一遍：浅色块上的字自带字色，没有写死的颜色。
+- [ ] 深色主题下看一遍：浅色块上的字自带字色，没有写死的颜色（改了零件就在它的故事里两种主题并排看；`test/stories.spec.ts` 对每个故事跑 axe）。
 - [ ] 一个区域最多一个 `primary`；危险的操作不填满，收不回的先确认或预演。
 - [ ] 一个块一圈线，块里没有再套边；只有浮层有 `shadow-float`。
 - [ ] 每个只有图标的按钮有名字；键盘能走到、Esc 能关。

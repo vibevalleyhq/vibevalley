@@ -7,8 +7,7 @@
   "tab": {
     "sprites": "图",
     "cursors": "指针",
-    "sounds": "音效",
-    "kit": "界面"
+    "sounds": "音效"
   },
   "shelves": "图鉴的书架",
   "find": "找素材",
@@ -103,38 +102,5 @@
       "label": "其他",
       "hint": "没归上类的"
     }
-  },
-  "kit": {
-    "intro": "工作台的令牌和零件，两种主题并排。这里画的就是页面在用的类和组件，改了 style.css 或 ui/，这里跟着变。",
-    "light": "浅色",
-    "dark": "深色",
-    "colour": "颜色",
-    "type": "字号",
-    "shape": "圆角和影",
-    "motion": "动效",
-    "replay": "再放一次",
-    "icons": "图标的大小",
-    "atoms": "零件",
-    "primary": "新建工单",
-    "plain": "普通",
-    "quiet": "安静",
-    "danger": "危险",
-    "disabled": "不能点",
-    "pressed": "按下",
-    "delete": "删除档案",
-    "question": "删了就找不回来。",
-    "view": "视图",
-    "list": "列表",
-    "board": "看板",
-    "toggle": "开着",
-    "done": "完成",
-    "failed": "失败",
-    "sent": "派出",
-    "field": "名字",
-    "hint": "说明在框下面。",
-    "placeholder": "填点什么",
-    "select": "选一个",
-    "pixel": "像素皮",
-    "sample": "派给帮工的工单 Issue 42"
   }
 }

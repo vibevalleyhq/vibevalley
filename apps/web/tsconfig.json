@@ -6,5 +6,5 @@
     "jsxImportSource": "@solidjs/web",
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "test", "scripts", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "test", "scripts", "vite.config.ts", "vite.stories.config.ts", "playwright.config.ts"]
 }

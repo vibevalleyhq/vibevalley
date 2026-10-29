@@ -1,4 +1,4 @@
-// Builds the page once for the run, into a folder of this run's own (two runs at once do not share one).
+// A folder of this run's own: two runs at once do not share one.
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
@@ -29,6 +29,23 @@ export default function setup() {
       stdio: "inherit",
       env: dev ? { ...process.env, NODE_ENV: "development" } : process.env,
     },
+  );
+  execFileSync(
+    "pnpm",
+    [
+      "exec",
+      "vp",
+      "build",
+      "--config",
+      "vite.stories.config.ts",
+      ...(dev ? ["--mode", "development", "--minify", "false"] : []),
+      "--outDir",
+      join(out, "stories"),
+      "--emptyOutDir",
+      "--logLevel",
+      "warn",
+    ],
+    { cwd: web, stdio: "inherit", env: dev ? { ...process.env, NODE_ENV: "development" } : process.env },
   );
   // Screenshots go to test-results; this folder is only the build.
   return () => rmSync(out, { recursive: true, force: true });

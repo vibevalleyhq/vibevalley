@@ -1,10 +1,10 @@
-import { Tabs } from "@vibevalley/base-ui";
+import { Tabs } from "../../ui/Tabs";
 import { t } from "@vibevalley/i18n";
 // 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
 // folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
 // the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
 
-import { For, Match, Show, Switch } from "solid-js";
+import { Match, Show, Switch } from "solid-js";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { useAgent } from "../../base/agents";
@@ -74,21 +74,13 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
     </div>
   );
   const bar = () => (
-    <Tabs.Root value={at()} onValueChange={(v) => router.navigate(orchestratorHref(props.agent, v as Tab))}>
-      <Tabs.List aria-label={t("web.orchestrator.orchestrator.tabs")} class="flex gap-1 border-b border-line pb-2">
-        <For each={shown()}>
-          {(t) => (
-            <Tabs.Tab
-              value={t.id}
-              data-key={t.id}
-              class={["h-8 cursor-pointer rounded-md px-3 text-base", t.id === at() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
-            >
-              {t.label}
-            </Tabs.Tab>
-          )}
-        </For>
-      </Tabs.List>
-    </Tabs.Root>
+    <Tabs
+      label={t("web.orchestrator.orchestrator.tabs")}
+      value={at()}
+      onChange={(v) => router.navigate(orchestratorHref(props.agent, v))}
+      items={shown().map((x) => ({ value: x.id, label: x.label }))}
+      class="border-b border-line pb-2"
+    />
   );
   // The trajectory takes the whole content area, its rows scrolling under a fixed head; the other tabs are a column.
   return (

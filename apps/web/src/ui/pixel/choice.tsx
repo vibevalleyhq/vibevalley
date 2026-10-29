@@ -127,7 +127,7 @@ export function PxPick(props: {
           "flex h-9 w-full cursor-pointer items-center gap-2 bg-cream-100 px-3 text-left disabled:cursor-default disabled:opacity-50",
         ]}
       >
-        <span class={["min-w-0 flex-1 truncate", current().value === "" ? "text-bark-500" : "text-bark-900"]}>{current().label}</span>
+        <span class={["min-w-0 flex-1 truncate", current().value === "" ? "text-bark-600" : "text-bark-900"]}>{current().label}</span>
         <SpriteIcon name="button-next" size={12} class="rotate-90" />
       </button>
       <Show when={open()}>
@@ -148,11 +148,11 @@ export function PxPick(props: {
                   }}
                   class={["flex cursor-pointer items-baseline gap-3 px-2.5 py-1.5 whitespace-nowrap", { "bg-cream-200": i() === highlight() }]}
                 >
-                  <span class={[pxText.sm, "flex-1", o.value === "" ? "text-bark-500" : o.value === props.value ? "text-leaf-700" : "text-bark-800"]}>
+                  <span class={[pxText.sm, "flex-1", o.value === "" ? "text-bark-600" : o.value === props.value ? "text-leaf-700" : "text-bark-800"]}>
                     {o.label}
                   </span>
                   <Show when={o.detail}>
-                    <span class={[pxText.xs, "text-bark-500"]}>{o.detail}</span>
+                    <span class={[pxText.xs, "text-bark-600"]}>{o.detail}</span>
                   </Show>
                 </li>
               )}

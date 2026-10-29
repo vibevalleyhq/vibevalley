@@ -6,15 +6,15 @@ import type { SpriteAtlas, SpriteInfo } from "./atlas";
 export const CardColors = {
   ink: "#3a2a18",
   paper: "#f3e2b8",
-  muted: "#7a6248",
+  muted: "#776046",
   good: "#3f6b2a",
   lightInk: "#fff3dc",
   wood: "#b07a45",
   held: "#b4cb7c",
   slot: "#eedcb2",
   ripe: "#e8b84a",
-  bug: "#c8543c",
-  stuck: "#5d8fb0",
+  bug: "#b44b36",
+  stuck: "#4a728c",
   rest: "#cdbb92",
   // Handed back and waiting: on its acceptance, or on the owner's answer.
   wait: "#b4cb7c",

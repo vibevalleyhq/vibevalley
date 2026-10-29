@@ -1,4 +1,4 @@
-import { Tabs } from "@vibevalley/base-ui";
+import { Tabs } from "../../ui/Tabs";
 import { t } from "@vibevalley/i18n";
 import { tookText } from "../../base/format";
 import { Splitter, usePaneWidth } from "../../ui/Splitter";
@@ -237,25 +237,18 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           <Icon name="settings" size={20} />
         </button>
       </header>
-      <Tabs.Root value={tab()} onValueChange={(v) => setTab(v as Tab)}>
-        <Tabs.List aria-label={t("web.channel.inChannel")} class="flex shrink-0 gap-1 border-b border-line px-3">
-          <For each={props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs}>
-            {(entry) => (
-              <Tabs.Tab
-                value={entry.tab}
-                data-key={entry.tab}
-                class={[
-                  "group -mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-2 pt-2 pb-1.5 text-sm",
-                  tab() === entry.tab ? "border-ink font-semibold" : "border-transparent text-muted hover:text-ink",
-                ]}
-              >
-                <Icon name={entry.icon} size={16} class={tab() === entry.tab ? "" : "opacity-70 group-hover:opacity-100"} />
-                {entry.label}
-              </Tabs.Tab>
-            )}
-          </For>
-        </Tabs.List>
-      </Tabs.Root>
+      <Tabs
+        look="line"
+        label={t("web.channel.inChannel")}
+        value={tab()}
+        onChange={setTab}
+        items={(props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs).map((e) => ({
+          value: e.tab,
+          label: e.label,
+          icon: e.icon,
+        }))}
+        class="shrink-0 border-b border-line px-3"
+      />
       <Show when={tab() === "chat"}>
         <div class="flex min-h-0 flex-1">
           <FileDrop channel={props.channel}>
