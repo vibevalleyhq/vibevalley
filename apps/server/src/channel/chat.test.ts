@@ -506,7 +506,7 @@ describe("the chat", () => {
         const { message: sq } = yield* f.chat.say("大家早", f.chat.defaultChannel(), "");
         const talk = yield* f.chat.speak("w10", "早", { target: `#general:${sq.number}`, anyway: true });
         expect([talk.kind, talk.target]).toEqual(["sent", `#general:${sq.number}`]);
-        const under = f.core.state().chat?.channels?.find((c) => c.root === sq.id);
+        const under = f.core.state().chat?.channels.find((c) => c.root === sq.id);
         expect(under?.subjectKind).toBe("talk");
       }),
     ),

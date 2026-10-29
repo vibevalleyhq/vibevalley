@@ -145,7 +145,7 @@ describe("a session's log", () => {
       const file = join(home, "events", "w1.json");
       const tr = new Trajectories(
         home,
-        (_, e) => pushed.push(e.text ?? ""),
+        (_, e) => pushed.push(e.text),
         (message) => warnings.push(message),
         yield* timeHere,
       );

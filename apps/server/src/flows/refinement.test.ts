@@ -48,7 +48,7 @@ describe("a refined issue", () => {
       yield* sessions.dismiss(before.id);
       let issue = yield* issues.add({ title: "新工单", project: "board" });
       const got = yield* issues.refine(issue.id, "慢慢看：看板拖卡还在调旧接口", "");
-      expect([got.status, got.title, got.assignee, got.sessions?.length ?? 0]).toEqual(["backlog", "慢慢看：看板拖卡还在调旧接口", "lab", 0]);
+      expect([got.status, got.title, got.assignee, got.sessions.length]).toEqual(["backlog", "慢慢看：看板拖卡还在调旧接口", "lab", 0]);
       expect(got.refining?.name).toBe(lab().name);
       expect(got.moves).toEqual(["canceled"]);
       expect((yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", owner)))._tag).toBe("Refused");
@@ -63,14 +63,14 @@ describe("a refined issue", () => {
       expect(issue.description).toBe("为什么：\n看板还在调旧接口\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- board.dart");
       expect(issue.criteria).toEqual(["拖到待办就开工"]);
       expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？", options: [] }]);
-      expect([issue.status, issue.sessions?.length ?? 0]).toEqual(["backlog", 0]);
+      expect([issue.status, issue.sessions.length]).toEqual(["backlog", 0]);
       yield* until(() => !drafting(core), "the refiner left");
       yield* refinementLeftNothing(f.config.workRoot, issue);
       const runs = yield* sessions.runs(issue.id);
       expect(runs.map((r) => r.triggeredBy.kind)).toEqual(["refine"]);
       const inState = () => core.state().issues.find((x) => x.id === issue.id)!;
       yield* until(
-        () => inState().refining === undefined && (inState().moves ?? []).includes("todo") && inState().criteria.length === 1,
+        () => inState().refining === undefined && inState().moves.includes("todo") && inState().criteria.length === 1,
         "the core state has its draft",
       );
 
@@ -80,7 +80,7 @@ describe("a refined issue", () => {
         (i) => i.title === "看板拖卡改用 8797 端口" && i.refining === undefined,
         "the second draft over the first",
       );
-      expect([issue.criteria, issue.questions.length ?? 0]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
+      expect([issue.criteria, issue.questions.length]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
       yield* until(() => !drafting(core), "the second refiner left");
 
       issue = yield* issues.setStatus(issue.id, "todo", "", "", owner);
@@ -133,7 +133,7 @@ describe("a refined issue", () => {
       const issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       // Held until the issue's thread is open, as it is before any real draft hands back.
       const before = yield* issues.refine(issue.id, "慢慢乱写一通", "");
-      const thread = () => core.state().chat?.channels?.find((c) => c.subjectId === issue.id)?.id;
+      const thread = () => core.state().chat?.channels.find((c) => c.subjectId === issue.id)?.id;
       yield* until(() => thread() !== undefined, "the issue's thread");
       yield* releaseHeld();
       yield* until(() => !drafting(core), "the refiner left");

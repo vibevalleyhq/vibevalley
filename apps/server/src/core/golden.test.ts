@@ -40,7 +40,7 @@ function differ(got: unknown, want: unknown, path = ""): string | undefined {
 function diff(a: unknown, b: unknown, path: string): string | undefined {
   if (a === b) return undefined;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null || Array.isArray(a) !== Array.isArray(b))
-    return `${path || "."}: got ${JSON.stringify(a)?.slice(0, 300)}, want ${JSON.stringify(b)?.slice(0, 300)}`;
+    return `${path || "."}: got ${JSON.stringify(a).slice(0, 300)}, want ${JSON.stringify(b).slice(0, 300)}`;
   if (Array.isArray(a)) {
     const y = b as unknown[];
     if (a.length !== y.length)
@@ -54,8 +54,8 @@ function diff(a: unknown, b: unknown, path: string): string | undefined {
   const x = a as Record<string, unknown>;
   const y = b as Record<string, unknown>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (!(k in x)) return `${path}.${k}: missing, want ${JSON.stringify(y[k])?.slice(0, 200)}`;
-    if (!(k in y)) return `${path}.${k}: got ${JSON.stringify(x[k])?.slice(0, 200)}, want none`;
+    if (!(k in x)) return `${path}.${k}: missing, want ${JSON.stringify(y[k]).slice(0, 200)}`;
+    if (!(k in y)) return `${path}.${k}: got ${JSON.stringify(x[k]).slice(0, 200)}, want none`;
     const d = diff(x[k], y[k], `${path}.${k}`);
     if (d) return d;
   }
@@ -156,7 +156,7 @@ describe("the golden files", () => {
       switch (kind) {
         case "task": {
           const graph = input.task as TaskGraph;
-          const tasks = graph.tasks ?? [];
+          const tasks = graph.tasks;
           same("problems", graphProblems(graph.tasks));
           same("layers", layersOf(graph.tasks));
           same(

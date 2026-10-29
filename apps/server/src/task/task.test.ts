@@ -352,9 +352,7 @@ describe("task graphs", () => {
         let stuck = yield* f.until(id, (g) => state(g, "boom") === "failed" && state(g, "flaky") === "merged");
         expect([taskOf(stuck, "boom")!.tries, taskOf(stuck, "flaky")!.tries, taskOf(stuck, "boom")!.failures]).toEqual([2, 1, 1]);
         expect(
-          (yield* f.tasks.events(id)).some(
-            (e) => e.kind === "task_sent_back" && e.task === "flaky" && e.actor === "system" && (e.detail ?? "").includes("没通过"),
-          ),
+          (yield* f.tasks.events(id)).some((e) => e.kind === "task_sent_back" && e.task === "flaky" && e.actor === "system" && e.detail.includes("没通过")),
         ).toBe(true);
         yield* f.tasks.taskAct(id, "boom", "retry", owner);
         stuck = yield* f.until(id, (g) => state(g, "boom") === "failed" && taskOf(g, "boom")!.failures === 2);

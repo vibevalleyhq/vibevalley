@@ -16,7 +16,7 @@ test("the recorded cases", () => {
       return got.ok ? { ok: true, tasks: got.tasks, ...(got.title !== undefined ? { title: got.title } : {}) } : { ok: false, problems: got.problems };
     }
     const i = c.in as { task: TaskGraph; edit: TaskEdit; id: string; output: string; index: number };
-    const graph = { ...i.task, tasks: i.task.tasks ?? [] };
+    const graph = { ...i.task, tasks: i.task.tasks };
     return {
       startable: startable(graph).map((n) => n.id),
       settled: allSettled(graph),
@@ -25,7 +25,7 @@ test("the recorded cases", () => {
       frozenTouched: graph.tasks.map((n) => frozenTouched(graph, n, ["test/a_test.go", "src/x.ts", "README.md"])),
       acceptancePassed: acceptancePassedText(i.output),
       frozenText: frozenTouchedText(["test/a_test.go", i.output]),
-      edited: edited(editTask(graph, i.id, i.edit ?? {})),
+      edited: edited(editTask(graph, i.id, i.edit)),
       removed: edited(removeTask(graph, i.id)),
     };
   });
