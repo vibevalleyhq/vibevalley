@@ -12,7 +12,7 @@ const optional = Schema.optionalKey;
 const tools: Record<string, Schema.Struct<Schema.Struct.Fields>> = {
   read: Schema.Struct({ path: Schema.String, offset: optional(Schema.Int), limit: optional(Schema.Int) }),
   read2: Schema.Struct({ path: Schema.String, offset: optional(Schema.Int) }),
-  bash: Schema.Struct({ command: Schema.String, timeout_seconds: optional(Schema.Number) }),
+  bash: Schema.Struct({ command: Schema.String, timeout_seconds: optional(Schema.Finite) }),
   edit: Schema.Struct({ path: Schema.String, old_text: Schema.String, new_text: Schema.String, replace_all: optional(Schema.Boolean) }),
   empty: Schema.Struct({}),
   tasks: Schema.Struct({

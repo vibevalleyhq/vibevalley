@@ -94,7 +94,7 @@ export class Reminders {
 
   private load(): Reminder[] {
     if (!existsSync(this.file)) return [];
-    return Schema.decodeUnknownSync(Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderSchema))))(readFileSync(this.file, "utf8"));
+    return Schema.decodeSync(Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderSchema))))(readFileSync(this.file, "utf8"));
   }
 
   private store(reminders: readonly Reminder[]) {
@@ -120,7 +120,7 @@ export class Reminders {
         name: Schema.String,
         message: Schema.String,
         at: Schema.optionalKey(Schema.String),
-        every_minutes: Schema.optionalKey(Schema.Number),
+        every_minutes: Schema.optionalKey(Schema.Finite),
         cron: Schema.optionalKey(Schema.String),
       }),
       run: (p) => {

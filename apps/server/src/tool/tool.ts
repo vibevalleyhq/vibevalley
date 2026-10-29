@@ -184,6 +184,8 @@ export const make = Effect.gen(function* () {
     return of ?? answers.noIssueOrAgent(k);
   });
   const withIssue = <E>(key: string, f: (issue: Issue) => Effect.Effect<string, E>) =>
+    // findIssue's text is the refusal the model reads, a result like f's: not a failure to filter out.
+    // @effect-diagnostics-next-line flatMapConditionalToFilterOrFail:off
     Effect.flatMap(findIssue(key), (item) => (typeof item === "string" ? Effect.succeed(item) : f(item)));
   const issueTool = <E>(op: IssueTool, f: (issue: Issue) => Effect.Effect<string, E>) => tool(op, descriptions[op], (p) => withIssue(p.id, f));
   /** The helper on the farm working the issue now, if any: its newest session. */

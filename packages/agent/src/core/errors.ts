@@ -1,8 +1,5 @@
 import { Data } from "effect";
 
-/** A thrown or rejected value as an Error: one that is passes as it is. */
-export const asError = (e: unknown): Error => (e instanceof Error ? e : new Error(String(e)));
-
 /** What a thrown or rejected value says: an Error's message, anything else as text. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -20,3 +17,8 @@ export class CannotContinue extends Data.TaggedError("CannotContinue")<{ readonl
 
 /** Asked of an agent that is closed. */
 export class AgentClosed extends Data.TaggedError("AgentClosed")<{ readonly message: string }> {}
+
+/** Something of the agent's own that did not go: its tools servers, its reminders, its saved conversation. */
+export class AgentFailed extends Data.TaggedError("AgentFailed")<{ readonly message: string; readonly cause?: unknown }> {}
+
+export const agentFailed = (cause: unknown): AgentFailed => new AgentFailed({ message: messageOf(cause), cause });

@@ -19,7 +19,7 @@ const alive = (pid: number) => {
 };
 
 /** server.json: where the server using this home listens, and its process. */
-const announcement = jsonOrNone(Schema.Struct({ url: Schema.String, pid: Schema.Number }));
+const announcement = jsonOrNone(Schema.Struct({ url: Schema.String, pid: Schema.Finite }));
 
 export class HomeTaken extends Error {}
 

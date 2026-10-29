@@ -254,7 +254,7 @@ export function codingTools(o: CodingOptions): Tool[] {
   const bash = schemaTool({
     name: "bash",
     description: words.bashDescription(formatSeconds(timeout)),
-    parameters: Schema.Struct({ command: Schema.String, timeout_seconds: Schema.optionalKey(Schema.Number) }),
+    parameters: Schema.Struct({ command: Schema.String, timeout_seconds: Schema.optionalKey(Schema.Finite) }),
     run: async (p, tc) => {
       const limit = p.timeout_seconds ? p.timeout_seconds * 1000 : timeout;
       const ran = await runCommand(["/bin/bash", "-lc", p.command], cwd, limit, runEnv, tc.signal);

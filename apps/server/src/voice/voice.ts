@@ -16,7 +16,7 @@ import type { Socket } from "effect/socket";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream, Data } from "effect";
 import { chatCompletions } from "../orchestrator/openai.ts";
 import { ServerConfig } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
@@ -62,6 +62,11 @@ const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => (
   reason,
   ...(settings ? { settings } : {}),
 });
+/** A step of a call outside the farm (Agora, the orchestrator's answer) that did not go; cause is what it threw. */
+class CallStepFailed extends Data.TaggedError("CallStepFailed")<{ readonly message: string; readonly cause: unknown }> {}
+
+const callStepFailed = (cause: unknown) => new CallStepFailed({ message: messageOf(cause), cause });
+
 const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
 
 export interface CallLine {
@@ -562,7 +567,7 @@ export const make = (options: VoiceOptions = {}) =>
           if (stopped || call.ending || calls.get(agentId) !== call) return false;
           yield* Effect.tryPromise({
             try: () => call.session.say(piece, { priority: "APPEND", interruptable: true }),
-            catch: (e) => e,
+            catch: callStepFailed,
           });
         }
         return true;
@@ -599,7 +604,7 @@ export const make = (options: VoiceOptions = {}) =>
         rang = undefined;
         const said = yield* Effect.tryPromise({
           try: (signal) => orchestrator.brief(onCallLine(texts, ring), AbortSignal.any([signal, call.life.signal])),
-          catch: (e) => e,
+          catch: callStepFailed,
         }).pipe(Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.succeed(undefined) : Effect.fail(e))));
         if (said === undefined || stopped || call.ending || calls.get(on) !== call) break;
         if (said) {
@@ -735,6 +740,8 @@ export const make = (options: VoiceOptions = {}) =>
             release,
             quick: callLine === undefined,
             greeting: forCall.greeting.trim(),
+            // The call's life spans its fibers (the answer it waits on, the words it reads out): ended when the call ends.
+            // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
             ending: false,
           });
@@ -784,8 +791,8 @@ export const make = (options: VoiceOptions = {}) =>
         } else client = clientOf(yield* creds(), settings.voice().area, time, options.fetch);
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
-          catch: (e) => e,
-        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed(t("server.voice.leaveFailed", { why: messageOf(e) }))))));
+          catch: callStepFailed,
+        }).pipe(Effect.catch((e) => (alreadyStopping(e.cause) ? Effect.void : Effect.fail(failed(t("server.voice.leaveFailed", { why: messageOf(e) }))))));
         yield* Effect.ensuring(
           stopping,
           Effect.sync(() => call?.release()),
@@ -867,7 +874,7 @@ export const make = (options: VoiceOptions = {}) =>
           try: () => res.text(),
           catch: (e) => unavailable(t("server.voice.dictation.cut", { why: messageOf(e) }), "call"),
         })).slice(0, 1 << 20);
-        const got = Schema.decodeUnknownOption(DictationResponse)(raw);
+        const got = Schema.decodeOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
         if (!res.ok)
           return yield* Effect.fail(

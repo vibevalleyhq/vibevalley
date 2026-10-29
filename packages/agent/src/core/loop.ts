@@ -362,7 +362,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       Effect.gen(function* () {
         const run: Run = { stop: yield* Deferred.make<void>(), done: yield* Deferred.make<void>() };
         const taken = yield* Ref.modify(active, (a) => (Option.isSome(a) ? ([false, a] as const) : ([true, Option.some(run)] as const)));
-        if (!taken) return yield* Effect.fail(new AgentBusy({ message: "the agent is already running" }));
+        if (!taken) return yield* new AgentBusy({ message: "the agent is already running" });
         const body = Effect.gen(function* () {
           const context = [...(yield* Ref.get(messages))];
           const fresh: AgentMessage<A>[] = [...prompts];

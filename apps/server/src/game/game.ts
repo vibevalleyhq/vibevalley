@@ -6,11 +6,11 @@
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
-import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream, Option } from "effect";
 import { ServerConfig } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
-import { jsonOf } from "../base/json.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { Projects } from "../project/project.ts";
 import * as q from "../../db/generated/game_ledger.sql.ts";
@@ -19,6 +19,10 @@ import * as q from "../../db/generated/game_ledger.sql.ts";
 const wantStationForMs = 10_000;
 const countEveryMs = 2 * 60_000;
 const countAfterRunMs = 15_000;
+
+/** A ledger row's payload, and the entry it makes with the row's kind and time; a row this code cannot read any more is none. */
+const payloadOf = jsonOrNone(Schema.Unknown);
+const entryOf = Schema.decodeUnknownOption(S.LedgerEntry);
 
 export class Game extends Context.Service<
   Game,
@@ -55,13 +59,10 @@ export const make = Effect.gen(function* () {
   const rows = yield* Effect.orDie(db(q.ledgerEntries()));
   const entries: LedgerEntry[] = [];
   for (const row of rows) {
-    try {
-      const fields = jsonOf(Schema.Unknown)(row.payload);
-      if (!Predicate.isObject(fields) || Array.isArray(fields)) continue;
-      entries.push(Schema.decodeUnknownSync(S.LedgerEntry)({ ...fields, kind: row.kind, at: row.at }));
-    } catch {
-      continue;
-    }
+    const fields = payloadOf(row.payload);
+    if (!Predicate.isObject(fields)) continue;
+    const entry = entryOf({ ...fields, kind: row.kind, at: row.at });
+    if (Option.isSome(entry)) entries.push(entry.value);
   }
   let folded: Folded = progressFold(entries);
   yield* core.apply({ type: "progress", progress: folded.progress });

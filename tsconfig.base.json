@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -7,6 +8,33 @@
     "noEmit": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "unstableApiUsage": "off",
+          "lazyEffect": "off",
+          "effectSucceedWithVoid": "off",
+          "schemaNumber": "warning",
+          "runEffectInsideEffect": "warning",
+          "unnecessaryFailYieldableError": "warning",
+          "preferTypedSchemaDecoder": "warning",
+          "tryCatchInEffectGen": "warning",
+          "schemaStructWithTag": "warning",
+          "flatMapConditionalToFilterOrFail": "warning",
+          "catchToIgnore": "warning",
+          "flatMapToTap": "warning",
+          "flatMapIdentityToFlatten": "warning",
+          "catchConditionalRefailToCatchIf": "warning",
+          "raceFirstWithSleepToTimeout": "warning",
+          "redundantOrDie": "warning",
+          "unnecessaryPipeChain": "warning",
+          "unnecessaryEffectGen": "warning",
+          "schemaSyncInEffect": "warning",
+          "abortControllerInEffect": "warning"
+        }
+      }
+    ]
   }
 }

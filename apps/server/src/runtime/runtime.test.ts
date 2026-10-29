@@ -114,10 +114,11 @@ describe("runtime", () => {
       }),
     ]);
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       let used = "";
       const options: RuntimeOptions = { registry, background: false, usageOf: async () => null };
       const r = yield* make(options);
-      const slow = Effect.runPromise(r.refresh("pi"));
+      const slow = runPromise(r.refresh("pi"));
       yield* Effect.promise(() => until(() => n === 1));
       yield* r.refresh("pi");
       release();
@@ -140,6 +141,7 @@ describe("runtime", () => {
       const fullGate = new Promise<void>((resolve) => (releaseFull = resolve));
       const usageGate = new Promise<void>((resolve) => (releaseUsage = resolve));
       return Effect.gen(function* () {
+        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
         let full = 0;
         let usageCalls = 0;
         const changed: AccountUsage = { status: "ok", subscription: "pro", windows: [] };
@@ -164,7 +166,7 @@ describe("runtime", () => {
           },
         });
         yield* r.refresh("pi");
-        const fullRefresh = Effect.runPromise(r.refresh("pi"));
+        const fullRefresh = runPromise(r.refresh("pi"));
         yield* Effect.promise(() => until(() => full === 2));
         const usageRefresh = yield* Effect.forkChild(r.refreshUsage("pi"));
         yield* Effect.promise(() => until(() => usageCalls === 2));
@@ -269,6 +271,7 @@ describe("runtime", () => {
     const latest = deferred<RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const r = yield* runtimes({
         probe: (id) => {
           if (id !== "pi") return notFound(id);
@@ -276,12 +279,12 @@ describe("runtime", () => {
           return probes === 1 ? old.promise : latest.promise;
         },
       });
-      const oldResult = Effect.runPromise(r.refresh("pi")).then(
+      const oldResult = runPromise(r.refresh("pi")).then(
         () => ({ status: "resolved" as const }),
         (error: unknown) => ({ status: "rejected" as const, error }),
       );
       yield* Effect.promise(() => until(() => probes === 1));
-      const latestResult = Effect.runPromise(r.refresh("pi"));
+      const latestResult = runPromise(r.refresh("pi"));
       yield* Effect.promise(() => until(() => probes === 2));
       old.reject(new Error("old probe failed"));
       expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
@@ -410,6 +413,7 @@ describe("runtime", () => {
     let release!: () => void;
     const held = new Promise<void>((done) => (release = done));
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       let probes = 0;
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("pi")]),
@@ -427,7 +431,7 @@ describe("runtime", () => {
       });
       yield* r.info("pi");
       const store = yield* Agents;
-      const updating = Effect.runPromise(r.update("pi", { ...store.settings("pi"), defaultEffort: "high" }));
+      const updating = runPromise(r.update("pi", { ...store.settings("pi"), defaultEffort: "high" }));
       yield* Effect.promise(() => until(() => waiting));
       const a = agent({});
       expect((yield* r.problemsOf(a)).map((i) => i.field)).toEqual(["effort"]);

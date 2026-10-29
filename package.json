@@ -18,6 +18,7 @@
     "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write"
   },
   "devDependencies": {
+    "@effect/tsgo": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/health": "workspace:*",
     "effect": "catalog:",

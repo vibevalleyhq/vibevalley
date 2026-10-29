@@ -451,6 +451,7 @@ describe("task graphs", () => {
   it.live("a graph is a parent issue, its steps the issues under it", () =>
     run((f) =>
       Effect.gen(function* () {
+        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
         const id = yield* f.split("菱形", "diamond");
         yield* f.until(id, (g) => g.state === "draft");
         const parent = yield* f.issues.get(id);
@@ -466,7 +467,7 @@ describe("task graphs", () => {
         expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
         expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
         yield* f.tasks.act(id, "merge", owner);
-        yield* untilGot(async () => (await Effect.runPromise(f.issues.get(id))).delivered === "merged", "the graph's issue closed as merged");
+        yield* untilGot(async () => (await runPromise(f.issues.get(id))).delivered === "merged", "the graph's issue closed as merged");
       }),
     ),
   );

@@ -69,6 +69,7 @@ describe("a session's work", () => {
   it.live("goes in the ledger when merged", () => {
     const f = farm();
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const w = yield* watch;
       const issues = yield* Issues;
       const sql = yield* SqlClient.SqlClient;
@@ -76,7 +77,7 @@ describe("a session's work", () => {
       yield* w.nextReport;
       yield* issues.merge(session.issue!);
       const entries = () =>
-        Effect.runPromise(
+        runPromise(
           sql<{
             n: number;
           }>`select count(*)::int as n from game_ledger where kind = 'harvested' and payload like ${`%"session":"${session.id}"%`}`.pipe(Effect.orDie),

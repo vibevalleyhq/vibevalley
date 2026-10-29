@@ -60,7 +60,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(schema: S, dir: stri
   const path = join(dir, file);
   if (!existsSync(path)) return undefined;
   try {
-    return Schema.decodeUnknownSync(Schema.fromJsonString(schema))(readFileSync(path, "utf8"));
+    return Schema.decodeSync(Schema.fromJsonString(schema))(readFileSync(path, "utf8"));
   } catch (e) {
     throw new TemplateProblem(t("server.agent.template.unreadable", { file: path, why: messageOf(e) }));
   }
@@ -112,7 +112,7 @@ export function readTemplate(dir: string, source: AgentTemplateSource): AgentTem
 
 /** The ids of the built-in templates, in the order they are listed and installed. */
 export const builtInIds = (): string[] =>
-  Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(Schema.String)))(readFileSync(join(builtInDir, "index.json"), "utf8")) as string[];
+  Schema.decodeSync(Schema.fromJsonString(Schema.Array(Schema.String)))(readFileSync(join(builtInDir, "index.json"), "utf8")) as string[];
 
 /** Every built-in template; one that does not read is a broken build (templates.test.ts keeps them readable). */
 export const builtInTemplates = (): AgentTemplate[] => builtInIds().map((id) => readTemplate(join(builtInDir, id), "builtIn"));

@@ -38,7 +38,7 @@ export const repository = (path: string) => {
   const conflicts = Effect.fnUntraced(function* (base: string, branch: string) {
     const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
     if (r.code === 0) return [] as string[];
-    if (r.code !== 1) return yield* Effect.fail(GitError.of(r.code, r.code < 0 ? r.stderr : t("server.project.mergeTree", { code: r.code })));
+    if (r.code !== 1) return yield* GitError.of(r.code, r.code < 0 ? r.stderr : t("server.project.mergeTree", { code: r.code }));
     // First line: the tree it would write; then each conflicted file.
     return [
       ...new Set(

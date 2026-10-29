@@ -1,6 +1,7 @@
 // What connector.ts asks of each chat app: log in, receive until a failure or the signal, send. Each app's adapter sits
 // beside its client (weixin.ts, feishu.ts, qq.ts).
 
+import { Data } from "effect";
 import type { ConnectorID, ConnectorLogin, ConnectorState } from "@vibevalley/protocol";
 
 export interface Inbound {
@@ -40,3 +41,6 @@ export interface Adapter {
   receive(signal: AbortSignal, secrets: Record<string, string>, io: Receiving): Promise<Failure | undefined>;
   send(signal: AbortSignal, secrets: Record<string, string>, to: string, text: string, reply: string): Promise<string | Failure>;
 }
+
+/** A step with an app that did not go (a login, a send): its message is what the owner sees. */
+export class ConnectorFailed extends Data.TaggedError("ConnectorFailed")<{ readonly message: string; readonly cause?: unknown }> {}

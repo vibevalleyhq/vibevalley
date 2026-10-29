@@ -41,7 +41,7 @@ export interface Item {
 }
 
 const ItemSchema: Schema.Codec<Item> = Schema.Struct({
-  type: Schema.optionalKey(Schema.Number),
+  type: Schema.optionalKey(Schema.Finite),
   text_item: Schema.optionalKey(Schema.Struct({ text: Schema.optionalKey(Schema.String) })),
   voice_item: Schema.optionalKey(Schema.Struct({ text: Schema.optionalKey(Schema.String) })),
   file_item: Schema.optionalKey(Schema.Struct({ file_name: Schema.optionalKey(Schema.String) })),
@@ -66,7 +66,7 @@ export interface Message {
 const MessageSchema: Schema.Codec<Message> = Schema.Struct({
   message_id: Schema.optionalKey(Schema.String),
   from_user_id: Schema.optionalKey(Schema.String),
-  message_type: Schema.optionalKey(Schema.Number),
+  message_type: Schema.optionalKey(Schema.Finite),
   context_token: Schema.optionalKey(Schema.String),
   group_id: Schema.optionalKey(Schema.String),
   item_list: Schema.optionalKey(Schema.Array(ItemSchema)),
@@ -82,12 +82,12 @@ export interface Updates {
 }
 
 const UpdatesSchema: Schema.Codec<Updates> = Schema.Struct({
-  ret: Schema.optionalKey(Schema.Number),
-  errcode: Schema.optionalKey(Schema.Number),
+  ret: Schema.optionalKey(Schema.Finite),
+  errcode: Schema.optionalKey(Schema.Finite),
   errmsg: Schema.optionalKey(Schema.String),
   msgs: Schema.optionalKey(Schema.Array(MessageSchema)),
   get_updates_buf: Schema.optionalKey(Schema.String),
-  longpolling_timeout_ms: Schema.optionalKey(Schema.Number),
+  longpolling_timeout_ms: Schema.optionalKey(Schema.Finite),
 });
 
 export const decodeUpdates = Schema.decodeUnknownSync(UpdatesSchema);
@@ -105,8 +105,8 @@ const QrStatusResponse = Schema.Struct({
   redirect_host: Schema.optionalKey(Schema.String),
 });
 const SendMessageResponse = Schema.Struct({
-  ret: Schema.optionalKey(Schema.Number),
-  errcode: Schema.optionalKey(Schema.Number),
+  ret: Schema.optionalKey(Schema.Finite),
+  errcode: Schema.optionalKey(Schema.Finite),
   errmsg: Schema.optionalKey(Schema.String),
   message_id: Schema.optionalKey(Schema.String),
 });
@@ -182,7 +182,7 @@ export class WeixinClient implements WeixinApi {
     const text = await res.text();
     if (res.status < 200 || res.status > 299) throw new WeixinError(`${label}: ${res.status}`);
     try {
-      return Schema.decodeUnknownSync(Schema.fromJsonString(schema))(text.replace(lossless, '"$1"$2:$3"$4"'));
+      return Schema.decodeSync(Schema.fromJsonString(schema))(text.replace(lossless, '"$1"$2:$3"$4"'));
     } catch (e) {
       throw new WeixinError(label + ": " + messageOf(e));
     }

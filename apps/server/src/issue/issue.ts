@@ -346,8 +346,10 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     const liveSession = (id: string) =>
-      Effect.flatMap(latest(id), (session) =>
-        sessions.find(session) ? Effect.succeed(session) : Effect.fail(missing(t("server.issue.helperRef", { id: session }), [lookIn.session])),
+      Effect.filterOrFail(
+        latest(id),
+        (session) => sessions.find(session) !== undefined,
+        (session) => missing(t("server.issue.helperRef", { id: session }), [lookIn.session]),
       );
 
     const issueWords = (req: Pick<IssueRequest, "title" | "description">) => {

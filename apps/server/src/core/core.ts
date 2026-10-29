@@ -207,7 +207,7 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(changes);
       Queue.offerUnsafe(queue, frameOf(state));
-      yield* Effect.forever(
+      return yield* Effect.forever(
         Effect.gen(function* () {
           const first = yield* PubSub.take(sub);
           yield* Effect.sleep(stateEveryMs);

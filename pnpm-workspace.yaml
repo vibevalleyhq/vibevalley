@@ -13,6 +13,7 @@ packages:
 catalogMode: strict
 
 catalog:
+  "@effect/tsgo": "0.63.0"
   "@agentclientprotocol/sdk": "2.0.0"
   "@axe-core/playwright": "^4.14.0"
   "@botiverse/oar": "0.69.0"
@@ -113,3 +114,13 @@ packageExtensions:
   expo-camera:
     dependencies:
       "@types/react": "~19.3.0"
+
+minimumReleaseAgeExclude:
+  - "@effect/tsgo-darwin-arm64@0.63.0"
+  - "@effect/tsgo-darwin-x64@0.63.0"
+  - "@effect/tsgo-linux-arm64@0.63.0"
+  - "@effect/tsgo-linux-arm@0.63.0"
+  - "@effect/tsgo-linux-x64@0.63.0"
+  - "@effect/tsgo-win32-arm64@0.63.0"
+  - "@effect/tsgo-win32-x64@0.63.0"
+  - "@effect/tsgo@0.63.0"

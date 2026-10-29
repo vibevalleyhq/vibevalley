@@ -51,6 +51,7 @@ describe("AgentHost", () => {
   it.live("says each answer once, whole, while the caller gets its words as they grow", () => {
     const config = testConfig();
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const sessions = yield* Sessions;
       const { llm } = scriptedLLM([answer([text("我看一下"), toolCall("missing", {})]), answer("看完了，一切正常")]);
       const said: string[] = [];
@@ -73,7 +74,7 @@ describe("AgentHost", () => {
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
         notice: () => {},
         log: () => {},
-        go: <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(e),
+        go: <A, E>(e: Effect.Effect<A, E>) => runPromise(e),
         scope: yield* Effect.scope,
       });
       const caller = new Caller();
@@ -114,6 +115,7 @@ describe("AgentHost", () => {
       release = resolve;
     });
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const sessions = yield* Sessions;
       const { llm } = scriptedLLM();
       const host = sessions.host({
@@ -134,7 +136,7 @@ describe("AgentHost", () => {
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
         notice: () => {},
         log: () => {},
-        go: <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(e),
+        go: <A, E>(e: Effect.Effect<A, E>) => runPromise(e),
         scope: yield* Effect.scope,
       });
       const caller = new Caller();

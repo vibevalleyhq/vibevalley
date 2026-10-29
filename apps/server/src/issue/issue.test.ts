@@ -340,6 +340,7 @@ describe("issues", () => {
     });
     const f = farm([worker]);
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       yield* (yield* Agents).save(lab());
@@ -351,7 +352,7 @@ describe("issues", () => {
       expect([first.branch, firstBranch]).toEqual([`vibevalley/issue-${issue.number}`, `vibevalley/issue-${issue.number}`]);
       const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
       yield* issues.cancel(issue.id);
-      yield* until(() => Effect.runPromise(issues.get(issue.id)).then((i) => i.status === "canceled"), "the canceled issue");
+      yield* until(() => runPromise(issues.get(issue.id)).then((i) => i.status === "canceled"), "the canceled issue");
       const again = yield* issues.reopen(issue.id, "keep going", "");
       const reopened = sessions.sessionOf(again)!;
       expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
@@ -528,6 +529,7 @@ describe("issues", () => {
   it.live("a queued issue keeps the channel it was first sent from", () => {
     const f = farm();
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
@@ -548,7 +550,7 @@ describe("issues", () => {
       const got = yield* issues.get(issue.id);
       expect(got.sessions).toHaveLength(1);
       expect((yield* sessions.get(got.sessions[0]!))?.channel).toBe(first.id);
-      yield* until(() => Effect.runPromise(sessions.runs(issue.id)).then((r) => r.length > 0), "the queued run");
+      yield* until(() => runPromise(sessions.runs(issue.id)).then((r) => r.length > 0), "the queued run");
       expect((yield* sessions.runs(issue.id))[0]!.triggeredBy.kind).toBe("issue");
       expect(yield* sql`select 1 from issue_queue where issue = ${issue.id}`.pipe(Effect.orDie)).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -558,6 +560,7 @@ describe("issues", () => {
     const clock = { now: 1_800_000_000_000 };
     const c = config();
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
@@ -570,10 +573,10 @@ describe("issues", () => {
       clock.now += 10 * 60_000;
       yield* crons.tick;
       let issue = yield* issues.ofCron(sc.id);
-      yield* until(async () => (issue = await Effect.runPromise(issues.ofCron(sc.id)))?.queuedAt !== undefined, "the cron queued");
+      yield* until(async () => (issue = await runPromise(issues.ofCron(sc.id)))?.queuedAt !== undefined, "the cron queued");
       yield* core.apply({ type: "left", id: sessionId("occupied") });
       yield* issues.tryQueued;
-      yield* until(() => Effect.runPromise(sessions.runs(issue!.id)).then((r) => r.length > 0), "the scheduled run");
+      yield* until(() => runPromise(sessions.runs(issue!.id)).then((r) => r.length > 0), "the scheduled run");
       const [run] = yield* sessions.runs(issue!.id);
       expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true });
       expect((yield* sessions.get(run!.session))?.channel).toBe(channel.id);
@@ -602,6 +605,7 @@ describe("issues", () => {
   it.live("an issue handed over goes on in the same issue with another profile", () => {
     const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const chat = yield* Channels;
@@ -610,7 +614,7 @@ describe("issues", () => {
       yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
       const issue = yield* issues.add({ title: "write hello", assignee: "lab", project: "demo" });
       const inReview = (n: number) =>
-        until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_review" && t.sessions.length === n), "round " + n);
+        until(() => runPromise(issues.get(issue.id)).then((t) => t.status === "in_review" && t.sessions.length === n), "round " + n);
       yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
       yield* inReview(1);
       const [first] = (yield* issues.get(issue.id)).sessions;
@@ -632,6 +636,7 @@ describe("issues", () => {
   it.live("an issue still being worked is not handed over", () => {
     const f = farm();
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const chat = yield* Channels;
       const agents = yield* Agents;
@@ -639,7 +644,7 @@ describe("issues", () => {
       yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
       const issue = yield* issues.add({ title: "work on", assignee: "lab", project: "demo" });
       yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
-      yield* until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_progress"), "working");
+      yield* until(() => runPromise(issues.get(issue.id)).then((t) => t.status === "in_progress"), "working");
       expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner, { assignee: "lab2" })))).toContain(
         "先叫停，等它停下再换人",
       );

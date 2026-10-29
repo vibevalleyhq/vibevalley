@@ -127,7 +127,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           },
         });
         const text = ((res.content ?? []) as { type: string; text?: string }[]).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-        if (res.isError) return yield* Effect.fail(new SourceError({ message: `${tool}: ${head(text, 300)}` }));
+        if (res.isError) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );
@@ -141,7 +141,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     if (!everything) args.filter_labels = agent ? label("agent", agent) : app;
     const text = yield* call("memory_search", args);
     return yield* Effect.mapError(
-      Schema.decodeUnknownEffect(SearchResponse)(text),
+      Schema.decodeEffect(SearchResponse)(text),
       () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
     ).pipe(Effect.map((r): Hit[] => r.results ?? []));
   });
@@ -151,8 +151,8 @@ export function nowledge(c: MemorySourceConfig): Source {
     const answer = yield* call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
     // The new memory's id, at the top or under memory; none when it found the same memory there already. An answer of
     // another shape is not taken for that: the note may not have been kept, and saying so lets the source's queue log it.
-    const added = Option.getOrUndefined(Schema.decodeUnknownOption(AddedResponse)(answer));
-    if (!added) return yield* Effect.fail(new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) }));
+    const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
+    if (!added) return yield* new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) });
     return added.memory_id || added.id || added.memory?.id || "";
   });
 

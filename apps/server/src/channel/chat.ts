@@ -506,7 +506,7 @@ export const make = Effect.gen(function* () {
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */
-  const tx = <A, E>(work: Effect.Effect<A, E>) => inTx(work).pipe(Effect.onError(() => Effect.catchCause(reload, () => Effect.void)));
+  const tx = <A, E>(work: Effect.Effect<A, E>) => inTx(work).pipe(Effect.onError(() => Effect.ignoreCause(reload)));
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   const orchestratorHub = yield* scopedPubSub<OrchestratorNews>();

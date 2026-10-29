@@ -83,7 +83,7 @@ export const request = Effect.fn("Cli.request")(function* (base: string, path: s
   const plain = HttpClientRequest.post(base + path);
   const res = yield* send(base, body === undefined ? plain : HttpClientRequest.bodyText(plain, body, "application/json"));
   const text = yield* res.text.pipe(Effect.mapError(unreachable(base)));
-  if (res.status < 200 || res.status >= 300) return yield* Effect.fail(failureOf(res.status, text));
+  if (res.status < 200 || res.status >= 300) return yield* failureOf(res.status, text);
   return text;
 });
 
@@ -94,7 +94,7 @@ const call = (base: string, op: keyof Handlers, input?: Readonly<Record<string, 
 const answer =
   <T>(schema: Schema.Codec<T>) =>
   (text: string) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(
+    Schema.decodeEffect(Schema.fromJsonString(schema))(text).pipe(
       Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: t("server.cli.failure.shape", { why: issue.message }) })),
     );
 
@@ -120,10 +120,8 @@ const checkedInput = Effect.fnUntraced(function* (e: Endpoint, given: string, ar
   const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.notJson", { why: issue.message }), "InvalidJson")));
   const value = { ...(fields as Record<string, unknown>), ...args };
   const missing = e.about.find((name) => value[name] === undefined);
-  if (missing !== undefined) return yield* Effect.fail(usage(path, t("server.cli.failure.missingArgument", { name: missing }), "MissingArgument"));
-  yield* Schema.decodeUnknownEffect(e.input!)(value).pipe(
-    Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))),
-  );
+  if (missing !== undefined) return yield* usage(path, t("server.cli.failure.missingArgument", { name: missing }), "MissingArgument");
+  yield* Schema.decodeEffect(e.input!)(value).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))));
   return JSON.stringify(value);
 });
 
@@ -153,14 +151,12 @@ function endpointCommand(e: Endpoint) {
       if (yield* DryRunFlag) {
         if (e.dryRun) return yield* printBody(yield* request(base, pathOf(e.dryRun), body));
         if (!readsOnly(e.op))
-          return yield* Effect.fail(
-            new Failure({
-              code: exit.usage,
-              tag: "NoDryRun",
-              text: t("server.cli.failure.dryRun", { op: e.op }),
-              next: [{ say: t("server.cli.next.whatItDoes"), run: [...path, "--help"] }],
-            }),
-          );
+          return yield* new Failure({
+            code: exit.usage,
+            tag: "NoDryRun",
+            text: t("server.cli.failure.dryRun", { op: e.op }),
+            next: [{ say: t("server.cli.next.whatItDoes"), run: [...path, "--help"] }],
+          });
       }
       yield* printBody(yield* request(base, pathOf(e.op), body));
     }),
@@ -172,7 +168,7 @@ const frames = (base: string, path: string) =>
   Stream.unwrap(
     Effect.gen(function* () {
       const res = yield* send(base, HttpClientRequest.get(base + path).pipe(HttpClientRequest.accept("text/event-stream")));
-      if (res.status !== 200) return yield* Effect.fail(failureOf(res.status, yield* res.text.pipe(Effect.mapError(unreachable(base)))));
+      if (res.status !== 200) return yield* failureOf(res.status, yield* res.text.pipe(Effect.mapError(unreachable(base))));
       return res.stream.pipe(
         Stream.decodeText,
         Stream.pipeThroughChannel(Sse.decode()),
@@ -221,7 +217,7 @@ export const issueWorkCommand = Command.make("work", { id: Argument.String("id")
     if (issue.status === "backlog") yield* call(base, "issue.status.update", { id: issue.id, status: "todo" });
     yield* frames(base, statePath).pipe(
       Stream.mapEffect((data) =>
-        Schema.decodeUnknownEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
+        Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
       ),
       Stream.filter((frame) => frame.state.issues !== undefined),
       Stream.mapEffect((frame) => {

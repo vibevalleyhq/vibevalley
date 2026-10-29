@@ -56,11 +56,7 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
     }
     return new Response("{}", { status: 200 });
   };
-  const http = Effect.runSync(
-    Effect.gen(function* () {
-      return yield* HttpClient.HttpClient;
-    }).pipe(Effect.provide(FetchHttpClient.layer)),
-  );
+  const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
   const run = <A, E>(e: Effect.Effect<A, E>) => Effect.provideService(e, FetchHttpClient.Fetch, fetch);
   const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, http);
   const turn = { agent: "lab", session: "done", project: "demo", job: "job", outcome: "completed" as const, said: "done", summary: "done" };
