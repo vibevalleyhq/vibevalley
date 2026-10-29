@@ -19,7 +19,7 @@ export const sizeText = (bytes: number) =>
  * A file as a tile (docs/style/design.md, 附件): a picture's thumbnail or the icon of its kind, its name and its size.
  * onRemove: a file not sent yet, which the owner may take back.
  */
-export function AttachmentTile(props: { file: Attachment; onRemove?: () => void; testid?: string }) {
+export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void) | undefined; testid?: string }) {
   const kind = () => fileKind(props.file.type);
   return (
     <span

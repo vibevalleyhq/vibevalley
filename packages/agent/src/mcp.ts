@@ -10,6 +10,7 @@ import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotoc
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { textTool } from "./core/tool.ts";
+import { asTransport } from "./mcpTransport.ts";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { afterRealTime } from "./realTime.ts";
 import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
@@ -85,9 +86,11 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   let stderr = "";
   let transport: Transport;
   if (server.url) {
-    transport = new StreamableHTTPClientTransport(new URL(server.url), {
-      requestInit: { headers: server.headers ?? {} },
-    });
+    transport = asTransport(
+      new StreamableHTTPClientTransport(new URL(server.url), {
+        requestInit: { headers: server.headers ?? {} },
+      }),
+    );
   } else {
     const stdio = new StdioClientTransport({
       command: server.command ?? "",
@@ -131,7 +134,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   }
 }
 
-function mcpTool(client: Client, server: string, t: { name: string; description?: string; inputSchema?: object }): Tool {
+function mcpTool(client: Client, server: string, t: { name: string; description?: string | undefined; inputSchema?: object | undefined }): Tool {
   const parameters = (t.inputSchema as JsonSchema | undefined) ?? { type: "object", properties: {} };
   return textTool<Record<string, unknown> | null>({
     name: mcpToolName(server, t.name),

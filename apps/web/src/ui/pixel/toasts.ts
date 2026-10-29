@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 // Each closes after its timeout (5 s by default), held while the pointer is over the stack; past `limit` they hide.
 
@@ -54,7 +55,7 @@ export class ToastStore {
   readonly snapshot = () => this.list;
 
   add({ type = "info", title, description, timeout = 5000, data }: ToastInput): number {
-    const t: ToastData = { id: ++this.next, type, title, description, timeout, data };
+    const t: ToastData = omitUndefined({ id: ++this.next, type, title, description, timeout, data });
     this.list = [t, ...this.list];
     this.left.set(t.id, timeout);
     if (!this.paused) this.start(t.id);

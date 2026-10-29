@@ -26,7 +26,7 @@ export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: numb
   );
 }
 
-function PieceView(props: { piece: Piece; ink: string; maxWidth?: number; maxLines?: number; center: boolean }) {
+function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undefined; maxLines?: number | undefined; center: boolean }) {
   return (
     <Switch>
       <Match when={props.piece.kind === "words" ? props.piece : undefined}>
@@ -109,15 +109,15 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number; maxLin
 /** A HUD sign: rows of pieces 3 px apart on paper with an ink border and a hard drop. `width` and `height` include the border. */
 export function PixelCard(props: {
   rows: readonly (readonly Piece[])[];
-  paper?: string;
-  ink?: string;
-  padX?: number;
-  padY?: number;
+  paper?: string | undefined;
+  ink?: string | undefined;
+  padX?: number | undefined;
+  padY?: number | undefined;
   width?: number;
   height?: number;
-  center?: boolean;
-  maxWidth?: number;
-  maxLines?: number;
+  center?: boolean | undefined;
+  maxWidth?: number | undefined;
+  maxLines?: number | undefined;
 }) {
   const centred = () => !!props.center || props.width !== undefined || props.height !== undefined;
   return (

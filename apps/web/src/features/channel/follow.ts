@@ -7,6 +7,7 @@ import { type Accessor, createEffect, createSignal } from "solid-js";
 import { chatPage } from "./rules";
 import { api } from "../../base/api";
 import { followReports, followChannel } from "../../base/gateway";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Followed {
   /** By number, oldest first. */
@@ -37,7 +38,7 @@ const againMs = 1000;
 interface Entry {
   followed: Followed;
   readonly listeners: Set<() => void>;
-  stop?: () => void;
+  stop: (() => void) | undefined;
   retry?: ReturnType<typeof setTimeout>;
   /** Moves on each start and stop: a late answer to an earlier one is dropped. */
   epoch: number;
@@ -47,7 +48,7 @@ const entries = new Map<string, Entry>();
 
 const entryOf = (id: string) => {
   let e = entries.get(id);
-  if (!e) entries.set(id, (e = { followed: empty, listeners: new Set(), epoch: 0 }));
+  if (!e) entries.set(id, (e = { followed: empty, listeners: new Set(), epoch: 0, stop: undefined }));
   return e;
 };
 
@@ -117,7 +118,7 @@ export const followed = {
   async loadOlder(id: string) {
     const e = entryOf(id);
     if (e.followed.complete) return;
-    const page = await api.channel.message.list({ id, before: e.followed.messages[0]?.number, limit: chatPage });
+    const page = await api.channel.message.list(omitUndefined({ id, before: e.followed.messages[0]?.number, limit: chatPage }));
     set(e, { ...e.followed, messages: merged(e.followed.messages, page), complete: page.length < chatPage });
   },
   /** A message by its place, from a channel followed or read once for it: a thread's root. */

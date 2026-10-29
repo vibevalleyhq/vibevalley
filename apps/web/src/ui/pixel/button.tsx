@@ -28,9 +28,9 @@ export function PxButton(
     children?: JSX.Element;
     tone?: PxTone;
     size?: PxSize;
-    icon?: string;
+    icon?: string | undefined;
     label?: string;
-    onClick?: (e: MouseEvent) => void;
+    onClick?: ((e: MouseEvent) => void) | undefined;
   } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick">,
 ) {
   const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "class", "type");

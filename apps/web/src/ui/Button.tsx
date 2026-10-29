@@ -12,7 +12,7 @@ const tones: Record<Tone, string> = {
   danger: "border border-line bg-page text-berry hover:bg-hover",
 };
 
-export function Button(props: { tone?: Tone; icon?: IconName; children?: JSX.Element } & JSX.ButtonHTMLAttributes<HTMLButtonElement>) {
+export function Button(props: { tone?: Tone; icon?: IconName | undefined; children?: JSX.Element } & JSX.ButtonHTMLAttributes<HTMLButtonElement>) {
   const rest = omit(props, "tone", "icon", "children", "class");
   return (
     <button

@@ -51,6 +51,7 @@ import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
 import { orchestratorMood } from "../../base/frame";
 import { prefsNow } from "../../base/prefs";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
 const walkSpeed = 42;
@@ -121,13 +122,14 @@ interface Actor {
   readonly walker: Walker;
   look: string;
   goal: Goal;
-  bed?: Bed;
+  bed: Bed | undefined;
   station: number;
-  leftAt?: number;
+  /** When it left the farm; undefined while it is here. */
+  leftAt: number | undefined;
   goneFor: number;
   hopAt: number;
-  where?: Whereabouts;
-  stroll?: Stroll;
+  where: Whereabouts | undefined;
+  stroll: Stroll | undefined;
 }
 
 const toLifeBox = (b: Box): LifeBox => [b.x0, b.y0, b.x1, b.y1];
@@ -174,12 +176,12 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       dog: v.dog,
       fx: { chimney: v.fx.chimney.map(toLifeBox), anvil: v.fx.anvil.map(toLifeBox), mast: v.fx.mast.map(toLifeBox), pond: v.fx.pond.map(toLifeBox) },
       workshop: toLifeBox(v.spotBoxes.get("runtimes") ?? { x0: 0, y0: 0, x1: 0, y1: 0 }),
-      places: {
+      places: omitUndefined({
         bench: v.places.get("bench")?.at,
         library: v.places.get("library")?.at,
         workshop: v.places.get("workshop")?.at,
         mast: v.places.get("mast")?.at,
-      },
+      }),
       has,
       texture,
       mapColor: pics.mapColor,
@@ -420,7 +422,22 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const walker = new Walker(v.gate, walkSpeed, (a, b) => v.nav.route(a, b));
     walker.go(goal.at);
     world.addChild(node);
-    return { node, body, footing: under, lantern, walker, look, goal, station: -1, goneFor: 0, hopAt: -10 };
+    return {
+      node,
+      body,
+      footing: under,
+      lantern,
+      walker,
+      look,
+      goal,
+      bed: undefined,
+      station: -1,
+      leftAt: undefined,
+      goneFor: 0,
+      hopAt: -10,
+      where: undefined,
+      stroll: undefined,
+    };
   };
 
   const placeFor = (s: Session, crop: Crop) => {

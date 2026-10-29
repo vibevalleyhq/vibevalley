@@ -81,7 +81,7 @@ export function TemplatesPage() {
   );
 }
 
-function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; runtimes: readonly RuntimeInfo[] }) {
+function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | undefined; runtimes: readonly RuntimeInfo[] }) {
   const [open, setOpen] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const router = useRouter();

@@ -9,6 +9,7 @@ import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 import { webRoutes, type YardPlace } from "./world/places";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** A refusal is the server's to tell (a notice). */
 export const fire = (command: Promise<unknown>) => void command.catch(() => {});
@@ -87,7 +88,9 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       if (!said) return;
       const id = frame()?.state.chat?.channels.find((c) => c.default)?.id;
       if (!id) return;
-      await api.channel.message.send({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() });
+      await api.channel.message.send(
+        omitUndefined({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() }),
+      );
     },
     aim: (bed) => aimAt(bed, farmState().tool),
     async act({ bed, tool, session: pointed }) {
@@ -115,7 +118,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
           return { kind: "done" };
       }
     },
-    chooseTitle: (achievement, tier) => api.game.title.set({ achievement, tier }),
+    chooseTitle: (achievement, tier) => api.game.title.set(omitUndefined({ achievement, tier })),
     refreshRuntime: async (id) => void (await api.runtime.refresh({ id })),
   };
   return commands;

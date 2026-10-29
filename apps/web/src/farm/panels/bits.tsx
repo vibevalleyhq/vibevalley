@@ -40,7 +40,7 @@ export function FarmEmpty(props: { text: string }) {
 }
 
 /** What the server answered, under the button that asked. */
-export function Said(props: { answer?: { ok: boolean; text: string } }) {
+export function Said(props: { answer?: { ok: boolean | undefined; text: string } | undefined }) {
   return <Show when={props.answer}>{(a) => <p class={["mt-2 text-[12px]", a().ok ? "text-leaf-700" : "text-berry"]}>{a().text}</p>}</Show>;
 }
 

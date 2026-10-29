@@ -82,7 +82,7 @@ function Said(props: { m: ChatMessage }) {
   );
 }
 
-function Report(props: { r: ChatMessage; issue?: Issue }) {
+function Report(props: { r: ChatMessage; issue?: Issue | undefined }) {
   const core = useCore();
   const session = () => core()?.sessions.find((s) => s.id === (props.r.session ?? props.r.from));
   const agentId = () => props.r.agent ?? session()?.agent;

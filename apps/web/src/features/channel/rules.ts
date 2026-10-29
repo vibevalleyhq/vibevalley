@@ -110,8 +110,9 @@ export function threadOwnerOf(thread: Channel, sessions: Session[]) {
       return findLast(sessions, (h) => h.issue === thread.subjectId);
     case "talk":
       return sessions.find((h) => h.id === thread.subjectId);
+    // A task's thread, or one not about anything: no one's words.
     case "graph":
-    case undefined:
+    default:
       return undefined;
   }
 }
@@ -130,8 +131,9 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
     }
     case "graph":
       return t("web.channel.names.planThread", { id: thread.subjectId ?? "" });
+    // A talk thread, or one not about anything.
     case "talk":
-    case undefined: {
+    default: {
       if (thread.subjectKind === "talk" && thread.subjectId) {
         const session = sessions.find((h) => h.id === thread.subjectId);
         return t("web.channel.names.talkThread", { who: session?.name ?? thread.title ?? thread.subjectId });
@@ -188,9 +190,10 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
   return messages.map((m, i) => {
     const label = dayLabel(m.at, now);
     const before = messages[i - 1];
+    const thread = threads.get(m.id);
     const item: FeedItem = {
       message: m,
-      thread: threads.get(m.id),
+      ...(thread ? { thread } : {}),
       // A reply shows who says it above the line it answers.
       continues:
         !!before &&

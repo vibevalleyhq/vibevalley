@@ -5,6 +5,7 @@ import { ToastHost } from "../../ui/ToastHost";
 import { AnswerView, IssueDetail } from "./IssueDetail";
 import { TodoDetail } from "./TodoDetail";
 import { acts, min, now, sampleChanges, sampleIssue, sampleSession, working } from "./issue.samples";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const description = "过期的会话现在报错，页面一直转圈。\n\n要做的：过期就回到登录页，说清楚为什么。";
 const criteria = ["过期的会话回到登录页", "登录页说「登录过期了」", "补一条跨过期限的测试"];
@@ -22,8 +23,14 @@ const resting = (more: Partial<Session> = {}) =>
 
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });
 
-const base = (more: Partial<Issue>) =>
-  sampleIssue(18, "修好登录过期", "in_review", "high", { description, criteria, project: "vibevalley", assignee: "老周", sessions: [], ...more });
+const base = (more: { [K in keyof Issue]?: Issue[K] | undefined }) =>
+  sampleIssue(
+    18,
+    "修好登录过期",
+    "in_review",
+    "high",
+    omitUndefined({ description, criteria, project: "vibevalley", assignee: "老周", sessions: [], ...more }),
+  );
 
 // Each state as the server sends it; the buttons follow apps/server/src/issue/attention.ts.
 const pages: Record<string, Page> = {

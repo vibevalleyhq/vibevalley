@@ -47,7 +47,7 @@ const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
-export function MessageList(props: { channel: Channel | undefined; filter?: string; point?: number | undefined; emptyText: string }) {
+export function MessageList(props: { channel: Channel | undefined; filter?: string | undefined; point?: number | undefined; emptyText: string }) {
   const core = useCore();
   const router = useRouter();
   const id = () => props.channel?.id;
@@ -361,7 +361,7 @@ function Dispatch(props: { m: ChatMessage }) {
 export function MessageRow(props: {
   m: ChatMessage;
   continues: boolean;
-  thread?: Channel;
+  thread?: Channel | undefined;
   inChannel?: boolean;
   where?: string | undefined;
   onJump?: () => void;

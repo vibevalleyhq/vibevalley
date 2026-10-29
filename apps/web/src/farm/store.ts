@@ -8,6 +8,7 @@ import type { BedFxKind, Tool } from "./tools";
 import type { Point } from "./world/level";
 import type { FarmPanel } from "./world/places";
 import type { Rect } from "./world/framing";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export type { FarmPanel } from "./world/places";
 
@@ -191,7 +192,7 @@ export const farm = {
   showTitle: () => set({ titleOpen: true }),
   /** Plays a bed's effect for a moment: the canvas draws it, the sounds hear it. */
   bedFx: (bed: number, kind: BedFxKind, text?: string) => {
-    const fx: BedFx = { id: ++nextFx, bed, kind, text };
+    const fx: BedFx = omitUndefined({ id: ++nextFx, bed, kind, text });
     set((s) => ({ bedFx: [...s.bedFx, fx] }));
     setTimeout(() => set((s) => ({ bedFx: s.bedFx.filter((f) => f !== fx) })), fxLinger);
   },

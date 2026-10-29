@@ -495,7 +495,7 @@ describe("runtime", () => {
           installation: async () => ({ kind: "not_found" }) as const,
         }),
       ]);
-      const r = yield* runtimes({ registry, probe: undefined });
+      const r = yield* make({ background: false, usageOf: async () => null, registry });
       // The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
       for (const info of r.list()) {
         expect(info.installation.status).toBe("checking");
@@ -546,7 +546,7 @@ describe("runtime", () => {
             env: {},
           }),
         );
-        const r = yield* runtimes({ registry, probe: undefined });
+        const r = yield* make({ background: false, usageOf: async () => null, registry });
         yield* r.refresh("pi");
         return yield* r.resolve(agent({}));
       }).pipe(Effect.scoped, Effect.provide(world()));

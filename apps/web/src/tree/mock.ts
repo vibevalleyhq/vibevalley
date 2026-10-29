@@ -3,6 +3,7 @@
 // a seed, so the page and its tests see the same tree on every load.
 
 import { currentLocale } from "@vibevalley/i18n";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export type MemoryKind = "leaf" | "fruit" | "seed";
 
@@ -223,17 +224,19 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
   for (let i = 0; i < 186; i++) {
     const written = at();
     const recalled = Math.floor(Math.pow(rnd(), 3) * 9);
-    items.push({
-      id: `leaf-${i}`,
-      kind: "leaf",
-      body: pick(notes),
-      agent: pick(agents).id,
-      project: rnd() < 0.25 ? null : pick(projects),
-      at: written,
-      recalled,
-      recalledAt: recalled > 0 ? written + rnd() * (now - written) : undefined,
-      fading: false,
-    });
+    items.push(
+      omitUndefined({
+        id: `leaf-${i}`,
+        kind: "leaf" as const,
+        body: pick(notes),
+        agent: pick(agents).id,
+        project: rnd() < 0.25 ? null : pick(projects),
+        at: written,
+        recalled,
+        recalledAt: recalled > 0 ? written + rnd() * (now - written) : undefined,
+        fading: false as const,
+      }),
+    );
   }
   // The five least used are the next to fall.
   [...items]
@@ -246,32 +249,36 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     const c = pick(cases);
     const written = at();
     const recalled = Math.floor(Math.pow(rnd(), 2) * 12);
-    items.push({
-      id: `fruit-${i}`,
-      kind: "fruit",
-      body: c.insight,
-      agent: pick(agents).id,
-      project: pick(projects),
-      at: written,
-      recalled,
-      recalledAt: recalled > 0 ? written + rnd() * (now - written) : undefined,
-      fading: false,
-      case: c,
-    });
+    items.push(
+      omitUndefined({
+        id: `fruit-${i}`,
+        kind: "fruit" as const,
+        body: c.insight,
+        agent: pick(agents).id,
+        project: pick(projects),
+        at: written,
+        recalled,
+        recalledAt: recalled > 0 ? written + rnd() * (now - written) : undefined,
+        fading: false as const,
+        case: c,
+      }),
+    );
   }
   // The fruit recalled last: the one that flashes.
-  items.push({
-    id: "fruit-now",
-    kind: "fruit",
-    body: cases[0]!.insight,
-    agent: "fox",
-    project: projects[1]!,
-    at: now - 6 * day,
-    recalled: 4,
-    recalledAt: now - 40_000,
-    fading: false,
-    case: cases[0],
-  });
+  items.push(
+    omitUndefined({
+      id: "fruit-now",
+      kind: "fruit" as const,
+      body: cases[0]!.insight,
+      agent: "fox",
+      project: projects[1]!,
+      at: now - 6 * day,
+      recalled: 4,
+      recalledAt: now - 40_000,
+      fading: false as const,
+      case: cases[0],
+    }),
+  );
   skills.forEach((name, i) => {
     items.push({
       id: `seed-${i}`,
@@ -281,7 +288,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
       project: null,
       at: since + ((i + 1) / (skills.length + 1)) * (now - since),
       recalled: Math.floor(rnd() * 20),
-      fading: false,
+      fading: false as const,
       sown: i < 4,
     });
   });
@@ -314,7 +321,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     if (a === b || links.some((l) => l.kind === "together" && ((l.a === a.id && l.b === b.id) || (l.a === b.id && l.b === a.id)))) continue;
     links.push({ kind: "together", a: a.id, b: b.id, times: 2 + Math.floor(rnd() * Math.min(a.recalled, b.recalled)) });
   }
-  return {
+  return omitUndefined({
     since,
     rounds: 128,
     recalls: items.reduce((n, m) => n + m.recalled, 0),
@@ -324,5 +331,5 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     projects,
     items,
     links,
-  };
+  });
 }

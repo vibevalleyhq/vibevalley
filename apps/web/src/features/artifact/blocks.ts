@@ -94,7 +94,7 @@ export function markdownShortcut(text: string): { type: BlockType; attrs: BlockA
 
 /** Each numbered block's number: its place in the run of numbered siblings it is in. `ordered` is the artifact's order,
  * each block followed by its children. */
-export function listNumbers(ordered: readonly { id: string; parentId?: string; type: string }[]): Map<string, number> {
+export function listNumbers(ordered: readonly { id: string; parentId?: string | undefined; type: string }[]): Map<string, number> {
   const last = new Map<string | undefined, [string, number]>();
   const out = new Map<string, number>();
   for (const b of ordered) {

@@ -43,6 +43,7 @@ const events: MossLineState["events"] = [
 ];
 
 const line = (more: Partial<MossLineState>): MossLineState => ({
+  problem: undefined,
   phase: "idle",
   muted: false,
   micLevel: 0,

@@ -71,7 +71,7 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
         case "conflict":
           return {
             head: t("web.issue.issue.conflict", { base: head.conflict?.base ?? t("web.issue.issue.main") }),
-            line: head.conflict?.files.join(t("web.issue.issue.and")),
+            ...(head.conflict ? { line: head.conflict.files.join(t("web.issue.issue.and")) } : {}),
             tone: "berry",
           };
         case "failed":
@@ -80,10 +80,10 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
           return { head: t("web.issue.issue.interrupted"), ...(said ? { line: said } : {}), tone: "wheat" };
         case "quiet":
           return { head: t("web.issue.issue.quiet", { who }), line: t("web.issue.issue.quietLine"), tone: "berry" };
-        case undefined:
+        // No reason given: under exactOptionalPropertyTypes a case undefined does not make this switch exhaustive.
+        default:
           return { head: t("web.issue.issue.stuck"), tone: "berry" };
       }
-      break;
     case "canceled":
       return attention.lead === "reopen" ? { head: t("web.issue.issue.canceled"), line: t("web.issue.issue.reopenLine"), tone: "faint" } : undefined;
     case "draft":

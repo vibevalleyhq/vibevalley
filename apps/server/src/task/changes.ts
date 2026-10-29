@@ -102,7 +102,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
         break;
       case "merged":
         if (n.conclusion) who.detail = n.conclusion;
-        if ((n.commits ?? []).length > 0) who.commits = n.commits;
+        if (n.commits && n.commits.length > 0) who.commits = n.commits;
         step(n, "task_merged", who);
         break;
       case "failed":

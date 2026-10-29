@@ -59,7 +59,7 @@ async function act(call: () => Promise<ConnectorStatus>, quiet = false) {
   }
 }
 
-export function ConnectorsPage(props: { id?: string }) {
+export function ConnectorsPage(props: { id?: string | undefined }) {
   const core = useCore();
   const selected = () => ConnectorIDValues.find((c) => c === props.id) ?? "weixin";
   const list = () => core()?.connectors;

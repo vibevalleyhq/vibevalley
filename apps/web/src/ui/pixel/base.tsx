@@ -8,7 +8,7 @@ export function PxWindow(props: {
   paper?: string;
   border?: boolean;
   class?: JSX.ClassValue;
-  style?: JSX.CSSProperties;
+  style?: JSX.CSSProperties | undefined;
   testid?: string;
 }) {
   return (

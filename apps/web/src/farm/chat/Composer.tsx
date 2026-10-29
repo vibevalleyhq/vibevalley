@@ -68,7 +68,8 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
   const box = createComposer(core, () => input, {
     target: () => {
       const reply = draftOf(props.channel?.id).reply;
-      return { id: props.channel?.id ?? "", agent: props.thread || pick() === "auto" ? undefined : pick(), ...(reply ? { replyTo: reply.number } : {}) };
+      const agent = props.thread || pick() === "auto" ? undefined : pick();
+      return { id: props.channel?.id ?? "", ...(agent ? { agent } : {}), ...(reply ? { replyTo: reply.number } : {}) };
     },
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,

@@ -47,7 +47,7 @@ export function ToastViewport(props: {
   );
 }
 
-function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; leading?: JSX.Element; kicker?: string; onClose: () => void }) {
+function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; leading?: JSX.Element; kicker?: string | undefined; onClose: () => void }) {
   const [drag, setDrag] = createSignal({ x: 0, y: 0 });
   let from: { x: number; y: number } | null = null;
   const front = () => props.index === 0 && !props.hidden;

@@ -20,7 +20,7 @@ export function PhaseGlyph(props: { phase: Phase; size?: IconSize }) {
 }
 
 /** A helper's face by its profile's look; for a sender without a profile, by its id. */
-export function HelperFace(props: { agent: string; runtime?: string; size?: number; muted?: boolean }) {
+export function HelperFace(props: { agent: string; runtime?: string | undefined; size?: number; muted?: boolean }) {
   const agent = useAgent(() => props.agent);
   const look = () => agent()?.look;
   return <AgentFace agentId={props.agent} look={look()} runtime={props.runtime ?? agent()?.runtime} size={props.size ?? 24} muted={props.muted} />;

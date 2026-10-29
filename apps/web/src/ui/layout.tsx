@@ -86,7 +86,7 @@ export function Toggle(props: {
   label: string;
   /** What a screen reader says, where the label alone does not say which. */
   ariaLabel?: string;
-  hint?: string;
+  hint?: string | undefined;
   tip?: string;
   checked: boolean;
   onChange: (on: boolean) => void;

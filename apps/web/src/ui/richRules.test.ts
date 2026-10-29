@@ -7,10 +7,10 @@ import { remarkIssueRefs, safeHref } from "./richRules";
 
 interface Hast {
   type: string;
-  tagName?: string;
-  value?: string;
-  properties?: { href?: string };
-  children?: Hast[];
+  tagName?: string | undefined;
+  value?: string | undefined;
+  properties?: { href?: string | undefined } | undefined;
+  children?: Hast[] | undefined;
 }
 const textOf = (n: Hast): string => n.value ?? (n.children ?? []).map(textOf).join("");
 /** Each link in the rendered tree, as its words and where it goes. */

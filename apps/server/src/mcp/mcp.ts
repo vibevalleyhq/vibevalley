@@ -81,7 +81,7 @@ export const make = (options: McpOptions = {}) =>
         if (!id) return text(failedCall(unknownCaller));
         return text(await call(tool, req.params.arguments));
       });
-      const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+      const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
       await server.connect(transport);
       try {
         return await transport.handleRequest(request);

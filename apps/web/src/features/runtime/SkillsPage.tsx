@@ -27,7 +27,7 @@ export const skillPath = (id?: string) => (id === undefined ? "/settings/skills"
 
 export const useSkills = () => useQuery(() => ({ queryKey: ["skills"], queryFn: () => api.skill.list() }));
 
-export function SkillsPage(props: { id?: string }) {
+export function SkillsPage(props: { id?: string | undefined }) {
   const router = useRouter();
   const [query, setQuery] = createSignal("");
   const skills = useSkills();

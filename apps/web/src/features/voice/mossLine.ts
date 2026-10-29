@@ -77,7 +77,7 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 export class MossLine {
   phase: MossPhase = "idle";
-  problem?: string;
+  problem: string | undefined = undefined;
   muted = false;
   micLevel = 0;
   mossLevel = 0;
@@ -86,16 +86,16 @@ export class MossLine {
   qos: MossQos = noQos();
   version = 0;
 
-  private ws?: WebSocket;
+  private ws: WebSocket | undefined = undefined;
   /** What passed since the last tick of the QoS clock. */
   private window = { up: 0, down: 0, frames: 0 };
-  private tick?: ReturnType<typeof setInterval>;
+  private tick: ReturnType<typeof setInterval> | undefined = undefined;
   /** When the owner's words last ended, waiting for MOSS's first sound; performance.now(). */
-  private heardAt?: number;
+  private heardAt: number | undefined = undefined;
   private replyTotal = 0;
-  private mic?: { stream: MediaStream; context: AudioContext };
-  private out?: AudioContext;
-  private piece?: Piece;
+  private mic: { stream: MediaStream; context: AudioContext } | undefined = undefined;
+  private out: AudioContext | undefined = undefined;
+  private piece: Piece | undefined = undefined;
   private playback = new Playback();
   private sources = new Map<Queued, AudioBufferSourceNode>();
   private readonly listeners = new Set<() => void>();

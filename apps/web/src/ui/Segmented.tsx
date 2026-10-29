@@ -12,7 +12,7 @@ interface Place {
  * 分段). */
 export function Segmented<T extends string>(props: {
   value: T;
-  options: { value: T; label: string; disabled?: boolean; title?: string }[];
+  options: { value: T; label: string; disabled?: boolean | undefined; title?: string | undefined }[];
   onChange: (v: T) => void;
   label: string;
   block?: boolean;

@@ -60,7 +60,7 @@ export function KeyField(props: {
   /** Marks the key for removal, or takes the mark back. */
   onRemove: (removing: boolean) => void;
   /** Where the key is made. */
-  link?: { readonly href: string; readonly label: string };
+  link?: { readonly href: string; readonly label: string } | undefined;
   tip?: string;
   /** A label as small as the fields' around it in a dense form. */
   small?: boolean;

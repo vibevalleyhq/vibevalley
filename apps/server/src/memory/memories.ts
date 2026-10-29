@@ -13,6 +13,7 @@ import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "../base/ids.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {
@@ -112,14 +113,14 @@ export const makeMemories = Effect.gen(function* () {
   const recallable = Effect.fnUntraced(
     function* (cue: RecallCue) {
       const all = yield* list(cue.agent);
-      const picked: PickCue = {
+      const picked: PickCue = omitUndefined({
         session: cue.session,
         project: cue.project,
         text: cue.text,
         skip: cue.skip,
         now: yield* Clock.currentTimeMillis,
         matches: yield* matches(cue.agent, cue.text),
-      };
+      });
       return pick(all, picked);
     },
     (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as Memory[]))),

@@ -121,7 +121,7 @@ export function AgentPage(props: { id: string }) {
   );
 }
 
-function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) {
+function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly Agent[] }) {
   // A new one stays new until it is saved and the route moves to its id, which builds the page again.
   const isNew = untrack(() => !props.saved);
   const [draft, setDraft] = createSignal(untrack(() => props.start));
@@ -404,7 +404,7 @@ function Stage(props: { draft: Agent; pose: Pose }) {
 
 type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory" | "trajectories";
 
-function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; nameTaken: boolean; isNew: boolean; onTrajectories: () => void }) {
+function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch; nameTaken: boolean; isNew: boolean; onTrajectories: () => void }) {
   const [tab, setTab] = createSignal<Tab>("who");
   const facts = () => factsOf(props.runtime);
   const tabs = (): [Tab, string][] => [
@@ -515,7 +515,7 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
 }
 
 /** A label with what it means behind an info icon, what sits at its right, the control, and what is wrong under it. */
-function Labeled(props: { label: string; tip?: string; hint?: string; error?: string; aside?: JSX.Element; children: JSX.Element }) {
+function Labeled(props: { label: string; tip?: string; hint?: string | undefined; error?: string | undefined; aside?: JSX.Element; children: JSX.Element }) {
   return (
     <div class="flex flex-col gap-1">
       <div class="flex items-center gap-1.5">
@@ -595,7 +595,7 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   );
 }
 
-function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
+function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
   const models = () => props.runtime?.models ?? [];
   const fallback = () => props.runtime?.settings.defaultModel || models().find((m) => m.isDefault)?.id || "";
   const model = () => models().find((m) => m.id === (props.draft.model || fallback()));
@@ -640,7 +640,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo; patch: Pat
 }
 
 /** What it takes comes with runtime.list: until then, nothing is said rather than a guess. */
-function Facts(props: { runtime: string; info?: RuntimeInfo }) {
+function Facts(props: { runtime: string; info?: RuntimeInfo | undefined }) {
   const facts = () => factsOf(props.info);
   return (
     <section class="flex flex-col gap-1.5 rounded-lg border border-line p-3">
@@ -705,7 +705,7 @@ function Persona(props: { draft: Agent; facts: RuntimeFacts; patch: Patch }) {
   );
 }
 
-function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
+function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
   const all = useSkills();
   const toggle = (id: string) => {
     const d = props.draft;
@@ -762,7 +762,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch 
 
 const mcpTarget = (s: MCPServer) => (s.type === "stdio" ? [s.command, ...s.args].join(" ") : s.url);
 
-function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
+function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
   const facts = () => factsOf(props.runtime);
   const mcpRefused = () => facts().refused[sessionMcpServers];
   const toolsRefused = () => facts().refused[sessionDisallowedTools];
@@ -875,7 +875,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
   );
 }
 
-function Inventory(props: { entries?: InventoryEntry[] | null }) {
+function Inventory(props: { entries?: InventoryEntry[] | null | undefined }) {
   return (
     <Switch
       fallback={

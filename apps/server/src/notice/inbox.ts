@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
 
 import { defaultOf } from "../channel/state.ts";
-import { needOf } from "@vibevalley/protocol/rules";
+import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
 import { patrolBrief, patrolWho } from "./prompts.ts";
@@ -36,6 +36,8 @@ function gathered(state: WorkspaceState): Unworded[] {
   const chat = state.chat;
   const general = defaultOf(chat)?.id;
   const out: Unworded[] = [];
+  // The channel is the session's or the default one; a farm without channels has neither.
+  const push = (e: Omit<Unworded, "channel"> & { readonly channel: string | undefined }) => out.push(omitUndefined(e));
   for (const h of state.sessions) {
     const want = wantOf(h, state);
     if (!want || (h.graph && want.kind !== "quiet")) continue;
@@ -48,7 +50,7 @@ function gathered(state: WorkspaceState): Unworded[] {
     switch (want.kind) {
       case "ask": {
         const question = want.questions[0]?.question ?? "";
-        out.push({
+        push({
           item: { id: `${h.id}:ask:${h.runs}`, kind: "ask", from, text: cut(question, 40), at, target },
           channel,
           since: at,
@@ -57,7 +59,7 @@ function gathered(state: WorkspaceState): Unworded[] {
         break;
       }
       case "review":
-        out.push({
+        push({
           item: { id: `${h.id}:review:${h.runs}`, kind: "review", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
@@ -65,7 +67,7 @@ function gathered(state: WorkspaceState): Unworded[] {
         });
         break;
       case "fix":
-        out.push({
+        push({
           item: { id: `${h.id}:fix:${h.runs}`, kind: "fix", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
@@ -73,7 +75,7 @@ function gathered(state: WorkspaceState): Unworded[] {
         });
         break;
       case "interrupted":
-        out.push({
+        push({
           item: { id: `${h.id}:interrupted:${h.runs}`, kind: "interrupted", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
@@ -82,7 +84,7 @@ function gathered(state: WorkspaceState): Unworded[] {
         break;
       case "conflict": {
         const files = (h.conflict?.files ?? []).length;
-        out.push({
+        push({
           item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.notice.conflictFiles", { files }), at, target },
           channel,
           since: at,
@@ -91,7 +93,7 @@ function gathered(state: WorkspaceState): Unworded[] {
         break;
       }
       case "quiet": {
-        out.push({
+        push({
           item: { id: `${h.id}:quiet:${want.since}`, kind: "quiet", from, text: cut(h.brief, 40), at: want.since, target },
           channel,
           since: want.since,
@@ -107,14 +109,14 @@ function gathered(state: WorkspaceState): Unworded[] {
     const target = { kind: "graph", graph: graph.id } as const;
     switch (graph.state) {
       case "draft":
-        out.push({
+        push({
           item: { id: graph.id + ":draft", kind: "graph-draft", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
           brief: patrolBrief.graphDraft(graph.title, graph.id),
         });
         break;
       case "ready":
-        out.push({
+        push({
           item: { id: graph.id + ":ready", kind: "graph-ready", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
           brief: patrolBrief.graphReady(graph.title, graph.id),
@@ -127,7 +129,7 @@ function gathered(state: WorkspaceState): Unworded[] {
           // A step retried and failed again asks again: from its second failure the id counts them.
           const failures = task.failures ?? 0;
           const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
-          out.push({
+          push({
             item: {
               id,
               kind: "task-failed",

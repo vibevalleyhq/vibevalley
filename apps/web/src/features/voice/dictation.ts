@@ -67,11 +67,11 @@ interface Recording {
 
 export class Dictation {
   phase: DictationPhase = "idle";
-  problem?: string;
+  problem: string | undefined = undefined;
   version = 0;
-  private recording?: Recording;
+  private recording: Recording | undefined = undefined;
   /** The field it was started from: the words go there, or nowhere once it is gone. */
-  private owner?: object;
+  private owner: object | undefined = undefined;
   private readonly listeners = new Set<() => void>();
 
   subscribe = (f: () => void) => {

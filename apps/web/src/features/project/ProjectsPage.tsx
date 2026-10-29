@@ -435,7 +435,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
 
 const hands = 8;
 
-function Hands(props: { activity?: ProjectActivity }) {
+function Hands(props: { activity?: ProjectActivity | undefined }) {
   const agents = useWorkAgents();
   const authors = () => props.activity?.authors ?? [];
   const top = () => (authors()[0] && authors()[0]!.commits > 0 ? authors()[0]!.commits : 1);

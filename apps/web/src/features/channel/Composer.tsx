@@ -33,7 +33,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const at = untrack(() => props.channel?.id);
   const router = useRouter();
   const box = createComposer(core, () => input, {
-    initial: at ? untrack(() => draftOf(at).text) : undefined,
+    ...(at ? { initial: untrack(() => draftOf(at).text) } : {}),
     target: () => {
       const d = draft();
       return {

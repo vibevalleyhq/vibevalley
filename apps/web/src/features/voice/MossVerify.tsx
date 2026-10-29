@@ -32,7 +32,7 @@ export function MossVerify(props: { typed: () => string }) {
 }
 
 /** The check as it looks: nothing yet, asking, or the answer as a mark with its reason on hover. */
-export function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult; onCheck: () => void }) {
+export function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult | undefined; onCheck: () => void }) {
   return (
     <div class="flex items-center gap-1.5">
       <IconButton icon="plug" label={t("web.voice.voice.moss.verify")} disabled={props.busy} onClick={() => props.onCheck()} />

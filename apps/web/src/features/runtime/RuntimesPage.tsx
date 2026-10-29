@@ -367,7 +367,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
 }
 
 /** The text is kept as typed, the number follows it (empty or 0 means none). */
-function NumberInput(props: { value?: number; onChange: (n: number | undefined) => void; placeholder: string; label: string; testid?: string }) {
+function NumberInput(props: { value?: number | undefined; onChange: (n: number | undefined) => void; placeholder: string; label: string; testid?: string }) {
   const [text, setText] = createSignal(untrack(() => (props.value ? String(props.value) : "")));
   return (
     <TextInput
@@ -387,7 +387,7 @@ function NumberInput(props: { value?: number; onChange: (n: number | undefined) 
   );
 }
 
-function Field(props: { label: string; hint?: string; children: JSX.Element }) {
+function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
     <div class="flex flex-col gap-1">
       <span class="flex items-center gap-1.5 text-xs font-medium text-muted">

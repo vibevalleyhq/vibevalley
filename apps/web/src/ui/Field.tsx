@@ -17,7 +17,7 @@ export function TextArea(props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement>)
 }
 
 /** A label over its control; what it means is behind an info icon beside the label. */
-export function Field(props: { label: string; hint?: string; children: JSX.Element }) {
+export function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
     <label class="flex flex-col gap-1">
       <span class="flex items-center gap-1.5 text-xs font-medium text-muted">
@@ -37,18 +37,18 @@ export function Field(props: { label: string; hint?: string; children: JSX.Eleme
 export function Select(props: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string; disabled?: boolean }[];
-  placeholder?: string;
+  options: { value: string; label: string; disabled?: boolean | undefined }[];
+  placeholder?: string | undefined;
   label: string;
   /** Placement only: width, margins. */
   class?: string;
-  testid?: string;
+  testid?: string | undefined;
   quiet?: boolean;
   /** A filter that narrows: tinted while a value other than "" is chosen. */
   filter?: boolean;
   /** control: 28px, for a toolbar row; field (default): 32px, beside inputs. */
   size?: "control" | "field";
-  disabled?: boolean;
+  disabled?: boolean | undefined;
 }) {
   const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder }] : []), ...props.options];
   return (

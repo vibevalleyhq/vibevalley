@@ -62,7 +62,7 @@ const main = Effect.gen(function* () {
         withdraw = announce(config.home, `http://${address}`);
         if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid } satisfies ServerReady) + "\n");
       }),
-    { runtime },
+    runtime ? { runtime } : {},
   );
   // With otlp.url the services' spans (Effect.fn), logs and metrics go to that collector; without it nothing is sent.
   const observed = config.otlp.url

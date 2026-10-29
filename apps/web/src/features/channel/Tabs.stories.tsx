@@ -18,6 +18,8 @@ const cron = (more: Partial<Cron>): Cron => ({
   ...more,
 });
 
+const neverRun = ({ lastRun: _lastRun, ...c }: Cron): Cron => c;
+
 export default stories({
   title: "组件/频道/定时任务",
   stories: {
@@ -28,7 +30,7 @@ export default stories({
       render: (a) => (
         <div class="w-[28rem]">
           <CronCard
-            s={cron(a.state === "disabled" ? { enabled: false } : a.state === "pending" ? { pending: true, by: "orchestrator", lastRun: undefined } : {})}
+            s={a.state === "disabled" ? cron({ enabled: false }) : a.state === "pending" ? neverRun(cron({ pending: true, by: "orchestrator" })) : cron({})}
           />
         </div>
       ),

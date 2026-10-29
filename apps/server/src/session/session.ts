@@ -39,7 +39,7 @@ import {
   type SessionId,
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { isBusy } from "@vibevalley/protocol/rules";
+import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream, Metric } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -152,7 +152,8 @@ interface Hand {
   readonly place: Workplace;
   readonly access: Semaphore.Semaphore;
   readonly journal: Journal;
-  sess?: OarSession;
+  /** The oar session it is attached to; undefined between launches. */
+  sess: OarSession | undefined;
   oarSessionId: string;
   lastText: string;
   tracking: Tracking;
@@ -592,7 +593,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       }
       const reaction = eventFacts(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
       h.tracking = reaction.tracking;
-      if (reaction.model) h.tracking = { ...h.tracking, rate: runtimes.quote(runtime, reaction.model) };
+      if (reaction.model) h.tracking = omitUndefined({ ...h.tracking, rate: runtimes.quote(runtime, reaction.model) });
       if (opened) {
         for (const fact of reaction.facts) if (fact.type === "run") apply(fact);
         startRun(h);
@@ -618,7 +619,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const read = readReport(report.outcome, report.text);
       const spent = session.spent ? since(session.spent, h.tracking.runFrom) : undefined;
       h.lastText = read.text;
-      h.tracking = { ...h.tracking, runFrom: undefined };
+      h.tracking = omitUndefined({ ...h.tracking, runFrom: undefined });
       const { launch, spoke } = h;
       apply({
         type: "report",
@@ -678,7 +679,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.launch = `${h.id}#${launches}`;
       h.spoke = false;
       if (s.agent.session.id) h.oarSessionId = s.agent.session.id;
-      h.tracking = { ...h.tracking, oarTokens: undefined };
+      h.tracking = omitUndefined({ ...h.tracking, oarTokens: undefined });
       const session = s.agent.session;
       // From the session's first record: its turn may have started (or ended) before this line runs.
       const stopEvents = session.events(watch(h, s, runtime), { cursor: { sessionId: session.id, afterSeq: -1 } });
@@ -1010,6 +1011,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           place: s.place,
           access: Semaphore.makeUnsafe(1),
           journal: yield* logOf(session),
+          sess: undefined,
           oarSessionId: s.oarSessionId,
           lastText: s.lastText,
           tracking: {},
@@ -1141,6 +1143,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             place,
             access: Semaphore.makeUnsafe(1),
             journal: registered.success,
+            sess: undefined,
             oarSessionId: "",
             lastText: "",
             tracking: {},

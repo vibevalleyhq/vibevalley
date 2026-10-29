@@ -12,7 +12,7 @@ export const toneVar = (tone: Tone) => `var(--color-${tone})`;
 const statusTone: Record<IssueStatus, Tone> = { backlog: "faint", todo: "muted", in_progress: "water", in_review: "wheat", done: "leaf", canceled: "faint" };
 
 /** A ring that fills as the work goes on, as Linear draws it. */
-export function StatusMark(props: { status: IssueStatus; size?: number; tone?: Tone; label?: string }) {
+export function StatusMark(props: { status: IssueStatus; size?: number; tone?: Tone | undefined; label?: string }) {
   const size = () => props.size ?? 14;
   const color = () => toneVar(props.tone ?? statusTone[props.status]);
   const c = () => size() / 2;
@@ -177,7 +177,7 @@ export function FlagChip(props: { text: string; tone: Tone }) {
 }
 
 /** A helper's head by its id, its look read from the profiles. */
-export function AgentFaceOf(props: { agent: string; runtime?: string; size?: number }) {
+export function AgentFaceOf(props: { agent: string; runtime?: string | undefined; size?: number }) {
   const found = useAgent(() => props.agent);
   return (
     <Show when={found()?.role !== "orchestrator"} fallback={<OrchestratorFace size={props.size ?? 18} agent={props.agent} />}>

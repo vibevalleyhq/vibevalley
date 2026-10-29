@@ -4,7 +4,7 @@
 import type { WorkspaceState, Fact, OrchestratorState, Outcome, Phase, Session } from "@vibevalley/protocol";
 import { withChannel, withMessage, withOwnerMentions } from "../channel/state.ts";
 import { withIssue, withIssueStatuses } from "../issue/state.ts";
-import { farmOf, same } from "@vibevalley/protocol/rules";
+import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "../game/play.ts";
 import { sessionOf, whileWorking, withSession } from "../session/state.ts";
 
@@ -21,7 +21,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
     case "call": {
       const reason = f.reason ? f.reason : undefined;
       if (state.call === f.state && state.callReason === reason) return [state, false];
-      return [{ ...state, call: f.state, callReason: reason }, true];
+      return [omitUndefined({ ...state, call: f.state, callReason: reason }), true];
     }
     case "orchestrator": {
       const was = state.orchestrators?.[f.agent];
@@ -86,12 +86,12 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
           ...x,
           runs: f.runs,
           phase: ended(f.outcome),
-          lastRun: { outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, ...(f.answer ? { answer: f.answer } : {}) },
+          lastRun: omitUndefined({ outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, answer: f.answer }),
         }))[0],
         true,
       ];
     case "conflict":
-      return withSession(state, f.id, (h) => ({ ...h, conflict: f.conflict }));
+      return withSession(state, f.id, (h) => omitUndefined({ ...h, conflict: f.conflict }));
     case "left":
       return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id) }, true];
     case "commits":

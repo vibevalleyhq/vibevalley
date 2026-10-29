@@ -41,7 +41,7 @@ export function newOrchestrator(): Agent {
   };
 }
 
-export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) {
+export function OrchestratorProfile(props: { saved?: Agent | undefined; start: Agent; all: readonly Agent[] }) {
   const isNew = untrack(() => !props.saved);
   const [draft, setDraft] = createSignal(untrack(() => props.start));
   const [saving, setSaving] = createSignal(false);

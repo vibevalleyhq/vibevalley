@@ -23,21 +23,21 @@ export class VoiceCall {
   phase: CallPhase = "idle";
   muted = false;
   agentHere = false;
-  problem?: string;
+  problem: string | undefined = undefined;
   /** The 设置 section the problem is fixed in, when the server says a setting does. */
-  problemAt?: VoiceFix;
+  problemAt: VoiceFix | undefined = undefined;
   /** 0..100: the microphone's level and the orchestrator's. */
   micLevel = 0;
   orchestratorLevel = 0;
   readonly captions = new LiveCaptions();
   version = 0;
 
-  private line?: RtcLine;
-  private agentId?: string;
-  private starting?: Promise<void>;
-  private ending?: Promise<void>;
+  private line: RtcLine | undefined = undefined;
+  private agentId: string | undefined = undefined;
+  private starting: Promise<void> | undefined = undefined;
+  private ending: Promise<void> | undefined = undefined;
   private cancel?: () => void;
-  private readonly pending: { text: string; owner: boolean; picked?: string; key?: string }[] = [];
+  private readonly pending: { text: string; owner: boolean; picked?: string | undefined; key?: string }[] = [];
   private readonly listeners = new Set<() => void>();
 
   /** The helper the owner picked to send work to, or undefined for the orchestrator's choice. */
@@ -84,7 +84,7 @@ export class VoiceCall {
     else this.pending.push(c);
   }
 
-  private send(agentId: string, c: { text: string; owner: boolean; picked?: string; key?: string }) {
+  private send(agentId: string, c: { text: string; owner: boolean; picked?: string | undefined; key?: string }) {
     const sent = c.owner
       ? api.voice.call.hear({ agentId, text: c.text, agent: c.picked ?? null, ...(c.key ? { sendKey: c.key } : {}) })
       : api.voice.call.say({ agentId, text: c.text });

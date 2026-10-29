@@ -5,7 +5,7 @@ interface Log {
   readonly id: string;
   steps: SessionEvent[];
   readonly listeners: Set<(steps: SessionEvent[]) => void>;
-  reading?: { during: SessionEvent[]; again: boolean };
+  reading: { during: SessionEvent[]; again: boolean } | undefined;
 }
 
 /** One current log per observed session. Snapshots replace the retained window; live revisions arriving during the read
@@ -22,7 +22,7 @@ export class SessionLogs {
   subscribe(id: string, listener: (steps: SessionEvent[]) => void): () => void {
     let log = this.logs.get(id);
     if (!log) {
-      log = { id, steps: [], listeners: new Set() };
+      log = { id, steps: [], listeners: new Set(), reading: undefined };
       this.logs.set(id, log);
     }
     log.listeners.add(listener);

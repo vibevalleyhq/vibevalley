@@ -1,5 +1,5 @@
 import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus } from "@vibevalley/protocol";
-import { isBusy, same } from "@vibevalley/protocol/rules";
+import { isBusy, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
 import { attentionIn } from "./attention.ts";
@@ -88,12 +88,12 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   (state.issues ?? []).forEach((t, i) => {
     const status = issueStatusOf(t, state);
     const drafting = issueRefiningOf(t, state);
-    const attention = attentionIn({ ...t, status, refining: drafting }, state);
+    const attention = attentionIn(omitUndefined({ ...t, status, refining: drafting }), state);
     // The moves read the attention: a round that failed is not completed, from the moment it fails.
-    const moves = statusMoves({ ...t, status, refining: drafting, attention });
+    const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, attention }));
     if (status === t.status && same(drafting, t.refining) && same(attention, t.attention) && same(moves, t.moves)) return;
     next ??= [...state.issues!];
-    next[i] = { ...t, status, refining: drafting, attention, moves };
+    next[i] = omitUndefined({ ...t, status, refining: drafting, attention, moves });
   });
   return next ? { ...state, issues: next } : state;
 }

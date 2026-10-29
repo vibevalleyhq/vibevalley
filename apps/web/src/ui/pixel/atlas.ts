@@ -3,6 +3,7 @@
 // manifest size over the density, which is the map's width over the level's (384).
 
 import { type Accessor, createSignal, onSettled } from "solid-js";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Size {
   readonly w: number;
@@ -50,7 +51,7 @@ export class SpriteAtlas {
       const [x0, y0, x1, y1] = v.yard ?? [];
       const yard =
         x0 !== undefined && y0 !== undefined && x1 !== undefined && y1 !== undefined ? { x0: x0 / d, y0: y0 / d, x1: x1 / d, y1: y1 / d } : undefined;
-      sprites.set(name, { name, w: v.w / d, h: v.h / d, ax: v.ax / d, ay: v.ay / d, yard, url: spriteUrl(name) });
+      sprites.set(name, omitUndefined({ name, w: v.w / d, h: v.h / d, ax: v.ax / d, ay: v.ay / d, yard, url: spriteUrl(name) }));
     }
     return new SpriteAtlas(sprites, d);
   }

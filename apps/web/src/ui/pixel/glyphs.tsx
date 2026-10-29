@@ -2,7 +2,7 @@ import { For } from "solid-js";
 import { type Cell, crossCells, tickCells } from "./cells";
 
 /** Whole cells on a `grid`×`grid` square; `color` is a CSS colour. */
-export function PixelMark(props: { cells: readonly Cell[]; size: number; color: string; grid?: number; label?: string }) {
+export function PixelMark(props: { cells: readonly Cell[]; size: number; color: string; grid?: number; label?: string | undefined }) {
   const grid = () => props.grid ?? 7;
   return (
     <svg

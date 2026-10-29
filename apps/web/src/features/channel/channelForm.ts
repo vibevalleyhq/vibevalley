@@ -5,6 +5,7 @@
 import { createSignal, untrack } from "solid-js";
 import { type Channel, defaultOrchestrator, type Notify } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Channel) {
@@ -44,7 +45,9 @@ export function createChannelForm(channel?: Channel) {
         if (notify() !== was.notify) await api.channel.notify.set({ id: channel.id, notify: notify() });
         return channel.id;
       }
-      return await api.channel.create({ name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined });
+      return await api.channel.create(
+        omitUndefined({ name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined }),
+      );
     } catch (e) {
       setError(reasonOf(e));
       return undefined;

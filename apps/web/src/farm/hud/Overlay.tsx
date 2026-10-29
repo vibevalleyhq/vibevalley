@@ -60,7 +60,7 @@ interface Pin {
   hop?: number;
 }
 
-const words = (text: string, color?: string): Piece => ({ kind: "words", text, color });
+const words = (text: string, color?: string): Piece => ({ kind: "words", text, ...(color ? { color } : {}) });
 
 function PinView(props: { pin: Pin }) {
   const card = () => (

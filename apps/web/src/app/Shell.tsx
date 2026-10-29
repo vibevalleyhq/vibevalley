@@ -55,7 +55,7 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
   );
 }
 
-function Rail(props: { here?: Place }) {
+function Rail(props: { here?: Place | undefined }) {
   const frames = useFrames();
   const waiting = () => waitingOnOwner(frames.frame?.inbox ?? []);
   const settings = places.find((p) => p.id === "settings")!;
@@ -103,7 +103,7 @@ function Rail(props: { here?: Place }) {
 }
 
 /** The head over a page: its place, and the farm's state, which goes back to the farm. */
-function Desk(props: { place?: Place }) {
+function Desk(props: { place?: Place | undefined }) {
   const core = useCore();
   const live = () => core()?.call === "live";
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;

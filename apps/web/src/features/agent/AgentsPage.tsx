@@ -163,7 +163,14 @@ function OrchestratorCard(props: { agent: Agent }) {
   );
 }
 
-export function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTally; here: number; skillName: Map<string, string>; errors: string[] }) {
+export function AgentCard(props: {
+  agent: Agent;
+  runtime?: RuntimeInfo | undefined;
+  tally?: AgentTally | undefined;
+  here: number;
+  skillName: Map<string, string>;
+  errors: string[];
+}) {
   const client = useQueryClient();
   const available = () => props.runtime?.installation.status === "available";
   const toggle = async () => {
