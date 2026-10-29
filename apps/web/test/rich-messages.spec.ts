@@ -33,7 +33,7 @@ test("a message's code, diagrams, links and lists", async ({ page, api }) => {
   await expect(page.locator('[data-testid="diagram"][data-failed]')).toHaveCount(1);
 
   await expect(page.locator('a[href^="javascript"]')).toHaveCount(0);
-  await expect(page.locator('a[href="https://example.com"]')).toHaveAttribute("target", "_blank");
+  await expect(page.getByTestId("message-body").locator('a[href="https://example.com"]')).toHaveAttribute("target", "_blank");
   await expect(page.locator("li.task")).toHaveCount(2);
 
   await page.locator(`a[href="/issues/${issue.number}"]`).click();

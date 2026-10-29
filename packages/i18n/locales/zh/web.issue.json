@@ -356,9 +356,9 @@
     "editing": "{who}在改代码",
     "history": "{n} 次：{line}",
     "historyItem": "{name}（{id}）",
-    "since": "已经 {span}",
-    "ran": "跑了 {n} 轮",
-    "used": "用了 {span}",
+    "since": "{span}了",
+    "ran": "第 {n} 轮",
+    "used": "共用 {span}",
     "noSteps": "还没有步骤。",
     "stepsGone": "干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。",
     "change": {
@@ -382,6 +382,7 @@
     "whoRuntime": "{name}（{runtime}）",
     "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
-    "graphStep": "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。"
+    "graphStep": "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
+    "justNow": "刚刚"
   }
 }
