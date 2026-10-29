@@ -4,6 +4,7 @@
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { join } from "node:path";
 import type {
   CommitCount,
@@ -164,14 +165,11 @@ export const make = Effect.gen(function* () {
     }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
   );
 
-  const events = yield* PubSub.unbounded<SideEvent>();
-  const transitions = yield* PubSub.unbounded<Transition>();
-  const owner = yield* PubSub.unbounded<OwnerDid>();
+  const events = yield* scopedPubSub<SideEvent>();
+  const transitions = yield* scopedPubSub<Transition>();
+  const owner = yield* scopedPubSub<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
-  const changes = yield* PubSub.unbounded<GameEffect | undefined>();
-  yield* Effect.addFinalizer(() =>
-    Effect.all([PubSub.shutdown(events), PubSub.shutdown(transitions), PubSub.shutdown(owner), PubSub.shutdown(changes)], { discard: true }),
-  );
+  const changes = yield* scopedPubSub<GameEffect | undefined>();
 
   const publish = (e: SideEvent) => {
     PubSub.publishUnsafe(events, e);

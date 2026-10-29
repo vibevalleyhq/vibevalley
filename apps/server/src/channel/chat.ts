@@ -6,6 +6,7 @@ import { list, t } from "@vibevalley/i18n";
 // a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
 // than lost. Everything that changes the chat runs one at a time.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import {
   type Chat,
@@ -506,9 +507,9 @@ export const make = Effect.gen(function* () {
   const tx = <A, E>(work: Effect.Effect<A, E>) => inTx(work).pipe(Effect.onError(() => Effect.catchCause(reload, () => Effect.void)));
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
-  const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
+  const orchestratorHub = yield* scopedPubSub<OrchestratorNews>();
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
-  const said = yield* PubSub.unbounded<ChatMessage>();
+  const said = yield* scopedPubSub<ChatMessage>();
 
   /** Nothing is slipped in while a session compacts its context. */
   const compacting = new Set<string>();

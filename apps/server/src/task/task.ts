@@ -4,6 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import {
   type Agent,
@@ -192,7 +193,7 @@ export const make = (options: TaskOptions = {}) =>
     const { run: db } = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
-    const newsHub = yield* PubSub.unbounded<string>();
+    const newsHub = yield* scopedPubSub<string>();
     const splitters = new Map<string, string>();
     const splitterTries = new Map<string, number>();
 

@@ -1,4 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
+import { scopedPubSub } from "../base/pubsub.ts";
 import { needsOwner, talkJob } from "./prompts.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import {
@@ -243,7 +244,7 @@ export const make = (options: IssueOptions = {}) =>
     /** After an issue is removed: its sessions' rows went with it, and its children's. */
     const reloadSessions = Effect.suspend(() => Effect.map(db(qs.allSessions()), (rows) => worked.load(rows)));
     yield* reloadSessions;
-    const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
+    const orchestratorHub = yield* scopedPubSub<OrchestratorWork>();
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 

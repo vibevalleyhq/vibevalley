@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
 import type { Actor } from "../base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
@@ -71,7 +72,7 @@ export const make = Effect.gen(function* () {
   const now = () => clock.currentTimeMillisUnsafe();
   // The ticker, the tools and the pages all change the list.
   const lock = yield* Semaphore.make(1);
-  const dueHub = yield* PubSub.unbounded<Due>();
+  const dueHub = yield* scopedPubSub<Due>();
 
   for (const row of yield* db(q.crons())) {
     const when = jsonOrNone(S.CronWhen)(row.spec);

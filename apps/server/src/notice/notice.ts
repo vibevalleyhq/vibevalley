@@ -2,6 +2,7 @@
 // routes listen and say it their own way: on a call the orchestrator says the news (voice), the patrol's findings wake the
 // orchestrator, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { inbox } from "./inbox.ts";
@@ -45,7 +46,7 @@ export const make = Effect.gen(function* () {
   // Until the startup primes it nothing is news: what comes back with the sessions was there before the stop.
   let known: Set<string> | undefined;
   let primed = false;
-  const newsHub = yield* PubSub.unbounded<readonly InboxItem[]>();
+  const newsHub = yield* scopedPubSub<readonly InboxItem[]>();
   const facts = yield* core.subscribe;
   yield* Effect.forkScoped(
     Stream.runForEach(facts, () =>
@@ -58,7 +59,7 @@ export const make = Effect.gen(function* () {
     ),
   );
 
-  const overdueHub = yield* PubSub.unbounded<Overdue>();
+  const overdueHub = yield* scopedPubSub<Overdue>();
   let memory: PatrolMemory = emptyPatrol();
   const patrol = Effect.gen(function* () {
     const [report, next] = patrolStep(core.state(), yield* Clock.currentTimeMillis, memory);

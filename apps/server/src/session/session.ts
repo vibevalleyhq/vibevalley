@@ -10,6 +10,7 @@ import { t } from "@vibevalley/i18n";
 // the sender leaves its trigger on the hand first and the turn takes the oldest. Admission serializes room and opening
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { join, resolve } from "node:path";
@@ -421,9 +422,9 @@ export const make = (options: SessionOptionsIn = {}) =>
     // A hand is acquired before admission; no path holding admission waits for a hand.
     const admission = yield* Semaphore.make(1);
 
-    const launchesHub = yield* PubSub.unbounded<LaunchActivity>();
+    const launchesHub = yield* scopedPubSub<LaunchActivity>();
     // The sessions' own facts, told as news in the order they were applied.
-    const newsHub = yield* PubSub.unbounded<SessionNews>();
+    const newsHub = yield* scopedPubSub<SessionNews>();
     const [, moves] = yield* core.transitions;
     yield* Effect.forkScoped(
       Stream.runForEach(moves, ({ fact, after }) => {
@@ -431,8 +432,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         return news ? PubSub.publish(newsHub, news) : Effect.void;
       }),
     );
-    const finishedHub = yield* PubSub.unbounded<RunFinished>();
-    const consumedHub = yield* PubSub.unbounded<InputConsumed>();
+    const finishedHub = yield* scopedPubSub<RunFinished>();
+    const consumedHub = yield* scopedPubSub<InputConsumed>();
     const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
 
     const hands = new Map<string, Hand>();
