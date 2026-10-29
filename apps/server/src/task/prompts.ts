@@ -108,8 +108,7 @@ export const frozenTouchedText = (files: readonly string[]) =>
 export const retryText = (task: Task) => "上一轮没做成。看一下报错，接着把这一步做完：" + task.title + "。";
 
 /** Only the helper an issue was last sent to splits it, and only while it is a plain open issue. */
-/** Whether a session may split the issue it works into a task graph: what refuses it (said to the session), or the
- * session, its issue, the issue's project and the session's branch, all there. */
+/** A refusal's problem is said to the session. */
 export function splittable(
   session: Session | undefined,
   issue: Issue | undefined,

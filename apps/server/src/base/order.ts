@@ -1,6 +1,4 @@
-// Orders for sort: text by its code points, numbers by size, and the first comparison that is not a tie.
-
-/** Go's cmp.Compare for strings: by bytes of UTF-8, which is by code point, not by UTF-16 unit. */
+/** By UTF-8 bytes, which is by code point, not by UTF-16 unit: the order the recorded cases were sorted in. */
 export function compareText(a: string, b: string): number {
   if (a === b) return 0;
   const x = [...a];
@@ -14,5 +12,4 @@ export function compareText(a: string, b: string): number {
 
 export const compare = (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** cmp.Or: the first that is not 0. */
 export const or = (...c: number[]) => c.find((x) => x !== 0) ?? 0;

@@ -11,8 +11,7 @@ export interface Streams {
   [livePath]: LiveEvent;
 }
 
-/** Calls onEvent with each `data:` payload of the stream at base + path until signal aborts or the stream ends (then it
- * rejects). */
+/** Never resolves: it rejects when the signal aborts or the stream ends. */
 export async function readStream<P extends keyof Streams>(
   base: string,
   path: P,

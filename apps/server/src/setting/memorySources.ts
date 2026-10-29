@@ -1,5 +1,3 @@
-// The memory sources the owner turned on, and what a change to them may be.
-
 import { t } from "@vibevalley/i18n";
 
 import { MemorySourceKindValues, type MemorySourceUpdate } from "@vibevalley/protocol";
@@ -31,7 +29,7 @@ export function memorySourcesProblem(sources: readonly MemorySourceUpdate[]): st
   return "";
 }
 
-/** The list given replaces the saved one; a source given without a key keeps the key saved for its kind. */
+/** A source given without a key keeps the key saved for its kind. */
 export function memorySourcesOver(saved: readonly MemorySourceConfig[], given: readonly MemorySourceUpdate[]): MemorySourceConfig[] {
   return given.map((m) => {
     const key = m.key !== undefined ? m.key.trim() : saved.find((c) => c.kind === m.kind)?.key;

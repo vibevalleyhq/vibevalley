@@ -1,6 +1,5 @@
 import { list, maybe, t } from "@vibevalley/i18n";
 import type { EventTokens } from "@vibevalley/protocol";
-// What one request of an in-process agent cost, in words for its log.
 
 export const tokensOf = (u: { input: number; cacheRead: number; output: number }): EventTokens => ({
   input: u.input,

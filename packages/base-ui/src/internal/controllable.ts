@@ -1,5 +1,3 @@
-// A value the caller may own or leave to the component.
-
 import { createSignal } from "solid-js";
 
 /**

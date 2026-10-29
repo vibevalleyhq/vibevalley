@@ -1,5 +1,3 @@
-// A step as drafted, and editing a graph's steps: each edit checked as a whole graph.
-
 import { t } from "@vibevalley/i18n";
 
 import type { Task, TaskEdit, TaskGraph } from "@vibevalley/protocol";

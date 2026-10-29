@@ -17,13 +17,9 @@ import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
-// An agent that runs in this process (the orchestrator) on VibeValley's own agent (agent/brain): the agent started on
-// first use, its inputs queued in order, its words streamed to where each input came from, its runs recorded
-// (execution.ts), the run a restart cut off taken up again, and a turn it got wrong kept as an eval case.
-//
-// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words
-// go. An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so
-// they go to the route of the input taken last, and the tools read that route too.
+// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words go.
+// An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
+// to the route of the input taken last, and the tools read that route too.
 
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before.
  * Its words are read once: what came before the reader is kept for it. */

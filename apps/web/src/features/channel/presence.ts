@@ -1,5 +1,3 @@
-// How a helper shows in the chat: its phase as a dot, an icon and the server's words, its runtime and its duty.
-
 import { spanText } from "@vibevalley/protocol/rules";
 
 import { actionIcon, type IconName } from "@/ui/icons";

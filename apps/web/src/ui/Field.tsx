@@ -30,10 +30,8 @@ export function Field(props: { label: string; hint?: string | undefined; childre
 }
 
 /**
- * One of a list, under a button that shows the chosen label (base-ui's Select, so the list looks and moves like the
- * workbench's menus on every system). value "" is the placeholder, and choosing it is choosing none. quiet is the side
- * column's: no box until the pointer is over it. onChange is given one of the options' values, typed as they are, or the
- * placeholder's "" (a placeholder needs a value type that holds "").
+ * value "" is the placeholder, and choosing it is choosing none (a placeholder needs a value type that holds ""). onChange
+ * is given an option's value, typed as the options are. quiet is the side column's: no box until the pointer is over it.
  */
 export function Select<V extends string>(props: {
   value: V;

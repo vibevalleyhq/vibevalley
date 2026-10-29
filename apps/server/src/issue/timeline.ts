@@ -1,5 +1,3 @@
-// An issue's timeline: its milestones, run by run, in the owner's words.
-
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueTimeline, Milestone, MilestoneKind, Run, RunTrigger, Spent } from "@vibevalley/protocol";
 import { closedText, plainText } from "@vibevalley/protocol/rules";

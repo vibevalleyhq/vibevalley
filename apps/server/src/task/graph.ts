@@ -2,7 +2,7 @@ import { list, t } from "@vibevalley/i18n";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/agent/dag";
 
-// A task graph's rules. Texts are measured as JavaScript does.
+// Texts are measured as JavaScript does.
 
 /** More steps than this means the job should be split into tasks. */
 /** A step as the frame shows it before its acts are worked out (graphFrom does that): none yet. */

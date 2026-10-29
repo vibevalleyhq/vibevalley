@@ -1,5 +1,3 @@
-// What a codebase is written in: languages by their aliases, their icons, and each one's share of the lines.
-
 import { t } from "@vibevalley/i18n";
 import { type LanguageCount } from "@vibevalley/protocol";
 

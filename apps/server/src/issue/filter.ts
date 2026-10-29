@@ -1,5 +1,3 @@
-// Which issues a filter picks (issue.list, the command line's and the agents' searches).
-
 import type { Issue, IssueFilter } from "@vibevalley/protocol";
 import { attentionWantsOwner } from "@vibevalley/protocol/rules";
 const spaces = /\s+/;

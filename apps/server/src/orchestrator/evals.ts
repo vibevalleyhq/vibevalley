@@ -49,7 +49,6 @@ export const orchestratorToolNames = () => [
   ...selfTools({ home: "", skills: () => [], memory: true, now: () => 0 }).map((t) => t.name),
 ];
 
-/** An expectation with the fields its kind reads. */
 type Checked =
   | { readonly kind: "called"; readonly tool: string; readonly argContains?: string | undefined; readonly argLacks?: string | undefined }
   | { readonly kind: "notCalled"; readonly tool: string }

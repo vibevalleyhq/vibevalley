@@ -1,5 +1,4 @@
-// A source file is named for what it decides (docs/style/naming.md): rules.ts, state.ts, data.ts, utils.ts and the like
-// would be true of a file in any module, so none is written.
+// Named for what it decides, never for a word that would fit any module (docs/style/naming.md).
 
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";

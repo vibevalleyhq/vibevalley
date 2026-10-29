@@ -11,8 +11,6 @@ import { jobBreak, recalledIn } from "./briefing.ts";
 import { clip } from "@/base/clip.ts";
 import type { Rate } from "@/runtime/price.ts";
 import { shellCommand } from "./shell.ts";
-// A session's events read as facts and journal steps. Pure: it reads the session as
-// the core state has it and the session's own bookkeeping, and changes nothing.
 
 /** The bubble over a session's head holds about this much. */
 const labelMax = 40;

@@ -1,5 +1,4 @@
-// What an issue's page says, top to bottom, for the owner: what it is, where it stands, what is asked of the owner, how far
-// it is against its criteria. Where it stands (and what the owner may do) is the server's Issue.attention; this only words it.
+// Where it stands (and what the owner may do) is the server's Issue.attention: this only words it.
 
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
@@ -94,7 +93,6 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   const step = head.graph?.task;
   const node = step === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === step);
   const attention = issue.attention;
-  // What it is doing is the live session's, in the frame's words: an ended one is doing nothing.
   const current = session ? doingOf(session) : nothing;
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.

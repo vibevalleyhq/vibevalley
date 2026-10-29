@@ -1,5 +1,3 @@
-// What settings may be saved: the whole of an update checked, its voice and memory sources by their own checks.
-
 import { t } from "@vibevalley/i18n";
 
 import { type SettingsUpdate } from "@vibevalley/protocol";

@@ -67,7 +67,6 @@ function show(e: BrainEvent, prompt: () => void) {
   }
 }
 
-/** What is typed: a line, or Ctrl+C. */
 type Typed = { readonly kind: "line"; readonly text: string } | { readonly kind: "interrupt" };
 
 /** Lines typed and Ctrl+C, until the input ends. */
@@ -92,7 +91,6 @@ const terminal = Stream.callback<Typed>((queue) =>
 /** The owner is done: /exit, Ctrl+C with nothing under way, or the input's end. */
 class Quit extends Data.TaggedError("Quit") {}
 
-/** Each thing typed, in order, until one quits. */
 const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));
 
 export interface OwnChat {
@@ -193,8 +191,7 @@ export interface RuntimeChat {
   readonly p?: string;
 }
 
-/** `runtime chat <runtime>`: a conversation with one runtime, on this machine. It is not VibeValley's work: no issue,
- * any folder, nothing in the core state, the trajectories or the spending. oar's calls are Promises: each is one. */
+/** A conversation with one runtime on this machine: no issue, any folder, and nothing in the core state, trajectories or spending. */
 export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void, unknown> =>
   id === "vibevalley"
     ? ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) })

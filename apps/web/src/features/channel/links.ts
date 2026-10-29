@@ -1,8 +1,5 @@
-// Links to the farm's own messages in a message's text: which channel and number each points at.
-
 import { type Chat } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "./places";
-/** A message on this farm that a message links to, by the address its copy-link tool gives. */
 export interface LinkedMessage {
   readonly channel: string;
   readonly number: number;

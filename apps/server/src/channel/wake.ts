@@ -1,5 +1,3 @@
-// What a woken agent is told of the chat, and how much: the wake's limits and the shape of its inbox.
-
 import type { ActorKind } from "@vibevalley/protocol";
 export interface UnreadRow {
   readonly target: string;
@@ -17,7 +15,6 @@ export const retryWindowMs = 60_000;
 
 export const heldShown = 3;
 
-/** A message as the orchestrator and a session read it. */
 export interface InboxMessage {
   readonly id: string;
   readonly number: number;
@@ -31,6 +28,5 @@ export interface InboxMessage {
   readonly deleted?: boolean;
   /** Files said with it, where they are on this computer. */
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
-  /** The artifact it announces (artifact/): what to read it by. */
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
 }

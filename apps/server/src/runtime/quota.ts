@@ -1,5 +1,3 @@
-// What a runtime's money and quota say about dispatching to it: whether its money is gone, and what is left of its quota.
-
 import { list, t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeInfo, RuntimeQuota } from "@vibevalley/protocol";
 
@@ -61,7 +59,6 @@ export function quotaText(usage: AccountUsage | null): string {
   }
 }
 
-/** What RuntimeInfo.quota says: the lowest window left, and in words. */
 export function quotaOf(usage: AccountUsage | null): RuntimeQuota {
   const left = quotaLeft(usage);
   return { ...(left !== undefined ? { left } : {}), text: quotaText(usage) };

@@ -1,5 +1,3 @@
-// The sowing form's offers: the templates filled for a project's stack, and the titles lately sent there.
-
 import { maybe, t } from "@vibevalley/i18n";
 import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
 import type { Issue, IssueTemplate, ProjectStack, TemplateBlank, TemplateKind } from "@vibevalley/protocol";
@@ -9,7 +7,6 @@ const recentTitles = 5;
 /** A title longer than this is a long instruction, not one to send again. */
 const recentTitleLength = 60;
 
-/** orchestrator: whether a profile id is an orchestrator's. */
 export function sentTitles(all: readonly Issue[], project: string, orchestrator: (id: string) => boolean): string[] {
   const mine = all
     .filter(

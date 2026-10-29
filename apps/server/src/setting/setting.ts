@@ -1,4 +1,8 @@
 import { t, setLocale } from "@vibevalley/i18n";
+// settings.json in the home, readable by the owner only (0600). A key saved here wins over the configuration's and is read
+// at each use, so it takes effect at once; keys are never logged, and a page sees only where each comes from and its last
+// characters.
+
 import { messageOf } from "@/errors.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,10 +15,6 @@ import { Context, Data, Effect, Layer, Schema } from "effect";
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
-// The owner's settings: settings.json in the home, readable by the owner only
-// (0600). A key saved here wins over the configuration's. Keys are read each time they are used, so one saved is used at
-// once; a page sees only where each comes from and its last characters; keys are never logged. The locale is the
-// process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
 import * as S from "@vibevalley/protocol/schema";
 

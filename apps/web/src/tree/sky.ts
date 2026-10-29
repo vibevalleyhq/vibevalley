@@ -1,5 +1,3 @@
-// Where each memory sits in the sky around the tree, and the ties between them (the tree's own shape is grow.ts).
-
 import type { MemoryItem, MemoryKind, MemoryLink, MemoryTree } from "./mock";
 /** A star: where a memory sits in the sky's disc, before the camera turns it. */
 export interface Star {

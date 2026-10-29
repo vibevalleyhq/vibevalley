@@ -1,6 +1,3 @@
-// How the farm reads to the orchestrator and what changed in it since its last turn: the situation's lines, the
-// runtimes' quota, the inbox.
-
 import { lineWords, quotaWords, situationWords } from "./prompts.ts";
 import { ownerId, type RuntimeInfo } from "@vibevalley/protocol";
 import { head } from "@/base/clip.ts";

@@ -1,6 +1,3 @@
-// The pyramid's boundaries (pyramid.ts): the whole farm of the flows is built only in src/flows, and each module's
-// recorded cases (recorded.test.ts, its golden data) are replayed against rules that stay in the process.
-
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 import { describe, expect, it } from "vite-plus/test";

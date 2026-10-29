@@ -1,5 +1,3 @@
-// The tilling calendar: commits by day over a year, the streaks, the growth by the newest commit, and dates in words.
-
 import { t } from "@vibevalley/i18n";
 import { type Crop, dayMs } from "@vibevalley/protocol";
 
@@ -45,13 +43,11 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
       const day = dayKey(at);
       const n = commits.get(day) ?? 0;
       column.push({ day, at, commits: n, level: level(n), future: at > today });
-      // A month's name over the week its first day is in; the first week names the month it shows.
       if ((at.getDate() === 1 || (w === 0 && d === 0)) && months.at(-1)?.week !== w)
         months.push({ week: w, label: t("web.base.time.month", { month: at.getMonth() + 1 }) });
     }
     grid.push(column);
   }
-  // A first label crowded by the next month's is dropped.
   if (months.length > 1 && months[1]!.week - months[0]!.week < 3) months.shift();
   return { weeks: grid, months };
 }

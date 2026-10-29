@@ -67,7 +67,6 @@ export function Section(props: { title: string; count?: number; aside?: JSX.Elem
   );
 }
 
-/** How often a memory came back, and when it last did when that is known. */
 function recalledText(recalled: number, recalledAt: number | undefined, now: number) {
   const n = Math.round(recalled);
   return recalledAt ? t("web.memory.memory.recalledLast", { n, last: ago(recalledAt, now) }) : t("web.memory.memory.recalled", { n });

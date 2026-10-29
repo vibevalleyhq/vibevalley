@@ -1,6 +1,3 @@
-// What a session is told of its issue (its brief, how to resume, how to cure a report it could not read) and what is
-// read back from its report (findings, a pull request's conclusion).
-
 import { t } from "@vibevalley/i18n";
 import { reportVerdict } from "@/session/report.ts";
 import type { Deliverable, Issue } from "@vibevalley/protocol";

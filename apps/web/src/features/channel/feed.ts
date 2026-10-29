@@ -1,5 +1,3 @@
-// A channel's messages as the page lays them out: runs of one sender, day lines, the orchestrator typing, the clock.
-
 import { t } from "@vibevalley/i18n";
 
 import { type Chat, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
@@ -21,8 +19,7 @@ const runMs = 5 * 60000;
 
 const senderOf = (m: ChatMessage) => (m.kind === "notice" ? "" : m.from);
 
-/** The rows of a channel's messages, with their day lines and grouping; filter keeps the messages containing it (any
- * case). */
+/** filter keeps the messages containing it, in any case. */
 export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], filter = "", now = new Date()): FeedItem[] {
   const threads = new Map<string, Channel>();
   for (const c of chat?.channels ?? []) if (c.type === "thread" && c.root) threads.set(c.root, c);

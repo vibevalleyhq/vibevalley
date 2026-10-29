@@ -1,9 +1,6 @@
-// An issue's stage on its page: talk, work, finish.
-
 import { t } from "@vibevalley/i18n";
 
 import type { IssueStatus } from "@vibevalley/protocol";
-/** The three acts of a plot (docs/concepts.md): talk it through, get it worked, finish it. */
 export type Stage = "talk" | "work" | "finish";
 
 export const stages: Stage[] = ["talk", "work", "finish"];

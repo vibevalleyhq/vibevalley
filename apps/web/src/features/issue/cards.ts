@@ -9,8 +9,6 @@ import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
 import { ago, tookText } from "@/base/format";
 import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
 import { attentionTone } from "./overview";
-// The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
-// lanes does (cardMove, laneOrder).
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";

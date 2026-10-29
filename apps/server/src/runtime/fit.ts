@@ -1,5 +1,4 @@
-// Whether a profile can run on its runtime, and which profile fits a job. agentProblems mirrors the checks oar makes
-// when a session opens, so a profile that would be refused is shown so before it is sent.
+// As oar's checks when a session opens: a profile it would refuse shows so before it is sent.
 
 import { list, t } from "@vibevalley/i18n";
 import type { Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
@@ -43,7 +42,6 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
   return { ...options, problems };
 }
 
-/** The profile's problems against its runtime as it is now; errors stop it being sent. */
 export function agentProblems(agent: Agent, runtime: RuntimeInfo | undefined): AgentProblem[] {
   const problems: AgentProblem[] = [];
   const add = (text: string) => problems.push({ field: "runtime", level: "error", text });

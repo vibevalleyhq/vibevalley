@@ -1,10 +1,4 @@
 import { t } from "@vibevalley/i18n";
-// The orchestrator (管家): the owner's agent that takes the work in, hands it to helpers, follows it and tells the owner.
-// Every input comes in through take, with its source; the intake table (intake.ts) says, per source, its first words,
-// whether it joins the run under way and what its run is triggered by. Each input carries the time, the farm (whole, or
-// what changed since the model last saw it), what memory gained, the channels' news and the line, and a route: where its
-// answer goes. Running the agent (starting it, queuing inputs, streaming words, recording runs, going on after a restart)
-// is the host's (session/host.ts).
 
 import { ownersLanguage } from "@/prompts.ts";
 

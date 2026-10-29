@@ -57,7 +57,6 @@ export function useGraphs(): () => TaskGraph[] {
   return () => frames.frame?.graphs ?? noGraphs;
 }
 
-/** A profile's name by its id; the default orchestrator with no name is 管家, a profile gone is its id. */
 export function useNameOf(): () => (id: string) => string {
   const agents = useAgents();
   return createMemo(() => {

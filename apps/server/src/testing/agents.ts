@@ -1,4 +1,4 @@
-// A whole profile for a test: a test says only what it is about, the rest is a profile as the farm keeps one.
+// Defaults as the farm keeps them: a test says only what it is about.
 
 import type { Agent } from "@vibevalley/protocol";
 

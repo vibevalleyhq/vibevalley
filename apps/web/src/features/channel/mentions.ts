@@ -1,5 +1,3 @@
-// Naming someone with @: who may be named here, what is being typed, and putting the name in.
-
 import { t } from "@vibevalley/i18n";
 
 import { type Agent, everyone, defaultOrchestrator, ownerId, type Session, type SessionView } from "@vibevalley/protocol";
@@ -48,13 +46,11 @@ export function typedName(text: string, caret: number) {
   return { start: caret - query.length - 1, query };
 }
 
-/** By the start of the token or anywhere in the name. */
 export function offeredFor(all: Nameable[], query: string) {
   const q = query.toLowerCase();
   return all.filter((n) => n.token.slice(1).toLowerCase().startsWith(q) || n.name.toLowerCase().includes(q)).slice(0, menuMax);
 }
 
-/** The text with the typed name replaced by the token and a space; the caret goes after the space. */
 export function insertName(text: string, caret: number, start: number, token: string) {
   const next = `${text.slice(0, start)}${token} ${text.slice(Math.min(Math.max(caret, start), text.length))}`;
   return { text: next, caret: start + token.length + 1 };

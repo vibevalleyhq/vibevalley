@@ -1,4 +1,6 @@
 import { list, t } from "@vibevalley/i18n";
+// Everything here runs one at a time.
+
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import type {
@@ -70,10 +72,6 @@ import {
   taskBrief,
 } from "./prompts.ts";
 import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
-// Task graphs: a job split into steps, each worked by its own session on a branch of the graph's,
-// merged back into the graph's branch when it is verified, and the whole graph merged into the main branch once every
-// step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
-// Everything here runs one at a time.
 
 import * as S from "@vibevalley/protocol/schema";
 

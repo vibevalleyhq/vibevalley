@@ -145,13 +145,11 @@ export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefine
   return item ? graphFrom(item, issues) : undefined;
 }
 
-/** How a task graph's issue closes: done with what it delivered, or canceled. */
 type Closing = { readonly delivered: "merged" | "merged_into_parent" } | { readonly canceled: "dismissed" };
 
 const graphClosed = (s: GraphState): Closing | undefined =>
   s === "done" ? { delivered: "merged" } : s === "abandoned" ? { canceled: "dismissed" } : undefined;
 
-/** A step merged into its graph's branch is done; one skipped, or left when its graph ended, is not. */
 function taskClosed(graph: GraphState, n: Task): Closing | undefined {
   if (n.state === "merged") return { delivered: "merged_into_parent" };
   if (n.state === "skipped" || graph === "done" || graph === "abandoned") return { canceled: "dismissed" };

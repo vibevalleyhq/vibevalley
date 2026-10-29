@@ -1,6 +1,3 @@
-// What a component passes on to its element: data attributes for its state, handlers and refs alongside its own, and
-// what it renders as.
-
 import type { JSX } from "@solidjs/web";
 
 /** A state as a data attribute: present (empty) when on, absent when off. */
