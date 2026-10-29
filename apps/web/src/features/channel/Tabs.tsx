@@ -86,7 +86,7 @@ export function Crons(props: { channel: Channel }) {
   );
 }
 
-function CronCard(props: { s: Cron }) {
+export function CronCard(props: { s: Cron }) {
   const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
   const setEnabled = (enabled: boolean) => act(api.cron.update({ id: props.s.id, enabled }));
@@ -112,7 +112,7 @@ function CronCard(props: { s: Cron }) {
     <div
       data-testid="cron"
       data-key={props.s.id}
-      class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]}
+      class={[card, "flex items-start gap-3", { "border-dashed": !(props.s.enabled || props.s.pending) }]}
       aria-label={t("web.channel.crons.label", { name: props.s.name })}
     >
       <Icon name="clock" size={20} class="mt-0.5" />
