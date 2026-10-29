@@ -1,3 +1,5 @@
+import { plainLine } from "@vibevalley/protocol/rules";
+import { Checkbox } from "../../ui/Checkbox";
 import { list, t } from "@vibevalley/i18n";
 import { Dot } from "../../ui/Dot";
 import type { IconName } from "../../ui/icons";
@@ -118,9 +120,7 @@ export function IssueDetail(props: {
             <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
-              <Show when={ask().line}>
-                <div class="mt-1 line-clamp-4 whitespace-pre-wrap">{ask().line}</div>
-              </Show>
+              <Show when={ask().line}>{(line) => <div class="mt-1 line-clamp-4">{plainLine(line())}</div>}</Show>
               <Show when={s().attention.state === "asking"}>
                 <For each={props.issue.questions}>
                   {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
@@ -425,14 +425,13 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
         {(r, i) => (
           <li class="flex items-start gap-2.5 rounded-md px-1.5 py-1 text-sm">
             <Show when={props.checking}>
-              <input
-                type="checkbox"
-                data-testid="criterion-tick"
+              <Checkbox
+                testid="criterion-tick"
                 data-key={i()}
-                aria-label={t("web.issue.detail.ticked", { criterion: r().text })}
+                label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
-                class="mt-0.5 size-4 shrink-0 cursor-pointer accent-leaf"
+                class="mt-0.5"
               />
             </Show>
             <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title={t("web.issue.detail.unsaid")} />}>

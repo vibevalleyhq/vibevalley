@@ -168,3 +168,10 @@ export const buttons = (...names: IssueAct[]): IssueAction[] =>
         return { act, does: "move", status: "todo", words: "none" };
     }
   });
+
+/** Picks a value in the workbench's Select (ui/Field.tsx): its button opens the list, the option is found by its value. */
+export async function choose(trigger: Locator, value: string) {
+  await trigger.click();
+  await trigger.page().locator(`[role="option"][data-value="${value}"]`).click();
+  await expect(trigger).toHaveAttribute("data-value", value);
+}

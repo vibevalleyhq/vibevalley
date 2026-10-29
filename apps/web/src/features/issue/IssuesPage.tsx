@@ -1,5 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
-import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -9,7 +9,7 @@ import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, card
 import { issueIs, type Lane } from "./rules";
 import { toast } from "../../ui/toasts";
 import { useRouter } from "../../base/router";
-import { useSelectValue } from "../../base/util";
+import { Select } from "../../ui/Field";
 import { useCore } from "../../base/frame";
 import { useOrchestrators } from "../../base/agents";
 import { useIssueHistory } from "./data";
@@ -286,7 +286,6 @@ function Toolbar(props: {
   const nameOf = useNameOf();
   const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].sort();
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].sort((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
-  const select = "h-7 max-w-[150px] cursor-pointer rounded-md border border-line bg-page px-2 text-sm outline-none hover:bg-hover focus:border-focus";
   return (
     // Narrow, the views go on their own line above the filters, at the right where the 显示 panel opens leftwards.
     <div class="@container px-3 pt-3 pb-2.5">
@@ -304,19 +303,21 @@ function Toolbar(props: {
             />
           </label>
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
-          <SelectOf
+          <Select
+            size="control"
+            class="max-w-[150px]"
             label={t("web.issue.page.byProject")}
             value={props.filter.project}
-            class={select}
-            none={t("web.issue.page.allProjects")}
+            placeholder={t("web.issue.page.allProjects")}
             options={projects().map((p) => ({ value: p, label: p }))}
             onChange={(project) => props.onFilter({ ...props.filter, project })}
           />
-          <SelectOf
+          <Select
+            size="control"
+            class="max-w-[150px]"
             label={t("web.issue.page.byHelper")}
             value={props.filter.agent}
-            class={select}
-            none={t("web.issue.page.allHelpers")}
+            placeholder={t("web.issue.page.allHelpers")}
             options={agents().map((a) => ({ value: a, label: nameOf()(a) }))}
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
@@ -339,26 +340,5 @@ function Toolbar(props: {
         </div>
       </div>
     </div>
-  );
-}
-
-/** A filter's select: everything, or one of the values the cards have. */
-function SelectOf(props: {
-  label: string;
-  value: string;
-  class: string;
-  none: string;
-  options: { value: string; label: string }[];
-  onChange: (v: string) => void;
-}) {
-  const ref = useSelectValue(
-    () => props.value,
-    () => props.options,
-  );
-  return (
-    <select ref={ref} aria-label={props.label} value={props.value} onChange={(e) => props.onChange(e.currentTarget.value)} class={props.class}>
-      <option value="">{props.none}</option>
-      <For each={props.options}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-    </select>
   );
 }

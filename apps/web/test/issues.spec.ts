@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { VibeValleyApi } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
+import { expect, test, choose } from "./fixtures";
 
 const issue = (api: VibeValleyApi, title: string) => api.issue.create({ title });
 
@@ -50,7 +50,7 @@ test("an issue opens at its own address and its edits are saved", async ({ page,
   const detail = page.getByTestId("issue");
   await detail.getByTestId("issue-title").fill("after the title changes");
   await detail.getByTestId("issue-description").fill("The login page remembers the last user name.");
-  await detail.getByTestId("issue-priority").selectOption("high");
+  await choose(detail.getByTestId("issue-priority"), "high");
   await detail.getByTestId("issue-save").click();
   await expect(detail.getByTestId("issue-save")).toBeDisabled();
   await expect.poll(async () => (await api.issue.get({ id: made.id })).title).toBe("after the title changes");

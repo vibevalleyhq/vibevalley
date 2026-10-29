@@ -147,6 +147,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 
 ### 禁用、空、滚动
 
+- 滚动条和选中的字也取调色板（`style.css` 的 base 层）：细的、淡墨色、没有槽，深色主题里不是系统的浅灰条；选中的字是叶色。
 - 禁用一律 `disabled:opacity-50`，加 `disabled:cursor-default`；按下时不下沉。
 - 能滚的区域（不带边框和阴影的那一层）加 `scroll-fade-y`，横着滚的一排加 `scroll-fade-x`：还能往哪边滚，那边淡出 16px，滚到头就不淡。遮罩会连边框和阴影一起遮，所以加在里面那层，不加在带边框的浮层上。折起来的长字加 `fold-fade`，最后三成淡出，看得出还有。
 - 消息列表离开最新的一屏，底上出一个胶囊：这期间别人说了几条，或「回到最新」；点了滚回底（减少动效时直接跳）。
@@ -164,6 +165,8 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - **链接**：站内只有图标的链接用 `IconLink`（地址只收 `/…`）；去别的网站的一律是 `OutLink`，写出去哪（「MOSS 开放平台 ↗」），不用一个光秃秃的箭头。
 - **钥匙和占位**：钥匙的状态写出来（「还没设」，或在用的最后四位），不只画一个点。输入框的示例值写成「比如：…」，不让它看着像已经填好的值。分段放在一列里时只有它的内容那么宽（`Segmented` 自己管）。
 - **按钮**（`ui/Button.tsx`）：`primary` 一个区域只有一个，是那里最要紧的一步；`plain` 是其余的；`quiet` 放在工具条和行里；`danger` 是字变莓色的 `plain`，不填满。只有图标的用 `IconButton`，它的名字就是悬停的提示和读屏的话。
+- **选择框和勾选框**（`ui/Field.tsx` 的 `Select`、`ui/Checkbox.tsx`，行为来自 `@vibevalley/base-ui`）：选择框是一个按钮，显示选中的那项、右边一个向下的小箭头，列表和菜单一个样子（`rounded-lg`、`shadow-float`、选中的那项后面一个勾），至少和按钮一样宽；`quiet` 是侧栏里平时不画框的那种，`size="control"` 是工具条上 28px 高的。勾选框是 16px 的 `rounded-xs` 方块，勾上了填 `accent`。单选、滑块用 base-ui 的 `RadioGroup`、`Slider`，样子照这两个配。系统自带的 `<select>`、勾选框、单选、滑块每台机器画得不一样，深色主题里还是浅的，工作台不用（lint `vibevalley/native-control`）；像素皮画自己的。
+- **一行里的报告**（`ui/plainLine.ts`）：帮工的汇报、消息是 Markdown，放在只有一行、几行的地方（工单的「要你做的」、经过、串的预览）时去掉 `#`、`**`、反引号、链接和列表的记号，连成一行，不露出原始的记号；整段看的地方才渲染 Markdown。
 - **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `bg-hover`，页面色加 `shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
 - **状态点**（`ui/Dot.tsx` 的 `Dot`，`features/channel/bits.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
 - **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/modal.ts` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
@@ -230,7 +233,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
 4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
 
-**写一个新界面之前**：先在图鉴的「界面」（`/catalog/kit`）看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了令牌、原子或一种 `tone`，也加进 `Kit.tsx`。
+**写一个新界面之前**：先在图鉴的「界面」（`/catalog/kit`）看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Select`、`Checkbox`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了令牌、原子或一种 `tone`，也加进 `Kit.tsx`。
 
 **类名怎么拼**：Solid 的 `class` 直接收数组和对象（`class={["h-7 …", { "bg-selected": on }, props.class]}`），不用 clsx。原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。所以不用 tailwind-merge 去合并互相冲突的类：真有要盖的那天，再加一个按我们的令牌配好的 `cn`。
 

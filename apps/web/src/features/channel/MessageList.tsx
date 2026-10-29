@@ -1,3 +1,4 @@
+import { plainLine } from "@vibevalley/protocol/rules";
 import { t } from "@vibevalley/i18n";
 import { tookText } from "../../base/format";
 import type { IconName } from "../../ui/icons";
@@ -470,7 +471,7 @@ function ThreadPreview(props: { thread: Channel }) {
         {(m) => (
           <span class="flex w-full items-center gap-2 text-sm">
             <span class="shrink-0 font-medium">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
-            <span class="min-w-0 flex-1 truncate text-muted">{m().text}</span>
+            <span class="min-w-0 flex-1 truncate text-muted">{plainLine(m().text)}</span>
             <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
           </span>
         )}

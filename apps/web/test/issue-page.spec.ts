@@ -108,7 +108,7 @@ test("a real round: the helper asks with options, one click answers, and it hand
   await expect(progress).toHaveAttribute("data-met", "1");
   await expect(progress).toHaveAttribute("data-total", "1");
   await expect(view.getByTestId("issue-ask").locator('[data-act="complete"]')).toBeVisible();
-  await expect(view.getByTestId("issue-deliver")).toHaveValue("change");
+  await expect(view.getByTestId("issue-deliver")).toHaveAttribute("data-value", "change");
   await expect(view.getByTestId("issue-story").locator('[data-testid="milestone"][data-kind="told"]').first()).toBeVisible();
 });
 

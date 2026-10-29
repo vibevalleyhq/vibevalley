@@ -119,6 +119,8 @@ export function makePositioner(use: () => FloatingParts, defaults: { side: Side;
           position: "fixed",
           left: `${at().x}px`,
           top: `${at().y}px`,
+          // Base UI's: a list can be at least as wide as what opened it (min-width: var(--anchor-width)).
+          "--anchor-width": `${at().anchorWidth}px`,
           // Not seen until placed: no flash in the corner.
           visibility: at().placed ? undefined : "hidden",
         }}

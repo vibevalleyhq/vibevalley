@@ -6,6 +6,7 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import { Button } from "../../ui/Button";
+import { Checkbox } from "../../ui/Checkbox";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Dot, type DotTone } from "../../ui/Dot";
 import { Field, Select, TextInput } from "../../ui/Field";
@@ -306,6 +307,8 @@ function Kit(props: { theme: "light" | "dark" }) {
             </Field>
           </div>
           <div class="flex flex-wrap items-center gap-2">
+            <Checkbox checked={on()} onChange={setOn} label={t("web.catalog.kit.done")} />
+            <Checkbox checked={false} indeterminate onChange={() => undefined} label={t("web.catalog.kit.done")} />
             <AttachmentTile file={{ id: "kit", name: "notes.md", type: "text/markdown", size: 2048 }} onRemove={() => undefined} />
             <span class="flex items-center gap-1 text-xs text-muted">
               <kbd class="min-w-6 rounded-xs border border-line bg-hover px-1.5 text-center font-mono text-2xs leading-5 text-ink">⌘K</kbd>

@@ -33,6 +33,10 @@
  *   docs/style/design.md (scripts/design-tokens.ts says which classes are off them); the pixel skin and the avatars are
  *   drawn and keep their own values.
  *
+ *   native-control: the workbench's choosers are its own (ui/Field.tsx's Select, ui/Checkbox.tsx, base-ui's RadioGroup
+ *   and Slider): a native <select>, checkbox, radio or range is drawn by the system, so it looks different on every
+ *   machine and stays light in the dark theme. vite.config.ts says where it runs; the pixel skin draws its own.
+ *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
@@ -201,6 +205,27 @@ const noCjkLiteral = defineRule({
   },
 });
 
+const nativeTypes = new Set(["checkbox", "radio", "range"]);
+
+const nativeControl = defineRule({
+  meta: {
+    messages: {
+      native: "the workbench draws its own choosers: ui/Field.tsx's Select, ui/Checkbox.tsx, base-ui's RadioGroup and Slider (docs/style/design.md)",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (node.name.type !== "JSXIdentifier") return;
+        const tag = node.name.name;
+        const type = node.attributes.find((a) => a.type === "JSXAttribute" && a.name.type === "JSXIdentifier" && a.name.name === "type");
+        const value = type?.type === "JSXAttribute" && type.value?.type === "Literal" ? type.value.value : undefined;
+        if (tag === "select" || (tag === "input" && typeof value === "string" && nativeTypes.has(value))) context.report({ node, messageId: "native" });
+      },
+    };
+  },
+});
+
 // The page's layers, in order; a file may import from its own unit or one before it.
 const pageLayers = ["base", "ui", "ui/pixel", "features", "skin", "app", "root"] as const;
 
@@ -274,5 +299,6 @@ export default definePlugin({
     "no-copy-selector": noCopySelector,
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,
+    "native-control": nativeControl,
   },
 });

@@ -1,4 +1,4 @@
-import { composerOn, expect, tab, test } from "./fixtures";
+import { composerOn, expect, tab, test, choose } from "./fixtures";
 
 // A server of its own: a second orchestrator is the whole farm's, and the other files count one.
 test.use({ farm: "orchestrators" });
@@ -32,7 +32,7 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
   await page.goto(`/chat/${general.id}`);
   await page.getByTestId("channel-settings-open").click();
   const dialog = page.getByTestId("channel-settings-dialog");
-  await dialog.getByTestId("channel-orchestrator").selectOption(id);
+  await choose(dialog.getByTestId("channel-orchestrator"), id);
   await dialog.getByTestId("submit").click();
   await expect(page.getByTestId("channel-orchestrator-line")).toHaveAttribute("data-key", id);
   expect((await api.channel.list()).find((c) => c.id === general.id)!.orchestrator).toBe(id);

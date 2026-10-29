@@ -4,7 +4,8 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./rules";
-import { aria, useSelectValue } from "../../base/util";
+import { aria } from "../../base/util";
+import { Select } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { toneVar } from "./Marks";
 
@@ -127,24 +128,18 @@ export function Pick(props: {
   disabled?: boolean;
   testid?: string;
 }) {
-  const ref = useSelectValue(
-    () => props.value,
-    () => props.options,
-  );
   return (
-    <select
-      ref={ref}
-      data-testid={props.testid}
-      aria-label={props.label}
+    <Select
+      quiet
+      size="control"
+      class="-ml-2 w-[calc(100%+8px)]"
+      label={props.label}
       value={props.value}
+      options={props.options}
+      placeholder={props.placeholder}
+      onChange={props.onChange}
       disabled={props.disabled}
-      onChange={(e) => props.onChange(e.currentTarget.value)}
-      class="-ml-2 h-7 w-[calc(100%+8px)] cursor-pointer rounded-md border border-transparent bg-transparent px-1.5 text-sm outline-none hover:border-line hover:bg-page focus:border-focus disabled:cursor-default disabled:opacity-50"
-    >
-      <Show when={props.placeholder !== undefined}>
-        <option value="">{props.placeholder}</option>
-      </Show>
-      <For each={props.options}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-    </select>
+      testid={props.testid}
+    />
   );
 }
