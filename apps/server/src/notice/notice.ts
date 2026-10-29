@@ -6,7 +6,7 @@ import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { inbox } from "./inbox.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { emptyPatrol, forOwner, type PatrolMemory, type PatrolNote, patrolStep } from "./rules.ts";
@@ -30,7 +30,7 @@ export interface NoticeShape {
   readonly prime: Effect.Effect<void>;
 }
 
-export class Notices extends Context.Service<Notices, NoticeShape>()("vibevalley/Notices") {}
+export class Notices extends Context.Service<Notices, NoticeShape>()("vibevalley/Notice") {}
 
 export const make = Effect.gen(function* () {
   const core = yield* Core;
@@ -87,7 +87,7 @@ export const layer = Layer.effect(Notices, make);
  * round waits one interval: right after a start, what looks hanging is mostly the restart. */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const notices = yield* Notices;
     yield* notices.prime;
     const every = config.patrol.heartbeatMinutes * 60_000;

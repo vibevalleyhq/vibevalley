@@ -8,7 +8,7 @@ import type { ScriptedTurn } from "@botiverse/oar/testing";
 import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
 import { starter } from "../testing/layers.ts";
 import { Effect, Stream } from "effect";
-import type { Config } from "../base/config.ts";
+import type { ConfigShape } from "../base/config.ts";
 import { Core } from "../core/core.ts";
 import { type Hired } from "../session/session.ts";
 import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart } from "../services.ts";
@@ -23,7 +23,7 @@ export const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, taskGraphsStart, notificationsStart);
 
 export interface Farm {
-  readonly config: Config;
+  readonly config: ConfigShape;
   readonly turns: ScriptedTurn[];
   readonly layer: ReturnType<typeof farmLayer>;
 }
@@ -34,7 +34,7 @@ export { helper };
 
 export function farm(
   options: Omit<WorldOptions, "runtimes"> & {
-    readonly change?: (c: Config) => Config;
+    readonly change?: (c: ConfigShape) => ConfigShape;
     readonly runtime?: Runtime;
   } = {},
 ): Farm {

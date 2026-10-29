@@ -10,7 +10,7 @@
 | 档案没填的外观补齐（`withCast`），和页面的 `castOf` 挑同一只动物 | 长相怎么画、动物和衣服的贴图（[农场的皮](docs/subsystems/farm.md)） |
 | 农机的注册表（`registry`）、探测、模型列表、清单（技能、MCP、工具）、缓存和推给页面 | 额度怎么读成字、钱的那条「派不出去」、价目和今天的花费（[帮工](docs/subsystems/session.md)「额度、花费和上限」） |
 | 农机接受哪些开会话的选项（`runtimeFacts` 和适配器的 `refusedSessionOptions`） | 选项怎么交给 oar、人设和技能怎么拼进会话、安装身份怎么用（[帮工](docs/subsystems/session.md)） |
-| 档案照现在的农机派不派得出去（`agentProblems`，`agent.check`、`assess`）；派活时用哪个模型、思考强度、环境变量、安装（`resolve`） | 挑哪个档案（`session.ChooseAgent`，[管家](docs/subsystems/orchestrator.md)「挑档案」）；派活的其余关口（[工单](docs/subsystems/issue.md)） |
+| 档案照现在的农机派不派得出去（`agentProblems`，`agent.validate`、`assess`）；派活时用哪个模型、思考强度、环境变量、安装（`resolve`） | 挑哪个档案（`session.ChooseAgent`，[管家](docs/subsystems/orchestrator.md)「挑档案」）；派活的其余关口（[工单](docs/subsystems/issue.md)） |
 | 技能库的存取；这台机器上装的技能从农机清单里来 | 档案的记性（[记性](docs/subsystems/memory.md)） |
 | | 捏帮工、模板、农具、技能书、管家页的界面（[界面清单](docs/reference/farm-ui.md#界面清单)）；内置模板的名单见本篇「内置的模板」 |
 | | VibeValley 自己的 agent 怎么跑、自己的任务（`packages/agent`，[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
@@ -22,8 +22,8 @@
 - **模板**：`apps/server/src/agent/template.ts` 读一个模板文件夹（`readTemplate`）、内置的目录（`builtInTemplates`，`templates/<id>/`，次序在 `templates/index.json`）、本机加进来的（`addedTemplates`，`$VIBEVALLEY_HOME/agent-templates/<id>/`），照模板做出档案（`profileOf`）和照模板更新（`updatedFrom`）。
 - **种子**：`apps/server/src/agent/seeds.json` 的 `defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seed.ts` 读它（`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
-- **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.update`、`agent.delete`，`agent.template.*`（`list`、`install`、`update`、`add`、`delete`），`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.setting.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
-- **页面**：`apps/web/src/features/agent/`（档案列表 `AgentsPage.tsx`，管家在上、帮工在下；模板目录 `TemplatesPage.tsx`（`/agents/templates`）；档案页上的来源和更新 `FromTemplate.tsx`；捏帮工和帮工的档案页 `AgentPage.tsx`；管家的档案页 `OrchestratorProfile.tsx`，`/agents/new?role=orchestrator` 新建）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `base/query.ts`（`useAgents`、`useRuntimes`）、`base/agents.ts`（`useWorkAgents` 是帮工、`useOrchestrators` 是管家、`orchestratorLookOf`、`useAgentProblems` 问 `agent.check`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
+- **接口**：`agent.list`、`agent.validate`、`agent.create`、`agent.update`、`agent.delete`，`agent.template.*`（`list`、`install`、`update`、`add`、`delete`），`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.setting.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
+- **页面**：`apps/web/src/features/agent/`（档案列表 `AgentsPage.tsx`，管家在上、帮工在下；模板目录 `TemplatesPage.tsx`（`/agents/templates`）；档案页上的来源和更新 `FromTemplate.tsx`；捏帮工和帮工的档案页 `AgentPage.tsx`；管家的档案页 `OrchestratorProfile.tsx`，`/agents/new?role=orchestrator` 新建）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `base/query.ts`（`useAgents`、`useRuntimes`）、`base/agents.ts`（`useWorkAgents` 是帮工、`useOrchestrators` 是管家、`orchestratorLookOf`、`useAgentProblems` 问 `agent.validate`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
 
 ## 模型和不变量
 
@@ -33,7 +33,7 @@
   - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时任务，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
 - **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了或不符合形状的 `config.json` 不覆盖**：文件按档案、技能和农机设置的 Schema 读回；读取、解析或形状校验失败就改名成 `config.json.unreadable-<毫秒>` 留着，像新农场一样起；改不了名就不开机。
-- **删技能同时解除档案引用**：`deleteSkill` 在同一次 `change` 中删除技能和所有档案（包括管家）的对应技能 id，写盘失败两边都不变；再建同名技能不会让旧档案自动带上它。
+- **删技能同时解除档案引用**：`removeSkill` 在同一次 `change` 中删除技能和所有档案（包括管家）的对应技能 id，写盘失败两边都不变；再建同名技能不会让旧档案自动带上它。
 - **新农场只有默认管家**：没有 `config.json` 时，档案只有从内置的 `orchestrator` 模板装的默认管家，加上配置 `agent.starters` 列出的内置模板（照列的次序，默认空；测试和沙箱用它装上全部内置的帮工），技能库空、农机设置空。帮工由主人在模板目录里挑着装。农机设置没存过的取 `defaultSettings`（启用、命令路径空、默认模型和思考强度空、无环境变量）。
 - **模板是一个文件夹**：`agent.json` 是配置（`id`、`version`、`role`、`name`、`duty`、`tags`、`runtime`、`model`、`effort`、`personaMode`、`worktree`、`look`，除了前四项和帮工的 `runtime` 都能不写），`agent.en.json` 只覆盖英文的 `name`、`duty`、`tags`，`persona.md`、`persona.en.md` 是人设；照农场的语言读，英文缺的取中文。`id` 只用小写字母、数字和 `-`；管家的模板不写农机（写了不是 `vibevalley` 的不收），读出来就是 `vibevalley`；帮工的要写推荐的农机。不放环境变量的值、默认项目、启用、MCP 和技能：前三样跟着机器，后两样以后再说。读不通的说清是哪个文件、哪一栏。
 - **装**（`agent.template.install`）：照模板建一份档案，id 是模板的 id，占了就 `-2`、`-3`，名字占了加「 2」「 3」；档案记着来源 `from: { template, version }`。同一个模板能装好几份。**照模板更新**（`agent.template.update`）：只在主人点了时做，用模板现在的版本盖掉职责、适合的活、人设和交给农机的方式、worktree，名字、长相、农机、模型、思考强度和这台机器的（环境、默认项目、启用、技能、MCP、禁用的工具）不动。页面在模板的 `version` 比档案记的大时提示。
@@ -50,7 +50,7 @@
 - **清单在工作目录 `projects/` 下读**（`projectsDir`）：农机自己装的技能、MCP 服务器、工具，各最多等 10 秒，读不到或不是 `ok` 就是 `null`。MCP 的说明拼成「状态 · N 个工具」；技能和工具的来源取路径、MCP 的 id，没有就取 `source`。
 - **这台电脑上装的技能**：页面把各农机清单里的技能按名字合成一份（`installedSkills`：第一个非空的说明，加上每台带着它的农机和来源，按名字排），只读；用这些农机的帮工自己按需加载。VibeValley 不复制它们。
 - **技能库**是 Agent Skills 的形状（`id`、名字、description、正文）。档案勾上的，派活时按勾的顺序以「## 名字」加正文接在人设后面，不管用哪台农机；人设交给农机的三种方式见[帮工](docs/subsystems/session.md)。
-- **预检和开会话用同一份选项规则**（`runtime/rules.ts` 的 `sessionOptions`）：先合并农机默认值与档案覆盖，再定模型回退，并检查农机能力与模型档位。`agentProblems` 把这些问题连同派新活的条件给预检；每次开会话的 `resolve` 也检查当次有效选项，有错就拒绝，不依赖较早的预检结果。设置存好就参与预检和解析，不等新探测完成。派活前（`issue` 的 `hire` 经 `check`，管家、计划、`dispatch` 挑人经 `assess`）和页面（`agent.check`）跑同一个检查。`error` 让它派不出去，`warn` 只提醒，每条带出问题的字段：
+- **预检和开会话用同一份选项规则**（`runtime/rules.ts` 的 `sessionOptions`）：先合并农机默认值与档案覆盖，再定模型回退，并检查农机能力与模型档位。`agentProblems` 把这些问题连同派新活的条件给预检；每次开会话的 `resolve` 也检查当次有效选项，有错就拒绝，不依赖较早的预检结果。设置存好就参与预检和解析，不等新探测完成。派活前（`issue` 的 `hire` 经 `check`，管家、计划、`dispatch` 挑人经 `assess`）和页面（`agent.validate`）跑同一个检查。`error` 让它派不出去，`warn` 只提醒，每条带出问题的字段：
   - `runtime`：不认识的农机；这台机器上找不到；在农具页被停用；以及钱的一条（`moneyStop`：额度用完、余额用完、到了每日预算，[帮工](docs/subsystems/session.md)）。
   - `persona`：写了人设、方式是追加或替换、农机不接受这个选项，原因后面加「把人设改成「写进工单开头」。」。
   - `effort`、`env`、`mcpServers`、`disallowedTools`：填了而农机不接受。
@@ -93,7 +93,7 @@
 - `runtime.setting.update` 先存设置，存不成就回错、不探；存成了重探一次，回新的样子。
 - 花了钱（`spend`）以后 3 秒把这台的样子再推一次，期间花的一起带上。
 
-**页面问能不能派**（`agent.check`）：页面把一组档案（可以是没存的草稿）交给服务端，服务端对每个用缓存里农机的样子跑 `agentProblems`，按 id 回。捏帮工页底部、帮工列表、工单详情都读它（`useAgentProblems`），档案一变就重问；服务端答之前当作没有问题。
+**页面问能不能派**（`agent.validate`）：页面把一组档案（可以是没存的草稿）交给服务端，服务端对每个用缓存里农机的样子跑 `agentProblems`，按 id 回。捏帮工页底部、帮工列表、工单详情都读它（`useAgentProblems`），档案一变就重问；服务端答之前当作没有问题。
 
 **派活时定农机怎么开**（`resolve`，`session` 开会话前调）：
 
@@ -107,14 +107,14 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`Settings`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
+- **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`Config`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
 - **工单（`issue`）**：`hire` 读档案、跑 `check`，有 `error` 就回「<档案> 派不出去：<原因>」；档案停用另回「<档案> 被停用了」。
 - **管家（`orchestrator`）、工具（`tool`）、计划（`task`）**：`Runtimes.candidates` 是每个档案和它现在能不能派（`assess`），`Runtimes.choose` 在其中按 `runtime/rules.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进现状。
 - **记性（`memory`）**、**定时任务（`cron`）**：`Agents` 列档案（不填档案的检索、定时任务派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
 - **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。
 - **oar（`@botiverse/oar`）**：适配器的安装、`listModels`、账户用量、清单（技能、MCP、工具）、`refusedSessionOptions`。
-- **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.check` 逐个调 `Runtimes.check`。
+- **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.validate` 逐个调 `Runtimes.problemsOf`。
 
 ## 为什么这样
 
@@ -126,7 +126,7 @@
 - **新建的 id 由服务端在提交时分。** 页面自己挑 `agent-N`，两台设备（「连接到本机」那头的也算）同时建会互相覆盖；导入和编辑指定 id 仍走保存。
 - **外观在服务端补齐，算法和页面一样。** 必填的枚举不能以空字符串到页面；补的和页面原来画的是同一只，存一次不换脸。
 - **只给真实数据：清单从农机读，装了的技能不复制进技能库。** 两份会对不上，农机那边改了、删了，VibeValley 不知道；所以只读地列出来，帮工按需自己加载。示例技能也不预置：示例和真装的混在一页，主人分不清哪些真在起作用。连不上服务端时说什么见[客户端](docs/subsystems/app.md)。
-- **「派不出去」只有服务端一份，页面问 `agent.check`。** 页面里再写一份，页面说能派、派的时候被拒；草稿也能问，不用先存。
+- **「派不出去」只有服务端一份，页面问 `agent.validate`。** 页面里再写一份，页面说能派、派的时候被拒；草稿也能问，不用先存。
 - **农机拒绝的选项以探测到的适配器为准，农场的说法盖在上面。** 只抄 `seeds.json` 会和 oar 漂开；只用适配器的，农场要更严、要中文原因时没有地方写。页面不从种子的标签推断能不能用。
 - **`runtime.list` 不等探测。** 探一台要问命令行、读模型和额度，冷启动时全部探完要十秒左右；列表等它，农具页和捏帮工就空着。没探到的先给 `checking`，名字和能力已经在里面，探完靠侧事件替换。放弃了「页面自带名字先画」：那是种子的副本，见下一条。
 - **农机的名字、长相和能做什么挂在 `runtime.list` 上，页面不读种子。** 「连接到本机」的设备和那台电脑的服务端版本不一样时，页面自带的名字和能力会和服务端说的对不上。放弃了另加一个接口把种子整份给（种子成了单独的东西，页面拿到还要自己拼）。挂在页面本来就在等的目录上，拿到的就是要显示的；目录到之前列表是空的，新帮工等目录到了再起草（名字和人设的方式都看农机）。

@@ -146,7 +146,7 @@ describe("memory", () => {
         const issues = yield* Issues;
         const sessions = yield* Sessions;
         // Waking after the restart reads the agent from the store, as in real use.
-        yield* (yield* Agents).saveAgent(scribe());
+        yield* (yield* Agents).save(scribe());
         const noted = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
         yield* nextPrompt(before, next, 0);
         yield* w.nextReport;

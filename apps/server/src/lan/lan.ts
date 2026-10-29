@@ -30,7 +30,7 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { code as newCode, newId } from "../base/ids.ts";
 import { missing, lookIn } from "../errors.ts";
@@ -141,7 +141,7 @@ export const make = (options: LanOptions = {}) =>
     const logs = yield* callbackLog;
     // Writes set off by a request belong to this service: they end with it and keep its services.
     const runHere = yield* FiberSet.makeRuntimePromise<never>();
-    const config = yield* Settings;
+    const config = yield* Config;
     const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;
     // Read in callbacks too: the Clock the service was built with.

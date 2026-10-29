@@ -9,15 +9,15 @@ import { noticeLine, onCallLine } from "./prompts.ts";
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { type AgoraGrant, type Area, type Check, type Dictated, defaultOrchestrator, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
-import { checkMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
+import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
+import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
 import type { Socket } from "effect/socket";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
 import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream } from "effect";
 import { chatCompletions } from "../orchestrator/openai.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
@@ -61,7 +61,7 @@ const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => (
   reason,
   ...(settings ? { settings } : {}),
 });
-const failed = (reason: string): ApiError => ({ _tag: "VoiceAgentFailed", reason });
+const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface CallLine {
@@ -264,7 +264,7 @@ export interface VoiceShape {
   readonly session: () => Effect.Effect<AgoraGrant, ApiError>;
   readonly renew: (channel: string, uid: string) => Effect.Effect<AgoraGrant, ApiError>;
   /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
-  readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceAgent, ApiError>;
+  readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
   readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
   /** What the owner said on a call: the orchestrator overhears it when Agora's model answers. */
   readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -273,7 +273,7 @@ export interface VoiceShape {
   readonly said: (agentId: string, text: string) => Effect.Effect<void, ApiError>;
   readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
   /** Whether MOSS Live takes the key given, or the saved one: the reason it does not, in the owner's words. */
-  readonly checkMoss: (key: string) => Effect.Effect<Check>;
+  readonly verifyMoss: (key: string) => Effect.Effect<Validation>;
   /** Why a page cannot have a line to MOSS Live now (no key saved), in the owner's words; undefined when it can. */
   readonly mossProblem: () => string | undefined;
   /** A page's line to MOSS Live (moss.ts relay), with the saved key, until either side closes. */
@@ -377,7 +377,7 @@ async function tunnelAnswers(url: string): Promise<boolean> {
 export const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const notices = yield* Notices;
     const settings = yield* Setting;
@@ -802,10 +802,10 @@ export const make = (options: VoiceOptions = {}) =>
         const call = yield* callOf(agentId);
         if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""));
       }),
-      checkMoss: Effect.fn("Voice.checkMoss")(function* (given) {
+      verifyMoss: Effect.fn("Voice.verifyMoss")(function* (given) {
         const key = given.trim() || settings.mossKey();
         if (key === "") return { problem: t("server.voice.moss.noKey") };
-        const r = yield* checkMoss(key, options.moss);
+        const r = yield* verifyMoss(key, options.moss);
         switch (r.kind) {
           case "ok":
             return {};

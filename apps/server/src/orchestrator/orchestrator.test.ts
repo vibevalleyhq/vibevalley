@@ -1,4 +1,5 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
+import type { EvalCase } from "./evals.ts";
 import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Message } from "@vibevalley/ai/messages";
@@ -12,7 +13,7 @@ import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
 import { messageText } from "@vibevalley/agent/messages";
 import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
-import type { Config } from "../base/config.ts";
+import type { ConfigShape } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
@@ -75,7 +76,7 @@ const respond = (c: Request): Answer => {
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
 /** The patrol runs by hand: heartbeatMinutes 0 leaves nothing to the timer. */
-const farm = (f: Reply = respond, config: Config = testConfig(), clock?: () => number) => {
+const farm = (f: Reply = respond, config: ConfigShape = testConfig(), clock?: () => number) => {
   const { llm, requests } = scriptedLLM(Array.from({ length: 100 }, () => f));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
@@ -99,7 +100,7 @@ const marked = (f: { readonly requests: readonly Request[] }) =>
 const enableLab = Effect.gen(function* () {
   const agents = yield* Agents;
   const lab = starter("lab");
-  yield* agents.saveAgent({ ...lab, enabled: true, effort: "" });
+  yield* agents.save({ ...lab, enabled: true, effort: "" });
   return lab;
 });
 
@@ -187,7 +188,7 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
-      const lead = yield* agents.createAgent({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
+      const lead = yield* agents.create({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
       const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
       const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
 
@@ -342,7 +343,7 @@ describe("the orchestrator", () => {
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       const me = agents.agent(defaultOrchestrator)!;
-      yield* agents.saveAgent({ ...me, model: "openai/gpt" });
+      yield* agents.save({ ...me, model: "openai/gpt" });
       const pieces = (text: string) =>
         Effect.promise(async () => {
           const out: string[] = [];
@@ -585,7 +586,13 @@ describe("the orchestrator", () => {
       yield* until(() => words().length >= 1, "its words");
       const asked = yield* until(() => (sessions.events(defaultOrchestrator) ?? []).find((e) => e.type === "user/message"), "its log");
       const made = yield* orchestrator.markWrong(asked.seq, "应该先看一眼地里");
-      const saved = JSON.parse(readFileSync(made.file, "utf8")) as { want: string; input: { customType: string }; did: { role: string }[]; tools: string[] };
+      const saved = JSON.parse(readFileSync(made.file, "utf8")) as Record<keyof EvalCase, unknown> & {
+        input: { customType: string };
+        did: { role: string }[];
+        tools: string[];
+      };
+      // Written in session/host.ts, read as an EvalCase here: every field the reader expects is there.
+      expect(Object.keys(saved).sort()).toEqual(["before", "createdAt", "did", "expect", "id", "input", "memory", "model", "tools", "want"]);
       expect(saved.want).toBe("应该先看一眼地里");
       expect(saved.input.customType).toBe("orchestratorInput");
       expect(saved.did.map((m) => m.role)).toContain("assistant");

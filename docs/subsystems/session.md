@@ -20,7 +20,7 @@
 - `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentProblems`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
-- 接口：`session.list`、`session.get`、`session.event.list`、`session.stop`、`issue.run.list`、`issue.history.list`、`runtime.*`、`agent.check`（[capabilities.md](docs/reference/capabilities.md)）。
+- 接口：`session.list`、`session.get`、`session.event.list`、`session.stop`、`issue.run.list`、`issue.history.list`、`runtime.*`、`agent.validate`（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：干活过程 `apps/web/src/features/session/WorkLog.tsx`，轨迹 `features/session/Trajectory.tsx`（[轨迹](docs/reference/farm-ui.md#轨迹)）；按 run 分段、瀑布的三道和合计的规则在 `features/session/rounds.ts`。
 
 ## 模型和不变量
@@ -72,7 +72,7 @@
 
 开一轮和发布它在同一把锁（`admission`）里，几个同时来的派活不会占到同一个空位。每个 Session 另有一把现场锁：带话、交接和离场互斥，合并和验收不占全局的准入锁，其他帮工仍能接话和叫停。带话先拿现场锁再拿准入锁，准入锁内不等已有 Session 的现场锁。地里满 6 个又来新活时，工单经 `Sessions.makeRoom` 请最早派出去的闲置帮工收工。
 
-**派不出去**（`runtime/rules.ts` 的 `agentProblems`，派活前查、`agent.check` 给页面）：档案停用、农机没装或停用、农机不接受档案的选项（人设方式、思考强度、环境变量、MCP、禁用工具）或模型没有这一档思考强度；以及钱的一条（`moneyStop`）：套餐的任一窗口用到 100%（写明几点重置）、余额用完、今天花到每日预算。正在干的会干完。
+**派不出去**（`runtime/rules.ts` 的 `agentProblems`，派活前查、`agent.validate` 给页面）：档案停用、农机没装或停用、农机不接受档案的选项（人设方式、思考强度、环境变量、MCP、禁用工具）或模型没有这一档思考强度；以及钱的一条（`moneyStop`）：套餐的任一窗口用到 100%（写明几点重置）、余额用完、今天花到每日预算。正在干的会干完。
 
 **额度和花费**（`runtime`）：
 

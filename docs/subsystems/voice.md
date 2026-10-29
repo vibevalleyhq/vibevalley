@@ -15,10 +15,10 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接、对 key 的检查（`checkMoss`）和页面的线路（`relay`）；`http/moss.ts` 把线路挂在 `mossLinePath`（`GET /api/v1/voice/moss/line`，WebSocket）。打电话还没接它，「设置 › MOSS Live」是单独试它的地方。
+- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接、对 key 的检查（`verifyMoss`）和页面的线路（`relay`）；`http/moss.ts` 把线路挂在 `mossLinePath`（`GET /api/v1/voice/moss/line`，WebSocket）。打电话还没接它，「设置 › MOSS Live」是单独试它的地方。
 - 服务端 `apps/server/src/voice/voice.ts`（`Voice`）：RTC 授予（签发、认领、续签、撤销）、通话（开始、停、`heard`、`said`）、把语音设置翻成声网的 vendors（`vendorsFor`、`agentFor`）、语音线路和隧道、听写。声网的令牌用 npm 的 `agora-token`，请 agent 进出用 `agora-agents`（声网的 ConvoAI SDK）。
 - 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `setting/rules.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/rules.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
-- 接口：`voice.session.create`、`voice.session.renew`、`voice.agent.start`、`voice.agent.stop`、`voice.agent.hear`、`voice.agent.say`、`voice.dictate`、`voice.moss.check`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
+- 接口：`voice.grant.create`、`voice.grant.renew`、`voice.call.start`、`voice.call.stop`、`voice.call.hear`、`voice.call.say`、`voice.dictate`、`voice.moss.verify`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`（选了自己的地址才写 `via: "own"`，没写就是 MOSS）、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`mossKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
 - 页面：`apps/web/src/features/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`DictationButton.tsx` 的听写键，`createCall.ts` 的 `createCall`，各处读同一通电话）；打电话是农场手机的事（点「管家」就拨），田头和工作台的聊天输入框只有听写；设置页 `features/voice/VoiceForm.tsx`（`part` 是 `line` 或 `agent`，`line` 再按 `view` 分通话线路、MOSS Live、听写），路由 `/settings/call`、`/settings/moss`、`/settings/dictation` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
@@ -30,7 +30,7 @@
 - **授予的期限就是令牌的期限**：没启动的授予与令牌同时过期，续签把两者一起延长；过期的在下一次请求时清掉，服务停止时全部清空。未知、过期或已撤销的 `channel + uid` 续签和启动都回 `VoiceUnavailable`（「这通电话的语音凭据已经失效，请重新接通」），页面重新取 `/session`。
 - **一份授予只有一个启动者**：启动时认领（`starting`），重复启动回「这通电话已经在接通」；启动失败撤销授予；成功后授予归通话，直到挂断。
 - **一通电话记下建立时的决定**：通话存它用的 Agora client、语音线路的释放函数、是不是快嘴（`quick`）和开场白。之后改「谁接电话」、区域、凭据都不改这通电话：字幕怎么分流、停止请求发到哪个区域都按建立时的。
-- **挂断一开始，字幕资格就终止**：挂断先删授予、把通话标成 `ending`，此后 `heard`、`said` 回 `VoiceAgentFailed`（「这通电话已经挂了」）；声网停止失败时保留原 client 供重试，但不再接字幕。
+- **挂断一开始，字幕资格就终止**：挂断先删授予、把通话标成 `ending`，此后 `heard`、`said` 回 `VoiceCallFailed`（「这通电话已经挂了」）；声网停止失败时保留原 client 供重试，但不再接字幕。
 - **电话里的每句话由服务端记进默认频道**，带 `spoken`，不叫醒任何人：主人的话快嘴模式下由 `Orchestrator.heard` 记，管家模式下由 `Orchestrator.answerer("phone")` 记；管家的回答照常进默认频道；快嘴的回答由页面交 `/voice/agent/said`，只在快嘴模式、通话没挂时记，开场白不记。
 - **农场只有一通电话**：页面的 `voiceCall`，点手机的「管家」、它通话屏上的「打给管家」和接听来电都开它、挂它；服务端的 `calls` 里没在挂断的那一通就是「正在通话」。
 - **管家能主动在电话里说**（`Voice.speak`）：有一通电话就经它建立时的会话说（`session.say`，声网的 `agents.speak`，带这个会话自己的 ConvoAI token；直接调 `client.agents.speak` 不带 token，声网回 401，管家的话进了默认频道却念不出来），`priority: APPEND`（排在正在说的这句之后，不打断主人）、`interruptable`（主人能插话）；一次最多 512 字节，长的在句末切成几段（`speakPieces`，每段不超过 480 字节）。没有电话回 false。念不出来只记日志。
@@ -41,27 +41,27 @@
 
 - **页面到 MOSS Live 的线路只经服务端转发**（`relay`）：页面说 MOSS 自己的协议，服务端只在握手时加上存下的 key，两头的帧原样过去；MOSS 还没连上时页面先发的等着。只认农场自己的页面（和订阅的 WebSocket 一样查 `Origin` 和 `Host`，`rpc.ts` 的 `fromTheFarm`），不是回 403；没存 key 时不升级，回 409 和原因，页面再用一次普通的 GET 读到它。MOSS 断开时页面收到关闭码 1011 和 MOSS 给的原因。
 - **MOSS Live 的协议里文档没写、实测出来的**：上行的音频帧前面带 `0x00`，下行的不带（每段是 9600 字节，正好 0.1 秒 48 kHz），每段前面有一条 `response.audio.context`；MOSS 只比已经放完的多发 2 秒左右，页面放完每段要回 `playback.chunk.completed`，否则它以 `playback_timeout` 停下；被打断时回 `playback.stopped`（放到第几毫秒），放完回 `playback.completed`。转写每次给到目前为止的全文（`*.transcript.updated`），主人的前几次还没有 `turn`；被打断的回答没有 `output.transcript.done`，说到哪里在 `response.interrupted` 的 `text` 里。工具调用（`session.update` 的 `tools`，OpenAI 的写法）会发 `response.function_call_arguments.done`，结果用 `conversation.item.create` 的 `function_call_output` 交回会被收下，但它不会接着把结果说出来，`response.create` 不认。
-- **试 MOSS Live 的 key 只接一个会话就关**（`voice.moss.check`，没给 key 用存下的）：服务端连 WebSocket、发 `attach_session`，收到 `session_attached` 就关掉（MOSS 从这一刻计费到关）。key 不对时握手直接断（关闭码 1006，和断网一样），所以握手失败再用同一个 key 发一次普通的 HTTPS：401、403 是 key 不认（带 MOSS 自己的话，比如「iam api key auth failed」），连不上是网络，别的说握手失败；8 秒（真实时间）没回话说没回应。key 只在服务端，页面只看到最后四个字，日志里的 `sk-…` 被抹掉。
+- **试 MOSS Live 的 key 只接一个会话就关**（`voice.moss.verify`，没给 key 用存下的）：服务端连 WebSocket、发 `attach_session`，收到 `session_attached` 就关掉（MOSS 从这一刻计费到关）。key 不对时握手直接断（关闭码 1006，和断网一样），所以握手失败再用同一个 key 发一次普通的 HTTPS：401、403 是 key 不认（带 MOSS 自己的话，比如「iam api key auth failed」），连不上是网络，别的说握手失败；8 秒（真实时间）没回话说没回应。key 只在服务端，页面只看到最后四个字，日志里的 `sk-…` 被抹掉。
 
 ## 怎么走
 
 **接通**（页面 `VoiceCall.start`）：
 
-1. 浏览器先要麦克风权限。`POST /api/v1/voice/session/create` 拿 `AgoraGrant`（`appId`、`channel`、`uid`、`token`）；没凭据回 `VoiceUnavailable`（「还没有 Agora 的凭据」），别的照常。
+1. 浏览器先要麦克风权限。`POST /api/v1/voice/grant/create` 拿 `AgoraGrant`（`appId`、`channel`、`uid`、`token`）；没凭据回 `VoiceUnavailable`（「还没有 Agora 的凭据」），别的照常。
 2. 用 `host.rtc`（手机壳的声网原生 SDK，`apps/mobile/src/rtc.ts`）或页面自己的声网 Web SDK（`features/voice/agora.ts`）加入频道、发布麦克风。
-3. `POST /api/v1/voice/agent/start`（`channel`、`uid`）。服务端认领授予、按当前语音设置建 vendors：
+3. `POST /api/v1/voice/call/start`（`channel`、`uid`）。服务端认领授予、按当前语音设置建 vendors：
    - 「谁接电话」是管家时先开语音线路，拿到这通电话的地址和钥匙，作为 OpenAI 兼容的大模型交给 Agora，模型名 `vibevalley-orchestrator`；开不了回 `VoiceUnavailable`（「管家的语音线路接不通」）。
    - 快嘴：Agora 托管的模型、DeepSeek（用农场的 DeepSeek key，`https://api.deepseek.com/chat/completions`）或自己的 OpenAI 兼容接口（`llmKey`）。参数固定：最多 15 轮历史、`max_tokens` 512、`temperature` 0.7、`top_p` 0.95，带开场白和出错时说的话。
    - 要 key 的（微软识别 `asrKey`、自己的大模型 `llmKey`、微软合成 `ttsKey`）缺 key 就回 `VoiceUnavailable`，说缺哪个、在哪一格填；`agora-agents` 拒绝某个配置时 `vendorsFor` 接住，当作「语音设置用不了」。
    - 断句和打断：VAD，`silenceMs`（默认 480）、`interruptMs`（默认 160），`idleSeconds`（默认 30）没人就离开；字幕走 RTC 的 data stream；语音管家的 uid 固定是 `voiceAgentUid`，页面靠它分开管家的声音和字幕。
    - 请 Agora 启动（HTTP 超时 25 秒）。启动失败或被中断都撤销授予、关线路；底层启动不能取消时，迟到返回的 agent id 也立即请它离开。启动返回时服务已经停下或授予已被撤销，回 `VoiceUnavailable`。
    - 成功：记下通话，回 `agentId`；`Core.did` 让账本记一笔语音。
-4. 令牌快过期时（SDK 的 `token-privilege-will-expire`）`POST /api/v1/voice/session/renew` 换同一组 `channel + uid` 的新令牌；失败在通话上显示原因。
+4. 令牌快过期时（SDK 的 `token-privilege-will-expire`）`POST /api/v1/voice/grant/renew` 换同一组 `channel + uid` 的新令牌；失败在通话上显示原因。
 
 **字幕**：页面从 data stream 收分块的消息，`captions.ts` 拼齐一轮再解，只留最近几轮。说着的时候就画在田头最下面（`liveCaptions`，淡色、带光标）：主人这一轮还在说的字随说随长；这一轮说完了留着，等田头有了同样的字（`spoken` 的那一条）就换成它，最多留 `captionLinger`（8 秒）。管家的字两种模式都画：不管谁接电话，它的话都要一段说完才进田头。
 
-- 主人的一句定稿时，连同 `agentId`、档案选择和 `sendKey` 交 `POST /api/v1/voice/agent/hear`。快嘴模式下服务端把农场设成开着、交给 `Orchestrator.heard`：记成主人在主频道的发言，提示管家「语音那边已经回答了」，派了活才说一句派给了谁。管家模式下收下不转。
-- 快嘴的一轮说完或被打断时（`turn_status` 不为 0），页面把说到的部分交 `POST /api/v1/voice/agent/say`，服务端经频道的 `spoken` 记成管家的话。
+- 主人的一句定稿时，连同 `agentId`、档案选择和 `sendKey` 交 `POST /api/v1/voice/call/hear`。快嘴模式下服务端把农场设成开着、交给 `Orchestrator.heard`：记成主人在主频道的发言，提示管家「语音那边已经回答了」，派了活才说一句派给了谁。管家模式下收下不转。
+- 快嘴的一轮说完或被打断时（`turn_status` 不为 0），页面把说到的部分交 `POST /api/v1/voice/call/say`，服务端经频道的 `spoken` 记成管家的话。
 - `/voice/agent` 返回前收到的字幕，页面暂存到拿到 `agentId` 再发；取消通话清掉它们。
 - `POST /api/v1/voice/hear` 没有 `agentId`：只有一通没在挂的电话时绑定到它；一通都没有回「没有正在接通的电话」，有几通回「请升级客户端后重试」。
 
@@ -78,7 +78,7 @@
 2. 正在通话：要说的事进一个队列，从不挤着说。队列里第一件到了先等 3 秒（`gatherMs`），这期间到的一起写成一条「【要告诉主人】……这 N 件合成一段说」交给管家（`Orchestrator.brief`，来源是工单，排在管家手上这一轮之后，不打断电话里正在答的那句）；管家照常在默认频道回答，答完整段经 `speak` 念出来，念的请求排在正在说的话之后。这一段交出去以前不再问管家；其间来的事攒着，下一次合成一条。管家答这件事时插进来别的话（主人在电话里又问了一句），这件的回答就此结束，已经说出来的照样念；一个字都没有的放回队列再问，连着三次没字就作罢。队列是 Voice 作用域里的 Effect 循环，等待和 brief 都能被服务关闭中断；挂断会中止这通电话的 brief 等待，但不停管家共享的 run，每段 `say` 前再查通话是否还在。brief 失败记日志并结束这一轮，不盲目重发管家可能已经收到的输入；之后来的事能再开一轮。挂断以后队列清空：这些事还在手机的未接和 Inbox 里。
 3. 没在通话：页面的手机照 Inbox 响铃（工单交回来带着问题的是一种「有问题问你」`ask`）。接听就是开电话：`VoiceCall.start(about)`，`about` 是响的那件事；服务端这通电话不念开场白，agent 进来后经同一个队列把「主人接起了你打的电话，你打电话是为了这件事：……（这期间又有：……）」交给管家，回答念出来作为第一句。通话中手机不响铃，来的事由第 2 步在电话里说。
 
-**挂断**（`VoiceCall.end` → `POST /api/v1/voice/agent/stop`）：终止字幕资格、撤销授予，用建立时的 client 请 Agora 离开（它已经在走、回 404 也算成功），释放语音线路的钥匙。失败回 `VoiceAgentFailed`，通话留着可以再停。不认识的 `agentId` 用当前凭据和区域去停。服务停止时清空授予、关线路和隧道。
+**挂断**（`VoiceCall.end` → `POST /api/v1/voice/call/stop`）：终止字幕资格、撤销授予，用建立时的 client 请 Agora 离开（它已经在走、回 404 也算成功），释放语音线路的钥匙。失败回 `VoiceCallFailed`，通话留着可以再停。不认识的 `agentId` 用当前凭据和区域去停。服务停止时清空授予、关线路和隧道。
 
 **听写**：
 
@@ -87,7 +87,7 @@
 3. 原样转给 `POST {url}/audio/transcriptions`（multipart，带 `model`、`response_format: json`），不加提示、不改声音，时限 2 分钟（本机模型第一次要加载）。`dictation.via` 定转给谁：默认 `moss`，是 MOSS 的转写（`https://api.mosi.cn/v1`、`moss-transcribe-1.0`，`moss.ts` 的 `mossTranscription`），带 MOSS Live 的同一把 `mossKey`；`own` 是主人填的地址和模型，有 `dictationKey` 就带 `Authorization: Bearer`。MOSS 没存 key、自己的地址没填、地址不对、连不上、对方回非 2xx（带对方的错误，留头 200 字）、回的不是转写格式，都回 `VoiceUnavailable` 和原因。
 4. 回来的 `text` 插进输入框的光标处（没有光标就放末尾，只在拉丁词之间补空格），主人看过再发；发出去是一条普通的消息。
 
-**改设置**：「设置」的「MOSS Live」（`/settings/moss`，`features/voice/MossPlayground.tsx`、`mossLine.ts`）单独和 MOSS Live 说话：填人设和规则，开始说话（麦克风 16 kHz、20 毫秒一帧；回答 48 kHz 排着放），看双方说的、线路上发和收的消息（正在变的字、音频的通告和播放回报不列），和每秒算一次的线路质量：应答（主人说完到 MOSS 第一段声音到达，上一轮和平均，超过 2.5 秒标红）、上行和下行的码率、每秒发出的麦克风帧（该是 50）、发送积压、播放缓冲、断音（同一个回答里上一段放完下一段还没到）、被 MOSS 停下的次数和原因。说的话不进田头。「设置」的「通话线路」（`/settings/call`）配线路：凭据和区域、识别、语言、断句、打断、没人时多久离开、谁接电话（`answer`），「听写」（`/settings/dictation`）先选走 MOSS 还是自己的地址：MOSS 只要它的 API Key（和「MOSS Live」页是同一把，两处都能填），自己的地址配地址、模型、key；「MOSS Live」页最上面是它的 API Key（旁边的插头试连一次：服务端接上一个会话马上关掉，回「接通了」或说不通的原因）。三页是同一个 `VoiceForm` 按 `view` 分，「恢复默认」只在通话线路上。管家页的「声音」（`/orchestrator/voice`）配电话上的管家：人设（只对快嘴有用）、开场白、出错时说的话、音色。两处是同一个 `VoiceForm`，按 `part`（`line`、`agent`）分；每处只把自己那几项叠在当前最新的设置上存，「恢复默认」只动自己那几项，两页不会互相覆盖。页面一边改一边问 `POST /api/v1/setting/check`，显示的就是保存时会被拒的理由。自己服务的 key 页面只看到最后四个字。MiniMax 音色旁边的试听播的是仓库里预先生成的样音，不连网。
+**改设置**：「设置」的「MOSS Live」（`/settings/moss`，`features/voice/MossPlayground.tsx`、`mossLine.ts`）单独和 MOSS Live 说话：填人设和规则，开始说话（麦克风 16 kHz、20 毫秒一帧；回答 48 kHz 排着放），看双方说的、线路上发和收的消息（正在变的字、音频的通告和播放回报不列），和每秒算一次的线路质量：应答（主人说完到 MOSS 第一段声音到达，上一轮和平均，超过 2.5 秒标红）、上行和下行的码率、每秒发出的麦克风帧（该是 50）、发送积压、播放缓冲、断音（同一个回答里上一段放完下一段还没到）、被 MOSS 停下的次数和原因。说的话不进田头。「设置」的「通话线路」（`/settings/call`）配线路：凭据和区域、识别、语言、断句、打断、没人时多久离开、谁接电话（`answer`），「听写」（`/settings/dictation`）先选走 MOSS 还是自己的地址：MOSS 只要它的 API Key（和「MOSS Live」页是同一把，两处都能填），自己的地址配地址、模型、key；「MOSS Live」页最上面是它的 API Key（旁边的插头试连一次：服务端接上一个会话马上关掉，回「接通了」或说不通的原因）。三页是同一个 `VoiceForm` 按 `view` 分，「恢复默认」只在通话线路上。管家页的「声音」（`/orchestrator/voice`）配电话上的管家：人设（只对快嘴有用）、开场白、出错时说的话、音色。两处是同一个 `VoiceForm`，按 `part`（`line`、`agent`）分；每处只把自己那几项叠在当前最新的设置上存，「恢复默认」只动自己那几项，两页不会互相覆盖。页面一边改一边问 `POST /api/v1/setting/validate`，显示的就是保存时会被拒的理由。自己服务的 key 页面只看到最后四个字。MiniMax 音色旁边的试听播的是仓库里预先生成的样音，不连网。
 
 听写默认走 MOSS，有了 MOSS 的 key 就能用。自己的地址有两种用法：本机开着 [speech-swift](https://github.com/soniqo/speech-swift) 的 `speech-server`（`brew install speech`），填 `http://127.0.0.1:8080/v1`、模型 `qwen3`、key 空着，声音不出这台电脑；云上如 OpenAI 填 `https://api.openai.com/v1`、`gpt-4o-mini-transcribe` 和 key，声音送到那一家。
 

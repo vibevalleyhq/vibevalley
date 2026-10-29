@@ -44,7 +44,7 @@ import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
 
 export type { SessionNews };
-import { serverAddress, Settings } from "../base/config.ts";
+import { serverAddress, Config } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
@@ -371,7 +371,7 @@ export function watchStalls(
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
     const store = yield* Agents;

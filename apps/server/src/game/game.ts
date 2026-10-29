@@ -7,7 +7,7 @@ import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol
 import * as S from "@vibevalley/protocol/schema";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOf } from "../base/json.ts";
@@ -40,7 +40,7 @@ export class Game extends Context.Service<Game, GameShape>()("vibevalley/Game") 
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const config = yield* Settings;
+  const config = yield* Config;
   const core = yield* Core;
   const projects = yield* Projects;
   const { attempt: db } = yield* Db;

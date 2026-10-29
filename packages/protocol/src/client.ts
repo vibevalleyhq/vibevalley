@@ -41,7 +41,7 @@ function apiErrorOf(value: unknown): ApiError | undefined {
       return validReason(value) && (value.settings === undefined || (VoiceFixValues as readonly unknown[]).includes(value.settings))
         ? (value as unknown as ApiError)
         : undefined;
-    case "VoiceAgentFailed":
+    case "VoiceCallFailed":
       return validReason(value) ? (value as unknown as ApiError) : undefined;
     default:
       return undefined;
@@ -79,7 +79,7 @@ export class VibeValleyApi {
   readonly setting = {
     get: (): Promise<T.SettingsStatus> => this.call("/api/v1/setting/get", undefined) as Promise<T.SettingsStatus>,
     /** The first thing Save would refuse in these settings, without saving them. */
-    check: (a: T.SettingsUpdate): Promise<T.Check> => this.call("/api/v1/setting/check", a) as Promise<T.Check>,
+    validate: (a: T.SettingsUpdate): Promise<T.Validation> => this.call("/api/v1/setting/validate", a) as Promise<T.Validation>,
     update: (a: T.SettingsUpdate): Promise<T.SettingsStatus> => this.call("/api/v1/setting/update", a) as Promise<T.SettingsStatus>,
   };
 
@@ -160,17 +160,17 @@ export class VibeValleyApi {
     dictate: (a: T.DictateRequest): Promise<T.Dictated> => this.call("/api/v1/voice/dictate", a) as Promise<T.Dictated>,
     moss: {
       /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
-      check: (a: T.MossCheckRequest): Promise<T.Check> => this.call("/api/v1/voice/moss/check", a) as Promise<T.Check>,
+      verify: (a: T.MossVerifyRequest): Promise<T.Validation> => this.call("/api/v1/voice/moss/verify", a) as Promise<T.Validation>,
     },
-    session: {
-      create: (): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/create", undefined) as Promise<T.AgoraGrant>,
-      renew: (a: T.RenewRequest): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/renew", a) as Promise<T.AgoraGrant>,
+    grant: {
+      create: (): Promise<T.AgoraGrant> => this.call("/api/v1/voice/grant/create", undefined) as Promise<T.AgoraGrant>,
+      renew: (a: T.VoiceGrantRenew): Promise<T.AgoraGrant> => this.call("/api/v1/voice/grant/renew", a) as Promise<T.AgoraGrant>,
     },
-    agent: {
-      start: (a: T.StartRequest): Promise<T.VoiceAgent> => this.call("/api/v1/voice/agent/start", a) as Promise<T.VoiceAgent>,
-      stop: (a: T.VoiceAgent): Promise<void> => this.call("/api/v1/voice/agent/stop", a) as Promise<void>,
-      hear: (a: T.VoiceHeard): Promise<void> => this.call("/api/v1/voice/agent/hear", a) as Promise<void>,
-      say: (a: T.VoiceSaid): Promise<void> => this.call("/api/v1/voice/agent/say", a) as Promise<void>,
+    call: {
+      start: (a: T.VoiceCallStart): Promise<T.VoiceCall> => this.call("/api/v1/voice/call/start", a) as Promise<T.VoiceCall>,
+      stop: (a: T.VoiceCall): Promise<void> => this.call("/api/v1/voice/call/stop", a) as Promise<void>,
+      hear: (a: T.VoiceHeard): Promise<void> => this.call("/api/v1/voice/call/hear", a) as Promise<void>,
+      say: (a: T.VoiceSaid): Promise<void> => this.call("/api/v1/voice/call/say", a) as Promise<void>,
     },
   };
 
@@ -313,7 +313,7 @@ export class VibeValleyApi {
   readonly agent = {
     list: (): Promise<T.Agent[]> => this.call("/api/v1/agent/list", undefined) as Promise<T.Agent[]>,
     /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
-    check: (a: T.AgentCheckRequest): Promise<T.AgentCheck[]> => this.call("/api/v1/agent/check", a) as Promise<T.AgentCheck[]>,
+    validate: (a: T.AgentValidateRequest): Promise<T.AgentValidation[]> => this.call("/api/v1/agent/validate", a) as Promise<T.AgentValidation[]>,
     /** Create allocates an identity; callers with an existing identity use save. */
     create: (a: T.Agent): Promise<T.Agent> => this.call("/api/v1/agent/create", a) as Promise<T.Agent>,
     update: (a: T.Agent): Promise<T.Agent> => this.call("/api/v1/agent/update", a) as Promise<T.Agent>,
@@ -366,7 +366,7 @@ export class VibeValleyApi {
   readonly project = {
     list: (): Promise<T.ProjectSummary[]> => this.call("/api/v1/project/list", undefined) as Promise<T.ProjectSummary[]>,
     /** The first thing Create would refuse in this project, without making it. */
-    check: (a: T.NewProject): Promise<T.Check> => this.call("/api/v1/project/check", a) as Promise<T.Check>,
+    validate: (a: T.NewProject): Promise<T.Validation> => this.call("/api/v1/project/validate", a) as Promise<T.Validation>,
     create: (a: T.NewProject): Promise<T.ProjectSummary> => this.call("/api/v1/project/create", a) as Promise<T.ProjectSummary>,
     language: {
       list: (a: { id: string }): Promise<T.ProjectLanguages> => this.call("/api/v1/project/language/list", a) as Promise<T.ProjectLanguages>,

@@ -245,6 +245,27 @@ const RULES: readonly Rule[] = [
     // The client's onFarm is the skin it is on.
     dirs: ["apps/server/src", "apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
   },
+  {
+    name: "a voice call under session or agent",
+    pattern: /voice[./](session|agent)[./]|\bVoiceAgent(Failed)?\b|\b(StartRequest|RenewRequest)\b/,
+    says: "a call's token is a grant (voice.grant.create, voice.grant.renew, VoiceGrantRenew); the call is a call (voice.call.*, VoiceCall, VoiceCallStart, VoiceCallFailed)",
+  },
+  {
+    name: "validating under the word check",
+    pattern: /\b(setting|project|agent)[./]check\b(?![.\w])|voice[./]moss[./]check\b|\b(MossCheck\w*|AgentCheck\w*|checkMoss)\b/,
+    says: "a form's input is validated (setting.validate, project.validate, agent.validate, Validation, AgentValidation); a key is verified (voice.moss.verify, verifyMoss, MossVerify); check is running checks",
+  },
+  {
+    name: "a service method repeating its service, or the startup config as Settings",
+    pattern:
+      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* Settings\b/,
+    says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is the Config service (yield* Config)",
+  },
+  {
+    name: "an issue's text as a job",
+    pattern: /\b(issueJob|splitJob)\b|server\.issue\.job\./,
+    says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, server.issue.brief.*)",
+  },
 ];
 
 // A word table (and the test that reads the English page) says what the owner reads, in the glossary's English column

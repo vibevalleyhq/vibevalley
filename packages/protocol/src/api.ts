@@ -38,8 +38,8 @@ export interface VoiceUnavailable {
   readonly settings?: VoiceFix;
 }
 
-export interface VoiceAgentFailed {
-  readonly _tag: "VoiceAgentFailed";
+export interface VoiceCallFailed {
+  readonly _tag: "VoiceCallFailed";
   readonly reason: string;
 }
 
@@ -54,7 +54,7 @@ export interface LanRefused {
 }
 
 /** What a route may refuse with: written as JSON with its _tag, at its status. */
-export type ApiError = Refused | Missing | VoiceUnavailable | VoiceAgentFailed | ConnectorRefused | LanRefused;
+export type ApiError = Refused | Missing | VoiceUnavailable | VoiceCallFailed | ConnectorRefused | LanRefused;
 
 const NextSchema: Schema.Codec<Next> = Schema.Struct({
   say: Schema.String,
@@ -79,7 +79,7 @@ export const ApiError: Schema.Codec<ApiError> = Schema.Union([
     reason: Schema.String,
     settings: Schema.optionalKey(Schema.Literals(VoiceFixValues)),
   }),
-  reasonOf("VoiceAgentFailed"),
+  reasonOf("VoiceCallFailed"),
   reasonOf("ConnectorRefused"),
   reasonOf("LanRefused"),
 ]);
@@ -88,7 +88,7 @@ export const errorStatus: Readonly<Record<ApiError["_tag"], number>> = {
   Refused: 409,
   Missing: 404,
   VoiceUnavailable: 503,
-  VoiceAgentFailed: 502,
+  VoiceCallFailed: 502,
   ConnectorRefused: 409,
   LanRefused: 403,
 };
@@ -101,7 +101,7 @@ export interface Handlers<R = never> {
   readonly "orchestrator.stop": (a: { readonly agent?: string }) => Effect.Effect<void, ApiError, R>;
   readonly "setting.get": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
   /** The first thing Save would refuse in these settings, without saving them. */
-  readonly "setting.check": (a: T.SettingsUpdate) => Effect.Effect<T.Check, ApiError, R>;
+  readonly "setting.validate": (a: T.SettingsUpdate) => Effect.Effect<T.Validation, ApiError, R>;
   readonly "setting.update": (a: T.SettingsUpdate) => Effect.Effect<T.SettingsStatus, ApiError, R>;
   readonly "channel.message.send": (a: T.SayRequest) => Effect.Effect<void, ApiError, R>;
   readonly "channel.create": (a: T.ChannelRequest) => Effect.Effect<string, ApiError, R>;
@@ -236,7 +236,7 @@ export interface Handlers<R = never> {
   readonly "runtime.setting.update": (a: { readonly id: string } & T.RuntimeSettings) => Effect.Effect<T.RuntimeInfo, ApiError, R>;
   readonly "agent.list": () => Effect.Effect<T.Agent[], ApiError, R>;
   /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
-  readonly "agent.check": (a: T.AgentCheckRequest) => Effect.Effect<T.AgentCheck[], ApiError, R>;
+  readonly "agent.validate": (a: T.AgentValidateRequest) => Effect.Effect<T.AgentValidation[], ApiError, R>;
   /** Create allocates an identity; callers with an existing identity use save. */
   readonly "agent.create": (a: T.Agent) => Effect.Effect<T.Agent, ApiError, R>;
   readonly "agent.update": (a: T.Agent) => Effect.Effect<T.Agent, ApiError, R>;
@@ -280,21 +280,21 @@ export interface Handlers<R = never> {
   readonly "skill.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "project.list": () => Effect.Effect<T.ProjectSummary[], ApiError, R>;
   /** The first thing Create would refuse in this project, without making it. */
-  readonly "project.check": (a: T.NewProject) => Effect.Effect<T.Check, ApiError, R>;
+  readonly "project.validate": (a: T.NewProject) => Effect.Effect<T.Validation, ApiError, R>;
   readonly "project.create": (a: T.NewProject) => Effect.Effect<T.ProjectSummary, ApiError, R>;
   readonly "project.language.list": (a: { readonly id: string }) => Effect.Effect<T.ProjectLanguages, ApiError, R>;
   /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
   readonly "project.template.list": (a: { readonly id: string }) => Effect.Effect<T.ProjectTemplates, ApiError, R>;
   readonly "project.activity.get": (a: { readonly id: string }) => Effect.Effect<T.ProjectActivity, ApiError, R>;
-  readonly "voice.session.create": () => Effect.Effect<T.AgoraGrant, ApiError, R>;
-  readonly "voice.session.renew": (a: T.RenewRequest) => Effect.Effect<T.AgoraGrant, ApiError, R>;
-  readonly "voice.agent.start": (a: T.StartRequest) => Effect.Effect<T.VoiceAgent, ApiError, R>;
-  readonly "voice.agent.stop": (a: T.VoiceAgent) => Effect.Effect<void, ApiError, R>;
-  readonly "voice.agent.hear": (a: T.VoiceHeard) => Effect.Effect<void, ApiError, R>;
-  readonly "voice.agent.say": (a: T.VoiceSaid) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.grant.create": () => Effect.Effect<T.AgoraGrant, ApiError, R>;
+  readonly "voice.grant.renew": (a: T.VoiceGrantRenew) => Effect.Effect<T.AgoraGrant, ApiError, R>;
+  readonly "voice.call.start": (a: T.VoiceCallStart) => Effect.Effect<T.VoiceCall, ApiError, R>;
+  readonly "voice.call.stop": (a: T.VoiceCall) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.call.hear": (a: T.VoiceHeard) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.call.say": (a: T.VoiceSaid) => Effect.Effect<void, ApiError, R>;
   readonly "voice.dictate": (a: T.DictateRequest) => Effect.Effect<T.Dictated, ApiError, R>;
   /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
-  readonly "voice.moss.check": (a: T.MossCheckRequest) => Effect.Effect<T.Check, ApiError, R>;
+  readonly "voice.moss.verify": (a: T.MossVerifyRequest) => Effect.Effect<T.Validation, ApiError, R>;
   readonly "connector.list": () => Effect.Effect<T.ConnectorStatus[], ApiError, R>;
   readonly "connector.login": (a: { readonly id: T.ConnectorID } & T.ConnectorLogin) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
   readonly "connector.verify": (a: { readonly id: T.ConnectorID } & T.VerifyRequest) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
@@ -390,10 +390,10 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "setting.check",
+    op: "setting.validate",
     about: [],
     input: S.SettingsUpdate,
-    result: S.Check,
+    result: S.Validation,
     can: ["owner", "remote"],
   },
   {
@@ -978,10 +978,10 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "agent.check",
+    op: "agent.validate",
     about: [],
-    input: S.AgentCheckRequest,
-    result: Schema.mutable(Schema.Array(S.AgentCheck)),
+    input: S.AgentValidateRequest,
+    result: Schema.mutable(Schema.Array(S.AgentValidation)),
     can: ["owner", "remote"],
   },
   {
@@ -1164,10 +1164,10 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "project.check",
+    op: "project.validate",
     about: [],
     input: S.NewProject,
-    result: S.Check,
+    result: S.Validation,
     can: ["owner", "remote"],
   },
   {
@@ -1199,49 +1199,49 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "voice.moss.check",
+    op: "voice.moss.verify",
     about: [],
-    input: S.MossCheckRequest,
-    result: S.Check,
+    input: S.MossVerifyRequest,
+    result: S.Validation,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.session.create",
+    op: "voice.grant.create",
     about: [],
     input: undefined,
     result: S.AgoraGrant,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.session.renew",
+    op: "voice.grant.renew",
     about: [],
-    input: S.RenewRequest,
+    input: S.VoiceGrantRenew,
     result: S.AgoraGrant,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.agent.start",
+    op: "voice.call.start",
     about: [],
-    input: S.StartRequest,
-    result: S.VoiceAgent,
+    input: S.VoiceCallStart,
+    result: S.VoiceCall,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.agent.stop",
+    op: "voice.call.stop",
     about: [],
-    input: S.VoiceAgent,
+    input: S.VoiceCall,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.agent.hear",
+    op: "voice.call.hear",
     about: [],
     input: S.VoiceHeard,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.agent.say",
+    op: "voice.call.say",
     about: [],
     input: S.VoiceSaid,
     result: undefined,

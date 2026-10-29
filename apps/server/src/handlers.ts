@@ -7,7 +7,7 @@ import { Agents } from "./agent/agent.ts";
 import { missing, lookIn, reasonOf, refused } from "./errors.ts";
 import { Projects } from "./project/project.ts";
 import { Effect, Option } from "effect";
-import { Settings } from "./base/config.ts";
+import { Config } from "./base/config.ts";
 import { Core } from "./core/core.ts";
 import { Artifacts } from "./artifact/artifact.ts";
 import { Channels } from "./channel/chat.ts";
@@ -27,7 +27,7 @@ import { HttpServerRequest } from "effect/http";
 import { owner } from "./base/actor.ts";
 
 export const handlers = Effect.gen(function* () {
-  const config = yield* Settings;
+  const config = yield* Config;
   const core = yield* Core;
   const setting = yield* Setting;
   const agents = yield* Agents;
@@ -52,14 +52,14 @@ export const handlers = Effect.gen(function* () {
     "orchestrator.open": () => core.open(),
     "orchestrator.stop": ({ agent }) => orchestrator.stop(agent),
     "game.achievement.list": () => Effect.sync(game.achievements),
-    "voice.session.create": () => voice.session(),
-    "voice.session.renew": (body) => voice.renew(body.channel, body.uid),
-    "voice.agent.start": (body) => voice.start(body.channel, body.uid, body.about),
-    "voice.agent.stop": (body) => voice.stop(body.agentId),
-    "voice.agent.hear": (body) => voice.heard(body.agentId, body.text, body.agent ?? "", body.sendKey ?? ""),
-    "voice.agent.say": (body) => voice.said(body.agentId, body.text),
+    "voice.grant.create": () => voice.session(),
+    "voice.grant.renew": (body) => voice.renew(body.channel, body.uid),
+    "voice.call.start": (body) => voice.start(body.channel, body.uid, body.about),
+    "voice.call.stop": (body) => voice.stop(body.agentId),
+    "voice.call.hear": (body) => voice.heard(body.agentId, body.text, body.agent ?? "", body.sendKey ?? ""),
+    "voice.call.say": (body) => voice.said(body.agentId, body.text),
     "voice.dictate": (body) => voice.dictate(body.audio, body.format),
-    "voice.moss.check": (body) => voice.checkMoss(body.key ?? ""),
+    "voice.moss.verify": (body) => voice.verifyMoss(body.key ?? ""),
     "voice.hear": (body) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
     "connector.list": () => connectors.list(),
     "connector.login": ({ id, ...body }) => connectors.login(id, body),
@@ -95,11 +95,11 @@ export const handlers = Effect.gen(function* () {
         ),
       ),
     "setting.get": () => Effect.sync(setting.status),
-    "setting.check": (body) => Effect.sync(() => setting.check(body)),
+    "setting.validate": (body) => Effect.sync(() => setting.validate(body)),
     "setting.update": (body) => setting.save(body).pipe(Effect.mapError((e) => refused(e.message))),
     "github.get": () => Effect.sync(projects.githubStatus),
     "project.list": () => projects.summaries(),
-    "project.check": (body) => Effect.sync(() => projects.check(body)),
+    "project.validate": (body) => Effect.sync(() => projects.validate(body)),
     "project.create": (body) =>
       projects.create(body).pipe(
         Effect.flatMap(projects.summary),
@@ -113,28 +113,28 @@ export const handlers = Effect.gen(function* () {
     "project.activity.get": ({ id }) =>
       Effect.flatMap(projects.activity(id), (a) => (a ? Effect.succeed(a) : Effect.fail(missing(t("server.projectRef", { id }), [lookIn.project])))),
     "agent.list": () => Effect.sync(agents.all),
-    "agent.create": (body) => agents.createAgent(body),
-    "agent.update": (agent) => agents.saveAgent(agent),
-    "agent.delete": ({ id }) => agents.deleteAgent(id),
-    "agent.previewDelete": ({ id }) => agents.previewDeleteAgent(id),
+    "agent.create": (body) => agents.create(body),
+    "agent.update": (agent) => agents.save(agent),
+    "agent.delete": ({ id }) => agents.remove(id),
+    "agent.previewDelete": ({ id }) => agents.previewRemove(id),
     "agent.template.list": () => Effect.sync(agents.templates),
     "agent.template.install": ({ id }) => agents.installTemplate(id),
     "agent.template.update": ({ agent }) => agents.updateFromTemplate(agent),
     "agent.template.add": ({ path }) => agents.addTemplate(path),
-    "agent.template.delete": ({ id }) => agents.deleteTemplate(id),
-    "agent.template.previewDelete": ({ id }) => agents.previewDeleteTemplate(id),
+    "agent.template.delete": ({ id }) => agents.removeTemplate(id),
+    "agent.template.previewDelete": ({ id }) => agents.previewRemoveTemplate(id),
     "skill.list": () => Effect.sync(agents.skills),
     "skill.create": (body) => agents.createSkill(body),
     "skill.update": (skill) => agents.saveSkill(skill),
-    "skill.delete": ({ id }) => agents.deleteSkill(id),
-    "skill.previewDelete": ({ id }) => agents.previewDeleteSkill(id),
+    "skill.delete": ({ id }) => agents.removeSkill(id),
+    "skill.previewDelete": ({ id }) => agents.previewRemoveSkill(id),
     "memory.list": ({ agent }) => memory.memoriesOf(agent),
     "memory.recall": ({ agent, project, text }) => memory.recallOf(agent, project ?? "", text ?? ""),
     "memory.search": ({ agent, project, text }) =>
       memory.search({ agent: agent ? (agents.named(agent)?.id ?? agent) : "", project: project ?? "", text: text ?? "", kind: "", limit: 0 }),
     "memory.create": ({ agent, ...body }) => memory.remember({ agent, text: body.text, project: body.project ?? "", by: owner }),
-    "memory.delete": ({ agent, memory: id }) => memory.forgetOf(agent, id),
-    "memory.previewDelete": ({ agent, memory: id }) => memory.previewForgetOf(agent, id),
+    "memory.delete": ({ agent, memory: id }) => memory.forget(agent, id),
+    "memory.previewDelete": ({ agent, memory: id }) => memory.previewForget(agent, id),
     "orchestrator.archive.list": ({ agent, q }) => Effect.sync(() => memory.archive(agent || defaultOrchestrator, q ?? "")),
     "orchestrator.archive.get": ({ agent, name }) =>
       Effect.suspend(() => {
@@ -146,7 +146,7 @@ export const handlers = Effect.gen(function* () {
       Effect.flatMap(runtimes.refresh(id), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
     "runtime.setting.update": ({ id, ...body }) =>
       Effect.flatMap(runtimes.update(id, body), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
-    "agent.check": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.check(agent), (problems) => ({ id: agent.id, problems }))),
+    "agent.validate": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.problemsOf(agent), (problems) => ({ id: agent.id, problems }))),
     "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) =>

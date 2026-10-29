@@ -17,7 +17,7 @@ import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";
 import { dbStores } from "../agent/taskStore.ts";
-import { projectsDir, Settings } from "../base/config.ts";
+import { projectsDir, Config } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
@@ -64,7 +64,7 @@ export interface RuntimeShape {
   readonly info: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
   readonly update: (id: string, s: RuntimeSettings) => Effect.Effect<RuntimeInfo | undefined, ApiError>;
   /** The profile's problems as it would be dispatched now. */
-  readonly check: (agent: Agent) => Effect.Effect<AgentProblem[]>;
+  readonly problemsOf: (agent: Agent) => Effect.Effect<AgentProblem[]>;
   readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
   /** Every profile, and whether it can be sent now. */
   readonly candidates: Effect.Effect<Candidate[]>;
@@ -191,7 +191,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const clock = yield* Clock.Clock;
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* callbackLog;
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const store = yield* Agents;
     const registry = options.registry ?? registryOf();
@@ -479,7 +479,7 @@ export const make = (options: RuntimeOptions = {}) =>
               refresh(id),
             )
           : Effect.succeed(undefined),
-      check: (agent) => Effect.map(assess(agent), (a) => a.problems),
+      problemsOf: (agent) => Effect.map(assess(agent), (a) => a.problems),
       assess,
       candidates,
       choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
@@ -556,7 +556,7 @@ export const layer = (options: RuntimeOptions = {}) =>
     Runtimes,
     Effect.gen(function* () {
       if (options.registry) return yield* make(options);
-      const config = yield* Settings;
+      const config = yield* Config;
       const keys = yield* Setting;
       const time = yield* timeHere;
       const service = yield* Llm;

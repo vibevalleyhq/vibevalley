@@ -1,6 +1,6 @@
 {
   "id": "assign-without-starting",
-  "created": 1792270980000,
+  "createdAt": 1792270980000,
   "model": "deepseek-flash",
   "want": "主人说这张让 Codex 做、先别开始，管家却开工了。应该记下并写上 assignee，不开工。",
   "memory": "",

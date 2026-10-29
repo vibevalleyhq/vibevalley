@@ -59,7 +59,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   one is answered by the open story (`answer` in `base/storyApi.ts`), and made-up data shared between stories is a
   `*.samples.ts` beside them (`features/issue/issue.samples.ts`); neither is imported by the product. A view tied to a
   device or a global (the microphone, a socket, the call) is split so its look takes props, and the stories draw that:
-  `DictationMark`, `MossCheckView`, `MossLineView`, `OrchestratorLine`. `vp run --filter
+  `DictationMark`, `MossVerifyView`, `MossLineView`, `OrchestratorLine`. `vp run --filter
   @vibevalley/web stories` serves them; `build:stories` (in `web:check`) builds them to `dist-stories/`, never into
   `dist/`; `test/stories.spec.ts` opens each in its themes with axe. A part that reads the page's data to draw itself is
   split so its drawing takes arguments (`Shortcuts` in `ShortcutSheet.tsx`). The format and the viewer are

@@ -197,7 +197,7 @@ const farm = Effect.gen(function* () {
   const core = yield* Core;
   const issues = yield* Issues;
   const agents = yield* Agents;
-  for (const a of agents.agents()) yield* agents.saveAgent({ ...a, effort: "" });
+  for (const a of agents.agents()) yield* agents.save({ ...a, effort: "" });
   const work = new FakeWork(core, issues);
   const git = new FakeGit(work);
   const states: TaskGraph[] = [];

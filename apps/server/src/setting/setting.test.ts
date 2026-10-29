@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { type Config, Settings } from "../base/config.ts";
+import { type ConfigShape, Config } from "../base/config.ts";
 import { Effect, Layer } from "effect";
 import { defaultVoice } from "./rules.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -10,8 +10,9 @@ import { layer, Setting } from "./setting.ts";
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
 
-const run = <A, E>(config: Config, body: Effect.Effect<A, E, Setting>) => body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config)))));
-const file = (config: Config) => JSON.parse(readFileSync(join(config.home, "settings.json"), "utf8")) as Record<string, unknown>;
+const run = <A, E>(config: ConfigShape, body: Effect.Effect<A, E, Setting>) =>
+  body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Config, config)))));
+const file = (config: ConfigShape) => JSON.parse(readFileSync(join(config.home, "settings.json"), "utf8")) as Record<string, unknown>;
 
 describe("settings", () => {
   it.effect("a key saved here wins over the configuration's, and only its end is ever shown", () => {
@@ -76,7 +77,7 @@ describe("settings", () => {
         // The page sends the voice whole: what equals the defaults is left out all the same.
         yield* s.save({ voice: wanted });
         expect(file(config).voice).toEqual({ area: "CN", silenceMs: 600, greeting: "在呢。" });
-        expect(s.check({ voice: { persona: "  " } }).problem).toBeTruthy();
+        expect(s.validate({ voice: { persona: "  " } }).problem).toBeTruthy();
         yield* s.save({ agoraAppId: appId });
         expect(s.voice().area).toBe("CN");
         const reset = yield* s.save({ voice: {} });
@@ -116,7 +117,7 @@ describe("settings", () => {
         expect(after.mossKey).toEqual({ source: "settings", hint: "…6b9c" });
         expect(JSON.stringify(after)).not.toContain("sk-moss");
         expect(s.mossKey()).toBe("sk-moss-live-key-6b9c");
-        expect(s.check({ mossKey: "sk with space" }).problem).toBeDefined();
+        expect(s.validate({ mossKey: "sk with space" }).problem).toBeDefined();
         expect((yield* s.save({ mossKey: "" })).mossKey).toEqual({});
         expect(s.mossKey()).toBe("");
       }),

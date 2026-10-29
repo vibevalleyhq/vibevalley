@@ -112,8 +112,8 @@ export const catalogs = {
       orchestratorRuntime: "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
       newAgentId: "新档案的 id 要留空；指定 id 请用保存",
       newSkillId: "新技能的 id 要留空；指定 id 请用保存",
-      deleteAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
-      deleteSkill: "删掉技能「{name}」",
+      removeAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
+      removeSkill: "删掉技能「{name}」",
       modelFailed: "模型出错了",
       noDeepSeekKey: "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
       refused: { launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数", serviceTier: "DeepSeek 没有服务档位" },
@@ -484,12 +484,12 @@ export const catalogs = {
         merge: "合进 {base}（{commits} 个提交），关成已完成，{helper} 收工",
         mainBranch: "主分支",
       },
-      job: {
+      brief: {
         reopenDefault: "接着把这张工单做完",
         handedOver: "这张工单换你接手了，之前是 {name}（{id}）在做",
         reopened: "这张工单重开了，上一次是 {name}（{id}）做的",
         how: "\n\n（{how}。）",
-        original: "\n这张工单原来是：{job}",
+        original: "\n这张工单原来是：{brief}",
         answer: "\n上一次的结论：{conclusion}",
         closed: "\n它是怎么关的：{closed}",
         lastRun: "\n最后一轮{outcome}：{summary}",
@@ -498,7 +498,7 @@ export const catalogs = {
         failedHead: "验收没过，这几处要修：",
         failedEnd: "\n\n修好以后在结论里逐条说怎么修的。",
         resume: "上一轮停在了半路，接着把它做完。",
-        cure: "接着修：{job}。看一下报错，修好再跑一遍测试",
+        cure: "接着修：{brief}。看一下报错，修好再跑一遍测试",
         cureHead: "接着修：",
         cureTail: "。看一下报错，修好再跑一遍测试",
         answerUnread: "接着修：上一轮交回的结论读不出来（{problem}）。接着查清楚，最后照这个格式交：",
@@ -3443,7 +3443,7 @@ export const catalogs = {
           stop: "停下 {name}",
           play: "试听 {name}",
         },
-        moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
+        moss: { console: "MOSS 开放平台", verify: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
         dictationVia: "听写走哪",
         dictationOwn: "自己的地址",
         dictationMossIntro: "录音经服务端交给 MOSS 转写，用 MOSS Live 的同一把 Key。",
@@ -3648,8 +3648,8 @@ export const catalogs = {
       orchestratorRuntime: "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
       newAgentId: "Leave a new profile's id empty; to choose the id, save it instead",
       newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
-      deleteAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
-      deleteSkill: 'Delete the skill "{name}"',
+      removeAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
+      removeSkill: 'Delete the skill "{name}"',
       modelFailed: "the model failed",
       noDeepSeekKey: "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
       refused: { launchArgs: "VibeValley runs inside the server process and takes no command-line arguments", serviceTier: "DeepSeek has no service tiers" },
@@ -4024,12 +4024,12 @@ export const catalogs = {
         merge: "Merge into {base} ({commits} commits), close as done, and {helper} leaves",
         mainBranch: "main",
       },
-      job: {
+      brief: {
         reopenDefault: "Finish this ticket",
         handedOver: "This ticket is handed over to you; {name} ({id}) was on it before",
         reopened: "This ticket is reopened; {name} ({id}) did it last time",
         how: "\n\n({how}.)",
-        original: "\nThe ticket was: {job}",
+        original: "\nThe ticket was: {brief}",
         answer: "\nLast time's answer: {conclusion}",
         closed: "\nHow it was closed: {closed}",
         lastRun: "\nThe last round {outcome}: {summary}",
@@ -4038,7 +4038,7 @@ export const catalogs = {
         failedHead: "The acceptance failed; these need fixing:",
         failedEnd: "\n\nOnce fixed, say how each was fixed in your conclusion.",
         resume: "The last round stopped halfway; carry on and finish it.",
-        cure: "Fix it: {job}. Look at the errors, fix them, and run the tests again",
+        cure: "Fix it: {brief}. Look at the errors, fix them, and run the tests again",
         cureHead: "Fix it: ",
         cureTail: ". Look at the errors, fix them, and run the tests again",
         answerUnread: "Fix it: the answer handed back last round could not be read ({problem}). Find it out, and hand it back in this format at the end:",
@@ -7149,7 +7149,7 @@ export const catalogs = {
         },
         moss: {
           console: "MOSS platform",
-          check: "Check that it connects",
+          verify: "Check that it connects",
           checking: "Connecting…",
           ok: "Connected",
           keyHint: "A key from the MOSS platform, used only by this machine's server",
@@ -7321,8 +7321,6 @@ export interface Messages {
   "mobile.unreachable": undefined;
   "mobile.waiting": undefined;
   "server.agent.defaultStaysOrchestrator": undefined;
-  "server.agent.deleteAgent": { readonly id: string | number; readonly name: string | number; readonly runtime: string | number };
-  "server.agent.deleteSkill": { readonly name: string | number };
   "server.agent.efforts": { readonly asked: string | number; readonly efforts: string | number; readonly runtime: string | number };
   "server.agent.effortsAnd": undefined;
   "server.agent.modelFailed": undefined;
@@ -7337,6 +7335,8 @@ export interface Messages {
   "server.agent.quoted": { readonly name: string | number };
   "server.agent.refused.launchArgs": undefined;
   "server.agent.refused.serviceTier": undefined;
+  "server.agent.removeAgent": { readonly id: string | number; readonly name: string | number; readonly runtime: string | number };
+  "server.agent.removeSkill": { readonly name: string | number };
   "server.agent.template.badId": { readonly file: string | number; readonly id: string | number };
   "server.agent.template.badVersion": { readonly file: string | number };
   "server.agent.template.builtIn": { readonly id: string | number };
@@ -7624,6 +7624,23 @@ export interface Messages {
   "server.game.tier.gold": { readonly title: string | number };
   "server.game.tier.silver": { readonly title: string | number };
   "server.helperRef": { readonly id: string | number };
+  "server.issue.brief.answer": { readonly conclusion: string | number };
+  "server.issue.brief.answerUnread": { readonly problem: string | number };
+  "server.issue.brief.closed": { readonly closed: string | number };
+  "server.issue.brief.cure": { readonly brief: string | number };
+  "server.issue.brief.cureHead": undefined;
+  "server.issue.brief.cureTail": undefined;
+  "server.issue.brief.end": undefined;
+  "server.issue.brief.failedEnd": undefined;
+  "server.issue.brief.failedHead": undefined;
+  "server.issue.brief.handedOver": { readonly id: string | number; readonly name: string | number };
+  "server.issue.brief.how": { readonly how: string | number };
+  "server.issue.brief.lastRun": { readonly outcome: string | number; readonly summary: string | number };
+  "server.issue.brief.original": { readonly brief: string | number };
+  "server.issue.brief.previous": undefined;
+  "server.issue.brief.reopenDefault": undefined;
+  "server.issue.brief.reopened": { readonly id: string | number; readonly name: string | number };
+  "server.issue.brief.resume": undefined;
   "server.issue.cannotDelete": { readonly n: string | number; readonly why: string | number };
   "server.issue.cannotMoveProject": { readonly n: string | number; readonly why: string | number };
   "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
@@ -7675,23 +7692,6 @@ export interface Messages {
   "server.issue.inGraph": undefined;
   "server.issue.issueNumbered": { readonly n: string | number };
   "server.issue.issueRef": { readonly ref: string | number };
-  "server.issue.job.answer": { readonly conclusion: string | number };
-  "server.issue.job.answerUnread": { readonly problem: string | number };
-  "server.issue.job.closed": { readonly closed: string | number };
-  "server.issue.job.cure": { readonly job: string | number };
-  "server.issue.job.cureHead": undefined;
-  "server.issue.job.cureTail": undefined;
-  "server.issue.job.end": undefined;
-  "server.issue.job.failedEnd": undefined;
-  "server.issue.job.failedHead": undefined;
-  "server.issue.job.handedOver": { readonly id: string | number; readonly name: string | number };
-  "server.issue.job.how": { readonly how: string | number };
-  "server.issue.job.lastRun": { readonly outcome: string | number; readonly summary: string | number };
-  "server.issue.job.original": { readonly job: string | number };
-  "server.issue.job.previous": undefined;
-  "server.issue.job.reopenDefault": undefined;
-  "server.issue.job.reopened": { readonly id: string | number; readonly name: string | number };
-  "server.issue.job.resume": undefined;
   "server.issue.merge.merged": { readonly name: string | number; readonly text: string | number };
   "server.issue.merge.tellFailed": { readonly why: string | number };
   "server.issue.move.byHelpers": undefined;
@@ -10808,11 +10808,11 @@ export interface Messages {
   "web.voice.voice.microsoftKey": undefined;
   "web.voice.voice.missing": undefined;
   "web.voice.voice.model": undefined;
-  "web.voice.voice.moss.check": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.console": undefined;
   "web.voice.voice.moss.keyHint": undefined;
   "web.voice.voice.moss.ok": undefined;
+  "web.voice.voice.moss.verify": undefined;
   "web.voice.voice.nextCall": undefined;
   "web.voice.voice.noSettings": { readonly why: string | number };
   "web.voice.voice.orchestratorPage": undefined;

@@ -10,7 +10,7 @@ import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { NodeServices } from "@effect/platform-node";
 import { Effect, Fiber, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
-import { type Config, Settings } from "../base/config.ts";
+import { type ConfigShape, Config } from "../base/config.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -42,9 +42,9 @@ const notFound = async (id: string): Promise<RuntimeInfo> => ({
   checkedAt: Date.now(),
 });
 
-const world = (config: Config = testConfig()) =>
+const world = (config: ConfigShape = testConfig()) =>
   Layer.mergeAll(coreLayer.pipe(Layer.provide(projection)), agentLayer).pipe(
-    Layer.provideMerge(Layer.succeed(Settings, config)),
+    Layer.provideMerge(Layer.succeed(Config, config)),
     Layer.provideMerge(NodeServices.layer),
   );
 
@@ -339,7 +339,7 @@ describe("runtime", () => {
       const assessed = yield* r.assess(a);
       expect(assessed.blocking.map((i) => i.field)).toEqual(["effort", "env"]);
       expect(usable(assessed)).toBe(false);
-      expect(yield* r.check(a)).toEqual(assessed.problems);
+      expect(yield* r.problemsOf(a)).toEqual(assessed.problems);
       expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -390,7 +390,7 @@ describe("runtime", () => {
           }),
         });
         const a = agent({ model: source === "profile" ? "missing" : "" });
-        const problems = yield* r.check(a);
+        const problems = yield* r.problemsOf(a);
         expect(problems).toEqual([
           { field: "model", level: "warn", text: "pi 的模型列表里没有 missing" },
           {
@@ -430,7 +430,7 @@ describe("runtime", () => {
       const updating = Effect.runPromise(r.update("pi", { ...store.settings("pi"), defaultEffort: "high" }));
       yield* Effect.promise(() => until(() => waiting));
       const a = agent({});
-      expect((yield* r.check(a)).map((i) => i.field)).toEqual(["effort"]);
+      expect((yield* r.problemsOf(a)).map((i) => i.field)).toEqual(["effort"]);
       expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
       release();
       yield* Effect.promise(() => updating);
@@ -449,7 +449,7 @@ describe("runtime", () => {
           }),
         });
         const a = agent({});
-        expect(yield* r.check(a)).toEqual([]);
+        expect(yield* r.problemsOf(a)).toEqual([]);
         const store = yield* Agents;
         yield* r.update("pi", {
           ...store.settings("pi"),

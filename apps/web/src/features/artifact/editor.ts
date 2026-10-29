@@ -19,14 +19,14 @@ import { keyBetween } from "@vibevalley/protocol/rules";
 import { reasonOf } from "../../base/api";
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
-/** Text edits wait this long after the last key, and no longer than maxWait while typing goes on. */
-export const idleWait = 500;
-export const maxWait = 2000;
+/** Text edits wait this long after the last key, and no longer than maxWaitMs while typing goes on. */
+export const idleWaitMs = 500;
+export const maxWaitMs = 2000;
 
-/** How often an open blocks artifact asks for what others (helpers) wrote while nothing of the owner's waits: every pollFast
- * while another writer was heard in the last busyPolls asks (or the demo was just started), else pollEvery. */
-export const pollEvery = 4000;
-export const pollFast = 1000;
+/** How often an open blocks artifact asks for what others (helpers) wrote while nothing of the owner's waits: every pollFastMs
+ * while another writer was heard in the last busyPolls asks (or the demo was just started), else pollEveryMs. */
+export const pollEveryMs = 4000;
+export const pollFastMs = 1000;
 const busyPolls = 4;
 
 /** A block another writer changed shows as being written for this many asks after the change was heard. */
@@ -155,7 +155,7 @@ export class BlockEditor {
   private cron() {
     clearTimeout(this.poll);
     if (this.disposed) return;
-    this.poll = setTimeout(() => void this.refresh().then(() => this.cron()), this.othersWriting ? pollFast : pollEvery);
+    this.poll = setTimeout(() => void this.refresh().then(() => this.cron()), this.othersWriting ? pollFastMs : pollEveryMs);
   }
 
   private async refresh() {
@@ -175,7 +175,7 @@ export class BlockEditor {
     if (redraw) this.changed();
   }
 
-  /** Starts the scripted demo: helpers write their sections at once; asks come every pollFast from now. */
+  /** Starts the scripted demo: helpers write their sections at once; asks come every pollFastMs from now. */
   async demo() {
     try {
       await this.api.artifact.demo({ id: this.artifactId });
@@ -329,8 +329,8 @@ export class BlockEditor {
 
   private arm() {
     clearTimeout(this.idle);
-    this.idle = setTimeout(() => this.flush(), idleWait);
-    this.max ??= setTimeout(() => this.flush(), maxWait);
+    this.idle = setTimeout(() => this.flush(), idleWaitMs);
+    this.max ??= setTimeout(() => this.flush(), maxWaitMs);
   }
 
   /** Enter at `at` (UTF-16) in b: an empty list item leaves the list; otherwise the text after `at` becomes a new block. */

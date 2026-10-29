@@ -82,7 +82,7 @@
     },
     "moss": {
       "console": "MOSS 开放平台",
-      "check": "测一下能不能接通",
+      "verify": "测一下能不能接通",
       "checking": "在接…",
       "ok": "接通了",
       "keyHint": "MOSS 开放平台的 key，只在这台电脑的服务端用"

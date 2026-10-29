@@ -12,7 +12,7 @@ import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
   type Changes,
-  type Check,
+  type Validation,
   type Conflict,
   type DayCount,
   type Author,
@@ -33,7 +33,7 @@ import {
 import { slice } from "../base/text.ts";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
 import { jsonOf } from "../base/json.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import {
@@ -237,7 +237,7 @@ export interface ProjectShape {
   readonly root: string;
   readonly limit: number;
   readonly maxSessions: () => number;
-  readonly check: (req: NewProject) => Check;
+  readonly validate: (req: NewProject) => Validation;
   readonly create: (req: NewProject) => Effect.Effect<Project, ProjectError>;
   readonly list: () => Effect.Effect<Project[]>;
   readonly summary: (p: Project) => Effect.Effect<ProjectSummary>;
@@ -279,7 +279,7 @@ export interface ProjectHooks {
 
 export const make = (hooks: ProjectHooks = {}) =>
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const work = resolve(config.workRoot);
     const root = join(work, "projects");
     // A file call that fails where the sync one would have thrown: a defect, as before.
@@ -491,7 +491,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       root,
       limit: perProject,
       maxSessions,
-      check: (req) => {
+      validate: (req) => {
         const problem = projectProblem(req);
         return problem ? { problem } : {};
       },

@@ -55,7 +55,7 @@ import { IconLink, OutLink } from "../../ui/IconButton";
 import { KeyField, SaveBar } from "../../ui/KeyField";
 import { Hint } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
-import { MossCheck } from "./MossCheck";
+import { MossVerify } from "./MossVerify";
 import { KeyRow, SettingsGroup } from "../../ui/settings";
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey" | "mossKey";
@@ -86,7 +86,7 @@ function useProblem(update: () => SettingsUpdate) {
   const asked = createSettled(() => JSON.stringify(update()));
   const check = useQuery(() => ({
     queryKey: ["settings-check", asked()],
-    queryFn: () => api.setting.check(JSON.parse(asked()) as SettingsUpdate),
+    queryFn: () => api.setting.validate(JSON.parse(asked()) as SettingsUpdate),
     placeholderData: keepPreviousData,
   }));
   return () => ready(check, undefined)?.problem;
@@ -226,7 +226,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   removing={cleared().has("mossKey")}
                   onRemove={remove("mossKey")}
                   link={{ href: "https://platform.mosi.cn/", label: t("web.voice.voice.moss.console") }}
-                  after={<MossCheck typed={() => secrets().mossKey ?? ""} />}
+                  after={<MossVerify typed={() => secrets().mossKey ?? ""} />}
                 />
               </SettingsGroup>
             </Show>

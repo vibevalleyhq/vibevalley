@@ -1,6 +1,6 @@
 {
   "id": "think-before-starting",
-  "created": 1792270800000,
+  "createdAt": 1792270800000,
   "model": "deepseek-flash",
   "want": "主人说了先别派活、只是一起想想，管家却记了一张工单并开工。应该不建工单、不开工，先列出 README 可以写哪几节，问主人要哪些。",
   "memory": "",

@@ -10,7 +10,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Context, Effect, FiberSet, Layer } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Sessions } from "../session/session.ts";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import { type Caller, Tools } from "../tool/tool.ts";
@@ -32,7 +32,7 @@ export interface McpOptions {
 
 export const make = (options: McpOptions = {}) =>
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const sessions = yield* Sessions;
     const tools = yield* Tools;
     const who = options.who ?? sessions.who;

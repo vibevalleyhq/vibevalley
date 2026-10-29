@@ -72,7 +72,7 @@ describe("a pull request", () => {
           const issues = yield* Issues;
           const sessions = yield* Sessions;
           const projects = yield* Projects;
-          yield* (yield* Agents).saveAgent(lab());
+          yield* (yield* Agents).save(lab());
           issue = yield* issues.add({ title: "写版本A", project: "clock", assignee: "lab" });
           yield* issues.start(issue.id, "");
           yield* w.nextReport;

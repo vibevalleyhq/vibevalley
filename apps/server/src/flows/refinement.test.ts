@@ -41,7 +41,7 @@ describe("a refined issue", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       // It names no one: whoever was last sent to work in the project drafts it.
       const before = mustHire(yield* issues.hire(lab(), "看看项目", "board"));
       yield* w.nextReport;
@@ -97,7 +97,7 @@ describe("a refined issue", () => {
     return Effect.gen(function* () {
       const issues = yield* Issues;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       let issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       yield* issues.refine(issue.id, "顺手提交：看板拖卡", "");
       issue = yield* await_(
@@ -129,7 +129,7 @@ describe("a refined issue", () => {
       const issues = yield* Issues;
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       // Held until the issue's thread is open, as it is before any real draft hands back.
       const before = yield* issues.refine(issue.id, "慢慢乱写一通", "");

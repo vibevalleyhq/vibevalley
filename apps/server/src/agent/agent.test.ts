@@ -3,14 +3,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { Cause, Effect, Exit, Layer } from "effect";
-import { type Config, Settings } from "../base/config.ts";
+import { type ConfigShape, Config } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Agents, layer, withCast } from "./agent.ts";
 import { defaultSettings } from "./seed.ts";
 import { starter } from "../testing/layers.ts";
 
-const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
-  Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
+const run = <A, E>(config: ConfigShape, body: Effect.Effect<A, E, Agents>) =>
+  Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Config, config))))));
 
 const draft = (change: Partial<Agent> = {}): Agent => ({
   id: "",
@@ -48,9 +48,9 @@ describe("profiles", () => {
           description: "",
           body: "old",
         });
-        profile = (yield* s.createAgent(draft({ skills: [skill.id, "other"] }))).id;
-        yield* s.saveAgent({ ...s.agent(defaultOrchestrator)!, skills: [skill.id] });
-        yield* s.deleteSkill(skill.id);
+        profile = (yield* s.create(draft({ skills: [skill.id, "other"] }))).id;
+        yield* s.save({ ...s.agent(defaultOrchestrator)!, skills: [skill.id] });
+        yield* s.removeSkill(skill.id);
         expect(s.agent(profile)?.skills).toEqual(["other"]);
         expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
         const recreated = yield* s.createSkill({
@@ -162,9 +162,9 @@ describe("profiles", () => {
         expect([orchestrator.runtime, orchestrator.enabled]).toEqual([orchestratorRuntime, true]);
         expect(s.agents().some((a) => a.id === defaultOrchestrator)).toBe(false);
         expect(s.all().some((a) => a.id === defaultOrchestrator)).toBe(true);
-        expect((yield* Effect.flip(s.deleteAgent(defaultOrchestrator)))._tag).toBe("Refused");
-        expect((yield* Effect.flip(s.saveAgent({ ...orchestrator, runtime: "claude" })))._tag).toBe("Refused");
-        yield* s.saveAgent({ ...orchestrator, model: "deepseek-pro" });
+        expect((yield* Effect.flip(s.remove(defaultOrchestrator)))._tag).toBe("Refused");
+        expect((yield* Effect.flip(s.save({ ...orchestrator, runtime: "claude" })))._tag).toBe("Refused");
+        yield* s.save({ ...orchestrator, model: "deepseek-pro" });
       }),
     ).pipe(
       Effect.andThen(
@@ -183,15 +183,15 @@ describe("profiles", () => {
       testConfig(),
       Effect.gen(function* () {
         const s = yield* Agents;
-        expect((yield* Effect.flip(s.createAgent(draft({ name: "外头的管家", role: "orchestrator", runtime: "claude" }))))._tag).toBe("Refused");
-        const lead = yield* s.createAgent(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
+        expect((yield* Effect.flip(s.create(draft({ name: "外头的管家", role: "orchestrator", runtime: "claude" }))))._tag).toBe("Refused");
+        const lead = yield* s.create(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
         expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
         expect([s.isOrchestrator(lead.id), s.isOrchestrator("backend")]).toEqual([true, false]);
         expect(s.agents().some((a) => a.role === "orchestrator")).toBe(false);
-        expect((yield* Effect.flip(s.saveAgent({ ...s.agent(defaultOrchestrator)!, role: "worker" })))._tag).toBe("Refused");
-        yield* s.saveAgent({ ...lead, role: "worker" });
+        expect((yield* Effect.flip(s.save({ ...s.agent(defaultOrchestrator)!, role: "worker" })))._tag).toBe("Refused");
+        yield* s.save({ ...lead, role: "worker" });
         expect(s.agents().some((a) => a.id === lead.id)).toBe(true);
-        yield* s.deleteAgent(lead.id);
+        yield* s.remove(lead.id);
       }),
     ),
   );
@@ -223,10 +223,10 @@ describe("profiles", () => {
         expect(s.templates().find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
         expect((yield* Effect.flip(s.installTemplate("nobody")))._tag).toBe("Missing");
         // The owner's changes stay until the profile is made again from the template; the machine's stay after it too.
-        yield* s.saveAgent({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
+        yield* s.save({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
         const again = yield* s.updateFromTemplate("backend-2");
         expect([again.name, again.persona, again.env, again.from?.version]).toEqual(["后端二号", starter("backend").persona, { CI: "1" }, 1]);
-        const hand = yield* s.createAgent(draft({ name: "手捏的" }));
+        const hand = yield* s.create(draft({ name: "手捏的" }));
         expect((yield* Effect.flip(s.updateFromTemplate(hand.id)))._tag).toBe("Refused");
       }),
     ),
@@ -254,9 +254,9 @@ describe("profiles", () => {
         expect((yield* Effect.flip(s.addTemplate(folder)))._tag).toBe("Refused");
         const lead = yield* s.installTemplate("lead");
         expect([lead.role, s.isOrchestrator(lead.id)]).toEqual(["orchestrator", true]);
-        expect((yield* s.previewDeleteTemplate("lead")).does[0]).toContain("1 份档案留着");
-        expect((yield* Effect.flip(s.deleteTemplate("backend")))._tag).toBe("Refused");
-        yield* s.deleteTemplate("lead");
+        expect((yield* s.previewRemoveTemplate("lead")).does[0]).toContain("1 份档案留着");
+        expect((yield* Effect.flip(s.removeTemplate("backend")))._tag).toBe("Refused");
+        yield* s.removeTemplate("lead");
         expect(s.templates().some((t) => t.id === "lead")).toBe(false);
         expect(s.agent(lead.id)?.from).toEqual({ template: "lead", version: 2 });
       }),
@@ -271,13 +271,13 @@ describe("profiles", () => {
         const ids = new Set<string>();
         const skills = new Set<string>();
         for (let i = 0; i < 12; i++) {
-          ids.add((yield* s.createAgent(draft())).id);
+          ids.add((yield* s.create(draft())).id);
           skills.add((yield* s.createSkill({ id: "", name: "Same Skill", body: "" } as never)).id);
         }
         expect(ids.size).toBe(12);
         expect([...skills].slice(0, 3)).toEqual(["same-skill", "same-skill-2", "same-skill-3"]);
-        expect((yield* Effect.flip(s.createAgent(draft({ id: "mine" }))))._tag).toBe("Refused");
-        const saved = yield* s.saveAgent({
+        expect((yield* Effect.flip(s.create(draft({ id: "mine" }))))._tag).toBe("Refused");
+        const saved = yield* s.save({
           ...draft({ id: "agent-7" }),
           look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"],
         });

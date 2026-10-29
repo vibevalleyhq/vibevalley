@@ -1,6 +1,6 @@
 {
   "id": "start-when-asked",
-  "created": 1792271040000,
+  "createdAt": 1792271040000,
   "model": "deepseek-flash",
   "want": "主人要马上做，管家只记进了备选。应该记下并开工（start: true）。",
   "memory": "",

@@ -81,12 +81,12 @@
     "merge": "合进 {base}（{commits} 个提交），关成已完成，{helper} 收工",
     "mainBranch": "主分支"
   },
-  "job": {
+  "brief": {
     "reopenDefault": "接着把这张工单做完",
     "handedOver": "这张工单换你接手了，之前是 {name}（{id}）在做",
     "reopened": "这张工单重开了，上一次是 {name}（{id}）做的",
     "how": "\n\n（{how}。）",
-    "original": "\n这张工单原来是：{job}",
+    "original": "\n这张工单原来是：{brief}",
     "answer": "\n上一次的结论：{conclusion}",
     "closed": "\n它是怎么关的：{closed}",
     "lastRun": "\n最后一轮{outcome}：{summary}",
@@ -95,7 +95,7 @@
     "failedHead": "验收没过，这几处要修：",
     "failedEnd": "\n\n修好以后在结论里逐条说怎么修的。",
     "resume": "上一轮停在了半路，接着把它做完。",
-    "cure": "接着修：{job}。看一下报错，修好再跑一遍测试",
+    "cure": "接着修：{brief}。看一下报错，修好再跑一遍测试",
     "cureHead": "接着修：",
     "cureTail": "。看一下报错，修好再跑一遍测试",
     "answerUnread": "接着修：上一轮交回的结论读不出来（{problem}）。接着查清楚，最后照这个格式交："

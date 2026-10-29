@@ -53,7 +53,7 @@ const codeOf: Readonly<Record<ApiError["_tag"], number>> = {
   Refused: exit.refused,
   Missing: exit.missing,
   VoiceUnavailable: exit.refused,
-  VoiceAgentFailed: exit.other,
+  VoiceCallFailed: exit.other,
   ConnectorRefused: exit.refused,
   LanRefused: exit.refused,
 };

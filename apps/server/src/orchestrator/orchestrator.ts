@@ -24,7 +24,7 @@ import { modelClient, noDeepSeekKey } from "../agent/model.ts";
 import { Llm } from "@vibevalley/ai/llm";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "@vibevalley/agent/self";
-import { agentHome, projectsDir, Settings } from "../base/config.ts";
+import { agentHome, projectsDir, Config } from "../base/config.ts";
 import { Channels, type OrchestratorNews, type SayMore } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import type { ApiError } from "../errors.ts";
@@ -112,7 +112,7 @@ export const make = (options: OrchestratorOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const logs = yield* callbackLog;
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const store = yield* Agents;
     const settings = yield* Setting;

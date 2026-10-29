@@ -1,6 +1,6 @@
 {
   "id": "complete-not-dismiss",
-  "created": 1792271400000,
+  "createdAt": 1792271400000,
   "model": "deepseek-flash",
   "want": "主人说收下 #41，管家却把工单挪到已取消让帮工收工，改动没进主分支。收下是完成：用 issue_status_update 挪到已完成，照工单交付。",
   "memory": "",

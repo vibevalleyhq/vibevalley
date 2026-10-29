@@ -3,7 +3,7 @@ import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { layer as agentLayer } from "../agent/agent.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
@@ -81,7 +81,7 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
-    Layer.provideMerge(Layer.succeed(Settings, testConfig())),
+    Layer.provideMerge(Layer.succeed(Config, testConfig())),
   );
 
 const nowledgeOn: MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
@@ -137,9 +137,9 @@ describe("memory sources", () => {
         expect(got.lines[1]).toBe("主人要中文的提交信息");
         expect([...fake.cues[0]!.skip!]).toEqual(["m1"]);
         expect((yield* m.list("lab")).map((x) => x.id)).toEqual([local.id, "nowledge:m9"]);
-        yield* m.forgetOf("lab", "nowledge:m9");
+        yield* m.forget("lab", "nowledge:m9");
         expect(fake.forgot).toEqual(["m9"]);
-        yield* m.forgetOf("lab", local.id);
+        yield* m.forget("lab", local.id);
         expect(fake.forgot).toHaveLength(1);
         expect(yield* m.list("lab")).toHaveLength(1);
       }),
@@ -260,7 +260,7 @@ describe("memory sources", () => {
                 ? Effect.asVoid(m.search({ agent: "lab", project: "", text: "query", kind: "", limit: 10 }))
                 : operation === "list"
                   ? Effect.asVoid(m.list("lab"))
-                  : m.forgetOf("lab", "nowledge:n1"),
+                  : m.forget("lab", "nowledge:n1"),
           ),
         );
         yield* Effect.promise(() => until(() => entered));
@@ -293,7 +293,7 @@ describe("memory sources", () => {
     const fake = Object.assign(new Fake("nowledge"), { noForget: true });
     return withFake(fake, (m) =>
       Effect.gen(function* () {
-        expect((yield* Effect.flip(m.forgetOf("lab", "nowledge:m1")))._tag).toBe("Refused");
+        expect((yield* Effect.flip(m.forget("lab", "nowledge:m1")))._tag).toBe("Refused");
         expect(fake.forgot).toEqual([]);
       }),
     );

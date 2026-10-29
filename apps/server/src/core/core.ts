@@ -22,7 +22,7 @@ import type {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
@@ -124,7 +124,7 @@ const isFact = (e: SideEvent): e is Fact => {
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const config = yield* Settings;
+  const config = yield* Config;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
   const read = jsonOf(S.WorkspaceState);

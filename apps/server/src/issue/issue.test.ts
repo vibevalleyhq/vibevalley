@@ -277,7 +277,7 @@ describe("issues", () => {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const issue = yield* issues.add({ title: "draft", project: "demo", assignee: "lab" });
       yield* issues.refine(issue.id, "keep reading", "");
       yield* until(() => started, "the writer");
@@ -314,7 +314,7 @@ describe("issues", () => {
     const f = farm([worker]);
     return Effect.gen(function* () {
       const issues = yield* Issues;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const issue = yield* issues.add({ title: "draft", project: "demo", assignee: "lab" });
       yield* issues.refine(issue.id, "read the project", "");
       yield* until(() => started, "the drafting writer");
@@ -342,7 +342,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
       expect(hired.session).toBeDefined();
       const first = hired.session!;
@@ -494,7 +494,7 @@ describe("issues", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const chat = yield* Channels;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
       yield* until(() => sessions.sessionOf(hired.session!.id)?.phase._tag === "done", "the report");
       const repo = join(f.config.workRoot, "projects", "demo");
@@ -533,7 +533,7 @@ describe("issues", () => {
       const chat = yield* Channels;
       const sessions = yield* Sessions;
       const sql = yield* SqlClient.SqlClient;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const first = yield* chat.openChannel("first", "", "demo");
       const second = yield* chat.openChannel("second", "", "demo");
       yield* occupied(core, "pi");
@@ -563,7 +563,7 @@ describe("issues", () => {
       const chat = yield* Channels;
       const sessions = yield* Sessions;
       const crons = yield* Crons;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
       const sc = yield* crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
@@ -586,7 +586,7 @@ describe("issues", () => {
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       yield* occupied(core, "pi");
       const issue = yield* issues.add({ title: "queued", assignee: "lab", project: "demo" });
       expect((yield* issues.start(issue.id, chat.defaultChannel())).queued).toBeDefined();
@@ -606,8 +606,8 @@ describe("issues", () => {
       const sessions = yield* Sessions;
       const chat = yield* Channels;
       const agents = yield* Agents;
-      yield* agents.saveAgent(lab());
-      yield* agents.saveAgent({ ...lab(), id: "lab2", name: "Lab Two" });
+      yield* agents.save(lab());
+      yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
       const issue = yield* issues.add({ title: "write hello", assignee: "lab", project: "demo" });
       const inReview = (n: number) =>
         until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_review" && t.sessions.length === n), "round " + n);
@@ -635,8 +635,8 @@ describe("issues", () => {
       const issues = yield* Issues;
       const chat = yield* Channels;
       const agents = yield* Agents;
-      yield* agents.saveAgent(lab());
-      yield* agents.saveAgent({ ...lab(), id: "lab2", name: "Lab Two" });
+      yield* agents.save(lab());
+      yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
       const issue = yield* issues.add({ title: "work on", assignee: "lab", project: "demo" });
       yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
       yield* until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_progress"), "working");

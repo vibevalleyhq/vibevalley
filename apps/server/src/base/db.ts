@@ -10,7 +10,7 @@ import { SqlClient } from "effect/sql";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { dbDir, Settings } from "./config.ts";
+import { dbDir, Config } from "./config.ts";
 
 const baseline = resolve(import.meta.dirname, "../../db/migrations/0001_schema.up.sql");
 const baselineSql = () => readFileSync(baseline, "utf8");
@@ -78,7 +78,7 @@ const migrate = (pglite: PGlite, client: SqlClient.SqlClient) =>
 /** The database as an SqlClient, with the schema in place. */
 export const Database = PgliteClient.layerFrom(
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const where = dbDir(config);
     const memory = where === "memory";
     const hash = baselineHash();

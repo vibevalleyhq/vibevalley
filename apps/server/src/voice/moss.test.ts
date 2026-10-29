@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { checkMoss, type MossEvents, type MossTransport } from "./moss.ts";
+import { verifyMoss, type MossEvents, type MossTransport } from "./moss.ts";
 
 /** A MOSS that answers the way script says, after the socket opens; status is what plain HTTPS answers. */
 const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTransport["status"] = () => Promise.resolve({ code: 400, body: "" })) => {
@@ -25,7 +25,7 @@ describe("checking a MOSS Live key", () => {
         on.open();
         if (sent.includes(JSON.stringify({ action: "attach_session" }))) on.text(JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }));
       });
-      expect(yield* checkMoss("sk-good", transport)).toEqual({ kind: "ok" });
+      expect(yield* verifyMoss("sk-good", transport)).toEqual({ kind: "ok" });
       expect([log.closed, log.asked]).toEqual([1, 0]);
     }),
   );
@@ -37,7 +37,7 @@ describe("checking a MOSS Live key", () => {
         (on) => on.down(""),
         () => Promise.resolve({ code: 403, body }),
       );
-      expect(yield* checkMoss("sk-bad", transport)).toEqual({ kind: "refused", why: "iam api key auth failed" });
+      expect(yield* verifyMoss("sk-bad", transport)).toEqual({ kind: "refused", why: "iam api key auth failed" });
     }),
   );
 
@@ -47,14 +47,14 @@ describe("checking a MOSS Live key", () => {
         (on) => on.down(""),
         () => Promise.reject(new Error("getaddrinfo ENOTFOUND api.mosi.cn")),
       );
-      expect((yield* checkMoss("sk-x", offline.transport)).kind).toBe("unreachable");
+      expect((yield* verifyMoss("sk-x", offline.transport)).kind).toBe("unreachable");
       const erring = fake((on) => {
         on.open();
         on.text(
           JSON.stringify({ action: "error", data: { type: "error", error: { code: "invalid_public_request", message: "invalid or unsupported request" } } }),
         );
       });
-      expect(yield* checkMoss("sk-x", erring.transport)).toEqual({ kind: "failed", why: "invalid or unsupported request" });
+      expect(yield* verifyMoss("sk-x", erring.transport)).toEqual({ kind: "failed", why: "invalid or unsupported request" });
     }),
   );
 });

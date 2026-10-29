@@ -1,6 +1,6 @@
 {
   "id": "note-without-starting",
-  "created": 1792270920000,
+  "createdAt": 1792270920000,
   "model": "deepseek-flash",
   "want": "主人只说记一下，管家却记下就开工了。应该查重后记进备选，不填 start，回编号和「在备选里」。",
   "memory": "",

@@ -20,7 +20,7 @@
 - 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`repository.ts` 是一个仓库能回答的和能做的（主分支、分支在不在和指向哪、谁包含谁、领先几个提交、远端地址；提交剩下的改动、不检出就合并、试合并看冲突、描述一个分支、清掉 worktree 和分支），git 的拼法都在这里，拿这些答案做什么（合并的规矩、PR、项目检查、释放时留什么）在 `project.ts`；`git.ts` 跑 git 和别的命令；`stack.ts` 认项目的栈。
 - 配置（`Config`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
-- 接口：`project.list`、`project.check`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
+- 接口：`project.list`、`project.validate`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/features/project/rules.ts`。
 
 ## 模型和不变量
@@ -42,7 +42,7 @@
 
 ## 怎么走
 
-**新建和导入**（`project.create`；表单边填边问 `project.check`，页面不另写校验）：
+**新建和导入**（`project.create`；表单边填边问 `project.validate`，页面不另写校验）：
 
 1. 校验名字和地址：GitHub 地址只收仓库主页 `https://github.com/<owner>/<repo>`，不收凭据、别的传输方式和命令行选项。
 2. 在项目锁里排他地 `mkdir`：同名的文件夹、空文件夹或符号链接都拒绝（「已经存在，请换个项目名」）。新建中的名字记在 `pending`，不进项目列表。
