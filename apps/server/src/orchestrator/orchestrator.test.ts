@@ -7,7 +7,7 @@ import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Said } from "@/testing/said.ts";
 import { starter } from "@/testing/layers.ts";
-import { Effect, Layer } from "effect";
+import { Effect, Fiber, Layer } from "effect";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Agents } from "@/agent/agent.ts";
@@ -265,8 +265,8 @@ describe("the orchestrator", () => {
     });
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const said = yield* Effect.promise(async () => {
-        const brief = orchestrator.brief("【要告诉主人】\n- #41 交回来了");
+      const brief = yield* Effect.forkChild(orchestrator.brief("【要告诉主人】\n- #41 交回来了"));
+      yield* Effect.promise(async () => {
         await whenTrue(() => f.requests.some((c) => lastLine(c).includes("要告诉主人")), "the brief's run asking");
         const joined = (async () => {
           for await (const _ of onPhone(orchestrator, "还有别的吗")) void _;
@@ -274,10 +274,9 @@ describe("the orchestrator", () => {
         // The call's line is taken in the next turn of the event loop; then the brief's answer may come.
         await new Promise((r) => setImmediate(r));
         release.open();
-        const out = await within(brief, 4000, "the brief");
         await joined;
-        return out;
       });
+      const said = yield* Fiber.join(brief).pipe(Effect.timeoutOrElse({ duration: 4000, orElse: () => Effect.die(new Error("waited for the brief")) }));
       expect(said).toContain("#41 交回来了");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -286,8 +285,8 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      // A caller already gone returns before the line is taken: nothing was started to wait for.
-      expect(yield* Effect.promise(() => orchestrator.brief("【要告诉主人】\n- #41 交回来了", AbortSignal.abort()))).toBe("");
+      // A brief interrupted before it runs takes no line: nothing was started to wait for.
+      yield* Fiber.interrupt(yield* Effect.forkChild(orchestrator.brief("【要告诉主人】\n- #41 交回来了"), { startImmediately: false }));
       expect(f.requests).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

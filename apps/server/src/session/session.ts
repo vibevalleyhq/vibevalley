@@ -78,7 +78,7 @@ import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type 
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { type Journal, Trajectories } from "./journal.ts";
-import { AgentHost, type HostOptions } from "./host.ts";
+import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import {
   conflictOf,
   instructions,
@@ -242,8 +242,8 @@ export class Sessions extends Context.Service<
     readonly who: (token: string) => string;
     /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
     readonly setAddress: (address: string) => void;
-    /** An agent run in this process (the orchestrator): its log and its runs are kept as a session's are. */
-    readonly host: <R>(options: HostOptions<R>) => AgentHost<R>;
+    /** An agent run in this process (the orchestrator), in the caller's scope: its log and its runs are kept as a session's are. */
+    readonly host: <R>(options: HostOptions<R>) => Effect.Effect<AgentHost<R>, never, Scope.Scope>;
     /** Brings back the sessions the farm had when it stopped, once every service is ready. */
     readonly restore: Effect.Effect<void>;
   }
@@ -1321,7 +1321,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time),
+      host: (o) => makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
       restore,
     });
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.

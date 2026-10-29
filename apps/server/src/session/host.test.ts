@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Deferred, Effect, Fiber, Stream } from "effect";
 import { testConfig } from "@/testing/layers.ts";
 import { aTurn, until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
@@ -9,54 +9,38 @@ import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";
 
 describe("Caller", () => {
-  it("removes the abort listener after every kind of wake", async () => {
-    const caller = new Caller();
-    const ended = new AbortController();
-    const signal = ended.signal;
-    let active = 0;
-    const add = signal.addEventListener.bind(signal);
-    const remove = signal.removeEventListener.bind(signal);
-    signal.addEventListener = (...args: Parameters<typeof signal.addEventListener>) => {
-      if (args[0] === "abort") active++;
-      add(...args);
-    };
-    signal.removeEventListener = (...args: Parameters<typeof signal.removeEventListener>) => {
-      if (args[0] === "abort") active--;
-      remove(...args);
-    };
-    const words = caller.words(signal);
-    for (let i = 0; i < 20; i++) {
-      const next = words.next();
-      caller.push(`word ${i}`);
-      expect((await next).value).toBe(`word ${i}`);
-      expect(active).toBe(0);
-    }
-    const last = words.next();
-    ended.abort();
-    expect((await last).done).toBe(true);
-    expect(active).toBe(0);
-  });
+  it.effect("keeps what came before its reader, then streams until it ends", () =>
+    Effect.gen(function* () {
+      const caller = new Caller();
+      caller.push("early ");
+      const reading = yield* Effect.forkChild(Stream.mkString(caller.words));
+      caller.push("late");
+      caller.end();
+      caller.push("after the end");
+      expect(yield* Fiber.join(reading)).toBe("early late");
+    }),
+  );
 
-  it("does not wait or add a listener for an already aborted signal", async () => {
-    const caller = new Caller();
-    const ended = new AbortController();
-    ended.abort();
-    const words = caller.words(ended.signal);
-    caller.push("not read");
-    expect((await words.next()).done).toBe(true);
-  });
+  it.effect("fails its reader with what failed it", () =>
+    Effect.gen(function* () {
+      const caller = new Caller();
+      caller.push("partly");
+      caller.fail(new Error("no model"));
+      const read = yield* Effect.flip(Stream.mkString(caller.words));
+      expect(read).toEqual(new Error("no model"));
+    }),
+  );
 });
 
 describe("AgentHost", () => {
   it.live("says each answer once, whole, while the caller gets its words as they grow", () => {
     const config = testConfig();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const sessions = yield* Sessions;
       const { llm } = scriptedLLM([answer([text("我看一下"), toolCall("missing", {})]), answer("看完了，一切正常")]);
       const said: string[] = [];
       const states: string[] = [];
-      const host = sessions.host({
+      const host = yield* sessions.host({
         name: "orchestrator",
         label: "管家",
         inputType: "testInput",
@@ -67,25 +51,20 @@ describe("AgentHost", () => {
         tools: () => [],
         first: "first",
         quiet: () => false,
-        say: async (_route, words) => void said.push(words),
-        state: async (s, route) => void states.push(route ? `${s} ${route}` : s),
+        say: (_route, words) => Effect.sync(() => void said.push(words)),
+        state: (s, route) => Effect.sync(() => void states.push(route ? `${s} ${route}` : s)),
         fresh: () => {},
         restored: () => ({ by: { kind: "" } }),
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
-        notice: () => {},
-        log: () => {},
-        go: <A, E>(e: Effect.Effect<A, E>) => runPromise(e),
-        scope: yield* Effect.scope,
+        notice: () => Effect.void,
       });
       const caller = new Caller();
       const heard: string[] = [];
-      const reading = (async () => {
-        for await (const w of caller.words()) heard.push(w);
-      })();
-      const result = yield* Effect.promise(() => host.submit(async () => ({ text: "看看" }), { route: "r", run: { by: { kind: "" } }, caller }, true));
+      const reading = yield* Effect.forkChild(Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))));
+      const result = yield* host.submit(() => Effect.succeed({ text: "看看" }), { route: "r", run: { by: { kind: "" } }, caller }, true);
       expect(result.ok).toBe(true);
       yield* until(() => states.at(-1) === "listening" && said.length === 2, "the run settled");
-      yield* Effect.promise(() => reading);
+      yield* Fiber.join(reading);
       expect(said).toEqual(["我看一下", "看完了，一切正常"]);
       // A character at a time from the script: more pushes than answers.
       expect(heard.length).toBeGreaterThan(2);
@@ -100,25 +79,16 @@ describe("AgentHost", () => {
         "thinking r",
         "listening",
       ]);
-      yield* Effect.promise(() => host.close());
+      yield* host.close;
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
 
   it.live("waits for an input build before closing, without delivering it late", () => {
     const config = testConfig();
-    let started = () => {};
-    const building = new Promise<void>((resolve) => {
-      started = resolve;
-    });
-    let release = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const sessions = yield* Sessions;
       const { llm } = scriptedLLM();
-      const host = sessions.host({
+      const host = yield* sessions.host({
         name: "orchestrator",
         label: "管家",
         inputType: "testInput",
@@ -129,42 +99,36 @@ describe("AgentHost", () => {
         tools: () => [],
         first: "first",
         quiet: () => true,
-        say: async () => {},
-        state: async () => {},
+        say: () => Effect.void,
+        state: () => Effect.void,
         fresh: () => {},
         restored: () => ({ by: { kind: "" } }),
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
-        notice: () => {},
-        log: () => {},
-        go: <A, E>(e: Effect.Effect<A, E>) => runPromise(e),
-        scope: yield* Effect.scope,
+        notice: () => Effect.void,
       });
+      const building = yield* Deferred.make<void>();
+      const gate = yield* Deferred.make<void>();
       const caller = new Caller();
-      const submitting = host.submit(
-        async () => {
-          started();
-          await gate;
-          return { text: "late" };
-        },
-        { route: "late", run: { by: { kind: "" } }, caller },
-        true,
+      const submitting = yield* Effect.forkChild(
+        host.submit(
+          () => Effect.as(Effect.andThen(Deferred.succeed(building, undefined), Deferred.await(gate)), { text: "late" }),
+          { route: "late", run: { by: { kind: "" } }, caller },
+          true,
+        ),
       );
-      yield* Effect.promise(() => building);
-      const closing = host.close();
-      let closed = false;
-      void closing.then(() => {
-        closed = true;
-      });
+      yield* Deferred.await(building);
+      const closing = yield* Effect.forkChild(host.close);
       // A close that did not wait for the build would have ended by the next turn.
       yield* aTurn;
-      expect(closed).toBe(false);
-      release();
-      const result = yield* Effect.promise(() => submitting);
+      expect(closing.pollUnsafe()).toBeUndefined();
+      yield* Deferred.succeed(gate, undefined);
+      const result = yield* Fiber.join(submitting);
       expect(result.ok).toBe(false);
-      expect(host.close()).toBe(closing);
-      yield* Effect.promise(() => closing);
+      yield* Fiber.join(closing);
+      // Every later close waits for the one close, which is over.
+      yield* host.close;
       expect(host.current().route).toBe("first");
-      expect((yield* Effect.promise(() => caller.words().next())).done).toBe(true);
+      expect(yield* Stream.mkString(caller.words)).toBe("");
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });
 });

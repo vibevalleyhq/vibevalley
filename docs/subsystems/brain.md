@@ -22,7 +22,7 @@ apps/server  组装和适配（不在包里）：
              session/host.ts 的 AgentHost（管家）  runtime/vibevalley.ts（农机 vibevalley：帮工）
              cli/chat.ts（命令行）                 orchestrator/openai.ts（/v1/chat/completions）
              agent/taskStore.ts（自己的任务存进库）  agent/model.ts（缺钥匙时对主人说的话）
-               │ openBrain(owner, BrainOptions)
+               │ Brain.make(BrainOptions)（管家，在 Effect 里），openBrain(owner, BrainOptions)（oar、命令行）
 packages/agent  Brain：对话文件、提示开头、压缩、自己的工具、帮手、提醒、自己的任务
                │
 packages/agent/src/core  一轮的循环：模型 ⇄ 工具，steer / followUp / abort；Tool 和建工具的函数
@@ -35,7 +35,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 - **`packages/ai`**：`models.ts` 模型表和价格；`client.ts` 的 `ModelClient`（模型、传输的服务、每次请求前现取的钥匙）、`deepseek`、`complete`、`defaultModel`，没钥匙时抛 `MissingKey`（服务端的 `agent/model.ts` 把它说成主人看得懂的话）；`llm.ts` 的 `Llm` 服务发请求、读流；`request.ts` 拼请求、`response.ts` 读流，都是纯函数；`messages.ts` 消息和事件的形状，照 pi-ai；`tools.ts` 由 Effect Schema 生成给模型看的 JSON Schema（`parametersOf`），先改正模型给的参数类型（`coerceArguments`）再交给 Schema 读。`testing.ts` 是照脚本回答的 `Llm`。黄金数据在 `testdata/`。
 - **`packages/agent/src/core`**：`loop.ts` 是循环（`make`）。一轮是 agent 作用域里的一条纤程。叫停是一个 `Deferred`，模型的流、`prepareRequest` 和工具都和它赛跑；一次回答里的几个工具同时跑。事件的种类和次序照 pi-agent-core 的 `Agent`。`tool.ts` 把 Schema 写的工具接到循环上（`schemaTool`、`effectTool`），农场的工具表（`tool`）也用它。
 - **`packages/agent/src`**：
-  - `brain.ts`：`Brain`，以及给 Promise 代码用的 `openBrain`、`BrainHandle`、`standaloneOwner`。
+  - `brain.ts`：`Brain`，以及给 Promise 代码（oar 的农机、命令行）用的 `openBrain`、`BrainHandle`、`standaloneOwner`。
   - `session.ts`：对话文件。`compaction.ts`：压缩。`prefix.ts`：开头按段算哈希。`messages.ts`：自己加的两种消息（`custom`、`compactionSummary`）。`run.ts`：一轮的用量和字（`RunResult` 只带模型自己说的错，主人看的话由宿主说）。
   - 自己的工具：`self.ts`（`load_skill`、`remember`、`rewrite_memory`、`search_archive`、`spawn_agent`），`skills.ts`，`memory.ts`，`mcp.ts`（MCP 客户端和 `mcpServers` 配置），`reminders.ts`（`reminder`、`list_reminders`、`cancel_reminder`），`agentTask.ts`、`agentTaskStore.ts`（接口和内存里的存储）、`agentTaskTools.ts`（`todo_add`、`todo_update`、`todo_list`），`coding.ts`（`read_file`、`write_file`、`edit_file`、`list_dir`、`grep`、`bash`、`web_fetch`）。`coding.ts`、`mcp.ts` 要起子进程，只用 `core` 的地方不加载它们。
   - `dag.ts`：先后的规则（查环、分层），种植计划（`task/graph.ts`）也用。`realTime.ts`：杀子进程和 MCP 超时用的真实时间，包里唯一能碰墙上时钟的文件。
@@ -109,7 +109,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 
 ### 作用域
 
-`Brain.make` 是作用域里的资源，方法都是 Effect。作用域关了，在跑的一轮、派出去的帮手、提醒和闲时的压缩跟着停。Promise 代码（oar 的农机、管家的宿主、命令行）经 `openBrain` 用它：Effect 跑在那个服务的纤程上，大脑的作用域是那个服务作用域的子作用域，服务关了大脑最晚跟着关。`close` 只关一次，重复调用等同一次。
+`Brain.make` 是作用域里的资源，方法都是 Effect。作用域关了，在跑的一轮、派出去的帮手、提醒和闲时的压缩跟着停。管家的宿主在 Effect 里直接 `Brain.make`，大脑的作用域是管家服务作用域的子作用域。Promise 代码（oar 的农机、命令行）经 `openBrain` 用它：Effect 跑在那个服务的纤程上，大脑的作用域是那个服务作用域的子作用域，服务关了大脑最晚跟着关。`close` 只关一次，重复调用等同一次。
 
 ## 怎么走
 
