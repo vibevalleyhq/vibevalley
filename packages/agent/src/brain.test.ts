@@ -9,7 +9,7 @@ import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
-import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
+import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, withAgent } from "./testing.ts";
 import { stopped, textTool } from "./core/tool.ts";
 import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
@@ -57,10 +57,10 @@ describe("the agent", () => {
       [answer([toolCall("nap", {})]), answer("睡好了")],
       async (r) => {
         const asking = Effect.runFork(r.agent.brain.ask(userMessage("睡", Date.now())));
-        await until(() => napping);
+        await whenTrue(() => napping, "napping");
         await Effect.runPromise(Fiber.interrupt(asking));
         wake.open();
-        await until(() => r.has("agent_settled"));
+        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(messageText(r.agent.history().at(-1)!)).toBe("睡好了");
       },
       { tools: [nap] },
@@ -81,7 +81,7 @@ describe("the agent", () => {
       [],
       async (r) => {
         await r.agent.send(userMessage("说", Date.now()));
-        await until(() => r.has("message_end"));
+        await whenTrue(() => r.has("message_end"), 'r.has("message_end")');
         try {
           const first = r.agent.close();
           const second = r.agent.close();
@@ -121,9 +121,9 @@ describe("the agent", () => {
       [],
       async (r) => {
         void r.agent.send(userMessage("说", Date.now()));
-        await until(() => started);
+        await whenTrue(() => started, "started");
         await Effect.runPromise(Scope.close(owner, Exit.void));
-        await until(() => cut);
+        await whenTrue(() => cut, "cut");
       },
       { llm: held },
       { run: (effect) => Effect.runPromise(effect), scope: owner },
@@ -141,7 +141,7 @@ describe("the agent", () => {
       ],
       async (r) => {
         expect(await r.ask("看看 notes.txt")).toBe("读到了：两行");
-        await until(() => r.has("agent_settled"));
+        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(r.events.flatMap((e) => (e.type === "tool_execution_start" || e.type === "tool_execution_end" ? [e.type + ":" + e.toolName] : []))).toEqual([
           "tool_execution_start:read_file",
           "tool_execution_end:read_file",
@@ -197,11 +197,11 @@ describe("the agent", () => {
       [answer([toolCall("nap", {})]), step((c) => answer("第二次听到：" + lastUser(c))), step((c) => answer("第三次听到：" + lastUser(c)))],
       async (r) => {
         await r.agent.send(userMessage("开始", Date.now()));
-        await until(() => napping);
+        await whenTrue(() => napping, "napping");
         await r.agent.later(userMessage("完了再说这个", Date.now()));
         await r.agent.send(userMessage("顺便", Date.now()));
         wake.open();
-        await until(() => r.agent.history().length >= 7);
+        await whenTrue(() => r.agent.history().length >= 7, "r.agent.history().length >= 7");
         expect(said(r.agent.history())).toEqual([
           "user:开始",
           "assistant:",
@@ -245,7 +245,10 @@ describe("the agent", () => {
       repeat(12, long),
       async (r) => {
         for (let n = 1; n <= 5; n++) await r.ask(`第 ${n} 件事`);
-        await until(() => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined));
+        await whenTrue(
+          () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined),
+          'r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined)',
+        );
         const last = r.requests.filter((c) => !summarizing(c)).at(-1)!;
         expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/);
         expect(r.agent.history()[0]!.role).toBe("compactionSummary");
@@ -323,7 +326,7 @@ describe("the agent", () => {
       `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
     );
     await withAgent(dir, [step((c) => answer("收到：" + lastUser(c)))], async (r) => {
-      await until(() => r.has("agent_settled"));
+      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
       const history = r.agent.history();
       expect(history[0]!.role).toBe("custom");
       expect(messageText(history[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
@@ -349,7 +352,7 @@ describe("the agent", () => {
             await move(TestClock.adjust(59 * 60_000));
             expect(r.has("agent_start")).toBe(false);
             await move(TestClock.adjust(60_000 + 20_000));
-            await until(() => r.has("agent_settled"));
+            await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
             expect(messageText(r.agent.history()[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
           },
           {},
@@ -389,7 +392,7 @@ describe("the agent", () => {
         remember(dir, "记在折叠之前", new Date());
         const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
         for (let n = 2; n <= 5 && !folded(); n++) await r.ask(`第 ${n} 件事`);
-        await until(folded);
+        await whenTrue(folded, "the history folded");
         await r.ask("折叠之后");
         const prompts = r.requests.filter((c) => !summarizing(c)).map(systemPrompt);
         expect(prompts[0]).not.toContain("记在折叠之前");
@@ -407,9 +410,12 @@ describe("the agent", () => {
       [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })],
       async (r) => {
         await r.agent.send(userMessage("说", Date.now()));
-        await until(() => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"));
+        await whenTrue(
+          () => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"),
+          'r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta")',
+        );
         await r.agent.stop();
-        await until(() => r.has("agent_settled"));
+        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(settled(r)!.run.aborted).toBe(true);
         const last = r.agent.history().at(-1)!;
         expect(last.role === "assistant" && last.stopReason).toBe("aborted");
@@ -421,9 +427,9 @@ describe("the agent", () => {
     const dir = home();
     await withAgent(dir, [answer([toolCall("bash", { command: "sleep 5" })])], async (r) => {
       await r.agent.send(userMessage("睡", Date.now()));
-      await until(() => r.has("tool_execution_start"));
+      await whenTrue(() => r.has("tool_execution_start"), 'r.has("tool_execution_start")');
       await r.agent.stop();
-      await until(() => r.has("agent_settled"));
+      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
       expect(settled(r)!.run.aborted).toBe(true);
       const last = r.agent.history().at(-1)!;
       expect(last.role).toBe("toolResult");
@@ -449,11 +455,11 @@ describe("the agent", () => {
     const dir = home();
     await withAgent(dir, [answer("一"), answer("二")], async (r) => {
       await r.ask("a");
-      await until(() => r.has("agent_settled"));
+      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
       expect(prefixChanges(r)).toEqual([]);
       (r.agent.tools()[0] as { description: string }).description = "改过的说明";
       await r.ask("b");
-      await until(() => prefixChanges(r).length > 0);
+      await whenTrue(() => prefixChanges(r).length > 0, "prefixChanges(r).length > 0");
       expect(prefixChanges(r)[0]).toContain("tools");
     });
   });
@@ -492,7 +498,7 @@ describe("the agent", () => {
         async (r, choices) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
           expect(r.requests.length).toBe(3);
-          await until(() => idleFolded(r));
+          await whenTrue(() => idleFolded(r), "idleFolded(r)");
           expect(r.requests.length).toBe(4);
           const [before, folding] = [r.requests[2]!, r.requests[3]!];
           expect(systemPrompt(folding)).toBe(systemPrompt(before));
@@ -513,7 +519,7 @@ describe("the agent", () => {
         () => answer([toolCall("list_dir", {})]),
         async (r) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
-          await until(() => idleFolded(r));
+          await whenTrue(() => idleFolded(r), "idleFolded(r)");
           expect((r.agent.history()[0] as CompactionSummaryMessage).summary).toBe("另起的摘要");
         },
       );
@@ -530,8 +536,8 @@ describe("the agent", () => {
         () => answer("摘要"),
         async (r) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
-          await until(() => asked > 0);
-          await until(() => !r.agent.busy());
+          await whenTrue(() => asked > 0, "asked > 0");
+          await whenTrue(() => !r.agent.busy(), "!r.agent.busy()");
           expect(asked).toBe(1);
           expect(r.requests.length).toBe(3);
           expect(r.agent.history()[0]!.role).toBe("user");
@@ -603,7 +609,7 @@ describe("the agent", () => {
             expect(r.requests.length).toBe(0);
             return;
           }
-          await until(() => r.has("agent_settled"));
+          await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
           expect(r.requests.length).toBe(1);
           expect(results(r.requests[0]!)).toEqual(
             name === "cut off in a tool" ? [{ failed: true, text: resumedUnknown }] : [{ failed: false, text: "（空的）" }],

@@ -1,4 +1,5 @@
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
+import { whenTrue } from "@vibevalley/testkit/until";
 import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
@@ -10,7 +11,7 @@ import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
 import { makeTaskRunner } from "./agentTaskTools.ts";
-import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
+import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, withAgent } from "./testing.ts";
 import { textTool } from "./core/tool.ts";
 import { objectSchema } from "@vibevalley/ai/tools";
 
@@ -74,7 +75,7 @@ describe("a run's receipt", () => {
       { tools: [echo] },
     );
     expect(await agent.ask(userMessage("one", Date.now()))).toBe("first");
-    await until(() => receipts.length === 1);
+    await whenTrue(() => receipts.length === 1, "receipts.length === 1");
     expect(receipts[0]).toMatchObject({
       id: 1,
       settled: true,
@@ -82,7 +83,7 @@ describe("a run's receipt", () => {
       contextTokens: 43,
     });
     expect(await agent.ask(userMessage("two", Date.now()))).toBe("second");
-    await until(() => receipts.length === 2);
+    await whenTrue(() => receipts.length === 2, "receipts.length === 2");
     expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
     expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
     await agent.close();
@@ -92,10 +93,10 @@ describe("a run's receipt", () => {
     const failed = { stopReason: "error", errorMessage: "broken" } as const;
     const { agent, receipts } = await receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
     expect(await agent.ask(userMessage("fail", Date.now()))).toBe("failed words");
-    await until(() => receipts.length === 1);
+    await whenTrue(() => receipts.length === 1, "receipts.length === 1");
     expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
     await agent.ask(userMessage("retry", Date.now()));
-    await until(() => receipts.length === 2);
+    await whenTrue(() => receipts.length === 2, "receipts.length === 2");
     expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
     await agent.close();
     const accounting = new RunAccounting();
@@ -130,11 +131,11 @@ describe("a run's receipt", () => {
       },
     );
     const answer = agent.ask(userMessage("A", Date.now()));
-    await until(() => entered);
+    await whenTrue(() => entered, "entered");
     await agent.later(userMessage("B", Date.now()));
     release();
     expect(await answer).toBe("");
-    await until(() => receipts.length === 1);
+    await whenTrue(() => receipts.length === 1, "receipts.length === 1");
     expect(receipts[0]).toMatchObject({ id: 1, text: "", usage: { input: 9 } });
     await agent.close();
   });
@@ -170,7 +171,10 @@ describe("a run's receipt", () => {
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
     void agent.send(userMessage("start", Date.now()));
-    await until(() => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"));
+    await whenTrue(
+      () => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"),
+      'events.some((e) => e.type === "message_update" && messageText(e.message) === "partial")',
+    );
     expect(agent.progress().current.settled).toBe(false);
     await Promise.all(Array.from({ length: 8 }, () => agent.close()));
     expect(agent.progress()).toMatchObject({
@@ -255,7 +259,7 @@ describe("the agent's own tasks", () => {
       Array.from({ length: 12 }, () => reply),
       async (r) => {
         await r.ask("查三样");
-        await until(() => sent.length === 3 && told === 3);
+        await whenTrue(() => sent.length === 3 && told === 3, "sent.length === 3 && told === 3");
         expect(await Effect.runPromise(store.load)).toEqual([]);
       },
       { tasks: store, reminders: false },
@@ -286,7 +290,7 @@ describe("the agent's own tasks", () => {
       Array.from({ length: 4 }, () => reply),
       async (r) => {
         expect(await r.ask("查")).toBe("派好了");
-        await until(() => started);
+        await whenTrue(() => started, "started");
         await r.agent.stop();
         const g = await Effect.runPromise(store.load);
         expect(g[0]).toMatchObject({ state: "waiting" });
@@ -322,8 +326,8 @@ describe("the agent's own tasks", () => {
       Array.from({ length: 10 }, () => reply),
       async (r) => {
         await r.ask("拆一下");
-        await until(() => nudged >= 2);
-        await until(() => !r.agent.busy());
+        await whenTrue(() => nudged >= 2, "nudged >= 2");
+        await whenTrue(() => !r.agent.busy(), "!r.agent.busy()");
         expect(nudged).toBe(2);
         events = [...r.events];
       },

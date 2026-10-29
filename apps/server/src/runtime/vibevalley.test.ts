@@ -1,4 +1,5 @@
 import type { Event, Session } from "@botiverse/oar";
+import { whenTrue } from "@vibevalley/testkit/until";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,7 +8,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { standaloneOwner } from "@vibevalley/agent/brain";
-import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until } from "@vibevalley/agent/testing";
+import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
 import { wallTime } from "../base/time.ts";
 
 const homes: (() => void)[] = [];
@@ -61,7 +62,7 @@ describe("VibeValley's runtime", () => {
       append: "你是后端老周。",
     });
     expect((await r.session.prompt("写个 hello.txt")).kind).toBe("accepted");
-    await until(() => ended(r).length === 1);
+    await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
     expect(readFileSync(join(r.cwd, "hello.txt"), "utf8")).toBe("hi");
     const kinds = new Set(r.events.map((e) => e.kind));
     for (const k of ["model", "text_delta", "tool_call_started", "tool_call_ended", "turn_ended", "usage"]) expect(kinds).toContain(k);
@@ -85,14 +86,14 @@ describe("VibeValley's runtime", () => {
       (c) => answer("排到了：" + lastUser(c)),
     ]);
     await r.session.prompt("开始");
-    await until(() => toolStarted(r));
+    await whenTrue(() => toolStarted(r), "toolStarted(r)");
     expect((await r.session.prompt("又一个")).kind).toBe("rejected");
     expect((await r.session.steer!("顺便")).kind).toBe("accepted");
     await r.session.queue("然后");
     const drop = randomUUID();
     await r.session.queue("不要了", { inputId: drop });
     expect((await r.session.withdraw!(drop)).kind).toBe("accepted");
-    await until(() => ended(r).length === 2);
+    await whenTrue(() => ended(r).length === 2, "ended(r).length === 2");
     expect(text(r)).toBe("听到：顺便排到了：然后");
     expect(r.pending()).toBe(0);
   });
@@ -100,9 +101,9 @@ describe("VibeValley's runtime", () => {
   it("ends the turn aborted", async () => {
     const r = await open([answer([toolCall("bash", { command: "sleep 5" })])]);
     await r.session.prompt("睡");
-    await until(() => toolStarted(r));
+    await whenTrue(() => toolStarted(r), "toolStarted(r)");
     expect((await r.session.abort()).kind).toBe("accepted");
-    await until(() => ended(r).length === 1);
+    await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
     expect(ended(r)[0]!.kind).toBe("aborted");
     expect((await r.session.abort()).kind).toBe("rejected");
   });
@@ -111,7 +112,7 @@ describe("VibeValley's runtime", () => {
     const count: Step = (c) => answer(`第 ${c.messages.filter((m) => m.role === "user").length} 句`);
     const first = await open([count]);
     await first.session.prompt("一");
-    await until(() => ended(first).length === 1);
+    await whenTrue(() => ended(first).length === 1, "ended(first).length === 1");
     await first.session.dispose();
     const again = await open([count], {
       resume: first.session.id,
@@ -120,7 +121,7 @@ describe("VibeValley's runtime", () => {
     });
     expect(again.session.id).toBe(first.session.id);
     await again.session.prompt("二");
-    await until(() => ended(again).length === 1);
+    await whenTrue(() => ended(again).length === 1, "ended(again).length === 1");
     expect(text(again)).toBe("第 2 句");
   });
 
@@ -141,7 +142,7 @@ rl.on('line', (line) => {
       mcp: join(dir, "farm.cjs"),
     });
     await r.session.prompt("汇报");
-    await until(() => ended(r).length === 1);
+    await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
     expect(toolsOf(r.requests[0]!).map((t) => t.name)).toContain("farm__say");
     expect(r.events.find((e) => e.kind === "tool_call_ended")).toMatchObject({
       content: [{ type: "text", text: "说了：做完了" }],
@@ -151,7 +152,7 @@ rl.on('line', (line) => {
   it("fails the turn when the model fails", async () => {
     const r = await open([answer("", { stopReason: "error", errorMessage: "DeepSeek 回了 503" })]);
     await r.session.prompt("试试");
-    await until(() => ended(r).length === 1);
+    await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
     expect(ended(r)[0]).toMatchObject({ kind: "failed", reason: "DeepSeek 回了 503" });
   });
 

@@ -37,14 +37,6 @@ export function tempHome(): { dir: string; done: () => void } {
   return { dir, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-export async function until(f: () => boolean, ms = 5_000) {
-  const deadline = Date.now() + ms;
-  while (!f()) {
-    if (Date.now() > deadline) throw new Error("timed out waiting");
-    await new Promise((r) => setTimeout(r, 5));
-  }
-}
-
 export interface Rig {
   readonly agent: BrainHandle;
   readonly events: BrainEvent[];
