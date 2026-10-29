@@ -12,14 +12,14 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
-import { type BrainEvent, openBrain, standaloneOwner } from "@vibevalley/agent/brain";
+import { Brain, type BrainEvent, standaloneOwner } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { modelClient } from "@/agent/model.ts";
 import { userMessage } from "@vibevalley/agent/messages";
 import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
 import { NodeServices } from "@effect/platform-node";
-import { Effect } from "effect";
+import { Clock, Data, Effect, FiberHandle, Option, Queue, Stream } from "effect";
 import { loadConfig } from "@/base/config.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
@@ -67,18 +67,33 @@ function show(e: BrainEvent, prompt: () => void) {
   }
 }
 
+/** What is typed: a line, or Ctrl+C. */
+type Typed = { readonly kind: "line"; readonly text: string } | { readonly kind: "interrupt" };
+
 /** Lines typed and Ctrl+C, until the input ends. */
-function terminal(onLine: (text: string) => void, onInterrupt: () => void): Promise<void> {
-  const rl = createInterface({ input: process.stdin, terminal: false });
-  rl.on("line", (l) => onLine(l.trim()));
-  process.on("SIGINT", onInterrupt);
-  return new Promise((done) =>
-    rl.on("close", () => {
-      process.off("SIGINT", onInterrupt);
-      done();
+const terminal = Stream.callback<Typed>((queue) =>
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      const rl = createInterface({ input: process.stdin, terminal: false });
+      rl.on("line", (l) => Queue.offerUnsafe(queue, { kind: "line", text: l.trim() }));
+      rl.on("close", () => Queue.endUnsafe(queue));
+      const interrupt = () => Queue.offerUnsafe(queue, { kind: "interrupt" });
+      process.on("SIGINT", interrupt);
+      return { rl, interrupt };
     }),
-  );
-}
+    ({ rl, interrupt }) =>
+      Effect.sync(() => {
+        process.off("SIGINT", interrupt);
+        rl.close();
+      }),
+  ),
+);
+
+/** The owner is done: /exit, Ctrl+C with nothing under way, or the input's end. */
+class Quit extends Data.TaggedError("Quit") {}
+
+/** Each thing typed, in order, until one quits. */
+const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));
 
 export interface OwnChat {
   /** The folder it works in; the current one when empty. */
@@ -94,31 +109,32 @@ export interface OwnChat {
 }
 
 /** The conversation with VibeValley's own agent. */
-export async function ownChat(values: OwnChat) {
-  const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
-  const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
-  const home = join(homedir(), ".vibevalley", "agent", values.name);
-  const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
-  const asked = values.p !== undefined;
-  // A one-off question keeps no reminders running.
-  const agent = await openBrain(standaloneOwner(), {
-    name: values.name,
-    instructions: instructions(currentLocale()),
-    llm,
-    home,
-    cwd,
-    tools: codingTools({ cwd }),
-    mcpServers: servers,
-    reminders: !asked,
-    tasks: memoryStore(),
-  });
-  for (const why of agent.mcpStatus().failed) console.error(dim(why));
-  let prompt = () => {};
-  agent.subscribe((e) => show(e, () => prompt()));
-  try {
-    if (asked) {
-      await agent.ask(userMessage(values.p, wallTime.now()));
+export const ownChat = (values: OwnChat) =>
+  Effect.gen(function* () {
+    const config = yield* loadConfig();
+    const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
+    const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
+    const home = join(homedir(), ".vibevalley", "agent", values.name);
+    const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
+    const asked = values.p !== undefined;
+    // A one-off question keeps no reminders running.
+    const agent = yield* Brain.make({
+      name: values.name,
+      instructions: instructions(currentLocale()),
+      llm,
+      home,
+      cwd,
+      tools: codingTools({ cwd }),
+      mcpServers: servers,
+      reminders: !asked,
+      tasks: memoryStore(),
+    });
+    for (const why of agent.mcpStatus().failed) console.error(dim(why));
+    let prompt = () => {};
+    agent.subscribe((e) => Effect.sync(() => show(e, () => prompt())));
+    const said = (text: string) => Effect.map(Clock.currentTimeMillis, (at) => userMessage(text, at));
+    if (values.p !== undefined) {
+      yield* agent.ask(yield* said(values.p));
       return;
     }
     console.log(
@@ -126,32 +142,27 @@ export async function ownChat(values: OwnChat) {
     );
     prompt = () => write("› ");
     prompt();
-    let quit = () => {};
-    const ended = new Promise<void>((r) => (quit = r));
-    const input = terminal(
-      (text) => {
-        if (text === "/exit") return quit();
+    yield* typed((typedIn) =>
+      Effect.gen(function* () {
+        if (typedIn.kind === "interrupt") {
+          if (!agent.busy()) {
+            console.log();
+            return yield* new Quit();
+          }
+          return yield* agent.stop();
+        }
+        const text = typedIn.text;
+        if (text === "/exit") return yield* new Quit();
         if (text === "/reset") {
-          void agent.reset();
+          yield* agent.reset();
           console.log(dim(t("server.cli.chat.forgot")));
           return prompt();
         }
-        if (text) void agent.send(userMessage(text, wallTime.now()));
+        if (text) yield* agent.send(yield* said(text));
         else prompt();
-      },
-      () => {
-        if (!agent.busy()) {
-          console.log();
-          return quit();
-        }
-        void agent.stop();
-      },
+      }),
     );
-    await Promise.race([input, ended]);
-  } finally {
-    await agent.close();
-  }
-}
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
 /** What a runtime said, as lines. */
 function render(e: Event): string | undefined {
@@ -183,86 +194,82 @@ export interface RuntimeChat {
 }
 
 /** `runtime chat <runtime>`: a conversation with one runtime, on this machine. It is not VibeValley's work: no issue,
- * any folder, nothing in the core state, the trajectories or the spending. */
-export async function runtimeChat(id: string, values: RuntimeChat) {
-  if (id === "vibevalley")
-    return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
-  const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const service = standaloneLlm();
-  const registry = registryOf([
-    vibevalleyRuntimeOf({
-      home: () => config.home,
-      llm: (model) => modelClient(model, config.deepseek.apiKey, service),
-      time: wallTime,
-      owner: standaloneOwner(),
-    }),
-    dshRuntime,
-  ]);
-  const runtime = registry.get(id);
-  if (!runtime) throw new Error(t("server.cli.chat.noRuntime", { id }));
-  if (!runtime.installation) throw new Error(t("server.cli.chat.unknownInstall", { id }));
-  const found = await runtime.installation();
-  if (found.kind !== "available") throw new Error(t("server.cli.chat.unusable", { id, kind: found.kind }));
-  const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
-  const session: Session = await runtime.session(found, {
-    cwd,
-    ...(values.model ? { model: values.model } : {}),
-    ...(values.effort ? { effort: values.effort } : {}),
-    ...(values.resume ? { resume: values.resume } : {}),
-  });
-  try {
-    console.log(dim(`${id} · ${session.id}${values.resume ? t("server.cli.chat.resumed") : ""}\n` + t("server.cli.chat.direct")));
-    session.events(
-      (e) => {
-        const line = render(e);
-        if (line !== undefined) console.log(line);
-      },
-      { cursor: { sessionId: session.id, afterSeq: -1 } },
-    );
-    // One turn at a time: a line typed while it runs is steered into it or queued after it.
-    let turn: { readonly cancel: () => void; readonly done: Promise<unknown> } | undefined;
-    const start = (text: string) => {
-      let cancel = () => {};
-      const cancelled = new Promise<void>((r) => (cancel = r));
-      const done = promptAndWait(session, text, { cancel: cancelled } as never)
-        .then((run) => {
-          if ((run as { kind?: string }).kind === "rejected")
-            console.log(dim(t("server.cli.chat.rejected", { why: String((run as { reason?: string }).reason ?? "") })));
-        })
-        .finally(() => {
-          turn = undefined;
-          write("› ");
-        });
-      turn = { cancel, done };
-    };
-    if (values.p !== undefined) {
-      start(values.p);
-      await turn!.done;
-      return;
-    }
-    write("› ");
-    let quit = () => {};
-    const ended = new Promise<void>((r) => (quit = r));
-    const input = terminal(
-      (text) => {
-        if (text === "/exit") return quit();
-        if (!text) return turn ? undefined : write("› ");
-        if (!turn) return start(text);
-        void (session.steer ? session.steer(text) : session.queue(text)).then((r) => {
-          if ((r as { kind?: string }).kind === "rejected")
-            console.log(dim(t("server.cli.chat.notSent", { why: String((r as { reason?: string }).reason ?? "") })));
-        });
-      },
-      () => {
-        if (!turn) {
-          console.log();
-          return quit();
-        }
-        turn.cancel();
-      },
-    );
-    await Promise.race([input, ended]);
-  } finally {
-    await session.dispose();
-  }
-}
+ * any folder, nothing in the core state, the trajectories or the spending. oar's calls are Promises: each is one. */
+export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void, unknown> =>
+  id === "vibevalley"
+    ? ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) })
+    : Effect.gen(function* () {
+        const config = yield* loadConfig().pipe(Effect.provide(NodeServices.layer));
+        const service = standaloneLlm();
+        const registry = registryOf([
+          vibevalleyRuntimeOf({
+            home: () => config.home,
+            llm: (model) => modelClient(model, config.deepseek.apiKey, service),
+            time: wallTime,
+            owner: standaloneOwner(),
+          }),
+          dshRuntime,
+        ]);
+        const runtime = registry.get(id);
+        if (!runtime) return yield* Effect.fail(t("server.cli.chat.noRuntime", { id }));
+        const installation = runtime.installation;
+        if (!installation) return yield* Effect.fail(t("server.cli.chat.unknownInstall", { id }));
+        const found = yield* Effect.tryPromise(() => installation());
+        if (found.kind !== "available") return yield* Effect.fail(t("server.cli.chat.unusable", { id, kind: found.kind }));
+        const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
+        const session: Session = yield* Effect.acquireRelease(
+          Effect.tryPromise(() =>
+            runtime.session(found, {
+              cwd,
+              ...(values.model ? { model: values.model } : {}),
+              ...(values.effort ? { effort: values.effort } : {}),
+              ...(values.resume ? { resume: values.resume } : {}),
+            }),
+          ),
+          (s) => Effect.promise(() => s.dispose()),
+        );
+        console.log(dim(`${id} · ${session.id}${values.resume ? t("server.cli.chat.resumed") : ""}\n` + t("server.cli.chat.direct")));
+        session.events(
+          (e) => {
+            const line = render(e);
+            if (line !== undefined) console.log(line);
+          },
+          { cursor: { sessionId: session.id, afterSeq: -1 } },
+        );
+        const said = (r: unknown, words: "rejected" | "notSent") => {
+          const refused = r as { kind?: string; reason?: string };
+          if (refused.kind === "rejected") console.log(dim(t(`server.cli.chat.${words}`, { why: String(refused.reason ?? "") })));
+        };
+        // One turn at a time: a line typed while it runs is steered into it or queued after it. Interrupting the turn's
+        // fiber aborts the prompt (its signal).
+        const turnOf = (text: string) =>
+          Effect.tryPromise((signal) => promptAndWait(session, text, { signal })).pipe(
+            Effect.map((run) => said(run, "rejected")),
+            Effect.ensuring(Effect.sync(() => write("› "))),
+          );
+        if (values.p !== undefined) return yield* turnOf(values.p);
+        const turns = yield* FiberHandle.make<void, unknown>();
+        write("› ");
+        yield* typed((typedIn) =>
+          Effect.gen(function* () {
+            const under = yield* FiberHandle.get(turns);
+            const busy = Option.isSome(under) && under.value.pollUnsafe() === undefined;
+            if (typedIn.kind === "interrupt") {
+              if (!busy) {
+                console.log();
+                return yield* new Quit();
+              }
+              return yield* FiberHandle.clear(turns);
+            }
+            const text = typedIn.text;
+            if (text === "/exit") return yield* new Quit();
+            if (!text) return busy ? undefined : write("› ");
+            if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text)), { onlyIfMissing: false });
+            const steering = session.steer ? session.steer(text) : session.queue(text);
+            yield* Effect.tryPromise(() => steering).pipe(
+              Effect.map((r) => said(r, "notSent")),
+              Effect.ignore,
+            );
+          }),
+        );
+      }).pipe(Effect.scoped);

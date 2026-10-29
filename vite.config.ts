@@ -279,7 +279,8 @@ export default defineConfig({
       },
       {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
-        // SDK's request handlers, and the fetch that the model client calls for the local chat/completions.
+        // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
+        // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).
         files: [
           "apps/server/src/runtime/vibevalley.ts",
           "apps/server/src/runtime/dsh.ts",
@@ -287,13 +288,8 @@ export default defineConfig({
           "apps/server/src/runtime/runtime.ts",
           "apps/server/src/mcp/mcp.ts",
           "apps/server/src/orchestrator/openai.ts",
+          "apps/server/src/base/time.ts",
         ],
-        rules: { "vibevalley/promise-boundary": "off" },
-      },
-      {
-        // Not moved into Effect yet; the list only shrinks (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上").
-        // The command line's chats, and time.ts's clock for the Promise code still left.
-        files: ["apps/server/src/voice/voice.ts", "apps/server/src/lan/lan.ts", "apps/server/src/cli/chat.ts", "apps/server/src/base/time.ts"],
         rules: { "vibevalley/promise-boundary": "off" },
       },
       {
