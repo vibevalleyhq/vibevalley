@@ -17,4 +17,4 @@ export function withMentions(text: string): string {
   return out + mentionLinks(text.slice(at));
 }
 
-export { plainText } from "../richRules";
+export { plainText } from "@vibevalley/protocol/rules";

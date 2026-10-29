@@ -1,5 +1,4 @@
 import { list, t } from "@vibevalley/i18n";
-import { Choice } from "../../ui/Choice";
 import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Issue, Session } from "@vibevalley/protocol";
@@ -10,7 +9,7 @@ import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, card
 import { issueIs, type Lane } from "./rules";
 import { toast } from "../../ui/toasts";
 import { useRouter } from "../../base/router";
-
+import { Select } from "../../ui/Field";
 import { useCore } from "../../base/frame";
 import { useOrchestrators } from "../../base/agents";
 import { useIssueHistory } from "./data";
@@ -312,20 +311,26 @@ function Toolbar(props: {
             />
           </label>
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
-          <Choice
+          <Select
+            size="control"
+            class="max-w-48"
             label={t("web.issue.page.byProject")}
             testid="filter-project"
             filter
             value={props.filter.project}
-            options={[{ value: "", label: t("web.issue.page.allProjects") }, ...projects().map((p) => ({ value: p, label: p }))]}
+            placeholder={t("web.issue.page.allProjects")}
+            options={projects().map((p) => ({ value: p, label: p }))}
             onChange={(project) => props.onFilter({ ...props.filter, project })}
           />
-          <Choice
+          <Select
+            size="control"
+            class="max-w-48"
             label={t("web.issue.page.byHelper")}
             testid="filter-agent"
             filter
             value={props.filter.agent}
-            options={[{ value: "", label: t("web.issue.page.allHelpers") }, ...agents().map((a) => ({ value: a, label: nameOf()(a) }))]}
+            placeholder={t("web.issue.page.allHelpers")}
+            options={agents().map((a) => ({ value: a, label: nameOf()(a) }))}
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
           <Show when={filterAny(props.filter)}>

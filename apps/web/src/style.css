@@ -253,6 +253,15 @@ body {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
   }
+  /* Scrollbars and selected text are the palette's too, in both themes: a thin bar of faint ink on nothing (not the
+     system's grey slab, light in the dark theme), and selection in leaf. scrollbar-width is not inherited, hence *. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-ink) 24%, transparent) transparent;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-leaf) 32%, transparent);
+  }
 }
 
 /* What comes over the page (a dialog, a menu, a popover) grows out of where it is, a little. */

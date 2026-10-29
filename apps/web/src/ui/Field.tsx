@@ -1,6 +1,7 @@
 import { For, omit } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useSelectValue } from "../base/util";
+import { Select as Base } from "@vibevalley/base-ui";
+import { Icon } from "./Icon";
 import { Hint } from "./Tip";
 
 const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
@@ -28,31 +29,69 @@ export function Field(props: { label: string; hint?: string; children: JSX.Eleme
   );
 }
 
-/** A plain <select>; value "" is the placeholder. */
+/**
+ * One of a list, under a button that shows the chosen label (base-ui's Select, so the list looks and moves like the
+ * workbench's menus on every system). value "" is the placeholder, and choosing it is choosing none. quiet is the side
+ * column's: no box until the pointer is over it.
+ */
 export function Select(props: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   placeholder?: string;
   label: string;
+  /** Placement only: width, margins. */
   class?: string;
   testid?: string;
+  quiet?: boolean;
+  /** A filter that narrows: tinted while a value other than "" is chosen. */
+  filter?: boolean;
+  /** control: 28px, for a toolbar row; field (default): 32px, beside inputs. */
+  size?: "control" | "field";
+  disabled?: boolean;
 }) {
-  const ref = useSelectValue(
-    () => props.value,
-    () => props.options,
-  );
+  const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder }] : []), ...props.options];
   return (
-    <select
-      ref={ref}
-      data-testid={props.testid}
-      aria-label={props.label}
-      value={props.value}
-      onChange={(e) => props.onChange(e.currentTarget.value)}
-      class={[box, "h-8 cursor-pointer", props.class]}
-    >
-      {props.placeholder !== undefined && <option value="">{props.placeholder}</option>}
-      <For each={props.options}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-    </select>
+    <Base.Root value={props.value} onValueChange={(v) => props.onChange(v)} items={all()} disabled={props.disabled}>
+      <Base.Trigger
+        data-testid={props.testid}
+        data-value={props.value}
+        aria-label={props.label}
+        class={[
+          "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left text-sm outline-none disabled:cursor-default disabled:opacity-50",
+          props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
+          props.quiet
+            ? "border-transparent bg-transparent hover:border-line hover:bg-page data-popup-open:border-line data-popup-open:bg-page"
+            : props.filter && props.value !== ""
+              ? "border-accent/40 bg-accent/8 hover:bg-accent/12"
+              : "border-line bg-page hover:bg-hover data-popup-open:border-focus",
+          props.class,
+        ]}
+      >
+        <Base.Value class="min-w-0 flex-1 truncate" placeholder={props.placeholder} />
+        <Icon name="choose" size={12} class="shrink-0 text-muted" />
+      </Base.Trigger>
+      <Base.Portal>
+        <Base.Positioner class="z-30" sideOffset={4}>
+          <Base.Popup class="max-h-72 min-w-(--anchor-width) origin-top animate-pop-in overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float outline-none">
+            <For each={all()}>
+              {(o) => (
+                <Base.Item
+                  value={o.value}
+                  data-key={o.value}
+                  disabled={o.disabled}
+                  class="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-sm outline-none data-disabled:cursor-default data-disabled:opacity-50 data-highlighted:bg-hover data-selected:font-medium"
+                >
+                  <span class="min-w-0 flex-1 truncate">{o.label}</span>
+                  <Base.ItemIndicator class="flex shrink-0 text-accent">
+                    <Icon name="ticked" size={14} />
+                  </Base.ItemIndicator>
+                </Base.Item>
+              )}
+            </For>
+          </Base.Popup>
+        </Base.Positioner>
+      </Base.Portal>
+    </Base.Root>
   );
 }

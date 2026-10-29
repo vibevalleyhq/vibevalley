@@ -34,16 +34,3 @@ export const remarkIssueRefs = () => (tree: MdNode) => {
   };
   walk(tree);
 };
-
-/** Markdown read as one plain line, for a preview where its marks (#, -, *, `, fences) would show as they are. */
-export function plainText(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gm, "")
-    .replace(/(\*\*|__|\*|_|~~)(.+?)\1/g, "$2")
-    .replaceAll("|", " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}

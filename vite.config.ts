@@ -230,7 +230,7 @@ export default defineConfig({
         // the pixel skin and the avatars are drawn to their own sizes.
         files: ["apps/web/src/**"],
         excludeFiles: ["apps/web/src/farm/**", "apps/web/src/tree/**", "apps/web/src/ui/pixel/**", "apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
-        rules: { "vibevalley/design-tokens": "error" },
+        rules: { "vibevalley/design-tokens": "error", "vibevalley/native-control": "error" },
       },
       {
         // Every colour of the page is named in style.css, the pixel skin's too: its palette does not follow the theme, but

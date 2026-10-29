@@ -1,6 +1,9 @@
 import type { SessionAction } from "@vibevalley/protocol";
 import {
   Add,
+  AngleDown,
+  Check,
+  Minus,
   Book,
   Call,
   Key,
@@ -102,6 +105,7 @@ export const icons = {
   hide: EyeClosed,
   undo: Undo,
   expand: AngleRight,
+  choose: AngleDown,
   previous: AngleLeft,
   next: AngleRight,
   enlarge: Maximize,
@@ -120,6 +124,8 @@ export const icons = {
   spend: Coin,
   bug: Bug,
   check: CheckCircle,
+  ticked: Check,
+  partly: Minus,
   cross: XCircle,
   warn: Danger,
   wait: Hourglass,

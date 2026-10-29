@@ -20,7 +20,7 @@ const placementOf = (side: Side, align: Align): Placement => (align === "center"
 
 /** Where the floating element is, and on which side and alignment it ended up, while both elements exist. */
 export function createAnchored(anchor: () => Element | undefined, floating: () => HTMLElement | undefined, o: () => AnchorOptions) {
-  const [at, setAt] = createSignal({ x: 0, y: 0, side: o().side ?? "bottom", align: o().align ?? "center", placed: false });
+  const [at, setAt] = createSignal({ x: 0, y: 0, side: o().side ?? "bottom", align: o().align ?? "center", placed: false, anchorWidth: 0 });
   createEffect(
     () => [anchor(), floating()] as const,
     ([a, f]) => {
@@ -33,7 +33,7 @@ export function createAnchored(anchor: () => Element | undefined, floating: () =
           middleware: [offset(sideOffset), flip({ padding: collisionPadding }), shift({ padding: collisionPadding })],
         }).then((p) => {
           const [s, al = "center"] = p.placement.split("-") as [Side, Align?];
-          setAt({ x: p.x, y: p.y, side: s, align: al, placed: true });
+          setAt({ x: p.x, y: p.y, side: s, align: al, placed: true, anchorWidth: a.getBoundingClientRect().width });
         });
       };
       return autoUpdate(a, f, place);

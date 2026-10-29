@@ -51,23 +51,6 @@ export function createSettled<T>(value: Accessor<T>, ms = 250): Accessor<T> {
 }
 
 /**
- * A ref for a <select> that sets its value again whenever the value or the options change: options that arrive after the
- * value (a list still loading) would otherwise leave the first option chosen.
- */
-export function useSelectValue(value: Accessor<string>, options: Accessor<unknown>) {
-  let el: HTMLSelectElement | undefined;
-  createEffect(
-    () => [value(), options()] as const,
-    ([v]) => {
-      if (el) el.value = v;
-    },
-  );
-  return (s: HTMLSelectElement) => {
-    el = s;
-  };
-}
-
-/**
  * Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. Returns
  * the ref for the box (the popup and what opens it, so the opener's own click still toggles). Escape is the page's to
  * give: on the farm it opens the menu.

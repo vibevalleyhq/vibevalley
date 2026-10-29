@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { plainText } from "../../ui/richRules";
+import { plainText } from "@vibevalley/protocol/rules";
 import { tookText } from "../../base/format";
 import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
