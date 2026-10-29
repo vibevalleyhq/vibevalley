@@ -1,12 +1,12 @@
-// What the doc tests write documents with.
+// What the blocks tests write artifacts with.
 
-import type { Block, DocSpan } from "@vibevalley/protocol";
+import type { Block, TextSpan } from "@vibevalley/protocol";
 
-export const span = (t: string): DocSpan => ({ t, marks: {} });
-export const bold = (t: string): DocSpan => ({ t, marks: { bold: true } });
+export const span = (t: string): TextSpan => ({ t, marks: {} });
+export const bold = (t: string): TextSpan => ({ t, marks: { bold: true } });
 export const para = (id: string, key: string, text: string): Block => ({
   id,
-  docId: "d",
+  artifactId: "d",
   orderKey: key,
   type: "paragraph",
   attrs: {},
@@ -20,7 +20,7 @@ export const para = (id: string, key: string, text: string): Block => ({
 export const sample =
   "# 周报：VibeValley 🌾\n" +
   "\n" +
-  "这周把**块编辑器**的第一步做完了，_顺利_ 😀。见 [设计](https://example.com/a_b) 和 `doc.submit`，~~不用 CRDT~~。\n" +
+  "这周把**块编辑器**的第一步做完了，_顺利_ 😀。见 [设计](https://example.com/a_b) 和 `artifact.submit`，~~不用 CRDT~~。\n" +
   "\n" +
   "## 做了什么\n" +
   "\n" +

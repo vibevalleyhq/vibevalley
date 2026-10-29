@@ -12,10 +12,12 @@ describe("what an artifact may be", () => {
     expect(artifactProblem({ title: "a", kind: "pdf", size: 10 })).not.toBe("");
     expect(artifactProblem({ size: 0 })).not.toBe("");
     expect(artifactProblem({ size: artifactMax + 1 })).not.toBe("");
+    // The owner's new one: a title and nothing in it yet.
+    expect(artifactProblem({ title: "周报" })).toBe("");
   });
 
-  it("serves HTML in a sandbox with no origin of its own and nothing to call, and Markdown as text", () => {
-    const html = artifactHeaders("html");
+  it("serves HTML in a sandbox with no origin of its own and nothing to call", () => {
+    const html = artifactHeaders;
     expect(html["content-type"]).toBe("text/html; charset=utf-8");
     expect(html["content-security-policy"]).toBe(htmlPolicy);
     const sandbox = htmlPolicy.split("; ")[0]!;
@@ -26,8 +28,5 @@ describe("what an artifact may be", () => {
     expect(htmlPolicy).toContain("connect-src 'none'");
     expect(htmlPolicy).toContain("form-action 'none'");
     expect(html["x-content-type-options"]).toBe("nosniff");
-    const md = artifactHeaders("markdown");
-    expect(md["content-type"]).toBe("text/plain; charset=utf-8");
-    expect(md["content-security-policy"]).toBe("sandbox; default-src 'none'");
   });
 });

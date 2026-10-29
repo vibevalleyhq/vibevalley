@@ -1,4 +1,5 @@
-import { Menu, Toolbar } from "@vibevalley/base-ui";
+import { Toolbar } from "@vibevalley/base-ui";
+import { MoreMenu } from "../../ui/MoreMenu";
 import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
@@ -23,8 +24,6 @@ import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePat
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
 const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(reasonOf(e), "bad"));
-
-const menuItem = "cursor-pointer rounded px-2 py-1 text-left text-sm outline-none hover:bg-hover data-highlighted:bg-hover";
 
 export function ReplyQuote(props: { channel: string; number: number }) {
   const answered = useMessage(() => ({ channel: props.channel, number: props.number }));
@@ -419,33 +418,19 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           <Icon name="edit" size={14} />
         </Toolbar.Button>
       </Show>
-      <Menu.Root open={more()} onOpenChange={setMore}>
-        <Menu.Trigger
-          render={(p) => <Toolbar.Button {...p} />}
-          class={tool}
-          data-testid="message-tool"
-          data-key="more"
-          aria-label={t("web.channel.more.label")}
-          title={t("web.channel.more.label")}
-        >
-          <Icon name="more" size={14} />
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Positioner side="top" align="end" class="z-30">
-            <Menu.Popup
-              aria-label={t("web.channel.more.label")}
-              class="flex w-44 origin-bottom-right animate-pop-in flex-col rounded-md border border-line bg-page p-1 shadow-float outline-none"
-            >
-              <Menu.Item data-key="copy-link" class={menuItem} onClick={copyLink}>
-                {t("web.channel.more.copyLink")}
-              </Menu.Item>
-              <Menu.Item data-key="mark-unread" class={menuItem} onClick={unread}>
-                {t("web.channel.more.markUnread")}
-              </Menu.Item>
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
+      <MoreMenu
+        label={t("web.channel.more.label")}
+        testid="message-tool"
+        dataKey="more"
+        side="top"
+        open={more()}
+        onOpenChange={setMore}
+        render={(p) => <Toolbar.Button {...p} />}
+        items={[
+          { key: "copy-link", label: t("web.channel.more.copyLink"), icon: "copy", onSelect: copyLink },
+          { key: "mark-unread", label: t("web.channel.more.markUnread"), icon: "show", onSelect: unread },
+        ]}
+      />
       <Toolbar.Button
         class={[tool, { "bg-berry/15": sure() }]}
         data-testid="message-tool"

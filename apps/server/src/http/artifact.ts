@@ -1,4 +1,4 @@
-// A version's content, a GET since an <iframe src> can only GET. Its headers keep an HTML page from ever running as one of
+// An html artifact's version, a GET since an <iframe src> can only GET. Its headers keep an HTML page from ever running as one of
 // the farm's (artifact/rules.ts); a version never changes once made, so it is cached for good.
 
 import { Effect } from "effect";
@@ -17,9 +17,8 @@ export const artifactContent = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const [id = "", version = ""] = new URL(request.url, "http://farm").pathname.slice(prefix.length).split("/");
     if (!/^[0-9a-f-]{36}$/.test(id) || !/^[1-9]\d*$/.test(version)) return notFound();
-    const found = yield* artifacts.file(id, Number(version));
-    if (!found) return notFound();
-    const headers = artifactHeaders(found.kind);
-    return yield* HttpServerResponse.file(found.path, { contentType: headers["content-type"]!, headers });
+    const path = yield* artifacts.file(id, Number(version));
+    if (!path) return notFound();
+    return yield* HttpServerResponse.file(path, { contentType: artifactHeaders["content-type"]!, headers: artifactHeaders });
   }).pipe(Effect.orElseSucceed(notFound)),
 );

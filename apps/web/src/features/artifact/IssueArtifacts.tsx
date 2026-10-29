@@ -20,7 +20,7 @@ export function IssueArtifacts(props: { issue: string; heading: JSX.Element }) {
                   card={{
                     id: a().id,
                     title: a().title,
-                    kind: a().kind,
+                    body: a().body,
                     version: a().version,
                     ...(a().versions.at(-1)?.note ? { note: a().versions.at(-1)!.note! } : {}),
                   }}

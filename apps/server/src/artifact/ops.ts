@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-// The op rules, over one document held in memory: Submit loads the page in a transaction,
+// The op rules, over one artifact held in memory: Submit loads the page in a transaction,
 // applies a batch's ops in order and writes back what changed. A stale update (baseRev behind) is taken only when the
 // block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
 
@@ -7,14 +7,14 @@ import type {
   Block,
   BlockInput,
   BlockAttrs,
-  DocOp,
-  DocOpMergeBlocks,
-  DocOpMoveBlock,
-  DocOpResult,
-  DocOpSplitBlock,
-  DocOpStatus,
-  DocOpUpdateText,
-  DocSpan,
+  BlockOp,
+  BlockOpMergeBlocks,
+  BlockOpMoveBlock,
+  BlockOpResult,
+  BlockOpSplitBlock,
+  BlockOpStatus,
+  BlockOpUpdateText,
+  TextSpan,
 } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./text.ts";
@@ -38,22 +38,22 @@ export const knownType = (text: string) => text in withText;
 export interface Revision {
   readonly block: string;
   readonly rev: number;
-  readonly spans: DocSpan[];
+  readonly spans: TextSpan[];
   readonly kind: "normal" | "conflict";
 }
 
 /** A result as the wire has it: rev 0, no reason and no texts are left out. */
-export function result(status: DocOpStatus, blockId: string, rev = 0, more: { yours?: DocSpan[]; reason?: string } = {}): DocOpResult {
+export function result(status: BlockOpStatus, blockId: string, rev = 0, more: { yours?: TextSpan[]; reason?: string } = {}): BlockOpResult {
   return { status, blockId, ...(rev ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
 }
 
 const applied = (b: Block) => result("applied", b.id, b.rev);
 const rejected = (id: string, reason: string) => result("rejected", id, 0, { reason });
-const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: t("server.doc.op.deleted") });
+const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: t("server.artifact.op.deleted") });
 
 export const parentOf = (b: Block) => b.parentId ?? "";
 
-export function textFor(type: string, spans: readonly DocSpan[] | undefined): DocSpan[] {
+export function textFor(type: string, spans: readonly TextSpan[] | undefined): TextSpan[] {
   if (!withText[type]) return [];
   if (type === "code") return unmarked(spans ?? []);
   return normal(spans);
@@ -69,7 +69,7 @@ export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly st
   const out: Record<string, unknown> = { ...attrs };
   for (const name of attrNames) if (patch[name] !== undefined && patch[name] !== null) out[name] = patch[name];
   for (const name of unset) {
-    if (!(attrNames as readonly string[]).includes(name)) throw new Error(t("server.doc.op.noAttr", { name }));
+    if (!(attrNames as readonly string[]).includes(name)) throw new Error(t("server.artifact.op.noAttr", { name }));
     delete out[name];
   }
   return out;
@@ -88,12 +88,12 @@ export class Page {
   readonly changed: string[] = [];
   readonly revisions: Revision[] = [];
   /** The block's text at a rev, from its revisions; undefined when there is none. */
-  base: (block: string, rev: number) => DocSpan[] | undefined = () => undefined;
-  /** A block id another document has. */
+  base: (block: string, rev: number) => TextSpan[] | undefined = () => undefined;
+  /** A block id another artifact has. */
   taken: (id: string) => boolean = () => false;
 
   constructor(
-    readonly doc: string,
+    readonly artifact: string,
     readonly actor: string,
     readonly now: number,
     blocks: readonly Block[],
@@ -128,7 +128,7 @@ export class Page {
   private liveParent(parent: string): string | undefined {
     while (parent !== "") {
       const b = this.find(parent);
-      if (!b) throw new Error(t("server.doc.op.noBlock", { id: parent }));
+      if (!b) throw new Error(t("server.artifact.op.noBlock", { id: parent }));
       if (!b.deleted) return b.id;
       parent = parentOf(b);
     }
@@ -137,10 +137,10 @@ export class Page {
 
   /** Checks a block the client made, and fills in what the server decides; a string is why it cannot be. */
   private fresh(b: BlockInput): Block | string {
-    if (!b.id) return t("server.doc.op.noId");
-    if (this.find(b.id) || this.taken(b.id)) return t("server.doc.op.taken", { id: b.id });
-    if (!knownType(b.type)) return t("server.doc.op.unknownType", { type: b.type });
-    if (!validKey(b.orderKey)) return t("server.doc.op.badKey", { key: b.orderKey });
+    if (!b.id) return t("server.artifact.op.noId");
+    if (this.find(b.id) || this.taken(b.id)) return t("server.artifact.op.taken", { id: b.id });
+    if (!knownType(b.type)) return t("server.artifact.op.unknownType", { type: b.type });
+    if (!validKey(b.orderKey)) return t("server.artifact.op.badKey", { key: b.orderKey });
     let parent: string | undefined;
     try {
       parent = this.liveParent(b.parentId ?? "");
@@ -152,7 +152,7 @@ export class Page {
       orderKey: b.orderKey,
       type: b.type,
       ...(parent !== undefined ? { parentId: parent } : {}),
-      docId: this.doc,
+      artifactId: this.artifact,
       rev: 0,
       attrs: attrsOf(b.attrs),
       text: textFor(b.type, b.text),
@@ -168,7 +168,7 @@ export class Page {
     return base !== undefined && sameText(base, b.text);
   }
 
-  apply(op: DocOp): DocOpResult {
+  apply(op: BlockOp): BlockOpResult {
     switch (op.op) {
       case "insert_block": {
         const b = this.fresh(op.block);
@@ -181,7 +181,7 @@ export class Page {
         return this.updateText(op);
       case "set_attrs": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, t("server.doc.op.missing"));
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
         if (b.deleted) return gone(b);
         try {
           b.attrs = patched(b.attrs, op.attrs ?? {}, op.unset);
@@ -193,9 +193,9 @@ export class Page {
       }
       case "set_type": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, t("server.doc.op.missing"));
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
         if (b.deleted) return gone(b);
-        if (!knownType(op.type)) return rejected(b.id, t("server.doc.op.unknownType", { type: op.type }));
+        if (!knownType(op.type)) return rejected(b.id, t("server.artifact.op.unknownType", { type: op.type }));
         b.type = op.type;
         b.attrs = attrsOf(op.attrs);
         b.text = textFor(op.type, b.text);
@@ -206,14 +206,14 @@ export class Page {
         return this.move(op);
       case "delete_block": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, t("server.doc.op.missing"));
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
         if (b.deleted) return result("noop", b.id, b.rev);
         this.setDeleted(b, true);
         return applied(b);
       }
       case "restore_block": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, t("server.doc.op.missing"));
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
         if (!b.deleted) return result("noop", b.id, b.rev);
         try {
           const parent = this.liveParent(parentOf(b));
@@ -230,14 +230,14 @@ export class Page {
       case "merge_blocks":
         return this.merge(op);
     }
-    return rejected("", t("server.doc.op.unknownOp", { op: (op as { op: string }).op }));
+    return rejected("", t("server.artifact.op.unknownOp", { op: (op as { op: string }).op }));
   }
 
-  private updateText(o: DocOpUpdateText): DocOpResult {
+  private updateText(o: BlockOpUpdateText): BlockOpResult {
     const b = this.find(o.blockId);
-    if (!b) return rejected(o.blockId, t("server.doc.op.missing"));
-    if (!withText[b.type]) return rejected(b.id, t("server.doc.op.noText"));
-    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.doc.op.noRev", { rev: o.baseRev }));
+    if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
+    if (!withText[b.type]) return rejected(b.id, t("server.artifact.op.noText"));
+    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.artifact.op.noRev", { rev: o.baseRev }));
     const yours = textFor(b.type, o.text);
     if (b.deleted) {
       this.lost(b, yours);
@@ -245,7 +245,7 @@ export class Page {
     }
     if (!this.unchangedSince(b, o.baseRev)) {
       this.lost(b, yours);
-      return result("conflict", b.id, b.rev, { yours, reason: t("server.doc.op.changed") });
+      return result("conflict", b.id, b.rev, { yours, reason: t("server.artifact.op.changed") });
     }
     if (sameText(yours, b.text)) return applied(b);
     b.text = yours;
@@ -254,7 +254,7 @@ export class Page {
   }
 
   /** Keeps a text that was not taken, at the rev it lost to. */
-  private lost(b: Block, yours: DocSpan[]) {
+  private lost(b: Block, yours: TextSpan[]) {
     this.revisions.push({ block: b.id, rev: b.rev, spans: yours, kind: "conflict" });
   }
 
@@ -264,18 +264,18 @@ export class Page {
     for (const c of this.children(b.id)) if (!!c.deleted !== deleted) this.setDeleted(c, deleted);
   }
 
-  private move(o: DocOpMoveBlock): DocOpResult {
+  private move(o: BlockOpMoveBlock): BlockOpResult {
     const b = this.find(o.blockId);
-    if (!b) return rejected(o.blockId, t("server.doc.op.missing"));
+    if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
     if (b.deleted) return gone(b);
-    if (!validKey(o.orderKey)) return rejected(b.id, t("server.doc.op.badKey", { key: o.orderKey }));
+    if (!validKey(o.orderKey)) return rejected(b.id, t("server.artifact.op.badKey", { key: o.orderKey }));
     let parent: string | undefined;
     try {
       parent = this.liveParent(o.parentId ?? "");
     } catch (e) {
       return rejected(b.id, (e as Error).message);
     }
-    for (let at = parent ?? ""; at !== ""; at = parentOf(this.find(at)!)) if (at === b.id) return rejected(b.id, t("server.doc.op.underSelf"));
+    for (let at = parent ?? ""; at !== ""; at = parentOf(this.find(at)!)) if (at === b.id) return rejected(b.id, t("server.artifact.op.underSelf"));
     if (parent === undefined) delete b.parentId;
     else b.parentId = parent;
     b.orderKey = o.orderKey;
@@ -283,23 +283,23 @@ export class Page {
     return applied(b);
   }
 
-  private split(o: DocOpSplitBlock): DocOpResult {
+  private split(o: BlockOpSplitBlock): BlockOpResult {
     const b = this.find(o.blockId);
-    if (!b) return rejected(o.blockId, t("server.doc.op.missing"));
-    if (!withText[b.type]) return rejected(b.id, t("server.doc.op.noText"));
-    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.doc.op.noRev", { rev: o.baseRev }));
+    if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
+    if (!withText[b.type]) return rejected(b.id, t("server.artifact.op.noText"));
+    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.artifact.op.noRev", { rev: o.baseRev }));
     if (b.deleted) return gone(b);
     const nb = this.fresh(o.newBlock);
     if (typeof nb === "string") return rejected(b.id, nb);
-    let status: DocOpStatus = "applied";
+    let status: BlockOpStatus = "applied";
     let reason: string | undefined;
     let at = o.offset;
     if (!this.unchangedSince(b, o.baseRev)) {
       // The offset was into a text that is no longer there: the block keeps all of its text and the new one starts empty.
       at = runeLen(b.text);
       status = "conflict";
-      reason = t("server.doc.op.splitAtEnd");
-    } else if (at < 0 || at > runeLen(b.text)) return rejected(b.id, t("server.doc.op.splitOutside", { at, length: runeLen(b.text) }));
+      reason = t("server.artifact.op.splitAtEnd");
+    } else if (at < 0 || at > runeLen(b.text)) return rejected(b.id, t("server.artifact.op.splitOutside", { at, length: runeLen(b.text) }));
     const [left, right] = splitAt(b.text, at);
     b.text = left;
     nb.text = textFor(nb.type, right);
@@ -309,15 +309,15 @@ export class Page {
     return result(status, b.id, b.rev, { reason });
   }
 
-  private merge(o: DocOpMergeBlocks): DocOpResult {
+  private merge(o: BlockOpMergeBlocks): BlockOpResult {
     const target = this.find(o.targetId);
     const source = this.find(o.sourceId);
-    if (!target) return rejected(o.targetId, t("server.doc.op.missing"));
-    if (!source) return rejected(o.sourceId, t("server.doc.op.missing"));
-    if (target.id === source.id) return rejected(target.id, t("server.doc.op.intoSelf"));
+    if (!target) return rejected(o.targetId, t("server.artifact.op.missing"));
+    if (!source) return rejected(o.sourceId, t("server.artifact.op.missing"));
+    if (target.id === source.id) return rejected(target.id, t("server.artifact.op.intoSelf"));
     if (source.deleted) return result("noop", target.id, target.rev);
     if (target.deleted) return gone(target);
-    if (!withText[target.type]) return rejected(target.id, t("server.doc.op.noText"));
+    if (!withText[target.type]) return rejected(target.id, t("server.artifact.op.noText"));
     // Both texts as they are now: there is nothing stale to conflict with.
     target.text = textFor(target.type, joined(target.text, source.text));
     let last = this.children(target.id).at(-1)?.orderKey ?? "";
@@ -340,7 +340,7 @@ export class Page {
   }
 }
 
-/** The live blocks in document order: each block, then its children. */
+/** The live blocks in artifact order: each block, then its children. */
 export function ordered(blocks: readonly Block[]): Block[] {
   const p = new Page("", "", 0, blocks);
   const out: Block[] = [];

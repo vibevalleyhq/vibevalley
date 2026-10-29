@@ -227,21 +227,18 @@ export const sessionParameters = {
     text: Schema.String,
   }),
   "channel.unread.list": Schema.Struct({}),
-  "doc.block.create": Schema.Struct({
-    id: Schema.String.annotate({ description: params.docId }),
-    level: Schema.optionalKey(Schema.Int.annotate({ description: params.docBlockCreate.level })),
-    text: Schema.String.annotate({ description: params.docBlockCreate.text }),
-    type: Schema.optionalKey(Schema.String.annotate({ description: params.docBlockCreate.type })),
+  "artifact.block.create": Schema.Struct({
+    id: artifactId,
+    level: Schema.optionalKey(Schema.Int.annotate({ description: params.blockCreate.level })),
+    text: Schema.String.annotate({ description: params.blockCreate.text }),
+    type: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.type })),
   }),
-  "doc.block.update": Schema.Struct({
-    baseRev: Schema.Int.annotate({ description: params.docBlockUpdate.baseRev }),
-    block: Schema.String.annotate({ description: params.docBlockUpdate.block }),
-    id: Schema.String.annotate({ description: params.docId }),
-    text: Schema.String.annotate({ description: params.docBlockUpdate.text }),
+  "artifact.block.update": Schema.Struct({
+    baseRev: Schema.Int.annotate({ description: params.blockUpdate.baseRev }),
+    block: Schema.String.annotate({ description: params.blockUpdate.block }),
+    id: artifactId,
+    text: Schema.String.annotate({ description: params.blockUpdate.text }),
   }).annotate({ requiredOrder: ["id", "block", "baseRev", "text"] }),
-  "doc.get": Schema.Struct({
-    id: Schema.String.annotate({ description: params.docId }),
-  }),
   "issue.split": Schema.Struct({
     tasks: Schema.mutable(
       Schema.Array(

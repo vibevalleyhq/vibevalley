@@ -1,4 +1,4 @@
-// What the document editor computes on its own: offsets in the server's unit, marks kept
+// What the blocks editor computes on its own: offsets in the server's unit, marks kept
 // through an edit, list numbers and the line-start shortcuts. Order keys are the shared rule (keyBetween); the ops' rules
 // stay the server's.
 
@@ -15,24 +15,24 @@ import {
   blockQuote,
   blockTodo,
   type BlockAttrs,
-  type DocMarks,
-  type DocSpan,
+  type SpanMarks,
+  type TextSpan,
 } from "@vibevalley/protocol";
 
 /** The server counts offsets in code points; a string's index is in UTF-16 units. */
 export const codePointOffset = (text: string, utf16: number) => [...text.slice(0, Math.min(Math.max(0, utf16), text.length))].length;
 
-export const plainOf = (spans: readonly DocSpan[]) => spans.map((s) => s.t).join("");
+export const plainOf = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join("");
 
-export const sameMarks = (a: DocMarks, b: DocMarks) =>
+export const sameMarks = (a: SpanMarks, b: SpanMarks) =>
   (a.bold ?? false) === (b.bold ?? false) &&
   (a.italic ?? false) === (b.italic ?? false) &&
   (a.code ?? false) === (b.code ?? false) &&
   (a.strike ?? false) === (b.strike ?? false) &&
   a.link === b.link;
 
-export function normalSpans(spans: Iterable<DocSpan>): DocSpan[] {
-  const out: DocSpan[] = [];
+export function normalSpans(spans: Iterable<TextSpan>): TextSpan[] {
+  const out: TextSpan[] = [];
   for (const s of spans) {
     if (!s.t) continue;
     const last = out.at(-1);
@@ -43,9 +43,9 @@ export function normalSpans(spans: Iterable<DocSpan>): DocSpan[] {
 }
 
 /** Spans cut at a UTF-16 index of their text. */
-export function splitSpans(spans: readonly DocSpan[], at: number): [DocSpan[], DocSpan[]] {
-  const left: DocSpan[] = [];
-  const right: DocSpan[] = [];
+export function splitSpans(spans: readonly TextSpan[], at: number): [TextSpan[], TextSpan[]] {
+  const left: TextSpan[] = [];
+  const right: TextSpan[] = [];
   for (const s of spans) {
     if (at <= 0) right.push(s);
     else if (at >= s.t.length) left.push(s);
@@ -62,7 +62,7 @@ const low = (unit: number) => unit >= 0xdc00 && unit <= 0xdfff;
 
 /** The spans after the text became `text`: what is the same at both ends keeps its marks; what was typed takes the marks
  * of the character before it, a link's excepted. */
-export function editSpans(old: readonly DocSpan[], text: string): DocSpan[] {
+export function editSpans(old: readonly TextSpan[], text: string): TextSpan[] {
   const before = plainOf(old);
   if (before === text) return [...old];
   let p = 0;
@@ -75,7 +75,7 @@ export function editSpans(old: readonly DocSpan[], text: string): DocSpan[] {
   const [, tail] = splitSpans(rest, before.length - p - s);
   const typed = text.slice(p, text.length - s);
   const m = head.at(-1)?.marks;
-  const marks: DocMarks = m
+  const marks: SpanMarks = m
     ? {
         ...(m.bold ? { bold: m.bold } : {}),
         ...(m.italic ? { italic: m.italic } : {}),
@@ -116,7 +116,7 @@ export function markdownShortcut(text: string): { type: string; attrs: BlockAttr
   return undefined;
 }
 
-/** Each numbered block's number: its place in the run of numbered siblings it is in. `ordered` is the document's order,
+/** Each numbered block's number: its place in the run of numbered siblings it is in. `ordered` is the artifact's order,
  * each block followed by its children. */
 export function listNumbers(ordered: readonly { id: string; parentId?: string; type: string }[]): Map<string, number> {
   const last = new Map<string | undefined, [string, number]>();

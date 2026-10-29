@@ -18,7 +18,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、收获 |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
-| [artifact.md](docs/subsystems/artifact.md) | 产出：帮工和管家交出来的一页，按版本存，带卡片说出来，在工作台里隔离着看 |
+| [artifact.md](docs/subsystems/artifact.md) | 产出：主人和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
 | [notice.md](docs/subsystems/notice.md) | 通知：Inbox、刚来的、巡查，经通话、手机、系统通知送到主人 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
@@ -26,7 +26,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [task.md](docs/subsystems/task.md) | 计划：带子工单的父工单、按图推进；agent 自己的任务 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
-| [doc.md](docs/subsystems/doc.md) | 文档：按块存、按 op 改、一批一个事务、Markdown 导入导出 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
 | [lan.md](docs/subsystems/lan.md) | 「连接到本机」：局域网里配对过的设备用同一个农场 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
@@ -68,6 +67,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家或帮工 | 帮工档案、角色 |
 | 农机 | machine | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
+| 产出 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来按版本换的网页；交上来的带卡片挂在频道和工单上 | 文档、doc、附件 |
 | 项目 | project | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 大地图 | the map | Workspace（`Config.WorkRoot`、`Config.Home`） | 全部项目、工单、群聊和档案；工作台「项目」页的「全部」 | 世界、全图 |
 | 空位 | spot | `project.max_sessions`、农场的上限 | 一个项目（和整个农场）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |

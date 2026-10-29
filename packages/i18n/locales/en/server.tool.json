@@ -33,9 +33,8 @@
     "search_archive": "Search old talks",
     "memory_search": "Search the memory",
     "memory_create": "Remember for a helper",
-    "doc_get": "Read a doc",
-    "doc_block_create": "Add to a doc",
-    "doc_block_update": "Change a doc's block"
+    "artifact_block_create": "Add to an artifact",
+    "artifact_block_update": "Change an artifact's block"
   },
   "about": "{label}: {about}"
 }

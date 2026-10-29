@@ -26,6 +26,12 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "a document, now an artifact",
+    pattern:
+      /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/,
+    says: "documents are artifacts with a blocks body (Artifacts, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
+  },
+  {
     name: "a cron under its old name",
     pattern: /[Rr]ecurrences?/,
     says: "a timed trigger is a Cron (Crons, CronWhen, cron.*, cron_create …); the page calls it 定时任务",

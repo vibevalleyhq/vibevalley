@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 
-const places = ["chat", "issues", "docs", "agents", "runtimes", "projects", "catalog", "settings"];
+const places = ["chat", "issues", "artifacts", "agents", "runtimes", "projects", "catalog", "settings"];
 
 test("the rail lists every place, the farm at the top, and marks where you are", async ({ page }) => {
   await page.goto("/issues");
@@ -17,7 +17,7 @@ test("the rail lists every place, the farm at the top, and marks where you are",
 test("every place opens under its own head, and the chat has none", async ({ page }) => {
   await page.goto("/issues");
   const rail = page.getByTestId("rail");
-  for (const place of ["docs", "agents", "runtimes", "projects", "catalog"]) {
+  for (const place of ["artifacts", "agents", "runtimes", "projects", "catalog"]) {
     await rail.locator(`[data-place="${place}"]`).click();
     await expect(page).toHaveURL(new RegExp(`/${place}$`));
     await expect(page.getByTestId("desk")).toHaveAttribute("data-place", place);

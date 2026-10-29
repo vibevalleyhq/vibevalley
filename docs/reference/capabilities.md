@@ -141,8 +141,15 @@
 | `artifact.content.get` | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.create` | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.version.create` | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.update` | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
+| `artifact.block.list` | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
+| `artifact.submit` | `/api/v1/artifact/submit` | ✓ | ✓ |   |   |
+| `artifact.block.create` | `/api/v1/artifact/block/create` | ✓ | ✓ |   | ✓ |
+| `artifact.block.update` | `/api/v1/artifact/block/update` | ✓ | ✓ |   | ✓ |
+| `artifact.markdown.get` | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
+| `artifact.demo` | `/api/v1/artifact/demo` | ✓ |   |   |   |
 
 ## game
 
@@ -239,17 +246,3 @@
 | `lan.device.previewDelete` | `/api/v1/lan/device/previewDelete` | ✓ |   |   |   |
 | `lan.pair` | `/api/v1/lan/pair` | ✓ | ✓ |   |   |
 | `lan.me.get` | `/api/v1/lan/me/get` | ✓ | ✓ |   |   |
-
-## doc
-
-| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
-|---|---|---|---|---|---|
-| `doc.list` | `/api/v1/doc/list` | ✓ | ✓ |   |   |
-| `doc.create` | `/api/v1/doc/create` | ✓ | ✓ |   |   |
-| `doc.import` | `/api/v1/doc/import` | ✓ | ✓ |   |   |
-| `doc.get` | `/api/v1/doc/get` | ✓ | ✓ |   | ✓ |
-| `doc.submit` | `/api/v1/doc/submit` | ✓ | ✓ |   |   |
-| `doc.block.create` | `/api/v1/doc/block/create` | ✓ | ✓ |   | ✓ |
-| `doc.block.update` | `/api/v1/doc/block/update` | ✓ | ✓ |   | ✓ |
-| `doc.markdown.get` | `/api/v1/doc/markdown/get` | ✓ | ✓ |   |   |
-| `doc.demo` | `/api/v1/doc/demo` | ✓ |   |   |   |

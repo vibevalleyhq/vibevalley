@@ -41,46 +41,46 @@ describe("the endpoints the agents' tools stand on", () => {
       expect(yield* refusal(() => api.graph.get({ id: "nope" }))).toBe("Missing");
       expect(yield* call(() => api.memory.search({ text: "登录" }))).toMatchObject({ found: [] });
 
-      const doc = yield* call(() => api.doc.create({ title: "说明" }));
-      const made = yield* call(() => api.doc.block.create({ id: doc.doc.id, type: "heading", level: 1, text: "开头" }));
+      const doc = yield* call(() => api.artifact.create({ title: "说明" }));
+      const made = yield* call(() => api.artifact.block.create({ id: doc.id, type: "heading", level: 1, text: "开头" }));
       expect(made).toMatchObject({ status: "applied", rev: 1 });
-      expect(yield* call(() => api.doc.block.update({ id: doc.doc.id, block: made.blockId, baseRev: 1, text: "新的开头" }))).toMatchObject({
+      expect(yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "新的开头" }))).toMatchObject({
         status: "applied",
       });
-      expect(yield* call(() => api.doc.block.update({ id: doc.doc.id, block: made.blockId, baseRev: 1, text: "晚了" }))).toMatchObject({
+      expect(yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "晚了" }))).toMatchObject({
         status: "conflict",
       });
-      expect(yield* refusal(() => api.doc.block.create({ id: doc.doc.id, type: "divider", text: "" }))).toBe("Refused");
+      expect(yield* refusal(() => api.artifact.block.create({ id: doc.id, type: "divider", text: "" }))).toBe("Refused");
     }).pipe(Effect.scoped),
   );
 
-  it.live("take a doc's block in the editor's shape: the new block's content and place, the rest filled in", () =>
+  it.live("take a blocks artifact's block in the editor's shape: the new block's content and place, the rest filled in", () =>
     Effect.gen(function* () {
       const api = yield* farm;
       const before = Date.now();
-      const made = yield* call(() => api.doc.create({ title: "插入" }));
+      const made = yield* call(() => api.artifact.create({ title: "插入" }));
       const inserted = crypto.randomUUID();
       yield* call(() =>
-        api.doc.submit({
-          id: made.doc.id,
+        api.artifact.submit({
+          id: made.id,
           batchId: crypto.randomUUID(),
           lastSeq: 0,
           ops: [{ op: "insert_block", block: { id: inserted, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
         }),
       );
-      const saved = (yield* call(() => api.doc.get({ id: made.doc.id }))).blocks[0]!;
-      expect(saved).toMatchObject({ id: inserted, docId: made.doc.id, rev: 1, updatedBy: "owner", text: [{ t: "你好世界", marks: {} }] });
+      const saved = (yield* call(() => api.artifact.block.list({ id: made.id }))).blocks[0]!;
+      expect(saved).toMatchObject({ id: inserted, artifactId: made.id, rev: 1, updatedBy: "owner", text: [{ t: "你好世界", marks: {} }] });
       expect(saved.updated).toBeGreaterThanOrEqual(before);
       expect(saved.deleted).toBeUndefined();
 
-      const imported = yield* call(() => api.doc.import({ title: "拆分", markdown: "你好世界" }));
-      const source = imported.blocks[0]!;
+      const imported = yield* call(() => api.artifact.create({ title: "拆分", kind: "markdown", content: "你好世界" }));
+      const source = (yield* call(() => api.artifact.block.list({ id: imported.id }))).blocks[0]!;
       const split = crypto.randomUUID();
       yield* call(() =>
-        api.doc.submit({
-          id: imported.doc.id,
+        api.artifact.submit({
+          id: imported.id,
           batchId: crypto.randomUUID(),
-          lastSeq: imported.doc.seq,
+          lastSeq: imported.seq,
           ops: [
             {
               op: "split_block",
@@ -92,9 +92,9 @@ describe("the endpoints the agents' tools stand on", () => {
           ],
         }),
       );
-      const after = yield* call(() => api.doc.get({ id: imported.doc.id }));
+      const after = yield* call(() => api.artifact.block.list({ id: imported.id }));
       expect(after.blocks.map((b) => b.text.map((x) => x.t).join(""))).toEqual(["你好", "世界"]);
-      expect(after.blocks[1]).toMatchObject({ id: split, docId: imported.doc.id, rev: 1, updatedBy: "owner" });
+      expect(after.blocks[1]).toMatchObject({ id: split, artifactId: imported.id, rev: 1, updatedBy: "owner" });
     }).pipe(Effect.scoped),
   );
 

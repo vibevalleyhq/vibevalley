@@ -7,23 +7,24 @@ import { SqlClient, SqlSchema } from "effect/sql"
 export const AddArtifactParams = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["channel_id"]: Schema.String,
+  ["body"]: Schema.String,
+  ["channel_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
+  ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["created_at"]: Schema.Number,
 })
 export type AddArtifactParams = typeof AddArtifactParams.Type
 
 
-export const AddArtifactSql = "-- Artifacts (artifact/artifact.ts).\n\n-- name: AddArtifact :exec\ninsert into artifact (id, title, kind, channel_id, issue, by_id, by_name, version, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8);"
+export const AddArtifactSql = "-- Artifacts (artifact/artifact.ts).\n\n-- name: AddArtifact :exec\ninsert into artifact (id, title, body, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, 0,\n        $9, $9);"
 
 export const addArtifact = Effect.fn("AddArtifact")(function* (params: AddArtifactParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddArtifactParams,
-    execute: (p) => sql.unsafe(AddArtifactSql, [p["id"], p["title"], p["kind"], p["channel_id"], p["issue"], p["by_id"], p["by_name"], p["created_at"]]),
+    execute: (p) => sql.unsafe(AddArtifactSql, [p["id"], p["title"], p["body"], p["channel_id"], p["issue"], p["by_id"], p["by_name"], p["version"], p["created_at"]]),
   })(params)
 })
 
@@ -36,19 +37,23 @@ export type ArtifactParams = typeof ArtifactParams.Type
 export const ArtifactResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["channel_id"]: Schema.String,
+  ["body"]: Schema.String,
+  ["channel_id"]: Schema.NullOr(Schema.String),
+  ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["created_at"]: Schema.Number,
   ["updated_at"]: Schema.Number,
+  ["said_channel"]: Schema.NullOr(Schema.String),
+  ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
 export type ArtifactResult = typeof ArtifactResult.Type
 
 
-export const ArtifactSql = "-- name: Artifact :one\nselect \"artifact\".\"id\", \"artifact\".\"title\", \"artifact\".\"kind\", \"artifact\".\"channel_id\", \"artifact\".\"issue\", \"artifact\".\"by_id\", \"artifact\".\"by_name\", \"artifact\".\"version\", \"artifact\".\"created_at\", \"artifact\".\"updated_at\" from artifact where id = $1;"
+export const ArtifactSql = "-- name: Artifact :one\n-- With the announcing message's channel and number, where a blocks one's comments are.\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id where a.id = $1;"
 
 export const artifact = Effect.fn("Artifact")(function* (params: ArtifactParams) {
   const sql = yield* SqlClient.SqlClient
@@ -60,7 +65,7 @@ export const artifact = Effect.fn("Artifact")(function* (params: ArtifactParams)
 })
 
 export const ArtifactsInChannelParams = Schema.Struct({
-  ["channel_id"]: Schema.String,
+  ["channel_id"]: Schema.NullOr(Schema.String),
 })
 export type ArtifactsInChannelParams = typeof ArtifactsInChannelParams.Type
 
@@ -68,19 +73,23 @@ export type ArtifactsInChannelParams = typeof ArtifactsInChannelParams.Type
 export const ArtifactsInChannelResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["channel_id"]: Schema.String,
+  ["body"]: Schema.String,
+  ["channel_id"]: Schema.NullOr(Schema.String),
+  ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["created_at"]: Schema.Number,
   ["updated_at"]: Schema.Number,
+  ["said_channel"]: Schema.NullOr(Schema.String),
+  ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
 export type ArtifactsInChannelResult = typeof ArtifactsInChannelResult.Type
 
 
-export const ArtifactsInChannelSql = "-- name: ArtifactsInChannel :many\nselect \"artifact\".\"id\", \"artifact\".\"title\", \"artifact\".\"kind\", \"artifact\".\"channel_id\", \"artifact\".\"issue\", \"artifact\".\"by_id\", \"artifact\".\"by_name\", \"artifact\".\"version\", \"artifact\".\"created_at\", \"artifact\".\"updated_at\" from artifact where channel_id = $1 order by updated_at desc, id;"
+export const ArtifactsInChannelSql = "-- name: ArtifactsInChannel :many\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.channel_id = $1 order by a.updated_at desc, a.id;"
 
 export const artifactsInChannel = Effect.fn("ArtifactsInChannel")(function* (params: ArtifactsInChannelParams) {
   const sql = yield* SqlClient.SqlClient
@@ -100,19 +109,23 @@ export type ArtifactsForIssueParams = typeof ArtifactsForIssueParams.Type
 export const ArtifactsForIssueResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["channel_id"]: Schema.String,
+  ["body"]: Schema.String,
+  ["channel_id"]: Schema.NullOr(Schema.String),
+  ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["created_at"]: Schema.Number,
   ["updated_at"]: Schema.Number,
+  ["said_channel"]: Schema.NullOr(Schema.String),
+  ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
 export type ArtifactsForIssueResult = typeof ArtifactsForIssueResult.Type
 
 
-export const ArtifactsForIssueSql = "-- name: ArtifactsForIssue :many\nselect \"artifact\".\"id\", \"artifact\".\"title\", \"artifact\".\"kind\", \"artifact\".\"channel_id\", \"artifact\".\"issue\", \"artifact\".\"by_id\", \"artifact\".\"by_name\", \"artifact\".\"version\", \"artifact\".\"created_at\", \"artifact\".\"updated_at\" from artifact where issue = $1 order by updated_at desc, id;"
+export const ArtifactsForIssueSql = "-- name: ArtifactsForIssue :many\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.issue = $1 order by a.updated_at desc, a.id;"
 
 export const artifactsForIssue = Effect.fn("ArtifactsForIssue")(function* (params: ArtifactsForIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -132,19 +145,23 @@ export type ArtifactsParams = typeof ArtifactsParams.Type
 export const ArtifactsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["channel_id"]: Schema.String,
+  ["body"]: Schema.String,
+  ["channel_id"]: Schema.NullOr(Schema.String),
+  ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["created_at"]: Schema.Number,
   ["updated_at"]: Schema.Number,
+  ["said_channel"]: Schema.NullOr(Schema.String),
+  ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
 export type ArtifactsResult = typeof ArtifactsResult.Type
 
 
-export const ArtifactsSql = "-- name: Artifacts :many\nselect \"artifact\".\"id\", \"artifact\".\"title\", \"artifact\".\"kind\", \"artifact\".\"channel_id\", \"artifact\".\"issue\", \"artifact\".\"by_id\", \"artifact\".\"by_name\", \"artifact\".\"version\", \"artifact\".\"created_at\", \"artifact\".\"updated_at\" from artifact order by updated_at desc, id limit $1;"
+export const ArtifactsSql = "-- name: Artifacts :many\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\norder by a.updated_at desc, a.id limit $1;"
 
 export const artifacts = Effect.fn("Artifacts")(function* (params: ArtifactsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -170,6 +187,59 @@ export const artifactVersioned = Effect.fn("ArtifactVersioned")(function* (param
   return yield* SqlSchema.void({
     Request: ArtifactVersionedParams,
     execute: (p) => sql.unsafe(ArtifactVersionedSql, [p["version"], p["updated_at"], p["id"]]),
+  })(params)
+})
+
+export const ArtifactAcceptedParams = Schema.Struct({
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["updated_at"]: Schema.Number,
+  ["id"]: Schema.String,
+})
+export type ArtifactAcceptedParams = typeof ArtifactAcceptedParams.Type
+
+
+export const ArtifactAcceptedSql = "-- name: ArtifactAccepted :exec\n-- A batch of a blocks artifact was taken: its seq is the batch's.\nupdate artifact set seq = $1, updated_at = $2 where id = $3;"
+
+export const artifactAccepted = Effect.fn("ArtifactAccepted")(function* (params: ArtifactAcceptedParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ArtifactAcceptedParams,
+    execute: (p) => sql.unsafe(ArtifactAcceptedSql, [p["seq"], p["updated_at"], p["id"]]),
+  })(params)
+})
+
+export const ArtifactSaidParams = Schema.Struct({
+  ["message_id"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type ArtifactSaidParams = typeof ArtifactSaidParams.Type
+
+
+export const ArtifactSaidSql = "-- name: ArtifactSaid :exec\nupdate artifact set message_id = $1 where id = $2;"
+
+export const artifactSaid = Effect.fn("ArtifactSaid")(function* (params: ArtifactSaidParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ArtifactSaidParams,
+    execute: (p) => sql.unsafe(ArtifactSaidSql, [p["message_id"], p["id"]]),
+  })(params)
+})
+
+export const ArtifactRenamedParams = Schema.Struct({
+  ["title"]: Schema.String,
+  ["updated_at"]: Schema.Number,
+  ["id"]: Schema.String,
+})
+export type ArtifactRenamedParams = typeof ArtifactRenamedParams.Type
+
+
+export const ArtifactRenamedSql = "-- name: ArtifactRenamed :exec\nupdate artifact set title = $1, updated_at = $2 where id = $3;"
+
+export const artifactRenamed = Effect.fn("ArtifactRenamed")(function* (params: ArtifactRenamedParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ArtifactRenamedParams,
+    execute: (p) => sql.unsafe(ArtifactRenamedSql, [p["title"], p["updated_at"], p["id"]]),
   })(params)
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { Block, BlockAttrs, DocOp, DocOpStatus, DocSpan } from "@vibevalley/protocol";
+import type { Block, BlockAttrs, BlockOp, BlockOpStatus, TextSpan } from "@vibevalley/protocol";
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { ordered, Page } from "./ops.ts";
@@ -7,7 +7,7 @@ import { normal, plain, runeLen, sameText, splitAt } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
 const block = (b: Partial<Block> & Pick<Block, "id" | "orderKey" | "type">): Block => ({
-  docId: "d",
+  artifactId: "d",
   attrs: {},
   text: [],
   rev: 1,
@@ -93,7 +93,7 @@ describe("order keys", () => {
 });
 
 describe("ops", () => {
-  const cases: { name: string; blocks: Block[]; history?: Record<string, Record<number, string>>; ops: DocOp[]; status: DocOpStatus[]; want: string }[] = [
+  const cases: { name: string; blocks: Block[]; history?: Record<string, Record<number, string>>; ops: BlockOp[]; status: BlockOpStatus[]; want: string }[] = [
     { name: "insert", blocks: [para("a", "V", "一")], ops: [{ op: "insert_block", block: para("b", "W", "二") }], status: ["applied"], want: "a=一 b=二" },
     {
       name: "insert refused",
@@ -250,7 +250,7 @@ describe("ops", () => {
       "restore_block",
       "split_block",
       "merge_blocks",
-    ] satisfies DocOp["op"][];
+    ] satisfies BlockOp["op"][];
     for (const op of ops)
       expect(
         new Page("d", "owner", 1, []).apply({
@@ -298,7 +298,7 @@ const attrsText = (a: BlockAttrs) => {
   return parts.sort().join(",");
 };
 
-const spansText = (spans: readonly DocSpan[]) =>
+const spansText = (spans: readonly TextSpan[]) =>
   spans
     .map(
       (s) =>
@@ -331,7 +331,7 @@ describe("markdown", () => {
     const got = shape(first);
     for (const w of [
       `0 heading level=1 "周报：VibeValley 🌾"`,
-      `0 paragraph  "这周把"+"块编辑器"B+"的第一步做完了，"+"顺利"I+" 😀。见 "+"设计"L(https://example.com/a_b)+" 和 "+"doc.submit"C+"，"+"不用 CRDT"S+"。"`,
+      `0 paragraph  "这周把"+"块编辑器"B+"的第一步做完了，"+"顺利"I+" 😀。见 "+"设计"L(https://example.com/a_b)+" 和 "+"artifact.submit"C+"，"+"不用 CRDT"S+"。"`,
       `1 bulleted  "子项：中文、emoji 👍🏽"`,
       `0 todo checked=true "合并段落"`,
       `0 quote  "引用一句\\n第二行"`,
@@ -362,7 +362,7 @@ describe("markdown", () => {
           span("word"),
         ],
       }),
-      block({ id: "s", orderKey: "VV", type: "paragraph", text: [span("doc_block_create 和 doc_block_update 是工具名")] }),
+      block({ id: "s", orderKey: "VV", type: "paragraph", text: [span("artifact_block_create 和 artifact_block_update 是工具名")] }),
       block({ id: "b", orderKey: "W", type: "paragraph", text: [span("- 像列表的段落")] }),
       block({ id: "c", orderKey: "X", type: "bulleted", text: [span("[ ] 像待办的列表")] }),
       block({ id: "d", orderKey: "Y", type: "numbered", text: [span("一")] }),

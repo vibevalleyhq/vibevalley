@@ -111,9 +111,6 @@ export const blockIssueRef = "issue_ref";
 /** Attrs.MemoryID, and text. */
 export const blockMemoryItem = "memory_item";
 
-/** Who wrote a block when the owner did; a helper's blocks carry its profile id. */
-export const docOwner = "owner";
-
 export interface ServerReady {
   url: string;
   pid: number;
@@ -296,12 +293,15 @@ export interface Attachment {
 /** The one read that is not a POST, since an <img src> can only GET. */
 export const attachmentPath = (id: string) => `/api/v1/attachment/${id}`;
 
-/** A page an agent or the owner made (docs/subsystems/artifact.md): a whole HTML page, run sandboxed, or Markdown the page
- * draws itself. */
+/** What the owner and the agents leave for people to read (docs/subsystems/artifact.md). Its body is blocks, written
+ * together block by block, or html, a whole page handed in version by version and run sandboxed. */
+export const ArtifactBodyValues = ["blocks", "html"] as const;
+export type ArtifactBody = (typeof ArtifactBodyValues)[number];
+
+/** What a maker hands in: a whole HTML page, or Markdown, which is read into blocks. */
 export const ArtifactKindValues = ["html", "markdown"] as const;
 export type ArtifactKind = (typeof ArtifactKindValues)[number];
 
-/** At most this many bytes a version; a title at most artifactTitleMax characters. */
 export const artifactMax = 5 * 1024 * 1024;
 export const artifactTitleMax = 80;
 
@@ -313,7 +313,8 @@ export const artifactPath = (id: string, version: number) => `${artifactPrefix}$
 export interface ArtifactCard {
   id: string;
   title: string;
-  kind: ArtifactKind;
+  body: ArtifactBody;
+  /** html: the version announced; blocks: 0. */
   version: number;
   /** What this version changed, in the maker's words. */
   note?: string;
@@ -335,26 +336,31 @@ export interface ArtifactVersion {
 export interface Artifact {
   id: string;
   title: string;
-  kind: ArtifactKind;
-  /** The channel or thread it was announced in. */
-  channel: string;
+  body: ArtifactBody;
+  /** The channel or thread it was announced in; none for one the owner started on the page. */
+  channel?: string;
+  /** The message that first announced it: a blocks one's comments are the replies to it. */
+  said?: { channel: string; number: number };
   issue?: string;
   by: string;
   byName: string;
-  /** The latest version. */
+  /** html: the latest version; blocks: 0. */
   version: number;
-  /** Oldest first. */
+  /** blocks: the batches taken; html: 0. */
+  seq: number;
+  /** html: each version, oldest first; blocks: none. */
   versions: ArtifactVersion[];
   at: number;
   updated: number;
 }
 
-/** channel: where it is announced, the caller's own place when absent (a helper's issue thread, the channel the
- * orchestrator answers); issue: the issue it is for, a helper's own when absent. */
+/** Without content, an empty blocks artifact to write in, not announced (the owner's 新建). With content, a hand-in:
+ * announced in channel, the caller's own place when absent (a helper's issue thread, the channel the orchestrator answers);
+ * issue: the issue it is for, a helper's own when absent. */
 export interface ArtifactRequest {
   title: string;
-  kind: ArtifactKind;
-  content: string;
+  kind?: ArtifactKind;
+  content?: string;
   note?: string;
   channel?: string;
   issue?: string;
@@ -2538,15 +2544,7 @@ export interface LiveEventRuntime {
   info: RuntimeInfo;
 }
 
-export interface Document {
-  id: string;
-  title: string;
-  seq: number;
-  created: number;
-  updated: number;
-}
-
-export interface DocMarks {
+export interface SpanMarks {
   bold?: boolean;
   italic?: boolean;
   code?: boolean;
@@ -2554,9 +2552,9 @@ export interface DocMarks {
   link?: string;
 }
 
-export interface DocSpan {
+export interface TextSpan {
   t: string;
-  marks: DocMarks;
+  marks: SpanMarks;
 }
 
 export interface BlockAttrs {
@@ -2578,91 +2576,82 @@ export interface BlockInput {
   orderKey: string;
   type: string;
   attrs: BlockAttrs;
-  text: DocSpan[];
+  text: TextSpan[];
 }
 
 export interface Block extends BlockInput {
-  docId: string;
+  artifactId: string;
   rev: number;
   deleted?: boolean;
   updatedBy: string;
   updated: number;
 }
 
-export interface DocSnapshot {
-  doc: Document;
+export interface BlockSnapshot {
+  artifact: Artifact;
   blocks: Block[];
 }
 
-export interface DocRequest {
-  title: string;
-}
-
-export interface DocImport {
-  title: string;
-  markdown: string;
-}
-
-export interface DocMarkdown {
+export interface ArtifactMarkdown {
   markdown: string;
 }
 
 /** Told apart by `op`. */
-export type DocOp =
-  | DocOpInsertBlock
-  | DocOpUpdateText
-  | DocOpSetAttrs
-  | DocOpSetType
-  | DocOpMoveBlock
-  | DocOpDeleteBlock
-  | DocOpRestoreBlock
-  | DocOpSplitBlock
-  | DocOpMergeBlocks;
+export type BlockOp =
+  | BlockOpInsertBlock
+  | BlockOpUpdateText
+  | BlockOpSetAttrs
+  | BlockOpSetType
+  | BlockOpMoveBlock
+  | BlockOpDeleteBlock
+  | BlockOpRestoreBlock
+  | BlockOpSplitBlock
+  | BlockOpMergeBlocks;
 
-export interface DocOpInsertBlock {
+export interface BlockOpInsertBlock {
   op: "insert_block";
   block: BlockInput;
 }
 
-export interface DocOpUpdateText {
+export interface BlockOpUpdateText {
   op: "update_text";
   blockId: string;
   baseRev: number;
-  text: DocSpan[];
+  text: TextSpan[];
 }
 
-export interface DocOpSetAttrs {
+export interface BlockOpSetAttrs {
   op: "set_attrs";
   blockId: string;
   attrs: BlockAttrs;
   unset?: string[];
 }
 
-export interface DocOpSetType {
+export interface BlockOpSetType {
   op: "set_type";
   blockId: string;
   type: string;
   attrs: BlockAttrs;
 }
 
-export interface DocOpMoveBlock {
+export interface BlockOpMoveBlock {
   op: "move_block";
   blockId: string;
   parentId?: string;
   orderKey: string;
 }
 
-export interface DocOpDeleteBlock {
+export interface BlockOpDeleteBlock {
   op: "delete_block";
   blockId: string;
 }
 
-export interface DocOpRestoreBlock {
+export interface BlockOpRestoreBlock {
   op: "restore_block";
   blockId: string;
 }
 
-export interface DocOpSplitBlock {
+export interface BlockOpSplitBlock {
   op: "split_block";
   blockId: string;
   baseRev: number;
@@ -2670,23 +2659,23 @@ export interface DocOpSplitBlock {
   newBlock: BlockInput;
 }
 
-export interface DocOpMergeBlocks {
+export interface BlockOpMergeBlocks {
   op: "merge_blocks";
   targetId: string;
   sourceId: string;
 }
 
-export interface DocSubmit {
+export interface BlockSubmit {
   batchId: string;
   lastSeq: number;
-  ops: DocOp[];
+  ops: BlockOp[];
 }
 
-export const DocOpStatusValues = ["applied", "merged", "conflict", "noop", "rejected"] as const;
-export type DocOpStatus = (typeof DocOpStatusValues)[number];
+export const BlockOpStatusValues = ["applied", "merged", "conflict", "noop", "rejected"] as const;
+export type BlockOpStatus = (typeof BlockOpStatusValues)[number];
 
 /** A block appended at a document's end. */
-export interface DocBlockCreate {
+export interface BlockCreate {
   /** paragraph (the default), heading, bulleted, numbered, todo, quote or code. */
   type?: string;
   /** A heading's: 1 to 3, 2 when none. */
@@ -2695,25 +2684,25 @@ export interface DocBlockCreate {
 }
 
 /** A block's text rewritten against the rev it was read at: a newer rev is a conflict, not an overwrite. */
-export interface DocBlockUpdate {
+export interface BlockUpdate {
   block: string;
   baseRev: number;
   text: string;
 }
 
-export interface DocOpResult {
-  status: DocOpStatus;
+export interface BlockOpResult {
+  status: BlockOpStatus;
   blockId: string;
   rev?: number;
-  text?: DocSpan[];
-  yours?: DocSpan[];
+  text?: TextSpan[];
+  yours?: TextSpan[];
   reason?: string;
 }
 
-export interface DocAck {
+export interface BlockAck {
   batchId: string;
   seq: number;
-  results: DocOpResult[];
+  results: BlockOpResult[];
   blocks: Block[];
 }
 
