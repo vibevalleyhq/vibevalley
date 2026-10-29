@@ -191,6 +191,8 @@ export interface Handlers<R = never> {
   /** An html one's new version over the latest; the old ones stay. Announced like the first. A blocks one is changed
    * block by block instead. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  /** Its title, as the owner renames it. */
+  readonly "artifact.update": (a: { readonly id: string; readonly title: string }) => Effect.Effect<T.Artifact, ApiError, R>;
   readonly "artifact.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "artifact.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   /** A blocks artifact and every live block (no tombstones), in order. */
@@ -826,6 +828,13 @@ export const endpoints: readonly Endpoint[] = [
     input: S.ArtifactVersionRequest,
     result: S.Artifact,
     can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.update",
+    about: ["id"],
+    input: input({ id: Schema.String, title: Schema.String }),
+    result: S.Artifact,
+    can: ["owner", "remote"],
   },
   {
     op: "artifact.delete",

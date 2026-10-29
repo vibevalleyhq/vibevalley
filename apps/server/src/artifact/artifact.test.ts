@@ -69,6 +69,8 @@ describe("an artifact", () => {
       expect([(yield* artifacts.blocks(blank.id)).blocks, (yield* chat.history(chat.defaultChannel())).length]).toEqual([[], before]);
       const html = yield* artifacts.create(owner, { title: "页", kind: "html", content: page("页") });
       expect(yield* Effect.flip(artifacts.blocks(html.id))).toMatchObject({ _tag: "Refused" });
+      expect((yield* artifacts.rename(blank.id, "  第 43 周  ")).title).toBe("第 43 周");
+      expect(yield* Effect.flip(artifacts.rename(blank.id, " "))).toMatchObject({ _tag: "Refused" });
     }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
   );
 

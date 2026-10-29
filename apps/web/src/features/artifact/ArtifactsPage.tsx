@@ -1,9 +1,9 @@
 import { t } from "@vibevalley/i18n";
-// 产出 (docs/subsystems/artifact.md): every artifact on the left, newest change first, and a new one to write in; the one
-// open on the right, written block by block or looked at as a page, with its versions and a reply that reaches its maker.
+// 产出 (docs/subsystems/artifact.md): every artifact on the left, newest change first, found by its title; the one open on
+// the right, written block by block or looked at as a page, with its versions and a reply that reaches its maker.
 
 import { type Artifact, type ArtifactVersion, artifactPath } from "@vibevalley/protocol";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { api, reasonOf } from "../../base/api";
 import { ago } from "../../base/format";
 import { useCore } from "../../base/frame";
@@ -12,14 +12,14 @@ import { useRouter, useSearch } from "../../base/router";
 import { Keyed, useNow } from "../../base/util";
 import { A } from "../../ui/A";
 import { Button } from "../../ui/Button";
-import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Empty } from "../../ui/Empty";
-import { TextArea, TextInput } from "../../ui/Field";
+import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
-import { OutLink } from "../../ui/IconButton";
+import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { Tag } from "../../ui/Tag";
 import { toast } from "../../ui/toasts";
 import { BlocksView } from "./BlocksView";
+import type { BlockEditor } from "./editor";
 import { bodyIcon, bodyLabel } from "./ArtifactCard";
 import { artifactHref, useArtifact, useArtifacts } from "./data";
 
@@ -30,25 +30,30 @@ const sandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 const messageHref = (at: { readonly channel: string; readonly number?: number }) =>
   at.number !== undefined ? `/chat/${at.channel}?m=${at.number}` : `/chat/${at.channel}`;
 
+/** The one just made with 新建: its title is selected to be typed over when it opens. */
+const [justMade, setJustMade] = createSignal<string>();
+
 /** `rest` is the path after /artifacts/. */
 export function ArtifactsPage(props: { rest: string }) {
   const router = useRouter();
   const now = useNow();
   const all = useArtifacts(() => ({}));
+  const [query, setQuery] = createSignal("");
   const list = () => ready(all, []);
+  const shown = () => {
+    const q = query().trim().toLowerCase();
+    return q ? list().filter((a) => a.title.toLowerCase().includes(q)) : list();
+  };
   const id = () => (props.rest ? decodeURIComponent(props.rest) : undefined);
   const open = () => id() ?? list()[0]?.id;
-  const [title, setTitle] = createSignal("");
-  const [problem, setProblem] = createSignal<string>();
   const create = async () => {
     try {
-      const made = await api.artifact.create({ title: title() });
-      setTitle("");
-      setProblem(undefined);
+      const made = await api.artifact.create({ title: t("web.artifact.page.untitled") });
+      setJustMade(made.id);
       await queries.invalidateQueries({ queryKey: ["artifacts"] });
       router.navigate(artifactHref(made.id));
     } catch (e) {
-      setProblem(reasonOf(e));
+      toast(reasonOf(e), "bad");
     }
   };
   return (
@@ -56,34 +61,35 @@ export function ArtifactsPage(props: { rest: string }) {
       <nav
         aria-label={t("web.artifact.page.list")}
         data-testid="artifact-list"
-        class={[id() ? "hidden lg:flex" : "flex", "shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto"]}
+        class={[id() ? "hidden lg:flex" : "flex", "min-h-0 shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72"]}
       >
-        <form
-          class="flex gap-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void create();
-          }}
-        >
-          <TextInput
-            data-testid="new-artifact-title"
-            aria-label={t("web.artifact.page.newTitle")}
-            placeholder={t("web.artifact.page.newTitle")}
-            value={title()}
-            onInput={(e) => setTitle(e.currentTarget.value)}
-          />
-          <Button type="submit" tone="primary" icon="add" data-testid="new-artifact">
+        <div class="flex gap-1.5">
+          <label class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
+            <Icon name="search" size={14} class="shrink-0 text-muted" />
+            <input
+              data-testid="artifact-search"
+              value={query()}
+              onInput={(e) => setQuery(e.currentTarget.value)}
+              placeholder={t("web.artifact.page.find")}
+              aria-label={t("web.artifact.page.find")}
+              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+            />
+          </label>
+          <Button tone="primary" icon="add" data-testid="new-artifact" onClick={() => void create()}>
             {t("web.artifact.page.new")}
           </Button>
-        </form>
-        <Show when={problem() || all.error}>
-          <p class="px-2 text-xs text-berry">{problem() ?? reasonOf(all.error)}</p>
+        </div>
+        <Show when={all.error}>
+          <p class="px-2 text-xs text-berry">{reasonOf(all.error)}</p>
         </Show>
         <Show when={all.isSuccess && list().length === 0}>
           <p class="px-2 text-xs text-muted lg:hidden">{t("web.artifact.page.none")}</p>
         </Show>
-        <ul class="flex flex-col gap-0.5">
-          <For each={list()} keyed={(a) => a.id}>
+        <Show when={list().length > 0 && shown().length === 0}>
+          <p class="px-2 text-xs text-muted">{t("web.artifact.page.nothingFound")}</p>
+        </Show>
+        <ul class="scroll-fade-y -mx-2 flex min-h-0 flex-col gap-0.5 overflow-y-auto px-2">
+          <For each={shown()} keyed={(a) => a.id}>
             {(a) => (
               <li>
                 <A
@@ -92,7 +98,11 @@ export function ArtifactsPage(props: { rest: string }) {
                   data-key={a().id}
                   data-body={a().body}
                   aria-current={a().id === open() ? "page" : undefined}
-                  class={["flex items-start gap-2 rounded-md px-2 py-1.5", a().id === open() ? "bg-selected" : "hover:bg-hover"]}
+                  class={[
+                    "flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-120",
+                    // With no address, the first is open only where there is room to show it beside the list.
+                    a().id === id() ? "bg-selected" : a().id === open() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
+                  ]}
                 >
                   <Icon name={bodyIcon[a().body]} size={16} class="mt-0.5 shrink-0 text-muted" />
                   <span class="flex min-w-0 flex-col">
@@ -119,7 +129,16 @@ export function ArtifactsPage(props: { rest: string }) {
           when={open()}
           fallback={
             <Show when={all.isSuccess}>
-              <Empty icon="artifacts">{t("web.artifact.page.none")}</Empty>
+              <Empty
+                icon="artifacts"
+                action={
+                  <Button icon="add" onClick={() => void create()}>
+                    {t("web.artifact.page.new")}
+                  </Button>
+                }
+              >
+                {t("web.artifact.page.none")}
+              </Empty>
             </Show>
           }
         >
@@ -133,9 +152,63 @@ export function ArtifactsPage(props: { rest: string }) {
 function Opened(props: { id: string }) {
   const found = useArtifact(() => props.id);
   return (
-    <Show when={ready(found, undefined)} fallback={<Show when={found.isError}>{<Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>}</Show>}>
+    <Show
+      when={ready(found, undefined)}
+      fallback={
+        <Show when={found.isError}>
+          <Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>
+        </Show>
+      }
+    >
       {(a) => <Shown artifact={a()} />}
     </Show>
+  );
+}
+
+/** The title, typed over in place: Enter or leaving it renames, Escape puts it back. */
+function Title(props: { artifact: Artifact }) {
+  const [text, setText] = createSignal(untrack(() => props.artifact.title));
+  // Taken while the component is made: a ref runs where the props may not be read yet.
+  const initialFresh = untrack(justMade) === untrack(() => props.artifact.id);
+  let field!: HTMLInputElement;
+  const save = async () => {
+    const title = text().trim();
+    if (!title || title === props.artifact.title) return setText(props.artifact.title);
+    try {
+      await api.artifact.update({ id: props.artifact.id, title });
+      void queries.invalidateQueries({ queryKey: ["artifacts"] });
+    } catch (e) {
+      toast(reasonOf(e), "bad");
+      setText(props.artifact.title);
+    }
+  };
+  return (
+    <input
+      ref={(el) => {
+        field = el;
+        if (initialFresh)
+          queueMicrotask(() => {
+            setJustMade(undefined);
+            field.focus();
+            field.select();
+          });
+      }}
+      data-testid="artifact-title"
+      aria-label={t("web.artifact.page.title")}
+      value={text()}
+      maxlength={80}
+      onInput={(e) => setText(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.isComposing) return;
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          setText(props.artifact.title);
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={() => void save()}
+      class="-mx-1 min-w-0 flex-1 truncate rounded-md bg-transparent px-1 text-xl leading-8 font-semibold outline-none hover:bg-hover focus:bg-hover"
+    />
   );
 }
 
@@ -144,6 +217,7 @@ function Shown(props: { artifact: Artifact }) {
   const router = useRouter();
   const core = useCore();
   const now = useNow();
+  const [asking, setAsking] = createSignal(false);
   const html = () => props.artifact.body === "html";
   const asked = () => Number(search().get("v"));
   const version = createMemo(() => props.artifact.versions.find((v) => v.version === asked()) ?? props.artifact.versions.at(-1));
@@ -151,6 +225,10 @@ function Shown(props: { artifact: Artifact }) {
   /** Where its comments are: the version shown, else where it was first said. */
   const said = () => version() ?? props.artifact.said;
   const pick = (n: number) => router.navigate(artifactHref(props.artifact.id, n === props.artifact.version ? undefined : n), { replace: true });
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(location.origin + artifactHref(props.artifact.id));
+    toast(t("web.artifact.page.copied"));
+  };
   const remove = async () => {
     try {
       const title = props.artifact.title;
@@ -163,42 +241,71 @@ function Shown(props: { artifact: Artifact }) {
       toast(reasonOf(e), "bad");
     }
   };
+  const openTab = () => {
+    const v = version();
+    if (v) window.open(artifactPath(props.artifact.id, v.version), "_blank", "noopener");
+  };
+  let editor: BlockEditor | undefined;
+  const demo = () => void editor?.demo();
+  const more = (): MoreItem[] => [
+    ...(html() ? [{ key: "open", label: t("web.artifact.page.open"), icon: "open" as const, onSelect: openTab }] : []),
+    { key: "copy-link", label: t("web.artifact.page.copyLink"), icon: "copy", onSelect: () => void copyLink() },
+    ...(html() ? [] : [{ key: "demo", label: t("web.artifact.blocks.demo"), icon: "play" as const, onSelect: demo }]),
+    { key: "delete", label: t("web.artifact.page.delete"), icon: "delete", danger: true, onSelect: () => setAsking(true) },
+  ];
   return (
     <div
       data-testid="artifact"
       data-key={props.artifact.id}
       data-body={props.artifact.body}
       data-version={version()?.version}
-      class="flex min-h-0 flex-1 flex-col gap-3 rounded-lg border border-line bg-page p-4 lg:flex-row"
+      class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row"
     >
-      <section class="flex min-h-[70vh] min-w-0 flex-1 flex-col gap-3 lg:min-h-0">
-        <header class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 class="min-w-0 truncate text-xl font-semibold">{props.artifact.title}</h1>
-          <Tag label={bodyLabel[props.artifact.body]} tone="wait" />
-          <span class="text-xs text-muted">
-            {t("web.artifact.page.by", { name: props.artifact.byName })} · {t("web.artifact.page.updated", { when: ago(props.artifact.updated, now()) })}
-          </span>
-          <Show when={issue()}>
-            {(i) => (
-              <A href={`/issues/${i().id}`} data-testid="artifact-issue" class="text-xs text-water hover:underline">
-                {t("web.artifact.page.forIssue", { number: i().number })}
-              </A>
-            )}
+      <section class="flex min-h-[70vh] min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:pl-2">
+        {/* A blocks one's header lines up with its text, past the gutter of faces and author bars (BlocksView). */}
+        <header class={["flex flex-col gap-1 pt-1", html() ? "" : "lg:pl-[35px]"]}>
+          <div class="flex items-center gap-2">
+            <Title artifact={props.artifact} />
+            <MoreMenu label={t("web.artifact.page.more")} testid="artifact-more" items={more()} />
+          </div>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <Tag label={bodyLabel[props.artifact.body]} tone="wait" />
+            <span>{t("web.artifact.page.by", { name: props.artifact.byName })}</span>
+            <span aria-hidden="true">·</span>
+            <span>{t("web.artifact.page.updated", { when: ago(props.artifact.updated, now()) })}</span>
+            <Show when={issue()}>
+              {(i) => (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <A href={`/issues/${i().id}`} data-testid="artifact-issue" class="text-water hover:underline">
+                    {t("web.artifact.page.forIssue", { number: i().number })}
+                  </A>
+                </>
+              )}
+            </Show>
+          </div>
+          <Show when={asking()}>
+            <div
+              role="group"
+              data-testid="artifact-delete"
+              class="mt-2 flex animate-fade-in flex-wrap items-center gap-2 rounded-md bg-bad-soft px-3 py-2"
+              onKeyDown={(e) => e.key === "Escape" && setAsking(false)}
+            >
+              <span class="min-w-0 flex-1 text-sm text-berry">{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</span>
+              <Button
+                tone="danger"
+                icon="delete"
+                data-testid="artifact-delete-sure"
+                ref={(el) => queueMicrotask(() => el.focus())}
+                onClick={() => void remove()}
+              >
+                {t("web.artifact.page.delete")}
+              </Button>
+              <Button onClick={() => setAsking(false)}>{t("web.base.form.never")}</Button>
+            </div>
           </Show>
-          <span class="flex-1" />
-          <Show when={html() ? version() : undefined}>
-            {(v) => <OutLink href={artifactPath(props.artifact.id, v().version)} label={t("web.artifact.page.open")} />}
-          </Show>
-          <ConfirmButton
-            label={t("web.artifact.page.delete")}
-            question={t("web.artifact.page.deleteAsk")}
-            tone="danger"
-            icon="delete"
-            testid="artifact-delete"
-            onConfirm={remove}
-          />
         </header>
-        <Show when={html() ? version() : undefined} fallback={<BlocksView id={props.artifact.id} />}>
+        <Show when={html() ? version() : undefined} fallback={<BlocksView id={props.artifact.id} onEditor={(e) => (editor = e)} />}>
           {(v) => (
             <iframe
               data-testid="artifact-frame"
@@ -212,45 +319,50 @@ function Shown(props: { artifact: Artifact }) {
         </Show>
       </section>
       <Show when={html() || said()}>
-        <aside class="flex shrink-0 flex-col gap-3 lg:w-72">
+        <aside class="flex shrink-0 flex-col gap-4 border-line lg:w-72 lg:border-l lg:pl-4">
           <Show when={html()}>
-            <h2 class="text-xs font-semibold text-muted">{t("web.artifact.page.versions")}</h2>
-            <ol data-testid="artifact-versions" class="flex flex-col gap-1">
-              <For each={[...props.artifact.versions].reverse()} keyed={(v) => v.version}>
-                {(v) => (
-                  <li>
-                    <button
-                      type="button"
-                      data-key={v().version}
-                      aria-pressed={v().version === version()?.version ? "true" : "false"}
-                      onClick={() => pick(v().version)}
-                      class={[
-                        "flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left",
-                        v().version === version()?.version ? "bg-selected" : "hover:bg-hover",
-                      ]}
-                    >
-                      <span class="text-sm font-medium">
-                        {t("web.artifact.card.version", { version: v().version })}{" "}
-                        <span class="text-xs font-normal text-muted">
-                          · {v().byName} · {ago(v().at, now())}
+            <div class="flex flex-col gap-1.5">
+              <h2 class="text-xs font-semibold text-muted">{t("web.artifact.page.versions")}</h2>
+              <ol data-testid="artifact-versions" class="flex flex-col gap-0.5">
+                <For each={[...props.artifact.versions].reverse()} keyed={(v) => v.version}>
+                  {(v) => (
+                    <li>
+                      <button
+                        type="button"
+                        data-key={v().version}
+                        aria-pressed={v().version === version()?.version ? "true" : "false"}
+                        onClick={() => pick(v().version)}
+                        class={[
+                          "flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left transition-colors duration-120",
+                          v().version === version()?.version ? "bg-selected" : "hover:bg-hover",
+                        ]}
+                      >
+                        <span class="text-sm font-medium">
+                          {t("web.artifact.card.version", { version: v().version })}{" "}
+                          <span class="text-xs font-normal text-muted">
+                            · {v().byName} · {ago(v().at, now())}
+                          </span>
                         </span>
-                      </span>
-                      <Show when={v().note}>{(note) => <span class="text-xs text-muted">{note()}</span>}</Show>
-                    </button>
-                  </li>
-                )}
-              </For>
-            </ol>
+                        <Show when={v().note}>{(note) => <span class="text-xs text-muted">{note()}</span>}</Show>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </div>
           </Show>
           <Show when={said()}>
             {(at) => (
-              <>
-                <A href={messageHref(at())} data-testid="artifact-message" class="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
-                  <Icon name="chat" size={12} />
-                  {t("web.artifact.talk.atMessage")}
-                </A>
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <h2 class="text-xs font-semibold text-muted">{version() ? t("web.artifact.talk.replyVersion") : t("web.artifact.talk.reply")}</h2>
+                  <A href={messageHref(at())} data-testid="artifact-message" class="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
+                    <Icon name="chat" size={12} />
+                    {t("web.artifact.talk.atMessage")}
+                  </A>
+                </div>
                 <Reply at={at()} version={version()} />
-              </>
+              </div>
             )}
           </Show>
         </aside>
@@ -292,6 +404,12 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
         rows={3}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void send();
+          }
+        }}
       />
       <Button type="submit" tone="primary" icon="reply" disabled={!text().trim() || busy()} data-testid="artifact-send" class="self-end">
         {t("web.artifact.talk.send")}

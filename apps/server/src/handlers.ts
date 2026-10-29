@@ -185,6 +185,7 @@ export const handlers = Effect.gen(function* () {
         artifacts.create({ from: ownerId, by: ownerId }, { ...req, ...(issue ? { issue } : {}) }),
       ),
     "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),
+    "artifact.update": ({ id, title }) => artifacts.rename(id, title),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
     "artifact.blocks.get": ({ id }) => artifacts.blocks(id),

@@ -50,7 +50,8 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   expect(violations.map((v) => v.id)).toEqual([]);
 
   // Deleted: back to 产出, its cards stay.
-  await page.getByTestId("artifact-delete").click();
+  await page.getByTestId("artifact-more").click();
+  await page.locator('[role="menuitem"][data-key="delete"]').click();
   await page.getByTestId("artifact-delete-sure").click();
   await expect(page).toHaveURL(/\/artifacts$/);
   await expect(api.artifact.get({ id: made.id })).rejects.toBeTruthy();

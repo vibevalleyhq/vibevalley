@@ -24,12 +24,10 @@ import { api } from "../../base/api";
 import { BlockEditor, type EditBlock } from "./editor";
 import { hexColor, swatches } from "../../ui/cast";
 import { knownTypes } from "./blocks";
-import { aria } from "../../base/util";
 import { createExternal } from "../../base/external";
 import { ready, useAgents } from "../../base/query";
-import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
+import { Checkbox } from "../../ui/Checkbox";
 
 /** The owner's lines on the attribution bar. */
 const ownerColor = "#c8a46e";
@@ -60,12 +58,14 @@ interface Row {
   readonly wanted: boolean;
 }
 
-/** Keyed by the id by its caller: one editor for the page's life. */
-export function BlocksView(props: { id: string }) {
+/** Keyed by the id by its caller: one editor for the page's life, handed to onEditor for what the page's menu does
+ * with it (the demo, which polls faster while it runs). */
+export function BlocksView(props: { id: string; onEditor?: (editor: BlockEditor) => void }) {
   const editor = new BlockEditor(
     api,
     untrack(() => props.id),
   );
+  untrack(() => props.onEditor)?.(editor);
   onSettled(() => {
     void editor.load();
     return () => editor.dispose();
@@ -121,14 +121,10 @@ export function BlocksView(props: { id: string }) {
       data-writing={(version(), editor.othersWriting) ? "" : undefined}
       class="flex min-h-0 flex-1 flex-col"
     >
-      <div class="flex items-center gap-2 pb-2 pl-[35px]">
-        <p role="status" class={["min-w-0 flex-1 truncate text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
-          {status()}
-        </p>
-        <Button tone="quiet" icon="play" data-testid="artifact-demo" onClick={() => void editor.demo()}>
-          {t("web.artifact.blocks.demo")}
-        </Button>
-      </div>
+      {/* Nothing written yet has nothing to report; the line comes with the first block. */}
+      <p role="status" class={["truncate pb-2 pl-[35px] text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
+        {(version(), editor.blocks.length > 0 || editor.busy || editor.error) ? status() : ""}
+      </p>
       <div class="min-h-0 flex-1 overflow-y-auto pr-3">
         <For each={rows()} keyed={(r) => r.block.id}>
           {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} />}
@@ -138,9 +134,11 @@ export function BlocksView(props: { id: string }) {
           type="button"
           data-testid="artifact-append"
           aria-label={t("web.artifact.blocks.append")}
-          class="block h-16 w-full cursor-text"
+          class="block h-16 w-full cursor-text pl-[35px] text-left text-base text-faint"
           onClick={() => editor.append()}
-        />
+        >
+          {(version(), editor.blocks.length === 0 && !editor.busy) ? t("web.artifact.blocks.start") : ""}
+        </button>
       </div>
     </article>
   );
@@ -161,27 +159,19 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent }) {
         return <span class="text-xs text-muted">{t("web.artifact.blocks.memoryItem")}</span>;
       case blockTodo:
         return (
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={aria(r().attrs.checked ?? false)}
-            aria-label={r().attrs.checked ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
-            onClick={() => props.editor.toggle(r().block)}
-            class={[
-              "mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-xs border-[1.5px]",
-              r().attrs.checked ? "border-leaf-600 bg-leaf" : "border-bark-400 bg-paper",
-            ]}
-          >
-            <Show when={r().attrs.checked}>
-              <Icon name="check" size={10} />
-            </Show>
-          </button>
+          <Checkbox
+            class="mt-1"
+            checked={r().attrs.checked ?? false}
+            label={r().attrs.checked ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
+            onChange={() => props.editor.toggle(r().block)}
+          />
         );
       default:
         return undefined;
     }
   };
-  const box = () => (r().type === blockQuote ? "border-l-[3px] border-cream-300 pl-3" : r().type === blockCode ? "rounded-md bg-ink-100 px-3 py-2" : "");
+  const box = () =>
+    r().type === blockQuote ? "border-l-[3px] border-line pl-3" : r().type === blockCode ? "rounded-md bg-code-bg px-3 py-2 text-code-ink" : "";
   const kind = () =>
     !knownTypes.has(r().type)
       ? "unknown"
@@ -247,19 +237,24 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent }) {
 }
 
 function Placeholder(props: { text: string }) {
-  return <div class="rounded-md border border-line bg-ink-100 px-2.5 py-1.5 text-sm text-muted">{props.text}</div>;
+  return <div class="rounded-md bg-hover px-2.5 py-1.5 text-sm text-muted">{props.text}</div>;
 }
 
+/** A block's whole type: size, line height and weight from one place, so no two font sizes meet on one element. */
 function typeStyle(r: Row) {
   switch (r.type) {
     case blockHeading:
-      return (r.attrs.level ?? 1) <= 1 ? "text-2xl font-semibold" : r.attrs.level === 2 ? "text-xl font-semibold" : "text-lg font-semibold";
+      return (r.attrs.level ?? 1) <= 1
+        ? "text-2xl leading-8 font-semibold"
+        : r.attrs.level === 2
+          ? "text-xl leading-7 font-semibold"
+          : "text-lg leading-7 font-semibold";
     case blockCode:
-      return "font-mono text-sm";
+      return "font-mono text-sm leading-6";
     case blockQuote:
-      return "text-muted";
+      return "text-base leading-6 text-muted";
     default:
-      return r.type === blockTodo && r.attrs.checked ? "text-muted line-through" : "";
+      return r.type === blockTodo && r.attrs.checked ? "text-base leading-6 text-muted line-through" : "text-base leading-6";
   }
 }
 
@@ -270,9 +265,9 @@ function Marked(props: { spans: readonly TextSpan[] }) {
         const cls = {
           "font-semibold": !!s.marks.bold,
           italic: !!s.marks.italic,
-          "rounded bg-ink/8 px-0.5 font-mono": !!s.marks.code,
+          "rounded-xs bg-hover px-0.5 font-mono": !!s.marks.code,
           "line-through": !!s.marks.strike,
-          "text-ok-ink underline": !!s.marks.link,
+          "text-water underline": !!s.marks.link,
         };
         return (
           <Show when={s.marks.link} fallback={<span class={cls}>{s.t}</span>}>
@@ -303,7 +298,7 @@ function BlockField(props: { editor: BlockEditor; row: Row }) {
           aria-label={t("web.artifact.blocks.block", { id: props.row.block.id })}
           onFocus={() => setEditing(true)}
           onClick={() => setEditing(true)}
-          class={["min-h-6 cursor-text text-base leading-6 break-words whitespace-pre-wrap", typeStyle(props.row)]}
+          class={["min-h-6 cursor-text break-words whitespace-pre-wrap", typeStyle(props.row)]}
         >
           <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? t("web.artifact.blocks.heading") : " "}</span>}>
             <Marked spans={props.row.spans} />
@@ -374,7 +369,7 @@ function Field(props: { editor: BlockEditor; row: Row; focusNow: boolean; onLeav
       onCompositionEnd={(e) => props.editor.composition(b(), false, e.currentTarget.value)}
       onInput={(e) => props.editor.edited(b(), e.currentTarget.value, e.currentTarget.selectionStart)}
       onKeyDown={key}
-      class={["block w-full resize-none overflow-hidden bg-transparent text-base leading-6 outline-none placeholder:text-faint", typeStyle(props.row)]}
+      class={["block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-faint", typeStyle(props.row)]}
     />
   );
 }

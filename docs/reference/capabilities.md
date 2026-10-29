@@ -141,6 +141,7 @@
 | `artifact.content.get` | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.create` | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.version.create` | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.update` | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
 | `artifact.blocks.get` | `/api/v1/artifact/blocks/get` | ✓ | ✓ |   |   |

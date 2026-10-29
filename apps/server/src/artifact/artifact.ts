@@ -55,6 +55,7 @@ export interface ArtifactShape {
   readonly create: (maker: Maker, req: ArtifactRequest) => Effect.Effect<Artifact, ApiError>;
   /** An html one's next version; a blocks one is refused, it is changed block by block. */
   readonly version: (maker: Maker, req: ArtifactVersionRequest) => Effect.Effect<Artifact, ApiError>;
+  readonly rename: (id: string, title: string) => Effect.Effect<Artifact, ApiError>;
   readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
   /** It and its versions or blocks go; a content file goes when no other version keeps it. Its cards stay in the channel. */
   readonly remove: (id: string) => Effect.Effect<void, ApiError>;
@@ -273,6 +274,16 @@ export const make = (options: ArtifactOptions = {}) =>
         }),
       create: (maker, req) => lock.withPermits(1)(create(maker, req)),
       version: (maker, req) => lock.withPermits(1)(version(maker, req)),
+      rename: (id, title) =>
+        lock.withPermits(1)(
+          Effect.gen(function* () {
+            yield* found(id);
+            const problem = artifactProblem({ title });
+            if (problem) return yield* Effect.fail(refused(problem));
+            yield* db(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
+            return yield* assemble(yield* found(id));
+          }),
+        ),
       previewRemove: (id) =>
         Effect.gen(function* () {
           const row = yield* found(id);

@@ -256,6 +256,8 @@ export class VibeValleyApi {
     get: (a: { id: string }): Promise<T.Artifact> => this.call("/api/v1/artifact/get", a) as Promise<T.Artifact>,
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest): Promise<T.Artifact> => this.call("/api/v1/artifact/create", a) as Promise<T.Artifact>,
+    /** Its title, as the owner renames it. */
+    update: (a: { id: string; title: string }): Promise<T.Artifact> => this.call("/api/v1/artifact/update", a) as Promise<T.Artifact>,
     delete: (a: { id: string }): Promise<void> => this.call("/api/v1/artifact/delete", a) as Promise<void>,
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/artifact/previewDelete", a) as Promise<T.Preview>,
     /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */

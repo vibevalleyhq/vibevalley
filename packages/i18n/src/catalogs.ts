@@ -1342,16 +1342,22 @@ export const catalogs = {
         versions: "版本",
         open: "在新标签页打开",
         delete: "删掉",
-        deleteAsk: "删掉这个产出？对话里的卡片还在。",
+        deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
         gone: "这个产出已经删掉了，或者没有这个产出。",
         frame: "「{title}」第 {version} 版",
         list: "全部产出",
-        newTitle: "新产出的标题",
         new: "新建",
         none: "还没有产出：写个标题新建一篇，或者让帮工交一份上来。",
         all: "全部产出",
         forIssue: "为 #{number} 做的",
+        untitled: "没起名的产出",
+        find: "按标题找",
+        nothingFound: "没有标题对得上的",
+        title: "标题",
+        more: "更多",
+        copyLink: "复制链接",
+        copied: "链接复制好了",
       },
       talk: {
         atMessage: "在对话里",
@@ -1384,6 +1390,7 @@ export const catalogs = {
         changed: "这一块刚被别人改过",
         conflict: "{why}：你写的没存上，留在修订里了",
         image: "图片：{alt} {src}",
+        start: "从这里开始写……",
       },
       body: { blocks: "一起写的", html: "网页" },
     },
@@ -4964,16 +4971,22 @@ export const catalogs = {
         versions: "Versions",
         open: "Open in a new tab",
         delete: "Delete",
-        deleteAsk: "Delete this artifact? Its cards stay in the conversation.",
+        deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
         gone: "This artifact was deleted, or there is no such artifact.",
         frame: '"{title}" version {version}',
         list: "All artifacts",
-        newTitle: "New artifact title",
         new: "New",
         none: "No artifacts yet: give one a title to start it, or have a helper hand one in.",
         all: "All artifacts",
         forIssue: "For #{number}",
+        untitled: "Untitled",
+        find: "Find by title",
+        nothingFound: "No title matches",
+        title: "Title",
+        more: "More",
+        copyLink: "Copy link",
+        copied: "Link copied",
       },
       talk: {
         atMessage: "In the conversation",
@@ -5006,6 +5019,7 @@ export const catalogs = {
         changed: "Someone else just changed this block",
         conflict: "{why}: what you wrote was not saved and stays in the revision",
         image: "Image: {alt} {src}",
+        start: "Start writing here…",
       },
       body: { blocks: "Written together", html: "Web page" },
     },
@@ -8644,6 +8658,7 @@ export interface Messages {
   "web.artifact.blocks.owner": undefined;
   "web.artifact.blocks.saved": undefined;
   "web.artifact.blocks.saving": undefined;
+  "web.artifact.blocks.start": undefined;
   "web.artifact.blocks.unknown": { readonly type: string | number };
   "web.artifact.blocks.writing": { readonly who: string | number };
   "web.artifact.blocks.wrote": { readonly who: string | number };
@@ -8654,17 +8669,23 @@ export interface Messages {
   "web.artifact.issue.title": undefined;
   "web.artifact.page.all": undefined;
   "web.artifact.page.by": { readonly name: string | number };
+  "web.artifact.page.copied": undefined;
+  "web.artifact.page.copyLink": undefined;
   "web.artifact.page.delete": undefined;
-  "web.artifact.page.deleteAsk": undefined;
+  "web.artifact.page.deleteAsk": { readonly title: string | number };
   "web.artifact.page.deleted": { readonly title: string | number };
+  "web.artifact.page.find": undefined;
   "web.artifact.page.forIssue": { readonly number: string | number };
   "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
   "web.artifact.page.gone": undefined;
   "web.artifact.page.list": undefined;
+  "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
-  "web.artifact.page.newTitle": undefined;
   "web.artifact.page.none": undefined;
+  "web.artifact.page.nothingFound": undefined;
   "web.artifact.page.open": undefined;
+  "web.artifact.page.title": undefined;
+  "web.artifact.page.untitled": undefined;
   "web.artifact.page.updated": { readonly when: string | number };
   "web.artifact.page.versions": undefined;
   "web.artifact.place.hint": undefined;

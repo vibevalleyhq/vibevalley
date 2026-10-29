@@ -3,19 +3,7 @@ import { list, t } from "@vibevalley/i18n";
 // their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
 // its seq goes up in order. Part of Artifacts (artifact.ts), which owns the artifact's row.
 
-import type {
-  Agent,
-  Block,
-  BlockAttrs,
-  BlockInput,
-  BlockAck,
-  BlockCreate,
-  BlockUpdate,
-  BlockOpResult,
-  BlockSnapshot,
-  TextSpan,
-  BlockSubmit,
-} from "@vibevalley/protocol";
+import type { Agent, Block, BlockAttrs, BlockInput, BlockAck, BlockCreate, BlockUpdate, BlockOpResult, TextSpan, BlockSubmit } from "@vibevalley/protocol";
 import { Clock, Effect, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Db } from "../base/db.ts";

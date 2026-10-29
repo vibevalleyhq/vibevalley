@@ -13,16 +13,22 @@
     "versions": "Versions",
     "open": "Open in a new tab",
     "delete": "Delete",
-    "deleteAsk": "Delete this artifact? Its cards stay in the conversation.",
+    "deleteAsk": "Delete “{title}”? Its cards stay in the conversation.",
     "deleted": "Deleted \"{title}\"",
     "gone": "This artifact was deleted, or there is no such artifact.",
     "frame": "\"{title}\" version {version}",
     "list": "All artifacts",
-    "newTitle": "New artifact title",
     "new": "New",
     "none": "No artifacts yet: give one a title to start it, or have a helper hand one in.",
     "all": "All artifacts",
-    "forIssue": "For #{number}"
+    "forIssue": "For #{number}",
+    "untitled": "Untitled",
+    "find": "Find by title",
+    "nothingFound": "No title matches",
+    "title": "Title",
+    "more": "More",
+    "copyLink": "Copy link",
+    "copied": "Link copied"
   },
   "talk": {
     "atMessage": "In the conversation",
@@ -56,7 +62,8 @@
     "notSaved": "Not saved: {why}",
     "changed": "Someone else just changed this block",
     "conflict": "{why}: what you wrote was not saved and stays in the revision",
-    "image": "Image: {alt} {src}"
+    "image": "Image: {alt} {src}",
+    "start": "Start writing here…"
   },
   "body": {
     "blocks": "Written together",
