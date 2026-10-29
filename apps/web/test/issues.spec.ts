@@ -58,7 +58,7 @@ test("an issue opens at its own address and its edits are saved", async ({ page,
   await detail.getByTestId("issue-description").fill("The login page remembers the last user name.");
   await choose(detail.getByTestId("issue-priority"), "high");
   await detail.getByTestId("issue-save").click();
-  await expect(detail.getByTestId("issue-save")).toBeDisabled();
+  await expect(detail.getByTestId("issue-save")).toBeHidden();
   await expect.poll(async () => (await api.issue.get({ id: made.id })).title).toBe("after the title changes");
   const saved = await api.issue.get({ id: made.id });
   expect([saved.description, saved.priority]).toEqual(["The login page remembers the last user name.", "high"]);

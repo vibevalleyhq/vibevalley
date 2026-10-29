@@ -62,13 +62,12 @@
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
-| 服务 | 管一类东西的用复数，管一样东西的用单数；建它的是 `make`、`layer` | `Issues`、`Channels`；`Core`、`Orchestrator` |
-| 服务的接口 | `XShape` | `IssueShape` |
+| 服务 | 管一类东西的用复数，管一样东西的用单数；接口和服务同名（`interface Issues`、`const Issues = Context.Service<Issues>(…)`），建它的是 `make`、`layer` | `Issues`、`Channels`；`Core`、`Orchestrator` |
 | 服务的标签和 `Effect.fn` 的名字 | `vibevalley/<概念>`；`<服务>.<方法>` | `"vibevalley/Issue"`；`"Issues.edit"` |
 | 带牌子的 id | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-`XShape` 是按角色起的后缀，是上面那条的例外：Effect 的 `Context.Service` 要一个类当标签、一个接口当形状，两个名字都指同一个服务，后缀只用来分开它们。
+服务的接口不另起名：Effect 给自己的服务（`FileSystem`、`HttpClient`）就是接口和服务同名，`Context.Service<Self, Shape>` 里的 `Shape` 只是类型参数的名字。
 
 ## 线上和存盘的形状
 

@@ -44,7 +44,7 @@ import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
 
 export type { SessionNews };
-import { serverAddress, Config } from "../base/config.ts";
+import { serverAddress, ServerConfig } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
@@ -164,7 +164,7 @@ interface Hand {
   heard: string[];
 }
 
-export interface SessionShape {
+export interface Sessions {
   readonly noRoom: (runtime: string, project: string) => string;
   /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
    * been idle longest, and says who. */
@@ -267,7 +267,7 @@ export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
 const reasonText = (e: unknown): string =>
   e instanceof Error ? e.message : typeof e === "object" && e !== null && "_tag" in e ? reasonOf(e as ApiError) : String(e);
 
-export class Sessions extends Context.Service<Sessions, SessionShape>()("vibevalley/Session") {}
+export const Sessions = Context.Service<Sessions>("vibevalley/Session");
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
@@ -371,7 +371,7 @@ export function watchStalls(
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
     const store = yield* Agents;
@@ -1054,7 +1054,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
       register: (session, current) => void executions.set(session, current),
     };
-    const shape: SessionShape = {
+    const shape: Sessions = {
       noRoom: roomFor,
       makeRoom: Effect.fn("Sessions.makeRoom")(function* (runtime, project) {
         const full = roomFor(runtime, project);

@@ -30,7 +30,7 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { code as newCode, newId } from "../base/ids.ts";
 import { missing, lookIn } from "../errors.ts";
@@ -61,7 +61,7 @@ interface Pairing {
   wrong: number;
 }
 
-export interface LanShape {
+export interface Lan {
   readonly status: () => LanStatus;
   readonly setOpen: (open: boolean) => Effect.Effect<LanStatus, ApiError>;
   readonly startPairing: () => Effect.Effect<LanStatus, ApiError>;
@@ -80,7 +80,7 @@ export interface LanShape {
   readonly setUpstream: (address: string) => void;
 }
 
-export class Lan extends Context.Service<Lan, LanShape>()("vibevalley/Lan") {}
+export const Lan = Context.Service<Lan>("vibevalley/Lan");
 
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -141,7 +141,7 @@ export const make = (options: LanOptions = {}) =>
     const logs = yield* callbackLog;
     // Writes set off by a request belong to this service: they end with it and keep its services.
     const runHere = yield* FiberSet.makeRuntimePromise<never>();
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;
     // Read in callbacks too: the Clock the service was built with.

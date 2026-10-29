@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
-import { type ConfigShape, Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
 import { githubOrigin, type GitHubRun, layer, probeGitHub, type ProjectHooks, Projects } from "./project.ts";
@@ -16,11 +16,11 @@ const gh =
   (...args) =>
     Effect.sync(() => ({ ok: true, missing: false, ...answer(args) }));
 
-const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ConfigShape> = {}, hooks: ProjectHooks = {}) =>
+const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ServerConfig> = {}, hooks: ProjectHooks = {}) =>
   body.pipe(
     Effect.provide(
       layer({ gh: noGitHub, ...hooks }).pipe(
-        Layer.provide(Layer.merge(Layer.succeed(Config, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
+        Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),
   );

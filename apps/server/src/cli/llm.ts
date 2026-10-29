@@ -2,6 +2,6 @@
 
 import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { type LlmShape, make } from "@vibevalley/ai/llm";
+import { type Llm, make } from "@vibevalley/ai/llm";
 
-export const standaloneLlm = (): LlmShape => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));
+export const standaloneLlm = (): Llm => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));

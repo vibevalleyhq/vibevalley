@@ -18,7 +18,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings } from "./seed.ts";
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
@@ -79,7 +79,7 @@ export function withCast(a: Agent): Agent {
   return { ...a, look };
 }
 
-export interface AgentShape {
+export interface Agents {
   /** The profiles work is sent to: the workers. */
   readonly agents: () => Agent[];
   /** All the profiles, the orchestrators too. */
@@ -137,13 +137,13 @@ const installed = (template: AgentTemplate, beside: readonly Agent[], id?: strin
     ),
   );
 
-export class Agents extends Context.Service<Agents, AgentShape>()("vibevalley/Agent") {}
+export const Agents = Context.Service<Agents>("vibevalley/Agent");
 
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
 export const make = Effect.gen(function* () {
-  const config = yield* Config;
+  const config = yield* ServerConfig;
   const file = join(config.home, "config.json");
   const disk = new FileWriter(file);
   const forkHere = yield* FiberSet.makeRuntime<never>();
@@ -215,7 +215,7 @@ export const make = Effect.gen(function* () {
     return item.source === "builtIn" ? Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : Effect.succeed(item);
   };
 
-  const shape: AgentShape = {
+  const shape: Agents = {
     agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),

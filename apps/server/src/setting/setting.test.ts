@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { type ConfigShape, Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Effect, Layer } from "effect";
 import { defaultVoice } from "./rules.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -10,9 +10,9 @@ import { layer, Setting } from "./setting.ts";
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
 
-const run = <A, E>(config: ConfigShape, body: Effect.Effect<A, E, Setting>) =>
-  body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Config, config)))));
-const file = (config: ConfigShape) => JSON.parse(readFileSync(join(config.home, "settings.json"), "utf8")) as Record<string, unknown>;
+const run = <A, E>(config: ServerConfig, body: Effect.Effect<A, E, Setting>) =>
+  body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config)))));
+const file = (config: ServerConfig) => JSON.parse(readFileSync(join(config.home, "settings.json"), "utf8")) as Record<string, unknown>;
 
 describe("settings", () => {
   it.effect("a key saved here wins over the configuration's, and only its end is ever shown", () => {

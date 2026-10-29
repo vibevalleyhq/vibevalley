@@ -8,7 +8,7 @@ import { head } from "../base/text.ts";
 import { wakeBreaker } from "./rules.ts";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import { type ConfigShape, Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
@@ -37,13 +37,13 @@ class FakeSessions {
   last = new Map<string, string>();
   running = new Map<string, string>();
   n = 0;
-  core!: Core["Service"];
+  core!: Core;
   launches!: PubSub.PubSub<LaunchActivity>;
 
   runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
   steersOf = (id: string) => [...(this.steers.get(id) ?? [])];
   private publish = (a: LaunchActivity) => PubSub.publishUnsafe(this.launches, a);
-  private apply = (...f: Parameters<Core["Service"]["apply"]>) => Effect.runSync(this.core.apply(...f));
+  private apply = (...f: Parameters<Core["apply"]>) => Effect.runSync(this.core.apply(...f));
 
   deliver = (id: string, text: string): Delivered => {
     if (!this.core.session(id)) return { kind: "refused", reason: "不在地里" };
@@ -121,8 +121,8 @@ const fakeHelpers = (x: FakeSessions) =>
     }),
   );
 
-const world = (x: FakeSessions, config: ConfigShape = testConfig()) => {
-  const c: ConfigShape = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
+const world = (x: FakeSessions, config: ServerConfig = testConfig()) => {
+  const c: ServerConfig = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
   return fakeHelpers(x).pipe(
     Layer.provideMerge(channelLayer),
     Layer.provideMerge(said),
@@ -130,7 +130,7 @@ const world = (x: FakeSessions, config: ConfigShape = testConfig()) => {
     Layer.provideMerge(coreLayer.pipe(Layer.provide(projection))),
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
-    Layer.provideMerge(Layer.succeed(Config, c)),
+    Layer.provideMerge(Layer.succeed(ServerConfig, c)),
   );
 };
 
@@ -202,7 +202,7 @@ const news = (f: Farm) =>
     };
   });
 
-const run = <A, E>(body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | Scope.Scope>, config?: ConfigShape) => {
+const run = <A, E>(body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | Scope.Scope>, config?: ServerConfig) => {
   const x = new FakeSessions();
   return Effect.flatMap(farm, (f) => body(f, x)).pipe(Effect.scoped, Effect.provide(world(x, config)));
 };

@@ -17,7 +17,7 @@ import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";
 import { dbStores } from "../agent/taskStore.ts";
-import { projectsDir, Config } from "../base/config.ts";
+import { projectsDir, ServerConfig } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
@@ -57,7 +57,7 @@ export interface Resolved {
   readonly env: Record<string, string>;
 }
 
-export interface RuntimeShape {
+export interface Runtimes {
   /** Answers at once: a runtime not looked at yet comes as checking, and its probe's answer follows as a runtime event. */
   readonly list: () => RuntimeInfo[];
   readonly refresh: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
@@ -79,7 +79,7 @@ export interface RuntimeShape {
   readonly usageSoon: (id: string) => void;
 }
 
-export class Runtimes extends Context.Service<Runtimes, RuntimeShape>()("vibevalley/Runtime") {}
+export const Runtimes = Context.Service<Runtimes>("vibevalley/Runtime");
 
 /** What reads a runtime's account usage; tests put their own. */
 export type UsageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) => Promise<AccountUsage | null>;
@@ -191,7 +191,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const clock = yield* Clock.Clock;
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* callbackLog;
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const core = yield* Core;
     const store = yield* Agents;
     const registry = options.registry ?? registryOf();
@@ -439,7 +439,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
 
-    const shape: RuntimeShape = {
+    const shape: Runtimes = {
       list: () =>
         runtimeIds().map((id) => {
           const hit = cache.get(id);
@@ -556,7 +556,7 @@ export const layer = (options: RuntimeOptions = {}) =>
     Runtimes,
     Effect.gen(function* () {
       if (options.registry) return yield* make(options);
-      const config = yield* Config;
+      const config = yield* ServerConfig;
       const keys = yield* Setting;
       const time = yield* timeHere;
       const service = yield* Llm;

@@ -60,7 +60,7 @@ import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
-import { type ProjectShape, Projects } from "../project/project.ts";
+import { Projects } from "../project/project.ts";
 import { MergeFailure, type ProjectError } from "../project/shapes.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { Runtimes } from "../runtime/runtime.ts";
@@ -79,7 +79,7 @@ import {
   startNeedsOwner,
   taskBrief,
 } from "./prompts.ts";
-import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, type SessionShape, Sessions } from "../session/session.ts";
+import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
@@ -102,7 +102,7 @@ const stepNext = (graph: TaskGraph, task: Task): Next[] =>
     run: commandOf("graph.task.act", [graph.id, task.id], { action }),
   }));
 
-export interface TaskShape {
+export interface Tasks {
   readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
   /** A helper finds its issue is several people's work: the issue becomes the graph, its steps the issues under it, and they start at once. */
   readonly splitIssue: (session: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
@@ -126,7 +126,7 @@ export interface TaskShape {
   readonly comeBack: Effect.Effect<void>;
 }
 
-export class Tasks extends Context.Service<Tasks, TaskShape>()("vibevalley/Task") {}
+export const Tasks = Context.Service<Tasks>("vibevalley/Task");
 
 const withNote = (graph: TaskGraph, note: string): TaskGraph => {
   const { note: _, ...rest } = graph;
@@ -142,9 +142,9 @@ const unmanned = (n: Task): Task => {
 export interface TaskWork {
   readonly hire: (agent: Agent, task: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
   readonly tell: (id: string, text: string) => Effect.Effect<string>;
-  readonly dismiss: SessionShape["dismiss"];
+  readonly dismiss: Sessions["dismiss"];
   readonly find: (id: string) => Roster | undefined;
-  readonly handOver: SessionShape["handOver"];
+  readonly handOver: Sessions["handOver"];
 }
 
 /** The git a graph's branches live in; tests play it. */
@@ -154,7 +154,7 @@ export interface TaskGit {
   readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
   readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
   readonly changedFiles: (cwd: string, base: string) => Effect.Effect<string[], ProjectError>;
-  readonly mergeInto: ProjectShape["mergeInto"];
+  readonly mergeInto: Projects["mergeInto"];
 }
 
 export interface TaskOptions {
@@ -496,7 +496,7 @@ export const make = (options: TaskOptions = {}) =>
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
-    const shape: TaskShape = {
+    const shape: Tasks = {
       splitIssueOf: (issue, title, steps) =>
         Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((item) => item.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
       graphs: () => graphsOf(core.state()),

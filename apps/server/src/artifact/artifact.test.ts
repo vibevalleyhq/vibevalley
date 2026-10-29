@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { ownerId } from "@vibevalley/protocol";
 import { artifactMax } from "./rules.ts";
 import { Effect } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { worldBelowTasks } from "../testing/world.ts";
 import { Artifacts } from "./artifact.ts";
@@ -95,7 +95,7 @@ describe("an artifact", () => {
     Effect.gen(function* () {
       const artifacts = yield* Artifacts;
       const chat = yield* Channels;
-      const dir = join((yield* Config).home, "artifacts");
+      const dir = join((yield* ServerConfig).home, "artifacts");
       const same = page("同一页");
       const one = yield* artifacts.create(owner, { title: "一", kind: "html", content: same });
       yield* artifacts.version(owner, { id: one.id, content: page("一的第二版") });

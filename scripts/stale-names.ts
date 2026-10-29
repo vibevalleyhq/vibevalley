@@ -258,13 +258,18 @@ const RULES: readonly Rule[] = [
   {
     name: "a service method repeating its service, or the startup config as Settings",
     pattern:
-      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* Settings\b/,
-    says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is the Config service (yield* Config)",
+      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* (Settings|Config)\b/,
+    says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is the ServerConfig service (yield* ServerConfig)",
   },
   {
     name: "an issue's text as a job",
     pattern: /\b(issueJob|splitJob)\b|server\.issue\.job\./,
     says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, server.issue.brief.*)",
+  },
+  {
+    name: "a service with a second name for its interface",
+    pattern: /extends Context\.Service<|\b[A-Z][A-Za-z]*Shape\b/,
+    says: 'a service and its interface share one name, as Effect\'s own FileSystem and HttpClient: interface Issues { … } and const Issues = Context.Service<Issues>("vibevalley/Issue")',
   },
 ];
 

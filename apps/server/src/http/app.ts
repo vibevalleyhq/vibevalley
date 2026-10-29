@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
-import type { ConfigShape } from "../base/config.ts";
+import type { ServerConfig } from "../base/config.ts";
 import { handlers } from "../handlers.ts";
 import { Lan } from "../lan/lan.ts";
 import { type ServiceOptions, services } from "../services.ts";
@@ -19,7 +19,7 @@ import { streams } from "./streams.ts";
 import { attachments } from "./attachment.ts";
 import { artifactContent } from "./artifact.ts";
 
-const routes = (config: ConfigShape) =>
+const routes = (config: ServerConfig) =>
   Layer.mergeAll(
     Layer.unwrap(Effect.map(handlers, (h) => api(h))),
     streams,
@@ -48,7 +48,7 @@ const ready = (listening: (address: string) => Effect.Effect<void>) =>
 
 /** port 0 is a free one. */
 export const app = (
-  config: ConfigShape,
+  config: ServerConfig,
   port: number,
   listening: (address: string) => Effect.Effect<void> = () => Effect.void,
   options: ServiceOptions = {},

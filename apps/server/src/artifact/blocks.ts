@@ -42,7 +42,7 @@ const resultsOf = jsonOf(Schema.mutable(Schema.Array(S.BlockOpResult)));
 const demoSections = [0, 1, 2] as const;
 type DemoSection = (typeof demoSections)[number];
 const demoParagraphs = (section: number) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section as DemoSection}.paragraphs.${p}`));
-export interface BlocksShape {
+export interface Blocks {
   /** Every live block (no tombstones), in order. */
   readonly blocks: (id: string) => Effect.Effect<Block[], ApiError>;
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
@@ -345,7 +345,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       yield* Effect.forkIn(runDemo(id, writers), scope);
     });
 
-    const shape: BlocksShape = {
+    const shape: Blocks = {
       demoRunning: () => demoOn,
       blocks,
       fill,

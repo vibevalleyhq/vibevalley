@@ -26,7 +26,7 @@ import {
   type Preview,
 } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer, Semaphore } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
@@ -43,7 +43,7 @@ export interface Maker {
   readonly by: string;
 }
 
-export interface ArtifactShape {
+export interface Artifacts {
   readonly list: (q: ArtifactListRequest) => Effect.Effect<Artifact[]>;
   readonly get: (id: string) => Effect.Effect<Artifact, ApiError>;
   /** An html one's version as made; a blocks one's Markdown now, its version its seq. */
@@ -69,7 +69,7 @@ export interface ArtifactShape {
   readonly demo: (id: string, helpers: readonly Agent[]) => Effect.Effect<void, ApiError>;
 }
 
-export class Artifacts extends Context.Service<Artifacts, ArtifactShape>()("vibevalley/Artifact") {}
+export const Artifacts = Context.Service<Artifacts>("vibevalley/Artifact");
 
 export type ArtifactOptions = BlocksOptions;
 
@@ -80,7 +80,7 @@ const missingArtifact = (id: string) => missing(t("server.artifact.missing", { i
 
 export const make = (options: ArtifactOptions = {}) =>
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const chat = yield* Channels;
     const { run: db, one } = yield* Db;
     // One change of an artifact's row at a time: a version's number is the latest's plus one.
@@ -241,7 +241,7 @@ export const make = (options: ArtifactOptions = {}) =>
       return { row, v };
     });
 
-    const shape: ArtifactShape = {
+    const shape: Artifacts = {
       list: (q) =>
         Effect.gen(function* () {
           const rows = q.issue

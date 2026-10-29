@@ -4,20 +4,20 @@ import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@v
 import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
-import type { ChannelShape } from "../channel/chat.ts";
-import type { CoreShape } from "../core/core.ts";
+import type { Channels } from "../channel/chat.ts";
+import type { Core } from "../core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
-import { type ProjectShape } from "../project/project.ts";
+import { type Projects } from "../project/project.ts";
 import { type Merged, MergeFailure, type Workplace } from "../project/shapes.ts";
-import { type NotTakenIn, type SessionShape } from "../session/session.ts";
+import { type NotTakenIn, type Sessions } from "../session/session.ts";
 import { statusMove } from "./moves.ts";
 import { pullRequestConclusion } from "./rules.ts";
 
 export interface MergeDeps {
-  readonly core: CoreShape;
-  readonly sessions: SessionShape;
-  readonly projects: ProjectShape;
-  readonly chat: ChannelShape;
+  readonly core: Core;
+  readonly sessions: Sessions;
+  readonly projects: Projects;
+  readonly chat: Channels;
   readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
   readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
   readonly get: (ref: string) => Effect.Effect<Issue, ApiError>;

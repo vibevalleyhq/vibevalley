@@ -22,7 +22,7 @@ import type {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
@@ -30,7 +30,7 @@ export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessio
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
-export interface ProjectionShape {
+export interface Projection {
   readonly reduce: (state: WorkspaceState, fact: Fact) => [WorkspaceState, boolean];
   /** What a fact sets off on the farm, from the state before it. */
   readonly effects: (before: WorkspaceState, fact: Fact) => GameEffect[];
@@ -39,7 +39,7 @@ export interface ProjectionShape {
   readonly restore: (kept: WorkspaceState) => WorkspaceState;
 }
 
-export class Projection extends Context.Service<Projection, ProjectionShape>()("vibevalley/Projection") {}
+export const Projection = Context.Service<Projection>("vibevalley/Projection");
 
 /** A burst of facts is one write, and one frame. */
 const saveAfterMs = 500;
@@ -58,7 +58,7 @@ export interface Transition {
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
 export type OwnerDid = { readonly kind: "reviewed"; readonly session: SessionId } | { readonly kind: "talked" };
 
-export interface CoreShape {
+export interface Core {
   readonly state: () => WorkspaceState;
   readonly session: (id: string) => Session | undefined;
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
@@ -86,7 +86,7 @@ export interface CoreShape {
   readonly states: Stream.Stream<StateFrame>;
 }
 
-export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") {}
+export const Core = Context.Service<Core>("vibevalley/Core");
 
 /** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'. */
 const toKeep = ({ chat: _chat, progress: _progress, crons: _crons, issues: _issues, connectors: _connectors, ...kept }: WorkspaceState): WorkspaceState => kept;
@@ -124,7 +124,7 @@ const isFact = (e: SideEvent): e is Fact => {
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const config = yield* Config;
+  const config = yield* ServerConfig;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
   const read = jsonOf(S.WorkspaceState);
@@ -214,7 +214,7 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const shape: CoreShape = {
+  const shape: Core = {
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,

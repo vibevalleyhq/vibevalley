@@ -7,7 +7,7 @@ import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol
 import * as S from "@vibevalley/protocol/schema";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOf } from "../base/json.ts";
@@ -20,7 +20,7 @@ const wantStationForMs = 10_000;
 const countEveryMs = 2 * 60_000;
 const countAfterRunMs = 15_000;
 
-export interface GameShape {
+export interface Game {
   /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
   readonly achievements: () => Achievement[];
   /** The title the owner wears: an achievement and its tier; none of either is the plain title. */
@@ -36,11 +36,11 @@ export interface GameShape {
   readonly asked: () => number;
 }
 
-export class Game extends Context.Service<Game, GameShape>()("vibevalley/Game") {}
+export const Game = Context.Service<Game>("vibevalley/Game");
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const config = yield* Config;
+  const config = yield* ServerConfig;
   const core = yield* Core;
   const projects = yield* Projects;
   const { attempt: db } = yield* Db;
