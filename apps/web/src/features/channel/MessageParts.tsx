@@ -1,4 +1,4 @@
-import { Menu } from "@vibevalley/base-ui";
+import { Menu, Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
@@ -302,8 +302,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   };
   const editable = () => props.m.from === ownerId && props.m.kind === "chat";
   return (
-    <div
-      role="toolbar"
+    <Toolbar.Root
       data-testid="message-tools"
       aria-label={t("web.channel.tools.label")}
       // Shown while hovered, and while something it opened is: the picker is outside the row.
@@ -316,23 +315,22 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         <div role="group" aria-label={t("web.channel.tools.pick")} class="flex items-center gap-0.5 border-r border-line pr-0.5">
           <For each={quickReactions}>
             {(emoji) => (
-              <button
-                type="button"
+              <Toolbar.Button
                 class={tool}
                 data-testid="quick-reaction"
                 data-key={emoji}
                 aria-label={emoji}
                 onClick={() => {
                   setPicking(false);
-                  run(() => api.channel.reaction.toggle({ id: props.m.id, emoji }));
+                  const id = props.m.id;
+                  run(() => api.channel.reaction.toggle({ id, emoji }));
                 }}
               >
                 {emoji}
-              </button>
+              </Toolbar.Button>
             )}
           </For>
-          <button
-            type="button"
+          <Toolbar.Button
             ref={(el) => (moreEmoji = el)}
             class={tool}
             data-testid="more-emoji"
@@ -342,7 +340,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             onClick={() => setEveryEmoji(!everyEmoji())}
           >
             <Icon name="add" size={14} />
-          </button>
+          </Toolbar.Button>
         </div>
       </Show>
       <Show when={everyEmoji()}>
@@ -357,8 +355,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           }}
         />
       </Show>
-      <button
-        type="button"
+      <Toolbar.Button
         class={tool}
         data-testid="message-tool"
         data-key="react"
@@ -367,9 +364,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         onClick={() => setPicking(!picking())}
       >
         <Icon name="react" size={16} />
-      </button>
-      <button
-        type="button"
+      </Toolbar.Button>
+      <Toolbar.Button
         class={tool}
         data-testid="message-tool"
         data-key="reply"
@@ -378,40 +374,41 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         onClick={() => drafts.reply(props.m.channel, props.m)}
       >
         <Icon name="reply" size={14} />
-      </button>
+      </Toolbar.Button>
       <Show when={props.inChannel}>
-        <button
-          type="button"
+        <Toolbar.Button
           class={tool}
           data-testid="message-tool"
           data-key="thread"
           aria-label={t("web.channel.tools.thread")}
           title={t("web.channel.tools.thread")}
-          onClick={() =>
+          onClick={() => {
+            const id = props.m.id;
             run(async () => {
-              const thread = await api.channel.thread.create({ id: props.m.id });
+              const thread = await api.channel.thread.create({ id });
               router.navigate(`/chat/${thread}`);
-            })
-          }
+            });
+          }}
         >
           <Icon name="thread" size={16} />
-        </button>
+        </Toolbar.Button>
       </Show>
-      <button
-        type="button"
+      <Toolbar.Button
         class={tool}
         data-testid="message-tool"
         data-key="pin"
         aria-label={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
         title={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
         aria-pressed={aria(props.m.pinned !== undefined)}
-        onClick={() => run(() => api.channel.pin.toggle({ id: props.m.id }))}
+        onClick={() => {
+          const id = props.m.id;
+          run(() => api.channel.pin.toggle({ id }));
+        }}
       >
         <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
-      </button>
+      </Toolbar.Button>
       <Show when={editable()}>
-        <button
-          type="button"
+        <Toolbar.Button
           class={tool}
           data-testid="message-tool"
           data-key="edit"
@@ -420,10 +417,17 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           onClick={() => props.onEdit()}
         >
           <Icon name="edit" size={14} />
-        </button>
+        </Toolbar.Button>
       </Show>
       <Menu.Root open={more()} onOpenChange={setMore}>
-        <Menu.Trigger class={tool} data-testid="message-tool" data-key="more" aria-label={t("web.channel.more.label")} title={t("web.channel.more.label")}>
+        <Menu.Trigger
+          render={(p) => <Toolbar.Button {...p} />}
+          class={tool}
+          data-testid="message-tool"
+          data-key="more"
+          aria-label={t("web.channel.more.label")}
+          title={t("web.channel.more.label")}
+        >
           <Icon name="more" size={14} />
         </Menu.Trigger>
         <Menu.Portal>
@@ -442,8 +446,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>
-      <button
-        type="button"
+      <Toolbar.Button
         class={[tool, { "bg-berry/15": sure() }]}
         data-testid="message-tool"
         data-key="delete"
@@ -454,12 +457,13 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         onClick={() => {
           if (!sure()) return void setSure(true);
           setSure(false);
-          run(() => api.channel.message.delete({ id: props.m.id }));
+          const id = props.m.id;
+          run(() => api.channel.message.delete({ id }));
         }}
       >
         <Icon name="delete" size={14} />
-      </button>
-    </div>
+      </Toolbar.Button>
+    </Toolbar.Root>
   );
 }
 

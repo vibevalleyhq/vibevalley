@@ -73,5 +73,11 @@ test("a toolbar is one tab stop that remembers the item focused last; arrows ski
   await settle();
   expect(document.activeElement).toBe($("[data-testid=help]"));
   expect($("[role=separator]").getAttribute("aria-orientation")).toBe("vertical");
+  const inside = document.createElement("button");
+  inside.textContent = "inside";
+  $("[role=toolbar]").append(inside);
+  inside.focus();
+  await userEvent.keyboard("{ArrowRight}");
+  expect(document.activeElement).toBe(inside);
   await expectAccessible();
 });
