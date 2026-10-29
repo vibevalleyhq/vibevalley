@@ -34,7 +34,7 @@ import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qv from "../../db/generated/artifact_version.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";
-import { artifactProblem } from "./rules.ts";
+import { artifactProblem } from "./policy.ts";
 
 /** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator); by: who it is kept as made by
  * (the owner, or the profile the session works as), and who writes its blocks. */

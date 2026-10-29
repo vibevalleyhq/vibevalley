@@ -8,7 +8,7 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { api } from "@/base/api";
 import { playSound } from "@/ui/pixel/sound";
 import { farm } from "@/farm/store";
-import { hasFarm, orchestratorReady } from "./rules";
+import { hasFarm, orchestratorReady } from "./ready";
 import { startScene } from "./scene";
 import { useRouter } from "@/base/router";
 import { useCore } from "@/base/frame";

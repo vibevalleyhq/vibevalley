@@ -28,7 +28,7 @@ import {
 import { ago } from "@/base/format";
 import { toast } from "@/ui/toasts";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
-import { createSessionEvents } from "./data";
+import { createSessionEvents } from "./events";
 import { ready, useQuery } from "@/base/query";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";

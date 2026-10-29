@@ -13,7 +13,7 @@ import { Database, Db } from "@/base/db.ts";
 import { Agents } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
 import { newsOf } from "@/session/session.ts";
-import { sessionOnIssue } from "@/session/state.ts";
+import { sessionOnIssue } from "@/session/roster.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/rules.ts";
 import { testConfig, offline } from "@/testing/layers.ts";

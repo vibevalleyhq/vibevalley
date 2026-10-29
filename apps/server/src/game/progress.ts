@@ -16,7 +16,7 @@ import {
   type Unlock,
   type SessionId,
 } from "@vibevalley/protocol";
-import { sessionOf, sessionOnIssue } from "@/session/state.ts";
+import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
 import { layersOf } from "@/task/graph.ts";
 import { achievementInWords, levelForCommits } from "./view.ts";

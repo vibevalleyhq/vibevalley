@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal, Show } from "solid-js";
 import { api, reasonOf } from "@/base/api";
-import { deviceGuess, keyCookie } from "./rules";
+import { deviceGuess, keyCookie } from "./device";
 import { Button } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
 

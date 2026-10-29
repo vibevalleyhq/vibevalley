@@ -6,7 +6,7 @@ import { withChannel, withMessage, withOwnerMentions } from "@/channel/state.ts"
 import { withIssue, withIssueStatuses } from "@/issue/state.ts";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
-import { sessionOf, whileWorking, withSession } from "@/session/state.ts";
+import { sessionOf, whileWorking, withSession } from "@/session/roster.ts";
 
 const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 

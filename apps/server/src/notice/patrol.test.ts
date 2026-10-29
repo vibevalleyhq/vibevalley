@@ -2,7 +2,8 @@ import { type ChatMessage, ownerId, type WorkspaceState } from "@vibevalley/prot
 import { describe, expect, it } from "vite-plus/test";
 import { emptyWorkspaceState } from "@/core/core.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
-import { emptyPatrol, forOwner, type PatrolNote, patrolStep } from "./rules.ts";
+import { emptyPatrol, type PatrolNote, patrolStep } from "./patrol.ts";
+import { forOwner } from "./away.ts";
 
 describe("the patrol", () => {
   // Every fifth round the farm is empty: what was hanging is forgotten.

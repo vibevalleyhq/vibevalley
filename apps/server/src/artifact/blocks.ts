@@ -24,7 +24,7 @@ import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
-import { unmarked } from "./text.ts";
+import { unmarked } from "./spans.ts";
 import { demoJitter, demoPieces } from "./demo.ts";
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qb from "../../db/generated/artifact_block.sql.ts";

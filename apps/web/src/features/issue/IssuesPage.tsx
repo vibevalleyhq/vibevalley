@@ -13,7 +13,7 @@ import { useRouter } from "@/base/router";
 import { Select } from "@/ui/Field";
 import { useCore } from "@/base/frame";
 import { useOrchestrators } from "@/base/agents";
-import { useIssueHistory } from "./data";
+import { useIssueHistory } from "./queries";
 import { Icon } from "@/ui/Icon";
 import { Segmented } from "@/ui/Segmented";
 import { IssueBoard } from "./Board";

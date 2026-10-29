@@ -1,6 +1,6 @@
 import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus } from "@vibevalley/protocol";
 import { isBusy, omitUndefined, same } from "@vibevalley/protocol/rules";
-import { sessionOf } from "@/session/state.ts";
+import { sessionOf } from "@/session/roster.ts";
 import { statusMoves } from "./moves.ts";
 import { attentionIn } from "./attention.ts";
 import { compare, compareText, or } from "@/base/text.ts";

@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 // the phone large.
 
 import { messageOf } from "@/base/format";
-import { farmChannelLabel } from "./text";
+import { farmChannelLabel } from "./labels";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "@/base/api";

@@ -1,2 +1,2 @@
-export { graphs, useGraphChanges } from "./data";
-export type { Answer } from "./data";
+export { graphs, useGraphChanges } from "./queries";
+export type { Answer } from "./queries";

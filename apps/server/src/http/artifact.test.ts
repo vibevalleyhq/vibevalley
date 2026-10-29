@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { artifactPath, ownerId } from "@vibevalley/protocol";
 import { Context, Effect, Layer } from "effect";
 import { Artifacts } from "@/artifact/artifact.ts";
-import { htmlPolicy } from "@/artifact/rules.ts";
+import { htmlPolicy } from "@/artifact/policy.ts";
 import { remoteMay } from "@/lan/lan.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";

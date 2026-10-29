@@ -16,7 +16,7 @@ import { Dialog } from "@/ui/Dialog";
 import { TextArea } from "@/ui/Field";
 import { run } from "./hooks";
 import { Note } from "./Sheet";
-import { useIssueChanges } from "./data";
+import { useIssueChanges } from "./queries";
 import { useCore } from "@/base/frame";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */

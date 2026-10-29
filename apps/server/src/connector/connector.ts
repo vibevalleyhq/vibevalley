@@ -28,7 +28,7 @@ import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { type Adapter, AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
-import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
+import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type WeixinApi, WeixinClient, weixinAdapter } from "./weixin.ts";
 import { Notices } from "@/notice/notice.ts";
 

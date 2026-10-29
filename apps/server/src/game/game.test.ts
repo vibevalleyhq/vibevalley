@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Repo, Session } from "@vibevalley/protocol";
-import { sessionOf } from "@/session/state.ts";
+import { sessionOf } from "@/session/roster.ts";
 import { playOf } from "./play.ts";
 import { Deferred, Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";

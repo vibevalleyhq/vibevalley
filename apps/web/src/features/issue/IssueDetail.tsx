@@ -34,7 +34,7 @@ import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
 import { IssueArtifacts } from "@/features/artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
+import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { useAgent } from "@/base/agents";
 import { createSessionEvents } from "@/features/session";
 

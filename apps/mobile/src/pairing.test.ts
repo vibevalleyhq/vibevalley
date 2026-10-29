@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { lanKeyCookie } from "@vibevalley/protocol";
-import { deviceName, isPairPage, keyScript, level, parsePairLink } from "./rules";
+import { deviceName, isPairPage, keyScript, level, parsePairLink } from "./pairing";
 
 test("a pairing link, from the QR code or the app's own scheme", () => {
   expect(parsePairLink(" http://192.168.1.20:8790/pair?c=ABCDE12345 ")).toEqual({ url: "http://192.168.1.20:8790", code: "ABCDE12345" });

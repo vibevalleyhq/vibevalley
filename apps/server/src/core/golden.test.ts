@@ -16,7 +16,7 @@ import { inbox } from "@/notice/inbox.ts";
 import { reduce } from "@/projection/reduce.ts";
 import { acceptanceChecks, readyTasks } from "@/task/rules.ts";
 import { graphText } from "@/task/prompts.ts";
-import { cronProblem } from "@/cron/rules.ts";
+import { cronProblem } from "@/cron/due.ts";
 import { yuan } from "@/runtime/money.ts";
 import { graphChanges, graphEventText } from "@/task/changes.ts";
 import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, TaskGraph } from "@vibevalley/protocol";

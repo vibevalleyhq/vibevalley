@@ -13,7 +13,7 @@ import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { aTurn } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
-import { afterRun, dueCrons, isMissed, needsOK } from "./rules.ts";
+import { afterRun, dueCrons, isMissed, needsOK } from "./due.ts";
 import { type Due, Crons } from "./cron.ts";
 import * as q from "../../db/generated/cron.sql.ts";
 

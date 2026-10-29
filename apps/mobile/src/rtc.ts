@@ -13,7 +13,7 @@ import {
 } from "react-native-agora";
 import { PermissionsAndroid, Platform } from "react-native";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
-import { level } from "./rules";
+import { level } from "./pairing";
 
 const fail = (code: number, what: string) => {
   if (code < 0) throw new Error(t("mobile.agora", { what, code }));

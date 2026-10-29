@@ -3,7 +3,7 @@
 // this file's. Every function here is pure: a graph in, a new graph out.
 
 import { dagIDValid, dagProblems } from "./dag.ts";
-import { head } from "./text.ts";
+import { head } from "./head.ts";
 import { agentTask as words } from "./prompts.ts";
 
 export type By = "self" | "subagent";

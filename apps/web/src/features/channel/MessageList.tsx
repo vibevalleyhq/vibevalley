@@ -34,7 +34,7 @@ import { A } from "@/ui/A";
 import { Markdown } from "@/ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { Tag, type TagTone } from "@/ui/Tag";
-import { useMarkRead } from "./data";
+import { useMarkRead } from "./reading";
 import { editingId, setEditingId } from "./draft";
 import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "@/features/session";

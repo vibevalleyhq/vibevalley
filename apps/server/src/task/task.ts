@@ -23,7 +23,7 @@ import {
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionOf } from "@/session/state.ts";
+import { sessionOf } from "@/session/roster.ts";
 import { graphActions, graphProblems, graphView, isAcceptance, isOpen, taskActions, taskOf } from "./graph.ts";
 import { graphsOf } from "./issues.ts";
 import { clip } from "@/base/text.ts";

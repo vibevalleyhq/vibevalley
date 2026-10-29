@@ -13,7 +13,7 @@ import { orMissing } from "@/errors.ts";
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";
-import { plain } from "./text.ts";
+import { plain } from "./spans.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
 const on = (config: ServerConfig["Service"] = testConfig()) =>

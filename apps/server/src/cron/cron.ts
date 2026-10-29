@@ -9,7 +9,7 @@ import { scopedPubSub } from "@/base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
 import type { Actor } from "@/base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
-import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./rules.ts";
+import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";

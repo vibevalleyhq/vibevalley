@@ -6,7 +6,7 @@ import { pathOf } from "@vibevalley/protocol";
 
 import * as SecureStore from "expo-secure-store";
 import type { LanPaired } from "@vibevalley/protocol";
-import { type PairLink, parsePairLink } from "./rules";
+import { type PairLink, parsePairLink } from "./pairing";
 
 export interface Farm {
   readonly url: string;

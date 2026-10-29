@@ -96,7 +96,7 @@ import {
   whoMakesRoom,
   withRecall,
 } from "./rules.ts";
-import { sessionOnIssue } from "./state.ts";
+import { sessionOnIssue } from "./roster.ts";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";

@@ -10,7 +10,8 @@ import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } f
 import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { emptyPatrol, forOwner, type PatrolMemory, type PatrolNote, patrolStep } from "./rules.ts";
+import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
+import { forOwner } from "./away.ts";
 
 /** What has waited too long in one channel. */
 export interface Overdue {

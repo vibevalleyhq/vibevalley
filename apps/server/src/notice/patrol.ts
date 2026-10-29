@@ -1,8 +1,8 @@
-// Notifications' rules: what of the farm's talk reaches the owner off the farm (forOwner), and the patrol (巡查), no model. Each inbox item waits out its kind's grace (a question may be answered
-// in a minute), is reported once, and again only after reportAgainMs if it still stands.
+// The patrol (巡查), no model: each inbox item waits out its kind's grace (a question may be answered in a minute), is
+// reported once, and again only after reportAgainMs if it still stands.
 
 import { patrolAgo } from "./prompts.ts";
-import { type ChatMessage, everyone, type InboxKind, ownerId, type WorkspaceState, type Notify } from "@vibevalley/protocol";
+import { type InboxKind, type WorkspaceState } from "@vibevalley/protocol";
 import { inboxEntries } from "./inbox.ts";
 
 /** In ms. Kinds not here the orchestrator does not hear of from the patrol: a failed run reaches it as it happens, a task
@@ -52,21 +52,4 @@ export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMem
     report.push({ key, ...(e.channel !== undefined ? { channel: e.channel } : {}), text: e.brief.replace("{ago}", patrolAgo(now - since)) });
   }
   return [report, next];
-}
-
-/** What of the farm's talk reaches the owner off the farm (the chat apps): reports, dispatches, the orchestrator's words
- * and what names the owner or everyone; from a place set to mentions, only what names them; from one set to none, nothing. */
-export function forOwner(m: ChatMessage, notify: Notify = "all"): boolean {
-  if (m.from === ownerId || notify === "none") return false;
-  if (notify === "mentions") return m.mentions.includes(ownerId) || m.mentions.includes(everyone);
-  switch (m.kind) {
-    case "report":
-    case "dispatch":
-      return true;
-    case "chat":
-      return m.fromKind === "orchestrator" || m.mentions.includes(ownerId) || m.mentions.includes(everyone);
-    case "notice":
-      break;
-  }
-  return false;
 }

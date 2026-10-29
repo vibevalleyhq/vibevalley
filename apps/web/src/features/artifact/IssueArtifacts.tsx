@@ -3,7 +3,7 @@ import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { ready } from "@/base/query";
 import { ArtifactCard } from "./ArtifactCard";
-import { useArtifacts } from "./data";
+import { useArtifacts } from "./queries";
 
 /** The artifacts made for an issue, latest version each; nothing when there are none. */
 export function IssueArtifacts(props: { issue: string; heading: JSX.Element }) {

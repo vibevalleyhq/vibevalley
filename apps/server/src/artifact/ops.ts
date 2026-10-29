@@ -18,7 +18,7 @@ import type {
   TextSpan,
 } from "@vibevalley/protocol";
 import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
-import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./text.ts";
+import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./spans.ts";
 
 const withText: Readonly<Record<string, boolean>> = {
   paragraph: true,

@@ -2,7 +2,7 @@ import { maybe, t } from "@vibevalley/i18n";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { messageOf } from "@/errors.ts";
-import { artifactMax } from "@/artifact/rules.ts";
+import { artifactMax } from "@/artifact/policy.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 // The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
