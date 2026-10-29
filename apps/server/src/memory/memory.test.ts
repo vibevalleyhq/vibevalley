@@ -96,9 +96,9 @@ describe("memory", () => {
       const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", project: " clock ", by: owner });
       expect([note.text, note.project, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
       expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", project: "", by: owner }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
-      yield* m.forgetOf("lab", note.id);
+      yield* m.forget("lab", note.id);
       // One that is not there is missing, not silently passed over.
-      expect((yield* Effect.flip(m.forgetOf("lab", "not-a-number")))._tag).toBe("Missing");
+      expect((yield* Effect.flip(m.forget("lab", "not-a-number")))._tag).toBe("Missing");
       expect(yield* m.list("lab")).toHaveLength(3);
       expect(yield* m.list("other")).toHaveLength(0);
     }).pipe(Effect.provide(world())),
@@ -121,7 +121,7 @@ describe("memory", () => {
       ]);
       expect(view.memories[1]!.at).toBe(new Date(2026, 9, 12).getTime());
       expect(view.carried).toBe(2);
-      yield* m.forgetOf("orchestrator", view.memories[1]!.id);
+      yield* m.forget("orchestrator", view.memories[1]!.id);
       expect((yield* m.memoriesOf("orchestrator")).memories.map((x) => x.text)).toEqual(["周末别派夜班 真的"]);
       expect(yield* Effect.flip(m.remember({ agent: "orchestrator", text: "  ", project: "", by: owner }))).toMatchObject({
         _tag: "Refused",
@@ -175,7 +175,7 @@ describe("memory", () => {
       const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
       expect(found.map((f) => f.id)).toEqual([note.id]);
       expect(found[0]!.score).toBeGreaterThan(0.5);
-      yield* m.forgetOf("lab", note.id);
+      yield* m.forget("lab", note.id);
       expect((yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found).toEqual([]);
     }).pipe(Effect.provide(world())),
   );
@@ -242,8 +242,8 @@ describe("memory", () => {
     mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     return Effect.gen(function* () {
       const m = yield* Memories;
-      expect((yield* Effect.flip(m.previewForgetOf("orchestrator", "m1")))._tag).toBe("Refused");
-      expect((yield* Effect.flip(m.forgetOf("orchestrator", "m1")))._tag).toBe("Refused");
+      expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Refused");
+      expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Refused");
     }).pipe(Effect.provide(world(config)));
   });
 });

@@ -32,7 +32,7 @@ describe("a talk with a helper profile", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const dm = yield* issues.talkWith("lab");
       expect(yield* issues.talkWith("lab")).toBe(dm);
       const channel = channelOf(core.state().chat, dm)!;

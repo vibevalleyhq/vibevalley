@@ -92,24 +92,24 @@ export interface AgentShape {
   readonly named: (key: string) => Agent | undefined;
   readonly skills: () => Skill[];
   readonly settings: (runtime: string) => RuntimeSettings;
-  readonly saveAgent: (a: Agent) => Effect.Effect<Agent, ApiError>;
-  readonly createAgent: (draft: Agent) => Effect.Effect<Agent, ApiError>;
-  readonly deleteAgent: (id: string) => Effect.Effect<void, ApiError>;
-  /** What deleteAgent would do, refused as it would be; nothing changes. */
-  readonly previewDeleteAgent: (id: string) => Effect.Effect<Preview, ApiError>;
+  readonly save: (a: Agent) => Effect.Effect<Agent, ApiError>;
+  readonly create: (draft: Agent) => Effect.Effect<Agent, ApiError>;
+  readonly remove: (id: string) => Effect.Effect<void, ApiError>;
+  /** What remove would do, refused as it would be; nothing changes. */
+  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
   readonly saveSkill: (s: Skill) => Effect.Effect<Skill, ApiError>;
   readonly createSkill: (draft: Skill) => Effect.Effect<Skill, ApiError>;
-  readonly deleteSkill: (id: string) => Effect.Effect<void, ApiError>;
-  /** What deleteSkill would do, refused as it would be; nothing changes. */
-  readonly previewDeleteSkill: (id: string) => Effect.Effect<Preview, ApiError>;
+  readonly removeSkill: (id: string) => Effect.Effect<void, ApiError>;
+  /** What removeSkill would do, refused as it would be; nothing changes. */
+  readonly previewRemoveSkill: (id: string) => Effect.Effect<Preview, ApiError>;
   readonly saveSettings: (runtime: string, s: RuntimeSettings) => Effect.Effect<RuntimeSettings, ApiError>;
   /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
   readonly templates: () => AgentTemplate[];
   readonly installTemplate: (id: string) => Effect.Effect<Agent, ApiError>;
   readonly updateFromTemplate: (agent: string) => Effect.Effect<Agent, ApiError>;
   readonly addTemplate: (path: string) => Effect.Effect<AgentTemplate, ApiError>;
-  readonly deleteTemplate: (id: string) => Effect.Effect<void, ApiError>;
-  readonly previewDeleteTemplate: (id: string) => Effect.Effect<Preview, ApiError>;
+  readonly removeTemplate: (id: string) => Effect.Effect<void, ApiError>;
+  readonly previewRemoveTemplate: (id: string) => Effect.Effect<Preview, ApiError>;
 }
 
 /** An id or a name not yet taken: the one wanted, else it with -2, -3… (ids) or 2, 3… (names). */
@@ -227,14 +227,14 @@ export const make = Effect.gen(function* () {
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
     isOrchestrator: (id) => s.agents.some((a) => a.id === id && a.role === "orchestrator"),
-    saveAgent: Effect.fn("Agents.saveAgent")(function* (a) {
+    save: Effect.fn("Agents.save")(function* (a) {
       const why = roleProblem(a);
       if (why) return yield* Effect.fail(refused(why));
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
       return cast;
     }),
-    createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
+    create: Effect.fn("Agents.create")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(t("server.agent.newAgentId")));
       const why = roleProblem(draft);
       if (why) return yield* Effect.fail(refused(why));
@@ -244,12 +244,12 @@ export const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, agents: [...x.agents, created] }));
       return created;
     }),
-    deleteAgent: (id) =>
+    remove: (id) =>
       Effect.andThen(
         deletableAgent(id),
         change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
       ),
-    previewDeleteAgent: (id) =>
+    previewRemove: (id) =>
       Effect.map(deletableAgent(id), (a) => ({
         does: [t("server.agent.deleteAgent", { name: a.name, id: a.id, runtime: a.runtime })],
       })),
@@ -271,7 +271,7 @@ export const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
       return created;
     }),
-    deleteSkill: (id) =>
+    removeSkill: (id) =>
       Effect.andThen(
         deletableSkill(id),
         change((x) => ({
@@ -280,7 +280,7 @@ export const make = Effect.gen(function* () {
           agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
         })),
       ),
-    previewDeleteSkill: (id) =>
+    previewRemoveSkill: (id) =>
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
         return {
@@ -326,14 +326,14 @@ export const make = Effect.gen(function* () {
       });
       return { ...item, installed: [] };
     }),
-    deleteTemplate: (id) =>
+    removeTemplate: (id) =>
       Effect.flatMap(deletableTemplate(id), (item) =>
         Effect.try({
           try: () => removeTemplate(config.home, item.id),
           catch: (e) => refused(t("server.agent.notSaved", { file: id, why: e instanceof Error ? e.message : String(e) })),
         }),
       ),
-    previewDeleteTemplate: (id) =>
+    previewRemoveTemplate: (id) =>
       Effect.map(deletableTemplate(id), (item) => ({
         does: [
           item.installed.length > 0

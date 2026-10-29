@@ -263,7 +263,7 @@ describe("Nowledge Mem", () => {
       const outside = listed.memories.find((x) => x.source === "nowledge");
       expect(outside).toBeDefined();
       expect([listed.sources.length, listed.sources[1]!.canList, listed.sources[1]!.canForget]).toEqual([2, true, false]);
-      expect((yield* Effect.flip(m.forgetOf("lab", outside!.id)))._tag).toBe("Refused");
+      expect((yield* Effect.flip(m.forget("lab", outside!.id)))._tag).toBe("Refused");
       expect(fake.others).toEqual([]);
     }).pipe(Effect.provide(world())),
   );

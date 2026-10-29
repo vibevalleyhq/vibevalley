@@ -95,7 +95,7 @@ describe("a session's work", () => {
       yield* Effect.gen(function* () {
         const w = yield* watch;
         // Waking reads the agent from the store, as in real use: keep the script-friendly one there.
-        yield* (yield* Agents).saveAgent(lab());
+        yield* (yield* Agents).save(lab());
         session = mustHire(yield* (yield* Issues).hire(lab(), "先写一点并提交", "survivor"));
         yield* w.nextReport;
       }).pipe(Effect.scoped, Effect.provide(before.layer));
@@ -222,7 +222,7 @@ describe("a session's work", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const a = mustHire(yield* issues.hire(lab(), "写版本A并提交", "clash"));
       const b = mustHire(yield* issues.hire(lab(), "写版本B并提交", "clash"));
       yield* w.nextReport;
@@ -316,7 +316,7 @@ describe("a session's work", () => {
       yield* Effect.gen(function* () {
         const w = yield* watch;
         const sessions = yield* Sessions;
-        yield* (yield* Agents).saveAgent(lab());
+        yield* (yield* Agents).save(lab());
         session = mustHire(yield* (yield* Issues).hire(lab(), "写打卡并提交", "runs"));
         yield* w.nextReport;
         expect(yield* sessions.tell(session.id, "再看看", said)).toMatch(/新的一轮/);

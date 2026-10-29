@@ -99,7 +99,7 @@ const marked = (f: { readonly requests: readonly Request[] }) =>
 const enableLab = Effect.gen(function* () {
   const agents = yield* Agents;
   const lab = starter("lab");
-  yield* agents.saveAgent({ ...lab, enabled: true, effort: "" });
+  yield* agents.save({ ...lab, enabled: true, effort: "" });
   return lab;
 });
 
@@ -187,7 +187,7 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
-      const lead = yield* agents.createAgent({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
+      const lead = yield* agents.create({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
       const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
       const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
 
@@ -342,7 +342,7 @@ describe("the orchestrator", () => {
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       const me = agents.agent(defaultOrchestrator)!;
-      yield* agents.saveAgent({ ...me, model: "openai/gpt" });
+      yield* agents.save({ ...me, model: "openai/gpt" });
       const pieces = (text: string) =>
         Effect.promise(async () => {
           const out: string[] = [];

@@ -31,9 +31,9 @@ export interface MemoryShape {
   /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a worker's are rows and its sources'. */
   readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
   readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
-  readonly forgetOf: (agent: string, id: string) => Effect.Effect<void, ApiError>;
-  /** What forgetOf would do, refused as it would be; nothing changes. */
-  readonly previewForgetOf: (agent: string, id: string) => Effect.Effect<Preview, ApiError>;
+  readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
+  /** What forget would do, refused as it would be; nothing changes. */
+  readonly previewForget: (agent: string, id: string) => Effect.Effect<Preview, ApiError>;
   readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<RecallPreview, ApiError>;
   /** What a run is told as it starts; only what is told is counted as recalled. */
   readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
@@ -131,7 +131,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
       });
 
-    // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
+    // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
     const fileRefused = (e: unknown) => refused(e instanceof Error ? e.message : String(e));
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
       const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
@@ -145,12 +145,12 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const shape: MemoryShape = {
       memoriesOf: (agent) => (inFile(agent) ? Effect.sync(() => orchestrator(agent)) : sources.list(agent)),
       remember: (n) => (inFile(n.agent) ? writeOrchestrator(n.agent, n.text) : write(n)),
-      forgetOf: (agent, id) =>
+      forget: (agent, id) =>
         Effect.andThen(
           forgettable(agent, id),
           inFile(agent) ? Effect.try({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : forget(agent, id),
         ),
-      previewForgetOf: (agent, id) =>
+      previewForget: (agent, id) =>
         Effect.map(forgettable(agent, id), (m) => ({
           does: [inFile(agent) ? t("server.memory.forgetOrchestrator", { text: m.text }) : t("server.memory.forget", { agent, text: m.text })],
         })),

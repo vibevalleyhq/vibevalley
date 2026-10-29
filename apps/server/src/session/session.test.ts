@@ -69,7 +69,7 @@ describe("sessions", () => {
     };
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true }));
       yield* Effect.promise(() => opening);
       const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending));
@@ -105,7 +105,7 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
@@ -170,7 +170,7 @@ describe("sessions", () => {
       );
       const sessions = yield* Sessions;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");

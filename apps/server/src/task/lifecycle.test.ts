@@ -36,7 +36,7 @@ describe("a task's workplace", () => {
       const sessions = yield* Sessions;
       const tasks = yield* Tasks;
       const agent = starter("lab");
-      yield* (yield* Agents).saveAgent({ ...agent, effort: "" });
+      yield* (yield* Agents).save({ ...agent, effort: "" });
       yield* issues.putTask({
         id: "p1",
         title: "retry checked work",
@@ -81,7 +81,7 @@ describe("a task's workplace", () => {
       const sessions = yield* Sessions;
       const tasks = yield* Tasks;
       const agent = starter("lab");
-      yield* (yield* Agents).saveAgent({ ...agent, effort: "" });
+      yield* (yield* Agents).save({ ...agent, effort: "" });
       const other = (yield* issues.hire({ ...agent, effort: "" }, "other session", "other")).session!;
       yield* until(() => sessions.sessionOf(other.id)?.phase._tag === "done", "the other session's first report");
       yield* issues.putTask({

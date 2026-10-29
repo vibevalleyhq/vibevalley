@@ -35,7 +35,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const closed = (id: string) =>
         await_(
@@ -86,7 +86,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const sql = yield* SqlClient.SqlClient;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock-in"));
       expect(session.issue).toBeTruthy();
       yield* w.nextReport;
@@ -136,7 +136,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const me = { ...lab(), workdir: "board" };
-      yield* (yield* Agents).saveAgent(me);
+      yield* (yield* Agents).save(me);
       const issue = yield* issues.add({ title: "看看", assignee: me.id });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
@@ -155,7 +155,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       refusedWith(yield* Effect.flip(issues.add({ title: "  " })));
       let issue = yield* issues.add({ title: "写打卡并提交" });
       expect(issue.status).toBe("backlog");
@@ -197,7 +197,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       yield* core.apply({
         type: "hired",
         session: {
@@ -255,7 +255,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const crons = yield* Crons;
-      yield* (yield* Agents).saveAgent({ ...lab(), enabled: true });
+      yield* (yield* Agents).save({ ...lab(), enabled: true });
       const made = yield* crons.add(
         {
           name: "巡检",
@@ -319,7 +319,7 @@ describe("an issue", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const move = (id: string, to: Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
       let issue = yield* issues.add({ title: "写打卡并提交", project: "clock", assignee: "lab" });
       expect(issue.moves).toEqual(["todo", "canceled"]);
@@ -350,7 +350,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const helper = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const place = (sessions as SessionsInside).place(helper.id)!;
@@ -378,7 +378,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const issue = yield* issues.add({
         title: "写打卡并提交",
         project: "resume",
@@ -420,7 +420,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
       const dropped = yield* issues.setStatus(drop.id, "canceled", "", "", owner);
       expect([dropped.status, dropped.attention.acts]).toEqual(["canceled", [{ act: "reopen", does: "move", status: "backlog", words: "none" }]]);
@@ -452,7 +452,7 @@ describe("an issue", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const committed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
@@ -487,7 +487,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const asked = yield* issues.add({
         title: "查一下打卡为什么慢，顺手提交",
@@ -556,7 +556,7 @@ describe("an issue", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       const issue = yield* issues.add({ title: "这一单必败", project: "fails", assignee: "lab" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
@@ -580,7 +580,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const core = yield* Core;
-      yield* (yield* Agents).saveAgent(lab());
+      yield* (yield* Agents).save(lab());
       let issue = yield* issues.add({
         title: "先问清楚，再写打卡并提交",
         project: "clock",
