@@ -29,7 +29,7 @@ const RULES: readonly Rule[] = [
     name: "a document, now an artifact",
     pattern:
       /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/,
-    says: "documents are artifacts with a blocks body (Artifacts, artifact.blocks.get, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
+    says: "documents are artifacts with a blocks body (Artifacts, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
   },
   {
     name: "a cron under its old name",

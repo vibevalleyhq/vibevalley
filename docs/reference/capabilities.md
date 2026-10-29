@@ -144,7 +144,7 @@
 | `artifact.update` | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
-| `artifact.blocks.get` | `/api/v1/artifact/blocks/get` | ✓ | ✓ |   |   |
+| `artifact.block.list` | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
 | `artifact.submit` | `/api/v1/artifact/submit` | ✓ | ✓ |   |   |
 | `artifact.block.create` | `/api/v1/artifact/block/create` | ✓ | ✓ |   | ✓ |
 | `artifact.block.update` | `/api/v1/artifact/block/update` | ✓ | ✓ |   | ✓ |

@@ -68,13 +68,13 @@ describe("the endpoints the agents' tools stand on", () => {
           ops: [{ op: "insert_block", block: { id: inserted, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
         }),
       );
-      const saved = (yield* call(() => api.artifact.blocks.get({ id: made.id }))).blocks[0]!;
+      const saved = (yield* call(() => api.artifact.block.list({ id: made.id }))).blocks[0]!;
       expect(saved).toMatchObject({ id: inserted, artifactId: made.id, rev: 1, updatedBy: "owner", text: [{ t: "你好世界", marks: {} }] });
       expect(saved.updated).toBeGreaterThanOrEqual(before);
       expect(saved.deleted).toBeUndefined();
 
       const imported = yield* call(() => api.artifact.create({ title: "拆分", kind: "markdown", content: "你好世界" }));
-      const source = (yield* call(() => api.artifact.blocks.get({ id: imported.id }))).blocks[0]!;
+      const source = (yield* call(() => api.artifact.block.list({ id: imported.id }))).blocks[0]!;
       const split = crypto.randomUUID();
       yield* call(() =>
         api.artifact.submit({
@@ -92,7 +92,7 @@ describe("the endpoints the agents' tools stand on", () => {
           ],
         }),
       );
-      const after = yield* call(() => api.artifact.blocks.get({ id: imported.id }));
+      const after = yield* call(() => api.artifact.block.list({ id: imported.id }));
       expect(after.blocks.map((b) => b.text.map((x) => x.t).join(""))).toEqual(["你好", "世界"]);
       expect(after.blocks[1]).toMatchObject({ id: split, artifactId: imported.id, rev: 1, updatedBy: "owner" });
     }).pipe(Effect.scoped),

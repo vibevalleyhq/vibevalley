@@ -275,11 +275,9 @@ export class VibeValleyApi {
        * block by block instead. */
       create: (a: T.ArtifactVersionRequest): Promise<T.Artifact> => this.call("/api/v1/artifact/version/create", a) as Promise<T.Artifact>,
     },
-    blocks: {
-      /** A blocks artifact and every live block (no tombstones), in order. */
-      get: (a: { id: string }): Promise<T.BlockSnapshot> => this.call("/api/v1/artifact/blocks/get", a) as Promise<T.BlockSnapshot>,
-    },
     block: {
+      /** A blocks artifact and every live block (no tombstones), in order. */
+      list: (a: { id: string }): Promise<T.BlockSnapshot> => this.call("/api/v1/artifact/block/list", a) as Promise<T.BlockSnapshot>,
       /** One block appended, as one batch of one op. */
       create: (a: { id: string } & T.BlockCreate): Promise<T.BlockOpResult> => this.call("/api/v1/artifact/block/create", a) as Promise<T.BlockOpResult>,
       update: (a: { id: string } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call("/api/v1/artifact/block/update", a) as Promise<T.BlockOpResult>,

@@ -196,7 +196,7 @@ export interface Handlers<R = never> {
   readonly "artifact.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "artifact.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   /** A blocks artifact and every live block (no tombstones), in order. */
-  readonly "artifact.blocks.get": (a: { readonly id: string }) => Effect.Effect<T.BlockSnapshot, ApiError, R>;
+  readonly "artifact.block.list": (a: { readonly id: string }) => Effect.Effect<T.BlockSnapshot, ApiError, R>;
   /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
   readonly "artifact.submit": (a: { readonly id: string } & T.BlockSubmit) => Effect.Effect<T.BlockAck, ApiError, R>;
   /** One block appended, as one batch of one op. */
@@ -852,7 +852,7 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "artifact.blocks.get",
+    op: "artifact.block.list",
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.BlockSnapshot,

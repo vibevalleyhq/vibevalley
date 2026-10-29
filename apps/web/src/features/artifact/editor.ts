@@ -146,7 +146,7 @@ export class BlockEditor {
 
   async load() {
     try {
-      this.take(await this.api.artifact.blocks.get({ id: this.artifactId }), true);
+      this.take(await this.api.artifact.block.list({ id: this.artifactId }), true);
       this.error = undefined;
     } catch (e) {
       this.error = reasonOf(e);
@@ -166,7 +166,7 @@ export class BlockEditor {
     // Drawn as being written before this ask: it may have stopped since.
     let redraw = this.othersWriting || this.blocks.some((b) => this.writing(b));
     try {
-      const snap = await this.api.artifact.blocks.get({ id: this.artifactId });
+      const snap = await this.api.artifact.block.list({ id: this.artifactId });
       this.polls++;
       if ((snap.artifact.seq !== this.seq || this.held.size > 0) && !this.busy) {
         this.take(snap, true, true);
