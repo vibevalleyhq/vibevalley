@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-主人想把 VibeValley 自己的活派给 VibeValley：工单派给帮工，帮工在 worktree 里改 heybro，验收过了合进 main。开始时这样做有几处会出事：
+主人想把 VibeValley 自己的活派给 VibeValley：工单派给帮工，帮工在 worktree 里改 VibeValley，验收过了合进 main。开始时这样做有几处会出事：
 
 - 拿来干活的农场和正在改的代码是同一份：源码里跑的服务端一重启、表结构一改，派出去的工单和频道就没了。
 - 表结构只有一个基线，直接改（[不留兼容](docs/subsystems/foundation.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
@@ -37,8 +37,8 @@ vv issue status update <issue> --json '{"status":"done"}'              # 收获
 
 | 农场 | 怎么来 | 用来 | 工作目录 |
 |---|---|---|---|
-| Beta | `bun run package:mac --channel beta` | 天天用，派 VibeValley 的活 | `~/vibevalley-beta` |
-| 源码 | `go run ./cmd/server` 加 `flutter run` | 改 VibeValley 时试 | `~/vibevalley-dev` |
+| Beta | `vp run package:mac`，加一个 `--channel beta` | 天天用，派 VibeValley 的活 | `~/vibevalley-beta` |
+| 源码 | `vp run desktop:dev` | 改 VibeValley 时试 | `~/vibevalley-dev` |
 | Alpha | 源码看着可以了，`--channel alpha` 打一个包 | 装上当新的 Beta 用一阵 | `~/vibevalley-alpha` |
 
 每个工作目录里 `projects/` 是项目，`worktrees/<项目>.<工单号>` 是工单的 worktree。农场合进的是自己那份克隆的 main（走 PR 的项目在 GitHub 上合），主人在别处的检出经 origin 拉取，碰不到。Alpha 用下来没问题，就用同一个提交打 Beta，换掉旧的；Beta 只在这个时候换。
@@ -56,7 +56,7 @@ vv issue status update <issue> --json '{"status":"done"}'              # 收获
 - 农场的规矩写死「提交信息用一句中文」，压过了项目的约定，codex 把它当系统指令，主人在频道说也不改。规矩改成照项目的约定写，项目没说才用中文，主人另有说法的照主人。
 - 规矩在帮工开工时进它的系统提示；接着干的帮工（包括农场重启以后）拿的还是开工时那一份，新规矩只对新开的帮工有用。
 - 并行的两个帮工各自过了检查，合在一起的 main 没人查：本地收获的检查要包含主分支的合并结果，走 PR 的靠 CI。
-- 新克隆的仓库要先 `flutter pub get` 才查得准格式（`app/tool/format-check.sh` 先装依赖）。
+- 新克隆的仓库要先装依赖（`vp install`）才查得准格式和类型。
 
 ### 还没做的
 

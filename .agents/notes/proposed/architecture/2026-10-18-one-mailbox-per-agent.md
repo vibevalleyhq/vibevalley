@@ -123,7 +123,7 @@ Status: proposed
 - 冷却、跳数、熔断、攒一批的参数在一处，对管家和帮工都生效，有测试。
 - 管家有正在跑的子活时，`interrupt` 变成 `queue`，有测试。
 - 插话没来得及交的，下一轮开头能看到，有测试。
-- `bun run server:check` 通过；照 `acceptance/server.md` 在真服务端上：帮工忙着时在它的工单串里连说三句，它在这一轮里收到一次补充，而不是三次。
+- `vp run server:check` 通过；照 `acceptance/server.md` 在真服务端上：帮工忙着时在它的工单串里连说三句，它在这一轮里收到一次补充，而不是三次。
 
 ## Risks
 

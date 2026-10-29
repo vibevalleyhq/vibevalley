@@ -49,7 +49,7 @@ Status: proposed
 - 帮工收工以后，用它汇报里的一句话 `memory_search`（`kind = episode`）能翻到这一次，回的是原文的那一段；管家归档过的原文同样翻得到。
 - 管家的系统提示在两次压缩之间一字不差，中途记了新的也一样（`packages/agent/src/brain.test.ts` 的同一类测试）。
 - 服务端不再读写 `orchestrator/MEMORY.md`。
-- `bun run server:check`、`bun run web:check`、`bun run docs:verify` 通过。
+- `vp run server:check`、`vp run web:check`、`vp run docs:verify` 通过。
 
 ## Risks
 
