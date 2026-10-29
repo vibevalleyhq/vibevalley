@@ -33,7 +33,7 @@ const categoryText: Record<AchievementCategory, string> = {
 
 const pip: Record<number, string> = { 1: "#c07a43", 2: "#a9b4bf", 3: "#e5a93c" };
 
-const emptyProgress: Progress = { coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [] };
+const emptyProgress: Progress = { coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], agents: {} };
 
 const day = (at: number) => {
   const d = new Date(Math.round(at));

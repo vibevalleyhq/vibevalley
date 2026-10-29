@@ -8,7 +8,7 @@ export const keepChannels = 100;
 
 export const isTop = (c: Channel) => c.type !== "thread";
 
-const emptyChat = (): Chat => ({ channels: [] });
+const emptyChat = (): Chat => ({ channels: [], ownerMentions: [] });
 
 export const withOwnerMentions = (chat: Chat | undefined, ownerMentions: OwnerMention[]): Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
 
@@ -25,7 +25,7 @@ export function withMessage(chat: Chat | undefined, m: ChatMessage): [Chat | und
 /** Beyond keepChannels the quietest threads go; the channels always stay. */
 export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   const base = chat ?? emptyChat();
-  let all = (base.channels ?? []).filter((x) => x.id !== c.id);
+  let all = base.channels.filter((x) => x.id !== c.id);
   all.push(c);
   const byID = (a: Channel, b: Channel) => compareText(a.id, b.id);
   if (all.length <= keepChannels) return { ...base, channels: all.sort(byID) };
@@ -38,15 +38,15 @@ export function withChannel(chat: Chat | undefined, c: Channel): Chat {
 
 /** A channel is #<name> (#general), a thread #<its channel's name>:<the number of the message it hangs under>, and a
  * direct channel @owner: only its peer reads an address, and the one there with it is the owner. */
-export function targetOf(c: Channel, channelName: string): string {
+export function targetOf(c: Pick<Channel, "type" | "rootNumber" | "name">, channelName: string): string {
   if (c.type === "direct") return "@" + ownerId;
   if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
   return "#" + (c.name ?? channelName);
 }
 
-export const defaultOf = (chat: Chat | undefined) => chat?.channels?.find((c) => c.default);
+export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
 
-export const channelOf = (chat: Chat | undefined, id: string) => chat?.channels?.find((c) => c.id === id);
+export const channelOf = (chat: Chat | undefined, id: string) => chat?.channels.find((c) => c.id === id);
 
 export function topOf(chat: Chat | undefined, c: Channel | undefined): Channel | undefined {
   if (!c) return defaultOf(chat);

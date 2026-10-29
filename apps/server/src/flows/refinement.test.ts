@@ -62,15 +62,15 @@ describe("a refined issue", () => {
       );
       expect(issue.description).toBe("为什么：\n看板还在调旧接口\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- board.dart");
       expect(issue.criteria).toEqual(["拖到待办就开工"]);
-      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？" }]);
+      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？", options: [] }]);
       expect([issue.status, issue.sessions?.length ?? 0]).toEqual(["backlog", 0]);
       yield* until(() => !drafting(core), "the refiner left");
       yield* refinementLeftNothing(f.config.workRoot, issue);
       const runs = yield* sessions.runs(issue.id);
       expect(runs.map((r) => r.triggeredBy.kind)).toEqual(["refine"]);
-      const inState = () => core.state().issues!.find((x) => x.id === issue.id)!;
+      const inState = () => core.state().issues.find((x) => x.id === issue.id)!;
       yield* until(
-        () => inState().refining === undefined && (inState().moves ?? []).includes("todo") && inState().criteria?.length === 1,
+        () => inState().refining === undefined && (inState().moves ?? []).includes("todo") && inState().criteria.length === 1,
         "the core state has its draft",
       );
 
@@ -80,7 +80,7 @@ describe("a refined issue", () => {
         (i) => i.title === "看板拖卡改用 8797 端口" && i.refining === undefined,
         "the second draft over the first",
       );
-      expect([issue.criteria, issue.questions?.length ?? 0]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
+      expect([issue.criteria, issue.questions.length ?? 0]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
       yield* until(() => !drafting(core), "the second refiner left");
 
       issue = yield* issues.setStatus(issue.id, "todo", "", "", owner);
@@ -102,7 +102,7 @@ describe("a refined issue", () => {
       yield* issues.refine(issue.id, "顺手提交：看板拖卡", "");
       issue = yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.criteria ?? []).length > 0 && i.refining === undefined,
+        (i) => i.criteria.length > 0 && i.refining === undefined,
         "refined",
       );
       yield* until(() => !drafting(core), "the refiner left");

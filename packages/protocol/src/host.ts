@@ -54,26 +54,26 @@ export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, d
 export interface Host {
   /** For logs and the about box only. */
   readonly name: "desktop" | "mobile" | "browser";
-  /** A system notification; null where there are none. */
-  readonly notify: ((notice: Notice) => Promise<void>) | null;
-  /** The tray's title and lines; null where there is no tray. */
-  readonly tray: ((summary: TraySummary) => Promise<void>) | null;
-  /** The key that starts and ends a call to the orchestrator from anywhere; null where there is none. */
-  readonly voiceShortcut: Shortcut | null;
-  /** A call the host carries itself (the phone's, which goes on with the screen locked); null: the page joins with
+  /** A system notification; absent where there are none. */
+  readonly notify?: (notice: Notice) => Promise<void>;
+  /** The tray's title and lines; absent where there is no tray. */
+  readonly tray?: (summary: TraySummary) => Promise<void>;
+  /** The key that starts and ends a call to the orchestrator from anywhere; absent where there is none. */
+  readonly voiceShortcut?: Shortcut;
+  /** A call the host carries itself (the phone's, which goes on with the screen locked); absent: the page joins with
    * Agora's web SDK. */
-  readonly rtc: Rtc | null;
+  readonly rtc?: Rtc;
   /** The window has no title bar of its own and the page reaches its top edge: top is the strip the window is dragged
-   * by, left what its buttons (macOS's traffic lights) take at the strip's start; null: the window has its own. */
-  readonly titleBar: { readonly top: number; readonly left: number } | null;
+   * by, left what its buttons (macOS's traffic lights) take at the strip's start; absent: the window has its own. */
+  readonly titleBar?: { readonly top: number; readonly left: number };
   /** Told the language the page speaks when it loads, so the host's own words (the tray's menu, the island, its dialogs)
-   * match; null where the host says nothing of its own. */
-  readonly locale: ((locale: Locale) => void) | null;
-  /** Shows a file or folder on this machine in the system's file manager; null where the host cannot. */
-  readonly reveal: ((path: string) => void) | null;
-  /** Told the theme the page chose, so the host's own parts (menus, scroll bars, the title strip) follow; null where the
+   * match; absent where the host says nothing of its own. */
+  readonly locale?: (locale: Locale) => void;
+  /** Shows a file or folder on this machine in the system's file manager; absent where the host cannot. */
+  readonly reveal?: (path: string) => void;
+  /** Told the theme the page chose, so the host's own parts (menus, scroll bars, the title strip) follow; absent where the
    * host draws nothing of its own. */
-  readonly theme: ((theme: ThemeChoice) => void) | null;
+  readonly theme?: (theme: ThemeChoice) => void;
 }
 
 /** Light, dark, or as the system is. */
@@ -121,14 +121,8 @@ export function mobileHost(post: (m: ToNative) => void) {
   const host: Host = {
     name: "mobile",
     notify: (notice) => ask({ call: "notify", notice: { title: notice.title, body: notice.body } }),
-    tray: null,
-    voiceShortcut: null,
-    titleBar: null,
     // The phone's shell speaks the phone's language (apps/mobile words.ts).
-    locale: null,
     // Files on the phone are not the farm's; the phone's status bar follows the system's theme.
-    reveal: null,
-    theme: null,
     rtc: async (grant, on) => {
       const line = next;
       active = { line, events: on };

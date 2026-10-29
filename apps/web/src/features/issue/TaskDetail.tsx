@@ -24,7 +24,7 @@ const stepTone: Record<TaskState, Tone> = { waiting: "faint", working: "water", 
 /** A task (计划 on screen): an issue whose work is split into steps, each its own issue, run in the order their needs
  * allow. `stepIssues` is a step's own issue by the step's id, once a helper has worked it. */
 export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string, string>; onOpen: (id: string) => void }) {
-  const [said, setSaid] = createSignal<Answer | null>(null);
+  const [said, setSaid] = createSignal<Answer>();
   const [reviewing, setReviewing] = createSignal(false);
   const [abandoning, setAbandoning] = createSignal(false);
   const nameOf = useNameOf();
@@ -33,9 +33,9 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
   const settled = () => Math.round(g().settled ?? 0);
   const byId = () => new Map(g().tasks.map((t) => [t.id, t]));
   // The order they can run in; before the server has laid them out, the order they were written in.
-  const layers = () => (g().layers?.length ? g().layers! : g().tasks.map((t) => [t.id]));
-  const actions = () => g().actions ?? [];
-  const word = (a: GraphAction) => g().actionText?.[a] ?? "";
+  const layers = () => (g().layers.length ? g().layers : g().tasks.map((t) => [t.id]));
+  const actions = () => g().actions;
+  const word = (a: GraphAction) => g().actionText[a] ?? "";
   const act = async (a: GraphAction) => {
     const id = g().id;
     setSaid(await graphs.act(id, a));
@@ -115,7 +115,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                     {(task) => {
                       const summary = () => {
                         const step = task();
-                        const waitsOn = (step.blockedBy ?? []).map((b) => byId().get(b)?.title ?? b);
+                        const waitsOn = step.blockedBy.map((b) => byId().get(b)?.title ?? b);
                         return [
                           step.stateText ?? step.state,
                           ...(step.agent ? [nameOf()(step.agent)] : []),
@@ -146,9 +146,9 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                               <span class="font-mono text-xs">{task().check}</span>
                             </Property>
                           </Show>
-                          <Show when={task().scope?.length}>
+                          <Show when={task().scope.length}>
                             <Property label={t("web.issue.task.scope")}>
-                              <span class="font-mono text-xs">{list(task().scope!)}</span>
+                              <span class="font-mono text-xs">{list(task().scope)}</span>
                             </Property>
                           </Show>
                           <Show when={task().conclusion}>
@@ -166,9 +166,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                                 </Button>
                               )}
                             </Show>
-                            <For each={task().actions ?? []}>
-                              {(a) => <Button onClick={() => void actOnStep(task(), a)}>{task().actionText?.[a] ?? a}</Button>}
-                            </For>
+                            <For each={task().actions}>{(a) => <Button onClick={() => void actOnStep(task(), a)}>{task().actionText[a] ?? a}</Button>}</For>
                           </div>
                         </Fold>
                       );
@@ -249,7 +247,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
 }
 
 /** A finished graph's changes before they go into the main branch: its commits and files, and the merge. */
-function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => void }) {
+function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | undefined) => void }) {
   const changes = useGraphChanges(() => props.graph.id);
   const merge = async () => {
     const id = props.graph.id;
@@ -265,7 +263,7 @@ function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => 
               {t("web.issue.changes.unreadable")}
               {reasonOf(changes.error)}
             </p>
-            <Button class="mt-2" onClick={() => props.onDone(null)}>
+            <Button class="mt-2" onClick={() => props.onDone(undefined)}>
               {t("web.issue.later")}
             </Button>
           </>
@@ -283,7 +281,7 @@ function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => 
               </Show>
               <ChangesBody changes={c()} />
               <div class="mt-2 flex justify-end gap-2">
-                <Button onClick={() => props.onDone(null)}>{t("web.issue.later")}</Button>
+                <Button onClick={() => props.onDone(undefined)}>{t("web.issue.later")}</Button>
                 <Button tone="primary" disabled={c().conflicts.length > 0} onClick={() => void merge()}>
                   {t("web.issue.task.merge", { base: c().base })}
                 </Button>

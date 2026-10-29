@@ -8,7 +8,7 @@ import { lcd } from "@/farm/phone/lcd";
 import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad, useTicks } from "@/farm/support";
 
-const game = kept<Blocks | null>(null);
+const game = kept<Blocks | undefined>(undefined);
 const best = kept(0);
 
 const cellSmall = 9;
@@ -86,11 +86,11 @@ export function BlocksGame(props: { big?: boolean }) {
       ctx.fillStyle = lcd.paper;
       ctx.fillRect(0, 0, blocksWidth * size, blocksHeight * size);
       const b = Math.max(1, Math.round(size / 7));
-      const block = (x: number, y: number, fill: string | null) => {
+      const block = (x: number, y: number, fill: string | undefined) => {
         if (y < 0) return;
         const px = x * size;
         const py = y * size;
-        if (fill === null) {
+        if (fill === undefined) {
           ctx.fillStyle = lcd.light;
           ctx.fillRect(px + b, py + b, size - 2 * b, size - 2 * b);
           return;
@@ -103,10 +103,10 @@ export function BlocksGame(props: { big?: boolean }) {
         ctx.fillRect(px + 3 * b, py + 3 * b, size - 1 - 6 * b, size - 1 - 6 * b);
       };
       if (!state) return;
-      state.well.forEach((c, i) => c && block(i % blocksWidth, Math.floor(i / blocksWidth), shade[c - 1]!));
+      state.well.forEach((c, i) => c && block(i % blocksWidth, Math.floor(i / blocksWidth), shade[c - 1]));
       if (!state.over) {
-        for (const [x, y] of cellsOf(landingOf(state))) block(x, y, null);
-        for (const [x, y] of cellsOf(state.piece)) block(x, y, shade[pieceKinds.indexOf(state.piece.kind)]!);
+        for (const [x, y] of cellsOf(landingOf(state))) block(x, y, undefined);
+        for (const [x, y] of cellsOf(state.piece)) block(x, y, shade[pieceKinds.indexOf(state.piece.kind)]);
       }
     },
   );

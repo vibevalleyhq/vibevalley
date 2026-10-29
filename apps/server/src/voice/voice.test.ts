@@ -195,6 +195,7 @@ const helperOn = (id: string, issue: string) =>
     issue,
     phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
+    refining: false,
   }) as unknown as Session;
 const issueOf = (id: string, number: number, session: string) =>
   ({
@@ -207,11 +208,14 @@ const issueOf = (id: string, number: number, session: string) =>
     sessions: [sessionId(session)],
     status: "in_progress",
     moves: [],
-    review: "glance",
     findings: [],
     questions: [],
+    description: "",
+    blockedBy: [],
+    criteria: [],
+    checks: [],
     attention: { state: "working", acts: [] },
-  }) as Issue;
+  }) satisfies Issue;
 
 const credentials = (voice?: Partial<VoiceSettings>) =>
   Effect.gen(function* () {
@@ -403,6 +407,8 @@ describe("voice", () => {
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",
@@ -450,6 +456,8 @@ describe("voice", () => {
       }
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",
@@ -457,6 +465,8 @@ describe("voice", () => {
       });
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w2"),
         outcome: "failed",
         summary: "没做成",
@@ -489,6 +499,8 @@ describe("voice", () => {
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",
@@ -499,6 +511,8 @@ describe("voice", () => {
       yield* core.apply({ type: "issue", issue: issueOf("t2", 42, "w2") });
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w2"),
         outcome: "failed",
         summary: "没做成",
@@ -531,6 +545,8 @@ describe("voice", () => {
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",
@@ -571,6 +587,8 @@ describe("voice", () => {
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "report",
+        questions: [],
+        checks: [],
         id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",

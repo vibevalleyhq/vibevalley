@@ -78,7 +78,7 @@ export const make = Effect.gen(function* () {
         yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
         const [next, news] = progressStep(folded, entry);
         folded = next;
-        yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || (news.unlocked?.length ?? 0) > 0 ? { news } : {}) });
+        yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
       }).pipe(Effect.catchCause((cause) => Effect.logError(`vibevalley: a ledger entry (${input.kind}) was not kept`, cause))),
     );
 

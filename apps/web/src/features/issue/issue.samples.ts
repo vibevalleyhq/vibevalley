@@ -26,6 +26,10 @@ export const sampleIssue = (number: number, title: string, status: IssueStatus, 
   deliver: "change",
   findings: [],
   questions: [],
+  description: "",
+  blockedBy: [],
+  criteria: [],
+  checks: [],
   attention: { state: attentionOf[status], acts: [] },
   ...more,
 });
@@ -39,6 +43,7 @@ export const sampleSession = (id: string, agent: string, phase: Phase, more: Par
   hiredAt: now - 42 * min,
   runs: 2,
   phase,
+  refining: false,
   ...more,
 });
 

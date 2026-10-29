@@ -57,6 +57,6 @@ describe("a link's preview", () => {
     expect(await read("https://out.example/", get, resolve)).toBeUndefined();
     expect(asked).toEqual(["https://out.example/"]);
     expect(await read("https://pdf.example/", get, resolve)).toBeUndefined();
-    expect(await read("https://fine.example/", get, resolve)).toEqual({ url: "https://fine.example/", title: "Fine" });
+    expect(await read("https://fine.example/", get, resolve)).toEqual({ url: "https://fine.example/", title: "Fine", description: "", site: "", image: "" });
   });
 });

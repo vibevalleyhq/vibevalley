@@ -31,7 +31,7 @@ export function IssueList(props: {
   onAdd: ListAdd;
 }) {
   const [folded, setFolded] = createSignal<ReadonlySet<string>>(new Set());
-  const [adding, setAdding] = createSignal<string | null>(null);
+  const [adding, setAdding] = createSignal<string>();
   const nameOf = useNameOf();
   const orchestrators = useOrchestrators();
   const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
@@ -39,7 +39,7 @@ export function IssueList(props: {
   // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the orchestrator's), or the one group.
   const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
   const add = (g: RowGroup<BoardCard>, text: string) => {
-    setAdding(null);
+    setAdding(undefined);
     props.onAdd(text, props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
   };
   const fold = (key: string) =>
@@ -86,7 +86,7 @@ export function IssueList(props: {
                     <AgentFaceOf agent={key} size={16} />
                   );
                 default:
-                  return null;
+                  return undefined;
               }
             };
             return (
@@ -108,7 +108,7 @@ export function IssueList(props: {
                     <IconButton
                       icon="add"
                       label={t("web.issue.list.writeIn", { group: label() })}
-                      onClick={() => setAdding(adding() === g().key ? null : g().key)}
+                      onClick={() => setAdding(adding() === g().key ? undefined : g().key)}
                     />
                   </Show>
                 </header>

@@ -40,7 +40,7 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
       Effect.gen(function* () {
         let problems: string[] = [];
         const g = yield* store.change((g) => {
-          const [next, bad] = engine.add(g, p.tasks ?? []);
+          const [next, bad] = engine.add(g, p.tasks);
           problems = bad;
           return next;
         });

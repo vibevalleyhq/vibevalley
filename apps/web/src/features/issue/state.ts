@@ -49,8 +49,8 @@ export interface CriterionRow {
 }
 
 function criteriaRows(issue: Issue): CriterionRow[] {
-  return (issue.criteria ?? []).map((text, i) => {
-    const c = (issue.checks ?? []).find((x) => x.criterion === i);
+  return issue.criteria.map((text, i) => {
+    const c = issue.checks.find((x) => x.criterion === i);
     return { text, ...(c ? { result: c.result, ...(c.proof ? { proof: c.proof } : {}) } : {}) };
   });
 }

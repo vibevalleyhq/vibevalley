@@ -25,7 +25,7 @@ export interface Merge {
   readonly sown: number;
   readonly over: boolean;
   /** One step back, no further. */
-  readonly previous: Merge | null;
+  readonly previous: Merge | undefined;
 }
 
 export const mergeStageName = (stage: number) => (stage <= mergeGoal ? mergeStages[stage - 1]! : t("web.farm.phone.merge.past", { n: stage - mergeGoal + 1 }));
@@ -73,7 +73,7 @@ export function canSlide(board: readonly number[]) {
 export function newMerge(seed: number): Merge {
   const [one, , s1] = sow(Array<number>(mergeSize * mergeSize).fill(0), seed);
   const [board, , s2] = sow(one, s1);
-  return { board, score: 0, moves: 0, seed: s2, grown: [], sown: -1, over: false, previous: null };
+  return { board, score: 0, moves: 0, seed: s2, grown: [], sown: -1, over: false, previous: undefined };
 }
 
 export function slideMerge(g: Merge, direction: MergeDirection): Merge {
@@ -97,7 +97,7 @@ export function slideMerge(g: Merge, direction: MergeDirection): Merge {
   }
   if (board.every((v, i) => v === g.board[i])) return g;
   const [sown, at, seed] = sow(board, g.seed);
-  return { board: sown, score: g.score + gained, moves: g.moves + 1, seed, grown, sown: at, over: !canSlide(sown), previous: { ...g, previous: null } };
+  return { board: sown, score: g.score + gained, moves: g.moves + 1, seed, grown, sown: at, over: !canSlide(sown), previous: { ...g, previous: undefined } };
 }
 
 /** The same slide again brings the same seed. */

@@ -22,10 +22,10 @@ export type TaskField = "title" | "brief" | "needs" | "agent" | "check" | "scope
 const taskFields: readonly { field: TaskField; text: (n: Task) => string }[] = [
   { field: "title", text: (n) => n.title },
   { field: "brief", text: (n) => n.brief },
-  { field: "needs", text: (n) => list(n.needs ?? []) },
+  { field: "needs", text: (n) => list(n.needs) },
   { field: "agent", text: (n) => n.agent ?? "" },
   { field: "check", text: (n) => n.check ?? "" },
-  { field: "scope", text: (n) => list(n.scope ?? []) },
+  { field: "scope", text: (n) => list(n.scope) },
 ];
 
 const isField = (f: string): f is TaskField => taskFields.some((x) => x.field === f);
@@ -57,7 +57,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
       case "splitting":
         break;
       case "draft":
-        graph("drafted", String((after.tasks ?? []).length));
+        graph("drafted", String(after.tasks.length));
         break;
       case "running":
         if (before.state === "paused") graph("resumed");
@@ -82,7 +82,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
   if (before.state === "splitting" || after.state === "abandoned") return out;
 
   const step = (n: Task, kind: GraphEventKind, extra: Partial<GraphChange> = {}) => out.push({ ...extra, graph: after.id, task: n.id, kind });
-  for (const n of after.tasks ?? []) {
+  for (const n of after.tasks) {
     const was = taskOf(before, n.id);
     if (!was) {
       step(n, "task_added", { detail: n.title });
@@ -102,7 +102,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
         break;
       case "merged":
         if (n.conclusion) who.detail = n.conclusion;
-        if (n.commits && n.commits.length > 0) who.commits = n.commits;
+        if (n.commits.length > 0) who.commits = n.commits;
         step(n, "task_merged", who);
         break;
       case "failed":
@@ -117,8 +117,8 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
         break;
     }
   }
-  for (const was of before.tasks ?? []) {
-    if (!(after.tasks ?? []).some((n) => n.id === was.id)) out.push({ graph: after.id, task: was.id, kind: "task_removed", detail: was.title });
+  for (const was of before.tasks) {
+    if (!after.tasks.some((n) => n.id === was.id)) out.push({ graph: after.id, task: was.id, kind: "task_removed", detail: was.title });
   }
   return out;
 }
@@ -171,6 +171,6 @@ export function graphEventText(e: GraphChange, titleOf: (task: string) => string
     case "task_added":
       return t("server.task.event.taskAdded", { step });
     case "task_removed":
-      return t("server.task.event.taskRemoved", { title: e.detail !== undefined ? e.detail : (e.task ?? "") });
+      return t("server.task.event.taskRemoved", { title: e.detail || (e.task ?? "") });
   }
 }

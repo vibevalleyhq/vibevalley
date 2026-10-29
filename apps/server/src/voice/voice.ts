@@ -175,7 +175,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
   }
 }
 
-const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area] ?? AgoraArea.US;
+const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area];
 
 /** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
  * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
@@ -818,7 +818,7 @@ export const make = (options: VoiceOptions = {}) =>
         const r = yield* verifyMoss(key, options.moss);
         switch (r.kind) {
           case "ok":
-            return {};
+            return { problem: "" };
           case "refused":
             return { problem: t("server.voice.moss.refused", { why: r.why }) };
           case "unreachable":

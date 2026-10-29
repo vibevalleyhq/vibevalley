@@ -175,7 +175,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       return {
         found: hits
           .filter((h) => h.text !== "")
-          .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
+          .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, fading: false, source: "everos", score: h.score, scope: h.scope })),
       };
     }),
     list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
@@ -206,7 +206,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       const project = n.project.trim();
       const at = yield* Clock.currentTimeMillis;
       yield* add(session, project, [
-        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project ?? "", n.text) },
+        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project, n.text) },
         { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
       ]);
       yield* Effect.ensuring(

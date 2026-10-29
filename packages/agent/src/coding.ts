@@ -20,9 +20,9 @@ export interface CodingOptions {
 
 const why = (e: unknown) => {
   const err = e as NodeJS.ErrnoException;
-  if (err?.code === "ENOENT") return "no such file or directory";
-  if (err?.code === "EISDIR") return "is a directory";
-  if (err?.code === "EACCES") return "permission denied";
+  if (err.code === "ENOENT") return "no such file or directory";
+  if (err.code === "EISDIR") return "is a directory";
+  if (err.code === "EACCES") return "permission denied";
   return err instanceof Error ? err.message : String(e);
 };
 

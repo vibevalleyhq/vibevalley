@@ -90,7 +90,7 @@ describe("crons", () => {
         const general = chat.defaultChannel();
         const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: clock.now + 150 }), owner);
         expect([made.channel, made.name, made.enabled, made.tz !== ""]).toEqual([general, "看进度", true, true]);
-        expect(core.state().crons?.map((x) => x.id)).toEqual([made.id]);
+        expect(core.state().crons.map((x) => x.id)).toEqual([made.id]);
         yield* s.tick;
         yield* drained;
         expect(due).toEqual([]);
@@ -121,7 +121,7 @@ describe("crons", () => {
         const s = yield* Crons;
         const core = yield* Core;
         const due = yield* collect;
-        const got = core.state().crons ?? [];
+        const got = core.state().crons;
         expect([got.length, got[1]?.enabled, got[1]?.agent]).toEqual([2, false, "lab"]);
         clock.now += 60 * 60_000;
         const on = yield* s.setEnabled(everyId, true);
@@ -151,7 +151,7 @@ describe("crons", () => {
       clock.now++;
       yield* s.tick;
       yield* drained;
-      const after = (core.state().crons ?? []).find((x) => x.id === made.id)!;
+      const after = core.state().crons.find((x) => x.id === made.id)!;
       expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
       yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
       yield* s.tick;
@@ -244,12 +244,12 @@ describe("crons", () => {
         const s = yield* Crons;
         expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "orchestrator"]]);
         const on = yield* s.setEnabled(id, true);
-        expect([on.enabled, on.pending]).toEqual([true, undefined]);
+        expect([on.enabled, on.pending]).toEqual([true, false]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
         const s = yield* Crons;
         const due = yield* collect;
-        expect(s.list().map((x) => [x.enabled, x.pending])).toEqual([[true, undefined]]);
+        expect(s.list().map((x) => [x.enabled, x.pending])).toEqual([[true, false]]);
         clock.now += 5 * 60_000;
         yield* s.tick;
         yield* drained;

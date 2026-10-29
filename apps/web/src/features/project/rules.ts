@@ -89,7 +89,7 @@ export function languageShares(counts: readonly LanguageCount[], top: number | u
     .filter((e) => e.lines > 0)
     .sort((a, b) => b.lines - a.lines || (a.language.label < b.language.label ? -1 : a.language.label > b.language.label ? 1 : 0));
   const total = all.reduce((n, e) => n + e.lines, 0);
-  const cut = top ?? all.length;
+  const cut = top;
   const rest = all.length > cut ? all.slice(cut) : [];
   const kept = rest.length > 1 ? all.slice(0, cut) : all;
   const shares = kept.map((e) => ({ ...e.language, lines: e.lines, files: e.files, share: total > 0 ? e.lines / total : 0 }));

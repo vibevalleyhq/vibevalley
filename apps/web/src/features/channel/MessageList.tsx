@@ -432,13 +432,11 @@ export function MessageRow(props: {
       >
         <Dispatch m={props.m} />
       </Show>
-      <Show when={props.m.attachments}>{(files) => <Attachments files={files()} />}</Show>
+      <Show when={props.m.attachments.length > 0 ? props.m.attachments : undefined}>{(files) => <Attachments files={files()} />}</Show>
       <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</Show>
       <Show when={props.m.deleted === undefined && props.m.text}>{(text) => <LinkedMessages text={text()} />}</Show>
-      <Show when={props.m.deleted === undefined && (props.m.embeds ?? []).length > 0 ? props.m.embeds : undefined}>
-        {(embeds) => <Embeds embeds={embeds()} />}
-      </Show>
-      <Show when={(props.m.reactions ?? []).length > 0}>
+      <Show when={props.m.deleted === undefined && props.m.embeds.length > 0 ? props.m.embeds : undefined}>{(embeds) => <Embeds embeds={embeds()} />}</Show>
+      <Show when={props.m.reactions.length > 0}>
         <Reactions m={props.m} names={nameOf} />
       </Show>
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>

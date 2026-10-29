@@ -25,7 +25,7 @@ export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefin
   return new Promise((resolve) => {
     // The markers keep out what a profile prints on its own.
     execFile(sh, ["-ilc", 'printf "__VV_PATH__%s__VV_PATH__" "$PATH"'], { timeout: shellPathTimeoutMs, env }, (error, stdout) => {
-      const found = /__VV_PATH__(.*?)__VV_PATH__/s.exec(stdout ?? "")?.[1];
+      const found = /__VV_PATH__(.*?)__VV_PATH__/s.exec(stdout)?.[1];
       resolve(error || !found ? env.PATH : found);
     });
   });

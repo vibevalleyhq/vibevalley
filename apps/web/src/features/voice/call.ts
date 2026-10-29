@@ -23,7 +23,7 @@ export class VoiceCall {
   phase: CallPhase = "idle";
   muted = false;
   agentHere = false;
-  problem: string | undefined = undefined;
+  problem = "";
   /** The 设置 section the problem is fixed in, when the server says a setting does. */
   problemAt: VoiceFix | undefined = undefined;
   /** 0..100: the microphone's level and the orchestrator's. */
@@ -60,10 +60,11 @@ export class VoiceCall {
     for (const f of this.listeners) f();
   }
 
-  private set(phase: CallPhase, problem?: string | null, at?: VoiceFix) {
+  /** problem: "" clears it; left out, it stays. */
+  private set(phase: CallPhase, problem?: string, at?: VoiceFix) {
     this.phase = phase;
     if (problem !== undefined) {
-      this.problem = problem ?? undefined;
+      this.problem = problem;
       this.problemAt = problem ? at : undefined;
     }
     this.changed();
@@ -71,8 +72,8 @@ export class VoiceCall {
 
   /** The owner read the problem and closed it. */
   dismiss() {
-    if (this.problem === undefined) return;
-    this.problem = undefined;
+    if (this.problem === "") return;
+    this.problem = "";
     this.problemAt = undefined;
     this.changed();
   }
@@ -86,7 +87,7 @@ export class VoiceCall {
 
   private send(agentId: string, c: { text: string; owner: boolean; picked?: string | undefined; key?: string }) {
     const sent = c.owner
-      ? api.voice.call.hear({ agentId, text: c.text, agent: c.picked ?? null, ...(c.key ? { sendKey: c.key } : {}) })
+      ? api.voice.call.hear({ agentId, text: c.text, ...(c.picked ? { agent: c.picked } : {}), ...(c.key ? { sendKey: c.key } : {}) })
       : api.voice.call.say({ agentId, text: c.text });
     sent.catch(() => undefined);
   }
@@ -103,7 +104,7 @@ export class VoiceCall {
     const stop = new Promise<never>((_, reject) => (this.cancel = () => ((cancelled = true), reject(new Cancelled()))));
     stop.catch(() => undefined);
     const until = <T>(p: Promise<T>) => Promise.race([p, stop]);
-    this.set("connecting", null);
+    this.set("connecting", "");
     try {
       const session = await until(api.voice.grant.create());
       let line: RtcLine | undefined;

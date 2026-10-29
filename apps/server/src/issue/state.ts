@@ -44,7 +44,7 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
     }
     return "canceled";
   }
-  const sessions = t.sessions ?? [];
+  const sessions = t.sessions;
   if (sessions.length > 0) {
     const h = sessionOf(state, sessions[sessions.length - 1]!);
     return !h ? "canceled" : isBusy(h) ? "in_progress" : "in_review";
@@ -56,8 +56,8 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
 export const keepClosedIssues = 50;
 
 export function issueOrder(a: Issue, b: Issue): number {
-  const sentA = (a.sessions ?? []).length > 0;
-  const sentB = (b.sessions ?? []).length > 0;
+  const sentA = a.sessions.length > 0;
+  const sentB = b.sessions.length > 0;
   if (!sentA && !sentB) return or(compare(a.rank ?? 0, b.rank ?? 0), compare(a.createdAt, b.createdAt), compareText(a.id, b.id));
   if (!sentA) return -1;
   if (!sentB) return 1;
@@ -85,21 +85,21 @@ export function issueRefiningOf(t: Issue, state: WorkspaceState): IssueRefining 
 /** The same array when none changed. */
 export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   let next: Issue[] | undefined;
-  (state.issues ?? []).forEach((t, i) => {
+  state.issues.forEach((t, i) => {
     const status = issueStatusOf(t, state);
     const drafting = issueRefiningOf(t, state);
     const attention = attentionIn(omitUndefined({ ...t, status, refining: drafting }), state);
     // The moves read the attention: a round that failed is not completed, from the moment it fails.
     const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, attention }));
     if (status === t.status && same(drafting, t.refining) && same(attention, t.attention) && same(moves, t.moves)) return;
-    next ??= [...state.issues!];
+    next ??= [...state.issues];
     next[i] = omitUndefined({ ...t, status, refining: drafting, attention, moves });
   });
   return next ? { ...state, issues: next } : state;
 }
 
 /** The findings still open: a failed acceptance's, until the next acceptance passes. */
-export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.resolved).length;
+export const openFindings = (t: Issue) => t.findings.filter((f) => !f.resolved).length;
 
 /** Assigned to an orchestrator (orchestrator: whether a profile id is one's): it answers it, no session works it. */
 export const isForOrchestrator = (t: Issue, orchestrator: (id: string) => boolean) => orchestrator(t.assignee ?? "");

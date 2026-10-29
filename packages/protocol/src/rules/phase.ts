@@ -62,7 +62,7 @@ export function phaseText(h: Session, now: number): string {
 /** What a session is doing in words, how long it has been quiet left as {span}. */
 export function phaseWords(h: Session): string {
   const need = needOf(h);
-  const conflict = need?.kind === "conflict" ? t("shared.phase.conflict", { base: need.conflict.base, files: list(need.conflict.files ?? []) }) : "";
+  const conflict = need?.kind === "conflict" ? t("shared.phase.conflict", { base: need.conflict.base, files: list(need.conflict.files) }) : "";
   const p = h.phase;
   switch (p._tag) {
     case "arriving":

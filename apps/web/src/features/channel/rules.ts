@@ -79,7 +79,7 @@ export const directsOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "direct") ?? []).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 /** A direct channel is named by its peer, which the server puts in its title. */
-export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? (c.title ?? "") : (c?.name ?? ""));
+export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? c.title : (c?.name ?? ""));
 
 export const channelLabel = (c: Channel | undefined) => (c?.type === "direct" ? channelName(c) : `#${channelName(c)}`);
 
@@ -136,7 +136,7 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
     default: {
       if (thread.subjectKind === "talk" && thread.subjectId) {
         const session = sessions.find((h) => h.id === thread.subjectId);
-        return t("web.channel.names.talkThread", { who: session?.name ?? thread.title ?? thread.subjectId });
+        return t("web.channel.names.talkThread", { who: session?.name || thread.title || (thread.subjectId ?? "") });
       }
       return thread.title || t("web.channel.names.thread");
     }
@@ -380,7 +380,7 @@ export function switchTargets(
     ...all.map((c): SwitchTarget => {
       switch (c.type) {
         case "channel":
-          return { kind: "channel", id: c.id, label: `#${channelName(c)}`, hint: c.category ?? "", unread: unreadUnder(chat, c), at: at(c) };
+          return { kind: "channel", id: c.id, label: `#${channelName(c)}`, hint: c.category, unread: unreadUnder(chat, c), at: at(c) };
         case "direct":
           return { kind: "direct", id: c.id, label: `@${channelName(c)}`, hint: t("web.channel.switcher.direct"), unread: unreadIn(c), at: at(c) };
         case "thread":

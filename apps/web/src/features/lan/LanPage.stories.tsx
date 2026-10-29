@@ -11,7 +11,7 @@ const devices: LanDevice[] = [
   { id: "d2", name: "书房的 iPad", pairedAt: now - 30 * 24 * 60 * min },
 ];
 
-const base: LanStatus = { open: false, hostName: "studio-mac", devices: [] };
+const base: LanStatus = { open: false, hostName: "studio-mac", devices: [], problem: "" };
 const open: LanStatus = { ...base, open: true, url: "http://192.168.1.20:8790" };
 
 const scene = (note: string, status: LanStatus): Story =>

@@ -46,6 +46,9 @@
  *   function or a new Promise anywhere else is a loop, a wait or a queue written by hand. Where a library's own interface
  *   is Promises (oar's runtimes, the MCP SDK's handlers), vite.config.ts turns the rule off for that file and says why.
  *
+ *   one-absent: a type that admits null and undefined at once carries two words for one thing. Outside's null is taken in
+ *   at the door (docs/style/code.md, "没有值"); vite.config.ts says where a door is.
+ *
  *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
  *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
  *   and moving a file does not change what its imports say. Siblings and children stay ./x.
@@ -340,6 +343,18 @@ const promiseBoundary = defineRule({
   },
 });
 
+const oneAbsent = defineRule({
+  meta: { messages: { both: "one word for none: undefined inside, null only at a door to the outside (docs/style/code.md, 没有值)" } },
+  create(context) {
+    return {
+      TSUnionType(node) {
+        const kinds = node.types.map((t) => t.type);
+        if (kinds.includes("TSNullKeyword") && kinds.includes("TSUndefinedKeyword")) context.report({ node, messageId: "both" });
+      },
+    };
+  },
+});
+
 const parentImportRule = defineRule({
   meta: {
     messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
@@ -377,6 +392,7 @@ export default definePlugin({
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
     "promise-boundary": promiseBoundary,
+    "one-absent": oneAbsent,
     "native-control": nativeControl,
   },
 });

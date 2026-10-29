@@ -56,7 +56,7 @@ export interface Folded {
   readonly seen: Seen;
 }
 
-export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1 });
+export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1, agents: {} });
 
 export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 
@@ -68,7 +68,7 @@ function tallied(p: Progress, e: LedgerEntry): Progress {
   const field = e.kind === "hired" ? "hired" : e.kind === "harvested" ? "harvested" : e.kind === "failed" ? "failed" : undefined;
   const agent = field ? (e as { agent?: string }).agent : undefined;
   if (!field || !agent) return p;
-  const was = p.agents?.[agent] ?? { hired: 0, harvested: 0, failed: 0 };
+  const was = p.agents[agent] ?? { hired: 0, harvested: 0, failed: 0 };
   return { ...p, agents: { ...p.agents, [agent]: { ...was, [field]: was[field] + 1 } } };
 }
 
@@ -92,7 +92,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       if (entry.runs <= 1 && !told && !failed) counts = bump(counts, "first_try", 1);
       if (seen.conflicted.includes(entry.session)) counts = bump(counts, "untangle", 1);
       if (failed) counts = bump(counts, "comeback", 1);
-      if (entry.cny !== undefined && entry.cny !== null && entry.cny < cheapCNY) counts = bump(counts, "thrifty", 1);
+      if (entry.cny !== undefined && entry.cny < cheapCNY) counts = bump(counts, "thrifty", 1);
       if (seen.reviewed.includes(entry.session)) counts = atLeast(counts, "s_review", 1);
       seen = { ...seen, runtimes: added(seen.runtimes, entry.runtime) };
       counts = { ...counts, every_machine: seen.runtimes.length };
@@ -170,7 +170,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
   }
   const next: Progress = { ...tallied(p, entry), coins: p.coins + coins, counts, unlocked: [...p.unlocked, ...unlocked] };
   next.multiplier = streakMultiplier(next.streak);
-  const news: ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), ...(unlocked.length > 0 ? { unlocked } : {}) };
+  const news: ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), unlocked };
   return [{ progress: next, seen }, news];
 }
 
@@ -181,7 +181,7 @@ const fullHouse = 6;
 const working = (state: WorkspaceState) => state.sessions.filter((h) => h.phase._tag === "working").length;
 
 function graphEntry(graph: TaskGraph): Entry {
-  const merged = new Set((graph.tasks ?? []).filter((n) => n.state === "merged").map((n) => n.id));
+  const merged = new Set(graph.tasks.filter((n) => n.state === "merged").map((n) => n.id));
   const parallel = layersOf(graph.tasks).some((layer) => layer.filter((id) => merged.has(id)).length >= 2);
   return { kind: "graph", graph: graph.id, merged: merged.size, parallel };
 }
@@ -227,7 +227,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           project: h.project ?? "",
           runtime: h.runtime,
           commits: fact.merged,
-          ...(h.spent?.cny !== undefined && h.spent.cny !== null ? { cny: h.spent.cny } : {}),
+          ...(h.spent?.cny !== undefined ? { cny: h.spent.cny } : {}),
           runs: h.runs,
         });
       break;
@@ -238,7 +238,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           const h = sessionOnIssue(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
-        for (const named of fact.message.mentions ?? []) {
+        for (const named of fact.message.mentions) {
           const h = named !== defaultOrchestrator && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }

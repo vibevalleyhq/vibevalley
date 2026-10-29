@@ -91,7 +91,7 @@ const five = (n: number) => String(n).padStart(5, "0");
 
 export function DinoGame(props: { big?: boolean }) {
   const zoom = () => (props.big ? 3 : 2);
-  const [d, setD] = createSignal<Dino | null>(null);
+  const [d, setD] = createSignal<Dino>();
   const [top, setTop] = best.use();
   let canvas: HTMLCanvasElement | undefined;
   const playing = () => !!d() && !d()!.over;

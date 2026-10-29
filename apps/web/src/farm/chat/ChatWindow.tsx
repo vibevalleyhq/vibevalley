@@ -65,7 +65,7 @@ const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
     return !v.agentHere ? "connecting" : v.agentState === "speaking" ? "speaking" : v.agentState === "thinking" ? "thinking" : "listening";
   if (!s) return "off";
   if (s.call === "connecting") return "connecting";
-  if (s.call === "error" || v.problem !== undefined) return "error";
+  if (s.call === "error" || v.problem !== "") return "error";
   if (s.call !== "live") return "off";
   const mood = orchestratorMood(s);
   return mood === "speaking" ? "speaking" : mood === "thinking" ? "thinking" : "listening";
@@ -107,7 +107,7 @@ function NewElsewhere(props: { except: string | undefined }) {
       {(newest) => (
         <button
           type="button"
-          onClick={() => farm.showChat(newest().default ? null : newest().id)}
+          onClick={() => farm.showChat(newest().default ? undefined : newest().id)}
           onDblClick={(e) => e.stopPropagation()}
           class="ml-2 shrink-0 cursor-pointer bg-berry/15 px-2 py-px text-[12px] text-berry hover:bg-berry/25"
         >
@@ -130,7 +130,7 @@ export function ChatWindow() {
   const large = useFarm((s) => s.chatLarge);
   const shownId = useFarm((s) => s.chatShown);
   const [problem, setProblem] = createSignal<string>();
-  const shown = createMemo(() => (shownId() ? channelOf(chat(), shownId()!) : undefined) ?? defaultOf(chat()));
+  const shown = createMemo(() => (shownId() ? channelOf(chat(), shownId()) : undefined) ?? defaultOf(chat()));
   const thread = () => (shown()?.type === "thread" ? shown() : undefined);
   const call = createCall();
   const phase = () => phaseOf(call(), core());
@@ -326,13 +326,13 @@ export function ChatWindow() {
 /** Why the last call did not connect, under the head: when a setting fixes it, a way to that section. */
 function CallProblem(props: { call: VoiceCall }) {
   const router = useRouter();
-  const open = () => props.call.phase === "idle" && props.call.problem !== undefined;
+  const open = () => props.call.phase === "idle" && props.call.problem !== "";
   return (
     <Show when={open()}>
       <div role="alert" data-testid="call-problem" class="shrink-0 border-b border-cream-200 bg-berry/10">
         <div class="flex flex-col gap-2 px-3 py-2.5 font-pixel text-[12px] leading-[1.625] text-bark-900">
           <div class="flex items-start gap-2">
-            <span class="min-w-0 flex-1">{t("web.farm.chat.noVoice", { why: props.call.problem ?? "" })}</span>
+            <span class="min-w-0 flex-1">{t("web.farm.chat.noVoice", { why: props.call.problem })}</span>
             <PxButton size="sm" icon="button-close" data-testid="call-problem-dismiss" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
           </div>
           <Show when={props.call.problemAt}>
@@ -363,9 +363,9 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   const now = useNow();
   const chat = () => core()?.chat;
   const channel = () => topOf(chat(), props.thread);
-  const backTo = () => (channel()?.type === "channel" ? channel()!.id : null);
+  const backTo = () => (channel()?.type === "channel" ? channel()!.id : undefined);
   const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
-  const title = () => threadTitle(props.thread, core()?.issues ?? [], core()?.sessions ?? []);
+  const title = () => threadTitle(props.thread, core()?.issues, core()?.sessions ?? []);
   const status = () => {
     const s = session();
     return s

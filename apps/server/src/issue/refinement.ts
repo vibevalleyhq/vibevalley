@@ -56,8 +56,8 @@ export function refinement(d: RefinementDeps) {
   });
 
   const beforeRefinement = Effect.fnUntraced(function* (issue: Issue, word: string, agent: string, where: string) {
-    let [title, description] = [issue.title, issue.description ?? ""];
-    if (word && issue.questions.length === 0 && !description && (issue.criteria ?? []).length === 0) [title, description] = splitBrief(word);
+    let [title, description] = [issue.title, issue.description];
+    if (word && issue.questions.length === 0 && !description && issue.criteria.length === 0) [title, description] = splitBrief(word);
     yield* inTx(
       Effect.gen(function* () {
         yield* db(
@@ -67,7 +67,7 @@ export function refinement(d: RefinementDeps) {
             project: nullText(issue.project ?? where),
             assignee: nullText(issue.assignee ?? agent),
             priority: issue.priority,
-            criteria: jsonOrNull(issue.criteria, (issue.criteria ?? []).length > 0),
+            criteria: jsonOrNull(issue.criteria, issue.criteria.length > 0),
             deliver: issue.deliver,
             id: issue.id,
           }),
@@ -100,7 +100,7 @@ export function refinement(d: RefinementDeps) {
       if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.refinement.onlyBacklog")));
       if (item.refining) return yield* Effect.fail(refused(t("server.issue.refinement.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);
-      const where = item.project ?? (chosen.workdir ?? "").trim();
+      const where = item.project ?? chosen.workdir.trim();
       if (!where) return yield* Effect.fail(refused(t("server.issue.refinement.noProject")));
       const said = word.trim();
       const brief = refinementBrief(item, said, where);

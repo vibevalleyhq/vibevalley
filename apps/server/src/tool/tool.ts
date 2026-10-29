@@ -698,7 +698,7 @@ export const make = Effect.gen(function* () {
               // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
               let agent: string | undefined;
               if (p.assignee || (to === "todo" && item.status === "backlog" && !item.assignee)) {
-                const chosen = yield* choose(item.title + "\n" + (item.description ?? ""), p.assignee ?? "", p.assignee ? "" : c.picked);
+                const chosen = yield* choose(item.title + "\n" + item.description, p.assignee ?? "", p.assignee ? "" : c.picked);
                 if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
@@ -877,7 +877,7 @@ export const make = Effect.gen(function* () {
       sessionDescriptions["issue.split"](maxTasks),
       Effect.fn("Tools.issueSplit")(function* (p: Session<"issue.split">) {
         const c = yield* callerOf(who);
-        const steps = (p.tasks ?? []).map((item) => ({
+        const steps = p.tasks.map((item) => ({
           id: item.id,
           title: item.title ?? "",
           brief: item.brief,

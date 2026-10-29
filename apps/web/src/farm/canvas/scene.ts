@@ -99,7 +99,7 @@ export interface SceneEvents {
   /** A thing in the yard was clicked (a YardPlace id). */
   readonly onSpot: (spot: string) => void;
   /** What the pointer is over changed: the bed and the yard place, for the store. */
-  readonly onHover: (bed: number | null, spot: string | null) => void;
+  readonly onHover: (bed: number | undefined, spot: string | undefined) => void;
 }
 
 export interface Scene {
@@ -317,7 +317,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     }
     over = hit;
     if (hit?.kind === "dog") pup.point(true);
-    on.onHover(bedOfHit(hit) ?? null, hit?.kind === "spot" ? hit.spot : null);
+    on.onHover(bedOfHit(hit) ?? undefined, hit?.kind === "spot" ? hit.spot : undefined);
   };
   const canvas = app.canvas;
   const local = (e: PointerEvent) => stage.fromScreen({ x: e.offsetX, y: e.offsetY });

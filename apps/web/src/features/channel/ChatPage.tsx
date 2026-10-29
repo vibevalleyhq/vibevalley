@@ -298,7 +298,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
     const id = dragged();
     setDragged(undefined);
     if (!id || id === onto.id || onto.default || onto.type !== "channel") return;
-    api.channel.update({ id, before: onto.id, category: onto.category ?? "" }).catch((e) => toast(reasonOf(e), "bad"));
+    api.channel.update({ id, before: onto.id, category: onto.category }).catch((e) => toast(reasonOf(e), "bad"));
   };
   const row = (c: Channel) => (
     <ChannelRow
@@ -698,7 +698,7 @@ function OrchestratorLine(props: { agent: string }) {
   const profile = useAgent(() => props.agent);
   const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
   const clock = useNow();
-  const since = () => core()?.orchestrators?.[props.agent]?.since;
+  const since = () => core()?.orchestrators[props.agent]?.since;
   return (
     <div
       data-testid="channel-orchestrator-line"
@@ -741,7 +741,7 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
           </Show>
         </span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <span class="truncate text-sm font-semibold">{threadTitle(props.thread, core()?.issues ?? [], sessions())}</span>
+          <span class="truncate text-sm font-semibold">{threadTitle(props.thread, core()?.issues, sessions())}</span>
           <span class="flex items-center gap-1 text-xs text-muted">
             <Show when={session()}>{(s) => <PhaseGlyph phase={s().phase} />}</Show>
             <span class="truncate">{status()}</span>
@@ -776,7 +776,7 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
   const [showArchived, setShowArchived] = createSignal(false);
   const live = () => threadsIn(core()?.chat, props.channel);
   const archived = () => threadsIn(core()?.chat, props.channel, true);
-  const title = (channel: Channel) => threadTitle(channel, core()?.issues ?? [], core()?.sessions ?? []);
+  const title = (channel: Channel) => threadTitle(channel, core()?.issues, core()?.sessions ?? []);
   const item = (channel: Channel) => (
     <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
   );

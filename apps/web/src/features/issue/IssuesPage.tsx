@@ -54,8 +54,8 @@ export function IssuesPage(props: { rest: string }) {
   const [filter, setFilter] = createSignal<BoardFilter>(noFilter);
   const [older, setOlder] = createSignal(false);
   const [look, setLookState] = createSignal(loadLook());
-  const [closing, setClosing] = createSignal<Closing | null>(null);
-  const [reopening, setReopening] = createSignal<Issue | null>(null);
+  const [closing, setClosing] = createSignal<Closing>();
+  const [reopening, setReopening] = createSignal<Issue>();
   const history = useIssueHistory(older);
 
   const setLook = (l: BoardLook) => {
@@ -168,8 +168,10 @@ export function IssuesPage(props: { rest: string }) {
           </IssueView>
         )}
       </Show>
-      <Show when={closing()}>{(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} onClose={() => setClosing(null)} />}</Show>
-      <Show when={reopening()}>{(issue) => <ReopenDialog issue={issue()} onClose={() => setReopening(null)} onReopened={() => open(issue().id)} />}</Show>
+      <Show when={closing()}>
+        {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} onClose={() => setClosing(undefined)} />}
+      </Show>
+      <Show when={reopening()}>{(issue) => <ReopenDialog issue={issue()} onClose={() => setReopening(undefined)} onReopened={() => open(issue().id)} />}</Show>
     </div>
   );
 }

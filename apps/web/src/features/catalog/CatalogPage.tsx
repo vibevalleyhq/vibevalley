@@ -499,7 +499,7 @@ function Sounds(props: { tabs: JSX.Element }) {
   const [query, setQuery] = createSignal("");
   const matches = (group: string, name: SoundName) => {
     const q = query().trim().toLowerCase();
-    return !q || [group, name, SOUND_LABEL[name] ?? ""].some((w) => w.toLowerCase().includes(q));
+    return !q || [group, name, SOUND_LABEL[name]].some((w) => w.toLowerCase().includes(q));
   };
   return (
     <Layout
@@ -530,12 +530,12 @@ function Sounds(props: { tabs: JSX.Element }) {
                         type="button"
                         data-testid="sound"
                         data-key={name}
-                        aria-label={t("web.catalog.playSound", { name: SOUND_LABEL[name] ?? name })}
+                        aria-label={t("web.catalog.playSound", { name: SOUND_LABEL[name] })}
                         onClick={() => playSound(name)}
                         class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page pr-3 pl-1.5 hover:bg-hover active:bg-selected"
                       >
                         <Icon name="play" size={16} />
-                        <span class="text-sm font-medium">{SOUND_LABEL[name] ?? name}</span>
+                        <span class="text-sm font-medium">{SOUND_LABEL[name]}</span>
                         <span class="font-mono text-xs text-muted">{name}</span>
                       </button>
                     )}

@@ -121,7 +121,7 @@ export const make = (options: ArtifactOptions = {}) =>
         versions: versions.map((v) => ({
           version: v.version,
           size: v.size,
-          ...(v.note !== null ? { note: v.note } : {}),
+          note: v.note ?? "",
           by: v.by_id,
           byName: v.by_name,
           at: v.created_at,
@@ -175,7 +175,7 @@ export const make = (options: ArtifactOptions = {}) =>
       const id = newId();
       const note = req.note?.trim() || undefined;
       const version = body === "html" ? 1 : 0;
-      const card: ArtifactCard = { id, title, body, version, ...(note ? { note } : {}) };
+      const card: ArtifactCard = { id, title, body, version, note: note ?? "" };
       // Said first: the name it goes by is the one the channel knows its maker by.
       const said = yield* chat.announce(maker.from, channel, words(t("server.artifact.made", { title }), note), card);
       const now = yield* Clock.currentTimeMillis;
@@ -210,7 +210,7 @@ export const make = (options: ArtifactOptions = {}) =>
       const sha = yield* keep(bytes);
       const next = row.version + 1;
       const note = req.note?.trim() || undefined;
-      const card: ArtifactCard = { id: row.id, title: row.title, body: "html", version: next, ...(note ? { note } : {}) };
+      const card: ArtifactCard = { id: row.id, title: row.title, body: "html", version: next, note: note ?? "" };
       // Announced where the first one was: its comments stay in one place.
       const said = yield* chat.announce(
         maker.from,

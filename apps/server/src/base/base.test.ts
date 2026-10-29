@@ -1,5 +1,6 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { FileWriter } from "./files.ts";
@@ -50,7 +51,7 @@ test("what the server writes is redacted", () => {
 });
 
 test("a kept file is written whole, and not after it is finished", () => {
-  const path = join(mkdtempSync(join(tmpdir(), "vibevalley-files-")), "deep", "state.json");
+  const path = join(tempDir("vibevalley-files-"), "deep", "state.json");
   const w = new FileWriter(path);
   w.write(() => "one");
   expect(readFileSync(path, "utf8")).toBe("one");
@@ -60,7 +61,7 @@ test("a kept file is written whole, and not after it is finished", () => {
 });
 
 test("one server per home; a stale lock is taken over", () => {
-  const home = mkdtempSync(join(tmpdir(), "vibevalley-lease-"));
+  const home = tempDir("vibevalley-lease-");
   const release = leaseHome(home);
   expect(() => leaseHome(home)).toThrow(HomeTaken);
   release();
@@ -71,7 +72,7 @@ test("one server per home; a stale lock is taken over", () => {
 });
 
 test("a server says where it listens in its home while it runs, and a stopped one's word is not taken", () => {
-  const home = mkdtempSync(join(tmpdir(), "vv-announce-"));
+  const home = tempDir("vv-announce-");
   expect(announced(home)).toBeUndefined();
   const withdraw = announce(home, "http://127.0.0.1:56048");
   expect(announced(home)).toBe("http://127.0.0.1:56048");

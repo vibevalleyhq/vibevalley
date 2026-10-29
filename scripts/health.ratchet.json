@@ -75,7 +75,7 @@
     "lintOff": 0
   },
   "server: Collaboration": {
-    "nonNull": 48,
+    "nonNull": 47,
     "doubleCast": 0,
     "lintOff": 0
   },
@@ -85,12 +85,12 @@
     "lintOff": 0
   },
   "server: Gateway": {
-    "nonNull": 20,
+    "nonNull": 16,
     "doubleCast": 0,
     "lintOff": 1
   },
   "server: Issues": {
-    "nonNull": 48,
+    "nonNull": 47,
     "doubleCast": 0,
     "lintOff": 0
   },
@@ -125,7 +125,7 @@
     "lintOff": 0
   },
   "web: farm": {
-    "nonNull": 78,
+    "nonNull": 74,
     "doubleCast": 0,
     "lintOff": 0
   },
@@ -135,7 +135,7 @@
     "lintOff": 0
   },
   "web: features/artifact": {
-    "nonNull": 10,
+    "nonNull": 8,
     "doubleCast": 0,
     "lintOff": 0
   },
@@ -155,7 +155,7 @@
     "lintOff": 0
   },
   "web: features/issue": {
-    "nonNull": 24,
+    "nonNull": 22,
     "doubleCast": 0,
     "lintOff": 0
   },

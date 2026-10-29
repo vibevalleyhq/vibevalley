@@ -94,7 +94,9 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
             </Card>
           }
         >
-          <Keyed key={selected()}>{() => <ConnectorCard id={selected()} status={of(selected()) ?? { id: selected(), state: "off", pending: 0 }} />}</Keyed>
+          <Keyed key={selected()}>
+            {() => <ConnectorCard id={selected()} status={of(selected()) ?? { id: selected(), state: "off", pending: 0, error: "", qr: "", pairCode: "" }} />}
+          </Keyed>
         </Show>
         <Card title={t("web.connector.connectors.know")}>
           <ul class="flex flex-col gap-1.5">
@@ -173,9 +175,7 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
         <Match when={state() === "pairing"}>
           <p class="text-sm">{t("web.connector.connectors.pairing", { app: label() })}</p>
           <div>
-            <span class="inline-block rounded-lg bg-hover px-4 py-2 font-mono text-3xl font-semibold tracking-[4px] select-all">
-              {props.status.pairCode ?? ""}
-            </span>
+            <span class="inline-block rounded-lg bg-hover px-4 py-2 font-mono text-3xl font-semibold tracking-[4px] select-all">{props.status.pairCode}</span>
           </div>
           <p class="text-xs text-muted">{t("web.connector.connectors.pairingNote")}</p>
           {disconnect()}

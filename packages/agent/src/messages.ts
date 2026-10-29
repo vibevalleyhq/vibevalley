@@ -120,7 +120,7 @@ export function transcript(messages: readonly BrainMessage[]): string {
         }
         break;
       case "toolResult":
-        out.push(transcriptWords.toolResultHeading(m.toolName, m.isError ?? false, messageText(m)));
+        out.push(transcriptWords.toolResultHeading(m.toolName, m.isError, messageText(m)));
         break;
     }
   }

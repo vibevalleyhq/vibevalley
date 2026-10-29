@@ -19,7 +19,7 @@ export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);
   const phone = phoneState();
   const count = () => missedOf(phone()).length;
-  const ringing = () => phone().ringing !== null;
+  const ringing = () => phone().ringing !== undefined;
   const core = useCore();
   const unfolded = useFarm((s) => s.chatOpen);
   const unread = () => (unfolded() ? 0 : unreadTotal(core()?.chat));

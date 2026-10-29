@@ -45,7 +45,7 @@ const toneOf: Record<Attention, Tone | undefined> = {
 
 export function glanceOf(frame: StateFrame, now: number): Glance {
   const rows: (IslandRow & { first: boolean })[] = [];
-  for (const issue of frame.state.issues ?? []) {
+  for (const issue of frame.state.issues) {
     const { state, stuck } = issue.attention;
     const tone = toneOf[state];
     if (!tone) continue;

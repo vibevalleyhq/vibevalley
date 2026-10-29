@@ -135,7 +135,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
 
     /** One batch, under the lock the caller holds. */
     const submitLocked = (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">): Effect.Effect<BlockAck, ApiError> => {
-      if (!body.batchId?.trim()) return Effect.fail(refused(t("server.artifact.noBatch")));
+      if (!body.batchId.trim()) return Effect.fail(refused(t("server.artifact.noBatch")));
       return sql
         .withTransaction(
           Effect.gen(function* () {
@@ -146,7 +146,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
             const p = new Page(id, actor, now, yield* blocksOf(id));
             // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
             const revisions = new Map<string, TextSpan[]>();
-            for (const op of body.ops ?? []) {
+            for (const op of body.ops) {
               if (op.op !== "update_text" && op.op !== "split_block") continue;
               const b = p.find(op.blockId);
               if (!b || op.baseRev > b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
@@ -159,13 +159,13 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
               if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
             }
             const taken = new Set<string>();
-            for (const op of body.ops ?? []) {
+            for (const op of body.ops) {
               const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
               if (fresh && Option.isSome(yield* db(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
             }
             p.base = (block, rev) => revisions.get(`${block}@${rev}`);
             p.taken = (block) => taken.has(block);
-            const results = (body.ops ?? []).map((op) => p.apply(op));
+            const results = body.ops.map((op) => p.apply(op));
             const changed = p.changedBlocks();
             for (const b of changed)
               yield* db(

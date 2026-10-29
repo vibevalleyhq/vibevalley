@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
+import { tempDir } from "@vibevalley/testkit/temp";
 import { Cause, Effect, Exit, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
 import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+
 import { join } from "node:path";
 import { testDatabase } from "@/testing/layers.ts";
 import { Db, setAsideStale } from "./db.ts";
@@ -64,7 +65,7 @@ describe("the database", () => {
 
   // A new folder on disk starts from the copy of the baseline the first database in memory left (db.ts).
   it.effect("a new database on disk made from the copy keeps what is written, across a reopen", () => {
-    const where = join(mkdtempSync(join(tmpdir(), "vibevalley-db-")), "db");
+    const where = join(tempDir("vibevalley-db-"), "db");
     const open = (f: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
     return Effect.gen(function* () {
       yield* lanDevices().pipe(Effect.provide(testDatabase()), Effect.orDie);
@@ -75,7 +76,7 @@ describe("the database", () => {
   });
 
   it("a database from another baseline is set aside, not deleted; one without a mark is taken as today's", () => {
-    const home = mkdtempSync(join(tmpdir(), "vibevalley-db-"));
+    const home = tempDir("vibevalley-db-");
     const db = join(home, "db");
     mkdirSync(db);
     expect(setAsideStale(db, "new", 7)).toBeUndefined();

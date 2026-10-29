@@ -40,7 +40,7 @@ export const intake: Readonly<Record<Source, { readonly head: string; readonly n
 export function quotaText(info: RuntimeInfo | undefined): string {
   const budget = info?.settings.dailyBudget ?? 0;
   const spentToday = info?.spentToday;
-  const low = info?.quota?.left !== undefined && info.quota.left !== null && info.quota.left < quotaLow ? quotaWords.low : "";
+  const low = info?.quota?.left !== undefined && info.quota.left < quotaLow ? quotaWords.low : "";
   let today = "";
   if (spentToday !== undefined || budget > 0) {
     today = quotaWords.today(yuan(spentToday ?? 0));

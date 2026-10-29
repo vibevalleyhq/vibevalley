@@ -67,6 +67,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     hiredAt: Date.now() - 600_000,
     runs: 1,
     phase: { _tag: "done" },
+    refining: false,
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },

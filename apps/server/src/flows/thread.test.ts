@@ -92,10 +92,10 @@ describe("an issue's thread", () => {
         "the issue's thread",
       ))!;
       const get = () => issues.get(issue.id);
-      yield* await_(get, (i) => (i.questions ?? []).length === 1, "its question");
+      yield* await_(get, (i) => i.questions.length === 1, "its question");
 
       yield* channels.say("用 8797", thread, "");
-      yield* await_(get, (i) => (i.questions ?? []).length === 0, "answered in the thread");
+      yield* await_(get, (i) => i.questions.length === 0, "answered in the thread");
       yield* await_(get, (i) => i.status === "in_review", "handed back");
       yield* issues.review(issue.id, { pass: true });
       expect((yield* get()).reviewedAt).toBeDefined();

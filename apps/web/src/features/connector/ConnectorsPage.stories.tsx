@@ -8,7 +8,7 @@ const min = 60_000;
 const qr = "https://login.weixin.qq.com/l/story-sample";
 
 const statusOf = (id: ConnectorID, state: ConnectorState, more: Partial<ConnectorStatus> = {}): ConnectorStatus => {
-  const base: ConnectorStatus = { id, state, pending: 0 };
+  const base: ConnectorStatus = { id, state, pending: 0, error: "", qr: "", pairCode: "" };
   switch (state) {
     case "off":
       return { ...base, ...more };

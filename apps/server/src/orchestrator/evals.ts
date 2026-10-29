@@ -80,7 +80,7 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
   const words = wordsOf(turn);
   const called = (tool: string, args = "", lacks?: string) =>
     calls.some((c) => {
-      const json = JSON.stringify(c.arguments ?? {});
+      const json = JSON.stringify(c.arguments);
       return c.name === tool && json.includes(args) && (lacks === undefined || !json.includes(lacks));
     });
   const missed: string[] = [];

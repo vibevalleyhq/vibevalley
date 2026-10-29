@@ -23,6 +23,7 @@ const make = (change: Partial<Cron> = {}): Cron => ({
   enabled: true,
   created: at("2026-10-12T08:00:00"),
   by: "owner",
+  pending: false,
   ...change,
 });
 
@@ -97,7 +98,7 @@ test("the fold keeps the facts; the words are the frame's", () => {
   expect(frameOf(one).state.crons).toEqual([{ ...s, whenText: "每天 09:00", nextText: "10/12 09:00" }]);
   expect(reduce(one, { type: "cron", at: 2, cron: s })[1]).toBe(false);
   const [off] = reduce(one, { type: "cron", at: 3, cron: { ...s, enabled: false } });
-  expect(frameOf(off).state.crons?.[0]?.nextText).toBe("关着");
+  expect(frameOf(off).state.crons[0]?.nextText).toBe("关着");
   const [gone] = reduce(off, { type: "cronGone", at: 4, id: "c1" });
   expect(gone.crons).toEqual([]);
   expect(reduce(emptyWorkspaceState(), { type: "cronGone", at: 5, id: "c9" })[1]).toBe(false);

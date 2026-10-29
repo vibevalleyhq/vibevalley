@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { join } from "node:path";
 import type { SessionEvent } from "@vibevalley/protocol";
 import { afterEach, describe, expect } from "vite-plus/test";
@@ -17,7 +18,7 @@ afterEach(() => {
 /** What the journals said they could not save. */
 const warnings: string[] = [];
 
-const trajectories = (home = mkdtempSync(join(tmpdir(), "journal-")), push: (id: string, e: SessionEvent) => void = () => {}) => {
+const trajectories = (home = tempDir("journal-"), push: (id: string, e: SessionEvent) => void = () => {}) => {
   const t = new Trajectories(home, push, (message) => warnings.push(message), wallTime);
   open.push(t);
   return t;
@@ -27,7 +28,7 @@ const bash = (text: string, input?: string) => ({ text, action: "run_command" as
 
 describe("a session's log", () => {
   it("discards an obsolete event file and writes the current event shape when the session runs again", () => {
-    const home = mkdtempSync(join(tmpdir(), "journal-"));
+    const home = tempDir("journal-");
     const dir = join(home, "events");
     mkdirSync(dir);
     const file = join(dir, "w1.json");
@@ -119,7 +120,7 @@ describe("a session's log", () => {
 
   it.effect("sends a grown step once, and writes it", () =>
     Effect.gen(function* () {
-      const home = mkdtempSync(join(tmpdir(), "journal-"));
+      const home = tempDir("journal-");
       const pushed: [string, SessionEvent][] = [];
       const tr = new Trajectories(
         home,
@@ -142,7 +143,7 @@ describe("a session's log", () => {
   it.effect("pushes a step 300 ms after it changes and saves 1.5 s after the last change, on the Clock it was given", () =>
     Effect.gen(function* () {
       const pushed: string[] = [];
-      const home = mkdtempSync(join(tmpdir(), "journal-"));
+      const home = tempDir("journal-");
       const file = join(home, "events", "w1.json");
       const tr = new Trajectories(
         home,
@@ -167,7 +168,7 @@ describe("a session's log", () => {
   );
 
   it("only grows", () => {
-    const home = mkdtempSync(join(tmpdir(), "journal-"));
+    const home = tempDir("journal-");
     const tr = trajectories(home);
     const file = join(home, "events", "w1.json");
     let j = tr.openLog("w1");

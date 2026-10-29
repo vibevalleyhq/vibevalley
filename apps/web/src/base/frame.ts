@@ -41,7 +41,7 @@ export function useCore(): () => WorkspaceState | undefined {
 
 /** An orchestrator's mood; one the state does not list is idle. */
 export const orchestratorMood = (state: WorkspaceState | undefined, agent = defaultOrchestrator): OrchestratorState =>
-  state?.orchestrators?.[agent]?.state ?? "idle";
+  state?.orchestrators[agent]?.state ?? "idle";
 
 /**
  * The frame as the stream sent it: a new object each time, for code that compares the one before with the one after

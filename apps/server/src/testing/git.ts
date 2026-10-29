@@ -1,8 +1,9 @@
 // Real git repositories for tests.
 
+import { tempDir } from "@vibevalley/testkit/temp";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, mkdirSync, writeFileSync } from "node:fs";
+
 import { join } from "node:path";
 
 /** Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. */
@@ -15,7 +16,7 @@ export const gitSync = (dir: string, ...args: string[]) =>
 
 /** A projects folder of its own, under a work root of its own. */
 export function projectsDir(): string {
-  const root = join(mkdtempSync(join(tmpdir(), "vibevalley-work-")), "projects");
+  const root = join(tempDir("vibevalley-work-"), "projects");
   mkdirSync(root);
   return root;
 }
@@ -29,7 +30,7 @@ export function repo(dir: string, mine: number, others: number) {
   const key = `${mine}:${others}`;
   let template = templates.get(key);
   if (template === undefined) {
-    template = join(mkdtempSync(join(tmpdir(), "vibevalley-repo-")), "repo");
+    template = join(tempDir("vibevalley-repo-"), "repo");
     made(template, mine, others);
     templates.set(key, template);
   }

@@ -137,7 +137,7 @@ export function questionsOf(said: string): Question[] {
         .map((o) => o.trim())
         .filter(Boolean);
       if (!question) return [];
-      return [options.length >= 2 ? { question, options } : { question }];
+      return [{ question, options: options.length >= 2 ? options : [] }];
     });
 }
 
@@ -163,7 +163,7 @@ export function checksOf(said: string): CriterionCheck[] {
     const criterion = Number(m[1]) - 1;
     if (criterion < 0) continue;
     const proof = m[3]!.trim().replace(/\*\*$/, "").trim();
-    out.set(criterion, { criterion, result: checkWords[m[2]!.toLowerCase()]!, ...(proof ? { proof } : {}) });
+    out.set(criterion, { criterion, result: checkWords[m[2]!.toLowerCase()]!, proof: proof });
   }
   return [...out.values()].sort((a, b) => a.criterion - b.criterion);
 }
@@ -219,8 +219,8 @@ export const toOarMcp = (server: MCPServer): McpServer =>
     : { name: server.name, command: server.command, args: server.args, env: server.env };
 
 export function instructions(agent: Agent, library: readonly Skill[]): string {
-  const parts = [(agent.persona ?? "").trim()];
-  for (const id of agent.skills ?? []) {
+  const parts = [agent.persona.trim()];
+  for (const id of agent.skills) {
     const skill = library.find((s) => s.id === id);
     if (skill) parts.push("## " + skill.name + "\n" + skill.body.trim());
   }

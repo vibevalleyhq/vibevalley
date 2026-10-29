@@ -46,7 +46,7 @@ function pilot(g: BugSnake): SnakeHeading {
 function piloted(seed: number, ticks: number): [number, BugSnake] {
   let g = newBugSnake(seed);
   let t = 0;
-  for (; t < ticks && g.over === null; t++) g = crawlBugSnake(steerBugSnake(g, pilot(g)));
+  for (; t < ticks && g.over === undefined; t++) g = crawlBugSnake(steerBugSnake(g, pilot(g)));
   return [t, g];
 }
 
@@ -84,18 +84,18 @@ describe("bug snake", () => {
   test("a bug lands with the fifth seed, is worth more the sooner, and flies off uneaten", () => {
     const g = crawlBugSnake(lined({ food: at(6, 7), eaten: 4 }));
     expect(g.eaten).toBe(5);
-    expect(g.bug).not.toBeNull();
+    expect(g.bug).not.toBeUndefined();
     expect(g.bugLeft).toBe(bugTicks);
     expect(!g.body.includes(g.bug!) && g.bug !== g.food).toBe(true);
     const fed = crawlBugSnake({ ...g, bug: at(7, 7), food: at(0, 0) });
     expect(fed.bugs).toBe(1);
-    expect(fed.bug).toBeNull();
+    expect(fed.bug).toBeUndefined();
     expect(fed.score).toBe(seedPoints + bugPoints + bugTicks);
     expect(fed.grow).toBe(1 + 2 - 1);
     const away = { ...g, bug: at(15, 0), bugLeft: 5, food: at(0, 0), turns: [] };
     expect(crawl(away, 4).bug).toBe(at(15, 0));
     expect(crawl(away, 4).bugLeft).toBe(1);
-    expect(crawl(away, 5).bug).toBeNull();
+    expect(crawl(away, 5).bug).toBeUndefined();
   });
 
   test("the wall and its own body end a run; its tail cell does not", () => {
@@ -104,7 +104,7 @@ describe("bug snake", () => {
     expect(crawlBugSnake(wall)).toBe(wall);
     expect(steerBugSnake(wall, "up")).toBe(wall);
     const ring = lined({ body: [at(5, 6), at(5, 7), at(6, 7), at(6, 6)], heading: "up", turns: ["right"] });
-    expect(crawlBugSnake(ring).over).toBeNull();
+    expect(crawlBugSnake(ring).over).toBeUndefined();
     expect(crawlBugSnake({ ...ring, grow: 1 }).over).toBe("self");
     const long = lined({ body: [at(5, 6), at(5, 7), at(6, 7), at(6, 6), at(7, 6)], heading: "up", turns: ["right"] });
     expect(crawlBugSnake(long).over).toBe("self");
@@ -121,7 +121,7 @@ describe("bug snake", () => {
       return [t, g.over, g.score, g.eaten, g.bugs, g.body.length, g.food, g.bug, g.seed];
     };
     expect(summary(1)).toEqual([266, "self", 357, 20, 3, 29, 111, 144, -1455494930]);
-    expect(summary(42)).toEqual([255, "wall", 312, 18, 3, 27, 10, null, 1639742264]);
+    expect(summary(42)).toEqual([255, "wall", 312, 18, 3, 27, 10, undefined, 1639742264]);
     expect(summary(2024)).toEqual([191, "self", 248, 15, 2, 22, 32, 0, 440014103]);
     expect([1, 42, 2024].map((s) => newBugSnake(s).food)).toEqual([141, 135, 182]);
   });

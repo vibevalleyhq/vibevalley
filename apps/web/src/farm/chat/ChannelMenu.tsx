@@ -123,7 +123,7 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
       aria-current={here() ? "true" : undefined}
       onClick={() => {
         props.onPick();
-        farm.showChat(c().default ? null : c().id);
+        farm.showChat(c().default ? undefined : c().id);
       }}
       class={["flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left", here() ? "bg-leaf-300/50" : "hover:bg-cream-200"]}
     >

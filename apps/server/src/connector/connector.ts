@@ -197,7 +197,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const pendingNow = Effect.suspend(() => {
         if (pendingOut !== undefined) return Effect.succeed(pendingOut);
         const at = outChanges;
-        return run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r?.n ?? 0)).pipe(
+        return run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r.n ?? 0)).pipe(
           Effect.tap((n) =>
             Effect.sync(() => {
               if (at === outChanges) pendingOut = n;
@@ -209,20 +209,19 @@ export const make = (options: ConnectorOptions = {}) =>
 
       const status: Effect.Effect<ConnectorStatus> = Effect.map(pendingNow, (pending) => {
         const state = chat.now();
-        const s: ConnectorStatus = { id, state: "off", pending };
-        if (err) s.error = err;
+        const s: ConnectorStatus = { id, state: "off", pending, error: err, qr: "", pairCode: "" };
         const a = account;
         if (a) {
           const where = a.channel ? channelOf(state, a.channel) : defaultOf(state);
           if (where?.name) s.channel = where.name;
         }
-        if (progress) return { ...s, state: progress.state, ...(progress.qr ? { qr: progress.qr } : {}) };
+        if (progress) return { ...s, state: progress.state, qr: progress.qr };
         if (!a) return s;
         if (!a.owner)
           return {
             ...s,
             state: "pairing",
-            ...(a.pairCode ? { pairCode: a.pairCode } : {}),
+            pairCode: a.pairCode,
             since: a.connectedAt,
           };
         const stopped = paused(a, now());
@@ -654,7 +653,7 @@ export const make = (options: ConnectorOptions = {}) =>
       }),
     );
 
-    const off = (id: ConnectorID): ConnectorStatus => ({ id, state: "off", pending: 0 });
+    const off = (id: ConnectorID): ConnectorStatus => ({ id, state: "off", pending: 0, error: "", qr: "", pairCode: "" });
     return Connectors.of({
       list: () => Effect.forEach(bridges, (b) => b.status),
       login: (id, input) => bridge(id)?.login(input) ?? Effect.succeed(off(id)),

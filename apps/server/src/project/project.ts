@@ -217,7 +217,7 @@ const runGitHub: GitHubRun = (...args) =>
   );
 
 export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitHubRun) {
-  const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false };
+  const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false, reason: "" };
   const version = yield* gh("--version");
   if (!version.ok) return { ...s, reason: version.missing ? t("server.project.gh.missing") : t("server.project.gh.failed") };
   const v = ghVersion.exec(version.out)?.[1];
@@ -490,10 +490,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       root,
       limit: perProject,
       maxSessions,
-      validate: (req) => {
-        const problem = projectProblem(req);
-        return problem ? { problem } : {};
-      },
+      validate: (req) => ({ problem: projectProblem(req) }),
       create: (req) =>
         serially(
           req.name,
@@ -823,7 +820,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         const probed = yield* probeGitHub(gh);
         const next = new Map<string, PullRequestCapability>();
         for (const p of yield* list()) {
-          let c: PullRequestCapability = { available: false, reason: probed.reason ?? "" };
+          let c: PullRequestCapability = { available: false, reason: probed.reason };
           if (probed.loggedIn) {
             const repo = githubOrigin(yield* repository(p.path).origin);
             if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };

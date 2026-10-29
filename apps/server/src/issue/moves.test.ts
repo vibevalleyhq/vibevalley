@@ -97,6 +97,7 @@ describe("moves and the attention", () => {
       runs: 1,
       issue: "t1",
       phase: { _tag: "working", since: 1, doing: { action: "none", label: "" } },
+      refining: false,
     } as unknown as Session;
     const issue = {
       ...base,
@@ -112,12 +113,12 @@ describe("moves and the attention", () => {
     for (const fact of [
       { type: "hired", at: 1, session: hired },
       { type: "issue", at: 1, issue },
-      { type: "report", at: 2, id: "w1", outcome: "completed", summary: "做完了", runs: 1 },
+      { type: "report", questions: [], checks: [], at: 2, id: "w1", outcome: "completed", summary: "做完了", runs: 1 },
     ] as Fact[])
       state = reduce(state, fact)[0];
-    expect(state.issues![0]!.moves).toContain("done");
-    state = reduce(state, { type: "report", at: 3, id: "w1", outcome: "failed", summary: "没做成", runs: 2 } as Fact)[0];
-    expect(state.issues![0]!.moves).toEqual(["todo", "canceled"]);
+    expect(state.issues[0]!.moves).toContain("done");
+    state = reduce(state, { type: "report", questions: [], checks: [], at: 3, id: sessionId("w1"), outcome: "failed", summary: "没做成", runs: 2 })[0];
+    expect(state.issues[0]!.moves).toEqual(["todo", "canceled"]);
   });
 });
 

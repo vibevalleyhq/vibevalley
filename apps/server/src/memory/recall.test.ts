@@ -35,6 +35,7 @@ const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory 
   text,
   at: now - dayMs,
   recalled: 0,
+  fading: false,
   ...change,
 });
 const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session: "w9", project: "clock", text, skip: new Set(), now, ...change });

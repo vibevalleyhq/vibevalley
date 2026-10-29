@@ -159,7 +159,7 @@ describe("an issue", () => {
       refusedWith(yield* Effect.flip(issues.add({ title: "  " })));
       let issue = yield* issues.add({ title: "写打卡并提交" });
       expect(issue.status).toBe("backlog");
-      const inState = (id: string) => core.state().issues?.find((x) => x.id === id);
+      const inState = (id: string) => core.state().issues.find((x) => x.id === id);
       expect(inState(issue.id)?.title).toBe("写打卡并提交");
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
       issue = yield* issues.edit(issue.id, { project: "backlog", assignee: "lab" }, owner);
@@ -210,6 +210,7 @@ describe("an issue", () => {
           hiredAt: 0,
           runs: 0,
           phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
+          refining: false,
         } as Session,
       });
       const issue = yield* issues.add({ title: "等空位的活", project: "queue", assignee: "lab" });
@@ -590,10 +591,10 @@ describe("an issue", () => {
       yield* w.nextReport;
       issue = yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.questions ?? []).length === 1,
+        (i) => i.questions.length === 1,
         "its question kept",
       );
-      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？" }]);
+      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？", options: [] }]);
       const crop = () => {
         const s = core.state().sessions.findLast((h) => h.issue === issue.id);
         return s && viewOf(core.state()).plots[s.id]?.crop;
@@ -603,7 +604,7 @@ describe("an issue", () => {
       yield* issues.comment(issue.id, "用 8797");
       yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.questions ?? []).length === 0,
+        (i) => i.questions.length === 0,
         "answered",
       );
       yield* w.nextReport;

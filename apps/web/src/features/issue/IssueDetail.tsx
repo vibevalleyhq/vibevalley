@@ -361,7 +361,7 @@ export function IssueDetail(props: {
                   type="button"
                   aria-label={t("web.issue.detail.copyPath")}
                   title={t("web.issue.detail.copyPath")}
-                  onClick={() => void navigator.clipboard?.writeText(worktree())}
+                  onClick={() => void navigator.clipboard.writeText(worktree())}
                   class="cursor-pointer rounded p-0.5 hover:bg-hover"
                 >
                   <Icon name="copy" size={14} />
@@ -387,7 +387,7 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
   return (
     <div class="mt-2.5">
       <div>{props.ask.question}</div>
-      <Show when={props.ask.options?.length}>
+      <Show when={props.ask.options.length}>
         <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
           <For each={props.ask.options}>
             {(o) => (

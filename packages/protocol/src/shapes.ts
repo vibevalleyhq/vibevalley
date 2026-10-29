@@ -108,7 +108,7 @@ export interface ServerReady {
 
 /** What checking a form before saving it found: the first thing that would be refused, if any. */
 export interface Validation {
-  problem?: string;
+  problem: string;
 }
 
 export interface RuntimeQuota {
@@ -215,12 +215,12 @@ export interface ChatMessage {
   agent?: string;
   kind: MessageKind;
   text: string;
-  mentions?: string[];
+  mentions: string[];
   session?: SessionId;
   run?: string;
   outcome?: Outcome;
   spent?: Spent;
-  spoken?: boolean;
+  spoken: boolean;
   /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
   sendKey?: string;
   at: number;
@@ -234,21 +234,21 @@ export interface ChatMessage {
   deleted?: number;
   pinned?: number;
   /** In the order they first came. */
-  reactions?: Reaction[];
-  attachments?: Attachment[];
+  reactions: Reaction[];
+  attachments: Attachment[];
   /** Previews of the links in its words, as the server read them. */
-  embeds?: Embed[];
+  embeds: Embed[];
   /** The artifact it announces, as it was at that version (docs/subsystems/artifact.md). */
   artifact?: ArtifactCard;
 }
 
 export interface Embed {
   url: string;
-  title?: string;
-  description?: string;
-  site?: string;
+  title: string;
+  description: string;
+  site: string;
   /** An image the page shows for it, at its own address on the web. */
-  image?: string;
+  image: string;
 }
 
 export const NotifyValues = ["all", "mentions", "none"] as const;
@@ -293,13 +293,13 @@ export interface ArtifactCard {
   /** html: the version announced; blocks: 0. */
   version: number;
   /** What this version changed, in the maker's words. */
-  note?: string;
+  note: string;
 }
 
 export interface ArtifactVersion {
   version: number;
   size: number;
-  note?: string;
+  note: string;
   /** Who made it: a profile's id, or the owner's. */
   by: string;
   byName: string;
@@ -374,7 +374,7 @@ export interface Channel {
   id: string;
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
-  default?: boolean;
+  default: boolean;
   /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
   /** The orchestrator that looks after the place, by its profile id, as the server resolves it: a channel's own (the
@@ -384,7 +384,7 @@ export interface Channel {
   /** A thread's channel. */
   parent?: string;
   /** A channel's group in the sidebar. */
-  category?: string;
+  category: string;
   /** Its place in the sidebar, lowest first; none comes after the placed. */
   position?: number;
   archived?: number;
@@ -394,7 +394,7 @@ export interface Channel {
   root?: string;
   rootNumber?: number;
   name?: string;
-  description?: string;
+  description: string;
   project?: string;
   subjectKind?: SubjectKind;
   subjectId?: string;
@@ -404,7 +404,7 @@ export interface Channel {
   /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
   unread?: number;
   /** A thread not on an issue or a task graph, by the server: a talk thread's session, else the head of the message it hangs under. */
-  title?: string;
+  title: string;
   /** The newest message, as a list shows it under the channel. */
   last?: ChannelLast;
   at: number;
@@ -505,7 +505,7 @@ export interface Session {
   channel?: string;
   play?: SessionPlay;
   issue?: IssueId;
-  refining?: boolean;
+  refining: boolean;
   phaseText?: string;
 }
 
@@ -527,22 +527,22 @@ export interface Task {
   needs: string[];
   agent?: string;
   check?: string;
-  scope?: string[];
-  acceptance?: boolean;
-  frozen?: string[];
+  scope: string[];
+  acceptance: boolean;
+  frozen: string[];
   state: TaskState;
   session?: SessionId;
-  conclusion?: string;
-  commits?: string[];
+  conclusion: string;
+  commits: string[];
   spent?: Spent;
   tries: number;
   failures?: number;
-  blockedBy?: string[];
+  blockedBy: string[];
   stateText?: string;
-  actions?: TaskAction[];
-  actionText?: Record<string, string>;
-  canEdit?: boolean;
-  canRemove?: boolean;
+  actions: TaskAction[];
+  actionText: Record<string, string>;
+  canEdit: boolean;
+  canRemove: boolean;
 }
 
 export interface TaskGraph {
@@ -553,14 +553,14 @@ export interface TaskGraph {
   branch?: string;
   state: GraphState;
   stateTag?: string;
-  actionText?: Record<string, string>;
-  actions?: GraphAction[];
+  actionText: Record<string, string>;
+  actions: GraphAction[];
   tasks: Task[];
   parallel: number;
-  note?: string;
+  note: string;
   createdAt: number;
-  layers?: string[][];
-  asksForYou?: boolean;
+  layers: string[][];
+  asksForYou: boolean;
   spent?: Spent;
   settled?: number;
 }
@@ -584,14 +584,14 @@ export interface Progress {
   counts: Record<string, number>;
   unlocked: Unlock[];
   title?: ProgressTitle;
-  agents?: Record<string, AgentTally>;
+  agents: Record<string, AgentTally>;
   multiplier?: number;
 }
 
 export interface ProgressNews {
   coins?: number;
   session?: SessionId;
-  unlocked?: Unlock[];
+  unlocked: Unlock[];
 }
 
 /** Told apart by `kind`. */
@@ -610,7 +610,7 @@ export interface Cron {
   created: number;
   lastRun?: number;
   by: ActorKind;
-  pending?: boolean;
+  pending: boolean;
   whenText?: string;
   nextText?: string;
 }
@@ -624,7 +624,7 @@ export interface OwnerMention {
 /** The channels, not what is said in them: a page follows a channel for that (rpc.ts). */
 export interface Chat {
   channels: Channel[];
-  ownerMentions?: OwnerMention[];
+  ownerMentions: OwnerMention[];
 }
 
 /** What a channel's follower gets: each message said there, by its number; Reset when it is too far behind to catch up. */
@@ -641,17 +641,17 @@ export interface ChannelReset {
 
 export interface WorkspaceState {
   call: CallState;
-  callReason?: string;
+  callReason: string;
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
-  orchestrators?: Record<string, OrchestratorNow>;
+  orchestrators: Record<string, OrchestratorNow>;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
-  crons?: Cron[];
-  issues?: Issue[];
+  crons: Cron[];
+  issues: Issue[];
   /** Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json. */
-  connectors?: ConnectorStatus[];
+  connectors: ConnectorStatus[];
 }
 
 export const SessionEventTypeValues = [
@@ -726,8 +726,8 @@ export type AccountUsage = AccountUsageOk | AccountUsageBalance | AccountUsageLo
 
 export interface InventoryEntry {
   name: string;
-  description?: string;
-  source?: string;
+  description: string;
+  source: string;
   enabled?: boolean;
 }
 
@@ -754,7 +754,7 @@ export interface RuntimeInfo {
   settings: RuntimeSettings;
   spentToday?: number;
   quota?: RuntimeQuota;
-  stop?: string;
+  stop: string;
   checkedAt: number;
 }
 
@@ -791,7 +791,7 @@ export interface InboxWords {
   label: string;
   title: string;
   body: string;
-  tray?: string;
+  tray: string;
 }
 
 export interface InboxItem {
@@ -886,12 +886,12 @@ export interface GraphEvent {
   kind: GraphEventKind;
   actor: ActorKind;
   session?: SessionId;
-  detail?: string;
-  changes?: TaskFieldChange[];
-  commits?: string[];
+  detail: string;
+  changes: TaskFieldChange[];
+  commits: string[];
   at: number;
-  text?: string;
-  actorText?: string;
+  text: string;
+  actorText: string;
 }
 
 export interface LanDevice {
@@ -916,7 +916,7 @@ export interface LanStatus {
   open: boolean;
   hostName: string;
   url?: string;
-  problem?: string;
+  problem: string;
   pairing?: LanPairing;
   devices: LanDevice[];
 }
@@ -931,15 +931,15 @@ export interface LanPairing {
 export interface ConnectorStatus {
   id: ConnectorID;
   state: ConnectorState;
-  qr?: string;
-  pairCode?: string;
+  qr: string;
+  pairCode: string;
   channel?: string;
   owner?: string;
   since?: number;
   lastInbound?: number;
   pausedUntil?: number;
   pending: number;
-  error?: string;
+  error: string;
 }
 
 export const ConnectorStateValues = ["off", "waiting", "scanned", "verify", "pairing", "connected", "paused"] as const;
@@ -1034,7 +1034,7 @@ export interface GitHubStatus {
   /** The logged-in account, when logged in. */
   account?: string;
   /** Why it is not usable, when it is not. */
-  reason?: string;
+  reason: string;
   checkedAt: number;
 }
 
@@ -1104,7 +1104,7 @@ export interface Memory {
   at: number;
   recalled: number;
   recalledAt?: number;
-  fading?: boolean;
+  fading: boolean;
   source?: string;
 }
 
@@ -1143,7 +1143,7 @@ export interface MemorySourceInfo {
   name: string;
   label: string;
   on: boolean;
-  off?: string;
+  off: string;
   canList: boolean;
   canForget: boolean;
   transcripts: boolean;
@@ -1300,7 +1300,7 @@ export interface Issue {
   id: IssueId;
   number: number;
   title: string;
-  description?: string;
+  description: string;
   project?: string;
   assignee?: string;
   priority: Priority;
@@ -1314,7 +1314,7 @@ export interface Issue {
   /** Canceled: why. */
   canceled?: IssueCanceled;
   parent?: IssueId;
-  blockedBy?: string[];
+  blockedBy: string[];
   graph?: IssueGraph;
   task?: IssueTask;
   cron?: string;
@@ -1327,8 +1327,8 @@ export interface Issue {
   reviewedAt?: number;
   findings: Finding[];
   questions: Question[];
-  criteria?: string[];
-  checks?: CriterionCheck[];
+  criteria: string[];
+  checks: CriterionCheck[];
   refining?: IssueRefining;
   /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the
    * orchestrator's): going on while it has no end; ended, the issue waits on the owner. */
@@ -1362,7 +1362,7 @@ export interface IssueRun {
 /** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
 export interface Question {
   question: string;
-  options?: string[];
+  options: string[];
 }
 
 export const CheckResultValues = ["met", "unmet", "unsure"] as const;
@@ -1372,7 +1372,7 @@ export type CheckResult = (typeof CheckResultValues)[number];
 export interface CriterionCheck {
   criterion: number;
   result: CheckResult;
-  proof?: string;
+  proof: string;
 }
 
 /** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
@@ -1458,12 +1458,12 @@ export interface IssueTask {
   key: string;
   state: TaskState;
   check?: string;
-  scope?: string[];
-  acceptance?: boolean;
-  frozen?: string[];
+  scope: string[];
+  acceptance: boolean;
+  frozen: string[];
   session?: SessionId;
   conclusion?: string;
-  commits?: string[];
+  commits: string[];
   spent?: Spent;
   tries: number;
   failures?: number;
@@ -1492,7 +1492,7 @@ export interface Finding {
   text: string;
   at: number;
   /** Settled: the next acceptance that passed after it was written. */
-  resolved?: boolean;
+  resolved: boolean;
 }
 
 export interface IssueRequest {
@@ -1542,7 +1542,7 @@ export interface Run {
   startedAt: number;
   endedAt?: number;
   outcome?: Outcome;
-  summary?: string;
+  summary: string;
   spent?: Spent;
 }
 
@@ -1628,7 +1628,7 @@ export interface MemorySource {
   enabled: boolean;
   read: boolean;
   write: boolean;
-  everything?: boolean;
+  everything: boolean;
   user?: string;
   key: KeyStatus;
 }
@@ -1879,7 +1879,7 @@ export interface GameEffectAchievement {
   reached: string;
   detail: string;
   coins: number;
-  oneOff?: boolean;
+  oneOff: boolean;
 }
 
 export interface LedgerEntryHarvested {
@@ -2121,7 +2121,7 @@ export interface FactCall {
   type: "call";
   at: number;
   state: CallState;
-  reason?: string;
+  reason: string;
 }
 
 /** What an orchestrator is doing now. */
@@ -2229,8 +2229,8 @@ export interface FactReport {
   summary: string;
   runs: number;
   spent?: Spent;
-  questions?: Question[];
-  checks?: CriterionCheck[];
+  questions: Question[];
+  checks: CriterionCheck[];
   answer?: IssueAnswer;
 }
 
@@ -2443,7 +2443,8 @@ export interface VoiceSaid {
 export interface VoiceHeard {
   agentId: string;
   text: string;
-  agent: string | null;
+  /** The profile the owner picked; absent for none. */
+  agent?: string;
   sendKey?: string;
 }
 

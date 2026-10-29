@@ -89,7 +89,7 @@ const pages: Record<string, Page> = {
         sessions: [s.id],
         checks: [
           { criterion: 0, result: "met", proof: "session.test.ts 覆盖了" },
-          { criterion: 1, result: "met" },
+          { criterion: 1, result: "met", proof: "" },
           { criterion: 2, result: "unsure", proof: "只测了过期前后各一秒" },
         ],
         attention: { state: "reviewing", since: now - 6 * min, lead: "complete", acts: [acts.complete, acts.reject, acts.tell, acts.close] },
@@ -105,7 +105,7 @@ const pages: Record<string, Page> = {
       note: "这一轮失败了：主动作是补救。",
       issue: base({
         sessions: [s.id],
-        findings: [{ id: "f1", text: "登录页的文案没改", at: now - 30 * min }],
+        findings: [{ id: "f1", text: "登录页的文案没改", at: now - 30 * min, resolved: false }],
         attention: { state: "stuck", stuck: "failed", since: now - 6 * min, lead: "cure", acts: [acts.cure, acts.tell, acts.close] },
       }),
       sessions: [s],

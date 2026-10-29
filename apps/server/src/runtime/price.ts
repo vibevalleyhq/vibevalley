@@ -50,7 +50,7 @@ const priceOf = (cost: Price | undefined): Price | undefined =>
 
 function piPrice(model: string): Price | undefined {
   const slash = model.indexOf("/");
-  if (slash >= 0) return priceOf(getBuiltinModel(model.slice(0, slash) as never, model.slice(slash + 1) as never)?.cost);
+  if (slash >= 0) return priceOf(getBuiltinModel(model.slice(0, slash) as never, model.slice(slash + 1) as never).cost);
   for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).sort()) {
     const found = getBuiltinModel(provider as never, model as never);
     if (found) return priceOf(found.cost);

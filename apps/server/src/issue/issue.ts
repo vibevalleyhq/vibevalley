@@ -262,7 +262,7 @@ export const make = (options: IssueOptions = {}) =>
         id: issueId(row.id),
         number: row.number,
         title: row.title,
-        ...(row.description ? { description: row.description } : {}),
+        description: row.description,
         ...(row.project !== null ? { project: row.project } : {}),
         ...(row.assignee !== null ? { assignee: row.assignee } : {}),
         priority: row.priority as Priority,
@@ -273,7 +273,7 @@ export const make = (options: IssueOptions = {}) =>
         ...(row.delivered !== null ? { delivered: row.delivered as Delivery } : {}),
         ...(row.canceled !== null ? { canceled: row.canceled as IssueCanceled } : {}),
         ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
-        ...(blockedBy ? { blockedBy } : {}),
+        blockedBy: blockedBy ?? [],
         ...(graph ? { graph } : {}),
         ...(task ? { task } : {}),
         ...(row.cron !== null ? { cron: row.cron } : {}),
@@ -285,8 +285,8 @@ export const make = (options: IssueOptions = {}) =>
         ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: column.findings(row.findings) ?? [],
         questions: column.questions(row.questions) ?? [],
-        ...(criteria ? { criteria } : {}),
-        ...(checks ? { checks } : {}),
+        criteria: criteria ?? [],
+        checks: checks ?? [],
         ...(lastRun ? { lastRun } : {}),
         ...(answer ? { answer } : {}),
         attention: { state: "draft", acts: [] },
@@ -493,7 +493,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!agent.enabled) return { refused: t("server.issue.disabled", { name: agent.name }) };
       for (const i of yield* runtimes.problemsOf(agent))
         if (i.level === "error") return { refused: t("server.issue.cannotSend", { name: agent.name, why: i.text }) };
-      const where = project.trim() || (agent.workdir ?? "").trim();
+      const where = project.trim() || agent.workdir.trim();
       if (!where) return { refused: t("server.issue.noProject") };
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused };
@@ -524,7 +524,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!issue.assignee) return yield* Effect.fail(refused(t("server.issue.noAssignee"), pick));
       const agent = store.agent(issue.assignee);
       if (!agent) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: issue.assignee }), pick));
-      return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
+      return [issue, agent, issue.project ?? agent.workdir] as const;
     });
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
@@ -868,7 +868,7 @@ export const make = (options: IssueOptions = {}) =>
           const e = n.report;
           const issue = worked.issueOf(e.id);
           // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
-          const checks = e.checks ?? [];
+          const checks = e.checks;
           if (issue && checks.length > 0) yield* checked(issue, checks);
           if (issue) yield* asked(issue, e.questions);
           if (issue) yield* answered(issue, e.id, e.outcome, e.answer);
@@ -999,7 +999,7 @@ export const make = (options: IssueOptions = {}) =>
     });
 
     const shape = Issues.of({
-      onBoard: () => core.state().issues ?? [],
+      onBoard: () => core.state().issues,
       list: () => Effect.map(everyIssue, (all) => all.filter((item) => !item.talk)),
       query: (f) =>
         Effect.gen(function* () {
@@ -1026,12 +1026,12 @@ export const make = (options: IssueOptions = {}) =>
           was = yield* get(id);
           if (isClosed(was.status)) return yield* Effect.fail(refused(t("server.issue.closed")));
         } else was = yield* unsent(id);
-        const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
+        const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description });
         if (upd.project !== undefined && upd.project !== was.project && was.project) {
           const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
           if (released.kept) return yield* Effect.fail(refused(t("server.issue.cannotMoveProject", { n: was.number, why: released.reason })));
         }
-        const criteria = upd.criteria !== undefined ? kept(upd.criteria) : (was.criteria ?? []);
+        const criteria = upd.criteria !== undefined ? kept(upd.criteria) : was.criteria;
         yield* db(
           q.editIssue({
             title,
@@ -1177,7 +1177,7 @@ export const make = (options: IssueOptions = {}) =>
         const text = (req.text ?? "").trim();
         if (fresh.length === 0 && !text) return yield* Effect.fail(refused(t("server.issue.failNeedsFindings")));
         const at = yield* Clock.currentTimeMillis;
-        const findings = [...item.findings, ...fresh.map((text) => ({ id: newId(), text, at }))];
+        const findings = [...item.findings, ...fresh.map((text) => ({ id: newId(), text, at, resolved: false }))];
         yield* judged(id, 0, findings);
         // The findings go to whoever works it as the next round's words, like any comment.
         yield* comment(id, failedText(findings, text));
@@ -1227,7 +1227,7 @@ export const make = (options: IssueOptions = {}) =>
                 q.putIssue({
                   id: issue.id,
                   title: issue.title,
-                  description: issue.description ?? "",
+                  description: issue.description,
                   project: nullText(issue.project),
                   assignee: nullText(issue.assignee),
                   priority: issue.priority,
@@ -1237,7 +1237,7 @@ export const make = (options: IssueOptions = {}) =>
                   delivered: issue.delivered ?? null,
                   canceled: issue.canceled ?? null,
                   parent: nullText(issue.parent),
-                  blocked_by: jsonOrNull(issue.blockedBy, (issue.blockedBy ?? []).length > 0),
+                  blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
                   graph: jsonOrNull(issue.graph, !!issue.graph),
                   task: jsonOrNull(issue.task, !!issue.task),
                 }),

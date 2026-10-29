@@ -55,7 +55,7 @@ export function FxLayer() {
     const data = toast.data as GameEffectAchievement | undefined;
     const village = loaded().village;
     if (toast.type !== ToastType.achievement || data?.kind !== "achievement" || !village) return undefined;
-    return <EarnedMedal atlas={village.atlas} achievement={data.achievement} tier={Math.round(data.tier)} oneOff={data.oneOff ?? false} />;
+    return <EarnedMedal atlas={village.atlas} achievement={data.achievement} tier={Math.round(data.tier)} oneOff={data.oneOff} />;
   };
 
   return (

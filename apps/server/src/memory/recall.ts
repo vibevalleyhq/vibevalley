@@ -126,7 +126,7 @@ export function memoryLikeness(a: ReadonlySet<string>, b: ReadonlySet<string>): 
 }
 
 /** project undefined: every project. */
-export function memoryIsNewNote(memories: readonly Memory[], text: string, project: string | undefined): boolean {
+export function memoryIsNewNote(memories: readonly Pick<Memory, "kind" | "text" | "project">[], text: string, project: string | undefined): boolean {
   const terms = termsOf(text);
   return !memories.some((m) => m.kind === "note" && m.project === project && (m.text === text || memoryLikeness(termsOf(m.text), terms) >= 0.8));
 }

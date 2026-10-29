@@ -41,6 +41,7 @@ const helper: Session = {
   hiredAt: 0,
   runs: 1,
   phase: { _tag: "done" },
+  refining: false,
   issue: issueId("clock"),
   play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
@@ -58,10 +59,14 @@ function frame(attention: IssueAttention, session: Session = helper): StateFrame
     moves: [],
     findings: [],
     questions: [],
+    description: "",
+    blockedBy: [],
+    criteria: [],
+    checks: [],
     attention,
   };
   return {
-    state: { call: "idle", sessions: [session], issues: [issue] },
+    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], orchestrators: {}, crons: [], connectors: [] },
     inbox: [],
     graphs: [],
     effects: [],
@@ -77,7 +82,7 @@ const aim = (f: StateFrame, tool: Tool) => {
 test("a crop is harvested exactly when the issue offers completing it", () => {
   const f = frame({ state: "asking", lead: "answer", acts: buttons("answer", "close") });
   expect(aim(f, "harvest").aim.ok).toBe(false);
-  f.state.issues![0]!.attention = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
+  f.state.issues[0]!.attention = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
   expect(aim(f, "harvest").aim.ok).toBe(true);
 });
 
@@ -106,6 +111,6 @@ test("a click is refused when the issue stops allowing its action after aiming",
   farm.hold("harvest");
   const commands = farmCommands(() => f);
   const pointed = commands.aim(beds[0]!);
-  f.state.issues![0]!.attention = { state: "asking", acts: buttons("answer", "close") };
+  f.state.issues[0]!.attention = { state: "asking", acts: buttons("answer", "close") };
   expect((await commands.act(pointed)).kind).toBe("refused");
 });

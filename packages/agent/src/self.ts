@@ -37,7 +37,7 @@ export function selfTools(o: SelfOptions): Tool[] {
     description: selfWords.rememberDescription,
     parameters: Schema.Struct({ note: Schema.String }),
     run: (p) => {
-      if (!p.note?.trim()) throw new Error(selfWords.emptyNote);
+      if (!p.note.trim()) throw new Error(selfWords.emptyNote);
       remember(o.home, p.note, new Date(o.now()));
       return selfWords.remembered;
     },
@@ -46,13 +46,13 @@ export function selfTools(o: SelfOptions): Tool[] {
     name: "rewrite_memory",
     description: selfWords.rewriteMemoryDescription,
     parameters: Schema.Struct({ content: Schema.String }),
-    run: (p) => selfWords.rewritten(rewriteMemory(o.home, p.content ?? "").lineCount),
+    run: (p) => selfWords.rewritten(rewriteMemory(o.home, p.content).lineCount),
   });
   const search = schemaTool({
     name: "search_archive",
     description: selfWords.searchArchiveDescription,
     parameters: Schema.Struct({ query: Schema.String }),
-    run: (p) => searchIn(o.home, p.query ?? ""),
+    run: (p) => searchIn(o.home, p.query),
   });
   return [loadSkill, ...(o.memory ? [rememberTool, rewrite] : []), search];
 }

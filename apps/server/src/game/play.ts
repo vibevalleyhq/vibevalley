@@ -39,8 +39,8 @@ export function withStations(state: WorkspaceState): WorkspaceState {
   return moved ? { ...state, sessions: placed } : state;
 }
 
-const remember = (list: readonly string[] | null | undefined, item: string, limit: number) => {
-  const out = (list ?? []).filter((x) => x !== item);
+const remember = (list: readonly string[], item: string, limit: number) => {
+  const out = list.filter((x) => x !== item);
   out.push(item);
   return out.slice(Math.max(0, out.length - limit));
 };
@@ -61,17 +61,17 @@ export const playedRun = (p: SessionPlay, at: number): SessionPlay => ({
   ...p,
   toolsThisRun: 0,
   runStartedAt: at,
-  history: lastN([...(p.history ?? []), { at, action: "thinking", label: "" }], historyLimit),
+  history: lastN([...p.history, { at, action: "thinking", label: "" }], historyLimit),
 });
 
 export function playedDoing(p: SessionPlay, f: FactDoing): SessionPlay {
-  const history = p.history ?? [];
+  const history = p.history;
   const last = history[history.length - 1];
   if (last && last.action === f.action && last.label === f.label) return p;
   const next: SessionPlay = { ...p, history: lastN([...history, { at: f.at, action: f.action, label: f.label }], historyLimit) };
   if (!isToolAction(f.action)) return next;
   next.toolsThisRun = p.toolsThisRun + 1;
-  next.counts = { ...p.counts, [f.action]: (p.counts?.[f.action] ?? 0) + 1 };
+  next.counts = { ...p.counts, [f.action]: (p.counts[f.action] ?? 0) + 1 };
   if ((f.action === "edit_file" || f.action === "read_file") && f.label !== "") next.files = remember(p.files, f.label, fileLimit);
   else if (f.action === "run_command" && f.label !== "") next.commands = remember(p.commands, f.label, commandLimit);
   return next;

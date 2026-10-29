@@ -68,22 +68,28 @@ function Layer(props: { o: FarmOverlay }) {
     <Switch>
       <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={t("web.farm.panel.harvest", { name: s().name })} icon="icon-harvest" size="lg" testid="harvest" onClose={() => farm.review(null)}>
-            <Keyed key={s().id}>{() => <HarvestReview session={s()} onDone={() => farm.review(null)} />}</Keyed>
+          <FarmDialog
+            title={t("web.farm.panel.harvest", { name: s().name })}
+            icon="icon-harvest"
+            size="lg"
+            testid="harvest"
+            onClose={() => farm.review(undefined)}
+          >
+            <Keyed key={s().id}>{() => <HarvestReview session={s()} onDone={() => farm.review(undefined)} />}</Keyed>
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "sow" ? props.o : undefined}>
         {(o) => (
-          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" testid="sow" onClose={() => farm.sow(null)}>
-            <SowForm station={o().station} onDone={() => farm.sow(null)} />
+          <FarmDialog title={t("web.farm.panel.sow", { plot: o().station + 1 })} icon="icon-seeds" size="lg" testid="sow" onClose={() => farm.sow(undefined)}>
+            <SowForm station={o().station} onDone={() => farm.sow(undefined)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" testid="water" onClose={() => farm.water(null)}>
-            <WaterForm session={s()} onDone={() => farm.water(null)} />
+          <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" testid="water" onClose={() => farm.water(undefined)}>
+            <WaterForm session={s()} onDone={() => farm.water(undefined)} />
           </FarmDialog>
         )}
       </Match>
@@ -94,7 +100,7 @@ function Layer(props: { o: FarmOverlay }) {
             icon={panelTitle[panel()][1]}
             size={panelTitle[panel()][2]}
             testid={panel()}
-            onClose={() => farm.panel(null)}
+            onClose={() => farm.panel(undefined)}
           >
             <Switch fallback={<TaskBoard />}>
               <Match when={panel() === "warehouse"}>

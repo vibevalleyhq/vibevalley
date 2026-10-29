@@ -150,7 +150,7 @@ function gathered(state: WorkspaceState): Unworded[] {
     }
   }
 
-  for (const sc of state.crons ?? []) {
+  for (const sc of state.crons) {
     if (!sc.pending) continue;
     out.push({
       item: {
@@ -187,7 +187,7 @@ type Want =
 /** What a session questions of the owner. Its issue's attention says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
 function wantOf(h: Session, state: WorkspaceState): Want | undefined {
-  const issue = h.issue === undefined ? undefined : state.issues?.find((item) => item.id === h.issue && item.sessions.at(-1) === h.id);
+  const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && item.sessions.at(-1) === h.id);
   if (!issue) {
     const need = needOf(h);
     switch (need?.kind) {
@@ -254,7 +254,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.review.tray", { who }),
       };
     case "ask":
-      return { label: t("server.notice.item.ask.label"), title: t("server.notice.item.ask.title", { who }), body: text };
+      return { label: t("server.notice.item.ask.label"), title: t("server.notice.item.ask.title", { who }), body: text, tray: "" };
     case "fix":
       return {
         label: t("server.notice.item.fix.label"),
@@ -263,7 +263,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.fix.tray", { who }),
       };
     case "interrupted":
-      return { label: t("shared.stuck.interrupted"), title: t("server.notice.item.interrupted.title", { who }), body: text };
+      return { label: t("shared.stuck.interrupted"), title: t("server.notice.item.interrupted.title", { who }), body: text, tray: "" };
     case "conflict":
       return {
         label: t("server.notice.item.conflict.label"),
@@ -300,7 +300,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.task-failed.tray", { text }),
       };
     case "mention":
-      return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text };
+      return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text, tray: "" };
     case "cron-ask":
       return {
         label: t("server.notice.item.cron-ask.label"),

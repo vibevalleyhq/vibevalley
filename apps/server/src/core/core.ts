@@ -27,7 +27,15 @@ import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf } from "@/base/json.ts";
 
-export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessions: [] });
+export const emptyWorkspaceState = (): WorkspaceState => ({
+  call: "idle",
+  callReason: "",
+  sessions: [],
+  orchestrators: {},
+  crons: [],
+  issues: [],
+  connectors: [],
+});
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
@@ -96,13 +104,13 @@ export class Core extends Context.Service<
   );
 }
 
-/** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'. */
-const toKeep = ({ chat: _chat, progress: _progress, crons: _crons, issues: _issues, connectors: _connectors, ...kept }: WorkspaceState): WorkspaceState => kept;
+/** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'
+ * (kept empty: they are filled from their homes). */
+const toKeep = ({ chat: _chat, progress: _progress, ...kept }: WorkspaceState): WorkspaceState => ({ ...kept, crons: [], issues: [], connectors: [] });
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
 const restarted = (kept: WorkspaceState): WorkspaceState => {
-  const { callReason: _callReason, orchestrators: _orchestrators, ...rest } = toKeep(kept);
-  return { ...rest, call: "idle" };
+  return { ...toKeep(kept), orchestrators: {}, call: "idle", callReason: "" };
 };
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
@@ -225,7 +233,7 @@ export const make = Effect.gen(function* () {
     apply,
     setOrchestrator: (agent, orchestrator, channel) => apply({ type: "orchestrator", agent, state: orchestrator, ...(channel ? { channel } : {}) }),
     setCommits: (commits) => apply({ type: "commits", commits }),
-    open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" }))),
+    open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live", reason: "" }))),
     sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity })),
     notice: (level, text) => Effect.suspend(() => side({ type: "notice", at: clock.currentTimeMillisUnsafe(), level, text })),
     runtime: (info) => Effect.suspend(() => side({ type: "runtime", at: clock.currentTimeMillisUnsafe(), info })),

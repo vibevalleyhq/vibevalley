@@ -1,5 +1,6 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { join } from "node:path";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
@@ -14,7 +15,7 @@ import { selfTools, subagentTool } from "./self.ts";
 const file = join(import.meta.dirname, "testdata", "declared.json");
 
 it("the brain's tools are declared to the model as they always were", () => {
-  const dir = mkdtempSync(join(tmpdir(), "vibevalley-declared-"));
+  const dir = tempDir("vibevalley-declared-");
   try {
     const reminders = new Reminders(dir, Date.now);
     const sets = {

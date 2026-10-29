@@ -5,18 +5,35 @@ import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalle
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/agent/dag";
 
 /** More steps than this means the job should be split into tasks. */
+/** A step as the frame shows it before its acts are worked out (graphFrom does that): none yet. */
+export const taskView = (): Pick<Task, "blockedBy" | "actions" | "actionText" | "canEdit" | "canRemove"> => ({
+  blockedBy: [],
+  actions: [],
+  actionText: {},
+  canEdit: false,
+  canRemove: false,
+});
+
+/** A graph as the frame shows it before its acts and layers are worked out: none yet. */
+export const graphView = (): Pick<TaskGraph, "actionText" | "actions" | "layers" | "asksForYou"> => ({
+  actionText: {},
+  actions: [],
+  layers: [],
+  asksForYou: false,
+});
+
 export const isOpen = (graph: { state: string }) => graph.state !== "done" && graph.state !== "abandoned";
 
 export const maxTasks = 12;
-export const taskOf = (graph: TaskGraph, id: string) => (graph.tasks ?? []).find((n) => n.id === id);
+export const taskOf = (graph: TaskGraph, id: string) => graph.tasks.find((n) => n.id === id);
 
 export const isSettled = (n: Task) => n.state === "merged" || n.state === "skipped";
 
 export const asksForYou = (graph: TaskGraph) =>
-  graph.state === "draft" || graph.state === "ready" || (isOpen(graph) && (graph.tasks ?? []).some((n) => n.state === "failed"));
+  graph.state === "draft" || graph.state === "ready" || (isOpen(graph) && graph.tasks.some((n) => n.state === "failed"));
 
 export function blockedBy(graph: TaskGraph, task: Task): string[] {
-  return (task.needs ?? []).filter((id) => {
+  return task.needs.filter((id) => {
     const need = taskOf(graph, id);
     return !need || !isSettled(need);
   });
@@ -27,7 +44,7 @@ export function graphSpent(graph: TaskGraph): Spent | undefined {
   let priced = false;
   let tokens = 0;
   let cny = 0;
-  for (const n of graph.tasks ?? []) {
+  for (const n of graph.tasks) {
     if (!n.spent) continue;
     spent = true;
     tokens += n.spent.tokens;
@@ -42,10 +59,10 @@ export function graphSpent(graph: TaskGraph): Spent | undefined {
 
 export const isAcceptance = (n: Task) => n.acceptance === true;
 
-const dagOf = (tasks: readonly Task[]): DagNode[] => tasks.map((n) => ({ id: n.id, after: n.needs ?? [] }));
+const dagOf = (tasks: readonly Task[]): DagNode[] => tasks.map((n) => ({ id: n.id, after: n.needs }));
 
-export function graphProblems(tasks: readonly Task[] | null | undefined): string[] {
-  const all = tasks ?? [];
+export function graphProblems(tasks: readonly Task[]): string[] {
+  const all = tasks;
   const problems: string[] = [];
   if (all.length === 0) problems.push(t("server.task.problem.empty"));
   if (all.length > maxTasks) problems.push(t("server.task.problem.tooMany", { max: maxTasks, n: all.length }));
@@ -76,7 +93,7 @@ export function graphProblems(tasks: readonly Task[] | null | undefined): string
   return problems;
 }
 
-export const layersOf = (tasks: readonly Task[] | null | undefined) => dagLayers(dagOf(tasks ?? []));
+export const layersOf = (tasks: readonly Task[]) => dagLayers(dagOf(tasks));
 
 /** What the graph's state allows now; the frame carries it so the client does not repeat the switch. */
 export function graphActions(graph: TaskGraph): GraphAction[] {

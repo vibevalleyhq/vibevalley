@@ -2,11 +2,15 @@ import { expect, test } from "vite-plus/test";
 import type { Channel, OrchestratorState, WorkspaceState } from "@vibevalley/protocol";
 import { archivedOf, groupsOf, linkedMessages, messagePath, orchestratorTyping, pointedAt, switchTargets, threadsIn, topsOf } from "./rules";
 
-const at = (id: string): Channel => ({ id, type: "channel", replies: 0, at: 0 });
+const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
 const state = (orchestrator: OrchestratorState, where?: string): WorkspaceState => ({
   call: "idle",
+  callReason: "",
   orchestrators: { orchestrator: { state: orchestrator, ...(where ? { channel: where } : {}) } },
   sessions: [],
+  crons: [],
+  issues: [],
+  connectors: [],
 });
 
 test("the orchestrator's dots show only in the channel it thinks or writes in", () => {
@@ -18,16 +22,29 @@ test("the orchestrator's dots show only in the channel it thinks or writes in", 
   expect(orchestratorTyping(undefined, at("c1"))).toBeUndefined();
   const two: WorkspaceState = {
     call: "idle",
+    callReason: "",
     sessions: [],
     orchestrators: { orchestrator: { state: "listening" }, lead: { state: "speaking", channel: "c2" } },
+    crons: [],
+    issues: [],
+    connectors: [],
   };
   expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking" }]);
-  const since: WorkspaceState = { call: "idle", sessions: [], orchestrators: { lead: { state: "thinking", channel: "c2", since: 1_000 } } };
+  const since: WorkspaceState = {
+    call: "idle",
+    callReason: "",
+    sessions: [],
+    orchestrators: { lead: { state: "thinking", channel: "c2", since: 1_000 } },
+    crons: [],
+    issues: [],
+    connectors: [],
+  };
   expect(orchestratorTyping(since, at("c2"))).toEqual({ agent: "lead", mood: "thinking", since: 1_000 });
 });
 
 test("the sidebar lists the default first, then by place, grouped in the order the groups first come", () => {
   const chat = {
+    ownerMentions: [],
     channels: [
       { ...at("b"), position: 2, category: "work" },
       { ...at("a"), position: 1 },
@@ -56,6 +73,7 @@ test("a message's address names its number, which the page reads back", () => {
 
 test("Ctrl+K lists places by what is typed: a name starting with it first, then the unread, then the newest", () => {
   const chat = {
+    ownerMentions: [],
     channels: [
       { ...at("g"), default: true, name: "general", at: 1 },
       { ...at("f"), name: "frontend", category: "dev", at: 5 },
@@ -78,7 +96,7 @@ test("Ctrl+K lists places by what is typed: a name starting with it first, then 
 });
 
 test("a message's links to farm messages are read from any host for a known channel, the default's only from this one", () => {
-  const chat = { channels: [{ ...at("01a17e65-9647-7222-9a7d-06132e9d4dae") }, { ...at("g"), default: true }] };
+  const chat = { channels: [{ ...at("01a17e65-9647-7222-9a7d-06132e9d4dae") }, { ...at("g"), default: true }], ownerMentions: [] };
   const known = "01a17e65-9647-7222-9a7d-06132e9d4dae";
   const text = `看这条 http://127.0.0.1:8787/chat/${known}?m=7 还有 http://192.168.1.5:8787/chat/${known}?m=7 和 http://127.0.0.1:8787/chat?m=3、http://other:1/chat?m=4 http://x/chat/01a17e65-0000-7222-9a7d-06132e9d4dae?m=1`;
   expect(linkedMessages(text, chat, "127.0.0.1:8787")).toEqual([

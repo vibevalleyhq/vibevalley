@@ -15,6 +15,7 @@ const session = (phase: Session["phase"]): Session => ({
   hiredAt: 0,
   runs: 1,
   phase,
+  refining: false,
   issue: issueId("t1"),
 });
 const issue = (attention: IssueAttention, more: Partial<Issue> = {}): Issue =>
@@ -30,7 +31,7 @@ describe("a plot", () => {
       // Reworked after a failed acceptance and handed back: it waits on the owner again, its findings are not weeds yet.
       [
         { state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] },
-        { findings: [{ id: "f", text: "再改", at: 1 }] },
+        { findings: [{ id: "f", text: "再改", at: 1, resolved: false }] },
         "flowering",
         "等你验收",
       ],
@@ -55,7 +56,10 @@ describe("a plot", () => {
 
   it("at work, fixes what a failed acceptance said", () => {
     const working = session({ _tag: "working", since: 1, doing: { action: "none", label: "" } });
-    const t = issue({ state: "working", acts: [{ act: "tell", does: "say" }] }, { status: "in_progress", findings: [{ id: "f", text: "再改", at: 1 }] });
+    const t = issue(
+      { state: "working", acts: [{ act: "tell", does: "say" }] },
+      { status: "in_progress", findings: [{ id: "f", text: "再改", at: 1, resolved: false }] },
+    );
     expect(plotOf(working, t)).toEqual({ crop: "weeds", badge: { text: "除草中 1", tone: "bug" } });
     expect(plotOf(working, { ...t, findings: [{ id: "f", text: "再改", at: 1, resolved: true }] }).crop).toBe("sprout");
   });

@@ -235,7 +235,7 @@ function Item(props: ComboboxItemProps) {
       onClick={(e) => {
         if (props.disabled) return;
         call(props.onClick, e);
-        if (!e.defaultPrevented) c.pick(props.value, props.label ?? e.currentTarget.textContent ?? props.value);
+        if (!e.defaultPrevented) c.pick(props.value, props.label ?? e.currentTarget.textContent);
       }}
     />
   );

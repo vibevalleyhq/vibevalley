@@ -113,7 +113,7 @@ const QUICK_PATS = 3;
 
 export function villageDog(random: () => number = Math.random): Dog {
   const every = cadence(random);
-  let act: { name: Act; at: number } | null = null;
+  let act: { name: Act; at: number } | undefined = undefined;
   /** Sitting up: after a pat or with you on a call, until it settles again. */
   let up = false;
   let upUntil = -Infinity;
@@ -122,13 +122,13 @@ export function villageDog(random: () => number = Math.random): Dog {
   let turn = 0;
   const pats: number[] = [];
 
-  const frameOf = (name: Act, since: number): Frame | null => {
+  const frameOf = (name: Act, since: number): Frame | undefined => {
     let left = since;
     for (const frame of ACTS[name]) {
       if (left < frame.s) return frame;
       left -= frame.s;
     }
-    return null;
+    return undefined;
   };
   const show = (picture: DogPicture, lift = 0, grow = 0): DogLook => ({ picture, lift, grow: pressed ? -1 : grow });
 
@@ -137,7 +137,7 @@ export function villageDog(random: () => number = Math.random): Dog {
       if (act) {
         const frame = frameOf(act.name, t - act.at);
         if (frame) return show(frame.picture, frame.lift, frame.grow);
-        act = null;
+        act = undefined;
       }
       if (listening || t < upUntil) {
         up = true;

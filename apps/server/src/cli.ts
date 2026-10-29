@@ -11,7 +11,7 @@ import { t } from "@vibevalley/i18n";
 import { messageOf } from "./errors.ts";
 import "./cli/locale.ts";
 
-import { Cause, Console, Effect, Exit, Option, type Stdio } from "effect";
+import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -26,8 +26,11 @@ const some = (o: Option.Option<string>) => Option.getOrUndefined(o);
 const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } : {});
 /** A conversation in the terminal. It takes Ctrl+C itself (stop the turn, again to quit), so the signal that interrupts
  * any other command must not end it: it runs uninterruptible and ends when the conversation does. */
-const chat = (talk: () => Promise<void>) =>
-  Effect.uninterruptible(Effect.tryPromise({ try: talk, catch: (e) => new Failure({ code: exit.other, tag: "Chat", text: messageOf(e) }) }));
+const chat = (talk: Effect.Effect<void, unknown>) =>
+  // Detached and joined uninterruptibly: the conversation itself stays interruptible inside (a turn Ctrl+C stops).
+  Effect.uninterruptible(Effect.flatMap(Effect.forkDetach(talk), Fiber.join)).pipe(
+    Effect.mapError((e) => new Failure({ code: exit.other, tag: "Chat", text: typeof e === "string" ? e : messageOf(e) })),
+  );
 
 const prompt = text("prompt", t("server.cli.flag.prompt")).pipe(Flag.withAlias("p"));
 
@@ -42,7 +45,7 @@ const runtimeChatCommand = Command.make(
     prompt,
   },
   (o) =>
-    chat(() =>
+    chat(
       runtimeChat(o.runtime, {
         ...(Option.isSome(o.model) ? { model: o.model.value } : {}),
         ...(Option.isSome(o.effort) ? { effort: o.effort.value } : {}),
@@ -62,8 +65,7 @@ const root = Command.make(
     mcp: text("mcp", t("server.cli.flag.mcp")),
     prompt,
   },
-  (o) =>
-    chat(() => ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
+  (o) => chat(ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
 ).pipe(
   Command.withDescription(t("server.cli.command.root")),
   Command.withSubcommands([...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
@@ -110,6 +112,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
 const codeOf = (end: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(end) ? (end.value as number) : Cause.hasInterruptsOnly(end.cause) ? exit.interrupted : exit.other;
 
+// Not every loader sets import.meta.main (tsx may not): the script run is then told by its path.
 if (import.meta.main ?? process.argv[1] === new URL(import.meta.url).pathname) {
   run(process.argv.slice(2)).pipe(
     Effect.provide([NodeServices.layer, FetchHttpClient.layer]),

@@ -60,6 +60,7 @@ const hired = (core: Core["Service"], s: Partial<Session> & { id: string }) =>
       runs: 0,
       phase: { _tag: "working", doing: { action: "thinking", label: "" } },
       ...s,
+      refining: false,
     } as Session,
   });
 

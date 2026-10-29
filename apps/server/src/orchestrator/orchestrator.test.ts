@@ -537,7 +537,7 @@ describe("the orchestrator", () => {
       offset = 100;
       yield* crons.tick;
       const core = yield* Core;
-      const handed = yield* until(() => core.state().issues?.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
+      const handed = yield* until(() => core.state().issues.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
       const id = handed.id;
       expect(handed.closedAt).toBeUndefined();
       expect([handed.deliver, handed.lastRun?.outcome]).toEqual(["answer", "completed"]);

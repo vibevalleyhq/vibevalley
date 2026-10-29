@@ -15,6 +15,7 @@ const session = (id: string, project?: string): Session => ({
   hiredAt: 0,
   runs: 0,
   phase: { _tag: "working", since: 0 } as Session["phase"],
+  refining: false,
 });
 
 const hire = (state = emptyWorkspaceState(), h: Session) => reduce(state, { type: "hired", at: 0, session: h })[0];

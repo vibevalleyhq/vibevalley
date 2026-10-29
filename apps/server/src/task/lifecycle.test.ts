@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { freshTask } from "./rules.ts";
+import { graphView } from "./graph.ts";
 import { owner } from "@/base/actor.ts";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -45,7 +47,9 @@ describe("a task's workplace", () => {
         state: "draft",
         parallel: 1,
         createdAt: Date.now(),
-        tasks: [{ id: "only", title: "one step", brief: "write fixed work", needs: [], state: "waiting", tries: 0, agent: "lab", check: "test -f fixed.txt" }],
+        tasks: [freshTask({ id: "only", title: "one step", brief: "write fixed work", agent: "lab", check: "test -f fixed.txt" })],
+        note: "",
+        ...graphView(),
       });
       yield* tasks.act("p1", "start", owner);
       yield* until(() => tasks.graphs()[0]?.state === "ready", "the same session fixing its rejected work");
@@ -93,17 +97,16 @@ describe("a task's workplace", () => {
         parallel: 1,
         createdAt: Date.now(),
         tasks: [
-          {
+          freshTask({
             id: "only",
             title: "one step",
             brief: "write checked work",
-            needs: [],
-            state: "waiting",
-            tries: 0,
             agent: "lab",
             check: `test ! -e unchecked.txt && touch '${started}' && while [ ! -e '${release}' ]; do sleep 0.01; done`,
-          },
+          }),
         ],
+        note: "",
+        ...graphView(),
       });
       yield* Effect.addFinalizer(() => Effect.sync(() => writeFileSync(release, "release\n")));
       yield* tasks.act("p1", "start", owner);

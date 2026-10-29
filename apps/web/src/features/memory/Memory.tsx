@@ -197,7 +197,7 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
         {(s) => (
           <div class={[item, "flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-xs text-muted"]}>
             <span class="text-sm font-medium text-ink">{s.label}</span>
-            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off ?? "" })}</span>
+            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}</span>
             <Show when={s.on}>
               <span>{s.canList ? t("web.memory.memory.listed") : t("web.memory.memory.unlisted")}</span>
               <span>{s.canForget ? t("web.memory.memory.forgettable") : t("web.memory.memory.forgetElsewhere")}</span>

@@ -154,7 +154,7 @@ const statusOf = (id: ConnectorID) =>
 /** The chat app's status once ok holds for it, as the connectors say it to the core whenever it changes. */
 const statusIs = (id: ConnectorID, ok: (s: ConnectorStatus) => boolean, what: string) =>
   whenState((state) => {
-    const s = state.connectors?.find((c) => c.id === id);
+    const s = state.connectors.find((c) => c.id === id);
     return s && ok(s) ? s : undefined;
   }, `${id}: ${what}`);
 
@@ -181,7 +181,7 @@ const qqPaired = (script: Script) =>
   Effect.gen(function* () {
     const c = yield* Connectors;
     yield* c.login("qq", { appId: "102", secret: "right" });
-    const code = (yield* reaches("qq", "pairing")).pairCode!;
+    const code = (yield* reaches("qq", "pairing")).pairCode;
     script.qqIn.push(qqMsg("owner-openid", code));
     yield* reaches("qq", "connected");
   });
@@ -435,7 +435,7 @@ describe("the chat apps", () => {
       const first = yield* c.login("feishu", {});
       expect(first.qr).toBe("https://open.feishu.cn/page/cli?user_code=AB");
       script.feishuScan.open();
-      const code = (yield* reaches("feishu", "pairing")).pairCode!;
+      const code = (yield* reaches("feishu", "pairing")).pairCode;
       script.feishuIn.push(feishuMsg("ou_owner", code));
       yield* reaches("feishu", "connected");
       script.feishuIn.push(feishuMsg("ou_other", "帮我删库"));
@@ -577,7 +577,7 @@ describe("the chat apps", () => {
         item_list: [...inbound.item_list!, { ref_msg: { svr_id: "missing" } }],
       });
       const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-      yield* status((s) => s.error !== undefined, "the failed quote lookup");
+      yield* status((s) => s.error !== "", "the failed quote lookup");
       expect(script.by("weixin")).toEqual([]);
       expect(yield* saidIn(chat.defaultChannel())).toEqual([]);
       expect(yield* sql`select ext_id from connector_inbound where not delivered`.pipe(Effect.orDie)).toHaveLength(1);

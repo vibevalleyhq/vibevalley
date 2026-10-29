@@ -40,7 +40,7 @@ test("a call's events reach its listener until it leaves", async () => {
   await leaving;
   receive({ line: 1, event: "rtc.left" });
   expect(heard).toEqual(["joined", "{}", "10/40", "expiring"]);
-  expect(host.tray).toBeNull();
+  expect(host.tray).toBeUndefined();
 });
 
 test("a cancelled join's late cleanup does not detach the next call", async () => {

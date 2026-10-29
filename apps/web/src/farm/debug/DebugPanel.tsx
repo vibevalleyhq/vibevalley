@@ -249,7 +249,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 <For each={g.names}>
                   {(n) => (
                     <button type="button" title={n} class={btn()} onClick={() => playSound(n)}>
-                      {SOUND_LABEL[n] ?? n}
+                      {SOUND_LABEL[n]}
                     </button>
                   )}
                 </For>
@@ -272,7 +272,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 class={btn()}
                 onClick={() =>
                   void navigator.clipboard
-                    ?.writeText(
+                    .writeText(
                       props.log
                         .entries()
                         .map((e) => JSON.stringify(e.json))

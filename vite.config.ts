@@ -113,6 +113,22 @@ export default defineConfig({
         rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }] }] },
       },
       {
+        // The server's tests make their folders with tempDir, which removes them when the run ends.
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.stories.tsx"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
+                { name: "node:fs", importNames: ["mkdtempSync"], message: "Use tempDir (@vibevalley/testkit/temp): it removes the folder when the run ends." },
+              ],
+            },
+          ],
+        },
+      },
+      {
         // Shipped code lets no any through: what JSON, a library or a cast gives untyped is typed where it comes in.
         // Tests and scripts read JSON they wrote themselves.
         files: ["apps/*/src/**", "packages/*/src/**"],
@@ -279,7 +295,8 @@ export default defineConfig({
       },
       {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
-        // SDK's request handlers, and the fetch that the model client calls for the local chat/completions.
+        // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
+        // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).
         files: [
           "apps/server/src/runtime/vibevalley.ts",
           "apps/server/src/runtime/dsh.ts",
@@ -287,14 +304,20 @@ export default defineConfig({
           "apps/server/src/runtime/runtime.ts",
           "apps/server/src/mcp/mcp.ts",
           "apps/server/src/orchestrator/openai.ts",
+          "apps/server/src/base/time.ts",
         ],
         rules: { "vibevalley/promise-boundary": "off" },
       },
       {
-        // Not moved into Effect yet; the list only shrinks (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上").
-        // The command line's chats, and time.ts's clock for the Promise code still left.
-        files: ["apps/server/src/voice/voice.ts", "apps/server/src/lan/lan.ts", "apps/server/src/cli/chat.ts", "apps/server/src/base/time.ts"],
-        rules: { "vibevalley/promise-boundary": "off" },
+        // One word for none (scripts/oxlint-plugin.ts, one-absent).
+        files: ["apps/**", "packages/**"],
+        excludeFiles: ["apps/server/db/generated/**"],
+        rules: { "vibevalley/one-absent": "error" },
+      },
+      {
+        // Doors to the outside, where null comes in and is turned into undefined: a stored column's text, the DOM's body.
+        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/draft.ts"],
+        rules: { "vibevalley/one-absent": "off" },
       },
       {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).

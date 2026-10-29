@@ -128,7 +128,7 @@ export function Overlay() {
         .filter((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"))
         .at(-1);
       if (hoverBed() === bed.index) {
-        const issue = session ? state.issues?.find((i) => i.id === issueOf(session)) : undefined;
+        const issue = session ? state.issues.find((i) => i.id === issueOf(session)) : undefined;
         const aim = aimTool(tool(), bed, session, plot, level, issue);
         where = "above";
         card = {

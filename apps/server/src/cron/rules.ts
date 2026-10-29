@@ -45,7 +45,7 @@ export function cronProblem(req: CronRequest, now: number): string {
       return cronTime.test(w.time) ? "" : t("server.cron.problem.time", { time: w.time });
     case "weekly": {
       if (!cronTime.test(w.time)) return t("server.cron.problem.time", { time: w.time });
-      const days = w.days ?? [];
+      const days = w.days;
       return days.length > 0 && !days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? "" : t("server.cron.problem.days");
     }
     case "cron":
