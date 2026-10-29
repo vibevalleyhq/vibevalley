@@ -98,6 +98,7 @@
 - **页面测试按稳定的标记找元素，不按字**：要点、要看的元素带 `data-testid`（说它是什么，小写加连字符：`moss-talk`、`settings-nav`、`issue-card`），状态写成属性（`data-state`、`aria-pressed`、`aria-current`、`data-found`），测试找 `getByTestId`、断言属性。同类里的某一个用 `data-key` 区分：列表项、消息、卡片用它的 id，页签、分段选项、菜单项用它的值（`[role="tab"][data-key="memory"]`）；工单的按钮用 `data-act`，消息的发送者用 `data-from`（id）和 `data-from-kind`。fixtures 里有常用的：`tab()` 找页签，`composerOn()` 等输入框换到那个频道再打字（早打的字会被那个频道的草稿换掉）。一个 worker 的测试共用一个服务端，别的文件留下的频道、消息、轮次都在：按自己造的东西的 id 找，不按第几个。不按界面上的字找（`getByText("开始说话")`、`getByRole(…, { name: "保存" })`），也不按 CSS 类找。测试自己造的数据（工单标题、档案名，和照字眼干活的帮工认的指令词）是数据，写成常量，按它找可以。lint `vibevalley/no-copy-selector` 拦下 `apps/web/test`、`apps/desktop/test` 里写死中文的选择器和文字断言（`getByText`、`getByRole` 的 `name`、`getByLabel`、`getByPlaceholder`、`getByTitle`、`filter` 的 `hasText`、`toHaveText`、`toContainText`）。
 - **可访问性单独查**：按名字找元素的时候顺带查过「按钮有没有名字」，按标记找就查不到了；所以每个工作台页面在浅色、深色两套主题下各跑一次 axe（`@axe-core/playwright` 的 WCAG 2 A、AA，`apps/web/test/a11y.spec.ts`）：没有名字的按钮、没有标签的输入框、对比度不到 4.5:1 的字，有就失败。
 - **组件在真的浏览器里测**：`packages/base-ui` 的测试是 Vitest 的浏览器模式（Playwright 带的 Chromium），渲染一个组件、真的点和按键，断言 ARIA、焦点、data 属性和浮层的位置，再跑一次 axe；焦点、顶层（`showModal`）和布局在模拟的 DOM 里不可信。CI 的页面那一步先装 Chromium。
+- **HTTP 这一层的测试两种写法各管一件事**：路由、解码、编码和状态码的契约用 `HttpRouter.toWebHandler` 加真的 `Request`（`http/api.test.ts`、`streams.test.ts`），不起端口；一个接口的行为一路走到服务用 `it.live` 加生成的客户端，对着真的端口（`http/endpoints.test.ts`、`rpc.test.ts`）。
 - **契约测试是页面的 Playwright**：`apps/web/test` 每个 worker 起一个真的服务端（临时家目录、环境里没有钥匙），点真的页面；`apps/desktop/test` 起整个 Electron 应用。
 
 ### 话放在哪
