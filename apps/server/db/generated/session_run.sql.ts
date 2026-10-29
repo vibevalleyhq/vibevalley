@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_session_run_outcome_e9d3bd4d227e } from "./types.js"
+
 export const StartRunParams = Schema.Struct({
   ["id"]: Schema.String,
   ["session"]: Schema.String,
@@ -43,7 +45,7 @@ export const heardInRun = Effect.fn("HeardInRun")(function* (params: HeardInRunP
 
 export const EndRunParams = Schema.Struct({
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["outcome"]: Schema.NullOr(Schema.String),
+  ["outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
@@ -75,7 +77,7 @@ export const OpenRunsResult = Schema.Struct({
   ["heard"]: Schema.NullOr(Schema.String),
   ["started_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["outcome"]: Schema.NullOr(Schema.String),
+  ["outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
 })
@@ -107,7 +109,7 @@ export const RunsOfIssueResult = Schema.Struct({
   ["heard"]: Schema.NullOr(Schema.String),
   ["started_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["outcome"]: Schema.NullOr(Schema.String),
+  ["outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
 })
@@ -139,7 +141,7 @@ export const RunsOfSessionResult = Schema.Struct({
   ["heard"]: Schema.NullOr(Schema.String),
   ["started_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["outcome"]: Schema.NullOr(Schema.String),
+  ["outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
 })
@@ -171,7 +173,7 @@ export const RunsOfEndedSessionsResult = Schema.Struct({
   ["heard"]: Schema.NullOr(Schema.String),
   ["started_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["outcome"]: Schema.NullOr(Schema.String),
+  ["outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
 })

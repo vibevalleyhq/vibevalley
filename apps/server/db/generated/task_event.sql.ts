@@ -4,12 +4,14 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_task_event_actor_685c5c5a7073, Pg_public_task_event_kind_6d97ba3e4537 } from "./types.js"
+
 export const AddGraphEventParams = Schema.Struct({
   ["id"]: Schema.String,
   ["graph_id"]: Schema.String,
   ["task_id"]: Schema.NullOr(Schema.String),
-  ["kind"]: Schema.String,
-  ["actor"]: Schema.String,
+  ["kind"]: Pg_public_task_event_kind_6d97ba3e4537,
+  ["actor"]: Pg_public_task_event_actor_685c5c5a7073,
   ["payload"]: Schema.String,
   ["created_at"]: Schema.Number,
 })
@@ -37,8 +39,8 @@ export const GraphEventsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["graph_id"]: Schema.String,
   ["task_id"]: Schema.NullOr(Schema.String),
-  ["kind"]: Schema.String,
-  ["actor"]: Schema.String,
+  ["kind"]: Pg_public_task_event_kind_6d97ba3e4537,
+  ["actor"]: Pg_public_task_event_actor_685c5c5a7073,
   ["payload"]: Schema.String,
   ["created_at"]: Schema.Number,
 })

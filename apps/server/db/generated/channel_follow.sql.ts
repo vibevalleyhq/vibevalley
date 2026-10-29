@@ -4,10 +4,12 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_channel_follow_reason_44b7e9378808 } from "./types.js"
+
 export const FollowParams = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["participant_id"]: Schema.String,
-  ["reason"]: Schema.String,
+  ["reason"]: Pg_public_channel_follow_reason_44b7e9378808,
   ["from_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type FollowParams = typeof FollowParams.Type

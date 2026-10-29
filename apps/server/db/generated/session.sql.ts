@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_session_closed_2de0cea65eff } from "./types.js"
+
 export const KeepSessionParams = Schema.Struct({
   ["id"]: Schema.String,
   ["agent"]: Schema.String,
@@ -30,7 +32,7 @@ export const keepSession = Effect.fn("KeepSession")(function* (params: KeepSessi
 
 export const EndSessionParams = Schema.Struct({
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["closed"]: Schema.NullOr(Schema.String),
+  ["closed"]: Schema.NullOr(Pg_public_session_closed_2de0cea65eff),
   ["id"]: Schema.String,
 })
 export type EndSessionParams = typeof EndSessionParams.Type
@@ -63,7 +65,7 @@ export const SessionByIDResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["closed"]: Schema.NullOr(Schema.String),
+  ["closed"]: Schema.NullOr(Pg_public_session_closed_2de0cea65eff),
   ["place"]: Schema.NullOr(Schema.String),
   ["oar_session"]: Schema.NullOr(Schema.String),
   ["last_text"]: Schema.NullOr(Schema.String),
@@ -100,7 +102,7 @@ export const EndedSessionsResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
-  ["closed"]: Schema.NullOr(Schema.String),
+  ["closed"]: Schema.NullOr(Pg_public_session_closed_2de0cea65eff),
   ["place"]: Schema.NullOr(Schema.String),
   ["oar_session"]: Schema.NullOr(Schema.String),
   ["last_text"]: Schema.NullOr(Schema.String),

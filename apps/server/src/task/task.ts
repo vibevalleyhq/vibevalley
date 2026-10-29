@@ -10,12 +10,9 @@ import {
   type Agent,
   type Changes,
   type GraphAction,
-  ActorKindValues,
   type ActorKind,
   type GraphEvent,
-  type GraphEventKind,
   type Preview,
-  GraphEventKindValues,
   type Session,
   type SessionGraph,
   type Task,
@@ -726,15 +723,13 @@ export const make = (options: TaskOptions = {}) =>
         const graph = get(id);
         const titleOf = (node: string) => (graph ? (taskOf(graph, node)?.title ?? node) : node);
         return rows.flatMap((row): GraphEvent[] => {
-          // A row this code no longer knows how to read is left out.
-          if (!(GraphEventKindValues as readonly string[]).includes(row.kind) || !(ActorKindValues as readonly string[]).includes(row.actor)) return [];
           const p: EventPayload = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
           const e: GraphEvent = {
             id: row.id,
             graph: row.graph_id,
             ...(row.task_id ? { task: row.task_id } : {}),
-            kind: row.kind as GraphEventKind,
-            actor: row.actor as ActorKind,
+            kind: row.kind,
+            actor: row.actor,
             ...(p.session ? { session: p.session } : {}),
             detail: p.detail ?? "",
             changes: p.changes ?? [],

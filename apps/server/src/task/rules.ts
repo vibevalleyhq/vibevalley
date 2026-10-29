@@ -145,7 +145,7 @@ export function parseSplit(text: string): ParsedSplit {
     try {
       raw = parseJson(blocks[i]!);
     } catch (e) {
-      last = t("server.task.parse.unreadable", { why: (e as Error).message });
+      last = t("server.task.parse.unreadable", { why: messageOf(e) });
       continue;
     }
     const draft = decodeSplitDraft(raw);

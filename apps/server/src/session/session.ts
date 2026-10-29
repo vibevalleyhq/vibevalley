@@ -319,7 +319,7 @@ export function runOf(r: qr.RunsOfSessionResult): Run {
   };
   if (r.issue !== null) run.issue = issueId(r.issue);
   if (r.ended_at !== null) run.endedAt = r.ended_at;
-  if (r.outcome !== null) run.outcome = r.outcome as Outcome;
+  if (r.outcome !== null) run.outcome = r.outcome;
   const spent = spentOf(r.spent);
   if (spent) run.spent = spent;
   return run;
@@ -338,7 +338,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
     brief: r.brief,
     hiredAt: r.hired_at,
     runs: runs.length,
-    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: (r.closed ?? "dismissed") as SessionClose },
+    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
     refining: false,
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
@@ -359,7 +359,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
   }
   if (tokens > 0 || priced) s.spent = { tokens, ...(priced ? { cny } : {}) };
   const last = runs.at(-1);
-  if (last?.outcome) s.lastRun = { outcome: last.outcome as Outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
+  if (last?.outcome) s.lastRun = { outcome: last.outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
   return s;
 }
 

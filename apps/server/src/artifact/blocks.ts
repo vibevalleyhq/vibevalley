@@ -20,7 +20,7 @@ import { Clock, Effect, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
-import { type ApiError, lookIn, refused } from "@/errors.ts";
+import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
@@ -86,7 +86,7 @@ const blockOf = (r: qb.ArtifactBlocksResult): Block =>
     ...(r.parent_id !== null ? { parentId: r.parent_id } : {}),
     orderKey: r.order_key,
     // Written only through BlockOp, whose type the wire decodes as a BlockType.
-    type: r.type as BlockType,
+    type: r.type,
     attrs: attrsOf(r.attrs),
     text: storedSpans(r.spans) ?? [],
     rev: r.rev,
@@ -216,7 +216,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
 
     const submit = (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">) => lock.withPermits(1)(submitLocked(id, actor, body));
 
-    const keyOrRefuse = (a: string, b: string) => Effect.try({ try: () => keyBetween(a, b), catch: (e) => refused((e as Error).message) });
+    const keyOrRefuse = (a: string, b: string) => Effect.try({ try: () => keyBetween(a, b), catch: (e) => refused(messageOf(e)) });
 
     const one = (ack: BlockAck, id: string): [Block | undefined, BlockOpResult | undefined] => [blockIn(ack, id), ack.results[0]];
 

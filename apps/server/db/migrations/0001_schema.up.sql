@@ -3,10 +3,11 @@
 -- numbers to the code, as the shapes have them); JSON is kept as text and read with @vibevalley/protocol/schema; a
 -- memory's terms are searched by a tsvector column.
 
+CREATE TYPE channel_participant_kind AS ENUM ('owner', 'orchestrator', 'session', 'profile', 'system');
 CREATE TABLE channel_participant (
   id         text primary key,
   -- A profile is a helper profile the owner talks with alone (its id is profile:<agent>), not one of its sessions.
-  kind       text not null check (kind in ('owner', 'orchestrator', 'session', 'profile', 'system')),
+  kind       channel_participant_kind not null,
   name       text not null,
   agent_id   text,
   runtime    text,
@@ -16,13 +17,16 @@ CREATE TABLE channel_participant (
   seq        integer generated always as identity,
   check ((kind in ('session', 'profile')) = (agent_id is not null))
 );
+CREATE TYPE channel_type AS ENUM ('channel', 'direct', 'thread');
+CREATE TYPE channel_subject_kind AS ENUM ('issue', 'graph', 'talk');
+CREATE TYPE channel_notify AS ENUM ('all', 'mentions', 'none');
 CREATE TABLE channel (
   id            text primary key,
-  type          text not null check (type in ('channel', 'direct', 'thread')),
+  type          channel_type not null,
   is_default    boolean not null default false,
   root_id       text unique,
   root_number   integer,
-  subject_kind  text check (subject_kind in ('issue', 'graph', 'talk')),
+  subject_kind  channel_subject_kind,
   subject_id    text,
   last_number   integer,
   reply_count   integer not null default 0,
@@ -41,7 +45,7 @@ CREATE TABLE channel (
   position      integer,
   archived_at   double precision,
   -- What of it counts for the owner: everything, only what @s the owner, or nothing.
-  notify        text not null default 'all' check (notify in ('all', 'mentions', 'none')),
+  notify        channel_notify not null default 'all',
   -- The orchestrator's profile id that looks after a channel: the owner's words there go to it; none is the default one.
   orchestrator  text,
   check ((type = 'thread') = (root_id is not null)),
@@ -54,12 +58,13 @@ CREATE TABLE channel (
   check (not is_default or archived_at is null),
   check (orchestrator is null or type = 'channel')
 );
+CREATE TYPE channel_message_kind AS ENUM ('chat', 'dispatch', 'report', 'notice');
 CREATE TABLE channel_message (
   id              text primary key,
   channel_id text not null references channel (id),
   number          integer not null,
   sender_id       text not null references channel_participant (id),
-  kind            text not null check (kind in ('chat', 'dispatch', 'report', 'notice')),
+  kind            channel_message_kind not null,
   body            text not null,
   meta            text,
   send_key        text,
@@ -85,16 +90,18 @@ CREATE TABLE channel_attachment (
   size        integer not null,
   created_at  double precision not null
 );
+CREATE TYPE channel_mention_resolved AS ENUM ('delivered', 'absent', 'unknown');
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
   target_id   text not null,
-  resolved    text not null check (resolved in ('delivered', 'absent', 'unknown')),
+  resolved    channel_mention_resolved not null,
   primary key (message_id, target_id)
 );
+CREATE TYPE channel_follow_reason AS ENUM ('owner', 'replied', 'mentioned', 'manual');
 CREATE TABLE channel_follow (
   channel_id  text not null references channel (id),
   participant_id   text not null references channel_participant (id),
-  reason           text not null check (reason in ('owner', 'replied', 'mentioned', 'manual')),
+  reason           channel_follow_reason not null,
   from_number      integer not null,
   unfollowed_at    double precision,
   primary key (channel_id, participant_id)
@@ -111,13 +118,16 @@ CREATE TABLE channel_seen_mark (
   message_id      text not null references channel_message (id) on delete cascade,
   primary key (participant_id, message_id)
 );
+CREATE TYPE channel_delivery_reason AS ENUM ('mention', 'everyone', 'own_thread', 'follower', 'channel', 'direct', 'dispatch', 'addressed', 'graph');
+CREATE TYPE channel_delivery_held_by AS ENUM ('hop_limit', 'cooldown', 'wake_breaker');
+CREATE TYPE channel_delivery_state AS ENUM ('pending', 'announced', 'handed', 'seen', 'dropped');
 CREATE TABLE channel_delivery (
   recipient_id   text not null references channel_participant (id),
   message_id     text not null references channel_message (id) on delete cascade,
-  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'channel', 'direct', 'dispatch', 'addressed', 'graph')),
+  reason         channel_delivery_reason not null,
   wakes          boolean not null,
-  held_by        text check (held_by in ('hop_limit', 'cooldown', 'wake_breaker')),
-  state          text not null default 'pending' check (state in ('pending', 'announced', 'handed', 'seen', 'dropped')),
+  held_by        channel_delivery_held_by,
+  state          channel_delivery_state not null default 'pending',
   launch         text,
   announced_at   double precision,
   handed_at      double precision,
@@ -128,6 +138,10 @@ CREATE TABLE channel_delivery (
   check ((held_by is null) or wakes),
   check ((state in ('announced', 'handed')) = (launch is not null) or state in ('seen', 'dropped'))
 );
+CREATE TYPE issue_priority AS ENUM ('urgent', 'high', 'medium', 'low');
+CREATE TYPE issue_delivered AS ENUM ('merged', 'merged_into_parent', 'pull_request', 'kept', 'none');
+CREATE TYPE issue_canceled AS ENUM ('dismissed', 'lost');
+CREATE TYPE issue_deliver AS ENUM ('change', 'branch', 'answer');
 CREATE TABLE issue (
   id          text primary key,
   number      integer not null unique,
@@ -135,7 +149,7 @@ CREATE TABLE issue (
   description text not null,
   project     text,
   assignee    text,
-  priority    text not null default 'medium' check (priority in ('urgent', 'high', 'medium', 'low')),
+  priority    issue_priority not null default 'medium',
   rank        integer not null default 0,
   parent      text references issue (id) on delete cascade,
   blocked_by  text,
@@ -146,10 +160,10 @@ CREATE TABLE issue (
   queued_at   double precision,
   closed_at   double precision,
   -- Closed, an issue is done with what it delivered, or canceled with why; never both.
-  delivered   text check (delivered in ('merged', 'merged_into_parent', 'pull_request', 'kept', 'none')),
-  canceled    text check (canceled in ('dismissed', 'lost')),
+  delivered   issue_delivered,
+  canceled    issue_canceled,
   pull_request text,
-  deliver text not null default 'change' check (deliver in ('change', 'branch', 'answer')),
+  deliver issue_deliver not null default 'change',
   -- A profile's talk with the owner: the direct channel it is said in. Off the board; read-only, its rounds' leftovers go.
   talk    text unique,
   reviewed_at double precision,
@@ -169,6 +183,7 @@ CREATE TABLE issue_session (
   issue           text not null references issue (id) on delete cascade,
   started_at      double precision not null
 );
+CREATE TYPE session_run_outcome AS ENUM ('completed', 'failed', 'interrupted');
 CREATE TABLE session_run (
   id           text primary key,
   session      text not null,
@@ -177,20 +192,23 @@ CREATE TABLE session_run (
   heard        text,
   started_at   double precision not null,
   ended_at     double precision,
-  outcome      text,
+  outcome      session_run_outcome,
   summary      text,
   spent        text
 );
+CREATE TYPE task_event_kind AS ENUM ('splitting', 'drafted', 'started', 'paused', 'resumed', 'ready', 'merged', 'abandoned', 'noted', 'task_started', 'task_sent_back', 'task_merged', 'task_failed', 'task_retried', 'task_requeued', 'task_skipped', 'task_edited', 'task_added', 'task_removed');
+CREATE TYPE task_event_actor AS ENUM ('owner', 'orchestrator', 'session', 'system');
 CREATE TABLE task_event (
   id          text primary key,
   graph_id    text not null,
   task_id     text,
-  kind        text not null,
-  actor       text not null check (actor in ('owner', 'orchestrator', 'session', 'system')),
+  kind        task_event_kind not null,
+  actor       task_event_actor not null,
   payload     text not null default '{}',
   created_at  double precision not null
 );
 CREATE INDEX task_event_by_graph on task_event (graph_id, id);
+CREATE TYPE cron_set_by AS ENUM ('owner', 'orchestrator', 'session', 'system');
 CREATE TABLE cron (
   id          text primary key,
   name        text not null,
@@ -205,7 +223,7 @@ CREATE TABLE cron (
   last_run    double precision,
   -- Who set it, and whether it waits for the owner to say yes (cron/rules.go's needsOK): a waiting one stays off
   -- until the owner turns it on, which clears pending.
-  set_by      text not null default 'owner' check (set_by in ('owner', 'orchestrator', 'session', 'system')),
+  set_by      cron_set_by not null default 'owner',
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
@@ -214,11 +232,14 @@ CREATE TABLE game_ledger (
   at      double precision not null,
   payload text not null default '{}'
 );
+CREATE TYPE memory_scope AS ENUM ('owner', 'agent');
+CREATE TYPE memory_kind AS ENUM ('note', 'issue');
+CREATE TYPE memory_author AS ENUM ('owner', 'orchestrator', 'session', 'system');
 CREATE TABLE memory (
   id           text primary key,
-  scope        text not null check (scope in ('owner', 'agent')),
+  scope        memory_scope not null,
   agent        text,                -- the profile id; null for scope owner
-  kind         text not null check (kind in ('profile', 'note', 'issue', 'episode')),
+  kind         memory_kind not null,
   title        text,
   body         text not null,
   terms        text not null default '',   -- body cut by gse, space-joined, lower case
@@ -227,7 +248,7 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   project      text,                -- null: every project
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'orchestrator', 'session', 'system')),
+  author       memory_author not null,
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   double precision not null,
   updated_at   double precision not null,
@@ -241,8 +262,9 @@ CREATE INDEX memory_by_agent ON memory (agent, created_at desc);
 CREATE INDEX memory_by_scope ON memory (scope, kind) WHERE replaced_by IS NULL;
 CREATE UNIQUE INDEX memory_one_issue ON memory (agent, session) WHERE kind = 'issue';
 CREATE INDEX memory_by_terms ON memory USING gin (terms_vector);
+CREATE TYPE connector_account_connector AS ENUM ('weixin', 'feishu', 'qq');
 CREATE TABLE connector_account (
-  connector      text primary key check (connector in ('weixin', 'feishu', 'qq')),
+  connector      connector_account_connector primary key,
   secrets        text not null,
   owner_id       text,
   pair_code      text,
@@ -266,12 +288,13 @@ CREATE TABLE connector_inbound (
   primary key (connector, ext_id)
 );
 CREATE INDEX connector_inbound_pending ON connector_inbound (connector, delivered) WHERE not delivered;
+CREATE TYPE connector_outbox_state AS ENUM ('pending', 'sent', 'dropped');
 CREATE TABLE connector_outbox (
   id          text primary key,
   connector   text not null,
   message_id  text not null references channel_message (id) on delete cascade,
   body        text not null,
-  state       text not null default 'pending' check (state in ('pending', 'sent', 'dropped')),
+  state       connector_outbox_state not null default 'pending',
   ext_id      text,
   tries       integer not null default 0,
   error       text,
@@ -302,6 +325,7 @@ CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send
 CREATE INDEX channel_delivery_open on channel_delivery (recipient_id, message_id) where state in ('pending', 'announced', 'handed');
 CREATE INDEX session_run_by_issue on session_run (issue, started_at);
 CREATE INDEX session_run_by_session on session_run (session, started_at);
+CREATE TYPE session_closed AS ENUM ('merged', 'completed', 'dismissed', 'lost');
 CREATE TABLE session (
   id        text primary key,
   agent     text not null,
@@ -313,7 +337,7 @@ CREATE TABLE session (
   graph     text,
   hired_at  double precision not null,
   ended_at  double precision,
-  closed    text check (closed in ('merged', 'completed', 'dismissed', 'lost')),
+  closed    session_closed,
   place       text,
   oar_session text,
   last_text   text,
@@ -331,6 +355,8 @@ CREATE TABLE issue_queue (
   channel text not null,
   triggered_by text not null
 );
+CREATE TYPE agent_task_executor AS ENUM ('self', 'subagent');
+CREATE TYPE agent_task_state AS ENUM ('waiting', 'working', 'done', 'failed', 'skipped');
 CREATE TABLE agent_task (
   graph text not null,
   keeper text not null,
@@ -339,8 +365,8 @@ CREATE TABLE agent_task (
   title text not null,
   brief text not null,
   after text not null,
-  executor text not null check (executor in ('self', 'subagent')),
-  state text not null check (state in ('waiting', 'working', 'done', 'failed', 'skipped')),
+  executor agent_task_executor not null,
+  state agent_task_state not null,
   result text not null,
   tries integer not null,
   updated_at double precision not null,
@@ -350,11 +376,12 @@ CREATE TABLE agent_task (
 CREATE INDEX agent_task_by_keeper on agent_task (keeper, finished_at);
 -- Artifacts (artifact/artifact.ts). A blocks one's blocks are a flat list, nested by parent_id and ordered by
 -- (order_key, id); every change is an op, and a batch of ops is one artifact_change with the artifact's next seq.
+CREATE TYPE artifact_body AS ENUM ('blocks', 'html');
 CREATE TABLE artifact (
   id          text primary key,
   title       text not null,
   -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version).
-  body        text not null check (body in ('blocks', 'html')),
+  body        artifact_body not null,
   -- The channel or thread it was announced in, none for one the owner started on the page; the issue it was made for, if any.
   channel_id  text references channel (id),
   -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).
@@ -387,12 +414,13 @@ CREATE TABLE artifact_version (
   primary key (artifact_id, version)
 );
 CREATE INDEX artifact_version_by_sha on artifact_version (sha);
+CREATE TYPE artifact_block_type AS ENUM ('paragraph', 'heading', 'bulleted', 'numbered', 'todo', 'quote', 'code', 'divider', 'image', 'issue_ref', 'memory_item');
 CREATE TABLE artifact_block (
   id          text primary key,
   artifact_id text not null references artifact (id) on delete cascade,
   parent_id   text,
   order_key   text not null,
-  type        text not null,
+  type        artifact_block_type not null,
   attrs       text not null default '{}', -- JSON: protocol.BlockAttrs
   spans       text not null default '[]', -- JSON: []protocol.TextSpan
   rev         integer not null,
@@ -402,13 +430,14 @@ CREATE TABLE artifact_block (
 );
 CREATE INDEX artifact_block_by_artifact on artifact_block (artifact_id, order_key, id);
 -- A block's text at each rev (kind normal), and a submitted text that was not taken (kind conflict, at the rev it lost to).
+CREATE TYPE artifact_block_revision_kind AS ENUM ('normal', 'conflict');
 CREATE TABLE artifact_block_revision (
   id         text primary key,
   block_id   text not null references artifact_block (id) on delete cascade,
   rev        integer not null,
   spans      text not null,
   actor      text not null,
-  kind       text not null check (kind in ('normal', 'conflict')),
+  kind       artifact_block_revision_kind not null,
   created_at double precision not null
 );
 CREATE INDEX artifact_block_revision_by_block on artifact_block_revision (block_id, rev);

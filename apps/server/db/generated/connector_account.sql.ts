@@ -4,14 +4,16 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_connector_account_connector_b578f4ff6726 } from "./types.js"
+
 export const ConnectorAccountParams = Schema.Struct({
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type ConnectorAccountParams = typeof ConnectorAccountParams.Type
 
 
 export const ConnectorAccountResult = Schema.Struct({
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
   ["secrets"]: Schema.String,
   ["owner_id"]: Schema.NullOr(Schema.String),
   ["pair_code"]: Schema.NullOr(Schema.String),
@@ -38,7 +40,7 @@ export const connectorAccount = Effect.fn("ConnectorAccount")(function* (params:
 })
 
 export const ConnectAccountParams = Schema.Struct({
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
   ["secrets"]: Schema.String,
   ["owner_id"]: Schema.NullOr(Schema.String),
   ["pair_code"]: Schema.NullOr(Schema.String),
@@ -58,7 +60,7 @@ export const connectAccount = Effect.fn("ConnectAccount")(function* (params: Con
 })
 
 export const DisconnectAccountParams = Schema.Struct({
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type DisconnectAccountParams = typeof DisconnectAccountParams.Type
 
@@ -75,7 +77,7 @@ export const disconnectAccount = Effect.fn("DisconnectAccount")(function* (param
 
 export const PauseAccountParams = Schema.Struct({
   ["paused_until"]: Schema.NullOr(Schema.Number),
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type PauseAccountParams = typeof PauseAccountParams.Type
 
@@ -92,7 +94,7 @@ export const pauseAccount = Effect.fn("PauseAccount")(function* (params: PauseAc
 
 export const AccountOwnerParams = Schema.Struct({
   ["owner_id"]: Schema.NullOr(Schema.String),
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type AccountOwnerParams = typeof AccountOwnerParams.Type
 
@@ -109,7 +111,7 @@ export const accountOwner = Effect.fn("AccountOwner")(function* (params: Account
 
 export const AccountCursorParams = Schema.Struct({
   ["cursor"]: Schema.String,
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type AccountCursorParams = typeof AccountCursorParams.Type
 
@@ -127,7 +129,7 @@ export const accountCursor = Effect.fn("AccountCursor")(function* (params: Accou
 export const AccountReplyParams = Schema.Struct({
   ["reply_context"]: Schema.NullOr(Schema.String),
   ["at"]: Schema.NullOr(Schema.Number),
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type AccountReplyParams = typeof AccountReplyParams.Type
 
@@ -144,7 +146,7 @@ export const accountReply = Effect.fn("AccountReply")(function* (params: Account
 
 export const AccountChannelParams = Schema.Struct({
   ["channel_id"]: Schema.NullOr(Schema.String),
-  ["connector"]: Schema.String,
+  ["connector"]: Pg_public_connector_account_connector_b578f4ff6726,
 })
 export type AccountChannelParams = typeof AccountChannelParams.Type
 

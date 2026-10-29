@@ -18,7 +18,7 @@ const row = (message: string, number: number, channel = "c"): DeliveryRow => ({
   created_at: 1,
   name: "主人",
   sender_kind: "owner",
-  channel_type: "general",
+  channel_type: "channel",
   root_id: null,
   root_number: null,
   subject_kind: null,

@@ -1,4 +1,5 @@
 import { Meter } from "@vibevalley/base-ui";
+import { variant, Keyed } from "@/base/util";
 import { t } from "@vibevalley/i18n";
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
@@ -23,7 +24,6 @@ import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./qu
 import { momentText, wallClockText, yuan } from "@/base/format";
 import { toast } from "@/ui/toasts";
 import { A } from "@/ui/A";
-import { Keyed } from "@/base/util";
 import { useWorkAgents } from "@/base/agents";
 import { ready, useRuntimes } from "@/base/query";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
@@ -177,7 +177,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
           <p class="text-sm text-muted">{props.info.preset.blurb}</p>
           <div class="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted">
             <Switch>
-              <Match when={inst().status === "available" ? (inst() as Extract<RuntimeInfo["installation"], { status: "available" }>) : undefined}>
+              <Match when={variant(inst(), "status", "available")}>
                 {(i) => (
                   <>
                     <span class="rounded bg-ok-soft px-1.5 text-ok-ink">
@@ -188,7 +188,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
                   </>
                 )}
               </Match>
-              <Match when={inst().status === "unsupported" ? (inst() as Extract<RuntimeInfo["installation"], { status: "unsupported" }>) : undefined}>
+              <Match when={variant(inst(), "status", "unsupported")}>
                 {(i) => <span class="rounded bg-bad-soft px-1.5 text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
               </Match>
               <Match when={inst().status === "not_found"}>
@@ -259,9 +259,7 @@ function Usage(props: { info: RuntimeInfo }) {
           <Match when={usage().status === "login_required"}>
             <p class="text-xs text-warn-ink">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
           </Match>
-          <Match when={usage().status === "unavailable" ? (usage() as Extract<Usage, { status: "unavailable" }>) : undefined}>
-            {(u) => <Quiet>{t("web.runtime.unreadable", { why: u().reason })}</Quiet>}
-          </Match>
+          <Match when={variant(usage(), "status", "unavailable")}>{(u) => <Quiet>{t("web.runtime.unreadable", { why: u().reason })}</Quiet>}</Match>
           <Match when={usage()}>
             <div class="flex items-start gap-3">
               <span class="flex w-14 shrink-0 flex-col items-center">
@@ -270,7 +268,7 @@ function Usage(props: { info: RuntimeInfo }) {
               </span>
               <div class="flex min-w-0 flex-1 flex-col gap-2.5">
                 <Switch>
-                  <Match when={usage().status === "balance" ? (usage() as Extract<Usage, { status: "balance" }>) : undefined}>
+                  <Match when={variant(usage(), "status", "balance")}>
                     {(u) => (
                       <>
                         <p class={["text-sm", { "text-berry": !u().available }]}>
@@ -284,7 +282,7 @@ function Usage(props: { info: RuntimeInfo }) {
                       </>
                     )}
                   </Match>
-                  <Match when={usage().status === "ok" ? (usage() as Extract<Usage, { status: "ok" }>) : undefined}>
+                  <Match when={variant(usage(), "status", "ok")}>
                     {(u) => (
                       <>
                         <Show when={u().subscription}>

@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_channel_notify_957f5fe258ae, Pg_public_channel_subject_kind_387f28ce6303, Pg_public_channel_type_653a6aa2de49 } from "./types.js"
+
 export const DefaultIDParams = Schema.Struct({
 
 })
@@ -120,7 +122,7 @@ export const CreateThreadParams = Schema.Struct({
   ["id"]: Schema.String,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
+  ["subject_kind"]: Schema.NullOr(Pg_public_channel_subject_kind_387f28ce6303),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
@@ -146,11 +148,11 @@ export type AllChannelsParams = typeof AllChannelsParams.Type
 
 export const AllChannelsResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["type"]: Schema.String,
+  ["type"]: Pg_public_channel_type_653a6aa2de49,
   ["is_default"]: Schema.Boolean,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
+  ["subject_kind"]: Schema.NullOr(Pg_public_channel_subject_kind_387f28ce6303),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["last_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["reply_count"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
@@ -164,7 +166,7 @@ export const AllChannelsResult = Schema.Struct({
   ["category"]: Schema.NullOr(Schema.String),
   ["position"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["archived_at"]: Schema.NullOr(Schema.Number),
-  ["notify"]: Schema.String,
+  ["notify"]: Pg_public_channel_notify_957f5fe258ae,
   ["orchestrator"]: Schema.NullOr(Schema.String),
 })
 export type AllChannelsResult = typeof AllChannelsResult.Type
@@ -189,11 +191,11 @@ export type RecentChannelsParams = typeof RecentChannelsParams.Type
 
 export const RecentChannelsResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["type"]: Schema.String,
+  ["type"]: Pg_public_channel_type_653a6aa2de49,
   ["is_default"]: Schema.Boolean,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
+  ["subject_kind"]: Schema.NullOr(Pg_public_channel_subject_kind_387f28ce6303),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["last_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["reply_count"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
@@ -207,7 +209,7 @@ export const RecentChannelsResult = Schema.Struct({
   ["category"]: Schema.NullOr(Schema.String),
   ["position"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["archived_at"]: Schema.NullOr(Schema.Number),
-  ["notify"]: Schema.String,
+  ["notify"]: Pg_public_channel_notify_957f5fe258ae,
   ["orchestrator"]: Schema.NullOr(Schema.String),
 })
 export type RecentChannelsResult = typeof RecentChannelsResult.Type
@@ -250,10 +252,10 @@ export type InboxOfParams = typeof InboxOfParams.Type
 
 export const InboxOfResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["type"]: Schema.String,
+  ["type"]: Pg_public_channel_type_653a6aa2de49,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
+  ["subject_kind"]: Schema.NullOr(Pg_public_channel_subject_kind_387f28ce6303),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["channel_name"]: Schema.NullOr(Schema.String),
   ["unread"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
@@ -366,7 +368,7 @@ export const setArchived = Effect.fn("SetArchived")(function* (params: SetArchiv
 })
 
 export const SetNotifyParams = Schema.Struct({
-  ["notify"]: Schema.String,
+  ["notify"]: Pg_public_channel_notify_957f5fe258ae,
   ["id"]: Schema.String,
 })
 export type SetNotifyParams = typeof SetNotifyParams.Type

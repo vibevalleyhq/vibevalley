@@ -27,17 +27,17 @@ export interface SceneArea {
 type Rgb = readonly [number, number, number];
 
 // Warm, low evening light from the left, like the hill behind (tree-hill.png): olive greens, sunlit edges going gold.
-const bark = { line: [52, 32, 22] as Rgb, fill: [104, 66, 40] as Rgb, light: [170, 108, 60] as Rgb };
+const bark = { line: [52, 32, 22], fill: [104, 66, 40], light: [170, 108, 60] } satisfies Record<string, Rgb>;
 const leaf = {
-  line: [30, 44, 24] as Rgb,
-  shade: [56, 80, 36] as Rgb,
-  fill: [92, 120, 46] as Rgb,
-  light: [158, 162, 62] as Rgb,
-  sun: [222, 186, 84] as Rgb,
-  dim: [104, 112, 86] as Rgb,
-};
-const yellow = { fill: [222, 170, 58] as Rgb, light: [246, 210, 110] as Rgb };
-const fruit = { line: [112, 52, 20] as Rgb, fill: [240, 156, 52] as Rgb, light: [255, 226, 140] as Rgb };
+  line: [30, 44, 24],
+  shade: [56, 80, 36],
+  fill: [92, 120, 46],
+  light: [158, 162, 62],
+  sun: [222, 186, 84],
+  dim: [104, 112, 86],
+} satisfies Record<string, Rgb>;
+const yellow = { fill: [222, 170, 58], light: [246, 210, 110] } satisfies Record<string, Rgb>;
+const fruit = { line: [112, 52, 20], fill: [240, 156, 52], light: [255, 226, 140] } satisfies Record<string, Rgb>;
 const starColour: Record<MemoryKind, Rgb> = { seed: [255, 214, 120], fruit: [242, 165, 65], leaf: [214, 240, 200] };
 
 const css = (c: Rgb, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
@@ -125,7 +125,7 @@ export function Scene(props: {
     // The hill above the valley, by day and by night (design/pixel gen.sh tree-hill): drawn into the scene at one of its
     // pixels to one of the scene's, so the tree drawn in code sits on the same grid. Until they load, the sky's colour.
     const backdrop = { day: new Image(), night: new Image(), up: new Image() };
-    const sky = { day: [232, 176, 150] as Rgb, night: [10, 14, 34] as Rgb };
+    const sky: Record<"day" | "night", Rgb> = { day: [232, 176, 150], night: [10, 14, 34] };
     const topColour = (img: HTMLImageElement): Rgb => {
       const c = document.createElement("canvas").getContext("2d")!;
       c.drawImage(img, 0, 0);

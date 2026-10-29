@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { messageOf } from "@/errors.ts";
+import { messageOf, errnoOf } from "@/errors.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -385,7 +385,7 @@ const cloudflared = (port: number) =>
     };
     child.stdout?.on("data", read);
     child.stderr?.on("data", read);
-    child.on("error", (e) => failWith((e as NodeJS.ErrnoException).code === "ENOENT" ? t("server.voice.tunnel.missing") : e.message));
+    child.on("error", (e) => failWith(errnoOf(e) === "ENOENT" ? t("server.voice.tunnel.missing") : e.message));
     child.on("exit", () => failWith(t("server.voice.tunnel.exited")));
     // Given up on before it said its address: the process goes too.
     return Effect.sync(() => {

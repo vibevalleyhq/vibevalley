@@ -110,7 +110,7 @@ export const make = (options: ArtifactOptions = {}) =>
       return {
         id: row.id,
         title: row.title,
-        body: row.body as ArtifactBody,
+        body: row.body,
         ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
         ...(row.said_channel !== null && row.said_number !== null ? { said: { channel: row.said_channel, number: row.said_number } } : {}),
         ...(row.issue !== null ? { issue: row.issue } : {}),

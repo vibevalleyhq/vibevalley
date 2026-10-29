@@ -151,7 +151,7 @@ const farm = Effect.gen(function* () {
         wakes: boolean;
         held_by: string;
         state: string;
-      }>`select message_id, reason, wakes, coalesce(held_by, '') as held_by, state from channel_delivery where recipient_id = ${recipient} order by message_id`,
+      }>`select message_id, reason, wakes, coalesce(held_by::text, '') as held_by, state from channel_delivery where recipient_id = ${recipient} order by message_id`,
     );
   const deliveryOf = async (recipient: string, message: string) => (await deliveries(recipient)).find((d) => d.message_id === message);
   return { core, chat, sql, messagesOf, channel, deliveries, deliveryOf };

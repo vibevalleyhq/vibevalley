@@ -494,7 +494,7 @@ export const make = Effect.gen(function* () {
   const model = new ChatModel();
   const reach = new Audience();
   const open = new Deliveries();
-  const follow = (channel: string, participant: string, reason: string, from: number) =>
+  const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
     Effect.andThen(
       db(qf.follow({ channel_id: channel, participant_id: participant, reason, from_number: from })),
       Effect.sync(() => reach.followed(channel, participant)),
@@ -552,7 +552,7 @@ export const make = Effect.gen(function* () {
   const seat = Effect.fnUntraced(function* (id: string) {
     const name = agents.agent(id)?.name.trim() || t("server.channel.name.orchestrator");
     if (model.participant(id)?.name === name && model.participant(id)?.kind === "orchestrator") return;
-    const joined = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
+    const joined: qp.UpsertParticipantParams = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
     yield* db(qp.upsertParticipant(joined));
     model.joined(joined);
   });
@@ -1152,7 +1152,14 @@ export const make = Effect.gen(function* () {
     );
 
   const openJob = Effect.fn("Channels.openJob")(function* (h: Session) {
-    const joined = { id: h.id, kind: "session", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: yield* Clock.currentTimeMillis };
+    const joined: qp.UpsertParticipantParams = {
+      id: h.id,
+      kind: "session",
+      name: h.name,
+      agent_id: h.agent,
+      runtime: h.runtime,
+      joined_at: yield* Clock.currentTimeMillis,
+    };
     yield* db(qp.upsertParticipant(joined));
     model.joined(joined);
     const job = jobOf(h);
@@ -1907,7 +1914,14 @@ export const make = Effect.gen(function* () {
           const peer = mine ? agent.id : profileId(agent.id);
           if (mine) yield* seat(agent.id);
           else {
-            const joined = { id: peer, kind: "profile", name: agent.name, agent_id: agent.id, runtime: null, joined_at: yield* Clock.currentTimeMillis };
+            const joined: qp.UpsertParticipantParams = {
+              id: peer,
+              kind: "profile",
+              name: agent.name,
+              agent_id: agent.id,
+              runtime: null,
+              joined_at: yield* Clock.currentTimeMillis,
+            };
             yield* db(qp.upsertParticipant(joined));
             model.joined(joined);
           }

@@ -4,10 +4,12 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_artifact_body_64de845bf79d } from "./types.js"
+
 export const AddArtifactParams = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["body"]: Schema.String,
+  ["body"]: Pg_public_artifact_body_64de845bf79d,
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
@@ -37,7 +39,7 @@ export type ArtifactParams = typeof ArtifactParams.Type
 export const ArtifactResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["body"]: Schema.String,
+  ["body"]: Pg_public_artifact_body_64de845bf79d,
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -73,7 +75,7 @@ export type ArtifactsInChannelParams = typeof ArtifactsInChannelParams.Type
 export const ArtifactsInChannelResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["body"]: Schema.String,
+  ["body"]: Pg_public_artifact_body_64de845bf79d,
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -109,7 +111,7 @@ export type ArtifactsForIssueParams = typeof ArtifactsForIssueParams.Type
 export const ArtifactsForIssueResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["body"]: Schema.String,
+  ["body"]: Pg_public_artifact_body_64de845bf79d,
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
@@ -145,7 +147,7 @@ export type ArtifactsParams = typeof ArtifactsParams.Type
 export const ArtifactsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
-  ["body"]: Schema.String,
+  ["body"]: Pg_public_artifact_body_64de845bf79d,
   ["channel_id"]: Schema.NullOr(Schema.String),
   ["message_id"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
