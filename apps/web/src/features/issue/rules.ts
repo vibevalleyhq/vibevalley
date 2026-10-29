@@ -81,6 +81,9 @@ export const laneLabel: Record<Lane, string> = {
 /** The status a lane's header is drawn with: the one its cards mostly have. */
 export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "in_progress", waiting: "in_review", closed: "done" };
 
+/** A card says its own status only where its lane does not: a draft in 待办 says so by its 草稿 flag instead. */
+export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane] && !(lane === "todo" && status === "backlog");
+
 /** The three acts of a plot (docs/concepts.md): talk it through, get it worked, finish it. */
 export type Stage = "talk" | "work" | "finish";
 export const stages: Stage[] = ["talk", "work", "finish"];
