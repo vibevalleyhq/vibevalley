@@ -5,6 +5,11 @@ import { icons, type IconName } from "./icons";
 export default stories({
   title: "组件/工作台/Tag",
   stories: {
+    States: story({
+      args: { tone: "ok", icon: "check", label: "完成" },
+      grid: { rows: ["tone", ["ok", "bad", "wait"]], cols: ["icon", ["", "check"]] },
+      render: (a) => <Tag label={a.label} tone={a.tone as TagTone} icon={(a.icon || undefined) as IconName | undefined} />,
+    }),
     Playground: story({
       args: { label: "完成", tone: "ok", icon: "check" },
       controls: { tone: { kind: "choice", options: ["ok", "bad", "wait"] }, icon: { kind: "choice", options: ["", ...Object.keys(icons)] } },

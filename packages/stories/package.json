@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
+    "axe-core": "catalog:",
     "reicon": "catalog:",
     "solid-js": "catalog:"
   },

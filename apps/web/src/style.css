@@ -17,6 +17,8 @@
   --wb-selected: #2f1f131a;
   --wb-focus: #74a046;
   --wb-accent: #567c31;
+  /* A primary button under the pointer: darker in light, so the page-coloured words on it stay readable. */
+  --wb-accent-hover: #476a28;
   --wb-leaf: #74a046;
   --wb-wheat: #e5a93c;
   --wb-berry: #aa3f31;
@@ -61,6 +63,7 @@
   --wb-selected: #f1e7d61c;
   --wb-focus: #8dbb5c;
   --wb-accent: #7fae4f;
+  --wb-accent-hover: #8dbb5c;
   --wb-leaf: #8dbb5c;
   --wb-wheat: #e5a93c;
   --wb-berry: #e37e6f;
@@ -100,6 +103,7 @@
   --color-selected: var(--wb-selected);
   --color-focus: var(--wb-focus);
   --color-accent: var(--wb-accent);
+  --color-accent-hover: var(--wb-accent-hover);
   --color-leaf: var(--wb-leaf);
   --color-wheat: var(--wb-wheat);
   --color-berry: var(--wb-berry);
@@ -134,6 +138,7 @@
   --color-selected: var(--wb-selected);
   --color-focus: var(--wb-focus);
   --color-accent: var(--wb-accent);
+  --color-accent-hover: var(--wb-accent-hover);
   --color-leaf: var(--wb-leaf);
   --color-wheat: var(--wb-wheat);
   --color-berry: var(--wb-berry);

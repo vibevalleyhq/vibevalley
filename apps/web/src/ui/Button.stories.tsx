@@ -17,6 +17,16 @@ export default stories({
         </Button>
       ),
     }),
+    States: story({
+      note: "每种色调在静止、指针下、键盘聚焦、按下时的样子；disabled 在参数里切。",
+      args: { label: "派活", icon: "add", tone: "primary", disabled: false },
+      grid: { rows: ["tone", tones], cols: "pseudo" },
+      render: (a) => (
+        <Button tone={a.tone as Tone} icon={(a.icon || undefined) as IconName | undefined} disabled={a.disabled}>
+          {a.label}
+        </Button>
+      ),
+    }),
     Tones: story({
       note: "主色一页只有一个；危险的动作用 danger，不用红色的主色。",
       render: () => (

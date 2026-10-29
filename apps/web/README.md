@@ -54,7 +54,10 @@ test/               Playwright against a real server per worker (fixtures.ts); s
 - **Stories.** Every part in `src/ui` (and `src/ui/pixel`) has an `X.stories.tsx` beside it (`src/stories.test.ts`;
   the few without say why there): its states with made-up data, in both themes, at a few widths. A title's first part
   is its level (`src/storyLevels.ts`): 设计体系, 组件, 交互 (parts working together, in `src/stories/`), 界面 (a
-  feature's view from made-up data, beside it in the feature). `vp run --filter
+  feature's view from made-up data, beside it in the feature). A part that answers the pointer has a `States` story
+  with a `grid` (its variants × rest, hover, focus, pressed). There is no server behind the stories: a view that reads
+  one is answered by the open story (`answer` in `base/storyApi.ts`), and made-up data shared between stories is a
+  `*.samples.ts` beside them (`features/issue/issue.samples.ts`); neither is imported by the product. `vp run --filter
   @vibevalley/web stories` serves them; `build:stories` (in `web:check`) builds them to `dist-stories/`, never into
   `dist/`; `test/stories.spec.ts` opens each in its themes with axe. A part that reads the page's data to draw itself is
   split so its drawing takes arguments (`Shortcuts` in `ShortcutSheet.tsx`). The format and the viewer are

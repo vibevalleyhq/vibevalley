@@ -732,6 +732,9 @@ importers:
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.16(solid-js@2.0.0-rc.16)
+      axe-core:
+        specifier: 'catalog:'
+        version: 4.14.0
       reicon:
         specifier: 'catalog:'
         version: 1.2.5

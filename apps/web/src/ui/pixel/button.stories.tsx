@@ -9,6 +9,15 @@ export default stories({
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {
+    States: story({
+      args: { label: "派活", tone: "primary", disabled: false },
+      grid: { rows: ["tone", tones], cols: "pseudo" },
+      render: (a) => (
+        <PxButton tone={a.tone as PxTone} disabled={a.disabled} onClick={() => undefined}>
+          {a.label}
+        </PxButton>
+      ),
+    }),
     Playground: story({
       args: { label: "派活", tone: "primary", size: "md", icon: "", disabled: false },
       controls: {

@@ -7,6 +7,14 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/app-32.png" />
   </head>
   <body>
+    <script>
+      // The words' language is read from <html data-locale> as the modules load (packages/i18n locale.ts): set it first.
+      const lang = new URLSearchParams(location.search).get("lang");
+      if (lang) {
+        document.documentElement.dataset.locale = lang;
+        document.documentElement.lang = lang === "en" ? "en" : "zh-Hans";
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/stories.tsx"></script>
   </body>

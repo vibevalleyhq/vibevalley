@@ -72,6 +72,39 @@ test("the viewer opens a story from the address, in folders, and keeps the view 
   await expect(page.getByTestId("story-link")).toHaveCount(1);
 });
 
+test("a state grid draws every combination, and a forced state looks as the real one does", async ({ page }) => {
+  await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Button:States", theme: "light", w: "full" })}`);
+  const grid = page.getByTestId("story-grid");
+  // Four tones down, rest / hover / focus / pressed across.
+  await expect(grid.getByTestId("story-cell")).toHaveCount(16);
+  const ground = (state: string) =>
+    grid
+      .locator(`tr:nth-child(1) [data-testid="story-cell"]${state === "rest" ? ":not([data-pseudo])" : `[data-pseudo="${state}"]`} button`)
+      .evaluate((b) => getComputedStyle(b).backgroundColor);
+  expect(await ground("hover")).not.toBe(await ground("rest"));
+  const ring = (state: string) =>
+    grid
+      .locator(`tr:nth-child(1) [data-testid="story-cell"]${state === "rest" ? ":not([data-pseudo])" : `[data-pseudo="${state}"]`} button`)
+      .evaluate((b) => getComputedStyle(b).outlineStyle);
+  expect(await ring("focus")).not.toBe(await ring("rest"));
+
+  // The single view takes one state for the whole frame.
+  await page.getByTestId("story-mode").locator('[data-value="single"]').click();
+  await page.getByTestId("story-state").locator('[data-value="hover"]').click();
+  await expect(page.getByTestId("story-frame")).toHaveAttribute("data-pseudo", "hover");
+  await expect(page).toHaveURL(/view=single&state=hover/);
+
+  await expect(page.getByTestId("story-a11y")).toHaveAttribute("data-count", "0");
+  await page.getByTestId("story-a11y").click();
+  await expect(page.getByTestId("story-a11y-panel")).toBeVisible();
+});
+
+test("the language comes from the address, before the parts draw", async ({ page }) => {
+  await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/ConfirmButton:Delete", theme: "light", lang: "en" })}`);
+  await expect(page.locator("html")).toHaveAttribute("data-locale", "en");
+  await expect(page.getByTestId("story-lang").locator('[data-value="en"]')).toHaveAttribute("aria-checked", "true");
+});
+
 // One test per stories file, so they spread over the workers; the titles are read off the files, as the viewer is not
 // loaded here.
 const titles = readdirSync(join(import.meta.dirname, "..", "src"), { recursive: true, encoding: "utf8" })

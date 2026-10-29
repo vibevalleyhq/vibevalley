@@ -11,6 +11,20 @@ const runtimes = [
 export default stories({
   title: "组件/工作台/Field",
   stories: {
+    States: story({
+      note: "输入框和选择框：静止、指针下、聚焦，和不能改的。",
+      args: { kind: "text", value: "vibevalley", disabled: false },
+      grid: { rows: ["kind", ["text", "select"]], cols: "pseudo" },
+      render: (a) => (
+        <div class="w-48">
+          {a.kind === "select" ? (
+            <Select label="农机" value="claude" options={runtimes} disabled={a.disabled} onChange={() => undefined} />
+          ) : (
+            <TextInput aria-label="项目名" value={a.value} disabled={a.disabled} />
+          )}
+        </div>
+      ),
+    }),
     Text: story({
       args: { label: "项目名", hint: "工作目录下的文件夹名", placeholder: "vibevalley", disabled: false },
       render: (a) => (

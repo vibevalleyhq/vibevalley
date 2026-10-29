@@ -37,6 +37,21 @@ export default stories({
         </div>
       ),
     }),
+    "Toggle states": story({
+      args: { checked: true, disabled: false },
+      grid: { rows: ["checked", [false, true]], cols: "pseudo" },
+      render: (a) => <Toggle label="开机时启动" checked={a.checked} disabled={a.disabled} onChange={() => undefined} />,
+    }),
+    "Row states": story({
+      note: "列表的一行：选中和没选中，各种交互状态。",
+      args: { active: false },
+      grid: { rows: ["active", [false, true]], cols: "pseudo" },
+      render: (a) => (
+        <ul class="w-56">
+          <ListRow to="/projects/vibevalley" title="vibevalley" line="3 个在做" active={a.active} leading={<Dot tone="leaf" />} />
+        </ul>
+      ),
+    }),
     Toggle: story({
       args: { checked: true, disabled: false, label: "开机时启动", hint: "登录后自己起来，农场一直在" },
       render: (a, set) => (
