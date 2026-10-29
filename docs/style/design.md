@@ -181,7 +181,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - **干活的经过**（`features/session/WorkLog.tsx`）：每一步一个块，底色说它是什么（交给它的话 `bg-wheat/14`、想起的 `bg-leaf/15`、它说的 `bg-hover`、出错 `bg-berry/10`），长的先折起来。
 - **分栏**（`ui/Splitter.tsx`）：侧面板和导航的边能拖宽窄，指针放上去出一条 `focus` 色的线，← → 每次 16px，双击回默认；宽窄按面板记在本机的偏好里（`base/prefs.ts` 的 `widths`），有上下限。窄屏上面板盖住页面时不给拖。
 - **快捷键**（`base/shortcuts.ts`、`ui/ShortcutSheet.tsx`）：每个快捷键是那张表的一行，`?`（不在输入框里时）打开的一览照它画，壳听的组合键（`mod+K`、`?`）也照它认；加一个快捷键先加一行，键帽是 `rounded-xs`、`text-2xs` 的 `kbd`。
-- **空状态**：一个图标、一句为什么空、下一步的链接或按钮（`Empty`）。
+- **空状态**（`ui/Empty.tsx` 的 `Empty`）：一整块没有东西时（文档、技能的右边、频道的任务页签），一个 48px 的 `faint` 图标、一句为什么空、下一步的按钮（有就放）；一节里的空只写一行 `text-muted` 的字，不放大图标。
 - **出错和限流**：一次性的用 toast（坏的是莓色）；持续的写在它所在的地方（额度瓶、连接的小灯、工单的「卡住了」）；拒绝的话里带下一步。
 
 ## 和那份八篇大纲对照
@@ -235,7 +235,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
 4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
 
-**写一个新界面之前**：先在图鉴的「界面」（`/catalog/kit`）看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Select`、`Checkbox`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了令牌、原子或一种 `tone`，也加进 `Kit.tsx`。
+**写一个新界面之前**：先在图鉴的「界面」（`/catalog/kit`）看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了令牌、原子或一种 `tone`，也加进 `Kit.tsx`。
 
 **类名怎么拼**：Solid 的 `class` 直接收数组和对象（`class={["h-7 …", { "bg-selected": on }, props.class]}`），不用 clsx。原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。所以不用 tailwind-merge 去合并互相冲突的类：真有要盖的那天，再加一个按我们的令牌配好的 `cn`。
 

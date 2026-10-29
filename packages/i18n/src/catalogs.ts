@@ -3084,7 +3084,7 @@ export const catalogs = {
         noMatch: "没有对得上的。",
         own: "VibeValley 自己的 · {count}",
         newSkill: "新技能",
-        noSkills: "还没有技能。",
+        noSkills: "还没有技能：写一个 VibeValley 自己的，或者在农机上装好再回来看。",
         installedNote: "装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。",
         where: "哪些农机有它",
         inUse: "{n} 个 agent 在用，删掉会从它们身上去掉。",
@@ -6801,7 +6801,7 @@ export const catalogs = {
         noMatch: "Nothing matches.",
         own: "VibeValley's own · {count}",
         newSkill: "New skill",
-        noSkills: "No skills yet.",
+        noSkills: "No skills yet: write one of VibeValley's own, or install some on a runtime and come back.",
         installedNote:
           "A skill installed on the machines: helpers using these machines load it when needed, no need to tick it in a profile. To change it, edit its file.",
         where: "Machines that have it",

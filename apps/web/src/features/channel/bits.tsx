@@ -1,10 +1,8 @@
 import { For, Match, Show, Switch } from "solid-js";
-import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon, type IconSize } from "../../ui/Icon";
-import type { IconName } from "../../ui/icons";
 import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
@@ -58,15 +56,4 @@ export function ThinkingDots() {
 
 export function Count(props: { n: number }) {
   return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
-}
-
-export function Empty(props: { icon: IconName; children: JSX.Element }) {
-  return (
-    <div data-testid="tab-empty" class="flex h-full items-center justify-center p-6">
-      <div class="flex max-w-96 flex-col items-center gap-3 text-center text-sm text-muted">
-        <Icon name={props.icon} size={48} class="opacity-80" />
-        {props.children}
-      </div>
-    </div>
-  );
 }

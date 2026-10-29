@@ -42,7 +42,8 @@ function Root(props: DivProps & { orientation?: Orientation | undefined; loop?: 
         }}
         onKeyDown={(e) => {
           call(props.onKeyDown, e);
-          if (!root || e.defaultPrevented) return;
+          // Only its own items' keys: something opened inside it (a picker, a menu) keeps its arrows.
+          if (!root || e.defaultPrevented || !(e.target instanceof HTMLElement) || !e.target.matches(item)) return;
           // An input keeps its own left and right.
           if (e.target instanceof HTMLInputElement && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return;
           roveFocus(e, root, `${item}:not([disabled])`, { orientation: ctx.orientation(), loop: props.loop ?? true });
