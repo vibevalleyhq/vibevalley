@@ -5,7 +5,7 @@
 import { Portal as SolidPortal, type JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show } from "solid-js";
 import { type Align, createAnchored, type Side } from "./anchored";
-import { createControllable, type DivProps, openAttrs, refs } from "./state";
+import { createControllable, type DivProps, flag, refs } from "./state";
 
 export interface FloatingRootProps<R extends string> {
   open?: boolean | undefined;
@@ -124,7 +124,8 @@ export function makePositioner(use: () => FloatingParts, defaults: { side: Side;
         }}
         data-side={at().side}
         data-align={at().align}
-        {...openAttrs(c.open())}
+        data-open={flag(c.open())}
+        data-closed={flag(!c.open())}
       />
     );
   };

@@ -1,3 +1,4 @@
+import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
@@ -5,7 +6,7 @@ import { api, reasonOf } from "../../base/api";
 import { useCore } from "../../base/frame";
 import { useRouter } from "../../base/router";
 import { useWorkAgents } from "../../base/agents";
-import { aria, autofocus } from "../../base/util";
+import { autofocus } from "../../base/util";
 import { Dialog } from "../../ui/Dialog";
 import { toast } from "../../ui/toasts";
 import { Count } from "./bits";
@@ -30,7 +31,6 @@ function SwitcherBody(props: { onClose: () => void }) {
   const router = useRouter();
   const profiles = useWorkAgents();
   const [query, setQuery] = createSignal("");
-  const [active, setActive] = createSignal(0);
   const targets = createMemo(() =>
     switchTargets(core()?.chat, query(), { issues: core()?.issues ?? [], sessions: core()?.sessions ?? [], profiles: profiles() }),
   );
@@ -43,58 +43,40 @@ function SwitcherBody(props: { onClose: () => void }) {
       .catch((e) => toast(reasonOf(e), "bad"));
   };
   return (
-    <div class="flex flex-col gap-2">
-      <input
-        ref={autofocus()}
-        data-testid="switcher-input"
-        value={query()}
-        role="combobox"
-        aria-expanded="true"
-        aria-controls="switcher-list"
-        aria-label={t("web.channel.switcher.title")}
-        placeholder={t("web.channel.switcher.hint")}
-        onInput={(e) => {
-          setQuery(e.currentTarget.value);
-          setActive(0);
-        }}
-        onKeyDown={(e) => {
-          if (e.isComposing) return;
-          const n = targets().length;
-          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-            e.preventDefault();
-            if (n > 0) setActive((a) => (a + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            const t = targets()[Math.min(active(), n - 1)];
-            if (t) go(t);
-          }
-        }}
-        class="h-10 rounded-md border border-line bg-page px-3 text-base outline-none focus:border-focus"
-      />
-      <div id="switcher-list" role="listbox" aria-label={t("web.channel.switcher.title")} class="flex flex-col gap-0.5">
-        <Show when={targets().length === 0}>
-          <p class="px-2 py-2 text-sm text-muted">{t("web.channel.switcher.none")}</p>
-        </Show>
-        <For each={targets()} keyed={(t) => `${t.kind}:${t.id}`}>
-          {(t, i) => (
-            <div
-              role="option"
-              data-key={t().id}
-              data-kind={t().kind}
-              aria-selected={aria(i() === active())}
-              onMouseEnter={() => setActive(i())}
-              onClick={() => go(t())}
-              class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5", { "bg-selected": i() === active() }]}
-            >
-              <span class={["min-w-0 flex-1 truncate text-sm", { "font-semibold": t().unread > 0 }]}>{t().label}</span>
-              <span class="shrink-0 truncate text-xs text-muted">{t().hint}</span>
-              <Show when={t().unread > 0}>
-                <Count n={t().unread} />
-              </Show>
-            </div>
-          )}
-        </For>
+    <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>
+      <div class="flex flex-col gap-2">
+        <Combobox.Input
+          ref={autofocus()}
+          data-testid="switcher-input"
+          aria-label={t("web.channel.switcher.title")}
+          placeholder={t("web.channel.switcher.hint")}
+          class="h-10 rounded-md border border-line bg-page px-3 text-base outline-none focus:border-focus"
+        />
+        <Combobox.Popup aria-label={t("web.channel.switcher.title")} class="flex flex-col gap-0.5">
+          <Combobox.Empty class="px-2 py-2 text-sm text-muted">{t("web.channel.switcher.none")}</Combobox.Empty>
+          <For each={targets()} keyed={(t) => `${t.kind}:${t.id}`}>
+            {(t) => (
+              <Combobox.Item
+                value={`${t().kind}:${t().id}`}
+                data-key={t().id}
+                data-kind={t().kind}
+                onClick={(e) => {
+                  // Going there closes the switcher; the input keeps what was typed until then.
+                  e.preventDefault();
+                  go(t());
+                }}
+                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 data-highlighted:bg-selected"
+              >
+                <span class={["min-w-0 flex-1 truncate text-sm", { "font-semibold": t().unread > 0 }]}>{t().label}</span>
+                <span class="shrink-0 truncate text-xs text-muted">{t().hint}</span>
+                <Show when={t().unread > 0}>
+                  <Count n={t().unread} />
+                </Show>
+              </Combobox.Item>
+            )}
+          </For>
+        </Combobox.Popup>
       </div>
-    </div>
+    </Combobox.Root>
   );
 }

@@ -1,3 +1,4 @@
+import { Progress } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 import { useRouter } from "../../base/router";
 import { ownerId } from "@vibevalley/protocol";
@@ -166,17 +167,14 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (
-              <span
-                role="progressbar"
+              <Progress.Root
+                value={u().percent}
                 aria-label={u().name}
-                aria-valuenow={u().percent}
-                aria-valuemin={0}
-                aria-valuemax={100}
                 class="relative flex h-10 items-center overflow-hidden rounded-md border border-line bg-page px-2 text-xs text-muted"
               >
-                <span class="absolute inset-y-0 left-0 bg-leaf/20" style={{ width: `${u().percent}%` }} />
+                <Progress.Indicator class="absolute inset-y-0 left-0 bg-leaf/20" />
                 <span class="relative max-w-48 truncate">{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
-              </span>
+              </Progress.Root>
             )}
           </For>
         </div>

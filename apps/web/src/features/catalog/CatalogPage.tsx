@@ -1,4 +1,4 @@
-import { Tabs } from "@vibevalley/base-ui";
+import { Slider, Tabs } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // 图鉴: every drawing the farm uses, its pointers and its sounds, and the workbench's own kit. /catalog is the drawings,
 // /catalog/<name> one of them large, /catalog/cursors, /catalog/sounds and /catalog/kit the other shelves.
@@ -379,16 +379,17 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
               </Button>
               <span class="text-xs text-muted">{t("web.catalog.frames", { n: f().length })}</span>
               <span class="flex-1" />
-              <input
-                type="range"
-                aria-label={t("web.catalog.fps")}
-                min={1}
-                max={12}
-                step={1}
-                value={fps()}
-                onInput={(e) => setFps(Number(e.currentTarget.value))}
-                class="w-24 accent-leaf"
-              />
+              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} class="w-24">
+                <Slider.Control class="relative flex h-4 cursor-pointer items-center">
+                  <Slider.Track class="relative h-1 w-full rounded-full bg-selected">
+                    <Slider.Indicator class="h-full rounded-full bg-leaf" />
+                    <Slider.Thumb
+                      aria-label={t("web.catalog.fps")}
+                      class="top-1/2 size-3 -translate-y-1/2 rounded-full border border-leaf bg-page shadow-raise outline-none focus-visible:outline-2 focus-visible:outline-focus"
+                    />
+                  </Slider.Track>
+                </Slider.Control>
+              </Slider.Root>
               <span class="w-14 text-xs text-muted">{t("web.catalog.perSecond", { n: fps() })}</span>
             </div>
             <div class="flex flex-wrap gap-1">

@@ -1,3 +1,4 @@
+import { Radio, RadioGroup } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // An orchestrator's profile, made or edited: its name, what it does, its persona, its DeepSeek model and its look. It
 // runs on VibeValley's own agent only, so it has no machine to pick; its memory and rounds are on its orchestrator page.
@@ -8,7 +9,6 @@ import { type Agent, defaultOrchestrator, orchestratorRuntime, type Orchestrator
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { useRouter } from "../../base/router";
-import { aria } from "../../base/util";
 import { toast } from "../../ui/toasts";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { A } from "../../ui/A";
@@ -167,27 +167,26 @@ export function OrchestratorProfile(props: { saved?: Agent; start: Agent; all: r
         </Field>
         <div class="flex flex-col gap-2">
           <span class="text-xs font-medium text-muted">{t("web.agent.orchestrator.look")}</span>
-          <div role="radiogroup" aria-label={t("web.agent.orchestrator.look")} class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <RadioGroup
+            aria-label={t("web.agent.orchestrator.look")}
+            value={draft().look.orchestrator ?? "farmer"}
+            onValueChange={(v) => setLook(v as OrchestratorLook)}
+            class="grid grid-cols-3 gap-2 sm:grid-cols-6"
+          >
             <For each={orchestratorLooks}>
               {(look) => (
-                <button
-                  type="button"
-                  role="radio"
+                <Radio.Root
+                  value={look.id}
                   data-key={look.id}
-                  aria-checked={aria((draft().look.orchestrator ?? "farmer") === look.id)}
                   title={look.blurb}
-                  onClick={() => setLook(look.id)}
-                  class={[
-                    "flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-xs",
-                    (draft().look.orchestrator ?? "farmer") === look.id ? "border-leaf bg-selected" : "border-line hover:bg-hover",
-                  ]}
+                  class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-line p-2 text-xs hover:bg-hover data-checked:border-leaf data-checked:bg-selected"
                 >
                   <OrchestratorFace size={48} look={look.id} />
                   {look.name}
-                </button>
+                </Radio.Root>
               )}
             </For>
-          </div>
+          </RadioGroup>
         </div>
       </div>
     </div>
