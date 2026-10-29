@@ -14,3 +14,5 @@ export { Separator } from "./separator";
 export { Slider } from "./slider";
 export { Accordion } from "./accordion";
 export { Toolbar } from "./toolbar";
+export { ContextMenu } from "./context-menu";
+export { PreviewCard, type PreviewCardOpenChangeReason } from "./preview-card";
