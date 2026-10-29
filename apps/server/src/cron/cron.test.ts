@@ -6,7 +6,7 @@ import { nextText } from "./when.ts";
 import { Effect, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { test } from "vite-plus/test";
-import { type ConfigShape } from "../base/config.ts";
+import { type ServerConfig } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { checkCases, goldenCases } from "../testing/golden.ts";
@@ -63,7 +63,7 @@ test("what waits for the owner's yes", () => {
 });
 
 /** The farm with crons on a clock turned by hand. */
-const farm = (config: ConfigShape, clock: { now: number }) => world({ config, clock: () => clock.now });
+const farm = (config: ServerConfig, clock: { now: number }) => world({ config, clock: () => clock.now });
 
 const collect = Effect.gen(function* () {
   const got: Due[] = [];

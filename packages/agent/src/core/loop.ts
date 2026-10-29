@@ -4,7 +4,7 @@
 // scope, stopping it is a Deferred the model's stream and the tools race, a turn's tools are fibers side by side.
 
 import { Clock, Deferred, Effect, FiberSet, Option, Ref, type Scope, Stream } from "effect";
-import { failedMessage, type LlmError, type LlmShape } from "@vibevalley/ai/llm";
+import { failedMessage, type LlmError, type Llm } from "@vibevalley/ai/llm";
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, ToolResultMessage } from "@vibevalley/ai/messages";
 import { zeroUsage } from "@vibevalley/ai/messages";
 import type { Model, ThinkingLevel } from "@vibevalley/ai/models";
@@ -56,7 +56,7 @@ export interface Turn<A> {
 }
 
 export interface AgentOptions<A> {
-  readonly llm: LlmShape;
+  readonly llm: Llm;
   readonly model: Model;
   readonly thinkingLevel?: ThinkingLevel;
   readonly tools: readonly Tool[];

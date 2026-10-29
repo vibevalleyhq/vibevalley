@@ -4,7 +4,7 @@ import type { Agent, BlockOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { Database, DbLayer } from "../base/db.ts";
-import { Config, type ConfigShape } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { waitFor, whenTrue } from "../testing/until.ts";
 import { newId } from "../base/ids.ts";
@@ -16,7 +16,7 @@ import { demoPieces } from "./demo.ts";
 import { plain } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
-const on = (config: ConfigShape = testConfig()) => DbLayer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(Config, config)));
+const on = (config: ServerConfig = testConfig()) => DbLayer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));
 
 /** The blocks of artifacts made straight in the table: the rest of Artifacts (channels, cards) is artifact.test.ts's. */
 const make = (options: BlocksOptions = {}) =>

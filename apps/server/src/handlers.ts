@@ -7,7 +7,7 @@ import { Agents } from "./agent/agent.ts";
 import { missing, lookIn, reasonOf, refused } from "./errors.ts";
 import { Projects } from "./project/project.ts";
 import { Effect, Option } from "effect";
-import { Config } from "./base/config.ts";
+import { ServerConfig } from "./base/config.ts";
 import { Core } from "./core/core.ts";
 import { Artifacts } from "./artifact/artifact.ts";
 import { Channels } from "./channel/chat.ts";
@@ -27,7 +27,7 @@ import { HttpServerRequest } from "effect/http";
 import { owner } from "./base/actor.ts";
 
 export const handlers = Effect.gen(function* () {
-  const config = yield* Config;
+  const config = yield* ServerConfig;
   const core = yield* Core;
   const setting = yield* Setting;
   const agents = yield* Agents;

@@ -10,16 +10,16 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Context, Effect, FiberSet, Layer } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Sessions } from "../session/session.ts";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import { type Caller, Tools } from "../tool/tool.ts";
 
-export interface McpShape {
+export interface Mcp {
   readonly handle: (request: Request) => Promise<Response>;
 }
 
-export class Mcp extends Context.Service<Mcp, McpShape>()("vibevalley/Mcp") {}
+export const Mcp = Context.Service<Mcp>("vibevalley/Mcp");
 
 export { unknownCaller };
 
@@ -32,7 +32,7 @@ export interface McpOptions {
 
 export const make = (options: McpOptions = {}) =>
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const sessions = yield* Sessions;
     const tools = yield* Tools;
     const who = options.who ?? sessions.who;

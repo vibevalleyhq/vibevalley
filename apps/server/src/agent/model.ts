@@ -1,13 +1,13 @@
 import { t } from "@vibevalley/i18n";
 // The model a farm agent talks to: agent/brain's deepseek, with a missing key said to the owner.
 
-import type { LlmShape } from "@vibevalley/ai/llm";
+import type { Llm } from "@vibevalley/ai/llm";
 import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
 
 /** Where to put a key, in the owner's words. */
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
 
-export function modelClient(id: string, key: string | (() => string | undefined), service: LlmShape): ModelClient {
+export function modelClient(id: string, key: string | (() => string | undefined), service: Llm): ModelClient {
   try {
     return deepseek(id, key, service);
   } catch (e) {

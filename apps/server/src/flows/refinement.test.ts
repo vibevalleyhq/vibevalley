@@ -12,7 +12,7 @@ import { Sessions } from "../session/session.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 import { releaseHeld } from "../testing/helper.ts";
 
-const drafting = (core: Core["Service"]) => core.state().sessions.some((h) => h.refining);
+const drafting = (core: Core) => core.state().sessions.some((h) => h.refining);
 
 const hasBranch = (project: string, branch: string) => {
   try {

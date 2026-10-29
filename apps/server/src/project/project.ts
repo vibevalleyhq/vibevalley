@@ -33,7 +33,7 @@ import {
 import { slice } from "../base/text.ts";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
 import { jsonOf } from "../base/json.ts";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import {
@@ -233,7 +233,7 @@ export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitH
   return { ...installed, loggedIn: true, account };
 });
 
-export interface ProjectShape {
+export interface Projects {
   readonly root: string;
   readonly limit: number;
   readonly maxSessions: () => number;
@@ -268,7 +268,7 @@ export interface ProjectShape {
   readonly finishPullRequest: (name: string, n: number) => Effect.Effect<Merged, ProjectError>;
 }
 
-export class Projects extends Context.Service<Projects, ProjectShape>()("vibevalley/Project") {}
+export const Projects = Context.Service<Projects>("vibevalley/Project");
 
 /** What tests change: gh, and git's network. */
 export interface ProjectHooks {
@@ -279,7 +279,7 @@ export interface ProjectHooks {
 
 export const make = (hooks: ProjectHooks = {}) =>
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const work = resolve(config.workRoot);
     const root = join(work, "projects");
     // A file call that fails where the sync one would have thrown: a defect, as before.
@@ -487,7 +487,7 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const toMergeFailure = <A, R>(e: Effect.Effect<A, unknown, R>) => Effect.mapError(e, failed);
 
-    const shape: ProjectShape = {
+    const shape: Projects = {
       root,
       limit: perProject,
       maxSessions,

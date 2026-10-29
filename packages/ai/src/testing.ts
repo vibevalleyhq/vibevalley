@@ -1,6 +1,6 @@
 import { Effect, Layer, Ref, Stream } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import { Llm, type LlmShape } from "./llm.ts";
+import { Llm } from "./llm.ts";
 import type { AssistantMessage, Context, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -117,7 +117,7 @@ export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) 
   const script = [...steps];
   const next = yield* Ref.make(0);
   const requests: Request[] = [];
-  const llm: LlmShape = {
+  const llm: Llm = {
     stream: (model, context, options) =>
       Stream.unwrap(
         Effect.gen(function* () {

@@ -13,7 +13,7 @@ import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { splitBrief } from "./prompts.ts";
-import { type Hired, type HireOptions, type Roster, NotTakenIn, type SessionShape } from "../session/session.ts";
+import { type Hired, type HireOptions, type Roster, NotTakenIn, type Sessions } from "../session/session.ts";
 import { MergeFailure, type Workplace } from "../project/shapes.ts";
 import { notTakenIn } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -62,8 +62,8 @@ class FakeWork implements TaskWork {
   released = new Promise<void>((r) => (this.release = r));
 
   constructor(
-    readonly core: Core["Service"],
-    readonly issues: Issues["Service"],
+    readonly core: Core,
+    readonly issues: Issues,
   ) {}
 
   private async work(h: Session, input: string): Promise<[string, string]> {
@@ -157,7 +157,7 @@ class FakeWork implements TaskWork {
     return session ? { session, place: { project: "", cwd: "" }, lastText: this.last.get(id) ?? "" } : undefined;
   };
 
-  handOver: SessionShape["handOver"] = (id, _closed, use, settle = "owner") =>
+  handOver: Sessions["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
       Effect.mapError((e) => {
         const failure = e instanceof MergeFailure ? e : MergeFailure.error(String(e));

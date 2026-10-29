@@ -24,7 +24,7 @@ import { modelClient, noDeepSeekKey } from "../agent/model.ts";
 import { Llm } from "@vibevalley/ai/llm";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "@vibevalley/agent/self";
-import { agentHome, projectsDir, Config } from "../base/config.ts";
+import { agentHome, projectsDir, ServerConfig } from "../base/config.ts";
 import { Channels, type OrchestratorNews, type SayMore } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import type { ApiError } from "../errors.ts";
@@ -81,7 +81,7 @@ interface Intake {
   readonly caller?: Caller;
 }
 
-export interface OrchestratorShape {
+export interface Orchestrator {
   /** The owner's words in a channel, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
    * the client's key for this send, a retry with the same key is the message already said. */
   readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
@@ -99,7 +99,7 @@ export interface OrchestratorShape {
   readonly markWrong: (on: number, want: string, agent?: string) => Effect.Effect<OrchestratorEval, ApiError>;
 }
 
-export class Orchestrator extends Context.Service<Orchestrator, OrchestratorShape>()("vibevalley/Orchestrator") {}
+export const Orchestrator = Context.Service<Orchestrator>("vibevalley/Orchestrator");
 
 export interface OrchestratorOptions {
   /** The model; absent, DeepSeek with the key in settings. */
@@ -112,7 +112,7 @@ export const make = (options: OrchestratorOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const logs = yield* callbackLog;
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const core = yield* Core;
     const store = yield* Agents;
     const settings = yield* Setting;

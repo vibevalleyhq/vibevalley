@@ -63,7 +63,7 @@ const bridgeError = (e: unknown) => (e instanceof BridgeError ? e : new BridgeEr
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
-export interface ConnectorShape {
+export interface Connectors {
   readonly list: () => Effect.Effect<ConnectorStatus[]>;
   readonly login: (id: ConnectorID, input: ConnectorLogin) => Effect.Effect<ConnectorStatus>;
   readonly verify: (id: ConnectorID, code: string) => Effect.Effect<ConnectorStatus>;
@@ -71,7 +71,7 @@ export interface ConnectorShape {
   readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
 }
 
-export class Connectors extends Context.Service<Connectors, ConnectorShape>()("vibevalley/Connector") {}
+export const Connectors = Context.Service<Connectors>("vibevalley/Connector");
 
 export interface ConnectorOptions {
   readonly weixin?: WeixinApi;
@@ -81,7 +81,7 @@ export interface ConnectorOptions {
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
   /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
-  readonly say?: (text: string, channel: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
+  readonly say?: (text: string, channel: string | undefined, chat: Channels) => Effect.Effect<void, ApiError>;
 }
 
 /** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */

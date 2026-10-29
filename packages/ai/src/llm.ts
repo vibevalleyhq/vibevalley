@@ -23,14 +23,14 @@ export class LlmError extends Data.TaggedError("LlmError")<{
   readonly partial?: AssistantMessage;
 }> {}
 
-export interface LlmShape {
+export interface Llm {
   /** Starts with start, ends with done or error; interrupting it stops the request. */
   readonly stream: (model: Model, context: LlmContext, options: StreamOptions) => Stream.Stream<AssistantMessageEvent, LlmError>;
   /** The whole answer; a failure is its error message (stopReason error), as a stream's error event carries one. */
   readonly complete: (model: Model, context: LlmContext, options: StreamOptions) => Effect.Effect<AssistantMessage>;
 }
 
-export class Llm extends Context.Service<Llm, LlmShape>()("vibevalley/Llm") {}
+export const Llm = Context.Service<Llm>("vibevalley/Llm");
 
 /** A failed request as the message a turn keeps: what had come, stopReason error. */
 export const failedMessage = (model: Model, timestamp: number, e: LlmError): AssistantMessage => ({

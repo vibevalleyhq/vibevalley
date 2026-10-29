@@ -14,7 +14,7 @@ import { testConfig } from "../testing/layers.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 import { releaseHeld } from "../testing/helper.ts";
 
-const lastText = (sessions: Sessions["Service"], id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
+const lastText = (sessions: Sessions, id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
 
 describe("a session's work", () => {
   it.live("is sent, works, reports and goes home", () => {

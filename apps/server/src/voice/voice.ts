@@ -17,7 +17,7 @@ import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftS
 import agoraToken from "agora-token";
 import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream } from "effect";
 import { chatCompletions } from "../orchestrator/openai.ts";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
@@ -260,7 +260,7 @@ interface Call {
   ending: boolean;
 }
 
-export interface VoiceShape {
+export interface Voice {
   readonly session: () => Effect.Effect<AgoraGrant, ApiError>;
   readonly renew: (channel: string, uid: string) => Effect.Effect<AgoraGrant, ApiError>;
   /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
@@ -307,7 +307,7 @@ export function speakPieces(text: string, max = 480): string[] {
   return out.filter(Boolean);
 }
 
-export class Voice extends Context.Service<Voice, VoiceShape>()("vibevalley/Voice") {}
+export const Voice = Context.Service<Voice>("vibevalley/Voice");
 
 export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
@@ -377,7 +377,7 @@ async function tunnelAnswers(url: string): Promise<boolean> {
 export const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const core = yield* Core;
     const notices = yield* Notices;
     const settings = yield* Setting;

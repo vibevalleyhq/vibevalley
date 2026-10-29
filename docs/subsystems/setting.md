@@ -1,6 +1,6 @@
 # 设置和配置
 
-服务端的值从三处来：配置（`base/config.ts` 的 `Config`，由 `loadConfig` 用 Effect 的 `Config` 读，开机读一次：环境变量在前，`VIBEVALLEY_` 加键名，DeepSeek 和声网的三把钥匙也认它们自己的名字；再是 `vibevalley.yaml`，最后是默认值）、「设置」（`Setting`，主人在工作台「设置」页 `/settings` 填的钥匙、语音、听写、记性的来源，存在 `$VIBEVALLEY_HOME/settings.json`），和代码里的默认值（`defaults()`）。设置里的钥匙比配置优先，每次用时现取，存了不用重启。服务端写出的每一行过一遍 `redact`，钥匙不进日志。
+服务端的值从三处来：配置（`base/config.ts` 的 `ServerConfig`，由 `loadConfig` 用 Effect 的 `Config` 读，开机读一次：环境变量在前，`VIBEVALLEY_` 加键名，DeepSeek 和声网的三把钥匙也认它们自己的名字；再是 `vibevalley.yaml`，最后是默认值）、「设置」（`Setting`，主人在工作台「设置」页 `/settings` 填的钥匙、语音、听写、记性的来源，存在 `$VIBEVALLEY_HOME/settings.json`），和代码里的默认值（`defaults()`）。设置里的钥匙比配置优先，每次用时现取，存了不用重启。服务端写出的每一行过一遍 `redact`，钥匙不进日志。
 
 ## 管什么，不管什么
 
@@ -15,7 +15,7 @@
 
 ## 在哪
 
-- 配置：`apps/server/src/base/config.ts`（`ConfigShape`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`、服务 `Config`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
+- 配置：`apps/server/src/base/config.ts`（`ServerConfig`：接口和服务同名；`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
 - 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`rules.ts`（`settingsProblem`、`keyHint`、记性来源的校验和合并、语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`apps/server/src/base/redact.ts`（`redact`、`redactOutput`）。
 - 接口：`setting.get`、`setting.validate`、`setting.update`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
@@ -32,7 +32,7 @@
 - **读不成就不起来**：`--config` 给了却找不到的文件、读不成数字的值、不在 0–65535 的 `port`、`voice.line.port`、`lan.port`，`github.pr_poll_seconds` 不大于 0，`loadConfig` 都报错，服务端不起来。家目录的 `vibevalley.yaml` 不在时照默认。
 - **读完再整理**：`work_root`、`tokei`、`web`、`db` 里开头的 `~/` 换成用户目录；`db` 是 `memory` 时用内存库，空的是家目录的 `db` 文件夹（`dbDir`），别的是那个文件夹。
 - **主接口的地址固定**：`serverAddress` 是 `127.0.0.1:<port>`，没有 `host` 配置，设了 `VIBEVALLEY_HOST` 也不认。
-- **服务只读 `ConfigShape` 的字段**：开机读一次，作为 `Config` 服务交给各服务，不读 `process.env`；测试从 `testing/layers.ts` 的 `testConfig()` 出发改字段。不热重载：改了配置要重启服务端。
+- **服务只读 `ServerConfig` 的字段**：开机读一次，作为 `ServerConfig` 服务交给各服务，不读 `process.env`；测试从 `testing/layers.ts` 的 `testConfig()` 出发改字段。不热重载：改了配置要重启服务端。
 
 **配置键**（默认值由 `defaults()` 给出）：
 
@@ -82,7 +82,7 @@
 
 ## 怎么走
 
-**开机**：`loadConfig` 读出 `ConfigShape` → 作为 `Config` 交给各服务；`Setting` 建的时候记下配置里的三把钥匙和语音的默认，读一次 `settings.json`。
+**开机**：`loadConfig` 读出 `ServerConfig` → 作为同名的服务交给各服务；`Setting` 建的时候记下配置里的三把钥匙和语音的默认，读一次 `settings.json`。
 
 **主人填一把钥匙**：设置页先 `setting.validate` 看格式，再 `setting.update`；服务端校验、合进内存里的那份、整份写回 `settings.json`，回新的 `SettingsStatus`。
 
@@ -97,7 +97,7 @@
 
 ## 和谁打交道
 
-- **谁依赖配置**：几乎所有服务的 `make` 都拿 `Config`；每个键归哪个子系统，见本篇「配置键」的表。
+- **谁依赖配置**：几乎所有服务的 `make` 都拿 `ServerConfig`；每个键归哪个子系统，见本篇「配置键」的表。
 - **谁依赖设置**：`orchestrator`、`runtime`、`voice`、`memory` 拿 `Setting`，只调取值的方法；`handlers.ts` 调 `status`、`check`、`save`，`check` 的结果里补上 `project` 的 GitHub 状态。
 - **「连接到本机」**：配对过的设备能看设置、能检查（`setting.get`、`setting.validate`），不能保存：`setting.update` 没有 `remote`（[连接到本机](docs/subsystems/lan.md)）。
 - **桌面版**：起服务端时设 `VIBEVALLEY_PORT=0` 和登录 shell 的 `PATH`，别的照环境和家目录的配置（[客户端](docs/subsystems/app.md)）。
@@ -107,7 +107,7 @@
 
 - **配置只有 YAML 和环境变量两个来源，照默认值的形状读。** 放弃了环境变量照旧散着读：值从哪来还要翻每个服务，测试只能改进程的环境。`defaults()` 的每个键就是能配的全部，环境变量名、数和一串怎么读都从它推出，不另写一张表。不热重载。不读 `.env`、不从 pi 的 `models.json` 找我们的钥匙、没有 `DEEPSEEK_BASE_URL`。
 - **配置用 YAML，不用 JSON。** 它是人手写的文件，YAML 能写注释；`config.json`、`settings.json` 由程序写。
-- **一个有类型的 `Config`，服务不读 `process.env`。** 一个值从哪来，看 `Config` 的字段和本篇的配置键表就够；测试改字段，不改进程的环境。
+- **一个有类型的 `ServerConfig`，服务不读 `process.env`。** 一个值从哪来，看 `ServerConfig` 的字段和本篇的配置键表就够；测试改字段，不改进程的环境。
 - **写错的值让服务端起不来，不悄悄用默认。** 悄悄落回默认时，主人以为改了的值其实没生效。
 - **钥匙存在服务端的家目录（`settings.json`），不存在页面里。** 放弃了存在页面里、每次带给服务端：几台设备各一份，钥匙还经过页面。服务端本来就是持有钥匙的一方。放弃了写回 `vibevalley.yaml`：那是人手写的文件，程序改它要保住注释和顺序；另一个文件也能单独设 0600。
 - **设置比配置优先。** 主人在应用里最后填的那把最该算数；装好应用的人不知道还有一个配置文件。

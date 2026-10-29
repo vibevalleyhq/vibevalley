@@ -64,7 +64,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
@@ -322,7 +322,7 @@ interface Written {
   ownerMentionsChanged?: boolean;
 }
 
-export interface ChannelShape {
+export interface Channels {
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
@@ -428,7 +428,7 @@ export interface ChannelShape {
   readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
 }
 
-export class Channels extends Context.Service<Channels, ChannelShape>()("vibevalley/Channel") {}
+export const Channels = Context.Service<Channels>("vibevalley/Channel");
 
 /** What came of handing a helper a message. */
 export interface Delivered {
@@ -477,7 +477,7 @@ export interface Helpers {
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const config = yield* Config;
+  const config = yield* ServerConfig;
   const core = yield* Core;
   const agents = yield* Agents;
   let helpers: Helpers | undefined;
@@ -1378,7 +1378,7 @@ export const make = Effect.gen(function* () {
     return { target: targetOfChannel(row), threads: threads.length, said };
   });
 
-  const shape: ChannelShape = {
+  const shape: Channels = {
     now: () => core.state().chat,
     follow: (channel, after) =>
       Stream.unwrap(

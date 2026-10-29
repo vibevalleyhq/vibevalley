@@ -64,7 +64,7 @@ import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
@@ -94,7 +94,7 @@ export interface OrchestratorWork {
   readonly said?: string;
 }
 
-export interface IssueShape {
+export interface Issues {
   /** The issues on the board: a talk with a profile is not one. */
   readonly list: () => Effect.Effect<Issue[]>;
   /** The board's issues a filter picks (issue.list). */
@@ -165,7 +165,7 @@ export interface IssueReviewRequest {
   readonly text?: string;
 }
 
-export class Issues extends Context.Service<Issues, IssueShape>()("vibevalley/Issue") {}
+export const Issues = Context.Service<Issues>("vibevalley/Issue");
 
 type Row = q.GetIssueResult;
 
@@ -226,7 +226,7 @@ export interface IssueOptions {
 export const make = (options: IssueOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const core = yield* Core;
     const store = yield* Agents;
     const projects = yield* Projects;
@@ -991,7 +991,7 @@ export const make = (options: IssueOptions = {}) =>
       return milestonesOf(issue, runs, names);
     });
 
-    const shape: IssueShape = {
+    const shape: Issues = {
       onBoard: () => core.state().issues ?? [],
       list: () => Effect.map(everyIssue, (all) => all.filter((item) => !item.talk)),
       query: (f) =>

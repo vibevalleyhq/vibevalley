@@ -10,7 +10,7 @@ import { SqlClient } from "effect/sql";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { dbDir, Config } from "./config.ts";
+import { dbDir, ServerConfig } from "./config.ts";
 
 const baseline = resolve(import.meta.dirname, "../../db/migrations/0001_schema.up.sql");
 const baselineSql = () => readFileSync(baseline, "utf8");
@@ -78,7 +78,7 @@ const migrate = (pglite: PGlite, client: SqlClient.SqlClient) =>
 /** The database as an SqlClient, with the schema in place. */
 export const Database = PgliteClient.layerFrom(
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const where = dbDir(config);
     const memory = where === "memory";
     const hash = baselineHash();
@@ -122,17 +122,16 @@ export function causeMessage(e: unknown): string {
  * process, so a query that fails is a bug or a full disk: run makes it a defect; attempt keeps the failure for the few
  * callers that log it and go on, or tell it as a refusal.
  */
-export class Db extends Context.Service<
-  Db,
-  {
-    readonly run: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
-    readonly attempt: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E>;
-    /** The one row, or undefined when there is none. Only no row is none: a query that fails is still a defect. */
-    readonly one: <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
-    /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
-    readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-  }
->()("vibevalley/Db") {}
+export interface Db {
+  readonly run: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
+  readonly attempt: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E>;
+  /** The one row, or undefined when there is none. Only no row is none: a query that fails is still a defect. */
+  readonly one: <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
+  /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
+  readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+}
+
+export const Db = Context.Service<Db>("vibevalley/Db");
 
 export const DbLayer = Layer.effect(
   Db,

@@ -1,7 +1,7 @@
 // A model to talk to: the model, the service that carries the request, and the key, asked for at each request.
 
 import type { Effect } from "effect";
-import type { LlmShape } from "./llm.ts";
+import type { Llm } from "./llm.ts";
 import type { AssistantMessage, Context } from "./messages.ts";
 import { getModel, type Model, models } from "./models.ts";
 import type { RequestOptions } from "./request.ts";
@@ -18,13 +18,13 @@ export class MissingKey extends Error {
 
 export interface ModelClient {
   readonly model: Model;
-  readonly service: LlmShape;
+  readonly service: Llm;
   /** Asked before each request (and each summary), so a key changed meanwhile is used at once. */
   readonly apiKey?: () => string | undefined;
 }
 
 /** id empty is defaultModel; the key is the caller's to find. */
-export function deepseek(id: string, key: string | (() => string | undefined), service: LlmShape): ModelClient {
+export function deepseek(id: string, key: string | (() => string | undefined), service: Llm): ModelClient {
   const apiKey = typeof key === "string" ? () => key : key;
   if (!apiKey()) throw new MissingKey();
   const name = id || defaultModel;

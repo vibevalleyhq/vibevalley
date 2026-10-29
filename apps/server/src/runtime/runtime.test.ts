@@ -10,7 +10,7 @@ import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { NodeServices } from "@effect/platform-node";
 import { Effect, Fiber, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
-import { type ConfigShape, Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -42,9 +42,9 @@ const notFound = async (id: string): Promise<RuntimeInfo> => ({
   checkedAt: Date.now(),
 });
 
-const world = (config: ConfigShape = testConfig()) =>
+const world = (config: ServerConfig = testConfig()) =>
   Layer.mergeAll(coreLayer.pipe(Layer.provide(projection)), agentLayer).pipe(
-    Layer.provideMerge(Layer.succeed(Config, config)),
+    Layer.provideMerge(Layer.succeed(ServerConfig, config)),
     Layer.provideMerge(NodeServices.layer),
   );
 

@@ -6,7 +6,7 @@ import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { inbox } from "./inbox.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { emptyPatrol, forOwner, type PatrolMemory, type PatrolNote, patrolStep } from "./rules.ts";
@@ -17,7 +17,7 @@ export interface Overdue {
   readonly notes: readonly PatrolNote[];
 }
 
-export interface NoticeShape {
+export interface Notices {
   /** What came into the inbox, each item once; what stood when the farm came up is known, not news. */
   readonly news: Effect.Effect<Stream.Stream<readonly InboxItem[]>, never, Scope.Scope>;
   /** The patrol's findings, one per channel. */
@@ -30,7 +30,7 @@ export interface NoticeShape {
   readonly prime: Effect.Effect<void>;
 }
 
-export class Notices extends Context.Service<Notices, NoticeShape>()("vibevalley/Notice") {}
+export const Notices = Context.Service<Notices>("vibevalley/Notice");
 
 export const make = Effect.gen(function* () {
   const core = yield* Core;
@@ -65,7 +65,7 @@ export const make = Effect.gen(function* () {
     for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
   });
 
-  const shape: NoticeShape = {
+  const shape: Notices = {
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
     overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
     toOwner: Effect.map(
@@ -87,7 +87,7 @@ export const layer = Layer.effect(Notices, make);
  * round waits one interval: right after a start, what looks hanging is mostly the restart. */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const notices = yield* Notices;
     yield* notices.prime;
     const every = config.patrol.heartbeatMinutes * 60_000;

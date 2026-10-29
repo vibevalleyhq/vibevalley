@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { NodeServices } from "@effect/platform-node";
 import { Effect } from "effect";
 import { expect, test } from "vite-plus/test";
-import { type ConfigShape, dbDir, loadConfig, serverAddress } from "./config.ts";
+import { type ServerConfig, dbDir, loadConfig, serverAddress } from "./config.ts";
 
 const temp = () => mkdtempSync(join(tmpdir(), "vibevalley-config-"));
 const load = (file: string, env: Record<string, string>) => Effect.runPromise(loadConfig(file, env).pipe(Effect.provide(NodeServices.layer)));
@@ -13,7 +13,7 @@ const refused = (file: string, env: Record<string, string>) =>
 
 test("the defaults, then the file, then the environment", async () => {
   const home = temp();
-  let c: ConfigShape = await load("", { VIBEVALLEY_HOME: home });
+  let c: ServerConfig = await load("", { VIBEVALLEY_HOME: home });
   expect([c.home, c.port, c.project.maxSessions, c.project.checkTimeoutSeconds, dbDir(c)]).toEqual([home, 8787, 3, 1200, join(home, "db")]);
   writeFileSync(join(home, "vibevalley.yaml"), "port: 9000\nsession:\n  stall_seconds: 60\nproject: { max_sessions: 5 }\ngit_emails: [a@x, b@x]\ndb: memory\n");
   const env = {

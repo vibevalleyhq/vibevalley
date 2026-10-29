@@ -9,7 +9,7 @@ import { Clock, Context, Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "@vibevalley/agent/memory";
-import { agentHome, Config } from "../base/config.ts";
+import { agentHome, ServerConfig } from "../base/config.ts";
 import { type ApiError, memoriesOf, missing, refused } from "../errors.ts";
 import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
@@ -27,7 +27,7 @@ export interface Recalled {
   readonly lines: string[];
 }
 
-export interface MemoryShape {
+export interface Memories {
   /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a worker's are rows and its sources'. */
   readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
   readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
@@ -50,7 +50,7 @@ export interface MemoryShape {
   readonly archiveFile: (agent: string, name: string) => string | undefined;
 }
 
-export class Memories extends Context.Service<Memories, MemoryShape>()("vibevalley/Memory") {}
+export const Memories = Context.Service<Memories>("vibevalley/Memory");
 
 const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory => {
   const person = line.text.startsWith(fromOwner);
@@ -77,7 +77,7 @@ const defaultBuild: BuildSource = (c, http) => (c.kind === "nowledge" ? nowledge
 
 export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
   Effect.gen(function* () {
-    const config = yield* Config;
+    const config = yield* ServerConfig;
     const setting = yield* Setting;
     const agents = yield* Agents;
     const local = yield* makeMemories;
@@ -142,7 +142,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return m;
     });
 
-    const shape: MemoryShape = {
+    const shape: Memories = {
       memoriesOf: (agent) => (inFile(agent) ? Effect.sync(() => orchestrator(agent)) : sources.list(agent)),
       remember: (n) => (inFile(n.agent) ? writeOrchestrator(n.agent, n.text) : write(n)),
       forget: (agent, id) =>

@@ -11,7 +11,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { setLocale } from "@vibevalley/i18n";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
@@ -77,7 +77,7 @@ export interface AgoraCredentials {
 
 export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
 
-export interface SettingShape {
+export interface Setting {
   readonly status: () => SettingsStatus;
   readonly validate: (u: SettingsUpdate) => Validation;
   /** A key missing from the update is kept, an empty one cleared; nothing is saved when something cannot be right. */
@@ -93,7 +93,7 @@ export interface SettingShape {
   readonly voiceConfig: () => VoiceConfig;
 }
 
-export class Setting extends Context.Service<Setting, SettingShape>()("vibevalley/Setting") {}
+export const Setting = Context.Service<Setting>("vibevalley/Setting");
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 
@@ -110,7 +110,7 @@ export function savedLocale(home: string): Locale {
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
 
 export const make = Effect.gen(function* () {
-  const config = yield* Config;
+  const config = yield* ServerConfig;
   const file = join(config.home, "settings.json");
   const disk = new FileWriter(file, 0o600);
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
@@ -192,7 +192,7 @@ export const make = Effect.gen(function* () {
     return status();
   });
 
-  const shape: SettingShape = {
+  const shape: Setting = {
     status,
     validate: (u) => {
       const problem = settingsProblem(u);

@@ -10,7 +10,7 @@ import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { layer as agentLayer } from "../agent/agent.ts";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -193,7 +193,7 @@ const world = (timeoutMs = 20_000) =>
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
-    Layer.provideMerge(Layer.succeed(Config, testConfig())),
+    Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
   );
 
 const save = (s: MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] })).pipe(Effect.orDie);

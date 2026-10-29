@@ -3,7 +3,7 @@ import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { layer as agentLayer } from "../agent/agent.ts";
-import { Config } from "../base/config.ts";
+import { ServerConfig } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
@@ -81,7 +81,7 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
-    Layer.provideMerge(Layer.succeed(Config, testConfig())),
+    Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
   );
 
 const nowledgeOn: MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
@@ -89,7 +89,7 @@ const nowledgeOn: MemorySourceUpdate = { kind: "nowledge", url: "http://up/", en
 const save = (s: MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] }));
 
 /** Memories with the fake as its one source outside the farm. */
-const withFake = <A, E>(fake: Fake, body: (m: Memories["Service"]) => Effect.Effect<A, E>) =>
+const withFake = <A, E>(fake: Fake, body: (m: Memories) => Effect.Effect<A, E>) =>
   Effect.gen(function* () {
     yield* save(nowledgeOn).pipe(Effect.orDie);
     return yield* body(yield* Memories);

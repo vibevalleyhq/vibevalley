@@ -75,7 +75,7 @@ export interface Caller {
 /** A throw here is told to the model as the tool's failure. */
 export type Who = () => Caller;
 
-export interface ToolShape {
+export interface Tools {
   /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
   readonly orchestrator: (who: Who) => Tool[];
   /** A session's tools, served on /mcp. */
@@ -85,7 +85,7 @@ export interface ToolShape {
   readonly sessionLine: (w: Roster) => string;
 }
 
-export class Tools extends Context.Service<Tools, ToolShape>()("vibevalley/Tool") {}
+export const Tools = Context.Service<Tools>("vibevalley/Tool");
 
 // The fields that name what a call is about, the first one given wins: an issue's or a channel's id, a profile, a title.
 const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
