@@ -371,7 +371,7 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
 /** The helper on the bed its pose goes with, its name under it. */
 function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
-  const crop = () => stagePoses.find((p) => p.pose === props.pose)!.crop;
+  const crop = () => stagePoses.find((p) => p.pose === props.pose)?.crop ?? "empty";
   return (
     <div
       class="relative flex flex-1 items-center justify-center overflow-hidden"

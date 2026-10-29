@@ -59,7 +59,7 @@ import {
   checkFailedText,
   frozenTouchedText,
   graphText,
-  issueSplitRefusal,
+  splittable,
   mergeNeedsOwner,
   graphMatch,
   graphNews,
@@ -557,33 +557,33 @@ export const make = (options: TaskOptions = {}) =>
       }, lock.withPermits(1)),
       splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
         const state = core.state();
-        const session = sessionOf(state, sessionId);
-        const issue = session?.issue ? state.issues.find((item) => item.id === session.issue) : undefined;
-        const why = issueSplitRefusal(session, issue, store.isOrchestrator);
-        if (why) return yield* Effect.fail(refused(why));
+        const asked = sessionOf(state, sessionId);
+        const split = splittable(asked, asked?.issue ? state.issues.find((item) => item.id === asked.issue) : undefined, store.isOrchestrator);
+        if (!split.ok) return yield* Effect.fail(refused(split.problem));
+        const { session, issue, project } = split;
         const tasks = steps.map(freshTask);
         const problems = graphProblems(tasks);
         if (problems.length > 0) return yield* Effect.fail(refused(t("server.task.act.stepsWrong", { problems: problems.join("\n- ") })));
         let graph: TaskGraph = {
-          id: issue!.id,
-          title: title.trim() || issue!.title,
-          goal: issue!.description,
-          project: issue!.project!,
+          id: issue.id,
+          title: title.trim() || issue.title,
+          goal: issue.description,
+          project: project,
           tasks,
           parallel: defaultParallel,
-          createdAt: issue!.createdAt,
+          createdAt: issue.createdAt,
           state: "running",
           note: "",
           ...graphView(),
         };
-        const branch = yield* openBranch(graph, session!.branch ?? "");
+        const branch = yield* openBranch(graph, split.branch);
         graph = { ...graph, branch };
-        yield* put(graph, sessionActor(session!.id), t("server.task.notice.splitBy", { name: session!.name })).pipe(
+        yield* put(graph, sessionActor(session.id), t("server.task.notice.splitBy", { name: session.name })).pipe(
           Effect.mapError((e) => refused(t("server.task.notice.splitNotSaved", { branch, why: reasonOf(e) }))),
         );
         yield* cron(graph.id);
-        yield* notice("info", t("server.task.notice.split", { name: session!.name, title: graph.title, n: tasks.length }));
-        yield* tellOrchestrator(graphNews.split(session!.name, graph.id, tasks.length, graphText(graph)));
+        yield* notice("info", t("server.task.notice.split", { name: session.name, title: graph.title, n: tasks.length }));
+        yield* tellOrchestrator(graphNews.split(session.name, graph.id, tasks.length, graphText(graph)));
         return graphTell.split(graph.title, tasks.length, branch);
       }, lock.withPermits(1)),
       act: Effect.fn("Tasks.act")(function* (id, action, by) {
@@ -707,8 +707,8 @@ export const make = (options: TaskOptions = {}) =>
       previewRemoveTask: Effect.fn("Tasks.previewRemoveTask")(function* (id, task) {
         const graph = yield* need(id);
         const result = removeTask(graph, task);
-        if (!result.ok) return yield* Effect.fail(refused(result.problem));
-        const gone = taskOf(graph, task)!;
+        const gone = taskOf(graph, task);
+        if (!result.ok || !gone) return yield* Effect.fail(refused(result.ok ? t("server.task.edit.noStep", { id: task }) : result.problem));
         const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => t("server.task.event.step", { title: n.title }));
         return {
           does: [

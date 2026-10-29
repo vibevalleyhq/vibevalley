@@ -422,8 +422,8 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       forget: (agent, id) =>
         Effect.suspend(() => {
           const problem = forgetProblem(id);
-          if (problem) return Effect.fail(new SourceError({ message: problem }));
-          const g = snapshot()!;
+          const g = snapshot();
+          if (problem || !g) return Effect.fail(new SourceError({ message: problem ?? t("server.memory.stopped") }));
           const [one, own] = owner(g.all, id);
           return one === local ? one.forget(agent, own) : leased(g, within(one.forget(agent, own), writeTimeoutMs));
         }),

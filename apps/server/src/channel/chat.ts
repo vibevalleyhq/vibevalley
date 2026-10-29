@@ -1619,7 +1619,8 @@ export const make = Effect.gen(function* () {
               yield* db(qd.seenOne({ seen_at: now, recipient_id: from, message_id: m.id }));
               open.seen(from, m.id);
             }
-            if (shown.length === unseen.length) yield* setRead(from, channel, shown.at(-1)!.number, now);
+            const newest = shown.at(-1);
+            if (newest && shown.length === unseen.length) yield* setRead(from, channel, newest.number, now);
             return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length };
           }
           // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
@@ -1698,7 +1699,8 @@ export const make = Effect.gen(function* () {
           const rows = opt.unread
             ? yield* db(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
             : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before || 2147483647, n: limit })))].reverse();
-          if (rows.length > 0 && !opt.before) yield* readThrough(who, channel, rows.at(-1)!.number);
+          const newest = rows.at(-1);
+          if (newest && !opt.before) yield* readThrough(who, channel, newest.number);
           lastRead.set(who, target);
           const older = rows.length > 0 && (yield* db(qm.messagesBefore({ channel_id: channel, number: rows[0]!.number, n: 1 }))).length > 0;
           return { target, messages: rows.map((m) => inboxOf(m, target)), older };

@@ -94,7 +94,7 @@ export function placeholderKinds(text: string): Map<string, "value" | Kind> {
   const walk = (parts: readonly Part[]) => {
     for (const p of parts) {
       if (typeof p === "string") continue;
-      if (!out.has(p.name) || p.kind) out.set(p.name, p.kind ?? (out.get(p.name) === undefined ? "value" : out.get(p.name)!));
+      if (!out.has(p.name) || p.kind) out.set(p.name, p.kind ?? out.get(p.name) ?? "value");
       for (const c of Object.values(p.cases ?? {})) walk(c);
     }
   };

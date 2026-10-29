@@ -437,12 +437,13 @@ export function Scene(props: {
         const from = new Map<string, { x: number; y: number }>();
         for (const p of [...tree.leaves, ...tree.fruits, ...tree.seeds]) from.set(p.item.id, { x: f.x + p.x, y: f.y - p.y + liftOf(k) });
         const placed = written()
-          .map((item) => {
-            const s = starOf.get(item.id)!;
+          .flatMap((item) => {
+            const s = starOf.get(item.id);
+            if (!s) return [];
             const to = project(s, t);
             const start = from.get(item.id) ?? { x: f.x, y: f.y };
             const kk = Math.min(1, Math.max(0, k * 1.25 - hash01(`${item.id}d`) * 0.25));
-            return { s, x: start.x + (to.x - start.x) * kk, y: start.y + (to.y - start.y) * kk, depth: to.depth };
+            return [{ s, x: start.x + (to.x - start.x) * kk, y: start.y + (to.y - start.y) * kk, depth: to.depth }];
           })
           .sort((a, b) => b.depth - a.depth);
         // The disc's own faint light and its rings (time, the older farther out), so its shape reads first.

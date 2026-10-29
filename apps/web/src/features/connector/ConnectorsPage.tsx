@@ -64,6 +64,10 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
   const selected = () => ConnectorIDValues.find((c) => c === props.id) ?? "weixin";
   const list = () => core()?.connectors;
   const of = (c: ConnectorID) => list()?.find((s) => s.id === c);
+  const lineOf = (c: ConnectorID) => {
+    const state = of(c)?.state;
+    return state && state !== "off" ? stateLabel[state] : connectorHow[c];
+  };
   return (
     <Split
       list={
@@ -76,7 +80,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
                 item={c}
                 active={c === selected()}
                 title={connectorLabel[c]}
-                line={of(c) && of(c)!.state !== "off" ? stateLabel[of(c)!.state] : connectorHow[c]}
+                line={lineOf(c)}
                 leading={<SpriteIcon name={`connector-${c}`} size={36} />}
                 trailing={<span class={["size-2 shrink-0 rounded-full", dot(of(c)?.state)]} aria-hidden="true" />}
               />

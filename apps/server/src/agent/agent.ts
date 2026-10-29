@@ -167,9 +167,11 @@ export const make = Effect.gen(function* () {
   let s: Stored = seed;
   s = (yield* readOrSetAside(file, readStored, "the profiles start from the starters")) ?? seed;
   // The default orchestrator is always there, and always an orchestrator: a farm is never without one.
+  const orchestrator = builtInOf(defaultOrchestrator);
+  if (!orchestrator) return yield* Effect.die(new Error(`the built-in template ${defaultOrchestrator} is not in agent/templates`));
   const agents = s.agents.some((a) => a.id === defaultOrchestrator)
     ? s.agents.map((a) => (a.id === defaultOrchestrator ? { ...a, role: "orchestrator" as const } : a))
-    : [installed(builtInOf(defaultOrchestrator)!, s.agents, defaultOrchestrator), ...s.agents];
+    : [installed(orchestrator, s.agents, defaultOrchestrator), ...s.agents];
   s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
   disk.write(() => JSON.stringify(s));
 

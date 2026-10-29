@@ -64,8 +64,8 @@ const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory =
   const person = line.text.startsWith(fromOwner);
   let at = fileTime;
   if (line.date) {
-    const [y, m, d] = line.date.split("-").map(Number);
-    at = new Date(y!, m! - 1, d).getTime();
+    // A date and a time with no zone is local time, as new Date(y, m - 1, d) is.
+    at = new Date(`${line.date}T00:00`).getTime();
   }
   return {
     id: line.id,

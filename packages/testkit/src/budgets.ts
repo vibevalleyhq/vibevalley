@@ -15,11 +15,12 @@ export default class Budgets implements Reporter {
 
   onTestRunEnd(modules: ReadonlyArray<TestModule>) {
     const { layerOf } = pyramid(this.vitest?.config.root ?? process.cwd());
-    const shape = new Map<Layer, { files: number; tests: number; ms: number }>(layers.map((l) => [l, { files: 0, tests: 0, ms: 0 }]));
+    const zero = () => ({ files: 0, tests: 0, ms: 0 });
+    const shape: Record<Layer, { files: number; tests: number; ms: number }> = { rule: zero(), module: zero(), flow: zero() };
     const over: { ms: number; name: string; layer: Layer }[] = [];
     for (const m of modules) {
       const layer = layerOf(m.relativeModuleId);
-      const at = shape.get(layer)!;
+      const at = shape[layer];
       at.files++;
       for (const t of m.children.allTests()) {
         const ms = t.diagnostic()?.duration ?? 0;
@@ -29,7 +30,7 @@ export default class Budgets implements Reporter {
       }
     }
     const rows = layers.map((l) => {
-      const s = shape.get(l)!;
+      const s = shape[l];
       return `  ${l.padEnd(6)} ${String(s.files).padStart(4)} files ${String(s.tests).padStart(5)} tests ${(s.ms / 1000).toFixed(1).padStart(7)} s   budget ${budgetMs[l]} ms`;
     });
     const lines = over.sort((a, b) => b.ms - a.ms).map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.layer.padEnd(6)} ${t.name}`);

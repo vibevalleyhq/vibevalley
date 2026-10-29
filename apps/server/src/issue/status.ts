@@ -68,9 +68,9 @@ export function issueOrder(a: Issue, b: Issue): number {
 export function withIssue(all: readonly Issue[] | undefined, t: Issue): Issue[] {
   let next = (all ?? []).filter((x) => x.id !== t.id);
   next.push(t);
-  const closed = next.filter((x) => x.closedAt !== undefined && x.parent === undefined);
+  const closed = next.flatMap((x) => (x.closedAt !== undefined && x.parent === undefined ? [{ id: x.id, at: x.closedAt }] : []));
   if (closed.length > keepClosedIssues) {
-    closed.sort((a, b) => compare(b.closedAt!, a.closedAt!));
+    closed.sort((a, b) => compare(b.at, a.at));
     const drop = new Set(closed.slice(keepClosedIssues).map((x) => x.id));
     next = next.filter((x) => !drop.has(x.id) && !(x.parent !== undefined && drop.has(x.parent)));
   }

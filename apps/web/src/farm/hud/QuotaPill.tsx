@@ -46,9 +46,7 @@ function UsageLines(props: { usage: AccountUsage | null }) {
                     <span class="block h-1.5 w-full" style={{ background: CardColors.barTrack }}>
                       <span class="block h-full" style={{ width: `${Math.max(0, Math.min(100, left()))}%`, background: levelInk[quotaLevel(left())] }} />
                     </span>
-                    <Show when={w.resetsAt !== null}>
-                      <span class="text-[10px] text-bark-400">{resetText(w.resetsAt!)}</span>
-                    </Show>
+                    <Show when={w.resetsAt}>{(at) => <span class="text-[10px] text-bark-400">{resetText(at())}</span>}</Show>
                   </div>
                 );
               }}
@@ -76,12 +74,15 @@ function Machine(props: { info: RuntimeInfo }) {
           <Show when={subscription()}>{(sub) => <span class="truncate text-[12px] text-bark-500">{sub()}</span>}</Show>
         </div>
         <UsageLines usage={usage()} />
-        <Show when={props.info.spentToday !== undefined}>
-          <p class="mt-0.5 text-[12px] text-bark-500">
-            {(props.info.settings.dailyBudget ?? 0) > 0
-              ? t("web.farm.quota.spentTodayBudget", { spent: yuan(props.info.spentToday!), budget: yuan(props.info.settings.dailyBudget!) })
-              : t("web.farm.quota.spentToday", { spent: yuan(props.info.spentToday!) })}
-          </p>
+        {/* Spent today may be 0, which is still said. */}
+        <Show when={props.info.spentToday !== undefined ? { spent: props.info.spentToday } : undefined}>
+          {(today) => (
+            <p class="mt-0.5 text-[12px] text-bark-500">
+              {(props.info.settings.dailyBudget ?? 0) > 0
+                ? t("web.farm.quota.spentTodayBudget", { spent: yuan(today().spent), budget: yuan(props.info.settings.dailyBudget ?? 0) })
+                : t("web.farm.quota.spentToday", { spent: yuan(today().spent) })}
+            </p>
+          )}
         </Show>
         <Show when={props.info.stop}>
           <p class="mt-0.5 text-[12px] text-berry">{props.info.stop}</p>

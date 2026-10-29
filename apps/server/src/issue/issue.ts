@@ -318,9 +318,10 @@ export const make = (options: IssueOptions = {}) =>
 
     /** The newest session, the one a merge, changes, comments and cancel act on; a reopen makes another. */
     const latest = (id: string) =>
-      Effect.flatMap(get(id), (issue) =>
-        issue.sessions.length === 0 ? Effect.fail(refused(t("server.issue.notStarted"))) : Effect.succeed(issue.sessions.at(-1)!),
-      );
+      Effect.flatMap(get(id), (issue) => {
+        const last = issue.sessions.at(-1);
+        return last === undefined ? Effect.fail(refused(t("server.issue.notStarted"))) : Effect.succeed(last);
+      });
 
     const unsent = (id: string) =>
       Effect.flatMap(get(id), (issue) =>
@@ -581,14 +582,15 @@ export const make = (options: IssueOptions = {}) =>
     const reopen = Effect.fn("Issues.reopen")(function* (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) {
       const issue = yield* get(id);
       if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return yield* Effect.fail(refused(t("server.issue.graphRetry")));
-      if (issue.sessions.length === 0) {
+      const newest = issue.sessions.at(-1);
+      if (newest === undefined) {
         // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
         if (!issue.lastRun) return yield* Effect.fail(refused(t("server.issue.neverStarted")));
         if (!isClosed(issue.status)) return yield* Effect.fail(refused(t("server.issue.stillOpen")));
         yield* start(id, channel, by, text);
         return "";
       }
-      const last = yield* sessions.get(issue.sessions.at(-1)!);
+      const last = yield* sessions.get(newest);
       if (!last) return yield* Effect.fail(missing(t("server.issue.issueRef", { ref: id }), [lookIn.issue]));
       if (!isClosed(issue.status)) return yield* Effect.fail(refused(t("server.issue.stillWorking", { name: last.name })));
       const agent = to ?? store.agent(last.agent);
@@ -623,9 +625,12 @@ export const make = (options: IssueOptions = {}) =>
       const result = yield* Effect.result(
         Effect.gen(function* () {
           if (isForOrchestrator(item, store.isOrchestrator)) return yield* toOrchestrator(item, channel.id, by, s);
-          if (!found || item.status === "backlog" || item.status === "todo") return yield* Effect.asVoid(start(item.id, channel.id, by));
-          if (isClosed(item.status)) return yield* Effect.asVoid(reopen(item.id, text, channel.id, by));
-          const d = yield* sessions.deliver(item.sessions.at(-1)!, text, by);
+          const newest = item.sessions.at(-1);
+          // An open issue no session has worked yet (its doer changed to a helper) starts one, as a new one does.
+          if (!found || item.status === "backlog" || item.status === "todo" || (!isClosed(item.status) && newest === undefined))
+            return yield* Effect.asVoid(start(item.id, channel.id, by));
+          if (isClosed(item.status) || newest === undefined) return yield* Effect.asVoid(reopen(item.id, text, channel.id, by));
+          const d = yield* sessions.deliver(newest, text, by);
           if (d.kind === "refused") return yield* Effect.fail(refused(d.reason ?? ""));
         }),
       );
@@ -1188,7 +1193,10 @@ export const make = (options: IssueOptions = {}) =>
         const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
         return all.map((issue) => ({
           issue,
-          sessions: issue.sessions.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
+          sessions: issue.sessions.flatMap((id) => {
+            const s = byId.get(id);
+            return s ? [s] : [];
+          }),
           missingSessions: issue.sessions.filter((id) => !byId.has(id)),
         }));
       }),

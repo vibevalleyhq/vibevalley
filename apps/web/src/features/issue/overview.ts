@@ -91,7 +91,8 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   const head = session ?? sessions[sessions.length - 1]!;
   const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
-  const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === head.graph!.task);
+  const step = head.graph?.task;
+  const node = step === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === step);
   const attention = issue.attention;
   // What it is doing is the live session's, in the frame's words: an ended one is doing nothing.
   const current = session ? doingOf(session) : nothing;

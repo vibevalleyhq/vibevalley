@@ -103,8 +103,7 @@ export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => R
         const k = (grouping === "project" ? f.project : f.agent) ?? "";
         by.set(k, [...(by.get(k) ?? []), r]);
       }
-      const keys = [...by.keys()].sort((a, b) => (a === "" ? 1 : 0) - (b === "" ? 1 : 0) || (a < b ? -1 : a > b ? 1 : 0));
-      return keys.map((k) => ({ key: k, rows: by.get(k)! }));
+      return [...by].sort(([a], [b]) => (a === "" ? 1 : 0) - (b === "" ? 1 : 0) || (a < b ? -1 : a > b ? 1 : 0)).map(([key, rows]) => ({ key, rows }));
     }
   }
 }

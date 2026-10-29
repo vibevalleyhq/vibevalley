@@ -156,8 +156,7 @@ export function unfinished(messages: readonly BrainMessage[]): {
 /** Reads the file only, without making an agent. */
 export const sessionUnfinished = (file: string) => unfinished(new SessionFile(file).load()).ok;
 
-const sameMessages = (a: readonly BrainMessage[], b: readonly BrainMessage[]) =>
-  a.length === b.length && (a.length === 0 || a.at(-1)!.timestamp === b.at(-1)!.timestamp);
+const sameMessages = (a: readonly BrainMessage[], b: readonly BrainMessage[]) => a.length === b.length && a.at(-1)?.timestamp === b.at(-1)?.timestamp;
 
 export class Brain {
   // Set in make, before anything can call the brain.
@@ -616,7 +615,8 @@ export class Brain {
       if (!(yield* self.quiet())) return false;
       const messages = self.history();
       const { missing, ok } = unfinished(messages);
-      if (!ok || self.now() - messages.at(-1)!.timestamp > maxAgeMs) return false;
+      const last = messages.at(-1);
+      if (!ok || !last || self.now() - last.timestamp > maxAgeMs) return false;
       if (missing.length > 0) {
         const more: BrainMessage[] = missing.map((call) => ({
           role: "toolResult",

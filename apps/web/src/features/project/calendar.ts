@@ -46,7 +46,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
       const n = commits.get(day) ?? 0;
       column.push({ day, at, commits: n, level: level(n), future: at > today });
       // A month's name over the week its first day is in; the first week names the month it shows.
-      if ((at.getDate() === 1 || (w === 0 && d === 0)) && (months.length === 0 || months.at(-1)!.week !== w))
+      if ((at.getDate() === 1 || (w === 0 && d === 0)) && months.at(-1)?.week !== w)
         months.push({ week: w, label: t("web.base.time.month", { month: at.getMonth() + 1 }) });
     }
     grid.push(column);

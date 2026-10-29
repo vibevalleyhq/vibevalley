@@ -29,8 +29,9 @@ export class Deliveries {
   }
 
   private move(recipient: string, message: string, from: readonly string[], to: Partial<DeliveryRow>) {
-    const r = this.open.get(recipient)?.get(message);
-    if (r && from.includes(r.state)) this.open.get(recipient)!.set(message, { ...r, ...to });
+    const mine = this.open.get(recipient);
+    const r = mine?.get(message);
+    if (mine && r && from.includes(r.state)) mine.set(message, { ...r, ...to });
   }
 
   /** MarkAnnounced. */

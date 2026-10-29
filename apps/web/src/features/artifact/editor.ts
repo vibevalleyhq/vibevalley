@@ -265,7 +265,8 @@ export class BlockEditor {
 
   depthOf(b: EditBlock) {
     let d = 0;
-    for (let p = b.parentId; p !== undefined && this.byId.has(p); p = this.byId.get(p)!.parentId) d++;
+    for (let up = b.parentId === undefined ? undefined : this.byId.get(b.parentId); up; up = up.parentId === undefined ? undefined : this.byId.get(up.parentId))
+      d++;
     return d;
   }
 
@@ -499,8 +500,8 @@ export class BlockEditor {
           // server gives back.
           const ops: BlockOp[] = [];
           const ids = new Set<string>();
-          while (this.queue.length > 0 && !(ops.length > 0 && this.queue[0]!.base !== undefined && ids.has(this.queue[0]!.base))) {
-            const next = this.queue.shift()!;
+          for (let next = this.queue[0]; next && !(ops.length > 0 && next.base !== undefined && ids.has(next.base)); next = this.queue[0]) {
+            this.queue.shift();
             ops.push(next.build());
             for (const id of next.ids) ids.add(id);
           }

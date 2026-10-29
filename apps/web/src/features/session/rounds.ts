@@ -199,7 +199,9 @@ export function turnLabel(steps: SessionEvent[], orchestrator: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
   if (steps.length === 0 || (orchestrator && tools === 0)) return undefined;
   // The orchestrator's round, folded: how long it thought and what it used.
-  const took = orchestrator && steps.length > 1 ? steps.at(-1)!.time - steps[0]!.time : undefined;
+  const [first] = steps;
+  const last = steps.at(-1);
+  const took = orchestrator && first && last && steps.length > 1 ? last.time - first.time : undefined;
   if (took !== undefined && took >= 1000) return t("web.session.rounds.thoughtFor", { took: tookText(took), n: tools });
   return tools > 0 ? t("web.session.rounds.usedTools", { n: tools }) : t("web.session.rounds.process");
 }
@@ -230,14 +232,18 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
   const top = log.filter((e) => e.under === undefined && e.type !== "run/start" && e.type !== "run/end");
   const groups: SessionEvent[][] = [];
   for (const e of top) {
-    if (groups.length === 0 || (e.type === "user/message" && groups.at(-1)!.length > 0)) groups.push([]);
-    groups.at(-1)!.push(e);
+    let round = groups.at(-1);
+    if (!round || (e.type === "user/message" && round.length > 0)) groups.push((round = []));
+    round.push(e);
   }
   const rounds: [number, number][] = [];
   const spans: LaneSpan[] = [];
   groups.forEach((steps, g) => {
-    const from = steps[0]!.time;
-    const to = g === groups.length - 1 && end > steps.at(-1)!.time ? end : steps.at(-1)!.time;
+    const first = steps[0];
+    const last = steps.at(-1);
+    if (!first || !last) return;
+    const from = first.time;
+    const to = g === groups.length - 1 && end > last.time ? end : last.time;
     rounds.push([from, to]);
     const calls = new Map<number, number>();
     let waiting = from;
@@ -266,7 +272,7 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
         case "tool/result":
           close(prev);
           if (e.call !== undefined && calls.has(e.call)) {
-            spans.push({ lane: "tool", start: calls.get(e.call)!, end: e.time, seq: e.call });
+            spans.push({ lane: "tool", start: calls.get(e.call) ?? e.time, end: e.time, seq: e.call });
             calls.delete(e.call);
           }
           waiting = e.time;

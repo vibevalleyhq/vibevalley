@@ -200,7 +200,15 @@ export function Trajectory(props: {
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
       </div>
-      <WaterfallView steps={props.steps} end={end()} colorOf={(seq) => (bySeq().get(seq) ? spanColor(bySeq().get(seq)!) : "#9b7550")} onPick={show} />
+      <WaterfallView
+        steps={props.steps}
+        end={end()}
+        colorOf={(seq) => {
+          const s = bySeq().get(seq);
+          return s ? spanColor(s) : "#9b7550";
+        }}
+        onPick={show}
+      />
       <div
         ref={(el) => (scroller = el)}
         class="mt-2 min-h-0 flex-1 overflow-y-auto border-y border-line py-1"

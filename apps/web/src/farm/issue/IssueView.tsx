@@ -104,7 +104,8 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
           onTask={
             props.session.graph
               ? () => {
-                  farm.openTaskBoard(props.session.graph!.id);
+                  const graph = props.session.graph;
+                  if (graph) farm.openTaskBoard(graph.id);
                   props.onDone();
                 }
               : undefined
@@ -400,8 +401,8 @@ function IssueBody(props: {
                         </PxButton>
                       )}
                     </For>
-                    <Show when={props.issue.reviewedAt !== undefined}>
-                      <span class="text-[12px] text-leaf-700">{t("web.farm.plot.reviewed", { clock: wallClockText(props.issue.reviewedAt!) })}</span>
+                    <Show when={props.issue.reviewedAt}>
+                      {(at) => <span class="text-[12px] text-leaf-700">{t("web.farm.plot.reviewed", { clock: wallClockText(at()) })}</span>}
                     </Show>
                   </div>
                 </Row>
@@ -438,10 +439,12 @@ function IssueBody(props: {
               <Row label={t("web.farm.plot.opened")}>
                 <p class={body}>{wallClockText(props.issue.createdAt)}</p>
               </Row>
-              <Show when={props.issue.closedAt !== undefined}>
-                <Row label={t("web.farm.plot.closed")}>
-                  <p class={body}>{wallClockText(props.issue.closedAt!)}</p>
-                </Row>
+              <Show when={props.issue.closedAt}>
+                {(at) => (
+                  <Row label={t("web.farm.plot.closed")}>
+                    <p class={body}>{wallClockText(at())}</p>
+                  </Row>
+                )}
               </Show>
               <Row label={t("web.farm.plot.history")}>
                 <p class={body}>{s().historyLine}</p>

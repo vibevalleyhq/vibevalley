@@ -109,7 +109,10 @@ export class Page {
 
   /** The changed blocks, in the order they were first changed. */
   changedBlocks(): Block[] {
-    return this.changed.map((id) => wire(this.blocks.get(id)!));
+    return this.changed.flatMap((id) => {
+      const b = this.blocks.get(id);
+      return b ? [wire(b)] : [];
+    });
   }
 
   /** Marks a block changed by this op: one more rev, and its text at that rev kept. */
@@ -281,7 +284,11 @@ export class Page {
     } catch (e) {
       return rejected(b.id, messageOf(e));
     }
-    for (let at = parent ?? ""; at !== ""; at = parentOf(this.find(at)!)) if (at === b.id) return rejected(b.id, t("server.artifact.op.underSelf"));
+    for (let at = parent ?? ""; at !== "";) {
+      if (at === b.id) return rejected(b.id, t("server.artifact.op.underSelf"));
+      const up = this.find(at);
+      at = up ? parentOf(up) : "";
+    }
     if (parent === undefined) delete b.parentId;
     else b.parentId = parent;
     b.orderKey = o.orderKey;
