@@ -44,6 +44,8 @@ export function Select(props: {
   class?: string;
   testid?: string;
   quiet?: boolean;
+  /** A filter that narrows: tinted while a value other than "" is chosen. */
+  filter?: boolean;
   /** control: 28px, for a toolbar row; field (default): 32px, beside inputs. */
   size?: "control" | "field";
   disabled?: boolean;
@@ -60,7 +62,9 @@ export function Select(props: {
           props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
           props.quiet
             ? "border-transparent bg-transparent hover:border-line hover:bg-page data-popup-open:border-line data-popup-open:bg-page"
-            : "border-line bg-page hover:bg-hover data-popup-open:border-focus",
+            : props.filter && props.value !== ""
+              ? "border-accent/40 bg-accent/8 hover:bg-accent/12"
+              : "border-line bg-page hover:bg-hover data-popup-open:border-focus",
           props.class,
         ]}
       >
@@ -74,6 +78,7 @@ export function Select(props: {
               {(o) => (
                 <Base.Item
                   value={o.value}
+                  data-key={o.value}
                   disabled={o.disabled}
                   class="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-sm outline-none data-disabled:cursor-default data-disabled:opacity-50 data-highlighted:bg-hover data-selected:font-medium"
                 >

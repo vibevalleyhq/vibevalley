@@ -16,9 +16,7 @@
       "closed": "Completed and canceled tickets; drag one back to In progress to reopen it."
     },
     "whichLane": "Which column",
-    "spots": "{taken} / {of} spots",
-    "write": "Write one",
-    "writeFull": "Write one in full"
+    "spots": "{taken} / {of} spots"
   },
   "display": {
     "boardNote": "The board always has a column per status, and dragging changes the status; grouping is for the list.",
@@ -34,8 +32,7 @@
     "all": "All tickets",
     "unfold": "Unfold {group}",
     "fold": "Fold {group}",
-    "writeIn": "Write one in \"{group}\"",
-    "none": "No tickets"
+    "writeIn": "Write one in \"{group}\""
   },
   "page": {
     "pickFirst": "Almost: pick which helper and which project, then press Start.",
@@ -43,8 +40,6 @@
     "historyUnread": "The tickets' records could not be read: ",
     "notFound": "No such ticket",
     "notFoundLine": "There is no ticket {id}: it may have been deleted, or the link is wrong.",
-    "sheet": "Ticket",
-    "close": "Close",
     "find": "Find a ticket: title, helper, project",
     "findLabel": "Find a ticket",
     "filter": "Filter",
@@ -55,7 +50,8 @@
     "shown": "{shown} / {of}",
     "clear": "Clear the filter",
     "view": "View",
-    "missing": "The run's record is missing: {what}. Its acts are not available."
+    "missing": "The run's record is missing: {what}. Its acts are not available.",
+    "backToBoard": "Issues"
   },
   "marks": {
     "priority": "Priority: {word}"
@@ -263,7 +259,8 @@
     "newProject": "New project",
     "projectHint": "The project's name, which is also its folder under the work folder",
     "projectName": "Project name",
-    "create": "Create"
+    "create": "Create",
+    "writeOwn": "Write it yourself"
   },
   "boardLabels": {
     "view": {

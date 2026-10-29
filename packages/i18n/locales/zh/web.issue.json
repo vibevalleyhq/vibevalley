@@ -16,9 +16,7 @@
       "closed": "已完成、已取消的工单；拖回「处理中」重开。"
     },
     "whichLane": "看哪一列",
-    "spots": "{taken} / {of} 个空位",
-    "write": "写一张",
-    "writeFull": "详细写一张"
+    "spots": "{taken} / {of} 个空位"
   },
   "display": {
     "boardNote": "看板总按状态分列，拖过去就改状态；分组用在列表上。",
@@ -34,8 +32,7 @@
     "all": "全部工单",
     "unfold": "展开 {group}",
     "fold": "收起 {group}",
-    "writeIn": "在「{group}」写一张",
-    "none": "没有工单"
+    "writeIn": "在「{group}」写一张"
   },
   "page": {
     "pickFirst": "还差一点：选好派哪个帮工、在哪个项目里做，再点「开工」。",
@@ -43,8 +40,6 @@
     "historyUnread": "工单记录没读到：",
     "notFound": "找不到这张工单",
     "notFoundLine": "没有 {id} 这张工单：可能已经删掉了，或者链接写错了。",
-    "sheet": "工单",
-    "close": "关掉",
     "find": "找工单：标题、帮工、项目",
     "findLabel": "找工单",
     "filter": "筛选",
@@ -55,7 +50,8 @@
     "shown": "{shown} / {of} 张",
     "clear": "清掉筛选",
     "view": "看法",
-    "missing": "执行记录缺失：{what}。执行动作暂不可用。"
+    "missing": "执行记录缺失：{what}。执行动作暂不可用。",
+    "backToBoard": "工单"
   },
   "marks": {
     "priority": "优先级：{word}"
@@ -263,7 +259,8 @@
     "newProject": "新建项目",
     "projectHint": "项目名，也是工作目录下的文件夹名",
     "projectName": "项目名",
-    "create": "新建"
+    "create": "新建",
+    "writeOwn": "自己写说明"
   },
   "boardLabels": {
     "view": {
