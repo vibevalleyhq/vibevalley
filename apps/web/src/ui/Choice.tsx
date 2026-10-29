@@ -27,7 +27,8 @@ export function Choice<T extends string>(props: {
           props.filter && props.value !== "" ? "border-accent/40 bg-accent/8 text-ink" : "border-line bg-page",
         ]}
       >
-        <Select.Value class="min-w-0 truncate" />
+        {/* "" is a choice here (all, none), which Base UI reads as nothing chosen: its label is the placeholder. */}
+        <Select.Value class="min-w-0 truncate" placeholder={props.options.find((o) => o.value === "")?.label} />
         <Icon name="expand" size={10} class="rotate-90 text-muted" />
       </Select.Trigger>
       <Select.Portal>

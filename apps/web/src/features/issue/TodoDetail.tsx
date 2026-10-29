@@ -240,7 +240,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
               type="button"
               data-testid="issue-write-own"
               onClick={() => setOwn(true)}
-              class="mt-3 cursor-pointer rounded-sm text-sm text-muted hover:text-ink hover:underline"
+              class="mt-3 block cursor-pointer rounded-sm text-left text-sm text-muted hover:text-ink hover:underline"
             >
               {t("web.issue.todo.writeOwn")}
             </button>

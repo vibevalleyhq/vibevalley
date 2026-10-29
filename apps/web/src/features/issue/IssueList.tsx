@@ -4,7 +4,8 @@ import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useOrchestrators } from "../../base/agents";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
-import { type BoardCard, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
+import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
+import type { IssueStatus } from "@vibevalley/protocol";
 import { closedShown, laneLabel, laneStatus } from "./rules";
 import { ago } from "../../base/format";
 import { OrchestratorFace } from "../../ui/Face";
@@ -119,7 +120,14 @@ export function IssueList(props: {
                   </Show>
                   <For each={rows()} keyed={(c) => c.id}>
                     {(c) => (
-                      <Row card={c()} selected={c().id === props.selected} showProject={props.grouping !== "project"} onOpen={props.onOpen} nameOf={nameOf()} />
+                      <Row
+                        card={c()}
+                        selected={c().id === props.selected}
+                        showProject={props.grouping !== "project"}
+                        groupStatus={props.grouping === "status" ? laneStatus[g().lane!] : undefined}
+                        onOpen={props.onOpen}
+                        nameOf={nameOf()}
+                      />
                     )}
                   </For>
                   <Show when={hidden() > 0 || (g().lane === "closed" && props.older && g().rows.length > closedShown)}>
@@ -135,7 +143,15 @@ export function IssueList(props: {
   );
 }
 
-function Row(props: { card: BoardCard; selected: boolean; showProject: boolean; onOpen: (id: string) => void; nameOf: (id: string) => string }) {
+function Row(props: {
+  card: BoardCard;
+  selected: boolean;
+  showProject: boolean;
+  /** The status the group stands for, when grouped by it: a row says its own only when it differs. */
+  groupStatus?: IssueStatus | undefined;
+  onOpen: (id: string) => void;
+  nameOf: (id: string) => string;
+}) {
   const graphs = useGraphs();
   const now = () => Date.now();
   const look = () => cardLook(props.card, props.nameOf, graphs(), now());
@@ -157,10 +173,16 @@ function Row(props: { card: BoardCard; selected: boolean; showProject: boolean; 
       class={["flex h-[38px] cursor-pointer items-center gap-2.5 rounded-md px-2.5", props.selected ? "bg-selected" : "hover:bg-hover"]}
     >
       <span class="flex w-3.5 shrink-0 justify-center">
-        <Show when={look().priority}>{(pr) => <PriorityMark priority={pr()} size={13} />}</Show>
+        <Show when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
+          {(pr) => <PriorityMark priority={pr()} size={13} />}
+        </Show>
       </span>
       <span class="hidden w-11 shrink-0 truncate text-xs text-muted @min-[640px]:block">{look().number}</span>
-      <StatusMark status={look().status} tone={look().statusTone} size={13} />
+      <span class="flex w-3.5 shrink-0 justify-center">
+        <Show when={props.groupStatus === undefined || (look().status !== props.groupStatus && !(props.groupStatus === "todo" && look().status === "backlog"))}>
+          <StatusMark status={look().status} tone={look().statusTone} size={13} />
+        </Show>
+      </span>
       <span class="min-w-0 flex-1 truncate text-sm">{look().title}</span>
       <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
       <For each={look().flags}>
@@ -174,7 +196,9 @@ function Row(props: { card: BoardCard; selected: boolean; showProject: boolean; 
         <span class="hidden w-[120px] shrink-0 truncate text-xs text-muted @min-[640px]:block">{project()}</span>
       </Show>
       <span class="flex w-[18px] shrink-0 justify-center">
-        <CardFace card={props.card} size={18} />
+        <Show when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
+          <CardFace card={props.card} size={18} />
+        </Show>
       </span>
       <span class="w-14 shrink-0 text-right text-xs text-muted @min-[640px]:w-[72px]">{ago(rowFacts(props.card).updatedAt, now())}</span>
     </div>
