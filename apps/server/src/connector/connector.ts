@@ -14,7 +14,24 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf } from "../channel/state.ts";
-import { Cause, Clock, Context, Data, Deferred, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schema, Semaphore, Stream } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  Data,
+  Deferred,
+  Duration,
+  Effect,
+  Fiber,
+  FiberSet,
+  Layer,
+  Option,
+  Predicate,
+  Schedule,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -109,6 +126,10 @@ export const make = (options: ConnectorOptions = {}) =>
     const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
+    /** retryFirst, then twice as long after each try that fails, up to retryMost. */
+    const outboxBackoff = Schedule.exponential(Duration.millis(retryFirst)).pipe(
+      Schedule.modifyDelay(({ duration }) => Effect.succeed(Duration.min(duration, Duration.millis(retryMost)))),
+    );
     // The bridges' fibers (each account's generation, the status said to the core) belong to this service: they end with
     // it and keep its services (the logger, the Clock).
     const forkHere = yield* FiberSet.makeRuntime<never>();
@@ -334,16 +355,22 @@ export const make = (options: ConnectorOptions = {}) =>
       });
 
       const outboxRun = Effect.gen(function* () {
-        let wait = retryFirst;
+        // The waits between tries of what is held: a fresh one after a try that goes, the next one after a try that fails.
+        const waits = Effect.map(Schedule.toStep(outboxBackoff), (step) => Effect.map(Effect.orDie(step(0, undefined)), ([delay]) => Duration.toMillis(delay)));
+        let nextWait = yield* waits;
+        let wait = yield* nextWait;
         for (;;) {
           if (outboxDirty) {
             outboxDirty = false;
             yield* drain(false);
-            wait = retryFirst;
+            nextWait = yield* waits;
+            wait = yield* nextWait;
             continue;
           }
           const result = yield* sleepOrWake(wait, (wake) => (wakeOutbox = wake)).pipe(Effect.ensuring(Effect.sync(() => (wakeOutbox = undefined))));
-          if (result === "timeout") wait = (yield* drain(false)) ? retryFirst : Math.min(2 * wait, retryMost);
+          if (result !== "timeout") continue;
+          if (yield* drain(false)) nextWait = yield* waits;
+          wait = yield* nextWait;
         }
       });
 
