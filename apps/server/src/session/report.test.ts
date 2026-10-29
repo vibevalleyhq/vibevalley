@@ -320,4 +320,7 @@ it("makes room with whoever has been idle longest", () => {
   expect(whoMakesRoom(farm, 4)).toBeUndefined();
   expect(whoMakesRoom(farm, 3)?.id).toBe("c");
   expect(whoMakesRoom([s("b", 1, "working")], 1)).toBeUndefined();
+  // Hired first but worked last: the one hired later, idle since it came, goes.
+  const worked = { ...s("early", 1, "resting"), lastRun: { outcome: "completed", summary: "", at: 9 } } as Session;
+  expect(whoMakesRoom([worked, s("late", 5, "resting")], 2)?.id).toBe("late");
 });
