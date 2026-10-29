@@ -73,7 +73,8 @@ export const shelves: readonly Shelf[] = [
   { id: "other", label: t("web.catalog.shelf.other.label"), hint: t("web.catalog.shelf.other.hint"), match: () => true },
 ];
 
-export const shelfOf = (name: string) => shelves.find((s) => s.match(name))!.id;
+/** Its shelf: the last, other, takes what no shelf before it does. */
+export const shelfOf = (name: string) => shelves.find((s) => s.match(name))?.id ?? "other";
 
 /** Case-insensitive, runs of digits by their value. */
 export function naturalCompare(a: string, b: string): number {
@@ -120,10 +121,7 @@ export function framesOf(name: string, has: (n: string) => boolean): string[] | 
 /** The commands that draw its sheet again and cut it. */
 export function remakeOf(p: Picture): { draw: string; cut: string } | undefined {
   if (!p.sheet) return undefined;
-  const stem = p.sheet
-    .split("/")
-    .at(-1)!
-    .replace(/\.png$/, "");
+  const stem = p.sheet.slice(p.sheet.lastIndexOf("/") + 1).replace(/\.png$/, "");
   return { draw: `design/pixel/gen.sh ${stem}`, cut: `python3 design/pixel/process.py ${stem}` };
 }
 
@@ -131,8 +129,8 @@ export function remakeOf(p: Picture): { draw: string; cut: string } | undefined 
 export function pictureMatches(p: Picture, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const shelf = shelves.find((s) => s.id === shelfOf(p.name))!;
+  const shelf = shelves.find((s) => s.id === shelfOf(p.name));
   const species = SpeciesValues.find((s) => p.name.startsWith(`${s}-`));
   const outfit = species && OutfitValues.find((o) => p.name.startsWith(`${species}-${o}-`));
-  return [p.name, shelf.label, species ? speciesLabel[species] : "", outfit ? outfitLabel[outfit] : ""].some((w) => w.toLowerCase().includes(q));
+  return [p.name, shelf?.label ?? "", species ? speciesLabel[species] : "", outfit ? outfitLabel[outfit] : ""].some((w) => w.toLowerCase().includes(q));
 }

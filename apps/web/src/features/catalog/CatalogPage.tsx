@@ -63,6 +63,10 @@ const shelfTabs = [
 ] as const;
 
 /** `rest` is the path after /catalog/. */
+/** Where a picture's head is, when it has one. */
+const headOf = (p: { readonly hx?: number | undefined; readonly hy?: number | undefined }) =>
+  p.hx !== undefined && p.hy !== undefined ? { x: p.hx, y: p.hy } : undefined;
+
 export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" || props.rest === "sounds" ? props.rest : "sprites");
   const tabs = () => <Tabs label={t("web.catalog.shelves")} value={shelf()} items={shelfTabs.map((s) => ({ value: s.id, label: s.label, href: s.to }))} />;
@@ -324,12 +328,14 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
                 background: "linear-gradient(#c84a3a,#c84a3a) center/100% 2px no-repeat, linear-gradient(#c84a3a,#c84a3a) center/2px 100% no-repeat",
               }}
             />
-            <Show when={shown().hx !== undefined && shown().hy !== undefined}>
-              <span
-                title={t("web.catalog.head")}
-                class="absolute border-2 border-water"
-                style={{ left: `${shown().hx! * scale() - 5}px`, top: `${shown().hy! * scale() - 5}px`, width: "10px", height: "10px" }}
-              />
+            <Show when={headOf(shown())}>
+              {(head) => (
+                <span
+                  title={t("web.catalog.head")}
+                  class="absolute border-2 border-water"
+                  style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px`, width: "10px", height: "10px" }}
+                />
+              )}
             </Show>
           </Show>
         </span>
@@ -394,9 +400,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
       <div class="flex flex-col gap-1.5">
         <Row label={t("web.catalog.size")}>{t("web.catalog.pixels", { w: numberText(props.picture.w), h: numberText(props.picture.h) })}</Row>
         <Row label={t("web.catalog.anchor")}>{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Row>
-        <Show when={props.picture.hx !== undefined && props.picture.hy !== undefined}>
-          <Row label={t("web.catalog.head")}>{`(${numberText(props.picture.hx!)}, ${numberText(props.picture.hy!)})`}</Row>
-        </Show>
+        <Show when={headOf(props.picture)}>{(head) => <Row label={t("web.catalog.head")}>{`(${numberText(head().x)}, ${numberText(head().y)})`}</Row>}</Show>
         <Row label={t("web.catalog.from")}>
           <Show when={props.picture.sheet} fallback={<span class="text-xs text-muted">{t("web.catalog.unrecorded")}</span>}>
             {(sheet) => <Code text={sheet()} />}

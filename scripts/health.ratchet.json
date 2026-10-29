@@ -24,13 +24,13 @@
     "lintOff": 0
   },
   "packages/agent": {
-    "nonNull": 21,
+    "nonNull": 18,
     "doubleCast": 2,
     "cast": 7,
     "lintOff": 0
   },
   "packages/ai": {
-    "nonNull": 13,
+    "nonNull": 11,
     "doubleCast": 0,
     "cast": 28,
     "lintOff": 0
@@ -54,7 +54,7 @@
     "lintOff": 0
   },
   "packages/i18n": {
-    "nonNull": 5,
+    "nonNull": 4,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0
@@ -66,49 +66,49 @@
     "lintOff": 0
   },
   "packages/stories": {
-    "nonNull": 5,
+    "nonNull": 3,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 0
   },
   "packages/testkit": {
-    "nonNull": 5,
+    "nonNull": 2,
     "doubleCast": 0,
     "cast": 6,
     "lintOff": 0
   },
   "server: Agent Sessions": {
-    "nonNull": 18,
+    "nonNull": 16,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0
   },
   "server: Agents": {
-    "nonNull": 39,
+    "nonNull": 35,
     "doubleCast": 0,
     "cast": 16,
     "lintOff": 0
   },
   "server: Collaboration": {
-    "nonNull": 47,
+    "nonNull": 42,
     "doubleCast": 0,
     "cast": 5,
     "lintOff": 0
   },
   "server: Gamification": {
-    "nonNull": 4,
+    "nonNull": 2,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 0
   },
   "server: Gateway": {
-    "nonNull": 16,
+    "nonNull": 7,
     "doubleCast": 0,
     "cast": 22,
     "lintOff": 1
   },
   "server: Issues": {
-    "nonNull": 47,
+    "nonNull": 29,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0
@@ -120,7 +120,7 @@
     "lintOff": 0
   },
   "server: Orchestrator": {
-    "nonNull": 11,
+    "nonNull": 7,
     "doubleCast": 0,
     "cast": 9,
     "lintOff": 0
@@ -138,7 +138,7 @@
     "lintOff": 0
   },
   "web: app": {
-    "nonNull": 10,
+    "nonNull": 9,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0
@@ -150,25 +150,25 @@
     "lintOff": 0
   },
   "web: farm": {
-    "nonNull": 74,
+    "nonNull": 67,
     "doubleCast": 0,
     "cast": 13,
     "lintOff": 0
   },
   "web: features/agent": {
-    "nonNull": 4,
+    "nonNull": 3,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 0
   },
   "web: features/artifact": {
-    "nonNull": 8,
+    "nonNull": 4,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0
   },
   "web: features/catalog": {
-    "nonNull": 18,
+    "nonNull": 11,
     "doubleCast": 0,
     "cast": 3,
     "lintOff": 0
@@ -180,13 +180,13 @@
     "lintOff": 0
   },
   "web: features/connector": {
-    "nonNull": 2,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0
   },
   "web: features/issue": {
-    "nonNull": 22,
+    "nonNull": 20,
     "doubleCast": 0,
     "cast": 3,
     "lintOff": 0
@@ -198,7 +198,7 @@
     "lintOff": 0
   },
   "web: features/memory": {
-    "nonNull": 6,
+    "nonNull": 3,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0
@@ -216,7 +216,7 @@
     "lintOff": 0
   },
   "web: features/project": {
-    "nonNull": 23,
+    "nonNull": 22,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0
@@ -228,7 +228,7 @@
     "lintOff": 0
   },
   "web: features/session": {
-    "nonNull": 23,
+    "nonNull": 14,
     "doubleCast": 0,
     "cast": 4,
     "lintOff": 0
@@ -246,13 +246,13 @@
     "lintOff": 0
   },
   "web: features/voice": {
-    "nonNull": 9,
+    "nonNull": 7,
     "doubleCast": 0,
     "cast": 3,
     "lintOff": 1
   },
   "web: tree": {
-    "nonNull": 27,
+    "nonNull": 25,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0

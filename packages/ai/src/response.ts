@@ -376,6 +376,7 @@ export function responseOf(model: Model, sse: string, timestamp = 0): AssistantM
     const d = data.line(line);
     if (d !== undefined) fold.chunk(JSON.parse(d));
   }
-  const last = fold.end().at(-1)!;
+  const last = fold.end().at(-1);
+  if (!last) return fold.message();
   return last.type === "done" ? last.message : last.type === "error" ? last.error : fold.message();
 }

@@ -49,20 +49,34 @@ export const orchestratorToolNames = () => [
   ...selfTools({ home: "", skills: () => [], memory: true, now: () => 0 }).map((t) => t.name),
 ];
 
-/** "" when it is whole: the fields its kind reads are there. */
-export function problemOf(e: Expect): string {
+/** An expectation with the fields its kind reads. */
+type Checked =
+  | { readonly kind: "called"; readonly tool: string; readonly argContains?: string | undefined; readonly argLacks?: string | undefined }
+  | { readonly kind: "notCalled"; readonly tool: string }
+  | { readonly kind: "silent" }
+  | { readonly kind: "says" | "saysNot"; readonly contains: string };
+
+/** The expectation as its kind reads it, or what is missing from it. */
+function checkedOf(e: Expect): Checked | string {
   switch (e.kind) {
     case "called":
+      return e.tool ? { kind: "called", tool: e.tool, argContains: e.argContains, argLacks: e.argLacks } : e.kind + " without a tool";
     case "notCalled":
-      return e.tool ? "" : e.kind + " without a tool";
+      return e.tool ? { kind: "notCalled", tool: e.tool } : e.kind + " without a tool";
     case "says":
     case "saysNot":
-      return e.contains ? "" : e.kind + " without contains";
+      return e.contains ? { kind: e.kind, contains: e.contains } : e.kind + " without contains";
     case "silent":
-      return "";
+      return { kind: "silent" };
     default:
       return `unknown kind ${JSON.stringify(e.kind)}`;
   }
+}
+
+/** "" when it is whole: the fields its kind reads are there. */
+export function problemOf(e: Expect): string {
+  const c = checkedOf(e);
+  return typeof c === "string" ? c : "";
 }
 
 const assistants = (turn: readonly BrainMessage[]) => turn.filter((m): m is AssistantMessage => m.role === "assistant");
@@ -85,21 +99,21 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
     });
   const missed: string[] = [];
   for (const e of expect) {
-    const problem = problemOf(e);
-    if (problem) {
-      missed.push(problem);
+    const c = checkedOf(e);
+    if (typeof c === "string") {
+      missed.push(c);
       continue;
     }
     const ok =
-      e.kind === "called"
-        ? called(e.tool!, e.argContains, e.argLacks)
-        : e.kind === "notCalled"
-          ? !called(e.tool!)
-          : e.kind === "silent"
+      c.kind === "called"
+        ? called(c.tool, c.argContains, c.argLacks)
+        : c.kind === "notCalled"
+          ? !called(c.tool)
+          : c.kind === "silent"
             ? words === ""
-            : e.kind === "says"
-              ? words.includes(e.contains!)
-              : !words.includes(e.contains!);
+            : c.kind === "says"
+              ? words.includes(c.contains)
+              : !words.includes(c.contains);
     if (!ok) missed.push(JSON.stringify(e));
   }
   return missed;

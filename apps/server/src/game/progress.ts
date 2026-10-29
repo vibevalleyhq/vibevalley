@@ -148,8 +148,9 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       // Only a tier reached can be worn, and not a starter task's; anything else takes the title off.
       const { title: _, ...untitled } = p;
       p = untitled;
-      const worn = entry.achievement && entry.tier ? achievementOf(entry.achievement) : undefined;
-      if (worn && isTitle(worn) && tierOf(p, worn.id) >= entry.tier!) p = { ...p, title: { id: worn.id, tier: entry.tier! } };
+      const tier = entry.tier;
+      const worn = entry.achievement && tier ? achievementOf(entry.achievement) : undefined;
+      if (worn && tier && isTitle(worn) && tierOf(p, worn.id) >= tier) p = { ...p, title: { id: worn.id, tier } };
       break;
     }
   }

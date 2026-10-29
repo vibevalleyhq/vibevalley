@@ -67,6 +67,12 @@ export function Section(props: { title: string; count?: number; aside?: JSX.Elem
   );
 }
 
+/** How often a memory came back, and when it last did when that is known. */
+function recalledText(recalled: number, recalledAt: number | undefined, now: number) {
+  const n = Math.round(recalled);
+  return recalledAt ? t("web.memory.memory.recalledLast", { n, last: ago(recalledAt, now) }) : t("web.memory.memory.recalled", { n });
+}
+
 function Pill(props: { label: string; on: boolean; onClick: () => void }) {
   return (
     <button
@@ -87,7 +93,8 @@ export function MemoryPanel(props: { agent: string }) {
   const act = () => memoryActions(props.agent);
   const core = useCore();
   const now = useNow();
-  const sessions = () => new Map((core()?.sessions ?? []).map((h) => [h.id, h.name]));
+  const sessions = () => new Map<string, string>((core()?.sessions ?? []).map((h) => [h.id, h.name]));
+  const sessionNameOf = (id: string | undefined) => (id === undefined ? t("web.memory.memory.helper") : (sessions().get(id) ?? id));
   const all = () => view()?.memories ?? [];
   const sources = () => new Map((view()?.sources ?? []).map((s) => [s.name, s]));
   const notes = () => all().filter((m) => m.kind === "note");
@@ -116,7 +123,7 @@ export function MemoryPanel(props: { agent: string }) {
                 <span class="w-[3px] shrink-0 bg-leaf" />
                 <div class="flex flex-col gap-0.5 px-3 py-2">
                   <span class="flex flex-wrap gap-2 text-xs text-muted">
-                    <span class="font-medium text-ink">{m().session ? (sessions().get(m().session!) ?? m().session) : t("web.memory.memory.helper")}</span>
+                    <span class="font-medium text-ink">{sessionNameOf(m().session)}</span>
                     <span>{m().project ?? t("web.memory.memory.allProjects")}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
@@ -146,7 +153,10 @@ export function MemoryPanel(props: { agent: string }) {
         <Show when={filtered().length > 0} fallback={<Quiet>{notes().length > 0 ? t("web.memory.memory.emptyHere") : t("web.memory.memory.nothing")}</Quiet>}>
           <For each={filtered()} keyed={(m) => m.id}>
             {(m) => {
-              const src = () => (m().source ? sources().get(m().source!) : undefined);
+              const src = () => {
+                const source = m().source;
+                return source ? sources().get(source) : undefined;
+              };
               return (
                 <Show
                   when={src()}
@@ -159,11 +169,7 @@ export function MemoryPanel(props: { agent: string }) {
                         m().project ?? t("web.memory.memory.allProjects"),
                         whose(m()),
                         ago(m().at, now()),
-                        m().recalled > 0
-                          ? m().recalledAt
-                            ? t("web.memory.memory.recalledLast", { n: Math.round(m().recalled), last: ago(m().recalledAt!, now()) })
-                            : t("web.memory.memory.recalled", { n: Math.round(m().recalled) })
-                          : t("web.memory.memory.neverRecalled"),
+                        m().recalled > 0 ? recalledText(m().recalled, m().recalledAt, now()) : t("web.memory.memory.neverRecalled"),
                       ]}
                       warning={m().fading ? t("web.memory.memory.fading", { keep: memoryKeep }) : undefined}
                     />

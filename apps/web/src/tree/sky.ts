@@ -70,8 +70,7 @@ export function constellation(links: readonly MemoryLink[], id: string): Set<str
   const seen = new Set([id]);
   const walk = (start: string, up: boolean) => {
     const queue = [start];
-    while (queue.length > 0) {
-      const at = queue.shift()!;
+    for (let at = queue.shift(); at !== undefined; at = queue.shift()) {
       for (const l of links) {
         if (l.kind !== "from") continue;
         const next = up ? (l.b === at ? l.a : undefined) : l.a === at ? l.b : undefined;

@@ -83,8 +83,9 @@ function update(cases: readonly Case[], rule: (c: Case) => unknown) {
     if (!path) continue;
     const got: unknown = JSON.parse(JSON.stringify(rule(c) ?? null));
     if (jsonDiff(got, c.out) === undefined) continue;
-    if (!byFile.has(path)) byFile.set(path, new Map());
-    byFile.get(path)!.set(c.line, got);
+    let lines = byFile.get(path);
+    if (!lines) byFile.set(path, (lines = new Map()));
+    lines.set(c.line, got);
   }
   for (const [path, outs] of byFile) {
     const rows = rowsOf(path).map((row, i) => (outs.has(i + 1) ? { ...row, out: outs.get(i + 1) } : row));

@@ -115,13 +115,19 @@ const json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The input, --json's fields and the arguments together, checked against the endpoint's Schema here, so a wrong field is
  * named before anything is sent. */
-const checkedInput = Effect.fnUntraced(function* (e: Endpoint, given: string, args: Readonly<Record<string, unknown>>, path: readonly string[]) {
+const checkedInput = Effect.fnUntraced(function* (
+  e: Endpoint,
+  input: Schema.Codec<unknown>,
+  given: string,
+  args: Readonly<Record<string, unknown>>,
+  path: readonly string[],
+) {
   const text = given === "" ? "{}" : yield* bodyText(given, path);
   const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.notJson", { why: issue.message }), "InvalidJson")));
   const value = { ...(fields as Record<string, unknown>), ...args };
   const missing = e.about.find((name) => value[name] === undefined);
   if (missing !== undefined) return yield* usage(path, t("server.cli.failure.missingArgument", { name: missing }), "MissingArgument");
-  yield* Schema.decodeEffect(e.input!)(value).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))));
+  yield* Schema.decodeEffect(input)(value).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))));
   return JSON.stringify(value);
 });
 
@@ -134,7 +140,7 @@ function endpointCommand(e: Endpoint) {
   for (const name of e.about) config[name] = Argument.String(name).pipe(Argument.optional);
   // Any input takes --json, what it is about included: a script writes the whole input in one place.
   if (e.input) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.json")));
-  return Command.make(path.at(-1)!, config as never, (given: Record<string, unknown>) =>
+  return Command.make(path.at(-1) ?? e.op, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
       const args = Object.fromEntries(
@@ -143,6 +149,7 @@ function endpointCommand(e: Endpoint) {
       const body = e.input
         ? yield* checkedInput(
             e,
+            e.input,
             Option.getOrElse((given.json as Option.Option<string> | undefined) ?? Option.none(), () => ""),
             args,
             path,
@@ -203,7 +210,7 @@ export const eventsCommand = Command.make("events", {}, () => Effect.flatMap(Ser
 
 /** Only what `issue work` reads of a frame; the rest is left as it came. */
 const IssuesOfFrame = Schema.fromJsonString(
-  Schema.Struct({ state: Schema.Struct({ issues: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus }))) }) }),
+  Schema.Struct({ state: Schema.Struct({ issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus })) }) }),
 );
 const settled = new Set<string>(["in_review", "done", "canceled"] satisfies (typeof IssueStatusValues)[number][]);
 
@@ -219,9 +226,8 @@ export const issueWorkCommand = Command.make("work", { id: Argument.String("id")
       Stream.mapEffect((data) =>
         Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
       ),
-      Stream.filter((frame) => frame.state.issues !== undefined),
       Stream.mapEffect((frame) => {
-        const now = frame.state.issues!.find((i) => i.id === issue.id);
+        const now = frame.state.issues.find((i) => i.id === issue.id);
         return now
           ? Effect.succeed(now.status)
           : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("server.cli.failure.gone", { n: issue.number }) }));
@@ -238,11 +244,15 @@ export const issueWorkCommand = Command.make("work", { id: Argument.String("id")
 /** Every endpoint as `<module> [<noun>] <verb>`, with the hand-written commands of a module (issue work, runtime chat) beside them. */
 export function groupCommands(extra: Readonly<Record<string, readonly Command.Command.Any[]>>) {
   const modules = new Map<string, { own: Command.Command.Any[]; nouns: Map<string, Command.Command.Any[]> }>();
-  const of = (m: string) => modules.get(m) ?? (modules.set(m, { own: [], nouns: new Map() }), modules.get(m)!);
+  const of = (m: string) => {
+    let got = modules.get(m);
+    if (!got) modules.set(m, (got = { own: [], nouns: new Map() }));
+    return got;
+  };
   for (const e of endpoints) {
-    const [m, ...rest] = e.op.split(".").map(kebab);
-    if (rest.length === 1) of(m!).own.push(endpointCommand(e));
-    else of(m!).nouns.set(rest[0]!, [...(of(m!).nouns.get(rest[0]!) ?? []), endpointCommand(e)]);
+    const [m = "", noun = "", ...more] = e.op.split(".").map(kebab);
+    if (more.length === 0) of(m).own.push(endpointCommand(e));
+    else of(m).nouns.set(noun, [...(of(m).nouns.get(noun) ?? []), endpointCommand(e)]);
   }
   for (const [m, commands] of Object.entries(extra)) of(m).own.push(...commands);
   const group = (name: string, commands: readonly Command.Command.Any[]) =>

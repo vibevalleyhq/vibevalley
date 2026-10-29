@@ -86,7 +86,8 @@ export class Journal {
   ) {
     this.disk = new FileWriter(file);
     this.steps = [...initial];
-    if (this.steps.length > 0) this.next = this.steps.at(-1)!.seq + 1;
+    const last = this.steps.at(-1);
+    if (last) this.next = last.seq + 1;
   }
 
   events() {
@@ -121,8 +122,9 @@ export class Journal {
   }
 
   private under(from: From | undefined): number | undefined {
-    if (!from || from.length === 0) return undefined;
-    return this.started.get(callKey(from.slice(0, -1), from.at(-1)!)) ?? -1;
+    const call = from?.at(-1);
+    if (!from || call === undefined) return undefined;
+    return this.started.get(callKey(from.slice(0, -1), call)) ?? -1;
   }
 
   /** The next seq, the time, the call it is under and the open run. */

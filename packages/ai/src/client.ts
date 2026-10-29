@@ -29,7 +29,9 @@ export function deepseek(id: string, key: string | (() => string | undefined), s
   if (!apiKey()) throw new MissingKey();
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
-  const model = known ?? { ...models.find((m) => m.id === defaultModel)!, id: name, name };
+  const fallback = models.find((m) => m.id === defaultModel);
+  if (!fallback) throw new Error(`the default model ${defaultModel} is not in the model table`);
+  const model = known ?? { ...fallback, id: name, name };
   return { model, service, apiKey };
 }
 

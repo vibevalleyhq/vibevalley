@@ -11,6 +11,14 @@ export interface Place {
   readonly path: string;
 }
 
+export const settingsPlace: Place = {
+  id: "settings",
+  label: t("web.base.place.settings.label"),
+  hint: t("web.base.place.settings.hint"),
+  icon: "settings",
+  path: "/settings",
+};
+
 export const places: readonly Place[] = [
   { id: "chat", label: t("web.base.place.chat.label"), hint: t("web.base.place.chat.hint"), icon: "chat", path: "/chat" },
   { id: "issues", label: t("web.base.place.issues.label"), hint: t("web.base.place.issues.hint"), icon: "issues", path: "/issues" },
@@ -19,7 +27,7 @@ export const places: readonly Place[] = [
   { id: "runtimes", label: t("web.base.place.runtimes.label"), hint: t("web.base.place.runtimes.hint"), icon: "runtimes", path: "/runtimes" },
   { id: "projects", label: t("web.base.place.projects.label"), hint: t("web.base.place.projects.hint"), icon: "projects", path: "/projects" },
   { id: "catalog", label: t("web.base.place.catalog.label"), hint: t("web.base.place.catalog.hint"), icon: "catalog", path: "/catalog" },
-  { id: "settings", label: t("web.base.place.settings.label"), hint: t("web.base.place.settings.hint"), icon: "settings", path: "/settings" },
+  settingsPlace,
 ];
 
 /** The place a path is in (/orchestrator is the agents' too); undefined for the farm. */

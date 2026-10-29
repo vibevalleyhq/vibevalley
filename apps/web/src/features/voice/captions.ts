@@ -109,7 +109,8 @@ export class LiveCaptions {
       this.heard.add(turn);
       this.onHeard?.(text);
     }
-    if (speaker === "orchestrator" && done) this.answer(this.find(speaker, turn)!);
+    const said = this.find(speaker, turn);
+    if (speaker === "orchestrator" && done && said) this.answer(said);
   }
 
   private answer(c: Caption) {

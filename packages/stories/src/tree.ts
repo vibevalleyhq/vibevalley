@@ -73,7 +73,7 @@ export function treeOf(list: readonly Entry[]): Node[] {
     if (!children) {
       children = [];
       folders.set(path, children);
-      folder(parts.slice(0, -1)).push({ kind: "folder", path, name: parts.at(-1)!, depth: parts.length - 1, children });
+      folder(parts.slice(0, -1)).push({ kind: "folder", path, name: parts.at(-1) ?? path, depth: parts.length - 1, children });
     }
     return children;
   };
@@ -81,7 +81,7 @@ export function treeOf(list: readonly Entry[]): Node[] {
   for (const e of list) counts.set(e.title, (counts.get(e.title) ?? 0) + 1);
   for (const e of list) {
     const parts = e.title.split("/");
-    if (counts.get(e.title) === 1) folder(parts.slice(0, -1)).push({ kind: "story", name: parts.at(-1)!, depth: parts.length - 1, entry: e });
+    if (counts.get(e.title) === 1) folder(parts.slice(0, -1)).push({ kind: "story", name: parts.at(-1) ?? e.title, depth: parts.length - 1, entry: e });
     else folder(parts).push({ kind: "story", name: e.name, depth: parts.length, entry: e });
   }
   return roots;

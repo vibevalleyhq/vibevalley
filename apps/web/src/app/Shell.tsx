@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Place, placeOf, places } from "./places";
+import { type Place, placeOf, places, settingsPlace } from "./places";
 import { useCore, useFrames } from "@/base/frame";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
@@ -58,7 +58,7 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
 function Rail(props: { here?: Place | undefined }) {
   const frames = useFrames();
   const waiting = () => waitingOnOwner(frames.frame?.inbox ?? []);
-  const settings = places.find((p) => p.id === "settings")!;
+  const settings = settingsPlace;
   return (
     <nav
       aria-label={t("web.base.rail")}
