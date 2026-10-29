@@ -98,3 +98,18 @@ allowBuilds:
   "@google/genai": false
   electron-winstaller: false
   protobufjs: false
+
+# The packages' files live once, in pnpm's global virtual store (~/Library/pnpm/store/…/links), and every checkout's
+# node_modules only links to them: a helper's worktree installs in a few seconds and holds tens of files, not tens of
+# thousands. The global store does not hoist, so a package whose types use one it does not declare gets it declared here.
+enableGlobalVirtualStore: true
+
+packageExtensions:
+  # @solidjs/web's jsx.d.ts imports csstype's CSSProperties: without it every style={{…}} is a type error.
+  "@solidjs/web":
+    dependencies:
+      csstype: "^3.2.3"
+  # expo-camera's types import React's: without it CameraView is not a JSX component.
+  expo-camera:
+    dependencies:
+      "@types/react": "~19.3.0"
