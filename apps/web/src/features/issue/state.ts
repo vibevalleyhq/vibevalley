@@ -149,16 +149,19 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       n: sessions.length,
       line: sessions.map((r) => t("web.issue.issue.historyItem", { name: r.name, id: r.id })).join(" → "),
     }),
-    /** 在等你 · 已经 3 分钟 · Claude 师傅 · 第 2 轮 · 用了 4 分钟 · ¥0.42; cny is all the issue's runs when known. */
+    /** 在等你 · 3 分钟了 · Claude 师傅 · 第 2 轮 · 共用 4 分钟 · ¥0.42; cny is all the issue's runs when known. Under a
+     * minute is 刚刚, and the time in all is left out then: two "under a minute"s said nothing. */
     statusLine(now: number, cny?: number) {
       const s = session ?? head;
       const turns = Math.round(s.runs);
+      const waited = attention.since !== undefined ? now - attention.since : undefined;
+      const used = (endedAt(head) ?? now) - sessions[0]!.hiredAt;
       return [
         t(`shared.attention.${attention.state}`),
-        ...(attention.since !== undefined ? [t("web.issue.issue.since", { span: spanText(now - attention.since) })] : []),
+        ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
         head.name,
         ...(turns > 0 ? [t("web.issue.issue.ran", { n: turns })] : []),
-        t("web.issue.issue.used", { span: spanText((endedAt(head) ?? now) - sessions[0]!.hiredAt) }),
+        ...(used >= 60_000 ? [t("web.issue.issue.used", { span: spanText(used) })] : []),
         ...((cny ?? s.spent?.cny) !== undefined ? [`¥${(cny ?? s.spent!.cny!).toFixed(2)}`] : []),
       ].join(" · ");
     },
