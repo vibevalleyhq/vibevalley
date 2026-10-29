@@ -292,7 +292,7 @@ export default defineConfig({
       },
       {
         // Not moved into Effect yet; the list only shrinks (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上").
-        // The local network's proxy waits by hand; the command line's chats and time.ts's Promise clock go with it.
+        // The command line's chats, and time.ts's clock for the Promise code still left.
         files: ["apps/server/src/voice/voice.ts", "apps/server/src/lan/lan.ts", "apps/server/src/cli/chat.ts", "apps/server/src/base/time.ts"],
         rules: { "vibevalley/promise-boundary": "off" },
       },
