@@ -22,6 +22,11 @@ class SubscriptionsClient extends Context.Service<SubscriptionsClient, Effect.Su
 
 let runtime: ManagedRuntime.ManagedRuntime<SubscriptionsClient, never> | undefined;
 
+// A dev reload builds this module again: the old runtime closes its socket rather than leaving it open beside the new one.
+import.meta.hot?.dispose(() => {
+  void runtime?.dispose();
+});
+
 /** Each event of one subscription until stop() is called, or until it ends (the farm ended it, or the line broke): then
  * ended(), and the caller follows again from what it has. */
 function run(
