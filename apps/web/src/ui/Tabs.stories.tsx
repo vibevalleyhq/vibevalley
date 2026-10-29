@@ -6,6 +6,21 @@ type Tab = "chat" | "jobs" | "crons" | "files";
 export default stories({
   title: "组件/工作台/Tabs",
   stories: {
+    States: story({
+      args: { look: "pills" },
+      grid: { rows: ["look", ["pills", "line"]], cols: "pseudo" },
+      render: (a) => (
+        <Tabs<Tab>
+          label="群聊里"
+          look={a.look as TabsLook}
+          value="chat"
+          items={[
+            { value: "chat", label: "聊天", icon: "chat" },
+            { value: "jobs", label: "活", icon: "issues" },
+          ]}
+        />
+      ),
+    }),
     Playground: story({
       note: "pills 用在窗格里，line 用在页面的头下面。",
       args: { look: "pills", value: "chat", icons: true },

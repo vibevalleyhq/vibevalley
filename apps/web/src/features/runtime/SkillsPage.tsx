@@ -90,7 +90,11 @@ export function SkillsPage(props: { id?: string }) {
         </ul>
         <div class="flex items-center gap-2 px-2 pt-3">
           <h3 class="flex-1 text-xs font-semibold text-muted">{t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}</h3>
-          <A href={skillPath("new")} data-testid="new-skill" class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-leaf">
+          <A
+            href={skillPath("new")}
+            data-testid="new-skill"
+            class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-accent-hover"
+          >
             {t("web.runtime.library.newSkill")}
           </A>
         </div>

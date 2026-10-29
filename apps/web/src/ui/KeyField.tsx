@@ -115,7 +115,7 @@ export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => vo
           e.preventDefault();
           props.onSave();
         }}
-        class="inline-flex h-7 cursor-pointer items-center rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf disabled:cursor-default disabled:opacity-50"
+        class="inline-flex h-7 cursor-pointer items-center rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-accent-hover disabled:cursor-default disabled:opacity-50"
       >
         {t("web.base.form.save")}
       </button>

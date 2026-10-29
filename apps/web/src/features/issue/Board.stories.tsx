@@ -1,51 +1,10 @@
 import { createSignal } from "solid-js";
-import type { Issue, IssueId, IssueStatus, Phase, Priority, Session, SessionId } from "@vibevalley/protocol";
+import type { Session } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 import { IssueBoard } from "./Board";
 import type { BoardCard } from "./cards";
 import type { Ordering } from "./display";
-
-const now = Date.now();
-const min = 60_000;
-
-const attentionOf: Record<IssueStatus, Issue["attention"]["state"]> = {
-  backlog: "draft",
-  todo: "queued",
-  in_progress: "working",
-  in_review: "reviewing",
-  done: "done",
-  canceled: "canceled",
-};
-
-const issue = (number: number, title: string, status: IssueStatus, priority: Priority, more: Partial<Issue> = {}): Issue => ({
-  id: `i${number}` as IssueId,
-  number,
-  title,
-  priority,
-  status,
-  createdAt: now - number * 37 * min,
-  sessions: [],
-  moves: [],
-  deliver: "change",
-  findings: [],
-  questions: [],
-  attention: { state: attentionOf[status], acts: [] },
-  ...more,
-});
-
-const session = (id: string, agent: string, phase: Phase, more: Partial<Session> = {}): Session => ({
-  id: id as SessionId,
-  name: agent,
-  agent,
-  runtime: "claude",
-  brief: "",
-  hiredAt: now - 42 * min,
-  runs: 2,
-  phase,
-  ...more,
-});
-
-const working = (since: number): Phase => ({ _tag: "working", since, doing: { action: "edit_file", label: "改 session.ts" } });
+import { min, now, sampleIssue as issue, sampleSession as session, working } from "./issue.samples";
 
 const sample = (): BoardCard[] => {
   const w = session("w1", "老周", working(now - 3 * min), { spent: { cny: 0.42 } as NonNullable<Session["spent"]> });

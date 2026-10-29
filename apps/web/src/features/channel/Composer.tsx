@@ -277,7 +277,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             title={t("web.channel.composer.sendHint")}
             class={[
               "inline-flex size-7 cursor-pointer items-center justify-center rounded-md border disabled:cursor-default",
-              box.canSend() ? "border-accent bg-accent hover:bg-leaf" : "border-transparent opacity-50",
+              box.canSend() ? "border-accent bg-accent hover:bg-accent-hover" : "border-transparent opacity-50",
             ]}
           >
             <Icon name="send" size={16} />

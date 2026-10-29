@@ -60,7 +60,7 @@ function AgentsPage() {
             <A
               href="/agents/new"
               data-testid="new-agent"
-              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf"
+              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-accent-hover"
             >
               <Icon name="add" size={14} />
               {t("web.agent.list.make")}

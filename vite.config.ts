@@ -161,9 +161,10 @@ export default defineConfig({
           "**/prompts.ts",
           "**/*.test.ts",
           "**/*.test.tsx",
-          // Stories are made-up samples for the page's parts, shown only in the stories' page (apps/web/stories.html), and
-          // their levels' names.
+          // Stories and their made-up samples, shown only in the stories' page (apps/web/stories.html), and their levels'
+          // names.
           "**/*.stories.tsx",
+          "**/*.samples.ts",
           "apps/web/src/storyLevels.ts",
           "apps/server/src/testing/**",
           "apps/server/src/**/testing.ts",

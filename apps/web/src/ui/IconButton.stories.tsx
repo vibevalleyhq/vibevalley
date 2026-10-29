@@ -5,6 +5,20 @@ import { icons, type IconName } from "./icons";
 export default stories({
   title: "组件/工作台/IconButton",
   stories: {
+    States: story({
+      args: { icon: "pin", danger: false, pressed: false, disabled: false },
+      grid: { rows: ["pressed", [false, true]], cols: "pseudo" },
+      render: (a) => (
+        <IconButton
+          icon={a.icon as IconName}
+          label="置顶"
+          pressed={a.pressed}
+          tone={a.danger ? "danger" : undefined}
+          disabled={a.disabled}
+          onClick={() => undefined}
+        />
+      ),
+    }),
     Playground: story({
       args: { icon: "search", label: "搜索", pressed: false, danger: false, disabled: false },
       controls: { icon: { kind: "choice", options: Object.keys(icons) } },

@@ -7,7 +7,7 @@ export type Tone = "plain" | "primary" | "quiet" | "danger";
 
 const tones: Record<Tone, string> = {
   plain: "border border-line bg-page hover:bg-hover",
-  primary: "border border-accent bg-accent text-page hover:bg-leaf",
+  primary: "border border-accent bg-accent text-page hover:bg-accent-hover",
   quiet: "border border-transparent hover:bg-hover",
   danger: "border border-line bg-page text-berry hover:bg-hover",
 };
