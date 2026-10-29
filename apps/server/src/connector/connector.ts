@@ -110,7 +110,9 @@ const sleepOrWake = (ms: number, register: (wake: () => void) => void) =>
   Effect.suspend(() => {
     const woke = Deferred.makeUnsafe<void>();
     register(() => Deferred.doneUnsafe(woke, Effect.void));
-    return Effect.raceFirst(Effect.as(Deferred.await(woke), "wake" as const), Effect.as(Effect.sleep(Math.max(0, ms)), "timeout" as const));
+    return Effect.as(Deferred.await(woke), "wake" as const).pipe(
+      Effect.timeoutOrElse({ duration: Math.max(0, ms), orElse: () => Effect.succeed("timeout" as const) }),
+    );
   });
 
 export const make = (options: ConnectorOptions = {}) =>
@@ -615,7 +617,7 @@ export const make = (options: ConnectorOptions = {}) =>
           };
           progressed.add(done);
           done();
-          yield* Effect.raceFirst(Deferred.await(shown), Effect.sleep(1_500)).pipe(Effect.ensuring(Effect.sync(() => progressed.delete(done))));
+          yield* Deferred.await(shown).pipe(Effect.timeoutOption(1_500), Effect.ensuring(Effect.sync(() => progressed.delete(done))));
           return yield* status;
         }),
         verify: (code: string) =>

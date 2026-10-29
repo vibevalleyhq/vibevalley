@@ -263,7 +263,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       const scope = yield* Scope.make();
       const operations = yield* Scope.provide(FiberSet.make(), scope);
       const writes = yield* Queue.dropping<Effect.Effect<void>, Cause.Done>(writeQueue);
-      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatMap(Queue.take(writes), (write) => write))), scope);
+      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatten(Queue.take(writes)))), scope);
       return { all: sources, off, scope, operations, writes, writer } satisfies Generation;
     });
 
@@ -307,9 +307,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       Effect.flatMap(FiberSet.run(g.operations, operation), (fiber) =>
         Fiber.join(fiber).pipe(
           Effect.onInterrupt(() => Fiber.interrupt(fiber)),
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause) ? Effect.fail(new SourceError({ message: g.why ?? "canceled" })) : Effect.failCause(cause),
-          ),
+          Effect.catchCauseIf(Cause.hasInterruptsOnly, () => Effect.fail(new SourceError({ message: g.why ?? "canceled" }))),
         ),
       );
 

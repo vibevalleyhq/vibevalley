@@ -172,8 +172,9 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
 
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {
+    const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
     const c = yield* Connectors;
-    return () => Effect.runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
+    return () => runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
   });
 
 /** The chat app's status once ok holds for it, as the connectors say it to the core whenever it changes. */
@@ -501,11 +502,12 @@ describe("the chat apps", () => {
       yield* Effect.scoped(Effect.provide(weixinConnected(before), farm(before, config)));
       const script = new Script();
       yield* Effect.gen(function* () {
+        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
         const chat = yield* Channels;
         expect((yield* Effect.promise(yield* statusOf("weixin"))).state).toBe("connected");
         script.weixinIn.push(wx(owner, "又见面了"));
         yield* until(async () => {
-          const got = await Effect.runPromise(Effect.provideService(saidIn(chat.defaultChannel()), Channels, chat));
+          const got = await runPromise(Effect.provideService(saidIn(chat.defaultChannel()), Channels, chat));
           return got.length === 1 && got[0] === "又见面了";
         }, "heard after a restart");
       }).pipe(Effect.scoped, Effect.provide(farm(script, config)));
@@ -645,6 +647,7 @@ describe("the chat apps", () => {
   it.live("keep the account when retiring what waited fails", () => {
     const script = new Script();
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const c = yield* Connectors;
       const chat = yield* Channels;
       const sql = yield* SqlClient.SqlClient;
@@ -664,7 +667,7 @@ describe("the chat apps", () => {
       // A new successful login must not replace the account if retiring its outbox fails.
       yield* c.login("qq", { force: true, appId: "new-app", secret: "right" });
       const again = yield* until(async () => {
-        const s = await Effect.runPromise(Effect.map(c.list(), (all) => all.find((x) => x.id === "qq")!));
+        const s = await runPromise(Effect.map(c.list(), (all) => all.find((x) => x.id === "qq")!));
         return s.state === "pairing" && s.error ? s : undefined;
       }, "the failed login");
       expect(again.error).toContain("disk failure");

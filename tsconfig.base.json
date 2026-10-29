@@ -15,7 +15,24 @@
         "diagnosticSeverity": {
           "unstableApiUsage": "off",
           "lazyEffect": "off",
-          "effectSucceedWithVoid": "off"
+          "effectSucceedWithVoid": "off",
+          "schemaNumber": "warning",
+          "runEffectInsideEffect": "warning",
+          "unnecessaryFailYieldableError": "warning",
+          "preferTypedSchemaDecoder": "warning",
+          "tryCatchInEffectGen": "warning",
+          "schemaStructWithTag": "warning",
+          "flatMapConditionalToFilterOrFail": "warning",
+          "catchToIgnore": "warning",
+          "flatMapToTap": "warning",
+          "flatMapIdentityToFlatten": "warning",
+          "catchConditionalRefailToCatchIf": "warning",
+          "raceFirstWithSleepToTimeout": "warning",
+          "redundantOrDie": "warning",
+          "unnecessaryPipeChain": "warning",
+          "unnecessaryEffectGen": "warning",
+          "schemaSyncInEffect": "warning",
+          "abortControllerInEffect": "warning"
         }
       }
     ]

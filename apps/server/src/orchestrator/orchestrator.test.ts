@@ -428,6 +428,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const { in: saidIn } = yield* Said;
@@ -445,7 +446,7 @@ describe("the orchestrator", () => {
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
       const merged = yield* until(async () => {
-        const t = await Effect.runPromise(issues.get(hired.session!.issue!));
+        const t = await runPromise(issues.get(hired.session!.issue!));
         return t.closedAt !== undefined && t;
       }, "merged");
       // The helper said its words and committed nothing: done, with nothing to merge, and said so.
@@ -472,6 +473,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
+      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
       const issues = yield* Issues;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
@@ -484,7 +486,7 @@ describe("the orchestrator", () => {
       expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
       yield* orchestrator.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
-      yield* until(async () => (await Effect.runPromise(issues.get(issue.id))).status === "in_review", "handed back");
+      yield* until(async () => (await runPromise(issues.get(issue.id))).status === "in_review", "handed back");
       yield* orchestrator.say("哪些在等我？", {}, undefined, "");
       const waiting = yield* until(() => words().find((w) => w.startsWith("工单：- #")), "listed");
       expect(waiting).toContain(`#${number}「首页偶尔白屏」等你验收`);

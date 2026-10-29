@@ -8,7 +8,7 @@ import { ServerConfig } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { waitFor, whenTrue } from "../testing/until.ts";
 import { newId } from "../base/ids.ts";
-import { missing } from "../errors.ts";
+import { orMissing } from "../errors.ts";
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";
@@ -22,7 +22,7 @@ const on = (config: ServerConfig["Service"] = testConfig()) =>
 const make = (options: BlocksOptions = {}) =>
   Effect.gen(function* () {
     const { run: db, one } = yield* Db;
-    const row = (id: string) => Effect.flatMap(one(qa.artifact({ id })), (r) => (r ? Effect.succeed(r) : Effect.fail(missing(id, []))));
+    const row = (id: string) => one(qa.artifact({ id })).pipe(orMissing(id, []));
     const blocks = yield* makeBlocks(row, options);
     const get = (id: string) =>
       Effect.gen(function* () {

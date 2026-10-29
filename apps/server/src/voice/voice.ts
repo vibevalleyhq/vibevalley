@@ -740,6 +740,8 @@ export const make = (options: VoiceOptions = {}) =>
             release,
             quick: callLine === undefined,
             greeting: forCall.greeting.trim(),
+            // The call's life spans its fibers (the answer it waits on, the words it reads out): ended when the call ends.
+            // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
             ending: false,
           });

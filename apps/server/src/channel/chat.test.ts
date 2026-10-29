@@ -137,13 +137,14 @@ const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) 
 
 /** The services of a test, and its helpers. */
 const farm = Effect.gen(function* () {
+  const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
   const core = yield* Core;
   const chat = yield* Channels;
   const sql = yield* SqlClient.SqlClient;
   const messagesOf = (yield* Said).in;
   const channel = (id: string | undefined) => (id ? channelOf(core.state().chat, id) : undefined);
   const deliveries = (recipient: string) =>
-    Effect.runPromise(
+    runPromise(
       sql<{
         message_id: string;
         reason: string;
@@ -160,6 +161,7 @@ type Farm = Effect.Success<typeof farm>;
 
 const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string, issue?: string) =>
   Effect.gen(function* () {
+    const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
     yield* f.core.apply({
       type: "hired",
       session: {
@@ -177,7 +179,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: strin
       } as Session,
     });
     let thread: Channel | undefined;
-    yield* until(async () => (thread = f.channel(await Effect.runPromise(f.chat.jobThread(id)))) !== undefined, "a job thread");
+    yield* until(async () => (thread = f.channel(await runPromise(f.chat.jobThread(id)))) !== undefined, "a job thread");
     return thread!;
   });
 
@@ -364,12 +366,13 @@ describe("the chat", () => {
   it.live("a search reads its filters, and an edit can take a message's files off", () =>
     run((f) =>
       Effect.gen(function* () {
+        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
         const general = f.chat.defaultChannel();
         const file = yield* f.chat.attach({ name: "图.png", type: "image/png", data: Buffer.from("x").toString("base64") });
         const pictured = (yield* f.chat.say("看图", undefined, "", { attachments: [file.id] })).message;
         yield* f.chat.say("一个链接 https://example.com/page", undefined, "");
         yield* f.chat.speak(defaultOrchestrator, "我看了图", { anyway: true, confirm: true });
-        const text = async (q: string) => (await Effect.runPromise(f.chat.search(q))).map((h) => h.message.text);
+        const text = async (q: string) => (await runPromise(f.chat.search(q))).map((h) => h.message.text);
         expect(yield* Effect.promise(() => text("has:image"))).toEqual(["看图"]);
         expect(yield* Effect.promise(() => text("has:link"))).toEqual(["一个链接 https://example.com/page"]);
         expect(yield* Effect.promise(() => text("图 from:管家"))).toEqual(["我看了图"]);

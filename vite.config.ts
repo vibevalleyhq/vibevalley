@@ -23,6 +23,7 @@ export default defineConfig({
       "server:check": [
         "vp check",
         "vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test",
+        "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
       ],
@@ -35,6 +36,17 @@ export default defineConfig({
       ],
       // The health package's tests, then the escape ratchet (scripts/health.config.ts); the report is `vp run health`.
       "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/health.config.ts --check"],
+      // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
+      "effect:check": [
+        "effect-tsgo diagnostics --project apps/server/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/testkit/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/health/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project apps/web/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project apps/desktop/tsconfig.json --strict",
+      ],
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
     },
   },

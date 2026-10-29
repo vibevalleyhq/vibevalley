@@ -175,8 +175,9 @@ describe("core", () => {
 
   it.effect("apply stays synchronous for oar callbacks", () =>
     Effect.gen(function* () {
+      const runSync = Effect.runSyncWith(yield* Effect.context<never>());
       const core = yield* Core;
-      yield* Effect.sync(() => Effect.runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
+      yield* Effect.sync(() => runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
       expect(core.state().orchestrators?.orchestrator?.state).toBe("thinking");
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
   );

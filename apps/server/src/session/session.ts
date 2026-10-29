@@ -382,6 +382,7 @@ export function watchStalls(
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
+    const runSync = Effect.runSyncWith(yield* Effect.context<never>());
     const config = yield* ServerConfig;
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
@@ -411,8 +412,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const later = yield* FiberMap.runtime(timers)<never>();
     // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
     // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
-    const apply = (...facts: FactIn[]) => Effect.runSync(core.apply(...facts));
-    const notice = (level: "info" | "warn" | "error", text: string) => Effect.runSync(core.notice(level, text));
+    const apply = (...facts: FactIn[]) => runSync(core.apply(...facts));
+    const notice = (level: "info" | "warn" | "error", text: string) => runSync(core.notice(level, text));
 
     const root = resolve(projects.root);
     const logDir = join(config.home, "logs");
@@ -422,7 +423,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
     const trajectories = new Trajectories(
       config.home,
-      (id, e) => Effect.runSync(core.sessionEvent(id, e)),
+      (id, e) => runSync(core.sessionEvent(id, e)),
       (message) => fire(Effect.logWarning(message)),
       time,
     );

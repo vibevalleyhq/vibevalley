@@ -57,19 +57,15 @@ describe("the game", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        yield* Effect.orDie(
-          q.addLedgerEntry({
-            id: "bad-infinity",
-            kind: "harvested",
-            at: 1,
-            payload: `{"session":"bad","project":"demo","runtime":"pi","commits":1e999,"runs":1}`,
-          }),
-        );
-        yield* Effect.orDie(q.addLedgerEntry({ id: "bad-shape", kind: "level", at: 2, payload: `{"level":"high"}` }));
-        yield* Effect.orDie(
-          q.addLedgerEntry({ id: "good", kind: "harvested", at: 3, payload: `{"session":"good","project":"demo","runtime":"pi","commits":1,"runs":1}` }),
-        );
-      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+        yield* q.addLedgerEntry({
+          id: "bad-infinity",
+          kind: "harvested",
+          at: 1,
+          payload: `{"session":"bad","project":"demo","runtime":"pi","commits":1e999,"runs":1}`,
+        });
+        yield* q.addLedgerEntry({ id: "bad-shape", kind: "level", at: 2, payload: `{"level":"high"}` });
+        yield* q.addLedgerEntry({ id: "good", kind: "harvested", at: 3, payload: `{"session":"good","project":"demo","runtime":"pi","commits":1,"runs":1}` });
+      }).pipe(Effect.orDie, Effect.scoped, Effect.provide(farm(config)));
       yield* Effect.gen(function* () {
         const progress = (yield* Core).state().progress!;
         expect(progress.counts.harvests).toBe(1);
@@ -150,7 +146,7 @@ describe("the game", () => {
         const projects = Layer.unwrap(
           Effect.map(Projects, (current) => Layer.succeed(Projects, Projects.of({ ...current, contributions: () => contributions }))),
         ).pipe(Layer.provideMerge(world({ config })));
-        const app = gameStart.pipe(Layer.provideMerge(Game.layer)).pipe(Layer.provideMerge(projects));
+        const app = gameStart.pipe(Layer.provideMerge(Game.layer), Layer.provideMerge(projects));
         yield* Effect.scoped(
           Effect.gen(function* () {
             const core = yield* Core;

@@ -250,9 +250,10 @@ describe("memory sources", () => {
       old.forget = async (_, __, signal) => void (await read(signal));
       old.stop = async () => void (stopped = true);
       return Effect.gen(function* () {
+        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
         yield* save(nowledgeOn);
         const m = yield* Memories;
-        const pending = Effect.runPromise(
+        const pending = runPromise(
           Effect.result(
             operation === "prefetch"
               ? Effect.asVoid(m.recall({ agent: "lab", project: "demo", text: "query" }))

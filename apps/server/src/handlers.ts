@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
-import { missing, lookIn, reasonOf, refused } from "./errors.ts";
+import { missing, lookIn, reasonOf, refused, orMissing } from "./errors.ts";
 import { Projects } from "./project/project.ts";
 import { Effect, Option } from "effect";
 import { ServerConfig } from "./base/config.ts";
@@ -81,7 +81,7 @@ export const handlers = Effect.gen(function* () {
         lan.me(Option.getOrUndefined(Option.map(request, (r) => r.headers[deviceHeader]))),
       ),
     "game.title.set": (body) => game.chooseTitle(body.achievement, body.tier),
-    "github.refresh": () => Effect.flatMap(projects.refreshGitHub(), (status) => Effect.as(issues.refreshPullRequests, status)),
+    "github.refresh": () => Effect.tap(projects.refreshGitHub(), () => issues.refreshPullRequests),
     "orchestrator.eval.create": (body) => orchestrator.markWrong(body.on, body.want, body.agent),
     "channel.message.send": (body) =>
       Effect.andThen(
@@ -108,10 +108,9 @@ export const handlers = Effect.gen(function* () {
     "project.language.list": ({ id }) =>
       projects.languages(id).pipe(
         Effect.mapError((e) => refused(e.message)),
-        Effect.flatMap((l) => (l ? Effect.succeed(l) : Effect.fail(missing(t("server.projectRef", { id }), [lookIn.project])))),
+        orMissing(t("server.projectRef", { id }), [lookIn.project]),
       ),
-    "project.activity.get": ({ id }) =>
-      Effect.flatMap(projects.activity(id), (a) => (a ? Effect.succeed(a) : Effect.fail(missing(t("server.projectRef", { id }), [lookIn.project])))),
+    "project.activity.get": ({ id }) => projects.activity(id).pipe(orMissing(t("server.projectRef", { id }), [lookIn.project])),
     "agent.list": () => Effect.sync(agents.all),
     "agent.create": (body) => agents.create(body),
     "agent.update": (agent) => agents.save(agent),
@@ -142,15 +141,12 @@ export const handlers = Effect.gen(function* () {
         return text !== undefined ? Effect.succeed(text) : Effect.fail(missing(t("server.archiveRef", { name }), [lookIn.archive]));
       }),
     "runtime.list": () => Effect.sync(runtimes.list),
-    "runtime.refresh": ({ id }) =>
-      Effect.flatMap(runtimes.refresh(id), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
-    "runtime.setting.update": ({ id, ...body }) =>
-      Effect.flatMap(runtimes.update(id, body), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
+    "runtime.refresh": ({ id }) => runtimes.refresh(id).pipe(orMissing("runtime " + id, [lookIn.runtime])),
+    "runtime.setting.update": ({ id, ...body }) => runtimes.update(id, body).pipe(orMissing("runtime " + id, [lookIn.runtime])),
     "agent.validate": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.problemsOf(agent), (problems) => ({ id: agent.id, problems }))),
     "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
-    "session.get": ({ id }) =>
-      Effect.flatMap(sessions.get(id), (s) => (s ? Effect.succeed(s) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session])))),
+    "session.get": ({ id }) => sessions.get(id).pipe(orMissing(t("server.helperRef", { id }), [lookIn.session])),
     "session.event.list": ({ id, run }) => Effect.sync(() => sessions.events(id, run ?? "") ?? []),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),

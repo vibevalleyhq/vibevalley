@@ -354,41 +354,31 @@ const doingFields = {
 
 export const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
 
-export const PhaseArriving: Codec<T.PhaseArriving> = Schema.Struct({
-  _tag: Schema.Literal("arriving"),
-});
+export const PhaseArriving: Codec<T.PhaseArriving> = Schema.TaggedStruct("arriving", {});
 
 export const Retry: Codec<T.Retry> = Schema.Struct({
   attempt: Schema.Finite,
   of: Schema.optionalKey(Schema.Finite),
 });
 
-export const PhaseWorking: Codec<T.PhaseWorking> = Schema.Struct({
-  _tag: Schema.Literal("working"),
+export const PhaseWorking: Codec<T.PhaseWorking> = Schema.TaggedStruct("working", {
   since: Schema.Finite,
   doing: Doing,
   quietSince: Schema.optionalKey(Schema.Finite),
   retry: Schema.optionalKey(Retry),
 });
 
-export const PhaseDone: Codec<T.PhaseDone> = Schema.Struct({
-  _tag: Schema.Literal("done"),
-});
+export const PhaseDone: Codec<T.PhaseDone> = Schema.TaggedStruct("done", {});
 
-export const PhaseFailed: Codec<T.PhaseFailed> = Schema.Struct({
-  _tag: Schema.Literal("failed"),
-});
+export const PhaseFailed: Codec<T.PhaseFailed> = Schema.TaggedStruct("failed", {});
 
-export const PhaseResting: Codec<T.PhaseResting> = Schema.Struct({
-  _tag: Schema.Literal("resting"),
-});
+export const PhaseResting: Codec<T.PhaseResting> = Schema.TaggedStruct("resting", {});
 
 export const SessionClose: Codec<T.SessionClose> = Schema.Literals(T.SessionCloseValues);
 export const Delivery: Codec<T.Delivery> = Schema.Literals(T.DeliveryValues);
 export const IssueCanceled: Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanceledValues);
 
-export const PhaseClosed: Codec<T.PhaseClosed> = Schema.Struct({
-  _tag: Schema.Literal("closed"),
+export const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
   at: Schema.Finite,
   closed: SessionClose,
 });
@@ -604,10 +594,7 @@ export const Chat: Codec<T.Chat> = Schema.Struct({
   ownerMentions: Schema.optionalKey(Schema.mutable(Schema.Array(OwnerMention))),
 });
 
-export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([
-  Schema.Struct({ _tag: Schema.Literal("Message"), message: ChatMessage }),
-  Schema.Struct({ _tag: Schema.Literal("Reset") }),
-]);
+export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([Schema.TaggedStruct("Message", { message: ChatMessage }), Schema.TaggedStruct("Reset", {})]);
 
 export const Priority: Codec<T.Priority> = Schema.Literals(T.PriorityValues);
 
