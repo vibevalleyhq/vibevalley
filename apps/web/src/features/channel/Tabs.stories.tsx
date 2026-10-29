@@ -1,10 +1,10 @@
-import type { Cron } from "@vibevalley/protocol";
+import type { CronView } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 import { CronCard } from "./Tabs";
 
 const now = Date.now();
 
-const cron = (more: Partial<Cron>): Cron => ({
+const cron = (more: Partial<CronView>): CronView => ({
   id: "c1",
   name: "每天的站会",
   text: "看一眼昨天交的活，写三行进展发到这里。",
@@ -16,10 +16,12 @@ const cron = (more: Partial<Cron>): Cron => ({
   lastRun: now - 86_400_000,
   by: "owner",
   pending: false,
+  whenText: "每天 09:30",
+  nextText: "明天 09:30",
   ...more,
 });
 
-const neverRun = ({ lastRun: _lastRun, ...c }: Cron): Cron => c;
+const neverRun = ({ lastRun: _lastRun, ...c }: CronView): CronView => c;
 
 export default stories({
   title: "组件/频道/定时任务",

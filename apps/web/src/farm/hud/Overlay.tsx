@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // head, the orchestrator's last words, and the yard's signs, names and counts. Words let clicks through to the village.
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
-import type { Session, SessionId } from "@vibevalley/protocol";
+import type { SessionId, SessionView } from "@vibevalley/protocol";
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./rules";
 import { farmState } from "@/farm/store";
 import { aimTool } from "@/farm/tools";
@@ -227,7 +227,7 @@ export function Overlay() {
 }
 
 /** What each helper is doing, over its head as it walks: moved every frame, not drawn again every frame. */
-function Heads(props: { sessions: readonly Session[]; village: Village }) {
+function Heads(props: { sessions: readonly SessionView[]; village: Village }) {
   const screen = useFarm((s) => s.screen);
   const placed = new Map<SessionId, HTMLDivElement>();
   const place = () => {
@@ -251,7 +251,7 @@ function Heads(props: { sessions: readonly Session[]; village: Village }) {
   );
 }
 
-function Head(props: { session: Session; village: Village; placed: Map<string, HTMLDivElement> }) {
+function Head(props: { session: SessionView; village: Village; placed: Map<string, HTMLDivElement> }) {
   const rows = () => {
     const doing = doingOf(props.session);
     const named = props.session.phase._tag === "arriving";

@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 // Words the HUD shows, from the frame: the clock, the warehouse, what a helper is doing, a plot's title and what the
 // orchestrator last said. The runtimes' quotas are features/runtime/quota.ts.
 
-import type { ChatMessage, WorkspaceState, Crop, Doing, Issue, Session } from "@vibevalley/protocol";
+import type { ChatMessage, WorkspaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
 
 import { beds, cropLabel, type Bed } from "@/farm/world/plots";
 
@@ -19,9 +19,9 @@ export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/
 export const harvestedOf = (s: WorkspaceState | undefined): Issue[] =>
   (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
 
-const nothing: Doing = { action: "none", label: "" };
+const nothing: DoingView = { action: "none", label: "", actionText: "" };
 
-export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : nothing);
+export const doingOf = (h: SessionView): DoingView => (h.phase._tag === "working" ? h.phase.doing : nothing);
 
 /** The levels that clear a locked bed: the level-up banner says so. */
 export const clearingLevels = new Set(beds.flatMap((b) => (b.unlockLevel === undefined ? [] : [b.unlockLevel])));

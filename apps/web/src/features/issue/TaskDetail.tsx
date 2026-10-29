@@ -117,7 +117,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                         const step = task();
                         const waitsOn = step.blockedBy.map((b) => byId().get(b)?.title ?? b);
                         return [
-                          step.stateText ?? step.state,
+                          step.stateText || step.state,
                           ...(step.agent ? [nameOf()(step.agent)] : []),
                           ...(step.state === "waiting" && waitsOn.length
                             ? [t("web.issue.task.waitsOn", { steps: waitsOn.join(t("web.issue.task.stepSeparator")) })]
@@ -208,7 +208,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
           </Button>
         </Show>
       </div>
-      <Property label={t("web.issue.task.state")}>{g().stateTag ?? g().state}</Property>
+      <Property label={t("web.issue.task.state")}>{g().stateTag || g().state}</Property>
       <Property label={t("web.issue.task.project")}>{g().project}</Property>
       <Property label={t("web.issue.task.progress")}>{t("web.issue.task.progressLine", { done: settled(), of: total() })}</Property>
       <Show when={g().spent}>{(sp) => <Property label={t("web.issue.task.spent")}>{spentText(sp())}</Property>}</Show>

@@ -6,7 +6,8 @@ import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/ag
 
 /** More steps than this means the job should be split into tasks. */
 /** A step as the frame shows it before its acts are worked out (graphFrom does that): none yet. */
-export const taskView = (): Pick<Task, "blockedBy" | "actions" | "actionText" | "canEdit" | "canRemove"> => ({
+export const taskView = (): Pick<Task, "blockedBy" | "actions" | "actionText" | "canEdit" | "canRemove" | "stateText"> => ({
+  stateText: "",
   blockedBy: [],
   actions: [],
   actionText: {},
@@ -15,7 +16,8 @@ export const taskView = (): Pick<Task, "blockedBy" | "actions" | "actionText" | 
 });
 
 /** A graph as the frame shows it before its acts and layers are worked out: none yet. */
-export const graphView = (): Pick<TaskGraph, "actionText" | "actions" | "layers" | "asksForYou"> => ({
+export const graphView = (): Pick<TaskGraph, "actionText" | "actions" | "layers" | "asksForYou" | "stateTag"> => ({
+  stateTag: "",
   actionText: {},
   actions: [],
   layers: [],

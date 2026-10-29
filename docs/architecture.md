@@ -75,7 +75,7 @@ flowchart LR
 
 工单（`Issue`）里开着的和最近关的 50 张（`keepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `issueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`graphsOf` 读成 `TaskGraph`（[种植计划](docs/subsystems/task.md)）。频道模块在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时任务、账本折出来的进度也在里面（[定时任务](docs/subsystems/cron.md)、[游戏](docs/subsystems/game.md)）。
 
-给页面的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`graphs`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `frameOf` 拼：给人看的话（帮工在干什么、定时任务什么时候跑、计划是哪个状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`reduce` 和 `state.json` 里没有。页面的规则（各 feature 里的纯函数）只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在页面。
+给页面的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`graphs`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `frameOf` 拼：给人看的话（帮工在干什么、定时任务什么时候跑、计划是哪个状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`reduce` 和 `state.json` 里没有：帧里的 `state` 是 `WorkspaceView`，帮工是 `SessionView`、定时任务是 `CronView`，比核心形状多出必有的说法，核心形状上没有这些字段。页面的规则（各 feature 里的纯函数）只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在页面。
 
 ## 事件流
 

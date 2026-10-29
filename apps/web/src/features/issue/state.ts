@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
-import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
+import type { Changes, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./rules";
 import { tookText } from "@/base/format";
@@ -38,8 +38,8 @@ export interface OwnerQuestion {
   tone: Tone;
 }
 
-const nothing: Doing = { action: "none", label: "" };
-const doingOf = (s: Session): Doing => (s.phase._tag === "working" ? s.phase.doing : nothing);
+const nothing: DoingView = { action: "none", label: "", actionText: "" };
+const doingOf = (s: SessionView): DoingView => (s.phase._tag === "working" ? s.phase.doing : nothing);
 
 /** One of the criteria as far as it got: the helper's word on it, if it gave one. */
 export interface CriterionRow {
@@ -95,13 +95,14 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
 }
 
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
-export function issueState(issue: Issue, sessions: Session[], session: Session | undefined, graphs: TaskGraph[]) {
+export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, graphs: TaskGraph[]) {
   const head = session ?? sessions[sessions.length - 1]!;
   const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
   const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === head.graph!.task);
   const attention = issue.attention;
-  const current = doingOf(head);
+  // What it is doing is the live session's, in the frame's words: an ended one is doing nothing.
+  const current = session ? doingOf(session) : nothing;
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
   const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => x.agent === s.agent));
@@ -134,8 +135,8 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     doing:
       attention.state === "working" && current.action !== "none"
         ? current.label
-          ? t("web.issue.issue.doingLabel", { action: capitalized(current.actionText ?? ""), label: current.label })
-          : t("web.issue.issue.doing", { action: capitalized(current.actionText ?? "") })
+          ? t("web.issue.issue.doingLabel", { action: capitalized(current.actionText), label: current.label })
+          : t("web.issue.issue.doing", { action: capitalized(current.actionText) })
         : undefined,
     openFindings: issue.findings.filter((f) => !f.resolved),
     resolvedFindings: issue.findings.filter((f) => f.resolved),

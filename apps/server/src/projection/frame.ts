@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
-import type { WorkspaceState, GameEffect, StateFrame } from "@vibevalley/protocol";
+import type { Doing, DoingView, GameEffect, StateFrame, WorkspaceState, WorkspaceView } from "@vibevalley/protocol";
 import { inbox } from "@/notice/inbox.ts";
 import { phaseWords } from "@vibevalley/protocol/rules";
 import { nextText, whenText } from "@/cron/when.ts";
@@ -40,21 +40,16 @@ export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): Stat
   return { state: withWords(state), inbox: inbox(state), graphs, view: viewOf(state), effects };
 }
 
-function withWords(state: WorkspaceState): WorkspaceState {
-  let next = state;
-  if (state.sessions.length > 0) {
-    next = {
-      ...next,
-      sessions: state.sessions.map((h) => {
-        const out = { ...h, phaseText: phaseWords(h) };
-        // The phase and the play are the state's: changed on copies.
-        if (h.phase._tag === "working") out.phase = { ...h.phase, doing: { ...h.phase.doing, actionText: t(`shared.action.${h.phase.doing.action}`) } };
-        if (h.play && h.play.history.length > 0)
-          out.play = { ...h.play, history: h.play.history.map((s) => ({ ...s, actionText: t(`shared.action.${s.action}`) })) };
-        return out;
-      }),
-    };
-  }
-  if (state.crons.length > 0) next = { ...next, crons: state.crons.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
-  return next;
+function withWords(state: WorkspaceState): WorkspaceView {
+  const doing = (d: Doing): DoingView => ({ ...d, actionText: t(`shared.action.${d.action}`) });
+  return {
+    ...state,
+    sessions: state.sessions.map(({ phase, play, ...h }) => ({
+      ...h,
+      phase: phase._tag === "working" ? { ...phase, doing: doing(phase.doing) } : phase,
+      ...(play ? { play: { ...play, history: play.history.map((s) => ({ ...s, ...doing(s) })) } } : {}),
+      phaseText: phaseWords({ ...h, phase }),
+    })),
+    crons: state.crons.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })),
+  };
 }

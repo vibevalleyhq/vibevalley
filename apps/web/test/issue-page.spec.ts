@@ -3,7 +3,7 @@
 // words say); the rest serve a frame and the issue's history with one in place, for states it does not reach.
 
 import type { Page, Route } from "@playwright/test";
-import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
+import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { buttons, expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -28,13 +28,13 @@ async function openIssue(
   made: Issue,
   attention: IssueAttention,
   more: Partial<Issue>,
-  helper: Partial<Session>,
+  helper: Partial<SessionView>,
   timeline: IssueTimeline,
   changes: Changes = nothingYet,
 ) {
   const now = Date.now();
   const frame = await firstFrame(server.url);
-  const session: Session = {
+  const session: SessionView = {
     id: sessionId("w1"),
     name: "阿狐",
     agent: "fox",
@@ -44,6 +44,7 @@ async function openIssue(
     runs: 1,
     phase: { _tag: "done" },
     refining: false,
+    phaseText: "",
     issue: made.id,
     branch: "vibevalley/1",
     ...helper,

@@ -15,6 +15,7 @@ import {
   type Milestone,
   type Session,
   type SessionEvent,
+  type SessionView,
 } from "@vibevalley/protocol";
 import { api } from "@/base/api";
 import { createIssueActs, perform } from "./acts";
@@ -43,7 +44,7 @@ import { createSessionEvents } from "@/features/session";
 export function IssueDetail(props: {
   issue: Issue;
   sessions: Session[];
-  session?: Session | undefined;
+  session?: SessionView | undefined;
   onClose: (session: Session, review: boolean) => void;
   onTask?: (() => void) | undefined;
 }) {

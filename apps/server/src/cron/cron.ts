@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
+import { whenText } from "./when.ts";
 import { messageOf } from "@/errors.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
@@ -196,7 +197,7 @@ export const make = Effect.gen(function* () {
     }, lock.withPermits(1)),
     previewRemove: (id) =>
       Effect.map(find(id), (was) => ({
-        does: [was.whenText ? t("server.cron.removeWhen", { name: was.name, when: was.whenText }) : t("server.cron.remove", { name: was.name })],
+        does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })],
       })),
     tick,
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),

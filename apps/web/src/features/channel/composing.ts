@@ -4,7 +4,7 @@
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
-import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceView } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "@/base/api";
@@ -47,7 +47,7 @@ export interface ComposerWays {
   readonly sent?: () => void;
 }
 
-export function createComposer(core: () => WorkspaceState | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
+export function createComposer(core: () => WorkspaceView | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
   const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);

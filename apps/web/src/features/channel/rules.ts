@@ -17,6 +17,7 @@ import {
   type Phase,
   type Session,
   type WorkspaceState,
+  type SessionView,
 } from "@vibevalley/protocol";
 
 export const isTop = (c: Channel) => c.type !== "thread";
@@ -88,7 +89,7 @@ export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" :
 /** Where a message is: its channel's address and its number, which the list scrolls to and lights up. */
 export const messagePath = (c: Channel | undefined, number: number) => `${chatPath(c)}?m=${number}`;
 
-const findLast = <T>(xs: T[] | undefined, test: (x: T) => boolean) => {
+const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
   if (!xs) return undefined;
   for (let i = xs.length - 1; i >= 0; i--) if (test(xs[i]!)) return xs[i];
   return undefined;
@@ -104,7 +105,7 @@ export function jobThreadOf(chat: Chat | undefined, session: Session) {
 }
 
 /** Whom a thread's words are for now: the session working its issue, or a talk thread's own session. */
-export function threadOwnerOf(thread: Channel, sessions: Session[]) {
+export function threadOwnerOf<S extends Session>(thread: Channel, sessions: readonly S[]): S | undefined {
   switch (thread.subjectKind) {
     case "issue":
       return findLast(sessions, (h) => h.issue === thread.subjectId);
@@ -245,8 +246,8 @@ export function workbenchClock(at: number) {
 const span = spanText;
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
-export function phaseText(h: Session, now: number) {
-  const words = h.phaseText ?? "";
+export function phaseText(h: SessionView, now: number) {
+  const words = h.phaseText;
   return h.phase._tag === "working" && h.phase.quietSince !== undefined ? words.replaceAll("{span}", span(now - h.phase.quietSince)) : words;
 }
 
@@ -311,7 +312,7 @@ export const menuMax = 6;
 
 /** The place's orchestrator (here) is @管家, every other orchestrator its @<profile id>; everyone only when there is
  * more than one helper. */
-export const nameables = (sessions: Session[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
+export const nameables = (sessions: SessionView[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
   {
     token: mentionOf[defaultOrchestrator]!,

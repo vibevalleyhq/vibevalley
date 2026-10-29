@@ -393,7 +393,6 @@ export const catalogs = {
       noChannel: "没有 {name} 这个频道",
       noProfile: "没有叫 {name} 的档案",
       noProject: "#{channel} 没有默认项目：直接派给帮工的定时任务要写 project",
-      remove: "删掉定时任务「{name}」：以后不再到点开工，它开过的工单留着",
       removeWhen: "删掉定时任务「{name}」（{when}）：以后不再到点开工，它开过的工单留着",
     },
     "server.game": {
@@ -3933,7 +3932,6 @@ export const catalogs = {
       noChannel: "There is no channel {name}",
       noProfile: "There is no profile called {name}",
       noProject: "#{channel} has no default project: a scheduled task sent straight to a helper needs a project",
-      remove: 'Delete the scheduled task "{name}": it no longer starts work when due; the tickets it opened stay',
       removeWhen: 'Delete the scheduled task "{name}" ({when}): it no longer starts work when due; the tickets it opened stay',
     },
     "server.game": {
@@ -7592,7 +7590,6 @@ export interface Messages {
   "server.cron.problem.past": undefined;
   "server.cron.problem.time": { readonly time: string | number };
   "server.cron.problem.zone": { readonly tz: string | number };
-  "server.cron.remove": { readonly name: string | number };
   "server.cron.removeWhen": { readonly name: string | number; readonly when: string | number };
   "server.cron.weekdays.0": undefined;
   "server.cron.weekdays.1": undefined;

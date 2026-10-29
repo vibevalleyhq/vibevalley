@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
 
-import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
+import { OutfitValues, SpeciesValues, type SessionView } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -67,7 +67,7 @@ export function IssueView() {
   );
 }
 
-function PlotDetail(props: { session: Session; onDone: () => void }) {
+function PlotDetail(props: { session: SessionView; onDone: () => void }) {
   const core = useCore();
   const router = useRouter();
   const history = useIssueHistory(() => true);
@@ -117,7 +117,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
 function IssueBody(props: {
   issue: Issue;
   sessions: Session[];
-  session: Session;
+  session: SessionView;
   onHarvest: (s: Session) => void;
   onClose: (s: Session) => Promise<void>;
   onThread?: (() => void) | undefined;

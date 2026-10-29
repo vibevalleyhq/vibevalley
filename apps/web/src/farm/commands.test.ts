@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vite-plus/test";
-import type { Issue, IssueAct, IssueAction, IssueAttention, Session, StateFrame } from "@vibevalley/protocol";
+import type { Issue, IssueAct, IssueAction, IssueAttention, StateFrame, SessionView } from "@vibevalley/protocol";
 import { farmCommands } from "./commands";
 import { farm, resetFarm } from "./store";
 import { beds } from "./world/plots";
@@ -32,7 +32,7 @@ const buttons = (...names: IssueAct[]): IssueAction[] =>
     }
   });
 
-const helper: Session = {
+const helper: SessionView = {
   id: sessionId("helper"),
   name: "阿狐",
   agent: "fox",
@@ -42,11 +42,12 @@ const helper: Session = {
   runs: 1,
   phase: { _tag: "done" },
   refining: false,
+  phaseText: "",
   issue: issueId("clock"),
   play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
 
-function frame(attention: IssueAttention, session: Session = helper): StateFrame {
+function frame(attention: IssueAttention, session: SessionView = helper): StateFrame {
   const issue: Issue = {
     id: issueId("clock"),
     number: 1,
@@ -95,7 +96,7 @@ test("a failed round can be cured even before its crop image catches up", () => 
 test("an issue in a task graph offers no farm actions even while its helper is working", () => {
   const f = frame(
     { state: "working", acts: [] },
-    { ...helper, phase: { _tag: "working", since: 0, doing: { action: "none", label: "" } }, graph: { id: "graph" } },
+    { ...helper, phase: { _tag: "working", since: 0, doing: { action: "none", label: "", actionText: "" } }, graph: { id: "graph" } },
   );
   for (const tool of ["water", "bug", "harvest", "shovel"] as const) expect(aim(f, tool).aim.ok, tool).toBe(false);
   expect(aim(f, "hand").aim.ok).toBe(true);

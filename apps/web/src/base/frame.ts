@@ -1,5 +1,5 @@
 import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
-import { defaultOrchestrator, type OrchestratorState, type StateFrame, type WorkspaceState } from "@vibevalley/protocol";
+import { defaultOrchestrator, type OrchestratorState, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
 import { createExternal } from "./external";
 import { type Frames, frames } from "./frames";
 
@@ -34,7 +34,7 @@ export function createFrames(): Frames {
 export const useFrames = () => useContext(FramesContext);
 
 /** The folded state; undefined until the first frame. Read it inside JSX or a memo. */
-export function useCore(): () => WorkspaceState | undefined {
+export function useCore(): () => WorkspaceView | undefined {
   const f = useFrames();
   return () => f.frame?.state;
 }

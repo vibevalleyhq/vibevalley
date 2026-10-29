@@ -2,7 +2,16 @@ import { t } from "@vibevalley/i18n";
 // An issue's lane, title and status and priority words.
 
 import { closedText } from "@vibevalley/protocol/rules";
-import { type WorkspaceState, type Issue, type IssueStatus, type Run, type RunTrigger, type Session, type TaskGraph } from "@vibevalley/protocol";
+import {
+  type Issue,
+  type IssueStatus,
+  type Run,
+  type RunTrigger,
+  type Session,
+  type TaskGraph,
+  type SessionView,
+  type WorkspaceView,
+} from "@vibevalley/protocol";
 
 /** Where a dispatched issue is on the board: not sent yet, in the works, waiting on the owner, or closed. */
 export type IssueTag = "queued" | "working" | "waiting" | "closed";
@@ -63,7 +72,7 @@ export function taskLine(g: TaskGraph) {
 export const endedAt = (s: Session) => (s.phase._tag === "closed" ? s.phase.at : undefined);
 
 /** The session on the farm now for an open issue. */
-export function issueSession(core: WorkspaceState | undefined, issue: Issue): Session | undefined {
+export function issueSession(core: WorkspaceView | undefined, issue: Issue): SessionView | undefined {
   if (!core || issue.sessions.length === 0 || issue.closedAt !== undefined) return undefined;
   const last = issue.sessions[issue.sessions.length - 1];
   return core.sessions.find((s) => s.id === last);
