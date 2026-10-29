@@ -1,6 +1,12 @@
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient, WeixinError } from "./weixin.ts";
+import { Effect } from "effect";
+import { FetchHttpClient, HttpClient } from "effect/http";
+import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient } from "./weixin.ts";
+
+const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
+const run = Effect.runPromise;
+const refusal = <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(Effect.flip(e));
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -44,26 +50,24 @@ describe("WeChat updates", () => {
   it("returns a failure without accepting malformed updates", async () => {
     let accepted = 0;
     const api: WeixinApi = {
-      login: async () => {
-        throw new Error("not used");
-      },
-      getUpdates: async () => ({ ret: 0, msgs: {} }) as never,
-      sendText: async () => {
-        throw new Error("not used");
-      },
+      login: () => Effect.die("not used"),
+      getUpdates: () => Effect.sync(() => decodeUpdates({ ret: 0, msgs: {} })),
+      sendText: () => Effect.die("not used"),
     };
     const adapter = weixinAdapter(api);
-    const result = await adapter.receive(
-      new AbortController().signal,
-      {},
-      {
-        cursor: "",
-        accept: async () => {
-          accepted++;
+    const exit = await Effect.runPromiseExit(
+      adapter.receive(
+        {},
+        {
+          cursor: "",
+          accept: () =>
+            Effect.sync(() => {
+              accepted++;
+            }),
         },
-      },
+      ),
     );
-    expect(result).toMatchObject({ kind: "failed" });
+    expect(exit._tag).toBe("Failure");
     expect(accepted).toBe(0);
   });
 });
@@ -75,45 +79,35 @@ describe("WeChat HTTP responses", () => {
         ? `{"qrcode":"code","qrcode_img_content":"https://qr.example"}`
         : `{"status":"confirmed","bot_token":"tok","ilink_bot_id":"bot","ilink_user_id":"owner"}`,
     );
-    const client = new WeixinClient(base);
-    const got = await client.login(
-      AbortSignal.timeout(2_000),
-      () => {},
-      () => "",
-    );
+    const client = new WeixinClient(http, base);
+    const got = await run(client.login(() => Effect.void, Effect.succeed("")));
     expect(got).toEqual({ account: { baseUrl: base, token: "tok" }, botId: "bot", owner: "owner" });
   });
 
   it("rejects a QR response with the wrong shape", async () => {
     const base = await serve(() => `{"qrcode":42,"qrcode_img_content":"https://qr.example"}`);
-    const client = new WeixinClient(base);
-    await expect(
-      client.login(
-        AbortSignal.timeout(2_000),
-        () => {},
-        () => "",
-      ),
-    ).rejects.toThrow(/拿不到登录二维码/);
+    const client = new WeixinClient(http, base);
+    expect((await refusal(client.login(() => Effect.void, Effect.succeed("")))).message).toMatch(/拿不到登录二维码/);
   });
 
   it("keeps a 64-bit sent message id and rejects a wrong id shape", async () => {
     let answer = `{"ret":0,"message_id":9007199254740993}`;
     const base = await serve(() => answer);
-    const client = new WeixinClient(base);
+    const client = new WeixinClient(http, base);
     const account = { baseUrl: base, token: "tok" };
-    expect(await client.sendText(AbortSignal.timeout(2_000), account, "owner", "hello", "ctx")).toBe("9007199254740993");
+    expect(await run(client.sendText(account, "owner", "hello", "ctx"))).toBe("9007199254740993");
     answer = `{"ret":0,"message_id":{}}`;
-    await expect(client.sendText(AbortSignal.timeout(2_000), account, "owner", "hello", "ctx")).rejects.toThrow(WeixinError);
+    expect(await refusal(client.sendText(account, "owner", "hello", "ctx"))).toMatchObject({ _tag: "AppFailed", kind: "failed" });
   });
 
   it("rejects malformed updates and decodes a later valid page", async () => {
     let answer = `{"ret":0,"msgs":{}}`;
     const base = await serve(() => answer);
-    const client = new WeixinClient(base);
+    const client = new WeixinClient(http, base);
     const account = { baseUrl: base, token: "tok" };
-    await expect(client.getUpdates(AbortSignal.timeout(2_000), account, "", 1_000)).rejects.toThrow(WeixinError);
+    expect(await refusal(client.getUpdates(account, "", 1_000))).toMatchObject({ _tag: "AppFailed" });
     answer = `{"ret":0,"msgs":[{"message_id":9007199254740993,"item_list":[]}]}`;
-    const got = await client.getUpdates(AbortSignal.timeout(2_000), account, "", 1_000);
+    const got = await run(client.getUpdates(account, "", 1_000));
     expect(got.msgs?.[0]?.message_id).toBe("9007199254740993");
   });
 });
