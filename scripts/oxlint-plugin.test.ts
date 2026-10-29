@@ -119,3 +119,18 @@ tester.run("parent-import", rule("parent-import"), {
     { code: "const m = import('../../ui/A');", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "parent" }] },
   ],
 });
+
+tester.run("promise-boundary", rule("promise-boundary"), {
+  valid: [
+    { code: "const a = Effect.tryPromise(async () => { await x(); });", filename: "/repo/apps/server/src/a.ts" },
+    { code: "const a = Effect.tryPromise({ try: async (signal) => f(signal), catch: e });", filename: "/repo/apps/server/src/a.ts" },
+    { code: "const a = Effect.promise(async () => g());", filename: "/repo/apps/server/src/a.ts" },
+    { code: "const a = () => fetch(u).then((r) => r.text());", filename: "/repo/apps/server/src/a.ts" },
+  ],
+  invalid: [
+    { code: "async function a() {}", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
+    { code: "const a = async () => { await b(); };", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
+    { code: "const a = Effect.tryPromise(() => run(async () => 1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
+    { code: "const a = new Promise((r) => r(1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "promise" }] },
+  ],
+});

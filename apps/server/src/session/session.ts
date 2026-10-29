@@ -40,7 +40,26 @@ import {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
-import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream, Metric } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  Data,
+  Deferred,
+  Effect,
+  Exit,
+  FiberMap,
+  FiberSet,
+  FileSystem,
+  Layer,
+  Option,
+  PubSub,
+  type Scope,
+  Semaphore,
+  Schema,
+  Stream,
+  Metric,
+} from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
@@ -134,8 +153,8 @@ interface Allocation {
   readonly resources: Set<RuntimeSession>;
   attached: boolean;
   failure?: string;
-  /** Keep rejection too: oar's next close may be a no-op after a failed dispose. */
-  closing?: Promise<void>;
+  /** Keep the failure too: oar's next close may be a no-op after a failed dispose. */
+  closing?: Deferred.Deferred<void, unknown>;
 }
 
 interface OarSession extends Allocation {
@@ -702,22 +721,38 @@ export const make = (options: SessionOptionsIn = {}) =>
       save();
     };
 
-    const closeAllocation = (allocation: Allocation) =>
-      (allocation.closing ??= (async () => {
-        const crew = await Promise.allSettled([allocation.subagents.close()]);
-        // A failed prompt may have made oar close its Subagent already. Its no-op close is not proof that dispose succeeded.
-        const resources = await Promise.allSettled([...allocation.resources].map((session) => session.dispose()));
-        for (const result of [...crew, ...resources]) if (result.status === "rejected") throw result.reason;
-      })());
+    /** Closes once, on the service's fibers: a caller that stops waiting does not stop the close, and every later call
+     * waits for it and gets its outcome. */
+    const closeAllocation = (allocation: Allocation): Effect.Effect<void, unknown> =>
+      Effect.suspend(() => {
+        if (allocation.closing) return Deferred.await(allocation.closing);
+        const closing = Deferred.makeUnsafe<void, unknown>();
+        allocation.closing = closing;
+        const close = Effect.gen(function* () {
+          const crew = yield* Effect.exit(Effect.tryPromise(() => allocation.subagents.close()));
+          // A failed prompt may have made oar close its Subagent already. Its no-op close is not proof that dispose succeeded.
+          const resources = yield* Effect.forEach([...allocation.resources], (session) => Effect.exit(Effect.tryPromise(() => session.dispose())), {
+            concurrency: "unbounded",
+          });
+          const failed = [crew, ...resources].find(Exit.isFailure);
+          if (failed) return yield* failed;
+        });
+        forkHere(
+          close.pipe(
+            Effect.mapError((e) => (e instanceof Cause.UnknownError ? e.cause : e)),
+            Effect.onExit((exit) => Deferred.done(closing, exit)),
+            Effect.ignore,
+          ),
+        );
+        return Deferred.await(closing);
+      });
 
     const stopOar = (allocation: Allocation) =>
-      Effect.tryPromise({
-        try: () => closeAllocation(allocation),
-        catch: (e) => {
+      closeAllocation(allocation).pipe(
+        Effect.mapError((e) => {
           allocation.failure = t("server.session.life.notStopped", { why: reasonText(e) });
           return refused(allocation.failure);
-        },
-      }).pipe(
+        }),
         Effect.tap(() =>
           Effect.sync(() => {
             if (allocations.get(allocation.owner.id) === allocation) allocations.delete(allocation.owner.id);
@@ -760,13 +795,14 @@ export const make = (options: SessionOptionsIn = {}) =>
       const mine: Runtime = {
         ...base,
         installation: () => (r.installation ? Promise.resolve(r.installation) : probeInstallation(base, r.binPath)),
-        session: async (installation, opts) => {
-          const session = await base.session(installation, { ...opts, ...own });
-          let disposing: Promise<void> | undefined;
-          const tracked: RuntimeSession = { ...session, dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())) };
-          resources.add(tracked);
-          return tracked;
-        },
+        // oar's interface: the base runtime's one call, with what it opens kept to be closed.
+        session: (installation, opts) =>
+          base.session(installation, { ...opts, ...own }).then((session) => {
+            let disposing: Promise<void> | undefined;
+            const tracked: RuntimeSession = { ...session, dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())) };
+            resources.add(tracked);
+            return tracked;
+          }),
       };
       const subagents = createSubagents({ runtimes: { get: (rid) => (rid === base.id ? mine : undefined) }, maxRunning, maxDepth: 1, cwd: root, logDir });
       const allocation: Allocation = { owner, subagents, resources, attached: false };
@@ -1049,7 +1085,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             Effect.forEach(
               [...allocations],
               ([id, allocation]) =>
-                Effect.tryPromise(() => closeAllocation(allocation)).pipe(
+                closeAllocation(allocation).pipe(
                   Effect.catch((e) => Effect.logWarning("an execution did not close", e).pipe(Effect.annotateLogs({ session: id }))),
                 ),
               { concurrency: "unbounded", discard: true },

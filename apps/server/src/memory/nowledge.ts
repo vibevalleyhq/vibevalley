@@ -93,21 +93,24 @@ export function nowledge(c: MemorySourceConfig): Source {
   let transport: StreamableHTTPClientTransport | undefined;
 
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart.
+  // The SDK's connect is the one call; a connect that fails or is stopped closes what it opened.
+  const connect = () => {
+    const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
+    transport = wire;
+    const one = new Client({ name: app, version: "1" });
+    return one
+      .connect(asTransport(wire), { timeout: prefetchTimeoutMs, signal: connecting.signal })
+      .then(() => connecting.signal.throwIfAborted())
+      .then(
+        () => one,
+        (e: unknown) =>
+          Promise.allSettled([one.close(), wire.close()]).then(() => {
+            throw e;
+          }),
+      );
+  };
   const open = () =>
-    (client ??= (async () => {
-      const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
-      transport = wire;
-      const one = new Client({ name: app, version: "1" });
-      try {
-        await one.connect(asTransport(wire), { timeout: prefetchTimeoutMs, signal: connecting.signal });
-        connecting.signal.throwIfAborted();
-      } catch (e) {
-        await one.close().catch(() => {});
-        await wire.close().catch(() => {});
-        throw e;
-      }
-      return one;
-    })().catch((e: unknown) => {
+    (client ??= connect().catch((e: unknown) => {
       client = undefined;
       throw e;
     }));

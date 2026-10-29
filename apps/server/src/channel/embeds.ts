@@ -58,18 +58,26 @@ export function privateAddress(ip: string): boolean {
   );
 }
 
-export type Resolve = (host: string) => Promise<readonly string[]>;
-const resolveAll: Resolve = async (host) => (isIP(host) ? [host] : (await lookup(host, { all: true })).map((a) => a.address));
+/** The addresses a name has; none when it does not resolve. */
+export type Resolve = (host: string) => Effect.Effect<readonly string[]>;
+const resolveAll: Resolve = (host) =>
+  isIP(host)
+    ? Effect.succeed([host])
+    : Effect.tryPromise(() => lookup(host, { all: true })).pipe(
+        Effect.map((all) => all.map((a) => a.address)),
+        Effect.orElseSucceed(() => []),
+      );
 
 /** May the server ask for this address: http(s), and every address its name has is on the public web. */
-export async function reachable(url: URL, resolve: Resolve = resolveAll): Promise<boolean> {
-  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  if (url.username || url.password) return false;
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
-  const addresses = await resolve(host).catch(() => []);
-  return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
-}
+export const reachable = (url: URL, resolve: Resolve = resolveAll): Effect.Effect<boolean> =>
+  Effect.gen(function* () {
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (url.username || url.password) return false;
+    const host = url.hostname.replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+    const addresses = yield* resolve(host);
+    return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
+  });
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
 const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_, e: string) => entities[e] ?? _).trim();
@@ -116,7 +124,7 @@ export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resol
   let url = new URL(link);
   for (let hop = 0; hop <= redirectsMax; hop++) {
     const at = url;
-    if (!(yield* Effect.promise(() => reachable(at, resolve)))) return undefined;
+    if (!(yield* reachable(at, resolve))) return undefined;
     const answered = yield* client.get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } }).pipe(
       Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
       Effect.timeoutOption(timeoutMs),

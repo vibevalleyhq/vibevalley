@@ -59,10 +59,10 @@ export const nodeTransport: MossTransport = {
     ws.addEventListener("error", () => on.down(""));
     return { send: (text) => ws.send(text), close: () => ws.close() };
   },
-  status: async (key) => {
-    const r = await fetch(mossUrl.replace(/^wss:/, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) });
-    return { code: r.status, body: await r.text() };
-  },
+  status: (key) =>
+    fetch(mossUrl.replace(/^wss:/, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
+      r.text().then((body) => ({ code: r.status, body })),
+    ),
 };
 
 const mossError = Schema.optionalKey(Schema.Struct({ message: Schema.optionalKey(Schema.String) }));
