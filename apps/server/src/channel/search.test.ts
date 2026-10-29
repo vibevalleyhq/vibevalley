@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { parseSearch } from "./search.ts";
-
 describe("a search", () => {
   it("reads its filters out of its words, and leaves one it cannot read among them", () => {
     expect(parseSearch("苹果 from:管家 in:#clock-in has:image has:link")).toEqual({

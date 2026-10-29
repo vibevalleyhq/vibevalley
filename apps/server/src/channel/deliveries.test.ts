@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
-
 const row = (message: string, number: number, channel = "c"): DeliveryRow => ({
   message_id: message,
   number,

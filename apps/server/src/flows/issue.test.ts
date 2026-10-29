@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { openFindings } from "@/issue/state.ts";
+import { openFindings } from "@/issue/status.ts";
 import { Said } from "@/testing/said.ts";
 import { viewOf } from "@/game/view.ts";
 import { Effect } from "effect";

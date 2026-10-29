@@ -1,7 +1,6 @@
 // What a woken agent is told of the chat, and how much: the wake's limits and the shape of its inbox.
 
-import { type ActorKind } from "@vibevalley/protocol";
-
+import type { ActorKind } from "@vibevalley/protocol";
 export interface UnreadRow {
   readonly target: string;
   readonly unread: number;

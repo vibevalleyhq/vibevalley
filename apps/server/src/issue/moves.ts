@@ -1,10 +1,9 @@
 import { t } from "@vibevalley/i18n";
+import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
+import { commandOf, type Next } from "@vibevalley/protocol/api";
 // The one table the board, the command line, the orchestrator's tools and the server's refusals go by. reduce works it
 // out with each issue's status and attention (withIssueStatuses), so a round that ends changes what the issue may do at
 // once, wherever it is read.
-
-import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
-import { commandOf, type Next } from "@vibevalley/protocol/api";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =

@@ -3,7 +3,7 @@
 
 import type { WorkspaceState, Fact, OrchestratorState, Outcome, Phase, Session } from "@vibevalley/protocol";
 import { withChannel, withMessage, withOwnerMentions } from "@/channel/folded.ts";
-import { withIssue, withIssueStatuses } from "@/issue/state.ts";
+import { withIssue, withIssueStatuses } from "@/issue/status.ts";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
 import { sessionOf, whileWorking, withSession } from "@/session/roster.ts";

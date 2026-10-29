@@ -1,11 +1,10 @@
 import { type AudienceInput, chatAudience } from "./audience.ts";
 import { channelNameProblem, parseChatTarget } from "./targets.ts";
-import { type InboxMessage, type UnreadRow } from "./wake.ts";
+import type { InboxMessage, UnreadRow } from "./wake.ts";
 import { mentionsIn } from "./mentions.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
-
 test("the recorded cases", () => {
   const cases = goldenCases("channel");
   expect(new Set(cases.map((c) => c.fn)).size).toBe(6);

@@ -3,7 +3,6 @@
 // Speaking again only clears the count: a tripped breaker stays tripped until it is reset.
 
 import { wakeBreaker } from "./audience.ts";
-
 export class WakeBreaker {
   private readonly failures = new Map<string, number>();
   private readonly open = new Set<string>();

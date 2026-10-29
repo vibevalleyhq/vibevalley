@@ -1,11 +1,4 @@
 import { list, t } from "@vibevalley/i18n";
-// The chat: the channels, the default one among them, the owner's direct channel with the orchestrator, and a thread
-// under any message of a channel; every
-// session's work is talked about in its issue's thread. Every message is written to the database first, in one
-// transaction with who it goes to; only then does it become a fact. A delivery goes pending → announced → handed → seen;
-// a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
-// than lost. Everything that changes the chat runs one at a time.
-
 import { HttpClient } from "effect/http";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
@@ -40,11 +33,10 @@ import {
   type Notify,
 } from "@vibevalley/protocol";
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { keepChannels, targetOf } from "./folded.ts";
 import { head } from "@/base/clip.ts";
-import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText } from "./audience.ts";
+import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
 import { channelNameProblem, parseChatTarget } from "./targets.ts";
 import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
 import { mentionOf, mentionsIn } from "./mentions.ts";
@@ -62,10 +54,17 @@ import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
-import { Audience } from "./audience.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
+// The chat: the channels, the default one among them, the owner's direct channel with the orchestrator, and a thread
+// under any message of a channel; every
+// session's work is talked about in its issue's thread. Every message is written to the database first, in one
+// transaction with who it goes to; only then does it become a fact. A delivery goes pending → announced → handed → seen;
+// a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
+// than lost. Everything that changes the chat runs one at a time.
+
+import * as S from "@vibevalley/protocol/schema";
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";

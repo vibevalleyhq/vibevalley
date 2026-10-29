@@ -1,9 +1,7 @@
 // A channel's name, and the addresses written to reach a place: a channel, a thread by number, @someone.
 
 import { t } from "@vibevalley/i18n";
-
 import { chatNamed } from "./mentions.ts";
-
 /** No #, : or spaces, so an address reads back. */
 const channelNamePattern = /^[\p{L}\p{N}_-]{1,24}$/u;
 

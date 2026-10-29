@@ -32,35 +32,23 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { closedText, shortTitle, isOneOf } from "@vibevalley/protocol/rules";
-import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
+import { closedText, shortTitle, isOneOf, isBusy } from "@vibevalley/protocol/rules";
+import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues, isClosed } from "./status.ts";
 import { cut } from "@/base/clip.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { attentionIn } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "@/task/rules.ts";
 import { dueText } from "@/cron/due.ts";
-import {
-  answerCureWords,
-  cureWords,
-  filledKinds,
-  findingsOf,
-  isClosed,
-  issueBrief,
-  kept,
-  milestonesOf,
-  nextTaskId,
-  openQuestions,
-  resumeWords,
-  sentTitles,
-  splitBrief,
-  pickIssues,
-} from "./rules.ts";
+import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
+import { filledKinds, sentTitles } from "./templates.ts";
+import { kept, openQuestions, refinement } from "./refinement.ts";
+import { milestonesOf } from "./timeline.ts";
+import { nextTaskId, jsonOrNull, nullText } from "./stored.ts";
+import { pickIssues } from "./filter.ts";
 import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { isBusy } from "@vibevalley/protocol/rules";
 import { inboxLines } from "@/channel/prompts.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
-import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
 import { ServerConfig } from "@/base/config.ts";
@@ -72,17 +60,16 @@ import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { issueBranch, Projects } from "@/project/project.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
 import { merging } from "./merge.ts";
-import { refinement } from "./refinement.ts";
-import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "@/session/journal.ts";
 import { type Hired, type HireOptions, NotRecorded, type SessionNews, Sessions } from "@/session/session.ts";
 import { type Due, Crons } from "@/cron/cron.ts";
-import * as q from "../../db/generated/issue.sql.ts";
-import * as qq from "../../db/generated/issue_queue.sql.ts";
-import * as qs from "../../db/generated/issue_session.sql.ts";
 import { IssueSessions } from "./sessions.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
 import { conflictBrief, parseAnswer } from "@/session/rules.ts";
+import * as S from "@vibevalley/protocol/schema";
+import * as q from "../../db/generated/issue.sql.ts";
+import * as qq from "../../db/generated/issue_queue.sql.ts";
+import * as qs from "../../db/generated/issue_session.sql.ts";
 
 export interface OrchestratorWork {
   readonly issue: Issue;

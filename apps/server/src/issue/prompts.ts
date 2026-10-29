@@ -3,7 +3,6 @@
 // locale: the helper answers in the owner's.
 
 import type { Issue, Question } from "@vibevalley/protocol";
-
 /** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself. */
 export const needsOwner = "改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 

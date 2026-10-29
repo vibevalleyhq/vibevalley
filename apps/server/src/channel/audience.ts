@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
 import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
-
 // Who hears a message, and who of them is held back (chatAudience), from what that needs, kept in memory beside the
 // chat's model (model.ts): who follows each thread,
 // how many times agents have woken agents in each channel since the owner last spoke there, and when each

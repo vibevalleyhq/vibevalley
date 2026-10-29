@@ -19,8 +19,8 @@ import { summaryOf } from "@/session/rules.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { until, waitFor } from "@/testing/until.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
+import * as qm from "../../db/generated/channel_message.sql.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
  * off), 「必败」 fails. */

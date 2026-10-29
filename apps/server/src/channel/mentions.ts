@@ -2,7 +2,6 @@
 
 import { maybe } from "@vibevalley/i18n";
 import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
-
 // The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English. The
 // orchestrator's names are the place's orchestrator, filled in where the place is known.
 export const chatNamed: Readonly<Record<string, string>> = {

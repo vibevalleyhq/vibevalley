@@ -1,7 +1,6 @@
 // A search as the owner types it: words, and from:, in:, has:, before:, after: filters.
 
 import { chatNamed } from "./mentions.ts";
-
 export type SearchHas = "file" | "image" | "link";
 
 /** What a search asks for: its words, and the filters written among them. */
