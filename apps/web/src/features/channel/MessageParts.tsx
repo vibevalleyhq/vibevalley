@@ -19,7 +19,9 @@ import { quickReactions } from "./emoji";
 import { EmojiPicker } from "./EmojiPicker";
 import { useCore } from "@/base/frame";
 import { markUnread } from "./reading";
-import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePath, workbenchClock } from "./rules";
+import { channelLabel, channelOf, messagePath } from "./places";
+import { type LinkedMessage, linkedMessages } from "./links";
+import { workbenchClock } from "./feed";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 

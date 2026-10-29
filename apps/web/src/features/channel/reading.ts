@@ -1,11 +1,9 @@
 // The chat page's reads beyond the channels it follows (features/channel/follow.ts).
 
 import { type Accessor, createEffect, createSignal } from "solid-js";
-
 import type { Channel } from "@vibevalley/protocol";
 import { api } from "@/base/api";
-import { newestUnread } from "./rules";
-
+import { newestUnread } from "./unread";
 // Channels the owner marked unread while looking at them: they stay unread until the owner leaves and comes back.
 const [held, setHeld] = createSignal<ReadonlySet<string>>(new Set());
 

@@ -1,6 +1,5 @@
 import { expect, test } from "vite-plus/test";
 import { commandOf, typedCommand } from "./commands";
-
 test("a line that is a command runs it with the words after it; any other line is said as it is", () => {
   expect(commandOf("/issue 给打卡页加分页")).toEqual({ name: "issue", text: "给打卡页加分页" });
   expect(commandOf("  /stop  ")).toEqual({ name: "stop", text: "" });

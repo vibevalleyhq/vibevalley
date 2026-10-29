@@ -7,23 +7,8 @@ export { draftOf, drafts } from "./draft";
 export { quickReactions } from "./emoji";
 export { EmojiPicker } from "./EmojiPicker";
 export { followed, useFollowed, useMessage, useReports } from "./follow";
-export {
-  channelLabel,
-  messagePath,
-  topOf,
-  topsOf,
-  directsOf,
-  chatPath,
-  channelOf,
-  feedOf,
-  defaultOf,
-  issueThreadOf,
-  orchestratorTyping,
-  parentAt,
-  phaseText,
-  threadOwnerOf,
-  threadTitle,
-  unreadIn,
-  unreadTotal,
-  unreadUnder,
-} from "./rules";
+export { channelLabel, messagePath, topOf, topsOf, directsOf, chatPath, channelOf, defaultOf, parentAt } from "./places";
+export { feedOf, orchestratorTyping } from "./feed";
+export { issueThreadOf, threadOwnerOf, threadTitle } from "./threads";
+export { phaseText } from "./presence";
+export { unreadIn, unreadTotal, unreadUnder } from "./unread";

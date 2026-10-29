@@ -10,21 +10,11 @@ import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, t
 import { api } from "@/base/api";
 import { ArtifactCard } from "@/features/artifact";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import {
-  channelOf,
-  messagePath,
-  chatPath,
-  feedOf,
-  parentAt,
-  phaseDot,
-  phaseText,
-  dutyShort,
-  runtimeLabel,
-  threadOwnerOf,
-  unreadIn,
-  orchestratorTyping,
-  workbenchClock,
-} from "./rules";
+import { channelOf, messagePath, chatPath, parentAt } from "./places";
+import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
+import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
+import { threadOwnerOf } from "./threads";
+import { unreadIn } from "./unread";
 import { aria, useNow } from "@/base/util";
 import { useRouter } from "@/base/router";
 import { useCore } from "@/base/frame";

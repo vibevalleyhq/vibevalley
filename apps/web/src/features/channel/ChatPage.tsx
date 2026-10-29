@@ -20,16 +20,12 @@ import {
   topsOf,
   chatPath,
   channelOf,
-  jobThreadOf,
-  phaseDot,
-  phaseText,
-  threadOwnerOf,
-  threadTitle,
-  unreadIn,
-  unreadUnder,
   defaultOf,
-  workbenchClock,
-} from "./rules";
+} from "./places";
+import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
+import { phaseDot, phaseText } from "./presence";
+import { unreadIn, unreadUnder } from "./unread";
+import { workbenchClock } from "./feed";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { useRouter } from "@/base/router";
 import { orchestratorMood, useCore } from "@/base/frame";

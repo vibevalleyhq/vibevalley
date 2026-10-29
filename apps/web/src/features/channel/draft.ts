@@ -1,14 +1,13 @@
 import { t } from "@vibevalley/i18n";
+import { createSignal } from "solid-js";
+import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
+import { reasonOf } from "@/base/api";
+import { recordOf } from "@/base/util";
+import { Option, Schema } from "effect";
 // What the owner is writing in each channel: the words, the message it answers and the files uploaded for it. Kept on
 // this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
 
-import { createSignal } from "solid-js";
-import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
-
-import { reasonOf } from "@/base/api";
-import { recordOf } from "@/base/util";
 import * as S from "@vibevalley/protocol/schema";
-import { Option, Schema } from "effect";
 
 export interface Draft {
   readonly text?: string;

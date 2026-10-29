@@ -5,8 +5,7 @@
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 import { api } from "@/base/api";
-import type { Nameable } from "./rules";
-
+import type { Nameable } from "./mentions";
 export const CommandNames = ["issue", "remember", "stop", "dm"] as const;
 export type CommandName = (typeof CommandNames)[number];
 
