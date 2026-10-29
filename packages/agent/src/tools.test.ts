@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
+import { ToolFailed } from "./core/errors.ts";
 import { join } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
@@ -90,7 +91,7 @@ describe("a tool whose work is an Effect", () => {
   });
 
   it("says a failure's message as its failed result", async () => {
-    const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new Error("不行")) });
+    const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new ToolFailed({ message: "不行" })) });
     expect(await fails(call([refuses], "refuses", {}))).toBe("不行");
   });
 });

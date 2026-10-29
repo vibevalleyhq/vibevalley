@@ -2,6 +2,7 @@ import { t } from "@vibevalley/i18n";
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
+import { messageOf } from "../errors.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { homedir } from "node:os";
@@ -241,7 +242,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
         llmOf("");
         return { kind: "available", via: "bundled" };
       } catch (e) {
-        return { kind: "unsupported", reason: e instanceof Error ? e.message : String(e) };
+        return { kind: "unsupported", reason: messageOf(e) };
       }
     },
     listModels: async () => ({

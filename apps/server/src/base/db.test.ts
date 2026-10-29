@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDatabase } from "../testing/layers.ts";
-import { Db, DbLayer, setAsideStale } from "./db.ts";
+import { Db, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
   it.effect("has the schema, and the generated queries run on it", () =>
@@ -30,7 +30,7 @@ describe("the database", () => {
       yield* sql.unsafe("drop table lan").pipe(Effect.orDie);
       const failed = yield* Effect.exit(db.one(lanOpen()));
       expect(Exit.isFailure(failed) && Cause.hasDies(failed.cause)).toBe(true);
-    }).pipe(Effect.provide(DbLayer.pipe(Layer.provideMerge(testDatabase())))),
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
   // In memory a farm's database is given back and kept for the next one (db.ts): it must be as good as new.
@@ -86,4 +86,21 @@ describe("the database", () => {
     expect(readdirSync(home).sort()).toEqual(["db.old-7", "db.old-7.schema"]);
     expect(setAsideStale(db, "new", 8)).toBeUndefined();
   });
+});
+
+/** Where a failed query is a value, not a defect (Db.attempt), and why. */
+const attempting: Readonly<Record<string, string>> = {
+  "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
+  "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
+  "memory/memories.ts": "a memory read or write that fails is logged and taken as none",
+};
+
+it("attempt is used only where a failed query is told or retried, each with its reason", () => {
+  const src = join(import.meta.dirname, "..");
+  const using = readdirSync(src, { recursive: true, encoding: "utf8" })
+    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+    .filter((f) => /\{[^}]*\battempt\b[^}]*\}\s*=\s*yield\*\s*Db\b|\bDb\b[^;]*\.attempt\(/.test(readFileSync(join(src, f), "utf8")))
+    .map((f) => f.split("\\").join("/"))
+    .sort();
+  expect(using).toEqual(Object.keys(attempting).sort());
 });

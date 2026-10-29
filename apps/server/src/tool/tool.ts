@@ -1,4 +1,7 @@
 import { maybe, t } from "@vibevalley/i18n";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { ToolFailed } from "@vibevalley/agent/core/errors";
+import { messageOf } from "../errors.ts";
 import { artifactMax } from "../artifact/rules.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -75,17 +78,23 @@ export interface Caller {
 /** A throw here is told to the model as the tool's failure. */
 export type Who = () => Caller;
 
-export interface Tools {
-  /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-  readonly orchestrator: (who: Who) => Tool[];
-  /** A session's tools, served on /mcp. */
-  readonly session: (who: Who) => Tool[];
-  /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
-  readonly start: (name: string, args: unknown) => ToolStart;
-  readonly sessionLine: (w: Roster) => string;
+export class Tools extends Context.Service<
+  Tools,
+  {
+    /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+    readonly orchestrator: (who: Who) => Tool[];
+    /** A session's tools, served on /mcp. */
+    readonly session: (who: Who) => Tool[];
+    /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
+    readonly start: (name: string, args: unknown) => ToolStart;
+    readonly sessionLine: (w: Roster) => string;
+  }
+>()("vibevalley/Tool") {
+  static readonly layer = Layer.effect(
+    Tools,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Tools = Context.Service<Tools>("vibevalley/Tool");
 
 // The fields that name what a call is about, the first one given wins: an issue's or a channel's id, a profile, a title.
 const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
@@ -118,8 +127,9 @@ export class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly mess
 const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
 
 /** A failure as the model reads it. */
-const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(reasonOf(e as ApiError)));
-const said = (e: unknown) => toError(e).message;
+/** A tool's refusal or failure as the failed result the model reads: an API refusal says its reason. */
+const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
+const said = (e: unknown) => toFailed(e).message;
 
 /** who throws for a caller nobody knows: the model reads it as the tool's failure. */
 const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e) }) });
@@ -150,7 +160,7 @@ export const make = Effect.gen(function* () {
         name: toolName(op),
         description,
         parameters: shown[op],
-        run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError),
+        run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
       });
     };
   const tool = toolOf(parameters, schemas);
@@ -410,7 +420,7 @@ export const make = Effect.gen(function* () {
           if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
           return readFile(full, "utf8");
         },
-        catch: (e) => refused(e instanceof Error ? e.message : String(e)),
+        catch: (e) => refused(messageOf(e)),
       });
     });
 
@@ -1017,5 +1027,3 @@ export const make = Effect.gen(function* () {
     sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),
   });
 });
-
-export const layer = Layer.effect(Tools, make);

@@ -3,6 +3,7 @@
 // (agent/brain/loop.test.ts holds the brain to that order), with Effect underneath: a run is a fiber of the agent's
 // scope, stopping it is a Deferred the model's stream and the tools race, a turn's tools are fibers side by side.
 
+import { AgentBusy, CannotContinue, type ToolFailed } from "./errors.ts";
 import { Clock, Deferred, Effect, FiberSet, Option, Ref, type Scope, Stream } from "effect";
 import { failedMessage, type LlmError, type Llm } from "@vibevalley/ai/llm";
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, ToolResultMessage } from "@vibevalley/ai/messages";
@@ -24,7 +25,7 @@ export interface Tool {
   readonly parameters: JsonSchema;
   /** args are coerced and checked against parameters first. A failure is a failed result with its message; being
    * interrupted is the run being stopped. */
-  readonly execute: (args: unknown, call: { readonly id: string }) => Effect.Effect<ToolResult, Error>;
+  readonly execute: (args: unknown, call: { readonly id: string }) => Effect.Effect<ToolResult, ToolFailed>;
 }
 
 /** The model's messages and the agent's own (A), which toLlm turns into the model's. */
@@ -56,7 +57,7 @@ export interface Turn<A> {
 }
 
 export interface AgentOptions<A> {
-  readonly llm: Llm;
+  readonly llm: Llm["Service"];
   readonly model: Model;
   readonly thinkingLevel?: ThinkingLevel;
   readonly tools: readonly Tool[];
@@ -75,13 +76,11 @@ export interface AgentOptions<A> {
   readonly stoppedText: string;
 }
 
-export class AgentBusy extends Error {}
-
 export interface Agent<A> {
   /** Starts a run with these messages; the agent must be idle. */
   readonly prompt: (messages: readonly AgentMessage<A>[]) => Effect.Effect<void, AgentBusy>;
   /** Starts a run from the transcript as it is (its last message the user's or a tool's), or from a queued line. */
-  readonly continue: Effect.Effect<void, AgentBusy | Error>;
+  readonly continue: Effect.Effect<void, AgentBusy | CannotContinue>;
   /** Taken before the next turn of the run under way, one a turn. */
   readonly steer: (message: AgentMessage<A>) => Effect.Effect<void>;
   /** Taken when the run would stop, one at a time. */
@@ -363,7 +362,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       Effect.gen(function* () {
         const run: Run = { stop: yield* Deferred.make<void>(), done: yield* Deferred.make<void>() };
         const taken = yield* Ref.modify(active, (a) => (Option.isSome(a) ? ([false, a] as const) : ([true, Option.some(run)] as const)));
-        if (!taken) return yield* Effect.fail(new AgentBusy("the agent is already running"));
+        if (!taken) return yield* Effect.fail(new AgentBusy({ message: "the agent is already running" }));
         const body = Effect.gen(function* () {
           const context = [...(yield* Ref.get(messages))];
           const fresh: AgentMessage<A>[] = [...prompts];
@@ -408,13 +407,13 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       continue: Effect.gen(function* () {
         const all = yield* Ref.get(messages);
         const last = all.at(-1) as { role?: string } | undefined;
-        if (!last) return yield* Effect.fail(new Error("No messages to continue from"));
+        if (!last) return yield* new CannotContinue({ message: "No messages to continue from" });
         if (last.role === "assistant") {
           const steered = yield* takeOne(steering);
           if (steered.length > 0) return yield* start(steered, true);
           const later = yield* takeOne(followUps);
           if (later.length > 0) return yield* start(later);
-          return yield* Effect.fail(new Error("Cannot continue from message role: assistant"));
+          return yield* new CannotContinue({ message: "Cannot continue from message role: assistant" });
         }
         return yield* start([]);
       }),

@@ -20,23 +20,29 @@ const wantStationForMs = 10_000;
 const countEveryMs = 2 * 60_000;
 const countAfterRunMs = 15_000;
 
-export interface Game {
-  /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
-  readonly achievements: () => Achievement[];
-  /** The title the owner wears: an achievement and its tier; none of either is the plain title. */
-  readonly chooseTitle: (achievement: string | undefined, tier: number | undefined) => Effect.Effect<void>;
-  /** The next session hired within ten seconds goes to this station, if it is still free. */
-  readonly want: (station: number) => void;
-  readonly record: (entry: Entry) => Effect.Effect<void>;
-  /** Commits on every project, a repository with several worktrees once: "yours" by author email. */
-  readonly count: () => Effect.Effect<CommitCount>;
-  /** The count and its write, serialized with run-end refreshes. */
-  readonly refresh: Effect.Effect<void>;
-  /** How many runs' ends asked for a count. */
-  readonly asked: () => number;
+export class Game extends Context.Service<
+  Game,
+  {
+    /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
+    readonly achievements: () => Achievement[];
+    /** The title the owner wears: an achievement and its tier; none of either is the plain title. */
+    readonly chooseTitle: (achievement: string | undefined, tier: number | undefined) => Effect.Effect<void>;
+    /** The next session hired within ten seconds goes to this station, if it is still free. */
+    readonly want: (station: number) => void;
+    readonly record: (entry: Entry) => Effect.Effect<void>;
+    /** Commits on every project, a repository with several worktrees once: "yours" by author email. */
+    readonly count: () => Effect.Effect<CommitCount>;
+    /** The count and its write, serialized with run-end refreshes. */
+    readonly refresh: Effect.Effect<void>;
+    /** How many runs' ends asked for a count. */
+    readonly asked: () => number;
+  }
+>()("vibevalley/Game") {
+  static readonly layer = Layer.effect(
+    Game,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Game = Context.Service<Game>("vibevalley/Game");
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
@@ -135,8 +141,6 @@ export const make = Effect.gen(function* () {
     asked: () => asked,
   });
 });
-
-export const layer = Layer.effect(Game, make);
 
 /** The commits counted now and every two minutes, once the farm is up. */
 export const start = Layer.effectDiscard(

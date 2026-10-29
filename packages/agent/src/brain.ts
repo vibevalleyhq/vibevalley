@@ -4,6 +4,7 @@
 // agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
+import { AgentClosed, asError, toolFailed } from "./core/errors.ts";
 import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
 import { join } from "node:path";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
@@ -106,8 +107,6 @@ const reminderTickMs = 20_000;
 export const resumedUnknown = words.resumedUnknown;
 
 const taskMessage = (text: string, now: number) => customMessage("task", text, now);
-
-const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)));
 
 const allowed = (tools: readonly Tool[], disallowed: readonly string[] = []) => tools.filter((t) => !disallowed.includes(t.name));
 
@@ -255,7 +254,7 @@ export class Brain {
             const said = yield* h.ask(userMessage(brief, now()));
             return said || words.subagentNoAnswer(label);
           }),
-        );
+        ).pipe(Effect.mapError(toolFailed));
       own.push(subagentTool(this.subagent));
     }
     if (options.tasks) {
@@ -542,10 +541,10 @@ export class Brain {
   }
 
   /** What the run it starts or joins ends up saying. */
-  ask(message: BrainMessage): Effect.Effect<string, Error> {
+  ask(message: BrainMessage): Effect.Effect<string, AgentClosed> {
     const self = this;
     return Effect.gen(function* () {
-      if (self.closed) return yield* Effect.fail(new Error("the agent is closed"));
+      if (self.closed) return yield* new AgentClosed({ message: "the agent is closed" });
       const answer = yield* Deferred.make<RunResult>();
       self.waiters.push(answer);
       yield* self.deliver(message, true);

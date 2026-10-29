@@ -8,16 +8,16 @@ import { ServerConfig } from "../base/config.ts";
 import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
 import { untilGot as until } from "../testing/until.ts";
-import { activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, Projects, layer, tokeiArgs } from "./project.ts";
+import { Projects, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
 import { type MergeFailure } from "./shapes.ts";
 
 /** gh is not installed. */
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
-const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ServerConfig> = {}, hooks: ProjectHooks = {}) =>
+const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ServerConfig["Service"]> = {}, hooks: ProjectHooks = {}) =>
   body.pipe(
     Effect.provide(
-      layer({ gh: noGitHub, ...hooks }).pipe(
+      Projects.layer({ gh: noGitHub, ...hooks }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),

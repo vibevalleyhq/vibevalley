@@ -1,6 +1,7 @@
 // The farm page's wiring that is not drawn: the village's pictures, the keys, the phone's calls and pad, the sounds.
 // The rules are framework-free in farm/*.ts; these connect them to the page.
 
+import { messageOf } from "../base/format";
 import { type FarmSoundInput, farmCues, inTurn } from "./cues";
 import { type Accessor, createEffect, createSignal, onSettled } from "solid-js";
 import type { StateFrame } from "@vibevalley/protocol";
@@ -19,7 +20,7 @@ export function useVillage(): Accessor<{ village?: Village; error?: string }> {
     let live = true;
     loadVillage().then(
       (village) => live && setGot({ village }),
-      (e: unknown) => live && setGot({ error: e instanceof Error ? e.message : String(e) }),
+      (e: unknown) => live && setGot({ error: messageOf(e) }),
     );
     return () => {
       live = false;

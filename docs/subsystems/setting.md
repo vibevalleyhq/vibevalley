@@ -62,7 +62,7 @@
 | `github.pr_poll_seconds` | 查询开着的 PR 的间隔，单位秒，必须大于 0 | 180 |
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
-| `otlp.url` | OTLP 收集器的地址（如 `http://127.0.0.1:4318`）：填了，`Effect.fn` 的 span、日志和指标都送过去；空着不送 | 空 |
+| `otlp.url` | OTLP 收集器的地址（如 `http://127.0.0.1:4318`）：填了，`Effect.fn` 的 span、日志（接口的日志带 `op`）和指标都送过去：`vibevalley.http.requests`（按 `op`、`status`）、`vibevalley.sse.open`（按 `stream`）、`vibevalley.sessions.running`；空着不送 | 空 |
 
 **设置**：
 

@@ -8,30 +8,30 @@
 import { Layer } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { FetchHttpClient } from "effect/http";
-import { layer as agent } from "./agent/agent.ts";
+import { Agents } from "./agent/agent.ts";
 import { ServerConfig } from "./base/config.ts";
-import { Database, DbLayer } from "./base/db.ts";
-import { layer as core } from "./core/core.ts";
-import { type ArtifactOptions, layer as artifact } from "./artifact/artifact.ts";
-import { layer as channel } from "./channel/chat.ts";
-import { type IssueOptions, layer as issue } from "./issue/issue.ts";
-import { layer as memory } from "./memory/memory.ts";
+import { Database, Db } from "./base/db.ts";
+import { Core } from "./core/core.ts";
+import { Artifacts, type ArtifactOptions } from "./artifact/artifact.ts";
+import { Channels } from "./channel/chat.ts";
+import { Issues, type IssueOptions } from "./issue/issue.ts";
+import { Memories } from "./memory/memory.ts";
 import { layer as projection } from "./projection/projection.ts";
-import { layer as notice, start as noticeStart } from "./notice/notice.ts";
-import { layer as project, type ProjectHooks, start as projectStart } from "./project/project.ts";
-import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
-import { layer as session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
-import { layer as cron, start as cronStart } from "./cron/cron.ts";
-import { layer as setting } from "./setting/setting.ts";
-import { layer as llm } from "@vibevalley/ai/llm";
-import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
-import { layer as tool } from "./tool/tool.ts";
-import { layer as mcp, type McpOptions } from "./mcp/mcp.ts";
-import { layer as orchestrators, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
-import { layer as game, start as gameStart } from "./game/game.ts";
-import { layer as lan, type LanOptions } from "./lan/lan.ts";
-import { layer as voice, type VoiceOptions } from "./voice/voice.ts";
-import { type ConnectorOptions, layer as connector } from "./connector/connector.ts";
+import { Notices, start as noticeStart } from "./notice/notice.ts";
+import { Projects, type ProjectHooks, start as projectStart } from "./project/project.ts";
+import { type RuntimeOptions, Runtimes } from "./runtime/runtime.ts";
+import { Sessions, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
+import { Crons, start as cronStart } from "./cron/cron.ts";
+import { Setting } from "./setting/setting.ts";
+import { Llm } from "@vibevalley/ai/llm";
+import { Tasks, start as taskGraphStart, type TaskOptions } from "./task/task.ts";
+import { Tools } from "./tool/tool.ts";
+import { Mcp, type McpOptions } from "./mcp/mcp.ts";
+import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
+import { Game, start as gameStart } from "./game/game.ts";
+import { Lan, type LanOptions } from "./lan/lan.ts";
+import { Voice, type VoiceOptions } from "./voice/voice.ts";
+import { Connectors, type ConnectorOptions } from "./connector/connector.ts";
 
 /** Builds layer on what is below it, keeping what is below. */
 const on =
@@ -56,71 +56,71 @@ export interface ServiceOptions {
 
 /** Platform: Node's services (files, paths, processes), an HTTP client, the database, the settings and secrets, the core state (folded by
  * the projection, which reads every module's rules). */
-export const platform = (config: ServerConfig) =>
+export const platform = (config: ServerConfig["Service"]) =>
   Database.pipe(
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),
     Layer.provideMerge(NodeServices.layer),
     Layer.provideMerge(FetchHttpClient.layer),
-    on(DbLayer),
+    on(Db.layer),
     on(projection),
-    on(core),
-    on(setting),
-    on(llm),
+    on(Core.layer),
+    on(Setting.layer),
+    on(Llm.layer),
   );
 
 /** Agents: the profiles, their memory, the runtimes they run on. */
 export const agents =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(agent), on(memory), on(runtime(o.runtime)));
+    below.pipe(on(Agents.layer), on(Memories.layer), on(Runtimes.layer(o.runtime)));
 
 /** Source Control: repositories, worktrees, checks, merges and pull requests. */
 export const sourceControl =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(project(o.project)));
+    below.pipe(on(Projects.layer(o.project)));
 
 /** Agent Sessions: an agent at work on a job in a workplace. */
 export const agentSessions =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(session(o.session)));
+    below.pipe(on(Sessions.layer(o.session)));
 
 /** Collaboration: channels, threads, messages, documents; the sessions register as its helpers. */
 export const collaboration =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(channel), on(artifact(o.artifact)));
+    below.pipe(on(Channels.layer), on(Artifacts.layer(o.artifact)));
 
 /** Issues without its task graphs: for a test that makes its own task service. */
 export const issuesBelowTaskGraphs =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(cron), on(issue(o.issue)));
+    below.pipe(on(Crons.layer), on(Issues.layer(o.issue)));
 
 /** Issues: the issues, their task graphs and crons. */
 export const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    issuesBelowTaskGraphs(o)(below).pipe(on(task(o.task)));
+    issuesBelowTaskGraphs(o)(below).pipe(on(Tasks.layer(o.task)));
 
 /** Notifications: what in the inbox is news to the owner, and the patrol. */
-export const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(notice));
+export const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Notices.layer));
 
 /** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
 export const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(tool), on(orchestrators(o.orchestrator)));
+    below.pipe(on(Tools.layer), on(Orchestrator.layer(o.orchestrator)));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
-export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(game));
+export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Game.layer));
 
 /** Gateway: every way in from outside; the HTTP API is mounted on these services by http/app.ts. */
 export const gateway =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(mcp(o.mcp)), on(lan(o.lan)), on(voice(o.voice)), on(connector(o.connector)));
+    below.pipe(on(Mcp.layer(o.mcp)), on(Lan.layer(o.lan)), on(Voice.layer(o.voice)), on(Connectors.layer(o.connector)));
 
 /** Source Control's startup: the first look at GitHub. */
 export const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
@@ -137,7 +137,7 @@ export const notificationsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => buil
 export const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(gameStart));
 
 /** The whole farm: every module built, then every startup in module order. */
-export const services = (config: ServerConfig, options: ServiceOptions = {}) =>
+export const services = (config: ServerConfig["Service"], options: ServiceOptions = {}) =>
   platform(config).pipe(
     agents(options),
     sourceControl(options),

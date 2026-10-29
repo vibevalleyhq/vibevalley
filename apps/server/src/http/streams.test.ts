@@ -3,18 +3,18 @@ import { describe, expect, it } from "vite-plus/test";
 import { Effect, Layer, Stream } from "effect";
 import { HttpRouter } from "effect/http";
 import { ServerConfig } from "../base/config.ts";
-import { Core, layer as coreLayer } from "../core/core.ts";
+import { Core } from "../core/core.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { testConfig } from "../testing/layers.ts";
 import { streams } from "./streams.ts";
 
-const appFor = (change: (core: Core) => Core) => {
-  const base = coreLayer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())));
+const appFor = (change: (core: Core["Service"]) => Core["Service"]) => {
+  const base = Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())));
   const custom = Layer.unwrap(Effect.map(Core, (core) => Layer.succeed(Core, Core.of(change(core))))).pipe(Layer.provide(base));
   return streams.pipe(Layer.provide(custom));
 };
 
-async function withRoutes(change: (core: Core) => Core, body: (handler: (request: Request) => Promise<Response>) => Promise<void>) {
+async function withRoutes(change: (core: Core["Service"]) => Core["Service"], body: (handler: (request: Request) => Promise<Response>) => Promise<void>) {
   const { handler, dispose } = HttpRouter.toWebHandler(appFor(change));
   try {
     await body(handler);

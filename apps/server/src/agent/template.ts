@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // persona.en.md, read in the farm's language. The built-in ones are templates/ beside this file, in the order of
 // templates/index.json; those added on this machine are copies in the home's agent-templates/.
 
+import { messageOf } from "../errors.ts";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
@@ -61,7 +62,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(schema: S, dir: stri
   try {
     return Schema.decodeUnknownSync(Schema.fromJsonString(schema))(readFileSync(path, "utf8"));
   } catch (e) {
-    throw new TemplateProblem(t("server.agent.template.unreadable", { file: path, why: e instanceof Error ? e.message : String(e) }));
+    throw new TemplateProblem(t("server.agent.template.unreadable", { file: path, why: messageOf(e) }));
   }
 };
 
@@ -126,7 +127,7 @@ export function addedTemplates(home: string): { readonly templates: AgentTemplat
     try {
       templates.push(readTemplate(join(root, name), "added"));
     } catch (e) {
-      problems.push(e instanceof Error ? e.message : String(e));
+      problems.push(messageOf(e));
     }
   }
   return { templates, problems };

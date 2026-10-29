@@ -22,12 +22,12 @@ import { Notices } from "../notice/notice.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { layer, Orchestrator } from "./orchestrator.ts";
+import { Orchestrator } from "./orchestrator.ts";
 import { deepseekModel, intake, orchestratorModel } from "./rules.ts";
 import { gate, untilGot as until, whenTrue, within } from "../testing/until.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
-const onPhone = (o: Orchestrator, text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
+const onPhone = (o: Orchestrator["Service"], text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
 const lastInput = (c: Request) =>
@@ -76,7 +76,7 @@ const respond = (c: Request): Answer => {
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
 /** The patrol runs by hand: heartbeatMinutes 0 leaves nothing to the timer. */
-const farm = (f: Reply = respond, config: ServerConfig = testConfig(), clock?: () => number) => {
+const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig(), clock?: () => number) => {
   const { llm, requests } = scriptedLLM(Array.from({ length: 100 }, () => f));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
@@ -84,7 +84,7 @@ const farm = (f: Reply = respond, config: ServerConfig = testConfig(), clock?: (
     repos: ["demo", "notes"],
     ...(clock ? { clock } : {}),
   });
-  return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
+  return { requests, layer: Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
 
 /** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. So a test that
@@ -319,7 +319,7 @@ describe("the orchestrator", () => {
           throw new Error("额度读不出来");
         },
       });
-      return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
+      return { requests, layer: Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
     })();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
@@ -359,7 +359,7 @@ describe("the orchestrator", () => {
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
       yield* pieces("（标记）");
       expect(refusal().length).toBe(1);
-    }).pipe(Effect.scoped, Effect.provide(layer().pipe(Layer.provideMerge(below))));
+    }).pipe(Effect.scoped, Effect.provide(Orchestrator.layer().pipe(Layer.provideMerge(below))));
   });
 
   it.live("hears a send key once", () => {

@@ -11,10 +11,10 @@ import { type ServerConfig } from "../base/config.ts";
 import { type GitHubRun, type ProjectHooks } from "../project/project.ts";
 import { registryOf } from "../runtime/runtime.ts";
 import { agentSessions, agents, collaboration, issuesBelowTaskGraphs, platform, type ServiceOptions, sourceControl } from "../services.ts";
-import { layer as notice } from "../notice/notice.ts";
-import { layer as task } from "../task/task.ts";
-import { layer as tool } from "../tool/tool.ts";
-import { layer as mcp } from "../mcp/mcp.ts";
+import { Notices } from "../notice/notice.ts";
+import { Tasks } from "../task/task.ts";
+import { Tools } from "../tool/tool.ts";
+import { Mcp } from "../mcp/mcp.ts";
 import { said } from "./said.ts";
 import { testConfig } from "./layers.ts";
 import { clockLayer } from "./clock.ts";
@@ -34,7 +34,7 @@ export const quietApp = {
 } satisfies ServiceOptions;
 
 export interface WorldOptions {
-  readonly config?: ServerConfig;
+  readonly config?: ServerConfig["Service"];
   /** The runtimes sessions run on; each is probed as installed. */
   readonly runtimes?: readonly Runtime[];
   readonly projects?: ProjectHooks;
@@ -73,7 +73,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
 /** The farm up to its notifications, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds
  * it). */
 export function world(options: WorldOptions = {}) {
-  return worldBelowTasks(options).pipe(on(task()), on(notice), on(tool), on(mcp(options.who ? { who: options.who } : {})));
+  return worldBelowTasks(options).pipe(on(Tasks.layer()), on(Notices.layer), on(Tools.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
 }
 
 const on =

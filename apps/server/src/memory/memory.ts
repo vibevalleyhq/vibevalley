@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
+import { messageOf } from "../errors.ts";
 import { fromOwner } from "./prompts.ts";
 import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer } from "effect";
@@ -27,30 +28,36 @@ export interface Recalled {
   readonly lines: string[];
 }
 
-export interface Memories {
-  /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a worker's are rows and its sources'. */
-  readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
-  readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
-  readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
-  /** What forget would do, refused as it would be; nothing changes. */
-  readonly previewForget: (agent: string, id: string) => Effect.Effect<Preview, ApiError>;
-  readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<RecallPreview, ApiError>;
-  /** What a run is told as it starts; only what is told is counted as recalled. */
-  readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
-  /** Behind memory_search: every source's best, taken in turns, the same memory once. */
-  readonly search: (q: SearchQuery) => Effect.Effect<SearchResult>;
-  /** The local rows keep the run before this returns; the other sources get it in the background. */
-  readonly keep: (run: FinishedRun) => Effect.Effect<void>;
-  readonly endSession: (s: EndedSession) => Effect.Effect<void>;
-  readonly write: (n: Note) => Effect.Effect<Memory, ApiError>;
-  readonly list: (agent: string) => Effect.Effect<Memory[]>;
-  readonly sources: () => MemorySourceInfo[];
-  /** An orchestrator's archive: what its compactions folded away. */
-  readonly archive: (agent: string, query: string) => ArchiveListing;
-  readonly archiveFile: (agent: string, name: string) => string | undefined;
+export class Memories extends Context.Service<
+  Memories,
+  {
+    /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a worker's are rows and its sources'. */
+    readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
+    readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
+    readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
+    /** What forget would do, refused as it would be; nothing changes. */
+    readonly previewForget: (agent: string, id: string) => Effect.Effect<Preview, ApiError>;
+    readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<RecallPreview, ApiError>;
+    /** What a run is told as it starts; only what is told is counted as recalled. */
+    readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
+    /** Behind memory_search: every source's best, taken in turns, the same memory once. */
+    readonly search: (q: SearchQuery) => Effect.Effect<SearchResult>;
+    /** The local rows keep the run before this returns; the other sources get it in the background. */
+    readonly keep: (run: FinishedRun) => Effect.Effect<void>;
+    readonly endSession: (s: EndedSession) => Effect.Effect<void>;
+    readonly write: (n: Note) => Effect.Effect<Memory, ApiError>;
+    readonly list: (agent: string) => Effect.Effect<Memory[]>;
+    readonly sources: () => MemorySourceInfo[];
+    /** An orchestrator's archive: what its compactions folded away. */
+    readonly archive: (agent: string, query: string) => ArchiveListing;
+    readonly archiveFile: (agent: string, name: string) => string | undefined;
+  }
+>()("vibevalley/Memory") {
+  static readonly layer = Layer.effect(
+    Memories,
+    Effect.suspend(() => make()),
+  );
 }
-
-export const Memories = Context.Service<Memories>("vibevalley/Memory");
 
 const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory => {
   const person = line.text.startsWith(fromOwner);
@@ -132,7 +139,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       });
 
     // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
-    const fileRefused = (e: unknown) => refused(e instanceof Error ? e.message : String(e));
+    const fileRefused = (e: unknown) => refused(messageOf(e));
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
       const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
@@ -142,7 +149,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return m;
     });
 
-    const shape: Memories = {
+    const shape = Memories.of({
       memoriesOf: (agent) => (inFile(agent) ? Effect.sync(() => orchestrator(agent)) : sources.list(agent)),
       remember: (n) => (inFile(n.agent) ? writeOrchestrator(n.agent, n.text) : write(n)),
       forget: (agent, id) =>
@@ -189,10 +196,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         hits: query.trim() ? searchArchive(homeOf(agent), query) : [],
       }),
       archiveFile: (agent, name) => readArchive(homeOf(agent), name),
-    };
+    });
     return shape;
   });
-
-export const layer = Layer.effect(Memories, make());
 
 export { MemoryRefused };

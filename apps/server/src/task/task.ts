@@ -4,6 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import {
   type Agent,
@@ -102,31 +103,34 @@ const stepNext = (graph: TaskGraph, task: Task): Next[] =>
     run: commandOf("graph.task.act", [graph.id, task.id], { action }),
   }));
 
-export interface Tasks {
-  readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
-  /** A helper finds its issue is several people's work: the issue becomes the graph, its steps the issues under it, and they start at once. */
-  readonly splitIssue: (session: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
-  /** The same split, asked of the session working the issue now: it is that session's branch the graph opens from. */
-  readonly splitIssueOf: (issue: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
-  readonly act: (id: string, action: GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
-  readonly taskAct: (id: string, task: string, action: TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
-  readonly editTask: (id: string, task: string, edit: TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
-  readonly removeTask: (id: string, task: string, by: Actor) => Effect.Effect<string, ApiError>;
-  /** What removeTask would do, refused as it would be; nothing changes. */
-  readonly previewRemoveTask: (id: string, task: string) => Effect.Effect<Preview, ApiError>;
-  readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
-  /** The task graphs now, as the board has them. */
-  readonly graphs: () => TaskGraph[];
-  readonly graph: (id: string) => Effect.Effect<TaskGraph, ApiError>;
-  readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
-  /** What the orchestrator is told about graphs, subscribed before it returns. */
-  readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
-  /** Once the sessions came back (Agent Sessions' startup): a graph cut off while splitting is abandoned, one cut off with
-   * steps at work pauses, and a running one goes on. */
-  readonly comeBack: Effect.Effect<void>;
+export class Tasks extends Context.Service<
+  Tasks,
+  {
+    readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
+    /** A helper finds its issue is several people's work: the issue becomes the graph, its steps the issues under it, and they start at once. */
+    readonly splitIssue: (session: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
+    /** The same split, asked of the session working the issue now: it is that session's branch the graph opens from. */
+    readonly splitIssueOf: (issue: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
+    readonly act: (id: string, action: GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
+    readonly taskAct: (id: string, task: string, action: TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
+    readonly editTask: (id: string, task: string, edit: TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
+    readonly removeTask: (id: string, task: string, by: Actor) => Effect.Effect<string, ApiError>;
+    /** What removeTask would do, refused as it would be; nothing changes. */
+    readonly previewRemoveTask: (id: string, task: string) => Effect.Effect<Preview, ApiError>;
+    readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
+    /** The task graphs now, as the board has them. */
+    readonly graphs: () => TaskGraph[];
+    readonly graph: (id: string) => Effect.Effect<TaskGraph, ApiError>;
+    readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
+    /** What the orchestrator is told about graphs, subscribed before it returns. */
+    readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
+    /** Once the sessions came back (Agent Sessions' startup): a graph cut off while splitting is abandoned, one cut off with
+     * steps at work pauses, and a running one goes on. */
+    readonly comeBack: Effect.Effect<void>;
+  }
+>()("vibevalley/Task") {
+  static readonly layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
 }
-
-export const Tasks = Context.Service<Tasks>("vibevalley/Task");
 
 const withNote = (graph: TaskGraph, note: string): TaskGraph => {
   const { note: _, ...rest } = graph;
@@ -142,9 +146,9 @@ const unmanned = (n: Task): Task => {
 export interface TaskWork {
   readonly hire: (agent: Agent, task: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
   readonly tell: (id: string, text: string) => Effect.Effect<string>;
-  readonly dismiss: Sessions["dismiss"];
+  readonly dismiss: Sessions["Service"]["dismiss"];
   readonly find: (id: string) => Roster | undefined;
-  readonly handOver: Sessions["handOver"];
+  readonly handOver: Sessions["Service"]["handOver"];
 }
 
 /** The git a graph's branches live in; tests play it. */
@@ -154,7 +158,7 @@ export interface TaskGit {
   readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
   readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
   readonly changedFiles: (cwd: string, base: string) => Effect.Effect<string[], ProjectError>;
-  readonly mergeInto: Projects["mergeInto"];
+  readonly mergeInto: Projects["Service"]["mergeInto"];
 }
 
 export interface TaskOptions {
@@ -189,7 +193,7 @@ export const make = (options: TaskOptions = {}) =>
     const { run: db } = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
-    const newsHub = yield* PubSub.unbounded<string>();
+    const newsHub = yield* scopedPubSub<string>();
     const splitters = new Map<string, string>();
     const splitterTries = new Map<string, number>();
 
@@ -496,7 +500,7 @@ export const make = (options: TaskOptions = {}) =>
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
-    const shape: Tasks = {
+    const shape = Tasks.of({
       splitIssueOf: (issue, title, steps) =>
         Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((item) => item.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
       graphs: () => graphsOf(core.state()),
@@ -737,11 +741,9 @@ export const make = (options: TaskOptions = {}) =>
         return changes;
       }),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    };
+    });
     return shape;
   });
-
-export const layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
 
 /** Issues' startup: the task graphs come back. */
 export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (item) => item.comeBack));

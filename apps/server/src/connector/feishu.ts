@@ -4,9 +4,15 @@ import { t } from "@vibevalley/i18n";
 // registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
 // API to the owner's open_id, with no reply window.
 
+import { Schema } from "effect";
+import { jsonOrNone } from "../base/json.ts";
+import { messageOf } from "../errors.ts";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { wallTime } from "../base/time.ts";
-import { type Adapter, message } from "./adapter.ts";
+import { type Adapter } from "./adapter.ts";
+
+/** A text message's content: {"text": …}. */
+const textContent = jsonOrNone(Schema.Struct({ text: Schema.optionalKey(Schema.String) }));
 
 export type Domain = "feishu" | "lark";
 
@@ -58,7 +64,7 @@ async function form(domain: Domain, body: Record<string, string>, signal: AbortS
     return (await res.json()) as Record<string, unknown>;
   } catch (e) {
     if (timed.aborted && !signal.aborted) throw new Error(t("server.connector.feishu.registerTimeout"), { cause: e });
-    throw new Error(t("server.connector.feishu.register", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
+    throw new Error(t("server.connector.feishu.register", { why: messageOf(e) }), { cause: e });
   }
 }
 
@@ -204,7 +210,7 @@ export class FeishuClient implements FeishuApi {
         data: { receive_id: openId, msg_type: "text", content: JSON.stringify({ text }) },
       });
     } catch (e) {
-      throw new Error(t("server.connector.feishu.send", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
+      throw new Error(t("server.connector.feishu.send", { why: messageOf(e) }), { cause: e });
     }
     if (res.code !== undefined && res.code !== 0) throw new Error(t("server.connector.feishu.send", { why: `${res.code} ${res.msg ?? ""}` }));
     if (!res.data?.message_id) throw new Error(t("server.connector.feishu.noId"));
@@ -225,11 +231,7 @@ export function text(m: Message): string {
         } as Record<string, string>
       )[m.messageType] ?? t("server.connector.media.message")
     );
-  try {
-    return ((JSON.parse(m.content) as { text?: string }).text ?? "").trim();
-  } catch {
-    return "";
-  }
+  return (textContent(m.content)?.text ?? "").trim();
 }
 
 export function feishuAdapter(api: FeishuApi): Adapter {
@@ -259,14 +261,14 @@ export function feishuAdapter(api: FeishuApi): Adapter {
         );
         return undefined;
       } catch (e) {
-        return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
+        return signal.aborted ? undefined : { kind: "failed", reason: messageOf(e) };
       }
     },
     send: async (signal, secrets, to, text) => {
       try {
         return await api.sendText(signal, appOf(secrets), to, text);
       } catch (e) {
-        return { kind: "failed", reason: message(e) };
+        return { kind: "failed", reason: messageOf(e) };
       }
     },
   };

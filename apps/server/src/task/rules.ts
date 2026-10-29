@@ -2,6 +2,8 @@ import { t } from "@vibevalley/i18n";
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
+import { Result, Schema, SchemaIssue } from "effect";
+import { messageOf } from "../errors.ts";
 import {
   type WorkspaceState,
   type GraphEvent,
@@ -74,58 +76,59 @@ function parseJson(body: string): unknown {
   try {
     return JSON.parse(body);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = messageOf(e);
     throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message, { cause: e });
   }
 }
 
+const formatIssue = SchemaIssue.makeFormatterDefault();
+
+const StepDraftSchema: Schema.Codec<StepDraft> = Schema.Struct({
+  id: Schema.String,
+  title: Schema.optionalKey(Schema.String),
+  brief: Schema.String,
+  needs: Schema.optionalKey(Schema.Array(Schema.String)),
+  agent: Schema.optionalKey(Schema.String),
+  check: Schema.optionalKey(Schema.String),
+  scope: Schema.optionalKey(Schema.Array(Schema.String)),
+  acceptance: Schema.optionalKey(Schema.Boolean),
+});
+
 /** Optional fields may be missing but never null; other keys are ignored. */
-function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } | string {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return t("server.task.parse.object");
-  const obj = raw as Record<string, unknown>;
-  let title: string | undefined;
-  if ("title" in obj) {
-    if (typeof obj.title !== "string") return t("server.task.parse.string", { at: `["title"]` });
-    title = obj.title;
+const SplitDraft = Schema.Struct({ title: Schema.optionalKey(Schema.String), tasks: Schema.Array(StepDraftSchema) });
+
+/** The first thing wrong with a split, in the words the model is answered with: where it is (["tasks"][0]["brief"]) and
+ * what it should have been. */
+function splitProblem(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = []): string {
+  const at = path.map((k) => (typeof k === "number" ? `[${k}]` : `["${String(k)}"]`)).join("");
+  switch (issue._tag) {
+    case "Pointer":
+      return splitProblem(issue.issue, [...path, ...issue.path]);
+    case "Composite":
+      return issue.issues[0] ? splitProblem(issue.issues[0], path) : t("server.task.parse.shape", { why: formatIssue(issue) });
+    case "MissingKey":
+      return t("server.task.parse.missing", { at });
+    case "InvalidType":
+      switch (issue.ast._tag) {
+        case "String":
+          return t("server.task.parse.string", { at });
+        case "Arrays":
+          return t("server.task.parse.array", { at });
+        case "Boolean":
+          return t("server.task.parse.boolean", { at });
+        case "Objects":
+          return path.length === 0 ? t("server.task.parse.object") : t("server.task.parse.stepObject", { at });
+        default:
+          return t("server.task.parse.shape", { why: formatIssue(issue) });
+      }
+    default:
+      return t("server.task.parse.shape", { why: formatIssue(issue) });
   }
-  if (!Array.isArray(obj.tasks)) return t("server.task.parse.array", { at: `["tasks"]` });
-  const tasks: StepDraft[] = [];
-  for (const [i, item] of obj.tasks.entries()) {
-    const at = `["tasks"][${i}]`;
-    if (typeof item !== "object" || item === null || Array.isArray(item)) return t("server.task.parse.stepObject", { at });
-    const o = item as Record<string, unknown>;
-    const text = (key: string, required: boolean): string | undefined | { problem: string } => {
-      if (!(key in o)) return required ? { problem: t("server.task.parse.missing", { at: `${at}["${key}"]` }) } : undefined;
-      return typeof o[key] === "string" ? o[key] : { problem: t("server.task.parse.string", { at: `${at}["${key}"]` }) };
-    };
-    const texts = (key: string): string[] | undefined | { problem: string } => {
-      if (!(key in o)) return undefined;
-      const a = o[key];
-      if (!Array.isArray(a)) return { problem: t("server.task.parse.array", { at: `${at}["${key}"]` }) };
-      const bad = a.findIndex((x) => typeof x !== "string");
-      return bad >= 0 ? { problem: t("server.task.parse.string", { at: `${at}["${key}"][${bad}]` }) } : (a as string[]);
-    };
-    const step: Record<string, unknown> = {};
-    for (const [key, read] of [
-      ["id", () => text("id", true)],
-      ["title", () => text("title", false)],
-      ["brief", () => text("brief", true)],
-      ["needs", () => texts("needs")],
-      ["agent", () => text("agent", false)],
-      ["check", () => text("check", false)],
-      ["scope", () => texts("scope")],
-    ] as const) {
-      const v = read();
-      if (v !== undefined && typeof v === "object" && !Array.isArray(v)) return v.problem;
-      if (v !== undefined) step[key] = v;
-    }
-    if ("acceptance" in o) {
-      if (typeof o.acceptance !== "boolean") return t("server.task.parse.boolean", { at: at + `["acceptance"]` });
-      step.acceptance = o.acceptance;
-    }
-    tasks.push(step as unknown as StepDraft);
-  }
-  return { ...(title !== undefined ? { title } : {}), tasks };
+}
+
+function decodeSplitDraft(raw: unknown): { title?: string; tasks: readonly StepDraft[] } | string {
+  const r = Schema.decodeUnknownResult(SplitDraft)(raw);
+  return Result.isSuccess(r) ? r.success : splitProblem(r.failure.issue);
 }
 
 export function parseSplit(text: string): ParsedSplit {
@@ -209,22 +212,23 @@ export const changeOf = (e: GraphEvent) => ({
 
 export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
 
-/** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
-export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
+/** An issue of a task graph as it is written down: what the graph says, and what only the issue knows from before. */
+export type GraphIssue = Draft & Pick<Issue, "priority" | "createdAt">;
+
+/** What only the issues know (priority, when they were written down and closed) comes from before; one closing now closes at now. */
+export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): GraphIssue[] {
   const was = new Map(before.map((item) => [item.id, item]));
-  const keep = (draft: Draft, closed: Closing | undefined): Issue => {
-    const item = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
-    const old = was.get(item.id);
-    if (old) {
-      Object.assign(item, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
-      if (closed !== undefined && old.closedAt !== undefined) item.closedAt = old.closedAt;
-    }
-    item.sessions ??= [];
-    delete item.delivered;
-    delete item.canceled;
-    if (closed) Object.assign(item, closed);
-    if (closed !== undefined && item.closedAt === undefined) item.closedAt = now;
-    return item;
+  const keep = (draft: Draft, closed: Closing | undefined): GraphIssue => {
+    const { delivered: _delivered, canceled: _canceled, closedAt: drafted, ...rest } = draft;
+    const old = was.get(draft.id);
+    const closedAt = closed === undefined ? drafted : (old?.closedAt ?? now);
+    return {
+      ...rest,
+      priority: old?.priority ?? "medium",
+      createdAt: old?.createdAt ?? graph.createdAt,
+      ...closed,
+      ...(closedAt !== undefined ? { closedAt } : {}),
+    };
   };
   const project = graph.project;
   const out = [

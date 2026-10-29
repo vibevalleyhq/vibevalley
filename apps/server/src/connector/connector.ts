@@ -9,11 +9,29 @@ import { t } from "@vibevalley/i18n";
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
+import { messageOf } from "../errors.ts";
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf } from "../channel/state.ts";
-import { Cause, Clock, Context, Data, Deferred, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schema, Semaphore, Stream } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  Data,
+  Deferred,
+  Duration,
+  Effect,
+  Fiber,
+  FiberSet,
+  Layer,
+  Option,
+  Predicate,
+  Schedule,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -24,7 +42,7 @@ import { reasonOf } from "../errors.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { type Failure, type Inbound, type Linked, message, type Progress, type Adapter } from "./adapter.ts";
+import { type Failure, type Inbound, type Linked, type Progress, type Adapter } from "./adapter.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
@@ -63,15 +81,18 @@ const bridgeError = (e: unknown) => (e instanceof BridgeError ? e : new BridgeEr
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
-export interface Connectors {
-  readonly list: () => Effect.Effect<ConnectorStatus[]>;
-  readonly login: (id: ConnectorID, input: ConnectorLogin) => Effect.Effect<ConnectorStatus>;
-  readonly verify: (id: ConnectorID, code: string) => Effect.Effect<ConnectorStatus>;
-  readonly logout: (id: ConnectorID) => Effect.Effect<ConnectorStatus>;
-  readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
+export class Connectors extends Context.Service<
+  Connectors,
+  {
+    readonly list: () => Effect.Effect<ConnectorStatus[]>;
+    readonly login: (id: ConnectorID, input: ConnectorLogin) => Effect.Effect<ConnectorStatus>;
+    readonly verify: (id: ConnectorID, code: string) => Effect.Effect<ConnectorStatus>;
+    readonly logout: (id: ConnectorID) => Effect.Effect<ConnectorStatus>;
+    readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
+  }
+>()("vibevalley/Connector") {
+  static readonly layer = (options?: ConnectorOptions) => Layer.effect(Connectors, make(options));
 }
-
-export const Connectors = Context.Service<Connectors>("vibevalley/Connector");
 
 export interface ConnectorOptions {
   readonly weixin?: WeixinApi;
@@ -81,7 +102,7 @@ export interface ConnectorOptions {
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
   /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
-  readonly say?: (text: string, channel: string | undefined, chat: Channels) => Effect.Effect<void, ApiError>;
+  readonly say?: (text: string, channel: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
 /** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */
@@ -105,6 +126,10 @@ export const make = (options: ConnectorOptions = {}) =>
     const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
+    /** retryFirst, then twice as long after each try that fails, up to retryMost. */
+    const outboxBackoff = Schedule.exponential(Duration.millis(retryFirst)).pipe(
+      Schedule.modifyDelay(({ duration }) => Effect.succeed(Duration.min(duration, Duration.millis(retryMost)))),
+    );
     // The bridges' fibers (each account's generation, the status said to the core) belong to this service: they end with
     // it and keep its services (the logger, the Clock).
     const forkHere = yield* FiberSet.makeRuntime<never>();
@@ -251,7 +276,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const send = (secrets: Record<string, string>, to: string, text: string, reply: string) =>
         Effect.tryPromise({
           try: (signal) => adapter.send(signal, secrets, to, text, reply),
-          catch: (e): Failure => ({ kind: "failed", reason: message(e) }),
+          catch: (e): Failure => ({ kind: "failed", reason: messageOf(e) }),
         }).pipe(Effect.catch((f) => Effect.succeed(f)));
 
       // The outbox: one drain at a time, in order. True when nothing is left that it could send now.
@@ -330,16 +355,22 @@ export const make = (options: ConnectorOptions = {}) =>
       });
 
       const outboxRun = Effect.gen(function* () {
-        let wait = retryFirst;
+        // The waits between tries of what is held: a fresh one after a try that goes, the next one after a try that fails.
+        const waits = Effect.map(Schedule.toStep(outboxBackoff), (step) => Effect.map(Effect.orDie(step(0, undefined)), ([delay]) => Duration.toMillis(delay)));
+        let nextWait = yield* waits;
+        let wait = yield* nextWait;
         for (;;) {
           if (outboxDirty) {
             outboxDirty = false;
             yield* drain(false);
-            wait = retryFirst;
+            nextWait = yield* waits;
+            wait = yield* nextWait;
             continue;
           }
           const result = yield* sleepOrWake(wait, (wake) => (wakeOutbox = wake)).pipe(Effect.ensuring(Effect.sync(() => (wakeOutbox = undefined))));
-          if (result === "timeout") wait = (yield* drain(false)) ? retryFirst : Math.min(2 * wait, retryMost);
+          if (result !== "timeout") continue;
+          if (yield* drain(false)) nextWait = yield* waits;
+          wait = yield* nextWait;
         }
       });
 
@@ -431,7 +462,7 @@ export const make = (options: ConnectorOptions = {}) =>
                   cursor,
                   accept: (messages, c) => (sealed || signal.aborted ? Promise.reject(new Error("canceled")) : acceptHere(accept(messages, c))),
                 }),
-              catch: (e): Failure => ({ kind: "failed", reason: message(e) }),
+              catch: (e): Failure => ({ kind: "failed", reason: messageOf(e) }),
             }).pipe(
               Effect.catch((f) => Effect.succeed(f)),
               Effect.ensuring(
@@ -678,5 +709,3 @@ export const make = (options: ConnectorOptions = {}) =>
       }),
     });
   });
-
-export const layer = (options?: ConnectorOptions) => Layer.effect(Connectors, make(options));

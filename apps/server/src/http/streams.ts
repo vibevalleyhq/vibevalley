@@ -3,7 +3,7 @@
 
 import { eventsPath, livePath, statePath } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { Effect, Schedule, type Schema, Stream } from "effect";
+import { Effect, Metric, Schedule, type Schema, Stream } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import { bounded } from "../core/bounded.ts";
 import { wireJson } from "../base/wire.ts";
@@ -12,6 +12,9 @@ import { Core } from "../core/core.ts";
 const heartbeatMs = 20_000;
 
 const encoder = new TextEncoder();
+
+/** The event streams open now, by stream: up when one starts, down when it ends however it ends. */
+const open = Metric.counter("vibevalley.sse.open", { description: "Event streams open now, by stream" });
 
 function sse<A>(name: string, events: Stream.Stream<A>, schema: Schema.Codec<A>) {
   const encode = wireJson(schema);
@@ -25,7 +28,11 @@ function sse<A>(name: string, events: Stream.Stream<A>, schema: Schema.Codec<A>)
     ),
   );
   const pings = Stream.fromSchedule(Schedule.spaced(heartbeatMs)).pipe(Stream.map(() => encoder.encode(": ping\n\n")));
-  return HttpServerResponse.stream(Stream.merge(data, pings, { haltStrategy: "left" }), {
+  const counted = open.pipe(Metric.withAttributes({ stream: name }));
+  const body = Stream.unwrap(Effect.as(Metric.update(counted, 1), Stream.merge(data, pings, { haltStrategy: "left" }))).pipe(
+    Stream.ensuring(Metric.update(counted, -1)),
+  );
+  return HttpServerResponse.stream(body, {
     headers: {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",

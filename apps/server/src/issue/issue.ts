@@ -1,4 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
+import { scopedPubSub } from "../base/pubsub.ts";
 import { needsOwner, talkJob } from "./prompts.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import {
@@ -76,7 +77,7 @@ import { merging } from "./merge.ts";
 import { refinement } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
-import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
+import { type Hired, type HireOptions, NotRecorded, type SessionNews, Sessions } from "../session/session.ts";
 import { type Due, Crons } from "../cron/cron.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
@@ -94,57 +95,62 @@ export interface OrchestratorWork {
   readonly said?: string;
 }
 
-export interface Issues {
-  /** The issues on the board: a talk with a profile is not one. */
-  readonly list: () => Effect.Effect<Issue[]>;
-  /** The board's issues a filter picks (issue.list). */
-  readonly query: (f: IssueFilter) => Effect.Effect<Issue[]>;
-  /** The issues the board holds now (open, and the latest closed). */
-  readonly onBoard: () => readonly Issue[];
-  readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
-  readonly add: (req: IssueRequest) => Effect.Effect<Issue, ApiError>;
-  /** On the owner's word only (actsForOwner). */
-  readonly edit: (id: string, upd: IssueUpdate, by: Actor) => Effect.Effect<Issue, ApiError>;
-  readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-  readonly queue: (id: string, queued: boolean) => Effect.Effect<Issue, ApiError>;
-  readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
-  readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. On the owner's
-   * word only (actsForOwner). */
-  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
-  /** Stops the turn of the session working it; the session stays, and a word starts the next. */
-  readonly stop: (id: string) => Effect.Effect<void, ApiError>;
-  /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
-   * fields, as the move would see them once saved. */
-  readonly previewStatus: (id: string, to: IssueStatus, text: string, opt?: StatusOptions, edit?: IssueUpdate) => Effect.Effect<Preview, ApiError>;
-  /** What remove would do, refused as it would be; nothing changes. */
-  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
-  /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
-  readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
-  readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
-  /** The owner's look counts for the game; anyone else's does not. */
-  readonly changes: (id: string, by: Actor) => Effect.Effect<Changes, ApiError>;
-  readonly merge: (id: string) => Effect.Effect<string, ApiError>;
-  readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
-  readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
-  readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
-  /** The owner's direct channel with a helper profile (or the orchestrator), opened with its talk issue the first time. */
-  readonly talkWith: (agent: string) => Effect.Effect<string, ApiError>;
-  readonly history: () => Effect.Effect<IssueHistory[]>;
-  readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
-  readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
-  /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
-  readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
-  /** A session starts on an existing issue: open it and link the session in one write. */
-  readonly ran: (id: string, session: Session) => Effect.Effect<void, Error>;
-  /** The issues of a task graph as the graph has them now, published as one commit once written. */
-  readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
-  readonly nextTaskId: () => Effect.Effect<string>;
-  /** Issues for the orchestrator, subscribed before it returns. */
-  readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
-  readonly ofCron: (id: string) => Effect.Effect<Issue | undefined>;
-  readonly refreshPullRequests: Effect.Effect<void>;
-  readonly tryQueued: Effect.Effect<void>;
+export class Issues extends Context.Service<
+  Issues,
+  {
+    /** The issues on the board: a talk with a profile is not one. */
+    readonly list: () => Effect.Effect<Issue[]>;
+    /** The board's issues a filter picks (issue.list). */
+    readonly query: (f: IssueFilter) => Effect.Effect<Issue[]>;
+    /** The issues the board holds now (open, and the latest closed). */
+    readonly onBoard: () => readonly Issue[];
+    readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
+    readonly add: (req: IssueRequest) => Effect.Effect<Issue, ApiError>;
+    /** On the owner's word only (actsForOwner). */
+    readonly edit: (id: string, upd: IssueUpdate, by: Actor) => Effect.Effect<Issue, ApiError>;
+    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
+    readonly queue: (id: string, queued: boolean) => Effect.Effect<Issue, ApiError>;
+    readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
+    readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
+    /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. On the owner's
+     * word only (actsForOwner). */
+    readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
+    /** Stops the turn of the session working it; the session stays, and a word starts the next. */
+    readonly stop: (id: string) => Effect.Effect<void, ApiError>;
+    /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
+     * fields, as the move would see them once saved. */
+    readonly previewStatus: (id: string, to: IssueStatus, text: string, opt?: StatusOptions, edit?: IssueUpdate) => Effect.Effect<Preview, ApiError>;
+    /** What remove would do, refused as it would be; nothing changes. */
+    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
+    readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
+    readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
+    /** The owner's look counts for the game; anyone else's does not. */
+    readonly changes: (id: string, by: Actor) => Effect.Effect<Changes, ApiError>;
+    readonly merge: (id: string) => Effect.Effect<string, ApiError>;
+    readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
+    readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
+    readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
+    /** The owner's direct channel with a helper profile (or the orchestrator), opened with its talk issue the first time. */
+    readonly talkWith: (agent: string) => Effect.Effect<string, ApiError>;
+    readonly history: () => Effect.Effect<IssueHistory[]>;
+    readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
+    readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
+    /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
+    readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
+    /** A session starts on an existing issue: open it and link the session in one write. */
+    readonly ran: (id: string, session: Session) => Effect.Effect<void, NotRecorded>;
+    /** The issues of a task graph as the graph has them now, published as one commit once written. */
+    readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
+    readonly nextTaskId: () => Effect.Effect<string>;
+    /** Issues for the orchestrator, subscribed before it returns. */
+    readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
+    readonly ofCron: (id: string) => Effect.Effect<Issue | undefined>;
+    readonly refreshPullRequests: Effect.Effect<void>;
+    readonly tryQueued: Effect.Effect<void>;
+  }
+>()("vibevalley/Issue") {
+  static readonly layer = (options?: IssueOptions) => Layer.effect(Issues, make(options));
 }
 
 export interface StatusOptions {
@@ -164,8 +170,6 @@ export interface IssueReviewRequest {
   readonly findings?: readonly string[];
   readonly text?: string;
 }
-
-export const Issues = Context.Service<Issues>("vibevalley/Issue");
 
 type Row = q.GetIssueResult;
 
@@ -240,7 +244,7 @@ export const make = (options: IssueOptions = {}) =>
     /** After an issue is removed: its sessions' rows went with it, and its children's. */
     const reloadSessions = Effect.suspend(() => Effect.map(db(qs.allSessions()), (rows) => worked.load(rows)));
     yield* reloadSessions;
-    const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
+    const orchestratorHub = yield* scopedPubSub<OrchestratorWork>();
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
@@ -439,7 +443,7 @@ export const make = (options: IssueOptions = {}) =>
         )
         .pipe(
           Effect.provideService(SqlClient.SqlClient, sql),
-          Effect.mapError((e) => new Error(causeMessage(e))),
+          Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
         );
       worked.added(session.id, id);
       yield* publish(id);
@@ -991,7 +995,7 @@ export const make = (options: IssueOptions = {}) =>
       return milestonesOf(issue, runs, names);
     });
 
-    const shape: Issues = {
+    const shape = Issues.of({
       onBoard: () => core.state().issues ?? [],
       list: () => Effect.map(everyIssue, (all) => all.filter((item) => !item.talk)),
       query: (f) =>
@@ -1254,8 +1258,6 @@ export const make = (options: IssueOptions = {}) =>
       ofCron,
       refreshPullRequests,
       tryQueued,
-    };
+    });
     return shape;
   });
-
-export const layer = (options?: IssueOptions) => Layer.effect(Issues, make(options));

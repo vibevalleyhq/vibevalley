@@ -3,6 +3,8 @@ import { t } from "@vibevalley/i18n";
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
+import { messageOf } from "../errors.ts";
+import { scopedPubSub } from "../base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
 import type { Actor } from "../base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
@@ -24,21 +26,27 @@ export interface Due {
   readonly missed: boolean;
 }
 
-export interface Crons {
-  readonly list: () => Cron[];
-  /** by is who asks, and on whose word (needsOK). */
-  readonly add: (req: CronRequest, by: Actor) => Effect.Effect<Cron, ApiError>;
-  /** Turned on is the owner's yes. */
-  readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Cron, ApiError>;
-  readonly remove: (id: string) => Effect.Effect<Cron, ApiError>;
-  /** What remove would do, refused as it would be; nothing changes. */
-  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
-  readonly tick: Effect.Effect<void>;
-  /** What comes due from now on, subscribed before it returns. */
-  readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
+export class Crons extends Context.Service<
+  Crons,
+  {
+    readonly list: () => Cron[];
+    /** by is who asks, and on whose word (needsOK). */
+    readonly add: (req: CronRequest, by: Actor) => Effect.Effect<Cron, ApiError>;
+    /** Turned on is the owner's yes. */
+    readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Cron, ApiError>;
+    readonly remove: (id: string) => Effect.Effect<Cron, ApiError>;
+    /** What remove would do, refused as it would be; nothing changes. */
+    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly tick: Effect.Effect<void>;
+    /** What comes due from now on, subscribed before it returns. */
+    readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
+  }
+>()("vibevalley/Cron") {
+  static readonly layer = Layer.effect(
+    Crons,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Crons = Context.Service<Crons>("vibevalley/Cron");
 
 /** $TZ when it names a zone, else the system's. */
 export function localZone(): string {
@@ -65,7 +73,7 @@ export const make = Effect.gen(function* () {
   const now = () => clock.currentTimeMillisUnsafe();
   // The ticker, the tools and the pages all change the list.
   const lock = yield* Semaphore.make(1);
-  const dueHub = yield* PubSub.unbounded<Due>();
+  const dueHub = yield* scopedPubSub<Due>();
 
   for (const row of yield* db(q.crons())) {
     const when = jsonOrNone(S.CronWhen)(row.spec);
@@ -107,7 +115,7 @@ export const make = Effect.gen(function* () {
         );
         if (written._tag === "Failure") {
           const failure = written.failure;
-          yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${failure instanceof Error ? failure.message : String(failure)}`);
+          yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`);
           continue;
         }
         yield* core.apply({ type: "cron", cron: after });
@@ -117,7 +125,7 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const shape: Crons = {
+  const shape = Crons.of({
     list: () => [...(core.state().crons ?? [])],
     add: Effect.fn("Crons.add")(function* (req, by) {
       const at = now();
@@ -193,11 +201,9 @@ export const make = Effect.gen(function* () {
       })),
     tick,
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),
-  };
+  });
   return shape;
 });
-
-export const layer = Layer.effect(Crons, make);
 
 /** Ticks once every service is built, so what the first tick finds due reaches the orchestrator (once ready). */
 export const start = Layer.effectDiscard(

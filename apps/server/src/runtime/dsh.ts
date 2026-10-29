@@ -7,6 +7,7 @@
 // and session/close, one prompt at a time, session/cancel, and session/set_config_option with a `model` select grouped
 // by provider and a `reasoning_effort` select in the thought_level category (off, low, high, max).
 
+import { jsonOrNone } from "../base/json.ts";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import {
@@ -18,7 +19,7 @@ import {
   type SessionOptions,
   type StartSession,
 } from "@botiverse/oar";
-import { Predicate } from "effect";
+import { Predicate, Schema } from "effect";
 import { afterRealTime } from "../base/time.ts";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
@@ -44,6 +45,18 @@ const { listingCwd } = await internal<{ listingCwd: (options: { cwd?: string }) 
 
 /** What dsh-acp has no channel for: its automation surface omits session prompts, tool denylists, names, tiers, extra
  * directories and output schemas. */
+/** A model option value as dsh writes it: ["provider", "model"]. */
+const modelPair = jsonOrNone(Schema.Tuple([Schema.String, Schema.String]));
+
+/** A JSON-RPC answer on dsh's stdout. */
+const rpcAnswer = jsonOrNone(
+  Schema.Struct({
+    id: Schema.optionalKey(Schema.Number),
+    result: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+    error: Schema.optionalKey(Schema.Struct({ code: Schema.optionalKey(Schema.Number), message: Schema.optionalKey(Schema.String) })),
+  }),
+);
+
 export const refusedSessionOptions: RefusedSessionOptions = {
   systemPrompt: "dsh-acp has no per-session system prompt input",
   appendSystemPrompt: "dsh-acp has no per-session system prompt append input",
@@ -74,13 +87,8 @@ export function optionValue(given: string): string {
 
 /** How a model is written outside dsh, provider/model, from its option value; a value that is no pair is itself. */
 export function modelId(value: string): string {
-  try {
-    const pair = JSON.parse(value) as unknown;
-    if (Array.isArray(pair) && pair.length === 2 && pair.every((x) => typeof x === "string")) return pair[0] + "/" + pair[1];
-  } catch {
-    // Not a pair.
-  }
-  return value;
+  const pair = modelPair(value);
+  return pair ? pair[0] + "/" + pair[1] : value;
 }
 
 /** A model id with the retired name folded into today's. */
@@ -159,20 +167,13 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
   let next = 0;
   const waiting = new Map<number, { resolve: (v: Rec) => void; reject: (e: Error) => void }>();
   lines.on("line", (line) => {
-    try {
-      const m = JSON.parse(line) as {
-        id?: number;
-        result?: Rec;
-        error?: { code?: number; message?: string };
-      };
-      const w = m.id !== undefined ? waiting.get(m.id) : undefined;
-      if (!w) return;
-      waiting.delete(m.id!);
-      if (m.error) w.reject(Object.assign(new Error(m.error.message ?? "ACP error"), { code: m.error.code }));
-      else w.resolve(m.result ?? {});
-    } catch {
-      // Not JSON-RPC: logs.
-    }
+    // A line that is no JSON-RPC answer is a log.
+    const m = rpcAnswer(line);
+    const w = m?.id !== undefined ? waiting.get(m.id) : undefined;
+    if (!m || !w || m.id === undefined) return;
+    waiting.delete(m.id);
+    if (m.error) w.reject(Object.assign(new Error(m.error.message ?? "ACP error"), { code: m.error.code }));
+    else w.resolve(m.result ?? {});
   });
   const request = (method: string, params: Rec) =>
     new Promise<Rec>((resolve, reject) => {

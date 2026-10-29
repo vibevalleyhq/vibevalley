@@ -7,7 +7,7 @@ import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
 /** Where to put a key, in the owner's words. */
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
 
-export function modelClient(id: string, key: string | (() => string | undefined), service: Llm): ModelClient {
+export function modelClient(id: string, key: string | (() => string | undefined), service: Llm["Service"]): ModelClient {
   try {
     return deepseek(id, key, service);
   } catch (e) {

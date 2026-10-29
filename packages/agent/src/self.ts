@@ -5,6 +5,7 @@ import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.t
 import { readSkill, type SkillInfo } from "./skills.ts";
 import { schemaEffectTool, schemaTool } from "./core/tool.ts";
 import { Effect, Schema } from "effect";
+import { ToolFailed } from "./core/errors.ts";
 import { self as selfWords } from "./prompts.ts";
 
 export interface SelfOptions {
@@ -57,14 +58,15 @@ export function selfTools(o: SelfOptions): Tool[] {
 }
 
 /** Interrupting it calls the subagent back. */
-export type Subagent = (brief: string, label: string) => Effect.Effect<string, Error>;
+export type Subagent = (brief: string, label: string) => Effect.Effect<string, ToolFailed>;
 
 export const subagentTool = (spawn: Subagent) =>
   schemaEffectTool({
     name: "spawn_agent",
     description: selfWords.spawnAgentDescription,
     parameters: Schema.Struct({ brief: Schema.String, label: Schema.optionalKey(Schema.String) }),
-    run: (p) => (p.brief.trim() ? spawn(p.brief, p.label ?? [...p.brief].slice(0, 20).join("")) : Effect.fail(new Error(selfWords.emptyBrief))),
+    run: (p) =>
+      p.brief.trim() ? spawn(p.brief, p.label ?? [...p.brief].slice(0, 20).join("")) : Effect.fail(new ToolFailed({ message: selfWords.emptyBrief })),
   });
 
 export const subagentInstructions = selfWords.subagentInstructions;

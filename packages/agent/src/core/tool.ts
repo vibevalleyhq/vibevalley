@@ -1,5 +1,6 @@
 // A tool that fails throws (or fails, as an Effect): the model reads the error's message as a failed result.
 
+import { type ToolFailed, toolFailed } from "./errors.ts";
 import { Effect, Schema } from "effect";
 import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
 import type { Tool } from "./loop.ts";
@@ -34,19 +35,17 @@ export interface TextToolSpec<P> {
 
 const answered = (text: string) => ({ content: [{ type: "text" as const, text: clip(text) }] });
 
-const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)));
-
 export const textTool = <P>(spec: TextToolSpec<P>): Tool => ({
   name: spec.name,
   description: spec.description,
   parameters: spec.parameters,
   execute: (params, call) =>
-    Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params as P, { callId: call.id, signal }), catch: asError }), answered),
+    Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params as P, { callId: call.id, signal }), catch: toolFailed }), answered),
 });
 
 export interface EffectToolSpec<P> extends Omit<TextToolSpec<P>, "run"> {
   /** A failure's message is the failed result the model reads. */
-  readonly run: (params: P) => Effect.Effect<string, Error>;
+  readonly run: (params: P) => Effect.Effect<string, ToolFailed>;
 }
 
 export const effectTool = <P>(spec: EffectToolSpec<P>): Tool => ({
@@ -76,6 +75,6 @@ export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields>>(
   return effectTool<unknown>({
     ...spec,
     parameters: parametersOf(spec.parameters),
-    run: (p) => Effect.flatMap(Effect.try({ try: () => read(p), catch: asError }), spec.run),
+    run: (p) => Effect.flatMap(Effect.try({ try: () => read(p), catch: toolFailed }), spec.run),
   });
 }

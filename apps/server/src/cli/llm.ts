@@ -4,4 +4,4 @@ import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { type Llm, make } from "@vibevalley/ai/llm";
 
-export const standaloneLlm = (): Llm => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));
+export const standaloneLlm = (): Llm["Service"] => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));

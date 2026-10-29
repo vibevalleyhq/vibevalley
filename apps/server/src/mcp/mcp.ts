@@ -3,6 +3,7 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
+import { messageOf } from "../errors.ts";
 import { coerceArguments } from "@vibevalley/ai/tools";
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 import { session } from "../base/actor.ts";
@@ -15,11 +16,14 @@ import { Sessions } from "../session/session.ts";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import { type Caller, Tools } from "../tool/tool.ts";
 
-export interface Mcp {
-  readonly handle: (request: Request) => Promise<Response>;
+export class Mcp extends Context.Service<
+  Mcp,
+  {
+    readonly handle: (request: Request) => Promise<Response>;
+  }
+>()("vibevalley/Mcp") {
+  static readonly layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));
 }
-
-export const Mcp = Context.Service<Mcp>("vibevalley/Mcp");
 
 export { unknownCaller };
 
@@ -51,7 +55,7 @@ export const make = (options: McpOptions = {}) =>
         const r = await runHere(tool.execute(coerceArguments(args ?? {}, tool.parameters), { id: "" }));
         return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
       } catch (e) {
-        return failedCall(e instanceof Error ? e.message : String(e));
+        return failedCall(messageOf(e));
       }
     };
 
@@ -88,5 +92,3 @@ export const make = (options: McpOptions = {}) =>
 
     return Mcp.of({ handle });
   });
-
-export const layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));

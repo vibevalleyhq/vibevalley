@@ -3,51 +3,55 @@ import { t } from "@vibevalley/i18n";
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
 
+import { messageOf } from "../errors.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
 import { parse } from "yaml";
 
-export interface ServerConfig {
-  /** VIBEVALLEY_HOME, or ~/.vibevalley; the YAML file is in it, so it cannot be set there. */
-  readonly home: string;
-  readonly version: string;
-  /** The farm's own folder: projects/<name> are its projects, worktrees/ the issues' worktrees. */
-  readonly workRoot: string;
-  /** Empty: home/db; "memory" keeps it in memory; anything else is the database's folder. */
-  readonly db: string;
-  readonly port: number;
-  /** The built page (apps/web/dist), served at / beside the API. Empty: no page. */
-  readonly web: string;
-  /** starters: the built-in templates a new farm installs beside its default orchestrator, by id, in order; in the
-   * environment, comma-separated. */
-  readonly agent: { readonly model: string; readonly starters: readonly string[] };
-  /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
-  readonly deepseek: { readonly apiKey: string };
-  readonly agora: { readonly appId: string; readonly appCertificate: string };
-  readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
-  readonly lan: { readonly port: number };
-  /** Commits by these emails count as yours too; in the environment, comma-separated. */
-  readonly gitEmails: readonly string[];
-  /** The tokei binary; empty: found on PATH. */
-  readonly tokei: string;
-  readonly cnyPerUsd: number;
-  /** 0 or less: no patrol. */
-  readonly patrol: { readonly heartbeatMinutes: number };
-  /** 0 or less: looked at every millisecond. */
-  readonly cron: { readonly tickMs: number };
-  /** stallSeconds: quiet this long, a session is shown as stuck; trajectoryDays: a gone session's steps are deleted after it (0 or less keeps them). */
-  readonly session: { readonly stallSeconds: number; readonly trajectoryDays: number };
-  readonly project: { readonly maxSessions: number; readonly checkTimeoutSeconds: number };
-  readonly github: { readonly prProjects: readonly string[]; readonly prPollSeconds: number };
-  readonly chat: { readonly noticeBatchMs: number; readonly retryWakeMs: number };
-  /** An OTLP collector (http://127.0.0.1:4318): the spans, logs and metrics go there; none when empty. */
-  readonly otlp: { readonly url: string };
-}
+export class ServerConfig extends Context.Service<
+  ServerConfig,
+  {
+    /** VIBEVALLEY_HOME, or ~/.vibevalley; the YAML file is in it, so it cannot be set there. */
+    readonly home: string;
+    readonly version: string;
+    /** The farm's own folder: projects/<name> are its projects, worktrees/ the issues' worktrees. */
+    readonly workRoot: string;
+    /** Empty: home/db; "memory" keeps it in memory; anything else is the database's folder. */
+    readonly db: string;
+    readonly port: number;
+    /** The built page (apps/web/dist), served at / beside the API. Empty: no page. */
+    readonly web: string;
+    /** starters: the built-in templates a new farm installs beside its default orchestrator, by id, in order; in the
+     * environment, comma-separated. */
+    readonly agent: { readonly model: string; readonly starters: readonly string[] };
+    /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
+    readonly deepseek: { readonly apiKey: string };
+    readonly agora: { readonly appId: string; readonly appCertificate: string };
+    readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
+    readonly lan: { readonly port: number };
+    /** Commits by these emails count as yours too; in the environment, comma-separated. */
+    readonly gitEmails: readonly string[];
+    /** The tokei binary; empty: found on PATH. */
+    readonly tokei: string;
+    readonly cnyPerUsd: number;
+    /** 0 or less: no patrol. */
+    readonly patrol: { readonly heartbeatMinutes: number };
+    /** 0 or less: looked at every millisecond. */
+    readonly cron: { readonly tickMs: number };
+    /** stallSeconds: quiet this long, a session is shown as stuck; trajectoryDays: a gone session's steps are deleted after it (0 or less keeps them). */
+    readonly session: { readonly stallSeconds: number; readonly trajectoryDays: number };
+    readonly project: { readonly maxSessions: number; readonly checkTimeoutSeconds: number };
+    readonly github: { readonly prProjects: readonly string[]; readonly prPollSeconds: number };
+    readonly chat: { readonly noticeBatchMs: number; readonly retryWakeMs: number };
+    /** An OTLP collector (http://127.0.0.1:4318): the spans, logs and metrics go there; none when empty. */
+    readonly otlp: { readonly url: string };
+  }
+>()("vibevalley/ServerConfig") {}
 
 export const noticeBatchMs = 3_000;
 
-export function defaults(home = homedir()): ServerConfig {
+export function defaults(home = homedir()): ServerConfig["Service"] {
   return {
     home: join(home, ".vibevalley"),
     version: "0.1.0",
@@ -87,7 +91,7 @@ const list = (name: string) =>
   );
 
 /** Every key but home and version, by its snake_case name, with its default (d). */
-const keys = (d: ServerConfig) =>
+const keys = (d: ServerConfig["Service"]) =>
   Keys.all({
     workRoot: text("work_root", d.workRoot),
     db: text("db", d.db),
@@ -140,7 +144,7 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
   const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
   return yield* Effect.try({
     try: (): unknown => parse(body),
-    catch: (e) => new ConfigError({ message: `${path}: ${e instanceof Error ? e.message : String(e)}` }),
+    catch: (e) => new ConfigError({ message: `${path}: ${messageOf(e)}` }),
   });
 });
 
@@ -149,7 +153,7 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
 export const loadConfig = Effect.fnUntraced(function* (
   file: string = "",
   env: Readonly<Record<string, string | undefined>> = process.env,
-): Effect.fn.Return<ServerConfig, ConfigError, FileSystem.FileSystem> {
+): Effect.fn.Return<ServerConfig["Service"], ConfigError, FileSystem.FileSystem> {
   const base = defaults();
   const home = env.VIBEVALLEY_HOME || base.home;
   const optional = file === "";
@@ -172,25 +176,24 @@ export const loadConfig = Effect.fnUntraced(function* (
     if (n < 0 || n > 65535) return yield* new ConfigError({ message: t("server.base.notPort", { path, name, port: n }) });
   }
   if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: t("server.base.prPoll") });
-  const c: ServerConfig = { ...base, ...read, home };
+  const c: ServerConfig["Service"] = { ...base, ...read, home };
   return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
 });
 
 /** The database's folder, or "memory". */
-export function dbDir(c: ServerConfig): string {
+export function dbDir(c: ServerConfig["Service"]): string {
   if (c.db === "memory") return "memory";
   if (c.db === "") return join(c.home, "db");
   return c.db;
 }
 
 /** The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. */
-export const serverAddress = (c: ServerConfig) => `127.0.0.1:${c.port}`;
+export const serverAddress = (c: ServerConfig["Service"]) => `127.0.0.1:${c.port}`;
 
 /** Where the projects are: each folder in it is one. */
-export const projectsDir = (c: ServerConfig) => join(c.workRoot, "projects");
+export const projectsDir = (c: ServerConfig["Service"]) => join(c.workRoot, "projects");
 
 /** A profile's own folder, an orchestrator's conversation, MEMORY.md, archive and evals among what it keeps there. */
-export const agentHome = (c: ServerConfig, agent: string) => join(c.home, "agent", agent);
+export const agentHome = (c: ServerConfig["Service"], agent: string) => join(c.home, "agent", agent);
 
 /** The configuration, as a service. */
-export const ServerConfig = Context.Service<ServerConfig>("vibevalley/ServerConfig");

@@ -7,6 +7,7 @@ import { t } from "@vibevalley/i18n";
 // go. An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so
 // they go to the route of the input taken last, and the tools read that route too.
 
+import { messageOf } from "../errors.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Usage } from "@vibevalley/ai/messages";
@@ -199,7 +200,7 @@ export class AgentHost<R> {
         b = await this.start();
       } catch (err) {
         if (this.closing) return this.closeInput(input);
-        const why = err instanceof Error ? err.message : String(err);
+        const why = messageOf(err);
         const id = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", t("server.session.host.cannotStart", { why }))).catch((e: Error) => {
           this.o.notice("error", t("server.session.host.notRecorded", { label: this.o.label, why: e.message }));
           return "";
@@ -298,7 +299,7 @@ export class AgentHost<R> {
         mkdirSync(join(this.o.home, "evals"), { recursive: true });
         writeFileSync(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 });
       } catch (err) {
-        return Effect.fail(refused(err instanceof Error ? err.message : String(err)));
+        return Effect.fail(refused(messageOf(err)));
       }
       return Effect.succeed({ id, file });
     });

@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
 // and the playback's account are moss.ts's; this wires them to the socket and the audio.
 
+import { messageOf } from "../../base/format";
 import { mossLinePath } from "@vibevalley/protocol";
 import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackAction, type Queued } from "./moss";
 
@@ -261,7 +262,7 @@ export class MossLine {
       this.send({ action: "mic_state", enabled: true });
       this.phase = "live";
     } catch (e) {
-      this.stop(e instanceof Error && e.name === "NotAllowedError" ? t("web.voice.call.noMic") : e instanceof Error ? e.message : String(e));
+      this.stop(e instanceof Error && e.name === "NotAllowedError" ? t("web.voice.call.noMic") : messageOf(e));
     }
     this.changed();
   }

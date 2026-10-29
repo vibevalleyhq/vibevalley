@@ -1,12 +1,13 @@
 // How a run goes, turn by turn, as the brain's loop has gone: the spec the loop is held to when it changes
 // (.agents/notes/proposed/architecture/2026-10-27-pi-in-effect.md, step 3).
 
+import { whenTrue } from "@vibevalley/testkit/until";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
 import { gate } from "@vibevalley/testkit/until";
 import { messageText, userMessage } from "./messages.ts";
-import { type Rig, results, tempHome, until, withAgent } from "./testing.ts";
+import { type Rig, results, tempHome, withAgent } from "./testing.ts";
 import { textTool } from "./core/tool.ts";
 
 const homes: (() => void)[] = [];
@@ -30,7 +31,7 @@ describe("a run's turns", () => {
   it("goes through its events in one order", async () => {
     await withAgent(home(), [answer([toolCall("list_dir", {})]), answer("好了")], async (r) => {
       await r.ask("列一下");
-      await until(() => r.has("agent_settled"));
+      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
       expect(shape(r)).toEqual([
         "agent_start",
         "turn_start",
@@ -103,11 +104,11 @@ describe("a run's turns", () => {
       [answer([toolCall("nap", {})]), answer("一"), answer("二")],
       async (r) => {
         await r.agent.send(userMessage("开始", Date.now()));
-        await until(() => napping);
+        await whenTrue(() => napping, "napping");
         await r.agent.send(userMessage("甲", Date.now()));
         await r.agent.send(userMessage("乙", Date.now()));
         wake.open();
-        await until(() => r.agent.history().length >= 7);
+        await whenTrue(() => r.agent.history().length >= 7, "r.agent.history().length >= 7");
         expect(said(r)).toEqual(["user:开始", "assistant:", "toolResult:醒了", "user:甲", "assistant:一", "user:乙", "assistant:二"]);
       },
       { tools: [nap] },
@@ -133,9 +134,12 @@ describe("a run's turns", () => {
       [answer([text("两个"), toolCall("slow", {}), toolCall("fast", {})]), answer("都好了")],
       async (r) => {
         await r.agent.send(userMessage("一起", Date.now()));
-        await until(() => slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast"));
+        await whenTrue(
+          () => slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast"),
+          'slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast")',
+        );
         slowDone.open();
-        await until(() => r.has("agent_settled"));
+        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(r.events.flatMap((e) => (e.type === "tool_execution_start" || e.type === "tool_execution_end" ? [e.type + ":" + e.toolName] : []))).toEqual([
           "tool_execution_start:slow",
           "tool_execution_start:fast",

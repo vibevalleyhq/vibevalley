@@ -10,6 +10,8 @@ import { t } from "@vibevalley/i18n";
 // the sender leaves its trigger on the hand first and the turn takes the oldest. Admission serializes room and opening
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
+import { messageOf } from "../errors.ts";
+import { scopedPubSub } from "../base/pubsub.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { join, resolve } from "node:path";
@@ -38,18 +40,19 @@ import {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream, Metric } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
 
 export type { SessionNews };
 import { serverAddress, ServerConfig } from "../base/config.ts";
-import { Db } from "../base/db.ts";
+import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core, type FactIn } from "../core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { Memories } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
 import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "../project/shapes.ts";
@@ -116,7 +119,7 @@ export interface HireOptions {
 export interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly issue: Pick<Issue, "id" | "number">;
   /** Links the session to its existing issue before the hired fact or any report can be seen. */
-  readonly hiring?: (s: Session) => Effect.Effect<void, unknown>;
+  readonly hiring?: (s: Session) => Effect.Effect<void, NotRecorded>;
 }
 
 export interface RunFinished {
@@ -164,72 +167,77 @@ interface Hand {
   heard: string[];
 }
 
-export interface Sessions {
-  readonly noRoom: (runtime: string, project: string) => string;
-  /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
-   * been idle longest, and says who. */
-  readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
-  readonly send: (agent: Agent, task: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
-  readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
-  /** deliver, in words for whoever sent it. */
-  readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
-  readonly stop: (id: string) => Effect.Effect<boolean>;
-  /** Discard resets its branch only after the runtime has stopped writing. */
-  /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
-  readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Effect.Effect<boolean, ApiError>;
-  /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone; the
-   * session stays. Not while a round goes on (the next report resets it). */
-  readonly discardWork: (id: string) => Effect.Effect<void>;
-  /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
-  readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
-  readonly roster: () => Roster[];
-  readonly find: (id: string) => Roster | undefined;
-  /** A session on the farm now, as the core state has it: what another module reads a session by. */
-  readonly sessionOf: (id: string) => Session | undefined;
-  readonly presentSessions: () => readonly Session[];
-  /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
-   * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
-   * it works. Work that does not go in keeps the session and its branch, marks a conflict, and says in NotTakenIn what
-   * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
-   * open keeps the session too. */
-  readonly handOver: (
-    id: string,
-    closed: SessionClose,
-    use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
-    settle?: Settle,
-  ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
-  /** What the session's branch would bring now; the conflict it shows is kept on the session. */
-  readonly changes: (id: string) => Effect.Effect<Changes | undefined, ApiError>;
-  /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
-  readonly list: (agent: string) => Effect.Effect<Session[]>;
-  /** A session on the farm, or one that has ended. */
-  readonly get: (id: string) => Effect.Effect<Session | undefined>;
-  readonly runs: (issue: string) => Effect.Effect<Run[]>;
-  /** A session's log, oldest first; a run's only when run is given. */
-  readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
-  /** These four are subscribed before they return: nothing published after is missed. */
-  readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
-  /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
-  readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
-  readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
-  readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
-  /** Whose token it is; "" when nobody's. */
-  readonly who: (token: string) => string;
-  /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
-  readonly setAddress: (address: string) => void;
-  /** An agent run in this process (the orchestrator): its log and its runs are kept as a session's are. */
-  readonly host: <R>(options: HostOptions<R>) => AgentHost<R>;
-  /** Brings back the sessions the farm had when it stopped, once every service is ready. */
-  readonly restore: Effect.Effect<void>;
+export class Sessions extends Context.Service<
+  Sessions,
+  {
+    readonly noRoom: (runtime: string, project: string) => string;
+    /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
+     * been idle longest, and says who. */
+    readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
+    readonly send: (agent: Agent, task: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
+    readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
+    /** deliver, in words for whoever sent it. */
+    readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
+    readonly stop: (id: string) => Effect.Effect<boolean>;
+    /** Discard resets its branch only after the runtime has stopped writing. */
+    /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
+    readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Effect.Effect<boolean, ApiError>;
+    /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone; the
+     * session stays. Not while a round goes on (the next report resets it). */
+    readonly discardWork: (id: string) => Effect.Effect<void>;
+    /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
+    readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
+    readonly roster: () => Roster[];
+    readonly find: (id: string) => Roster | undefined;
+    /** A session on the farm now, as the core state has it: what another module reads a session by. */
+    readonly sessionOf: (id: string) => Session | undefined;
+    readonly presentSessions: () => readonly Session[];
+    /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
+     * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
+     * it works. Work that does not go in keeps the session and its branch, marks a conflict, and says in NotTakenIn what
+     * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
+     * open keeps the session too. */
+    readonly handOver: (
+      id: string,
+      closed: SessionClose,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+      settle?: Settle,
+    ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
+    /** What the session's branch would bring now; the conflict it shows is kept on the session. */
+    readonly changes: (id: string) => Effect.Effect<Changes | undefined, ApiError>;
+    /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
+    readonly list: (agent: string) => Effect.Effect<Session[]>;
+    /** A session on the farm, or one that has ended. */
+    readonly get: (id: string) => Effect.Effect<Session | undefined>;
+    readonly runs: (issue: string) => Effect.Effect<Run[]>;
+    /** A session's log, oldest first; a run's only when run is given. */
+    readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
+    /** These four are subscribed before they return: nothing published after is missed. */
+    readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
+    /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
+    readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
+    readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
+    readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
+    /** Whose token it is; "" when nobody's. */
+    readonly who: (token: string) => string;
+    /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
+    readonly setAddress: (address: string) => void;
+    /** An agent run in this process (the orchestrator): its log and its runs are kept as a session's are. */
+    readonly host: <R>(options: HostOptions<R>) => AgentHost<R>;
+    /** Brings back the sessions the farm had when it stopped, once every service is ready. */
+    readonly restore: Effect.Effect<void>;
+  }
+>()("vibevalley/Session") {
+  static readonly layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));
 }
 
 /** What execution.ts keeps runs with; a write that fails is an error the run retries. */
 export interface RunStore {
-  readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, Error>;
-  readonly link: (run: string, issue: string) => Effect.Effect<void, Error>;
-  readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, Error>;
-  readonly issues: (run: string) => Effect.Effect<IssueId[], Error>;
-  readonly finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => Effect.Effect<void, Error>;
+  readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, NotRecorded>;
+  readonly link: (run: string, issue: string) => Effect.Effect<void, NotRecorded>;
+  readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, NotRecorded>;
+  readonly issues: (run: string) => Effect.Effect<IssueId[], NotRecorded>;
+  readonly finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => Effect.Effect<void, NotRecorded>;
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: InputConsumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
@@ -251,6 +259,12 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
   }
 }
 
+/** The executions open now (a helper's runtime session, the orchestrator's), as a gauge. */
+const running = Metric.gauge("vibevalley.sessions.running", { description: "Executions open now" });
+
+/** A write of a session's own records (a run, the issue it works) that did not go through. */
+export class NotRecorded extends Data.TaggedError("NotRecorded")<{ readonly message: string; readonly cause?: unknown }> {}
+
 /** Work that did not go in (see handOver); the session stays. */
 export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
   readonly failure: MergeFailure;
@@ -264,10 +278,7 @@ export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
 }> {}
 
 /** A failure's words, whatever it is. */
-const reasonText = (e: unknown): string =>
-  e instanceof Error ? e.message : typeof e === "object" && e !== null && "_tag" in e ? reasonOf(e as ApiError) : String(e);
-
-export const Sessions = Context.Service<Sessions>("vibevalley/Session");
+const reasonText = (e: unknown): string => (e instanceof Error ? e.message : Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : String(e));
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
@@ -392,7 +403,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const forkHere = yield* FiberSet.makeRuntime<never>();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((err) => (err instanceof Error ? err : new Error(String(err)))));
+      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
     const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
@@ -418,9 +429,9 @@ export const make = (options: SessionOptionsIn = {}) =>
     // A hand is acquired before admission; no path holding admission waits for a hand.
     const admission = yield* Semaphore.make(1);
 
-    const launchesHub = yield* PubSub.unbounded<LaunchActivity>();
+    const launchesHub = yield* scopedPubSub<LaunchActivity>();
     // The sessions' own facts, told as news in the order they were applied.
-    const newsHub = yield* PubSub.unbounded<SessionNews>();
+    const newsHub = yield* scopedPubSub<SessionNews>();
     const [, moves] = yield* core.transitions;
     yield* Effect.forkScoped(
       Stream.runForEach(moves, ({ fact, after }) => {
@@ -428,8 +439,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         return news ? PubSub.publish(newsHub, news) : Effect.void;
       }),
     );
-    const finishedHub = yield* PubSub.unbounded<RunFinished>();
-    const consumedHub = yield* PubSub.unbounded<InputConsumed>();
+    const finishedHub = yield* scopedPubSub<RunFinished>();
+    const consumedHub = yield* scopedPubSub<InputConsumed>();
     const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
 
     const hands = new Map<string, Hand>();
@@ -504,7 +515,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
     };
     /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
-    const keptRun = (what: string, e: Effect.Effect<unknown, Error>) =>
+    const keptRun = (what: string, e: Effect.Effect<unknown, NotRecorded>) =>
       Effect.catch(Effect.asVoid(e), (err) => Effect.logWarning(`vibevalley: ${what}: ${err.message}`));
 
     /** Called before the input goes out, so the turn it opens finds it. */
@@ -708,7 +719,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         Effect.tap(() =>
           Effect.sync(() => {
             if (allocations.get(allocation.owner.id) === allocation) allocations.delete(allocation.owner.id);
-          }),
+          }).pipe(Effect.andThen(Metric.update(running, allocations.size))),
         ),
       );
 
@@ -758,6 +769,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const subagents = createSubagents({ runtimes: { get: (rid) => (rid === base.id ? mine : undefined) }, maxRunning, maxDepth: 1, cwd: root, logDir });
       const allocation: Allocation = { owner, subagents, resources, attached: false };
       allocations.set(id, allocation);
+      yield* Metric.update(running, allocations.size);
       const opening = Effect.gen(function* () {
         const task = text && agent.personaMode === "prompt" ? text + jobBreak + input : input;
         const spawned = yield* Effect.promise(() =>
@@ -772,7 +784,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               ...(resume ? { resume } : {}),
               env: r.env,
             })
-            .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: e instanceof Error ? e.message : String(e) })),
+            .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: messageOf(e) })),
         );
         if (spawned.kind !== "spawned") return yield* failedOpening(allocation, t("shared.join.aside", { text: spawned.reason, aside: spawned.code }));
         const verb = resume ? "woke" : "sent";
@@ -888,9 +900,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             const launch = h.launch;
             if (starts) expect(h, by);
             const sent = yield* Effect.promise(() =>
-              s.agent
-                .send(withRecall(recall, text), "followup")
-                .catch((e: unknown) => ({ kind: "error" as const, reason: e instanceof Error ? e.message : String(e) })),
+              s.agent.send(withRecall(recall, text), "followup").catch((e: unknown) => ({ kind: "error" as const, reason: messageOf(e) })),
             );
             if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch };
             if (starts) unexpect(h);
@@ -1033,9 +1043,14 @@ export const make = (options: SessionOptionsIn = {}) =>
           }
         }).pipe(
           Effect.andThen(
-            Effect.promise(() => Promise.all([...allocations.values()].map((allocation) => closeAllocation(allocation).catch(() => {})))).pipe(
-              Effect.timeoutOption(closeWaitMs),
-            ),
+            Effect.forEach(
+              [...allocations],
+              ([id, allocation]) =>
+                Effect.tryPromise(() => closeAllocation(allocation)).pipe(
+                  Effect.catch((e) => Effect.logWarning("an execution did not close", e).pipe(Effect.annotateLogs({ session: id }))),
+                ),
+              { concurrency: "unbounded", discard: true },
+            ).pipe(Effect.timeoutOption(closeWaitMs)),
           ),
           Effect.andThen(Effect.sync(() => trajectories.close())),
         ),
@@ -1054,7 +1069,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
       register: (session, current) => void executions.set(session, current),
     };
-    const shape: Sessions = {
+    const shape = Sessions.of({
       noRoom: roomFor,
       makeRoom: Effect.fn("Sessions.makeRoom")(function* (runtime, project) {
         const full = roomFor(runtime, project);
@@ -1268,7 +1283,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
       host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time),
       restore,
-    };
+    });
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
     chat.useHelpers({
       present: (id) => hands.has(id),
@@ -1299,8 +1314,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       mcpUrl: () => mcpUrl,
     });
   });
-
-export const layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));
 
 /** The sessions as a test sees them: the shape, and what is inside it. */
 export type SessionsInside = Effect.Success<ReturnType<typeof make>>;

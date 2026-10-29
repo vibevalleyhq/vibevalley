@@ -6,6 +6,8 @@ import { list, t } from "@vibevalley/i18n";
 // a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
 // than lost. Everything that changes the chat runs one at a time.
 
+import { HttpClient } from "effect/http";
+import { scopedPubSub } from "../base/pubsub.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import {
   type Chat,
@@ -75,7 +77,7 @@ import { linksIn, readEmbed } from "./embeds.ts";
 import { Audience } from "./audience.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
-import { type ApiError, refused, lookIn, missing } from "../errors.ts";
+import { type ApiError, refused, lookIn, missing, Inconsistent } from "../errors.ts";
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
@@ -322,113 +324,119 @@ interface Written {
   ownerMentionsChanged?: boolean;
 }
 
-export interface Channels {
-  /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
-  readonly defaultChannel: () => string;
-  readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
-  /** The owner's words; again: sendKey was sent before, and the message is that one. */
-  readonly say: (
-    text: string,
-    channel: string | undefined,
-    sendKey: string,
-    more?: SayMore,
-  ) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
-  /** The owner's own chat words, changed. Changes tell and wake nobody. */
-  readonly edit: (id: string, text: string, keep?: readonly string[]) => Effect.Effect<ChatMessage, ApiError>;
-  /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
-  readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
-  /** A participant's reaction added, or taken back when it is there and add is not asked. */
-  readonly react: (id: string, who: string, emoji: string, add?: boolean) => Effect.Effect<ChatMessage, ApiError>;
-  readonly pin: (id: string) => Effect.Effect<ChatMessage, ApiError>;
-  readonly pins: (channel: string) => Effect.Effect<ChatMessage[], ApiError>;
-  /** The thread under a channel's message, opened if it has none. */
-  readonly threadUnder: (id: string) => Effect.Effect<string, ApiError>;
-  readonly search: (text: string, channel?: string) => Effect.Effect<MessageHit[], ApiError>;
-  readonly attach: (upload: AttachmentUpload) => Effect.Effect<Attachment, ApiError>;
-  readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
-  /** Words to a session in its thread; with no thread the session hears them straight. */
-  readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
-  /** A session's or the orchestrator's words, through channel_message_send. */
-  readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
-  /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
-   * session's own thread, else the default channel. */
-  readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** Words that announce an artifact (artifact/), with its card, said as from (the owner, a session or an orchestrator) in
-   * a channel placeOf names. Never held for unseen messages, as speak's are: it answers none of them. */
-  readonly announce: (from: string, channel: string, text: string, card: ArtifactCard) => Effect.Effect<ChatMessage, ApiError>;
-  /** Words said on a call, kept in the default channel as they were said; they wake no one. */
-  readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
-  readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
-  /** code names the kind, for dropping repeats. */
-  readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
-  readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
-  /** The places who has not read all of, the newest first, by their addresses. */
-  readonly unread: (who: string) => Effect.Effect<ChannelUnread[]>;
-  /** Every channel and direct channel as a page lists them, the default first. */
-  readonly list: () => Effect.Effect<Channel[]>;
-  readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<ChatMessage[]>;
-  /** A message's durable location; the recent state may hold neither the message nor its thread. */
-  readonly messageLocation: (id: string) => Effect.Effect<{ readonly channel: Channel; readonly top: string } | undefined>;
-  readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
-  /** The thread of the issue the session works (a talk thread of its own when it works none). */
-  readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
-  /** The channels the core state holds now. */
-  readonly now: () => Chat | undefined;
-  /** What is said in a channel after the message numbered after, then what is said there from now on; Reset when
-   * more than catchUpMax were missed. A follower too slow for what is said ends, and comes back with its number. */
-  readonly follow: (channel: string, after: number) => Stream.Stream<ChannelEvent, ApiError>;
-  /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
-  readonly reports: (after?: string) => Stream.Stream<ChannelEvent>;
-  /** Subscribed before it returns. */
-  readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
-  /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
-   * Subscribed before it returns. */
-  readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: ChatMessage }>, never, Scope.Scope>;
-  /** What came to the orchestrator and does not wake it. */
-  readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
-  readonly channels: () => Effect.Effect<Info[]>;
-  readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
-  /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
-  /** Each field given changes: a channel's description, project, name, group and place; a thread's title. */
-  readonly updateChannel: (id: string, upd: ChannelUpdate) => Effect.Effect<void, ApiError>;
-  readonly archive: (id: string) => Effect.Effect<void, ApiError>;
-  readonly removeChannel: (id: string) => Effect.Effect<void, ApiError>;
-  readonly previewRemoveChannel: (id: string) => Effect.Effect<Preview, ApiError>;
-  readonly setNotify: (id: string, notify: Notify) => Effect.Effect<void, ApiError>;
-  /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
-  readonly notifyOf: (id: string) => Notify;
-  /** The owner's direct channel with a profile (a helper's, or an orchestrator's), made if there is none. */
-  readonly openDirect: (agent: { readonly id: string; readonly name: string }) => Effect.Effect<string>;
-  /** An orchestrator's direct channel with the owner; "" when it has none yet. */
-  readonly orchestratorDirect: (agent: string) => string;
-  /** The orchestrator a place is looked after by: a channel's own, its thread's channel's, a direct channel's peer when
-   * that is an orchestrator, else the default one. */
-  readonly orchestratorOf: (channel: string) => string;
-  /** A profile's direct channel is its talk issue's thread from now on. */
-  readonly linkTalk: (channel: string, issue: string) => Effect.Effect<void>;
-  /** The newest messages of a channel, oldest first, as an agent reads them. */
-  readonly recent: (channel: string, n: number) => Effect.Effect<InboxMessage[]>;
-  readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
-  /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */
-  readonly topOf: (channel: string) => Effect.Effect<Info>;
-  /** How the orchestrator writes the place it answers in: a direct channel's own address, else its channel's. */
-  readonly addressOf: (channel: string) => Effect.Effect<{ readonly direct: boolean; readonly target: string }>;
-  readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
-  /** Agent Sessions registers the helpers; until then a message for one waits. */
-  readonly useHelpers: (helpers: Helpers) => void;
-  /** Once the helpers on the farm are back: what waited for each goes to it now. */
-  readonly helpersBack: Effect.Effect<void>;
-  /** What a helper's launch did. */
-  readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
-  /** Messages a helper took as input. */
-  readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
-  /** A helper hired, reported or gone: a job opens, the report is posted in its thread, a job closes. */
-  readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
+export class Channels extends Context.Service<
+  Channels,
+  {
+    /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
+    readonly defaultChannel: () => string;
+    readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
+    /** The owner's words; again: sendKey was sent before, and the message is that one. */
+    readonly say: (
+      text: string,
+      channel: string | undefined,
+      sendKey: string,
+      more?: SayMore,
+    ) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
+    /** The owner's own chat words, changed. Changes tell and wake nobody. */
+    readonly edit: (id: string, text: string, keep?: readonly string[]) => Effect.Effect<ChatMessage, ApiError>;
+    /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
+    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
+    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    /** A participant's reaction added, or taken back when it is there and add is not asked. */
+    readonly react: (id: string, who: string, emoji: string, add?: boolean) => Effect.Effect<ChatMessage, ApiError>;
+    readonly pin: (id: string) => Effect.Effect<ChatMessage, ApiError>;
+    readonly pins: (channel: string) => Effect.Effect<ChatMessage[], ApiError>;
+    /** The thread under a channel's message, opened if it has none. */
+    readonly threadUnder: (id: string) => Effect.Effect<string, ApiError>;
+    readonly search: (text: string, channel?: string) => Effect.Effect<MessageHit[], ApiError>;
+    readonly attach: (upload: AttachmentUpload) => Effect.Effect<Attachment, ApiError>;
+    readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
+    /** Words to a session in its thread; with no thread the session hears them straight. */
+    readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
+    /** A session's or the orchestrator's words, through channel_message_send. */
+    readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
+    /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
+     * session's own thread, else the default channel. */
+    readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
+    /** Words that announce an artifact (artifact/), with its card, said as from (the owner, a session or an orchestrator) in
+     * a channel placeOf names. Never held for unseen messages, as speak's are: it answers none of them. */
+    readonly announce: (from: string, channel: string, text: string, card: ArtifactCard) => Effect.Effect<ChatMessage, ApiError>;
+    /** Words said on a call, kept in the default channel as they were said; they wake no one. */
+    readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
+    /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
+    readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
+    /** code names the kind, for dropping repeats. */
+    readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
+    readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
+    /** The places who has not read all of, the newest first, by their addresses. */
+    readonly unread: (who: string) => Effect.Effect<ChannelUnread[]>;
+    /** Every channel and direct channel as a page lists them, the default first. */
+    readonly list: () => Effect.Effect<Channel[]>;
+    readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<ChatMessage[]>;
+    /** A message's durable location; the recent state may hold neither the message nor its thread. */
+    readonly messageLocation: (id: string) => Effect.Effect<{ readonly channel: Channel; readonly top: string } | undefined>;
+    readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
+    /** The thread of the issue the session works (a talk thread of its own when it works none). */
+    readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
+    /** The channels the core state holds now. */
+    readonly now: () => Chat | undefined;
+    /** What is said in a channel after the message numbered after, then what is said there from now on; Reset when
+     * more than catchUpMax were missed. A follower too slow for what is said ends, and comes back with its number. */
+    readonly follow: (channel: string, after: number) => Stream.Stream<ChannelEvent, ApiError>;
+    /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
+    readonly reports: (after?: string) => Stream.Stream<ChannelEvent>;
+    /** Subscribed before it returns. */
+    readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
+    /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
+     * Subscribed before it returns. */
+    readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: ChatMessage }>, never, Scope.Scope>;
+    /** What came to the orchestrator and does not wake it. */
+    readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
+    readonly channels: () => Effect.Effect<Info[]>;
+    readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
+    /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
+    /** Each field given changes: a channel's description, project, name, group and place; a thread's title. */
+    readonly updateChannel: (id: string, upd: ChannelUpdate) => Effect.Effect<void, ApiError>;
+    readonly archive: (id: string) => Effect.Effect<void, ApiError>;
+    readonly removeChannel: (id: string) => Effect.Effect<void, ApiError>;
+    readonly previewRemoveChannel: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly setNotify: (id: string, notify: Notify) => Effect.Effect<void, ApiError>;
+    /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
+    readonly notifyOf: (id: string) => Notify;
+    /** The owner's direct channel with a profile (a helper's, or an orchestrator's), made if there is none. */
+    readonly openDirect: (agent: { readonly id: string; readonly name: string }) => Effect.Effect<string>;
+    /** An orchestrator's direct channel with the owner; "" when it has none yet. */
+    readonly orchestratorDirect: (agent: string) => string;
+    /** The orchestrator a place is looked after by: a channel's own, its thread's channel's, a direct channel's peer when
+     * that is an orchestrator, else the default one. */
+    readonly orchestratorOf: (channel: string) => string;
+    /** A profile's direct channel is its talk issue's thread from now on. */
+    readonly linkTalk: (channel: string, issue: string) => Effect.Effect<void>;
+    /** The newest messages of a channel, oldest first, as an agent reads them. */
+    readonly recent: (channel: string, n: number) => Effect.Effect<InboxMessage[]>;
+    readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
+    /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */
+    readonly topOf: (channel: string) => Effect.Effect<Info>;
+    /** How the orchestrator writes the place it answers in: a direct channel's own address, else its channel's. */
+    readonly addressOf: (channel: string) => Effect.Effect<{ readonly direct: boolean; readonly target: string }>;
+    readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
+    /** Agent Sessions registers the helpers; until then a message for one waits. */
+    readonly useHelpers: (helpers: Helpers) => void;
+    /** Once the helpers on the farm are back: what waited for each goes to it now. */
+    readonly helpersBack: Effect.Effect<void>;
+    /** What a helper's launch did. */
+    readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
+    /** Messages a helper took as input. */
+    readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
+    /** A helper hired, reported or gone: a job opens, the report is posted in its thread, a job closes. */
+    readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
+  }
+>()("vibevalley/Channel") {
+  static readonly layer = Layer.effect(
+    Channels,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Channels = Context.Service<Channels>("vibevalley/Channel");
 
 /** What came of handing a helper a message. */
 export interface Delivered {
@@ -479,6 +487,7 @@ export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const core = yield* Core;
+  const http = yield* HttpClient.HttpClient;
   const agents = yield* Agents;
   let helpers: Helpers | undefined;
   const { run: db, one, inTx } = yield* Db;
@@ -500,9 +509,9 @@ export const make = Effect.gen(function* () {
   const tx = <A, E>(work: Effect.Effect<A, E>) => inTx(work).pipe(Effect.onError(() => Effect.catchCause(reload, () => Effect.void)));
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
-  const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
+  const orchestratorHub = yield* scopedPubSub<OrchestratorNews>();
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
-  const said = yield* PubSub.unbounded<ChatMessage>();
+  const said = yield* scopedPubSub<ChatMessage>();
 
   /** Nothing is slipped in while a session compacts its context. */
   const compacting = new Set<string>();
@@ -773,7 +782,7 @@ export const make = Effect.gen(function* () {
   const settle = Effect.fn("Channels.settle")(function* (inserted: MsgRow) {
     let row = inserted;
     const ch = model.channel(row.channel_id);
-    if (!ch) return yield* Effect.die(new Error(`no channel ${row.channel_id}`));
+    if (!ch) return yield* Effect.die(new Inconsistent({ message: `no channel ${row.channel_id}` }));
     const meta = metaOf(row.meta);
     const orchestrators = orchestratorIds();
     const here = orchestratorOfRow(ch);
@@ -887,7 +896,7 @@ export const make = Effect.gen(function* () {
         }
         // The row as MessageByID would read it back: the sender's name and kind are the participant's.
         const sender = model.participant(w.from);
-        if (!sender) return yield* Effect.die(new Error(`no participant ${w.from}`));
+        if (!sender) return yield* Effect.die(new Inconsistent({ message: `no participant ${w.from}` }));
         const id = newId();
         const meta = metaText(w.meta);
         const created_at = yield* Clock.currentTimeMillis;
@@ -947,9 +956,15 @@ export const make = Effect.gen(function* () {
     if (links.length === 0) return;
     void forkHere(
       Effect.gen(function* () {
-        const found = (yield* Effect.promise(() => Promise.all(links.map((l) => readEmbed(l).catch(() => undefined))))).filter(
-          (e): e is Embed => e !== undefined,
-        );
+        const found = (yield* Effect.forEach(
+          links,
+          (l) =>
+            readEmbed(l).pipe(
+              Effect.provideService(HttpClient.HttpClient, http),
+              Effect.catchCause((cause) => Effect.as(Effect.logWarning("a link preview was not read", cause), undefined)),
+            ),
+          { concurrency: "unbounded" },
+        )).filter((e): e is Embed => e !== undefined);
         yield* locked(
           Effect.gen(function* () {
             const now = yield* one(qm.messageByID({ id: row.id }));
@@ -1378,7 +1393,7 @@ export const make = Effect.gen(function* () {
     return { target: targetOfChannel(row), threads: threads.length, said };
   });
 
-  const shape: Channels = {
+  const shape = Channels.of({
     now: () => core.state().chat,
     follow: (channel, after) =>
       Stream.unwrap(
@@ -1976,8 +1991,6 @@ export const make = Effect.gen(function* () {
     activity: (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`)),
     consumed: (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`)),
     sessionNews: onSessionNews,
-  };
+  });
   return shape;
 });
-
-export const layer = Layer.effect(Channels, make);

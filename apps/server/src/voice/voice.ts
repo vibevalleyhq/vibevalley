@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
+import { messageOf } from "../errors.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -62,7 +63,6 @@ const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => (
   ...(settings ? { settings } : {}),
 });
 const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface CallLine {
   readonly id: string;
@@ -157,7 +157,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
     return { stt, llm, tts };
   } catch (e) {
     // The SDK throws on a configuration it refuses; that is a problem with the settings, not the server's.
-    return unavailable(t("server.voice.unusable", { why: message(e) }), "call");
+    return unavailable(t("server.voice.unusable", { why: messageOf(e) }), "call");
   }
 }
 
@@ -260,28 +260,33 @@ interface Call {
   ending: boolean;
 }
 
-export interface Voice {
-  readonly session: () => Effect.Effect<AgoraGrant, ApiError>;
-  readonly renew: (channel: string, uid: string) => Effect.Effect<AgoraGrant, ApiError>;
-  /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
-  readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
-  readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
-  /** What the owner said on a call: the orchestrator overhears it when Agora's model answers. */
-  readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
-  /** The relay without a call id: the one call on. */
-  readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
-  readonly said: (agentId: string, text: string) => Effect.Effect<void, ApiError>;
-  readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
-  /** Whether MOSS Live takes the key given, or the saved one: the reason it does not, in the owner's words. */
-  readonly verifyMoss: (key: string) => Effect.Effect<Validation>;
-  /** Why a page cannot have a line to MOSS Live now (no key saved), in the owner's words; undefined when it can. */
-  readonly mossProblem: () => string | undefined;
-  /** A page's line to MOSS Live (moss.ts relay), with the saved key, until either side closes. */
-  readonly mossLine: (page: Socket.Socket) => Effect.Effect<void, never, Scope.Scope>;
-  /** The keys of the lines open now, by call. */
-  readonly lines: () => number;
-  /** Words read out on the call that is on, queued after what is being said; false when no call is on. */
-  readonly speak: (text: string) => Effect.Effect<boolean>;
+export class Voice extends Context.Service<
+  Voice,
+  {
+    readonly session: () => Effect.Effect<AgoraGrant, ApiError>;
+    readonly renew: (channel: string, uid: string) => Effect.Effect<AgoraGrant, ApiError>;
+    /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
+    readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
+    readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
+    /** What the owner said on a call: the orchestrator overhears it when Agora's model answers. */
+    readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
+    /** The relay without a call id: the one call on. */
+    readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
+    readonly said: (agentId: string, text: string) => Effect.Effect<void, ApiError>;
+    readonly dictate: (audio: string, format: string) => Effect.Effect<Dictated, ApiError>;
+    /** Whether MOSS Live takes the key given, or the saved one: the reason it does not, in the owner's words. */
+    readonly verifyMoss: (key: string) => Effect.Effect<Validation>;
+    /** Why a page cannot have a line to MOSS Live now (no key saved), in the owner's words; undefined when it can. */
+    readonly mossProblem: () => string | undefined;
+    /** A page's line to MOSS Live (moss.ts relay), with the saved key, until either side closes. */
+    readonly mossLine: (page: Socket.Socket) => Effect.Effect<void, never, Scope.Scope>;
+    /** The keys of the lines open now, by call. */
+    readonly lines: () => number;
+    /** Words read out on the call that is on, queued after what is being said; false when no call is on. */
+    readonly speak: (text: string) => Effect.Effect<boolean>;
+  }
+>()("vibevalley/Voice") {
+  static readonly layer = (options?: VoiceOptions) => Layer.effect(Voice, make(options));
 }
 
 /** Agora reads out at most 512 bytes at a time: the words in pieces under that, cut after a sentence where one ends. */
@@ -306,8 +311,6 @@ export function speakPieces(text: string, max = 480): string[] {
   }
   return out.filter(Boolean);
 }
-
-export const Voice = Context.Service<Voice>("vibevalley/Voice");
 
 export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
@@ -568,7 +571,7 @@ export const make = (options: VoiceOptions = {}) =>
         effect.pipe(
           Effect.catch((e) =>
             Effect.sync(() => {
-              logs.warn("vibevalley: voice: the orchestrator's words were not read out: " + message(e));
+              logs.warn("vibevalley: voice: the orchestrator's words were not read out: " + messageOf(e));
               return false;
             }),
           ),
@@ -609,7 +612,7 @@ export const make = (options: VoiceOptions = {}) =>
         }
       }
     }).pipe(
-      Effect.catch((e) => Effect.sync(() => logs.warn("vibevalley: voice: the update could not be told: " + message(e)))),
+      Effect.catch((e) => Effect.sync(() => logs.warn("vibevalley: voice: the update could not be told: " + messageOf(e)))),
       Effect.ensuring(
         Effect.sync(() => {
           waiting.length = 0;
@@ -651,7 +654,7 @@ export const make = (options: VoiceOptions = {}) =>
         const uid = newUid();
         const issued = yield* Effect.try({
           try: () => sign(c, channel, uid),
-          catch: (e) => unavailable(t("server.voice.noToken", { why: message(e) })),
+          catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
         });
         if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
         prune();
@@ -669,7 +672,7 @@ export const make = (options: VoiceOptions = {}) =>
         if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
         const issued = yield* Effect.try({
           try: () => sign(g.credentials, channel, uid),
-          catch: (e) => unavailable(t("server.voice.noToken", { why: message(e) })),
+          catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
         });
         g.expires = now() + tokenSeconds * 1000;
         return issued;
@@ -693,7 +696,7 @@ export const make = (options: VoiceOptions = {}) =>
             openingLine = openLine();
             callLine = yield* Effect.tryPromise({
               try: () => openingLine!,
-              catch: (e) => unavailable(t("server.voice.lineFailed", { why: message(e) })),
+              catch: (e) => unavailable(t("server.voice.lineFailed", { why: messageOf(e) })),
             });
             const opened = callLine;
             let once = false;
@@ -720,7 +723,7 @@ export const make = (options: VoiceOptions = {}) =>
           starting = pending;
           const id = yield* Effect.tryPromise({
             try: () => pending,
-            catch: (e) => failed(t("server.voice.joinFailed", { why: message(e) })),
+            catch: (e) => failed(t("server.voice.joinFailed", { why: messageOf(e) })),
           });
           if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
           g.agent = id;
@@ -758,7 +761,7 @@ export const make = (options: VoiceOptions = {}) =>
                     try {
                       await agora.stopAgent(id);
                     } catch (e) {
-                      logs.warn("vibevalley: voice: the late agent could not be stopped: " + message(e));
+                      logs.warn("vibevalley: voice: the late agent could not be stopped: " + messageOf(e));
                     }
                   },
                   () => undefined,
@@ -782,7 +785,7 @@ export const make = (options: VoiceOptions = {}) =>
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
           catch: (e) => e,
-        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed(t("server.voice.leaveFailed", { why: message(e) }))))));
+        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed(t("server.voice.leaveFailed", { why: messageOf(e) }))))));
         yield* Effect.ensuring(
           stopping,
           Effect.sync(() => call?.release()),
@@ -858,11 +861,11 @@ export const make = (options: VoiceOptions = {}) =>
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
               signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
-          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: message(e) }), "dictation"),
+          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: messageOf(e) }), "dictation"),
         });
         const raw = (yield* Effect.tryPromise({
           try: () => res.text(),
-          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: message(e) }), "call"),
+          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: messageOf(e) }), "call"),
         })).slice(0, 1 << 20);
         const got = Schema.decodeUnknownOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
@@ -881,5 +884,3 @@ export const make = (options: VoiceOptions = {}) =>
         }),
     });
   });
-
-export const layer = (options?: VoiceOptions) => Layer.effect(Voice, make(options));

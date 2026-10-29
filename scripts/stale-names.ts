@@ -267,9 +267,12 @@ const RULES: readonly Rule[] = [
     says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, server.issue.brief.*)",
   },
   {
-    name: "a service with a second name for its interface",
-    pattern: /extends Context\.Service<|\b[A-Z][A-Za-z]*Shape\b/,
-    says: 'a service and its interface share one name, as Effect\'s own FileSystem and HttpClient: interface Issues { … } and const Issues = Context.Service<Issues>("vibevalley/Issue")',
+    name: "a service not in Effect's default class form",
+    pattern: /= Context\.Service<|\b[A-Z][A-Za-z]*Shape\b|^export const layer\b/m,
+    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issues extends Context.Service<Issues, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issues["Service"]',
+    // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
+    // cannot sit on the class.
+    except: /^apps\/server\/src\/projection\/projection\.ts$/,
   },
 ];
 

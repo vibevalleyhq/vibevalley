@@ -43,33 +43,36 @@ export interface Maker {
   readonly by: string;
 }
 
-export interface Artifacts {
-  readonly list: (q: ArtifactListRequest) => Effect.Effect<Artifact[]>;
-  readonly get: (id: string) => Effect.Effect<Artifact, ApiError>;
-  /** An html one's version as made; a blocks one's Markdown now, its version its seq. */
-  readonly content: (id: string, version?: number) => Effect.Effect<ArtifactContent & { readonly body: ArtifactBody }, ApiError>;
-  /** An html version's file on disk, for the route that serves it; undefined when there is none. */
-  readonly file: (id: string, version: number) => Effect.Effect<string | undefined>;
-  /** Without content, an empty blocks one, not announced. With content, a hand-in: html kept whole, Markdown read into
-   * blocks, announced with its card. issue is the caller's to give (a helper's own issue), never looked up here. */
-  readonly create: (maker: Maker, req: ArtifactRequest) => Effect.Effect<Artifact, ApiError>;
-  /** An html one's next version; a blocks one is refused, it is changed block by block. */
-  readonly version: (maker: Maker, req: ArtifactVersionRequest) => Effect.Effect<Artifact, ApiError>;
-  readonly rename: (id: string, title: string) => Effect.Effect<Artifact, ApiError>;
-  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
-  /** It and its versions or blocks go; a content file goes when no other version keeps it. Its cards stay in the channel. */
-  readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-  readonly blocks: (id: string) => Effect.Effect<BlockSnapshot, ApiError>;
-  readonly markdown: (id: string) => Effect.Effect<string, ApiError>;
-  /** A batch of ops from actor (the owner, or a helper's profile id): blocks.ts. */
-  readonly submit: (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">) => Effect.Effect<BlockAck, ApiError>;
-  readonly appendBlock: (id: string, actor: string, req: BlockCreate) => Effect.Effect<BlockOpResult, ApiError>;
-  readonly updateBlock: (id: string, actor: string, req: BlockUpdate) => Effect.Effect<BlockOpResult, ApiError>;
-  /** Starts the demo and returns at once (blocks.ts). */
-  readonly demo: (id: string, helpers: readonly Agent[]) => Effect.Effect<void, ApiError>;
+export class Artifacts extends Context.Service<
+  Artifacts,
+  {
+    readonly list: (q: ArtifactListRequest) => Effect.Effect<Artifact[]>;
+    readonly get: (id: string) => Effect.Effect<Artifact, ApiError>;
+    /** An html one's version as made; a blocks one's Markdown now, its version its seq. */
+    readonly content: (id: string, version?: number) => Effect.Effect<ArtifactContent & { readonly body: ArtifactBody }, ApiError>;
+    /** An html version's file on disk, for the route that serves it; undefined when there is none. */
+    readonly file: (id: string, version: number) => Effect.Effect<string | undefined>;
+    /** Without content, an empty blocks one, not announced. With content, a hand-in: html kept whole, Markdown read into
+     * blocks, announced with its card. issue is the caller's to give (a helper's own issue), never looked up here. */
+    readonly create: (maker: Maker, req: ArtifactRequest) => Effect.Effect<Artifact, ApiError>;
+    /** An html one's next version; a blocks one is refused, it is changed block by block. */
+    readonly version: (maker: Maker, req: ArtifactVersionRequest) => Effect.Effect<Artifact, ApiError>;
+    readonly rename: (id: string, title: string) => Effect.Effect<Artifact, ApiError>;
+    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    /** It and its versions or blocks go; a content file goes when no other version keeps it. Its cards stay in the channel. */
+    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
+    readonly blocks: (id: string) => Effect.Effect<BlockSnapshot, ApiError>;
+    readonly markdown: (id: string) => Effect.Effect<string, ApiError>;
+    /** A batch of ops from actor (the owner, or a helper's profile id): blocks.ts. */
+    readonly submit: (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">) => Effect.Effect<BlockAck, ApiError>;
+    readonly appendBlock: (id: string, actor: string, req: BlockCreate) => Effect.Effect<BlockOpResult, ApiError>;
+    readonly updateBlock: (id: string, actor: string, req: BlockUpdate) => Effect.Effect<BlockOpResult, ApiError>;
+    /** Starts the demo and returns at once (blocks.ts). */
+    readonly demo: (id: string, helpers: readonly Agent[]) => Effect.Effect<void, ApiError>;
+  }
+>()("vibevalley/Artifact") {
+  static readonly layer = (options?: ArtifactOptions) => Layer.effect(Artifacts, make(options));
 }
-
-export const Artifacts = Context.Service<Artifacts>("vibevalley/Artifact");
 
 export type ArtifactOptions = BlocksOptions;
 
@@ -241,7 +244,7 @@ export const make = (options: ArtifactOptions = {}) =>
       return { row, v };
     });
 
-    const shape: Artifacts = {
+    const shape = Artifacts.of({
       list: (q) =>
         Effect.gen(function* () {
           const rows = q.issue
@@ -315,8 +318,6 @@ export const make = (options: ArtifactOptions = {}) =>
       appendBlock: blocks.appendBlock,
       updateBlock: blocks.updateBlock,
       demo: blocks.demo,
-    };
+    });
     return shape;
   });
-
-export const layer = (options?: ArtifactOptions) => Layer.effect(Artifacts, make(options));

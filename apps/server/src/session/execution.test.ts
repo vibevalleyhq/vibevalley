@@ -7,7 +7,7 @@ import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
 import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
-import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside } from "./session.ts";
+import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside, NotRecorded } from "./session.ts";
 
 const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
 const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
@@ -120,11 +120,14 @@ describe("the orchestrator's runs", () => {
     Effect.gen(function* () {
       const sessions = (yield* Sessions) as SessionsInside;
       let broken = true;
-      const store: RunStore = { ...sessions.runStore, finish: (...a) => (broken ? Effect.fail(new Error("disk full")) : sessions.runStore.finish(...a)) };
+      const store: RunStore = {
+        ...sessions.runStore,
+        finish: (...a) => (broken ? Effect.fail(new NotRecorded({ message: "disk full" })) : sessions.runStore.finish(...a)),
+      };
       const x = new AgentExecution("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);
       yield* x.observe(user("一"), { by: { kind: "comment" } });
       const first = sessions.currentRun("orchestrator");
-      expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(Error);
+      expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(NotRecorded);
       expect(sessions.currentRun("orchestrator")).toBe("");
       broken = false;
       yield* x.observe(user("二"), { by: { kind: "comment" } });

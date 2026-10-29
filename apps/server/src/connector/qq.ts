@@ -2,9 +2,10 @@ import { t } from "@vibevalley/i18n";
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
+import { messageOf } from "../errors.ts";
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
-import { type Adapter, message } from "./adapter.ts";
+import { type Adapter } from "./adapter.ts";
 
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
@@ -84,7 +85,7 @@ export class QQClient implements QQApi {
       body = decodeTokenResponse(await res.json());
     } catch (e) {
       if (timed.aborted && !signal.aborted) throw new Error(t("server.connector.qq.authTimeout"), { cause: e });
-      throw new Error(t("server.connector.qq.auth", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
+      throw new Error(t("server.connector.qq.auth", { why: messageOf(e) }), { cause: e });
     }
     if (!body.access_token) throw new Error(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
     const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(String(body.expires_in ?? "")) || 7200;
@@ -112,7 +113,7 @@ export class QQClient implements QQApi {
       gateway = decodeGatewayResponse(await (await fetch(this.api + "/gateway", { headers: this.headers(app, token), signal })).json());
     } catch (e) {
       if (signal.aborted) return;
-      throw new Error(t("server.connector.qq.gateway", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
+      throw new Error(t("server.connector.qq.gateway", { why: messageOf(e) }), { cause: e });
     }
     if (!gateway.url) throw new Error(t("server.connector.qq.noGateway"));
     if (signal.aborted) return;
@@ -210,7 +211,7 @@ export class QQClient implements QQApi {
     try {
       token = await this.token(signal, app);
     } catch (e) {
-      throw new SendError(e instanceof Error ? e.message : String(e), 401);
+      throw new SendError(messageOf(e), 401);
     }
     const payload: Record<string, unknown> = { content: text, msg_type: 0 };
     if (msgId) {
@@ -228,14 +229,14 @@ export class QQClient implements QQApi {
         signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
       });
     } catch (e) {
-      throw new SendError(t("server.connector.qq.send", { why: e instanceof Error ? e.message : String(e) }));
+      throw new SendError(t("server.connector.qq.send", { why: messageOf(e) }));
     }
     let body: { id?: string; message?: string; code?: number } | undefined;
     let decodeError = "";
     try {
       body = (await res.json()) as typeof body;
     } catch (e) {
-      decodeError = e instanceof Error ? e.message : String(e);
+      decodeError = messageOf(e);
     }
     if (res.status < 200 || res.status > 299)
       throw new SendError(t("server.connector.qq.send", { why: `${body?.code ?? res.status} ${body?.message ?? ""}`.trim() }), res.status);
@@ -264,7 +265,7 @@ export function qqAdapter(api: QQApi): Adapter {
         });
         return undefined;
       } catch (e) {
-        return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
+        return signal.aborted ? undefined : { kind: "failed", reason: messageOf(e) };
       }
     },
     send: async (signal, secrets, to, text, reply) => {
@@ -275,7 +276,7 @@ export function qqAdapter(api: QQApi): Adapter {
         const status = e instanceof SendError ? e.status : 0;
         return {
           kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed",
-          reason: message(e),
+          reason: messageOf(e),
         };
       }
     },

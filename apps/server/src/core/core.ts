@@ -4,6 +4,7 @@
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
+import { scopedPubSub } from "../base/pubsub.ts";
 import { join } from "node:path";
 import type {
   CommitCount,
@@ -30,16 +31,17 @@ export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessio
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
-export interface Projection {
-  readonly reduce: (state: WorkspaceState, fact: Fact) => [WorkspaceState, boolean];
-  /** What a fact sets off on the farm, from the state before it. */
-  readonly effects: (before: WorkspaceState, fact: Fact) => GameEffect[];
-  readonly frame: (state: WorkspaceState, effects?: GameEffect[]) => StateFrame;
-  /** The state read back from state.json, made whole (the sessions' places on the farm). */
-  readonly restore: (kept: WorkspaceState) => WorkspaceState;
-}
-
-export const Projection = Context.Service<Projection>("vibevalley/Projection");
+export class Projection extends Context.Service<
+  Projection,
+  {
+    readonly reduce: (state: WorkspaceState, fact: Fact) => [WorkspaceState, boolean];
+    /** What a fact sets off on the farm, from the state before it. */
+    readonly effects: (before: WorkspaceState, fact: Fact) => GameEffect[];
+    readonly frame: (state: WorkspaceState, effects?: GameEffect[]) => StateFrame;
+    /** The state read back from state.json, made whole (the sessions' places on the farm). */
+    readonly restore: (kept: WorkspaceState) => WorkspaceState;
+  }
+>()("vibevalley/Projection") {}
 
 /** A burst of facts is one write, and one frame. */
 const saveAfterMs = 500;
@@ -58,35 +60,41 @@ export interface Transition {
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
 export type OwnerDid = { readonly kind: "reviewed"; readonly session: SessionId } | { readonly kind: "talked" };
 
-export interface Core {
-  readonly state: () => WorkspaceState;
-  readonly session: (id: string) => Session | undefined;
-  /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
-  readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
-  /** channel: where it thinks or writes, while it does. */
-  readonly setOrchestrator: (agent: string, state: OrchestratorState, channel?: string) => Effect.Effect<void>;
-  readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
-  /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
-  readonly open: () => Effect.Effect<void>;
-  readonly sessionEvent: (id: string, activity: SessionEvent) => Effect.Effect<void>;
-  readonly notice: (level: NoticeLevel, text: string) => Effect.Effect<void>;
-  readonly runtime: (info: RuntimeInfo) => Effect.Effect<void>;
-  readonly did: (d: OwnerDid) => Effect.Effect<void>;
-  /** The state now, then the transitions from here on. */
-  readonly transitions: Effect.Effect<readonly [WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
-  /** A snapshot of the state, then every side event. */
-  readonly events: Stream.Stream<SideEvent>;
-  /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
-  readonly subscribe: Effect.Effect<Stream.Stream<SideEvent>, never, Scope.Scope>;
-  readonly facts: Stream.Stream<Fact>;
-  readonly live: Stream.Stream<LiveEvent>;
-  /** What the owner did from now on, subscribed before this returns: none said after it is missed. */
-  readonly owner: Effect.Effect<Stream.Stream<OwnerDid>, never, Scope.Scope>;
-  /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
-  readonly states: Stream.Stream<StateFrame>;
+export class Core extends Context.Service<
+  Core,
+  {
+    readonly state: () => WorkspaceState;
+    readonly session: (id: string) => Session | undefined;
+    /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
+    readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
+    /** channel: where it thinks or writes, while it does. */
+    readonly setOrchestrator: (agent: string, state: OrchestratorState, channel?: string) => Effect.Effect<void>;
+    readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
+    /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
+    readonly open: () => Effect.Effect<void>;
+    readonly sessionEvent: (id: string, activity: SessionEvent) => Effect.Effect<void>;
+    readonly notice: (level: NoticeLevel, text: string) => Effect.Effect<void>;
+    readonly runtime: (info: RuntimeInfo) => Effect.Effect<void>;
+    readonly did: (d: OwnerDid) => Effect.Effect<void>;
+    /** The state now, then the transitions from here on. */
+    readonly transitions: Effect.Effect<readonly [WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
+    /** A snapshot of the state, then every side event. */
+    readonly events: Stream.Stream<SideEvent>;
+    /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
+    readonly subscribe: Effect.Effect<Stream.Stream<SideEvent>, never, Scope.Scope>;
+    readonly facts: Stream.Stream<Fact>;
+    readonly live: Stream.Stream<LiveEvent>;
+    /** What the owner did from now on, subscribed before this returns: none said after it is missed. */
+    readonly owner: Effect.Effect<Stream.Stream<OwnerDid>, never, Scope.Scope>;
+    /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
+    readonly states: Stream.Stream<StateFrame>;
+  }
+>()("vibevalley/Core") {
+  static readonly layer = Layer.effect(
+    Core,
+    Effect.suspend(() => make),
+  );
 }
-
-export const Core = Context.Service<Core>("vibevalley/Core");
 
 /** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'. */
 const toKeep = ({ chat: _chat, progress: _progress, crons: _crons, issues: _issues, connectors: _connectors, ...kept }: WorkspaceState): WorkspaceState => kept;
@@ -157,14 +165,11 @@ export const make = Effect.gen(function* () {
     }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
   );
 
-  const events = yield* PubSub.unbounded<SideEvent>();
-  const transitions = yield* PubSub.unbounded<Transition>();
-  const owner = yield* PubSub.unbounded<OwnerDid>();
+  const events = yield* scopedPubSub<SideEvent>();
+  const transitions = yield* scopedPubSub<Transition>();
+  const owner = yield* scopedPubSub<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
-  const changes = yield* PubSub.unbounded<GameEffect | undefined>();
-  yield* Effect.addFinalizer(() =>
-    Effect.all([PubSub.shutdown(events), PubSub.shutdown(transitions), PubSub.shutdown(owner), PubSub.shutdown(changes)], { discard: true }),
-  );
+  const changes = yield* scopedPubSub<GameEffect | undefined>();
 
   const publish = (e: SideEvent) => {
     PubSub.publishUnsafe(events, e);
@@ -214,7 +219,7 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const shape: Core = {
+  const shape = Core.of({
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
@@ -243,8 +248,6 @@ export const make = Effect.gen(function* () {
     ),
     owner: Effect.map(PubSub.subscribe(owner), Stream.fromSubscription),
     states,
-  };
+  });
   return shape;
 });
-
-export const layer = Layer.effect(Core, make);

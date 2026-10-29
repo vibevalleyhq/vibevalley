@@ -5,12 +5,13 @@ import type { ChatMessage } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Stream } from "effect";
 import { Core } from "../core/core.ts";
 
-export interface Said {
-  readonly in: (channel: string) => ChatMessage[];
-  readonly all: () => ChatMessage[];
-}
-
-export const Said = Context.Service<Said>("vibevalley/testing/Said");
+export class Said extends Context.Service<
+  Said,
+  {
+    readonly in: (channel: string) => ChatMessage[];
+    readonly all: () => ChatMessage[];
+  }
+>()("vibevalley/testing/Said") {}
 
 export const said = Layer.effect(
   Said,

@@ -2088,19 +2088,8 @@ export interface VoiceTTSMicrosoft {
   voiceName: string;
 }
 
-export interface SettingsUpdateVoice {
-  area?: Area;
-  language?: Language;
-  asr?: VoiceASR;
-  answer?: VoiceAnswer;
-  tts?: VoiceTTS;
-  persona?: string;
-  greeting?: string;
-  failureMessage?: string;
-  silenceMs?: number;
-  interruptMs?: number;
-  idleSeconds?: number;
-}
+/** A change to the voice settings: the keys it names. */
+export type SettingsUpdateVoice = Partial<VoiceSettings>;
 
 /** Told apart by `type`. */
 export type Fact =

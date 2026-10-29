@@ -3,12 +3,11 @@ import { describe, expect, it } from "@effect/vitest";
 import type { Agent, BlockOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
-import { Database, DbLayer } from "../base/db.ts";
+import { Database, Db } from "../base/db.ts";
 import { ServerConfig } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { waitFor, whenTrue } from "../testing/until.ts";
 import { newId } from "../base/ids.ts";
-import { Db } from "../base/db.ts";
 import { missing } from "../errors.ts";
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";
@@ -16,7 +15,8 @@ import { demoPieces } from "./demo.ts";
 import { plain } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
-const on = (config: ServerConfig = testConfig()) => DbLayer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));
+const on = (config: ServerConfig["Service"] = testConfig()) =>
+  Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));
 
 /** The blocks of artifacts made straight in the table: the rest of Artifacts (channels, cards) is artifact.test.ts's. */
 const make = (options: BlocksOptions = {}) =>
