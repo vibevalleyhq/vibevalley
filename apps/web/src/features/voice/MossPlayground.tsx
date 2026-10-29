@@ -9,7 +9,7 @@ import { TextArea } from "../../ui/Field";
 import { IconButton } from "../../ui/IconButton";
 import { Card } from "../../ui/layout";
 import { Hint, Tip } from "../../ui/Tip";
-import { mossLine } from "./mossLine";
+import { type MossLine, mossLine, type MossSetup } from "./mossLine";
 
 function Level(props: { value: number; label: string }) {
   return (
@@ -36,7 +36,17 @@ function Stat(props: { label: string; value: string; tip: string; bad?: boolean 
 
 export function MossPlayground() {
   const version = createExternal(mossLine.subscribe, () => mossLine.version);
-  const line = () => (version(), mossLine);
+  return (
+    <MossLineView line={(version(), mossLine)} onTalk={(setup) => void mossLine.start(setup)} onEnd={() => mossLine.end()} onMute={(on) => mossLine.mute(on)} />
+  );
+}
+
+/** What the line shows, read off the line; the device and the socket stay in mossLine. */
+export type MossLineState = Pick<MossLine, "phase" | "problem" | "muted" | "micLevel" | "mossLevel" | "turns" | "events" | "qos">;
+
+/** The playground as it looks at any moment of a call: what MossPlayground draws, and its stories. */
+export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossSetup) => void; onEnd: () => void; onMute: (on: boolean) => void }) {
+  const line = () => props.line;
   const [persona, setPersona] = createSignal("");
   const [instructions, setInstructions] = createSignal(t("web.voice.moss.defaultInstructions"));
   const idle = () => line().phase === "idle";
@@ -62,17 +72,12 @@ export function MossPlayground() {
             <Show
               when={idle()}
               fallback={
-                <Button tone="danger" icon="stop" data-testid="moss-hang-up" onClick={() => mossLine.end()}>
+                <Button tone="danger" icon="stop" data-testid="moss-hang-up" onClick={() => props.onEnd()}>
                   {line().phase === "connecting" ? t("web.voice.moss.connecting") : t("web.voice.moss.hangUp")}
                 </Button>
               }
             >
-              <Button
-                tone="primary"
-                icon="record"
-                data-testid="moss-talk"
-                onClick={() => void mossLine.start({ persona: persona(), instructions: instructions() })}
-              >
+              <Button tone="primary" icon="record" data-testid="moss-talk" onClick={() => props.onTalk({ persona: persona(), instructions: instructions() })}>
                 {t("web.voice.moss.talk")}
               </Button>
             </Show>
@@ -81,7 +86,7 @@ export function MossPlayground() {
                 icon="record"
                 pressed={line().muted}
                 label={line().muted ? t("web.voice.moss.unmute") : t("web.voice.moss.mute")}
-                onClick={() => mossLine.mute(!line().muted)}
+                onClick={() => props.onMute(!line().muted)}
               />
               <Level value={line().micLevel} label={t("web.voice.moss.you")} />
               <Level value={line().mossLevel} label="MOSS" />
@@ -140,7 +145,10 @@ export function MossPlayground() {
             <For each={line().turns}>
               {(turn) => (
                 <div class={["flex", turn.who === "owner" ? "justify-end" : "justify-start"]}>
-                  <p class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "owner" ? "bg-ok-soft" : "bg-hover", { "opacity-60": !turn.done }]}>
+                  <p
+                    class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "owner" ? "bg-ok-soft" : "bg-hover", { italic: !turn.done }]}
+                    data-done={turn.done ? "" : undefined}
+                  >
                     {turn.text}
                   </p>
                 </div>

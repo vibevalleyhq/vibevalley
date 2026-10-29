@@ -122,7 +122,7 @@ function Row(props: { label: string; children: JSX.Element }) {
   );
 }
 
-function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
+export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   const core = useCore();
   const [busy, setBusy] = createSignal(false);
   const run = async (call: () => Promise<ConnectorStatus>) => {

@@ -118,11 +118,15 @@ function AgentsPage() {
 
 function CardShell(props: { agent: Agent; to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
   return (
-    <div data-testid="agent-card" data-key={props.agent.id} data-role={props.agent.role} class={["group relative", { "opacity-60": !!props.muted }]}>
+    <div data-testid="agent-card" data-key={props.agent.id} data-role={props.agent.role} data-muted={props.muted ? "" : undefined} class="group relative">
       <A
         href={props.to}
         aria-label={props.label}
-        class="flex h-full flex-col rounded-lg border border-line bg-page p-4 transition-colors hover:border-ink/20 hover:bg-page focus-visible:outline-2 focus-visible:outline-focus"
+        class={[
+          "flex h-full flex-col rounded-lg border border-line bg-page p-4 transition-colors hover:border-ink/20 hover:bg-page focus-visible:outline-2 focus-visible:outline-focus",
+          // Off, it says so by its dashed edge and greyed face, not by fading its words below what can be read.
+          { "border-dashed": !!props.muted },
+        ]}
       >
         {props.children}
       </A>
@@ -159,7 +163,7 @@ function OrchestratorCard(props: { agent: Agent }) {
   );
 }
 
-function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTally; here: number; skillName: Map<string, string>; errors: string[] }) {
+export function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTally; here: number; skillName: Map<string, string>; errors: string[] }) {
   const client = useQueryClient();
   const available = () => props.runtime?.installation.status === "available";
   const toggle = async () => {
