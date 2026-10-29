@@ -1,4 +1,6 @@
 import { maybe, t } from "@vibevalley/i18n";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { messageOf } from "../errors.ts";
 import { artifactMax } from "../artifact/rules.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
@@ -125,8 +127,9 @@ export class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly mess
 const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
 
 /** A failure as the model reads it. */
-const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(reasonOf(e as ApiError)));
-const said = (e: unknown) => toError(e).message;
+/** A tool's refusal or failure as the failed result the model reads: an API refusal says its reason. */
+const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
+const said = (e: unknown) => toFailed(e).message;
 
 /** who throws for a caller nobody knows: the model reads it as the tool's failure. */
 const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e) }) });
@@ -157,7 +160,7 @@ export const make = Effect.gen(function* () {
         name: toolName(op),
         description,
         parameters: shown[op],
-        run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError),
+        run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
       });
     };
   const tool = toolOf(parameters, schemas);

@@ -28,7 +28,8 @@ describe("an agent's own tasks, kept", () => {
             throw new AgentTaskError("不改了");
           }),
         );
-        expect(refused, name).toBeInstanceOf(AgentTaskError);
+        expect(refused, name).toMatchObject({ _tag: "ToolFailed", message: "不改了" });
+        expect(refused.cause, name).toBeInstanceOf(AgentTaskError);
         expect(yield* s.change(() => undefined), name).toBeUndefined();
         expect(yield* s.load, name).toEqual(g);
         const ended = yield* s.change((g) => update(update(g, "a", { state: "done" }), "c", { state: "skipped" }));

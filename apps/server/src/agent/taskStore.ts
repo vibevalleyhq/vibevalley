@@ -8,7 +8,7 @@ import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { type By, finished, type State, type AgentTask } from "@vibevalley/agent/agentTask";
 import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
-import { asError } from "@vibevalley/agent/core/errors";
+import { toolFailed } from "@vibevalley/agent/core/errors";
 
 const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
 const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
@@ -31,7 +31,7 @@ export const dbStores: Effect.Effect<(keeper: string) => AgentTaskStore, never, 
       db.inTx(
         Effect.gen(function* () {
           const rows = yield* db.run(q.openAgentTasks({ keeper }));
-          const g = yield* Effect.try({ try: () => f(rows.map(fromRow)), catch: asError });
+          const g = yield* Effect.try({ try: () => f(rows.map(fromRow)), catch: toolFailed });
           if (g === undefined) return g;
           // The graph keeps its id while it is open; a new one starts when the keeper had none.
           const graph = rows[0]?.graph ?? newId();

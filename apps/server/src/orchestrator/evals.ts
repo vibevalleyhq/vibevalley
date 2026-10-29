@@ -2,6 +2,7 @@
 // the checks that catch the error, written by whoever fixes it. evals.test.ts holds the committed cases (testdata/evals) to
 // their checks; evals.live.test.ts replays them on the real model.
 
+import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -144,7 +145,7 @@ export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): T
       Effect.suspend(() => {
         const next = recorded.get(t.name + " " + argsKey(args))?.shift();
         if (!next) return Effect.succeed({ content: [{ type: "text" as const, text: noResult }] });
-        if (next.isError) return Effect.fail(new Error(next.content.map((c) => (c.type === "text" ? c.text : "")).join("")));
+        if (next.isError) return Effect.fail(new ToolFailed({ message: next.content.map((c) => (c.type === "text" ? c.text : "")).join("") }));
         return Effect.succeed({ content: next.content });
       }),
   }));
