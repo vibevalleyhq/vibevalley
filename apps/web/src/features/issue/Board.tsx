@@ -5,7 +5,7 @@ import type { JSX } from "@solidjs/web";
 import { maxRunning } from "@vibevalley/protocol";
 import type { Ordering } from "./display";
 import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
-import { closedShown, type Lane, laneLabel, lanes, laneStatus } from "./rules";
+import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./rules";
 import { autofocus } from "../../base/util";
 import { Hint } from "../../ui/Tip";
 import { Segmented } from "../../ui/Segmented";
@@ -210,9 +210,9 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;
   };
-  // Its own status, when the lane does not say it: a draft in 待办 says so by its 草稿 flag.
-  const ownStatus = () => look().status !== laneStatus[props.card.lane] && !(props.card.lane === "todo" && look().status === "backlog");
-  const marks = () => ownStatus() || !!loud() || !!cardAgent(props.card) || props.card.kind === "orchestrator" || !!look().progress || look().flags.length > 0;
+  const showsStatus = () => ownStatus(props.card.lane, look().status);
+  const marks = () =>
+    showsStatus() || !!loud() || !!cardAgent(props.card) || props.card.kind === "orchestrator" || !!look().progress || look().flags.length > 0;
   const placing = () => {
     const d = props.drag.dragging();
     return !!props.onPlace && d?.kind === "todo" && d.id !== props.card.id;
@@ -275,7 +275,7 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <Show when={marks()}>
           <div data-testid="card-marks" class="mt-2 flex flex-wrap items-center gap-1.5">
-            <Show when={ownStatus()}>
+            <Show when={showsStatus()}>
               <StatusMark status={look().status} tone={look().statusTone} size={13} />
             </Show>
             <Show when={loud()}>{(pr) => <PriorityMark priority={pr()} size={13} />}</Show>
