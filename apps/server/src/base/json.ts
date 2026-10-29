@@ -1,4 +1,5 @@
-// JSON this server wrote (a table's JSON column), read back by its shape's Schema rather than cast.
+// JSON read by its shape's Schema rather than cast: what this server wrote (a table's JSON column, a file in its home),
+// and what comes from outside (a vendor's body, a child process's line, a tool's output).
 
 import { Option, Schema } from "effect";
 

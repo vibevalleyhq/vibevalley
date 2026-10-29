@@ -13,7 +13,7 @@ import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrid
 import { Context, Data, Effect, Layer, Schema } from "effect";
 import { ServerConfig } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
-import { jsonOf } from "../base/json.ts";
+import { jsonOf, jsonOrNone } from "../base/json.ts";
 
 const MemorySourceConfig = Schema.Struct({
   kind: S.MemorySourceKind,
@@ -103,10 +103,12 @@ export class Setting extends Context.Service<
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 
+const savedSettingsLocale = jsonOrNone(Schema.Struct({ locale: Schema.optionalKey(Schema.String) }));
+
 /** The locale saved in a home's settings.json, for a process that does not run the farm (the command line). */
 export function savedLocale(home: string): Locale {
   try {
-    return (JSON.parse(readFileSync(join(home, "settings.json"), "utf8")) as { locale?: unknown }).locale === "en" ? "en" : "zh";
+    return savedSettingsLocale(readFileSync(join(home, "settings.json"), "utf8"))?.locale === "en" ? "en" : "zh";
   } catch {
     return "zh";
   }

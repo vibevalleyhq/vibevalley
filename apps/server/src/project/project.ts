@@ -32,7 +32,7 @@ import {
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
-import { jsonOf } from "../base/json.ts";
+import { jsonOf, jsonOrNone } from "../base/json.ts";
 import { ServerConfig } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
@@ -142,19 +142,17 @@ const localeCompare = (a: string, b: string) => {
   return x < y ? -1 : x > y ? 1 : a < b ? -1 : a > b ? 1 : 0;
 };
 
+/** tokei --output json: each language's lines and the files it read. */
+const tokeiOutput = jsonOrNone(
+  Schema.Record(Schema.String, Schema.Struct({ code: Schema.Number, comments: Schema.Number, blanks: Schema.Number, reports: Schema.Array(Schema.Unknown) })),
+);
+
 /** Its total, and languages with nothing but blank lines, left out; undefined when it is not tokei's output. */
 export function countsOf(output: string): LanguageCount[] | undefined {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(output);
-  } catch {
-    return undefined;
-  }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+  const raw = tokeiOutput(output);
+  if (!raw) return undefined;
   const out: LanguageCount[] = [];
-  for (const [name, body] of Object.entries(raw as Record<string, unknown>)) {
-    const l = body as { code?: unknown; comments?: unknown; blanks?: unknown; reports?: unknown };
-    if (typeof l?.code !== "number" || typeof l.comments !== "number" || typeof l.blanks !== "number" || !Array.isArray(l.reports)) return undefined;
+  for (const [name, l] of Object.entries(raw)) {
     if (name === "Total" || l.code + l.comments <= 0) continue;
     out.push({
       name,

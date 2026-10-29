@@ -1,6 +1,6 @@
 // The farm's models over the wire: a request (request.ts) out, its stream read (response.ts) back, as pi-ai's events.
 
-import { Clock, Context, Data, Effect, Layer, Stream } from "effect";
+import { Clock, Context, Data, Effect, Layer, Stream, Predicate } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
 import type { AssistantMessage, Context as LlmContext } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
@@ -56,8 +56,8 @@ export const failedMessage = (model: Model, timestamp: number, e: LlmError): Ass
 /** As pi-ai words a refusal: the status and the body's error object, else its text. */
 function statusMessage(status: number, text: string): string {
   try {
-    const body = JSON.parse(text) as { error?: unknown };
-    if (body.error && typeof body.error === "object") return `${status}: ${JSON.stringify(body.error)}`;
+    const body: unknown = JSON.parse(text);
+    if (Predicate.isObject(body) && Predicate.isObject(body.error)) return `${status}: ${JSON.stringify(body.error)}`;
   } catch {
     // Not JSON: the text as it came.
   }

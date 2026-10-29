@@ -4,7 +4,8 @@
 // plain HTTPS, where a refused key answers 401 or 403. A relay is a page's own line to MOSS: the page speaks MOSS's
 // protocol (JSON actions, and binary frames tagged 0x00 for audio), the server only adds the key.
 
-import { Effect, Queue, type Scope } from "effect";
+import { jsonOrNone } from "../base/json.ts";
+import { Effect, Queue, type Scope, Schema } from "effect";
 import { Socket } from "effect/socket";
 import { afterRealTime } from "../base/time.ts";
 
@@ -64,15 +65,17 @@ export const nodeTransport: MossTransport = {
   },
 };
 
+const mossError = Schema.optionalKey(Schema.Struct({ message: Schema.optionalKey(Schema.String) }));
+
+/** What MOSS says, on the socket ({ action, data: { error } }) or in a refused handshake's body ({ error }). */
+const mossMessage = jsonOrNone(
+  Schema.Struct({ action: Schema.optionalKey(Schema.String), error: mossError, data: Schema.optionalKey(Schema.Struct({ error: mossError })) }),
+);
+
 /** The message of a refusal's JSON body ({ error: { message } }), or the body itself, cut short. */
 const refusal = (body: string) => {
-  try {
-    const m = (JSON.parse(body) as { error?: { message?: unknown } }).error?.message;
-    if (typeof m === "string" && m !== "") return m;
-  } catch {
-    // Not JSON: the body is the reason.
-  }
-  return body.slice(0, 200);
+  const m = mossMessage(body)?.error?.message;
+  return m ? m : body.slice(0, 200);
 };
 
 const handshake = (key: string, transport: MossTransport) =>
@@ -91,17 +94,9 @@ const handshake = (key: string, transport: MossTransport) =>
     link = transport.connect(key, {
       open: () => link?.send(JSON.stringify({ action: "attach_session" })),
       text: (data) => {
-        let m: { action?: unknown; data?: { error?: { message?: unknown } } };
-        try {
-          m = JSON.parse(data) as typeof m;
-        } catch {
-          return;
-        }
-        if (m.action === "session_attached") settle("attached");
-        else if (m.action === "error") {
-          const message = m.data?.error?.message;
-          settle({ error: typeof message === "string" ? message : "" });
-        }
+        const m = mossMessage(data);
+        if (m?.action === "session_attached") settle("attached");
+        else if (m?.action === "error") settle({ error: m.data?.error?.message ?? "" });
       },
       down: (why) => settle({ down: why }),
     });

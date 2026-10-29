@@ -1,5 +1,6 @@
 import { maybe, t } from "@vibevalley/i18n";
 
+import { Predicate } from "effect";
 import { messageOf } from "../errors.ts";
 import { reportVerdict } from "../session/rules.ts";
 import type {
@@ -106,8 +107,8 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
   for (let i = blocks.length - 1; i >= 0; i--) {
     let d: IssueRefinement;
     try {
-      const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.issue.refinement.notObject"));
+      const raw: unknown = JSON.parse(blocks[i]!);
+      if (!Predicate.isObject(raw)) throw new Error(t("server.issue.refinement.notObject"));
       d = {
         title: textOf(raw.title, "title"),
         why: textOf(raw.why, "why"),

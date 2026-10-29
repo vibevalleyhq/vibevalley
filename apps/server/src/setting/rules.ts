@@ -117,9 +117,13 @@ export function voiceProblem(v: SettingsUpdateVoice): string {
 const voiceKeys = ["area", "language", "asr", "answer", "tts", "persona", "greeting", "failureMessage", "silenceMs", "interruptMs", "idleSeconds"] as const;
 
 export function voiceSettingsOver(defaults: VoiceSettings, overrides: SettingsUpdateVoice): VoiceSettings {
-  const out: Record<string, unknown> = { ...defaults };
-  for (const key of voiceKeys) if (overrides[key] !== undefined) out[key] = overrides[key];
-  return out as unknown as VoiceSettings;
+  const out: VoiceSettings = { ...defaults };
+  const take = <K extends (typeof voiceKeys)[number]>(key: K) => {
+    const value = overrides[key];
+    if (value !== undefined) out[key] = value;
+  };
+  for (const key of voiceKeys) take(key);
+  return out;
 }
 
 /** Only what differs. */

@@ -4,10 +4,15 @@ import { t } from "@vibevalley/i18n";
 // registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
 // API to the owner's open_id, with no reply window.
 
+import { Schema } from "effect";
+import { jsonOrNone } from "../base/json.ts";
 import { messageOf } from "../errors.ts";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { wallTime } from "../base/time.ts";
 import { type Adapter } from "./adapter.ts";
+
+/** A text message's content: {"text": …}. */
+const textContent = jsonOrNone(Schema.Struct({ text: Schema.optionalKey(Schema.String) }));
 
 export type Domain = "feishu" | "lark";
 
@@ -226,11 +231,7 @@ export function text(m: Message): string {
         } as Record<string, string>
       )[m.messageType] ?? t("server.connector.media.message")
     );
-  try {
-    return ((JSON.parse(m.content) as { text?: string }).text ?? "").trim();
-  } catch {
-    return "";
-  }
+  return (textContent(m.content)?.text ?? "").trim();
 }
 
 export function feishuAdapter(api: FeishuApi): Adapter {

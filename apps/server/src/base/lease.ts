@@ -3,6 +3,8 @@ import { t } from "@vibevalley/i18n";
 // has no flock, so a lock whose process is gone is stale and is taken over. server.json says where that server listens,
 // so the command line finds it on whatever port it got (the desktop app asks for a free one).
 
+import { Schema } from "effect";
+import { jsonOrNone } from "./json.ts";
 import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +17,9 @@ const alive = (pid: number) => {
     return (e as NodeJS.ErrnoException).code === "EPERM";
   }
 };
+
+/** server.json: where the server using this home listens, and its process. */
+const announcement = jsonOrNone(Schema.Struct({ url: Schema.String, pid: Schema.Number }));
 
 export class HomeTaken extends Error {}
 
@@ -55,7 +60,7 @@ export function announce(home: string, url: string): () => void {
   writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", { mode: 0o600 });
   return () => {
     try {
-      if ((JSON.parse(readFileSync(path, "utf8")) as { pid?: number }).pid === process.pid) unlinkSync(path);
+      if (announcement(readFileSync(path, "utf8"))?.pid === process.pid) unlinkSync(path);
     } catch {
       // Already gone.
     }
@@ -65,8 +70,8 @@ export function announce(home: string, url: string): () => void {
 /** Where the server using this home listens; undefined when none says so or it has stopped. */
 export function announced(home: string): string | undefined {
   try {
-    const { url, pid } = JSON.parse(readFileSync(join(home, "server.json"), "utf8")) as { url?: unknown; pid?: unknown };
-    return typeof url === "string" && typeof pid === "number" && alive(pid) ? url : undefined;
+    const said = announcement(readFileSync(join(home, "server.json"), "utf8"));
+    return said && alive(said.pid) ? said.url : undefined;
   } catch {
     return undefined;
   }

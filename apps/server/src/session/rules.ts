@@ -2,6 +2,7 @@ import { list, maybe, t } from "@vibevalley/i18n";
 // The session's rules, pure: how a run's end reads, whether there is room for one
 // more helper, which profile a job goes to, and what a session is told about the farm. Lengths are UTF-16 units.
 
+import { Predicate } from "effect";
 import { messageOf } from "../errors.ts";
 import { recallHead, recallIntro } from "./prompts.ts";
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
@@ -97,8 +98,8 @@ export function parseAnswer(text: string): { answer?: IssueAnswer; problem: stri
   for (let i = blocks.length - 1; i >= 0; i--) {
     let a: IssueAnswer;
     try {
-      const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.session.answer.notObject"));
+      const raw: unknown = JSON.parse(blocks[i]!);
+      if (!Predicate.isObject(raw)) throw new Error(t("server.session.answer.notObject"));
       a = {
         conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
         evidence: answerLines(raw.evidence, "evidence"),
