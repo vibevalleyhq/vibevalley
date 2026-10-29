@@ -39,6 +39,11 @@
     "doubleCast": 0,
     "lintOff": 0
   },
+  "packages/health": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
   "packages/i18n": {
     "nonNull": 5,
     "doubleCast": 0,
@@ -65,13 +70,13 @@
     "lintOff": 0
   },
   "server: Agents": {
-    "nonNull": 40,
+    "nonNull": 39,
     "doubleCast": 0,
     "lintOff": 0
   },
   "server: Collaboration": {
     "nonNull": 48,
-    "doubleCast": 1,
+    "doubleCast": 0,
     "lintOff": 0
   },
   "server: Gamification": {
@@ -86,7 +91,7 @@
   },
   "server: Issues": {
     "nonNull": 48,
-    "doubleCast": 2,
+    "doubleCast": 0,
     "lintOff": 0
   },
   "server: Notifications": {
@@ -101,7 +106,7 @@
   },
   "server: Platform": {
     "nonNull": 6,
-    "doubleCast": 1,
+    "doubleCast": 0,
     "lintOff": 1
   },
   "server: Source Control": {
