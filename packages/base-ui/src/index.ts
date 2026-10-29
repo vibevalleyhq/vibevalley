@@ -8,3 +8,7 @@ export { Switch } from "./switch";
 export { Tabs } from "./tabs";
 export { Tooltip, type TooltipOpenChangeReason } from "./tooltip";
 export { Toggle, ToggleGroup } from "./toggle";
+export { Meter, Progress } from "./range";
+export { Radio, RadioGroup } from "./radio";
+export { Separator } from "./separator";
+export { Slider } from "./slider";
