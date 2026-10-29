@@ -129,6 +129,8 @@ export function StoriesApp(props: {
   wrap?: (story: () => JSX.Element) => JSX.Element;
   /** The languages the host can draw in, the first its own. */
   locales?: readonly string[];
+  /** Called as each story opens, before it draws: the host forgets what the one before left (a query cache). */
+  prepare?: () => void;
 }) {
   const list = entries(props.stories, props.order);
   // The forced states are copies of the page's rules: written once the styles are in, and again when they change (dev).
@@ -252,7 +254,7 @@ export function StoriesApp(props: {
       </nav>
 
       <Show when={open()} keyed fallback={<p class="m-auto text-muted">No stories.</p>}>
-        {(e: Entry) => <Opened entry={e} view={view()} move={move} wrap={props.wrap} locales={props.locales ?? []} />}
+        {(e: Entry) => <Opened entry={e} view={view()} move={move} wrap={props.wrap} locales={props.locales ?? []} prepare={props.prepare} />}
       </Show>
     </div>
   );
@@ -267,7 +269,9 @@ function Opened(props: {
   move: (patch: Partial<View>) => void;
   wrap: ((story: () => JSX.Element) => JSX.Element) | undefined;
   locales: readonly string[];
+  prepare: (() => void) | undefined;
 }) {
+  props.prepare?.();
   const story = props.entry.story;
   const [args, setArgs] = createStore<Args>({ ...story.args });
   const set = (patch: Partial<Args>) =>
