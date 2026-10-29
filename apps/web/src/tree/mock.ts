@@ -77,11 +77,11 @@ const agentsZh: MemoryAgent[] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projectsZh = ["heybro", "字幕面板", "官网", "billing"];
+const projectsZh = ["vibevalley", "字幕面板", "官网", "billing"];
 
 const notesZh = [
   "表名用单数：issue、issue_session",
-  "改完 db/queries 要跑 bun run db:generate",
+  "改完 db/queries 要跑 vp run db:generate",
   "主人不要兼容层，旧数据直接作废",
   "页面不折事实，要新数据就加 protocol 字段",
   "提交说明一句话说改完以后的行为",
@@ -95,7 +95,7 @@ const notesZh = [
   "图标用像素贴图，不用字符代替",
   "Solid 2 的 Show 函数子节点会在分支关掉后抛错",
   "服务端只听 127.0.0.1",
-  "改了 api.ts 要跑 bun run api:client",
+  "改了 api.ts 要跑 vp run api:client",
   "中文和英文之间空一格",
   "golden 数据有意改了才重写，先看 diff",
   "字幕面板的快捷键不和播放器冲突",
@@ -131,11 +131,11 @@ const agentsEn: MemoryAgent[] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projectsEn = ["heybro", "subtitle-panel", "site", "billing"];
+const projectsEn = ["vibevalley", "subtitle-panel", "site", "billing"];
 
 const notesEn = [
   "Table names are singular: issue, issue_session",
-  "After changing db/queries, run bun run db:generate",
+  "After changing db/queries, run vp run db:generate",
   "The owner wants no compatibility layers; old data is dropped",
   "The page folds no facts; new data is a protocol field",
   "A commit subject says the behavior after the change",
@@ -149,7 +149,7 @@ const notesEn = [
   "Icons are pixel sprites, not characters",
   "Solid 2's Show throws if a function child runs after the branch closes",
   "The server listens on 127.0.0.1 only",
-  "After changing api.ts, run bun run api:client",
+  "After changing api.ts, run vp run api:client",
   "A space between Chinese and English words",
   "Rewrite golden data only on purpose, after reading the diff",
   "The subtitle panel's shortcuts never clash with the player's",
