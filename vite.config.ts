@@ -272,6 +272,39 @@ export default defineConfig({
         rules: { "vibevalley/page-layers": "error" },
       },
       {
+        // The server is Effect; a Promise is only a library's one call (scripts/oxlint-plugin.ts, promise-boundary).
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
+        rules: { "vibevalley/promise-boundary": "error" },
+      },
+      {
+        // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
+        // SDK's request handlers, and the fetch that the model client calls for the local chat/completions.
+        files: [
+          "apps/server/src/runtime/vibevalley.ts",
+          "apps/server/src/runtime/dsh.ts",
+          "apps/server/src/runtime/pi.ts",
+          "apps/server/src/runtime/runtime.ts",
+          "apps/server/src/mcp/mcp.ts",
+          "apps/server/src/orchestrator/openai.ts",
+        ],
+        rules: { "vibevalley/promise-boundary": "off" },
+      },
+      {
+        // Not moved into Effect yet; the list only shrinks (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上").
+        // The orchestrator's host and its inputs, the call's line and the local network's proxy wait and queue by hand;
+        // the command line's chats and time.ts's Promise clock go with them.
+        files: [
+          "apps/server/src/session/host.ts",
+          "apps/server/src/orchestrator/orchestrator.ts",
+          "apps/server/src/voice/voice.ts",
+          "apps/server/src/lan/lan.ts",
+          "apps/server/src/cli/chat.ts",
+          "apps/server/src/base/time.ts",
+        ],
+        rules: { "vibevalley/promise-boundary": "off" },
+      },
+      {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).
         files: ["apps/web/src/**", "apps/server/src/**"],
         rules: { "vibevalley/parent-import": "error" },

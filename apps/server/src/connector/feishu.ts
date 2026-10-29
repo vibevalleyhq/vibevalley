@@ -150,10 +150,11 @@ export class FeishuClient implements FeishuApi {
             onError: (e: Error) => resume(Effect.fail(failedWith(t("server.connector.feishu.disconnected", { why: e.message })))),
           });
           const dispatcher = new Lark.EventDispatcher({}).register({
-            "im.message.receive_v1": async (data) => {
+            // The SDK waits on what this returns before it acknowledges the event.
+            "im.message.receive_v1": (data) => {
               const from = data.sender.sender_id?.open_id;
-              if (!from || data.sender.sender_type !== "user") return;
-              await take(
+              if (!from || data.sender.sender_type !== "user") return Promise.resolve();
+              return take(
                 got({
                   messageId: data.message.message_id,
                   from,

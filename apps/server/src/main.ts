@@ -32,16 +32,17 @@ redactOutput(process.stderr);
 
 // The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents: pi is the scripted helper the
 // server's tests hire, and it is the only runtime installed. Never set otherwise; loaded only then.
-const testRuntimes = async () => {
-  const [{ helper, installedOnly }, { registryOf }] = await Promise.all([import("./testing/helper.ts"), import("./runtime/runtime.ts")]);
+const testRuntimes = Effect.gen(function* () {
+  const { helper, installedOnly } = yield* Effect.promise(() => import("./testing/helper.ts"));
+  const { registryOf } = yield* Effect.promise(() => import("./runtime/runtime.ts"));
   const given = [helper()];
   return { registry: registryOf(given), probe: installedOnly(given), background: false };
-};
+});
 
 const main = Effect.gen(function* () {
   const loaded = yield* loadConfig(flags.config);
   const config = flags.web ? { ...loaded, web: flags.web } : loaded;
-  const runtime = process.env.VIBEVALLEY_TEST_RUNTIMES === "1" ? yield* Effect.promise(testRuntimes) : undefined;
+  const runtime = process.env.VIBEVALLEY_TEST_RUNTIMES === "1" ? yield* testRuntimes : undefined;
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(config.home, { recursive: true });
   yield* fs.makeDirectory(projectsDir(config), { recursive: true });

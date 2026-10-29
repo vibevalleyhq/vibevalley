@@ -47,29 +47,36 @@ const watchDdl = `CREATE FUNCTION vibevalley_ddl_mark() RETURNS event_trigger LA
   BEGIN PERFORM set_config('${ddlMark}', '1', false); END $$;
 CREATE EVENT TRIGGER vibevalley_ddl ON ddl_command_end EXECUTE FUNCTION vibevalley_ddl_mark();`;
 const unmark = `SELECT set_config('${ddlMark}', '', false)`;
-const changed = async (pglite: PGlite) =>
-  (await pglite.query<{ mark: string | null }>(`SELECT current_setting('${ddlMark}', true) AS mark`)).rows[0]?.mark === "1";
+const changed = (pglite: PGlite) =>
+  Effect.map(
+    Effect.promise(() => pglite.query<{ mark: string | null }>(`SELECT current_setting('${ddlMark}', true) AS mark`)),
+    (r) => r.rows[0]?.mark === "1",
+  );
 /** Empties a database given back and keeps it, or closes it when its schema was changed. Deleting with the foreign keys
  * off is cheaper than TRUNCATE, which makes every table's files again; restarting the sequences is DDL itself, so the
  * mark is cleared after. */
-const giveBack = async (pglite: PGlite) => {
-  if (await changed(pglite)) return pglite.close();
-  if (emptyAll === undefined) {
-    const tables = await pglite.query<{ name: string }>(
-      "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'effect_sql_migrations'",
-    );
-    const sequences = await pglite.query<{ name: string }>("SELECT sequencename AS name FROM pg_sequences WHERE schemaname = 'public'");
-    emptyAll = [
-      "SET session_replication_role = replica;",
-      ...tables.rows.map((t) => `DELETE FROM "${t.name}";`),
-      "SET session_replication_role = origin;",
-      ...sequences.rows.map((q) => `ALTER SEQUENCE "${q.name}" RESTART;`),
-      `${unmark};`,
-    ].join(" ");
-  }
-  await pglite.exec(emptyAll);
-  spare.push(pglite);
-};
+const giveBack = (pglite: PGlite) =>
+  Effect.gen(function* () {
+    if (yield* changed(pglite)) return yield* Effect.promise(() => pglite.close());
+    if (emptyAll === undefined) {
+      const tables = yield* Effect.promise(() =>
+        pglite.query<{ name: string }>("SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'effect_sql_migrations'"),
+      );
+      const sequences = yield* Effect.promise(() =>
+        pglite.query<{ name: string }>("SELECT sequencename AS name FROM pg_sequences WHERE schemaname = 'public'"),
+      );
+      emptyAll = [
+        "SET session_replication_role = replica;",
+        ...tables.rows.map((t) => `DELETE FROM "${t.name}";`),
+        "SET session_replication_role = origin;",
+        ...sequences.rows.map((q) => `ALTER SEQUENCE "${q.name}" RESTART;`),
+        `${unmark};`,
+      ].join(" ");
+    }
+    const all = emptyAll;
+    yield* Effect.promise(() => pglite.exec(all));
+    spare.push(pglite);
+  });
 
 const migrate = (pglite: PGlite, client: SqlClient.SqlClient) =>
   PgliteMigrator.run({
@@ -90,10 +97,13 @@ export const Database = PgliteClient.layerFrom(
     // A folder that is not there yet is a new database: it can start from the copy too.
     const base = memory || !existsSync(where) ? memoryBase : undefined;
     const kept = memory ? spare.pop() : undefined;
-    const from = async () => (base ? { loadDataDir: await base } : undefined);
     const pglite = yield* Effect.acquireRelease(
-      Effect.promise(async () => kept ?? (memory ? PGlite.create(await from()) : PGlite.create(where, await from()))),
-      (db) => Effect.promise(() => (memory ? giveBack(db) : db.close())),
+      Effect.gen(function* () {
+        if (kept) return kept;
+        const options = base ? { loadDataDir: yield* Effect.promise(() => base) } : undefined;
+        return yield* Effect.promise(() => (memory ? PGlite.create(options) : PGlite.create(where, options)));
+      }),
+      (db) => (memory ? giveBack(db) : Effect.promise(() => db.close())),
     );
     const client = yield* PgliteClient.fromClient({ liveClient: pglite });
     if (!kept) yield* migrate(pglite, client);

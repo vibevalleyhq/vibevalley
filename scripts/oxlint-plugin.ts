@@ -41,6 +41,11 @@
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
  *
+ *   promise-boundary: the server is Effect; a Promise is only the one call into an outside library, made inside
+ *   Effect.tryPromise or Effect.promise (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上"). An async
+ *   function or a new Promise anywhere else is a loop, a wait or a queue written by hand. Where a library's own interface
+ *   is Promises (oar's runtimes, the MCP SDK's handlers), vite.config.ts turns the rule off for that file and says why.
+ *
  *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
  *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
  *   and moving a file does not change what its imports say. Siblings and children stay ./x.
@@ -293,6 +298,48 @@ const pageLayersRule = defineRule({
   },
 });
 
+/** Effect.tryPromise(async …), Effect.tryPromise({ try: async … }) and Effect.promise(async …): the one place an async body is the boundary. */
+function inEffectPromise(node: { parent?: unknown }): boolean {
+  const isWrapper = (n: unknown): boolean => {
+    const call = n as { type?: string; callee?: { type?: string; object?: { type?: string; name?: string }; property?: { type?: string; name?: string } } };
+    const c = call.callee;
+    return (
+      call.type === "CallExpression" &&
+      c?.type === "MemberExpression" &&
+      c.object?.type === "Identifier" &&
+      c.object.name === "Effect" &&
+      c.property?.type === "Identifier" &&
+      (c.property.name === "tryPromise" || c.property.name === "promise")
+    );
+  };
+  const parent = node.parent as { type?: string; key?: { type?: string; name?: string }; parent?: { parent?: unknown } } | undefined;
+  if (isWrapper(parent)) return true;
+  return parent?.type === "Property" && parent.key?.type === "Identifier" && parent.key.name === "try" && isWrapper(parent.parent?.parent);
+}
+
+const promiseBoundary = defineRule({
+  meta: {
+    messages: {
+      async:
+        "the server is Effect: write this in Effect.gen, and keep the library's one call in Effect.tryPromise (scripts/oxlint-plugin.ts, promise-boundary)",
+      promise: "the server is Effect: wait with Effect.callback, Deferred or Queue instead of a new Promise (scripts/oxlint-plugin.ts, promise-boundary)",
+    },
+  },
+  create(context) {
+    const check = (node: Parameters<typeof inEffectPromise>[0] & { async?: boolean }) => {
+      if (node.async && !inEffectPromise(node)) context.report({ node: node as never, messageId: "async" });
+    };
+    return {
+      FunctionDeclaration: check,
+      FunctionExpression: check,
+      ArrowFunctionExpression: check,
+      NewExpression(node) {
+        if (node.callee.type === "Identifier" && node.callee.name === "Promise") context.report({ node, messageId: "promise" });
+      },
+    };
+  },
+});
+
 const parentImportRule = defineRule({
   meta: {
     messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
@@ -329,6 +376,7 @@ export default definePlugin({
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
+    "promise-boundary": promiseBoundary,
     "native-control": nativeControl,
   },
 });

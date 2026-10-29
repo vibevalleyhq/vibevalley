@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { embedOf, linksIn, privateAddress, reachable, readEmbed } from "./embeds.ts";
+import { embedOf, linksIn, privateAddress, type Resolve, reachable, readEmbed } from "./embeds.ts";
 
 const page = (html: string, headers: Record<string, string> = { "content-type": "text/html; charset=utf-8" }, status = 200) =>
   new Response(html, { status, headers });
 
 /** readEmbed on the farm's fetch client, with fetch itself the test's. */
-const read = (link: string, get: typeof fetch, resolve: (host: string) => Promise<string[]>) =>
+const read = (link: string, get: typeof fetch, resolve: Resolve) =>
   Effect.runPromise(readEmbed(link, resolve).pipe(Effect.provide(FetchHttpClient.layer), Effect.provideService(FetchHttpClient.Fetch, get)));
 
 describe("a link's preview", () => {
@@ -21,14 +21,14 @@ describe("a link's preview", () => {
       expect(privateAddress(ip), ip).toBe(true);
     expect(privateAddress("93.184.216.34")).toBe(false);
     const at =
-      (...ips: string[]) =>
-      async () =>
-        ips;
-    expect(await reachable(new URL("https://example.com"), at("93.184.216.34"))).toBe(true);
-    expect(await reachable(new URL("https://example.com"), at("93.184.216.34", "10.0.0.1"))).toBe(false);
-    expect(await reachable(new URL("http://localhost:8787"), at("127.0.0.1"))).toBe(false);
-    expect(await reachable(new URL("file:///etc/passwd"), at("93.184.216.34"))).toBe(false);
-    expect(await reachable(new URL("https://user:pw@example.com"), at("93.184.216.34"))).toBe(false);
+      (...ips: string[]): Resolve =>
+      () =>
+        Effect.succeed(ips);
+    expect(await Effect.runPromise(reachable(new URL("https://example.com"), at("93.184.216.34")))).toBe(true);
+    expect(await Effect.runPromise(reachable(new URL("https://example.com"), at("93.184.216.34", "10.0.0.1")))).toBe(false);
+    expect(await Effect.runPromise(reachable(new URL("http://localhost:8787"), at("127.0.0.1")))).toBe(false);
+    expect(await Effect.runPromise(reachable(new URL("file:///etc/passwd"), at("93.184.216.34")))).toBe(false);
+    expect(await Effect.runPromise(reachable(new URL("https://user:pw@example.com"), at("93.184.216.34")))).toBe(false);
   });
 
   it("is what the page says of itself in its head", () => {
@@ -45,7 +45,7 @@ describe("a link's preview", () => {
   });
 
   it("follows a redirect only to a public address, and reads only a page", async () => {
-    const resolve = async (host: string) => (host === "inside.example" ? ["10.0.0.5"] : ["93.184.216.34"]);
+    const resolve: Resolve = (host) => Effect.succeed(host === "inside.example" ? ["10.0.0.5"] : ["93.184.216.34"]);
     const asked: string[] = [];
     const get = (async (url: URL | string) => {
       const u = String(url);
