@@ -309,6 +309,17 @@ export default defineConfig({
         rules: { "vibevalley/promise-boundary": "off" },
       },
       {
+        // One word for none (scripts/oxlint-plugin.ts, one-absent).
+        files: ["apps/**", "packages/**"],
+        excludeFiles: ["apps/server/db/generated/**"],
+        rules: { "vibevalley/one-absent": "error" },
+      },
+      {
+        // Doors to the outside, where null comes in and is turned into undefined: a stored column's text, the DOM's body.
+        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/draft.ts"],
+        rules: { "vibevalley/one-absent": "off" },
+      },
+      {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).
         files: ["apps/web/src/**", "apps/server/src/**"],
         rules: { "vibevalley/parent-import": "error" },

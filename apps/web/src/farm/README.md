@@ -43,20 +43,20 @@ outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
 
 | Action | Does |
 |---|---|
-| `select(sessionId \| null)` | opens / closes a plot's issue (`inspect`) |
-| `review(id \| null)`, `sow(station \| null)`, `water(id \| null)` | the harvest, the sowing form, the watering form |
-| `panel(FarmPanel \| null)` | `shop`, `warehouse`, `graphs`, `log`, `manager`, `taskBoard` |
+| `select(sessionId \| undefined)` | opens / closes a plot's issue (`inspect`) |
+| `review(id \| undefined)`, `sow(station \| undefined)`, `water(id \| undefined)` | the harvest, the sowing form, the watering form |
+| `panel(FarmPanel \| undefined)` | `shop`, `warehouse`, `graphs`, `log`, `manager`, `taskBoard` |
 | `menu(open)`, `closeTop()` | the Esc menu; closing the top layer (false when none) |
-| `openTaskBoard(graph?)`, `showGraph(graph \| null)` | the task board, at a graph |
+| `openTaskBoard(graph?)`, `showGraph(graph \| undefined)` | the task board, at a graph |
 | `hold(tool)` | the tool in hand (`tools.ts`: hand, water, bug, weed, harvest, shovel; keys 1–6) |
-| `hover(bed \| null, spot \| null)` | set by the canvas: the bed and the yard place under the pointer |
+| `hover(bed \| null, spot \| undefined)` | set by the canvas: the bed and the yard place under the pointer |
 | `revealNames(on)` | Alt held: every name tag shows |
-| `chatOpen(open)`, `chatLarge(large)`, `showChat(channel \| null)` | the chat: unfolding takes the phone out, putting the phone away folds it; null is the general channel |
+| `chatOpen(open)`, `chatLarge(large)`, `showChat(channel \| undefined)` | the chat: unfolding takes the phone out, putting the phone away folds it; undefined is the general channel |
 | `phoneOpen(open)`, `friendsOpen(open)` | |
 | `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (`localStorage` `vibevalley.title.seen`) |
 | `bedFx(bed, kind, text?)` | a bed's effect for 2.2 s (`water`, `spray`, `harvest`, `shovel`, `note`); the commands call it |
 | `reward(effect)` | a reward for 4 s; FarmPage pushes each frame's rewards |
-| `setScreen(screen \| null)` | set by the canvas only (below) |
+| `setScreen(screen \| undefined)` | set by the canvas only (below) |
 
 `clock` is the one day clock (`@vibevalley/engine/clock`, a day is 600 s, starts at 0.42): the canvas advances it every
 frame; the HUD reads `timeOfDay()` (changes every five minutes of the day); the debug console calls
@@ -64,7 +64,7 @@ frame; the HUD reads `timeOfDay()` (changes every five minutes of the day); the 
 
 ## How the DOM finds things on the canvas
 
-The canvas publishes `FarmUi.screen: VillageScreen | null` (null until it has drawn, replaced when the framing
+The canvas publishes `FarmUi.screen: VillageScreen | undefined` (undefined until it has drawn, replaced when the framing
 changes). Everything is in the farm page's CSS pixels, its top left at 0, 0:
 
 - `scale` (screen pixels per art pixel, whole), `box` (the whole village, may stick out), `shown` (the part inside the

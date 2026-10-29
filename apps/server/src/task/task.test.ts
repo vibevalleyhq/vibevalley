@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { sampleAgent } from "@/testing/agents.ts";
 import { freshTask } from "./rules.ts";
 import { graphView } from "./graph.ts";
 import { orchestrator, owner } from "@/base/actor.ts";
@@ -436,7 +437,7 @@ describe("task graphs", () => {
   });
 
   it("choosing a profile, and the splitter's brief", () => {
-    const a = (id: string, runtime: string, ...tags: string[]) => ({ id, name: "名" + id, runtime, tags }) as Agent;
+    const a = (id: string, runtime: string, ...tags: string[]) => sampleAgent({ id, name: "名" + id, runtime, tags });
     const cands = [
       { agent: a("x", "pi", "测试"), usable: true },
       { agent: a("y", "claude", "前端", "页面"), usable: true },
@@ -540,6 +541,7 @@ describe("task graphs", () => {
             parallel: 1,
             createdAt: 0,
             tasks: [{ ...freshTask({ id: "a", title: "步骤", brief: "做事" }), state: "failed", session: sessionId("w900") }],
+            note: "",
             ...graphView(),
           } satisfies TaskGraph;
           yield* f.issues.putTask(graph);

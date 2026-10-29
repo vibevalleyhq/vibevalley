@@ -89,7 +89,7 @@ const pages: Record<string, Page> = {
         sessions: [s.id],
         checks: [
           { criterion: 0, result: "met", proof: "session.test.ts 覆盖了" },
-          { criterion: 1, result: "met" },
+          { criterion: 1, result: "met", proof: "" },
           { criterion: 2, result: "unsure", proof: "只测了过期前后各一秒" },
         ],
         attention: { state: "reviewing", since: now - 6 * min, lead: "complete", acts: [acts.complete, acts.reject, acts.tell, acts.close] },

@@ -19,9 +19,8 @@ export function reduce(state: WorkspaceState, fact: Fact): [WorkspaceState, bool
 function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
   switch (f.type) {
     case "call": {
-      const reason = f.reason ? f.reason : undefined;
-      if (state.call === f.state && state.callReason === reason) return [state, false];
-      return [omitUndefined({ ...state, call: f.state, callReason: reason }), true];
+      if (state.call === f.state && state.callReason === f.reason) return [state, false];
+      return [{ ...state, call: f.state, callReason: f.reason }, true];
     }
     case "orchestrator": {
       const was = state.orchestrators[f.agent];
@@ -30,7 +29,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       const { [f.agent]: _was, ...others } = state.orchestrators;
       // A round runs from its first thinking through its writing: its start stays while it goes on.
       const busy = (s: OrchestratorState | undefined) => s === "thinking" || s === "speaking";
-      const since = busy(f.state) ? (busy(was?.state) ? was?.since : f.at) : undefined;
+      const since = busy(f.state) ? (busy(was?.state) ? was.since : f.at) : undefined;
       const now =
         f.state === "idle" && !f.channel
           ? others
@@ -42,7 +41,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return [chat === state.chat ? state : { ...state, ...(chat ? { chat } : {}) }, news];
     }
     case "channel":
-      if (state.chat?.channels?.some((c) => c.id === f.channel.id && same(c, f.channel))) return [state, false];
+      if (state.chat?.channels.some((c) => c.id === f.channel.id && same(c, f.channel))) return [state, false];
       return [{ ...state, chat: withChannel(state.chat, f.channel) }, true];
     case "channelGone": {
       const all = state.chat?.channels ?? [];

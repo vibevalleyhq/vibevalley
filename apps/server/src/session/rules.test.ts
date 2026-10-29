@@ -255,7 +255,7 @@ describe("a run's report", () => {
     expect(checksOf(said)).toEqual([
       { criterion: 0, result: "met", proof: "再跑一遍也过" },
       { criterion: 1, result: "unmet", proof: "还差文档" },
-      { criterion: 2, result: "unsure" },
+      { criterion: 2, result: "unsure", proof: "" },
     ]);
   });
 

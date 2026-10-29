@@ -262,7 +262,7 @@ export const make = (options: IssueOptions = {}) =>
         id: issueId(row.id),
         number: row.number,
         title: row.title,
-        ...(row.description ? { description: row.description } : {}),
+        description: row.description,
         ...(row.project !== null ? { project: row.project } : {}),
         ...(row.assignee !== null ? { assignee: row.assignee } : {}),
         priority: row.priority as Priority,
@@ -493,7 +493,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!agent.enabled) return { refused: t("server.issue.disabled", { name: agent.name }) };
       for (const i of yield* runtimes.problemsOf(agent))
         if (i.level === "error") return { refused: t("server.issue.cannotSend", { name: agent.name, why: i.text }) };
-      const where = project.trim() || (agent.workdir ?? "").trim();
+      const where = project.trim() || agent.workdir.trim();
       if (!where) return { refused: t("server.issue.noProject") };
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused };
@@ -524,7 +524,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!issue.assignee) return yield* Effect.fail(refused(t("server.issue.noAssignee"), pick));
       const agent = store.agent(issue.assignee);
       if (!agent) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: issue.assignee }), pick));
-      return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
+      return [issue, agent, issue.project ?? agent.workdir] as const;
     });
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
@@ -1026,7 +1026,7 @@ export const make = (options: IssueOptions = {}) =>
           was = yield* get(id);
           if (isClosed(was.status)) return yield* Effect.fail(refused(t("server.issue.closed")));
         } else was = yield* unsent(id);
-        const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
+        const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description });
         if (upd.project !== undefined && upd.project !== was.project && was.project) {
           const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
           if (released.kept) return yield* Effect.fail(refused(t("server.issue.cannotMoveProject", { n: was.number, why: released.reason })));
@@ -1227,7 +1227,7 @@ export const make = (options: IssueOptions = {}) =>
                 q.putIssue({
                   id: issue.id,
                   title: issue.title,
-                  description: issue.description ?? "",
+                  description: issue.description,
                   project: nullText(issue.project),
                   assignee: nullText(issue.assignee),
                   priority: issue.priority,

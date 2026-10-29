@@ -42,7 +42,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
         {(m) => (
           <Show when={m().deleted === undefined} fallback={<span class="italic">{t("web.channel.messages.replyGone")}</span>}>
             <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
-            <span class="min-w-0 truncate">{m().text || list(m().attachments.map((a) => a.name) ?? [])}</span>
+            <span class="min-w-0 truncate">{m().text || list(m().attachments.map((a) => a.name))}</span>
           </Show>
         )}
       </Show>
@@ -558,7 +558,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
       <Show when={m()}>
         {(said) => (
           <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</span>}>
-            <span class="line-clamp-3 text-sm">{said().text || list(said().attachments.map((a) => a.name) ?? [])}</span>
+            <span class="line-clamp-3 text-sm">{said().text || list(said().attachments.map((a) => a.name))}</span>
           </Show>
         )}
       </Show>

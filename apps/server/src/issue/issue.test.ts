@@ -455,6 +455,7 @@ describe("issues", () => {
         state: "draft",
         parallel: 1,
         createdAt: 0,
+        note: "",
         tasks: [freshTask({ id: "a", title: "first", brief: "first" }), freshTask({ id: "b", title: "second", brief: "second", needs: ["a"] })],
         ...graphView(),
       };

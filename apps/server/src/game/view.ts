@@ -56,7 +56,7 @@ function growth(h: Session): Crop {
   const play = playOf(h);
   const since = play.runStartedAt ?? h.hiredAt;
   let crop: Crop = "sprout";
-  for (const step of play.history ?? []) {
+  for (const step of play.history) {
     if (step.at < since) continue;
     if (step.action === "edit_file" && crop === "sprout") crop = "leafy";
     else if (step.action === "run_command" && crop === "leafy") crop = "flowering";
@@ -215,7 +215,7 @@ function standingsOf(p: Progress | undefined): AchievementStanding[] {
   return achievements().map((a) => {
     const s: AchievementStanding = { id: a.id, tier: 0, count: 0 };
     if (p) {
-      s.count = p.counts?.[a.id] ?? 0;
+      s.count = p.counts[a.id] ?? 0;
       for (const u of p.unlocked) if (u.id === a.id && u.tier > s.tier) s.tier = u.tier;
     }
     const next = a.tiers[s.tier];

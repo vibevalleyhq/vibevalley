@@ -31,7 +31,7 @@ export function createTypeahead() {
     timer = setTimeout(() => (typed = ""), typeaheadMs);
     const items = itemsIn(root, item);
     const at = typeahead(
-      items.map((el) => el.dataset.label ?? el.textContent ?? ""),
+      items.map((el) => el.dataset.label ?? el.textContent),
       items.indexOf(document.activeElement as HTMLElement),
       typed,
       (i) => !disabled(items[i]!),

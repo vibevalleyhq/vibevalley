@@ -17,7 +17,7 @@ export interface PhoneLogEntry {
 export interface PhoneState {
   readonly calls: readonly InboxItem[];
   readonly handled: ReadonlySet<string>;
-  readonly ringing: InboxItem | null;
+  readonly ringing: InboxItem | undefined;
   readonly log: readonly PhoneLogEntry[];
 }
 
@@ -40,7 +40,7 @@ export interface PhoneHost {
 }
 
 export class PhoneCalls {
-  private state: PhoneState = { calls: [], handled: new Set(), ringing: null, log: [] };
+  private state: PhoneState = { calls: [], handled: new Set(), ringing: undefined, log: [] };
   private readonly listeners = new Set<() => void>();
   /** undefined until the first look, which rings nothing. */
   private known: Set<string> | undefined;
@@ -105,7 +105,7 @@ export class PhoneCalls {
   private endRing() {
     this.stopBell();
     if (!this.state.ringing) return;
-    this.set({ ringing: null });
+    this.set({ ringing: undefined });
     if (this.openedByRing) {
       this.openedByRing = false;
       this.host.setOpen(false);
@@ -115,7 +115,7 @@ export class PhoneCalls {
   silence() {
     this.stopBell();
     this.openedByRing = false;
-    if (this.state.ringing) this.set({ ringing: null });
+    if (this.state.ringing) this.set({ ringing: undefined });
   }
 
   settle(call: InboxItem, answered: boolean) {
@@ -134,7 +134,7 @@ export class PhoneCalls {
   putAway() {
     this.openedByRing = false;
     this.stopBell();
-    if (this.state.ringing) this.set({ ringing: null });
+    if (this.state.ringing) this.set({ ringing: undefined });
   }
 }
 

@@ -52,7 +52,7 @@ export function nextRun(s: Cron): number | undefined {
     case "daily":
       return daily(from, w.time, [], s.tz);
     case "weekly":
-      return daily(from, w.time, w.days ?? [], s.tz);
+      return daily(from, w.time, w.days, s.tz);
     case "cron":
       return cronNext(from, w.expr, s.tz);
   }
@@ -85,7 +85,7 @@ export function whenText(when: CronWhen, tz: string): string {
     case "daily":
       return t("server.cron.when.daily", { time: when.time });
     case "weekly": {
-      const days = [...new Set(when.days ?? [])].sort((a, b) => a - b);
+      const days = [...new Set(when.days)].sort((a, b) => a - b);
       return t("server.cron.when.weekly", { days: list(days.map((d) => (d >= 0 && d < 7 ? weekday(d) : String(d)))), time: when.time });
     }
     case "cron":

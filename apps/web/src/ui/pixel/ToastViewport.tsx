@@ -49,7 +49,7 @@ export function ToastViewport(props: {
 
 function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; leading?: JSX.Element; kicker?: string | undefined; onClose: () => void }) {
   const [drag, setDrag] = createSignal({ x: 0, y: 0 });
-  let from: { x: number; y: number } | null = null;
+  let from: { x: number; y: number } | undefined = undefined;
   const front = () => props.index === 0 && !props.hidden;
   return (
     <div
@@ -74,12 +74,12 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
         if (from) setDrag({ x: Math.max(0, e.clientX - from.x), y: Math.max(0, e.clientY - from.y) });
       }}
       onPointerUp={() => {
-        from = null;
+        from = undefined;
         if (drag().x > 40 || drag().y > 40) props.onClose();
         else setDrag({ x: 0, y: 0 });
       }}
       onPointerCancel={() => {
-        from = null;
+        from = undefined;
         setDrag({ x: 0, y: 0 });
       }}
     >

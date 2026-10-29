@@ -59,26 +59,26 @@ export interface FarmUi {
   readonly overlays: readonly FarmOverlay[];
   readonly tool: Tool;
   /** The bed and the yard place (YardPlace id) under the pointer, set by the canvas. */
-  readonly hoverBed: number | null;
-  readonly hoverSpot: string | null;
+  readonly hoverBed: number | undefined;
+  readonly hoverSpot: string | undefined;
   /** Held Alt (or the first visit): every name tag shows. */
   readonly revealNames: boolean;
   /** The phone is unfolded, its right screen the chat; folded whenever the phone is put away, so it opens folded. */
   readonly chatOpen: boolean;
   readonly chatLarge: boolean;
-  /** The channel the chat shows: null is the general channel, else a thread's or channel's id. */
-  readonly chatShown: string | null;
+  /** The channel the chat shows: undefined is the general channel, else a thread's or channel's id. */
+  readonly chatShown: string | undefined;
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
   /** The task graph the task board shows; null is the newest still open. */
-  readonly graphShown: string | null;
+  readonly graphShown: string | undefined;
   readonly titleOpen: boolean;
   readonly bedFx: readonly BedFx[];
   /** Rewards shown in the FX layer for a few seconds each. */
   readonly rewards: readonly GameEffectReward[];
-  readonly screen: VillageScreen | null;
+  readonly screen: VillageScreen | undefined;
   /** The project whose farm is on the page ("" for the sessions without one), and the one `/` opens next; this machine's. */
-  readonly project: string | null;
+  readonly project: string | undefined;
 }
 
 const titleSeenKey = "vibevalley.title.seen";
@@ -87,9 +87,9 @@ const projectKey = "vibevalley.farm.project";
 
 const savedProject = () => {
   try {
-    return localStorage.getItem(projectKey);
+    return localStorage.getItem(projectKey) ?? undefined;
   } catch {
-    return null;
+    return undefined;
   }
 };
 
@@ -104,19 +104,19 @@ const titleSeen = () => {
 let state: FarmUi = {
   overlays: [],
   tool: "hand",
-  hoverBed: null,
-  hoverSpot: null,
+  hoverBed: undefined,
+  hoverSpot: undefined,
   revealNames: false,
   chatOpen: false,
   chatLarge: false,
-  chatShown: null,
+  chatShown: undefined,
   phoneOpen: false,
   friendsOpen: false,
-  graphShown: null,
+  graphShown: undefined,
   titleOpen: !titleSeen(),
   bedFx: [],
   rewards: [],
-  screen: null,
+  screen: undefined,
   project: savedProject(),
 };
 
@@ -136,7 +136,7 @@ export const subscribeFarm = (l: () => void) => {
   return () => listeners.delete(l);
 };
 
-const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | null) =>
+const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | undefined) =>
   set((s) => ({
     overlays: [...s.overlays.filter((o) => o.kind !== kind), ...(next ? [next] : [])].sort((a, b) => overlayOrder[a.kind] - overlayOrder[b.kind]),
   }));
@@ -152,32 +152,32 @@ export const clock = dayClock({ daySeconds: 600, start: 0.42 });
 
 export const farm = {
   /** Opens a plot's issue (null closes it). */
-  select: (sessionId: string | null) => replace("inspect", sessionId === null ? null : { kind: "inspect", sessionId }),
-  review: (sessionId: string | null) => replace("review", sessionId === null ? null : { kind: "review", sessionId }),
-  sow: (station: number | null) => replace("sow", station === null ? null : { kind: "sow", station }),
-  water: (sessionId: string | null) => replace("water", sessionId === null ? null : { kind: "water", sessionId }),
-  panel: (panel: FarmPanel | null) => replace("panel", panel === null ? null : { kind: "panel", panel }),
-  menu: (open: boolean) => replace("menu", open ? { kind: "menu" } : null),
+  select: (sessionId: string | undefined) => replace("inspect", sessionId === undefined ? undefined : { kind: "inspect", sessionId }),
+  review: (sessionId: string | undefined) => replace("review", sessionId === undefined ? undefined : { kind: "review", sessionId }),
+  sow: (station: number | undefined) => replace("sow", station === undefined ? undefined : { kind: "sow", station }),
+  water: (sessionId: string | undefined) => replace("water", sessionId === undefined ? undefined : { kind: "water", sessionId }),
+  panel: (panel: FarmPanel | undefined) => replace("panel", panel === undefined ? undefined : { kind: "panel", panel }),
+  menu: (open: boolean) => replace("menu", open ? { kind: "menu" } : undefined),
   /** Closes the top layer; false when none was open. */
   closeTop: () => {
     const top = state.overlays.at(-1);
     if (!top) return false;
-    replace(top.kind, null);
+    replace(top.kind, undefined);
     return true;
   },
   openTaskBoard: (graph?: string) => {
     if (graph) set({ graphShown: graph });
     replace("panel", { kind: "panel", panel: "taskBoard" });
   },
-  showGraph: (graph: string | null) => set({ graphShown: graph }),
+  showGraph: (graph: string | undefined) => set({ graphShown: graph }),
   hold: (tool: Tool) => set({ tool }),
-  hover: (bed: number | null, spot: string | null) => set({ hoverBed: bed, hoverSpot: spot }),
+  hover: (bed: number | undefined, spot: string | undefined) => set({ hoverBed: bed, hoverSpot: spot }),
   revealNames: (on: boolean) => set({ revealNames: on }),
   /** Unfolds the phone (taking it out) or folds it. */
   chatOpen: (open: boolean) => set(open ? { chatOpen: true, phoneOpen: true } : { chatOpen: false }),
   chatLarge: (large: boolean) => set({ chatLarge: large }),
   /** Shows a channel in the chat: the phone comes out unfolded. */
-  showChat: (channel: string | null) => set({ chatShown: channel, chatOpen: true, phoneOpen: true }),
+  showChat: (channel: string | undefined) => set({ chatShown: channel, chatOpen: true, phoneOpen: true }),
   phoneOpen: (open: boolean) => set(open ? { phoneOpen: true } : { phoneOpen: false, chatOpen: false }),
   friendsOpen: (open: boolean) => set({ friendsOpen: open }),
   /** Leaves the title screen; it does not show again on this machine. */
@@ -200,7 +200,7 @@ export const farm = {
     set((s) => ({ rewards: [...s.rewards, r] }));
     setTimeout(() => set((s) => ({ rewards: s.rewards.filter((x) => x !== r) })), rewardLinger);
   },
-  setScreen: (screen: VillageScreen | null) => set({ screen }),
+  setScreen: (screen: VillageScreen | undefined) => set({ screen }),
   setProject: (project: string) => {
     set({ project });
     try {
@@ -216,17 +216,17 @@ export function resetFarm() {
   set({
     overlays: [],
     tool: "hand",
-    hoverBed: null,
-    hoverSpot: null,
+    hoverBed: undefined,
+    hoverSpot: undefined,
     revealNames: false,
     chatOpen: false,
     chatLarge: false,
-    chatShown: null,
+    chatShown: undefined,
     phoneOpen: false,
     friendsOpen: false,
-    graphShown: null,
+    graphShown: undefined,
     bedFx: [],
     rewards: [],
-    screen: null,
+    screen: undefined,
   });
 }

@@ -2,9 +2,10 @@ import { expect, test } from "vite-plus/test";
 import type { Channel, OrchestratorState, WorkspaceState } from "@vibevalley/protocol";
 import { archivedOf, groupsOf, linkedMessages, messagePath, orchestratorTyping, pointedAt, switchTargets, threadsIn, topsOf } from "./rules";
 
-const at = (id: string): Channel => ({ id, type: "channel", default: false, replies: 0, at: 0 });
+const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
 const state = (orchestrator: OrchestratorState, where?: string): WorkspaceState => ({
   call: "idle",
+  callReason: "",
   orchestrators: { orchestrator: { state: orchestrator, ...(where ? { channel: where } : {}) } },
   sessions: [],
   crons: [],
@@ -21,6 +22,7 @@ test("the orchestrator's dots show only in the channel it thinks or writes in", 
   expect(orchestratorTyping(undefined, at("c1"))).toBeUndefined();
   const two: WorkspaceState = {
     call: "idle",
+    callReason: "",
     sessions: [],
     orchestrators: { orchestrator: { state: "listening" }, lead: { state: "speaking", channel: "c2" } },
     crons: [],
@@ -30,6 +32,7 @@ test("the orchestrator's dots show only in the channel it thinks or writes in", 
   expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking" }]);
   const since: WorkspaceState = {
     call: "idle",
+    callReason: "",
     sessions: [],
     orchestrators: { lead: { state: "thinking", channel: "c2", since: 1_000 } },
     crons: [],

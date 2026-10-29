@@ -43,7 +43,7 @@ function withWords(state: WorkspaceState): WorkspaceState {
         const out = { ...h, phaseText: phaseWords(h) };
         // The phase and the play are the state's: changed on copies.
         if (h.phase._tag === "working") out.phase = { ...h.phase, doing: { ...h.phase.doing, actionText: t(`shared.action.${h.phase.doing.action}`) } };
-        if (h.play && (h.play.history ?? []).length > 0)
+        if (h.play && h.play.history.length > 0)
           out.play = { ...h.play, history: h.play.history.map((s) => ({ ...s, actionText: t(`shared.action.${s.action}`) })) };
         return out;
       }),

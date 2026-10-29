@@ -53,7 +53,7 @@ export function useIslands(): () => Island[] {
   const frames = useFrames();
   const projects = useProjects();
   return createMemo(() =>
-    islandsOf({ projects: ready(projects, []), sessions: core()?.sessions ?? [], plots: frames.frame?.view?.plots ?? {}, issues: core()?.issues ?? [] }),
+    islandsOf({ projects: ready(projects, []), sessions: core()?.sessions ?? [], plots: frames.frame?.view.plots ?? {}, issues: core()?.issues ?? [] }),
   );
 }
 

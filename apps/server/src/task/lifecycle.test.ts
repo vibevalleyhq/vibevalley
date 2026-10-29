@@ -48,6 +48,7 @@ describe("a task's workplace", () => {
         parallel: 1,
         createdAt: Date.now(),
         tasks: [freshTask({ id: "only", title: "one step", brief: "write fixed work", agent: "lab", check: "test -f fixed.txt" })],
+        note: "",
         ...graphView(),
       });
       yield* tasks.act("p1", "start", owner);
@@ -104,6 +105,7 @@ describe("a task's workplace", () => {
             check: `test ! -e unchecked.txt && touch '${started}' && while [ ! -e '${release}' ]; do sleep 0.01; done`,
           }),
         ],
+        note: "",
         ...graphView(),
       });
       yield* Effect.addFinalizer(() => Effect.sync(() => writeFileSync(release, "release\n")));

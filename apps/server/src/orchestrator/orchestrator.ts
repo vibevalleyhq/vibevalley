@@ -359,7 +359,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       Effect.gen(function* () {
         const channel = yield* chat.topOf(w.channel);
         const again = w.said ? lineWords.again(w.said) : "";
-        let line = lineWords.issue(w.issue.title, w.issue.description ?? "", again, channel.name);
+        let line = lineWords.issue(w.issue.title, w.issue.description, again, channel.name);
         const s = w.cron;
         if (s) {
           const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";

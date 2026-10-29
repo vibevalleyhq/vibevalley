@@ -120,15 +120,15 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   const out: Delivery[] = [];
   if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken) return out;
   const byAgent = i.fromKind === "session" || i.fromKind === "orchestrator";
-  const present = i.present ?? i.sessions ?? [];
+  const present = i.present ?? i.sessions;
   let hops = i.hops;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
     if (recipient === i.from || out.some((d) => d.recipient === recipient)) return;
     if (!i.orchestrators.includes(recipient) && !present.includes(recipient)) return;
     let heldBy: HeldBy | undefined;
     if (wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
-    else if (wakes && byAgent && !i.orchestrators.includes(recipient) && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
-    else if (wakes && i.fromKind !== "owner" && (i.broken ?? []).includes(recipient)) heldBy = "wake_breaker";
+    else if (wakes && byAgent && !i.orchestrators.includes(recipient) && i.cooling.includes(recipient)) heldBy = "cooldown";
+    else if (wakes && i.fromKind !== "owner" && i.broken.includes(recipient)) heldBy = "wake_breaker";
     if (wakes && byAgent && !heldBy) hops++;
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
   };
@@ -148,17 +148,17 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   const mentions = i.mentions;
   for (const m of mentions) {
     if (m === everyone) {
-      if (i.fromKind === "owner") for (const h of i.sessions ?? []) add(h, "everyone", true);
+      if (i.fromKind === "owner") for (const h of i.sessions) add(h, "everyone", true);
     } else if (m !== ownerId) add(m, "mention", true);
   }
   const thread = i.channel.type === "thread";
   const owner = thread ? (i.threadOwner ?? "") : "";
   if (i.fromKind === "owner") {
     if (owner) add(owner, "own_thread", true);
-    if (thread) for (const f of i.followers ?? []) add(f, "follower", true);
+    if (thread) for (const f of i.followers) add(f, "follower", true);
     else {
       if (!mentions.some((m) => m !== ownerId)) add(i.orchestrator, "addressed", true);
-      for (const h of i.sessions ?? []) add(h, "channel", false);
+      for (const h of i.sessions) add(h, "channel", false);
     }
   } else if (owner) add(owner, "own_thread", true);
   return out;

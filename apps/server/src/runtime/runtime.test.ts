@@ -1,4 +1,5 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { sampleAgent } from "@/testing/agents.ts";
 import { tempDir } from "@vibevalley/testkit/temp";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -30,6 +31,7 @@ const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {
   });
 
 const notFound = async (id: string): Promise<RuntimeInfo> => ({
+  stop: "",
   id,
   preset: presetOf(id),
   facts: factsOf(id),
@@ -52,7 +54,7 @@ const world = (config: ServerConfig["Service"] = testConfig()) =>
 /** A runtime service over the given runtimes, never asking this machine's. */
 const runtimes = (options: RuntimeOptions = {}) => make({ background: false, probe: notFound, usageOf: async () => null, ...options });
 
-const agent = (a: Partial<Agent>): Agent => ({ id: "a", name: "小禾", runtime: "pi", enabled: true, ...a }) as Agent;
+const agent = (a: Partial<Agent>): Agent => sampleAgent({ id: "a", name: "小禾", ...a });
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -568,7 +570,7 @@ describe("runtime", () => {
       yield* r.refresh("pi");
       r.setSpent({ day: "2000-01-01", byRuntime: { pi: 12 } });
       const got = yield* r.info("pi");
-      expect([got!.spentToday, got!.stop]).toEqual([undefined, undefined]);
+      expect([got!.spentToday, got!.stop]).toEqual([undefined, ""]);
       r.spend("pi", 3);
       expect((yield* r.info("pi"))!.spentToday).toBe(3);
       r.spend("pi", 9);

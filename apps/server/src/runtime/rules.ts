@@ -16,7 +16,7 @@ function whenText(at: number): string {
 }
 
 /** Why a runtime takes no work now because of money (quota gone, balance gone, the day's budget spent); "" when it does. */
-export function moneyStop(info: RuntimeInfo | null | undefined): string {
+export function moneyStop(info: RuntimeInfo | undefined): string {
   if (!info) return "";
   const u = info.usage;
   if (u?.status === "ok") {
@@ -35,14 +35,14 @@ export function moneyStop(info: RuntimeInfo | null | undefined): string {
 }
 
 /** The least left of any window, 0 at the least; undefined when the usage has no windows. */
-export function quotaLeft(usage: AccountUsage | null | undefined): number | undefined {
+export function quotaLeft(usage: AccountUsage | null): number | undefined {
   if (usage?.status !== "ok" || usage.windows.length === 0) return undefined;
   return Math.max(0, Math.min(...usage.windows.map((w) => 100 - w.usedPercent)));
 }
 
 const balanceText = (currency: string, amount: number) => (currency === "CNY" ? "¥" : currency === "USD" ? "$" : currency + " ") + amount.toFixed(2);
 
-export function quotaText(usage: AccountUsage | null | undefined): string {
+export function quotaText(usage: AccountUsage | null): string {
   if (!usage) return t("server.runtime.quota.none");
   switch (usage.status) {
     case "login_required":
@@ -64,7 +64,7 @@ export function quotaText(usage: AccountUsage | null | undefined): string {
 }
 
 /** What RuntimeInfo.quota says: the lowest window left, and in words. */
-export function quotaOf(usage: AccountUsage | null | undefined): RuntimeQuota {
+export function quotaOf(usage: AccountUsage | null): RuntimeQuota {
   const left = quotaLeft(usage);
   return { ...(left !== undefined ? { left } : {}), text: quotaText(usage) };
 }
@@ -72,7 +72,7 @@ export function quotaOf(usage: AccountUsage | null | undefined): RuntimeQuota {
 const blank = (s: string | undefined) => (s ?? "").trim() === "";
 
 /** Both the dispatch check and session opening validate these choices; availability and spending only gate new work. */
-export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefined, runtime: RuntimeInfo | null | undefined) {
+export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefined, runtime: RuntimeInfo | undefined) {
   const models = runtime?.models;
   const wanted = agent.model || settings?.defaultModel || "";
   const missingModel = wanted && models && !models.some((m) => m.id === wanted) ? wanted : "";
@@ -85,14 +85,14 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
   const problems: AgentProblem[] = [];
   const add = (field: string, level: AgentProblemLevel, text: string) => problems.push({ field, level, text });
   // The probed facts; seeds.json's for a runtime not probed.
-  const facts = runtime?.facts?.refused ? runtime.facts : factsOf(agent.runtime);
-  const refused = facts.refused ?? {};
+  const facts = runtime?.facts.refused ? runtime.facts : factsOf(agent.runtime);
+  const refused = facts.refused;
   const promptOption = agent.personaMode === "append" ? sessionAppendSystemPrompt : agent.personaMode === "replace" ? sessionSystemPrompt : "";
   if (!blank(agent.persona) && promptOption && refused[promptOption]) add("persona", "error", t("server.runtime.persona", { refused: refused[promptOption] }));
   if (options.effort && refused[sessionEffort]) add("effort", "error", refused[sessionEffort]);
   if (Object.keys(options.env).length > 0 && refused[sessionEnv]) add("env", "error", refused[sessionEnv]);
-  if ((agent.mcpServers ?? []).length > 0 && refused[sessionMcpServers]) add("mcpServers", "error", refused[sessionMcpServers]);
-  if ((agent.disallowedTools ?? []).length > 0 && refused[sessionDisallowedTools]) add("disallowedTools", "error", refused[sessionDisallowedTools]);
+  if (agent.mcpServers.length > 0 && refused[sessionMcpServers]) add("mcpServers", "error", refused[sessionMcpServers]);
+  if (agent.disallowedTools.length > 0 && refused[sessionDisallowedTools]) add("disallowedTools", "error", refused[sessionDisallowedTools]);
   if (runtime && options.missingModel) add("model", "warn", t("server.runtime.noModel", { runtime: runtime.id, model: options.missingModel }));
   if (runtime && models && options.effort) {
     const model = models.find((m) => (options.model ? m.id === options.model : m.isDefault));
@@ -105,7 +105,7 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
 }
 
 /** The profile's problems against its runtime as it is now; errors stop it being sent. */
-export function agentProblems(agent: Agent, runtime: RuntimeInfo | null | undefined): AgentProblem[] {
+export function agentProblems(agent: Agent, runtime: RuntimeInfo | undefined): AgentProblem[] {
   const problems: AgentProblem[] = [];
   const add = (text: string) => problems.push({ field: "runtime", level: "error", text });
   if (!runtime) add(t("server.runtime.unknownRuntime", { runtime: agent.runtime }));
@@ -136,7 +136,7 @@ export function chooseAgent(candidates: readonly Candidate[], task: string, name
   let bestScore = -1;
   for (const c of candidates) {
     if (!c.usable) continue;
-    const score = (c.agent.tags ?? []).filter((item) => text.includes(item.toLowerCase())).length;
+    const score = c.agent.tags.filter((item) => text.includes(item.toLowerCase())).length;
     if (score > bestScore) {
       best = c.agent;
       bestScore = score;

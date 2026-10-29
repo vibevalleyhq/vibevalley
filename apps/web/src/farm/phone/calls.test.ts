@@ -10,7 +10,7 @@ const call = (id: string): InboxItem => ({
   text: "做完了",
   at: 0,
   target: { kind: "session", id: "s1" },
-  words: { label: "活熟了", title: "阿狐 做完了", body: "做完了" },
+  words: { label: "活熟了", title: "阿狐 做完了", body: "做完了", tray: "" },
 });
 
 /** A phone on a hand-turned clock. */
@@ -57,14 +57,14 @@ test("the first look rings nothing; a new call rings, opens the phone, and gives
   const { calls, host, rings, wait } = phone();
   calls.resume();
   calls.calls([call("a")]);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   expect(missedOf(calls.get()).map((c) => c.id)).toEqual(["a"]);
   calls.calls([call("a"), call("b")]);
   expect(calls.get().ringing?.id).toBe("b");
   expect(host.open).toBe(true);
   wait(ringFor);
   expect(rings).toEqual([0, ...Array.from({ length: ringFor / ringEvery }, (_, i) => (i + 1) * ringEvery)]);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   expect(host.open).toBe(false);
   expect(missedOf(calls.get()).map((c) => c.id)).toEqual(["a", "b"]);
 });
@@ -76,7 +76,7 @@ test("a call answered elsewhere stops ringing; one already open stays open", () 
   calls.calls([call("a")]);
   expect(calls.get().ringing?.id).toBe("a");
   calls.calls([]);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   expect(host.open).toBe(true);
 });
 
@@ -86,7 +86,7 @@ test("answering logs the call, takes it off the missed and keeps the phone out; 
   calls.calls([]);
   calls.calls([call("a"), call("b")]);
   calls.settle(call("a"), true);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   expect(host.open).toBe(true);
   calls.settle(call("b"), false);
   expect(missedOf(calls.get())).toEqual([]);
@@ -102,10 +102,10 @@ test("nothing rings while the farm is away, and coming back primes again", () =>
   calls.calls([]);
   calls.pause();
   calls.calls([call("a")]);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   calls.resume();
   calls.calls([call("a")]);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   calls.calls([call("a"), call("b")]);
   expect(calls.get().ringing?.id).toBe("b");
 });
@@ -116,7 +116,7 @@ test("on a call nothing rings: the orchestrator says it there, and the call wait
   calls.calls([]);
   host.talking = true;
   calls.calls([call("a")]);
-  expect(calls.get().ringing).toBeNull();
+  expect(calls.get().ringing).toBeUndefined();
   expect(rings).toEqual([]);
   expect(missedOf(calls.get()).map((c) => c.id)).toEqual(["a"]);
   host.talking = false;

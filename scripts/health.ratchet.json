@@ -125,7 +125,7 @@
     "lintOff": 0
   },
   "web: farm": {
-    "nonNull": 77,
+    "nonNull": 74,
     "doubleCast": 0,
     "lintOff": 0
   },
@@ -135,7 +135,7 @@
     "lintOff": 0
   },
   "web: features/artifact": {
-    "nonNull": 10,
+    "nonNull": 8,
     "doubleCast": 0,
     "lintOff": 0
   },

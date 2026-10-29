@@ -67,7 +67,7 @@ interface Recording {
 
 export class Dictation {
   phase: DictationPhase = "idle";
-  problem: string | undefined = undefined;
+  problem = "";
   version = 0;
   private recording: Recording | undefined = undefined;
   /** The field it was started from: the words go there, or nowhere once it is gone. */
@@ -79,9 +79,10 @@ export class Dictation {
     return () => this.listeners.delete(f);
   };
 
-  private set(phase: DictationPhase, problem?: string | null) {
+  /** problem: "" clears it; left out, it stays. */
+  private set(phase: DictationPhase, problem?: string) {
     this.phase = phase;
-    if (problem !== undefined) this.problem = problem ?? undefined;
+    if (problem !== undefined) this.problem = problem;
     this.version++;
     for (const f of this.listeners) f();
   }
@@ -91,7 +92,7 @@ export class Dictation {
     if (this.phase === "transcribing") return;
     if (this.phase === "recording") return this.finish();
     this.owner = owner;
-    this.set("recording", null);
+    this.set("recording", "");
     let stream: MediaStream | undefined;
     let context: AudioContext | undefined;
     const drop = () => {
@@ -154,7 +155,7 @@ export class Dictation {
       if (all.length === 0) throw new Error(t("web.voice.dictation.nothing"));
       const said = await api.voice.dictate({ audio: base64Of(wavOf(all)), format: "wav" });
       if (this.owner === owner && said.text) r.onWords(said.text);
-      this.set("idle", null);
+      this.set("idle", "");
     } catch (e) {
       this.set("idle", reasonOf(e));
     } finally {

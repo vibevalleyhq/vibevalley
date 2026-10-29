@@ -8,7 +8,7 @@ import { unreadTotal } from "@/features/channel";
 /** The tray's title (working helpers, calls waiting) and its lines. */
 export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]): TraySummary {
   const working = state.sessions.filter((h) => h.phase._tag === "working").length;
-  const waiting = inbox.flatMap((c) => c.words.tray ?? []);
+  const waiting = inbox.flatMap((c) => (c.words.tray ? [c.words.tray] : []));
   const unread = unreadTotal(state.chat);
   const lines = [
     state.call === "live" ? (working > 0 ? t("web.notice.tray.working", { n: working }) : t("web.notice.tray.idle")) : t("web.notice.tray.off"),

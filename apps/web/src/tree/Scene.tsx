@@ -87,7 +87,7 @@ export function Scene(props: {
   until: number;
   sky: boolean;
   area: SceneArea;
-  onHover: (hover: SceneHover | null) => void;
+  onHover: (hover: SceneHover | undefined) => void;
   onPick: (item: MemoryItem) => void;
 }) {
   let canvas!: HTMLCanvasElement;
@@ -560,7 +560,7 @@ export function Scene(props: {
       if (best?.item.id === hovered) return;
       hovered = best?.item.id;
       light(props.sky ? hovered : undefined);
-      props.onHover(best ? { item: best.item, x: e.clientX, y: e.clientY } : null);
+      props.onHover(best ? { item: best.item, x: e.clientX, y: e.clientY } : undefined);
     };
     const up = (e: PointerEvent) => {
       const moved = drag?.moved;
@@ -572,7 +572,7 @@ export function Scene(props: {
     const leave = () => {
       hovered = undefined;
       lit = undefined;
-      props.onHover(null);
+      props.onHover(undefined);
     };
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);

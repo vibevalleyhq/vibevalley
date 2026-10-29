@@ -18,13 +18,13 @@ export interface BugSnake {
   readonly grow: number;
   readonly food: number;
   /** With the ticks before it flies off. */
-  readonly bug: number | null;
+  readonly bug: number | undefined;
   readonly bugLeft: number;
   readonly eaten: number;
   readonly bugs: number;
   readonly score: number;
   readonly seed: number;
-  readonly over: BugSnakeEnd | null;
+  readonly over: BugSnakeEnd | undefined;
 }
 
 export const seedPoints = 10;
@@ -50,20 +50,20 @@ export function newBugSnake(seed: number): BugSnake {
   const row = Math.floor(bugSnakeHeight / 2) * bugSnakeWidth;
   const body = [row + 5, row + 4, row + 3];
   const [food, s] = place(body, seed);
-  return { body, heading: "right", turns: [], grow: 0, food, bug: null, bugLeft: 0, eaten: 0, bugs: 0, score: 0, seed: s, over: null };
+  return { body, heading: "right", turns: [], grow: 0, food, bug: undefined, bugLeft: 0, eaten: 0, bugs: 0, score: 0, seed: s, over: undefined };
 }
 
 export const bugSnakeStepMs = (g: BugSnake) => Math.max(80, 200 - (g.body.length - 3) * 4);
 
 /** Turning back onto itself, or the way it already goes, is ignored. */
 export function steerBugSnake(g: BugSnake, to: SnakeHeading): BugSnake {
-  if (g.over !== null || g.turns.length >= maxTurns) return g;
+  if (g.over !== undefined || g.turns.length >= maxTurns) return g;
   const last = g.turns.at(-1) ?? g.heading;
   return to === last || to === opposite[last] ? g : { ...g, turns: [...g.turns, to] };
 }
 
 export function crawlBugSnake(g: BugSnake): BugSnake {
-  if (g.over !== null) return g;
+  if (g.over !== undefined) return g;
   const heading = g.turns[0] ?? g.heading;
   const turns = g.turns.slice(1);
   const head = g.body[0]!;
@@ -77,22 +77,22 @@ export function crawlBugSnake(g: BugSnake): BugSnake {
   const body = [to, ...kept];
   let { grow, food, bug, bugLeft, eaten, bugs, score, seed } = g;
   if (grow > 0) grow--;
-  if (bug !== null && to === bug) {
+  if (bug !== undefined && to === bug) {
     score += bugPoints + bugLeft;
     grow += 2;
     bugs++;
-    [bug, bugLeft] = [null, 0];
-  } else if (bug !== null && --bugLeft <= 0) {
-    [bug, bugLeft] = [null, 0];
+    [bug, bugLeft] = [undefined, 0];
+  } else if (bug !== undefined && --bugLeft <= 0) {
+    [bug, bugLeft] = [undefined, 0];
   }
-  let over: BugSnakeEnd | null = null;
+  let over: BugSnakeEnd | undefined = undefined;
   if (to === food) {
     score += seedPoints;
     grow++;
     eaten++;
-    [food, seed] = place(bug === null ? body : [...body, bug], seed);
+    [food, seed] = place(bug === undefined ? body : [...body, bug], seed);
     if (food === -1) over = "full";
-    else if (eaten % bugEvery === 0 && bug === null) {
+    else if (eaten % bugEvery === 0 && bug === undefined) {
       const [landed, s] = place([...body, food], seed);
       seed = s;
       if (landed !== -1) [bug, bugLeft] = [landed, bugTicks];

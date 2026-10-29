@@ -207,7 +207,7 @@ export function AgentCard(props: {
       <div class="flex items-start gap-3">
         <span
           class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-hover"
-          style={{ background: `radial-gradient(70% 70% at 50% 70%, ${hexColor(props.agent.look.hat ?? "")}33, transparent), var(--color-hover)` }}
+          style={{ background: `radial-gradient(70% 70% at 50% 70%, ${hexColor(props.agent.look.hat)}33, transparent), var(--color-hover)` }}
         >
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={68} muted={!props.agent.enabled} />
         </span>

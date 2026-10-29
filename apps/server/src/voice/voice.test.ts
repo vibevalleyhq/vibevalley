@@ -210,6 +210,7 @@ const issueOf = (id: string, number: number, session: string) =>
     moves: [],
     findings: [],
     questions: [],
+    description: "",
     blockedBy: [],
     criteria: [],
     checks: [],

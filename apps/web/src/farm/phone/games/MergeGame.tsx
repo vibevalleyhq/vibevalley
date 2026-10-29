@@ -9,7 +9,7 @@ import { lcd } from "@/farm/phone/lcd";
 import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad } from "@/farm/support";
 
-const game = kept<Merge | null>(null);
+const game = kept<Merge | undefined>(undefined);
 const best = kept(0);
 
 /** 12×12: `#` ink, `+` dark, `o` mid, `.` light. */
@@ -206,7 +206,7 @@ export function MergeGame() {
   const [cheer, setCheer] = createSignal(false);
   /** A pressed mid-game: start over? */
   const [asking, setAsking] = createSignal(false);
-  let touch: { x: number; y: number } | null = null;
+  let touch: { x: number; y: number } | undefined = undefined;
 
   const start = () => {
     setG(newMerge(Math.floor(Math.random() * 2 ** 31)));
@@ -260,7 +260,7 @@ export function MergeGame() {
 
   const swiped = (x: number, y: number) => {
     const from = touch;
-    touch = null;
+    touch = undefined;
     if (!from) return;
     const dx = x - from.x;
     const dy = y - from.y;
@@ -285,7 +285,7 @@ export function MergeGame() {
           ? [t("web.farm.phone.merge.harvest"), t("web.farm.phone.merge.goOn")]
           : now.over
             ? [t("web.farm.phone.merge.full", { score: score() }), t("web.farm.phone.merge.overKeys")]
-            : null;
+            : undefined;
   };
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center gap-1.5 px-2 pt-2">
@@ -321,7 +321,7 @@ export function MergeGame() {
         }}
         onPointerDown={(e) => (touch = { x: e.clientX, y: e.clientY })}
         onPointerUp={(e) => swiped(e.clientX, e.clientY)}
-        onPointerCancel={() => (touch = null)}
+        onPointerCancel={() => (touch = undefined)}
       >
         <For each={board()} keyed={false}>
           {(stage, i) => (

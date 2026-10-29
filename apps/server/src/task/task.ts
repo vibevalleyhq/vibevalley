@@ -138,10 +138,7 @@ export class Tasks extends Context.Service<
   static readonly layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
 }
 
-const withNote = (graph: TaskGraph, note: string): TaskGraph => {
-  const { note: _, ...rest } = graph;
-  return note ? { ...rest, note } : rest;
-};
+const withNote = (graph: TaskGraph, note: string): TaskGraph => ({ ...graph, note });
 
 const unmanned = (n: Task): Task => {
   const { session: _, ...rest } = n;
@@ -225,7 +222,7 @@ export const make = (options: TaskOptions = {}) =>
           const detail = c.detail || why || undefined;
           const payload = {
             ...(c.session ? { session: c.session } : {}),
-            ...(detail ? { detail } : {}),
+            detail: detail ?? "",
             ...(c.changes && c.changes.length > 0 ? { changes: c.changes } : {}),
             ...(c.commits && c.commits.length > 0 ? { commits: c.commits } : {}),
           };
@@ -286,7 +283,7 @@ export const make = (options: TaskOptions = {}) =>
         yield* tell(session.id, graphTell.fixGraph(parsed.problems));
         return;
       }
-      const draft = withNote({ ...graph, ...(parsed.title ? { title: parsed.title } : {}), tasks: parsed.tasks, state: "draft" }, "");
+      const draft = withNote({ ...graph, title: parsed.title ?? "", tasks: parsed.tasks, state: "draft" }, "");
       yield* putSystem(draft);
       splitters.delete(graph.id);
       splitterTries.delete(graph.id);
@@ -540,6 +537,7 @@ export const make = (options: TaskOptions = {}) =>
           tasks: [],
           parallel: defaultParallel,
           createdAt: yield* Clock.currentTimeMillis,
+          note: "",
           ...graphView(),
         };
         yield* put(graph, by);
@@ -573,12 +571,13 @@ export const make = (options: TaskOptions = {}) =>
         let graph: TaskGraph = {
           id: issue!.id,
           title: title.trim() || issue!.title,
-          goal: issue!.description ?? "",
+          goal: issue!.description,
           project: issue!.project!,
           tasks,
           parallel: defaultParallel,
           createdAt: issue!.createdAt,
           state: "running",
+          note: "",
           ...graphView(),
         };
         const branch = yield* openBranch(graph, session!.branch ?? "");
@@ -737,10 +736,12 @@ export const make = (options: TaskOptions = {}) =>
             kind: row.kind as GraphEventKind,
             actor: row.actor as ActorKind,
             ...(p.session ? { session: p.session } : {}),
-            ...(p.detail ? { detail: p.detail } : {}),
+            detail: p.detail ?? "",
             changes: p.changes ?? [],
             commits: p.commits ?? [],
             at: row.created_at,
+            text: "",
+            actorText: "",
           };
           return [
             {

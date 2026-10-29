@@ -28,7 +28,7 @@ export function DictationButton(props: {
   return (
     <DictationMark
       state={off() ? "unset" : phase()}
-      problem={problem() ?? undefined}
+      problem={problem()}
       size={props.size}
       class={props.class}
       onClick={() =>

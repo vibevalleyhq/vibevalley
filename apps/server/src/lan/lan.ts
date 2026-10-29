@@ -343,8 +343,7 @@ export const make = (options: LanOptions = {}) =>
     });
 
     const status = (): LanStatus => {
-      const s: LanStatus = { open, hostName: hostName(), devices: [] };
-      if (problem) s.problem = problem;
+      const s: LanStatus = { open, hostName: hostName(), devices: [], problem };
       const addr = url();
       if (open && server) {
         if (!addr) s.problem = t("server.lan.noAddress");

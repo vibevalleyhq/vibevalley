@@ -24,7 +24,7 @@ const stepTone: Record<TaskState, Tone> = { waiting: "faint", working: "water", 
 /** A task (计划 on screen): an issue whose work is split into steps, each its own issue, run in the order their needs
  * allow. `stepIssues` is a step's own issue by the step's id, once a helper has worked it. */
 export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string, string>; onOpen: (id: string) => void }) {
-  const [said, setSaid] = createSignal<Answer | null>(null);
+  const [said, setSaid] = createSignal<Answer>();
   const [reviewing, setReviewing] = createSignal(false);
   const [abandoning, setAbandoning] = createSignal(false);
   const nameOf = useNameOf();
@@ -247,7 +247,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
 }
 
 /** A finished graph's changes before they go into the main branch: its commits and files, and the merge. */
-function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => void }) {
+function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | undefined) => void }) {
   const changes = useGraphChanges(() => props.graph.id);
   const merge = async () => {
     const id = props.graph.id;
@@ -263,7 +263,7 @@ function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => 
               {t("web.issue.changes.unreadable")}
               {reasonOf(changes.error)}
             </p>
-            <Button class="mt-2" onClick={() => props.onDone(null)}>
+            <Button class="mt-2" onClick={() => props.onDone(undefined)}>
               {t("web.issue.later")}
             </Button>
           </>
@@ -281,7 +281,7 @@ function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => 
               </Show>
               <ChangesBody changes={c()} />
               <div class="mt-2 flex justify-end gap-2">
-                <Button onClick={() => props.onDone(null)}>{t("web.issue.later")}</Button>
+                <Button onClick={() => props.onDone(undefined)}>{t("web.issue.later")}</Button>
                 <Button tone="primary" disabled={c().conflicts.length > 0} onClick={() => void merge()}>
                   {t("web.issue.task.merge", { base: c().base })}
                 </Button>

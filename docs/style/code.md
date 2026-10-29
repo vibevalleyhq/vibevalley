@@ -14,6 +14,22 @@
 - 对主人说的话写进词典（`packages/i18n/locales`），中英各一份，代码里写 `t("key")`；对模型说的写进 `prompts.ts`，用中文（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。用农场的叫法（[用语表](docs/README.md#用语)）。
 - 注释用英文。
 
+## 没有值
+
+「没有」只有一种写法在自己的代码里流动；外面带进来的 `null` 在进门处换掉。
+
+| 写法 | 什么时候 | 例子 |
+|---|---|---|
+| 必有的字段，给默认值 | 没有和「空」是一回事：列表 `[]`、表 `{}`、开关 `false`、说给人看的字 `""` | `mentions: []`、`description: ""`、`problem: ""`（`xProblem` 没问题就是 `""`） |
+| `x?: T`（不写） | 没有本身就是一种情况：没跑过就没有 `lastRun`，没连到别处就没有 `project`、`channel`；请求里不写就是不改；宿主没有这项本事就没有 `notify` | `lastRun?: LastRun`、`IssueUpdate.title?` |
+| `x: T \| undefined` | 内存里会被清空的状态（类的字段、一次运行的记录）；查找没找到 | `sess: OarSession \| undefined`、`Map.get` |
+| `null` | 只在外面说 `null` 的地方：库表的列（`db/generated`）、DOM 和浏览器的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
+
+- 不写 `T | null | undefined`：外面来的 `null` 在进门的那一处换成 `undefined`（`jsonOrNone`、`?? undefined`），里面只认一种。
+- 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、测试的黄金数据、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
+- 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。
+- 帧上那些由投影补的说法（`phaseText`、`whenText`、`stateText`）还挂在核心形状上、是可选的：该挪到帧自己的视图形状上，挪的时候改成必有的。
+
 ## 注释
 
 注释只写不看它就会写错或改错的东西。代码自己能说清楚的，不写。

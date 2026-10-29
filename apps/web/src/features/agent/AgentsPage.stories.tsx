@@ -27,6 +27,7 @@ const agent = (more: Partial<Agent> = {}): Agent => ({
 });
 
 const runtime = (installation: Installation): RuntimeInfo => ({
+  stop: "",
   id: "claude",
   preset: { id: "claude", label: "Claude Code", blurb: "", look },
   facts: { steer: true, refused: {}, capabilities: [], inProcess: false },

@@ -47,7 +47,7 @@ export function refinementBrief(
 ): string {
   word = word.trim();
   const questions = t.questions ?? [];
-  const criteria = t.criteria ?? [];
+  const criteria = t.criteria;
   const answering = word !== "" && questions.length > 0;
   const redraft = !!t.description || criteria.length > 0;
   const example = {

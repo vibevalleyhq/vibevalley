@@ -30,7 +30,7 @@ describe("an issue as a job", () => {
   it("title and job", () => {
     expect(splitBrief("\n  写打卡  \n\n细节在 README\n还有测试\n")).toEqual(["写打卡", "细节在 README\n还有测试"]);
     expect(issueBrief({ title: "写打卡", description: "细节在 README\n还有测试", criteria: [] })).toBe("写打卡\n\n细节在 README\n还有测试");
-    expect(issueBrief({ title: "只有标题", criteria: [] })).toBe("只有标题");
+    expect(issueBrief({ title: "只有标题", description: "", criteria: [] })).toBe("只有标题");
     expect(splitBrief("  ")).toEqual(["", ""]);
   });
 
@@ -39,7 +39,7 @@ describe("an issue as a job", () => {
     expect(job.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n主人觉得最近慢了\n\n")).toBe(true);
     expect(job).toContain('"conclusion"');
     expect(job).toContain('"evidence"');
-    expect(issueBrief({ title: "写打卡", deliver: "change", criteria: [] })).toBe("写打卡");
+    expect(issueBrief({ title: "写打卡", description: "", deliver: "change", criteria: [] })).toBe("写打卡");
   });
 
   it("a job written as one long line keeps a short title and all of it as the description", () => {
@@ -60,6 +60,7 @@ describe("an issue as a job", () => {
       moves: [],
       findings: [{ id: "f1", text: "少了测试", at: 400, resolved: false }],
       questions: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
+      description: "",
       blockedBy: [],
       criteria: [],
       checks: [],
@@ -145,7 +146,7 @@ describe("drafts", () => {
   });
 
   it("briefs", () => {
-    const first = refinementBrief({ title: "新工单", criteria: [] }, "看板拖卡还在调旧接口", "board");
+    const first = refinementBrief({ title: "新工单", description: "", criteria: [] }, "看板拖卡还在调旧接口", "board");
     for (const want of [refinementOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："])
       expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");

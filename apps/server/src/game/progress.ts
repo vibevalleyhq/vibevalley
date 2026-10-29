@@ -92,7 +92,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       if (entry.runs <= 1 && !told && !failed) counts = bump(counts, "first_try", 1);
       if (seen.conflicted.includes(entry.session)) counts = bump(counts, "untangle", 1);
       if (failed) counts = bump(counts, "comeback", 1);
-      if (entry.cny !== undefined && entry.cny !== null && entry.cny < cheapCNY) counts = bump(counts, "thrifty", 1);
+      if (entry.cny !== undefined && entry.cny < cheapCNY) counts = bump(counts, "thrifty", 1);
       if (seen.reviewed.includes(entry.session)) counts = atLeast(counts, "s_review", 1);
       seen = { ...seen, runtimes: added(seen.runtimes, entry.runtime) };
       counts = { ...counts, every_machine: seen.runtimes.length };
@@ -181,7 +181,7 @@ const fullHouse = 6;
 const working = (state: WorkspaceState) => state.sessions.filter((h) => h.phase._tag === "working").length;
 
 function graphEntry(graph: TaskGraph): Entry {
-  const merged = new Set((graph.tasks ?? []).filter((n) => n.state === "merged").map((n) => n.id));
+  const merged = new Set(graph.tasks.filter((n) => n.state === "merged").map((n) => n.id));
   const parallel = layersOf(graph.tasks).some((layer) => layer.filter((id) => merged.has(id)).length >= 2);
   return { kind: "graph", graph: graph.id, merged: merged.size, parallel };
 }
@@ -227,7 +227,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           project: h.project ?? "",
           runtime: h.runtime,
           commits: fact.merged,
-          ...(h.spent?.cny !== undefined && h.spent.cny !== null ? { cny: h.spent.cny } : {}),
+          ...(h.spent?.cny !== undefined ? { cny: h.spent.cny } : {}),
           runs: h.runs,
         });
       break;

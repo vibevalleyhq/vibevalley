@@ -87,7 +87,7 @@ export function VillageCanvas() {
         setDrawn(false);
         delete host.dataset.ready;
         stopFit();
-        if (farmState().screen) farm.setScreen(null);
+        if (farmState().screen) farm.setScreen(undefined);
         scene?.destroy();
       };
     },
@@ -104,7 +104,7 @@ export function VillageCanvas() {
       let pressed = false;
       const apply = () => {
         const s = farmState();
-        const bed = s.hoverBed === null ? undefined : beds[s.hoverBed];
+        const bed = s.hoverBed === undefined ? undefined : beds[s.hoverBed];
         const aim = bed ? commands.aim(bed).aim : undefined;
         const name = !aim
           ? s.hoverSpot

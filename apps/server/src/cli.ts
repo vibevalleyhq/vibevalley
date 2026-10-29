@@ -112,6 +112,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
 const codeOf = (end: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(end) ? (end.value as number) : Cause.hasInterruptsOnly(end.cause) ? exit.interrupted : exit.other;
 
+// Not every loader sets import.meta.main (tsx may not): the script run is then told by its path.
 if (import.meta.main ?? process.argv[1] === new URL(import.meta.url).pathname) {
   run(process.argv.slice(2)).pipe(
     Effect.provide([NodeServices.layer, FetchHttpClient.layer]),

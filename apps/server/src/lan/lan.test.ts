@@ -43,7 +43,7 @@ const ask = (addr: string, code: string, name: string) =>
 const open = (lan: Lan["Service"]) =>
   Effect.map(lan.setOpen(true), (s) => {
     expect(s).toMatchObject({ open: true });
-    expect(s.problem).toBeUndefined();
+    expect(s.problem).toBe("");
     return s.url!;
   });
 

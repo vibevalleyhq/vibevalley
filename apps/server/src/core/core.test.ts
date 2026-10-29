@@ -39,7 +39,7 @@ describe("core", () => {
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
-      expect([s.call, s.callReason, s.orchestrators]).toEqual(["idle", undefined, {}]);
+      expect([s.call, s.callReason, s.orchestrators]).toEqual(["idle", "", {}]);
       expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
@@ -69,7 +69,7 @@ describe("core", () => {
       const core = yield* Core;
       yield* core.open();
       const reopen = core.open();
-      yield* core.apply({ type: "call", state: "idle" });
+      yield* core.apply({ type: "call", state: "idle", reason: "" });
       expect(core.state().call).toBe("idle");
       yield* reopen;
       expect(core.state().call).toBe("live");

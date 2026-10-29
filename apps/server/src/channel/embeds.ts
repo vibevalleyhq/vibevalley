@@ -109,10 +109,10 @@ export function embedOf(url: string, html: string): Embed | undefined {
   }
   return {
     url,
-    ...(title ? { title: cut(title, 200) } : {}),
-    ...(description ? { description: cut(description, 300) } : {}),
-    ...(site ? { site: cut(site, 80) } : {}),
-    ...(imageUrl ? { image: imageUrl } : {}),
+    title: cut(title, 200),
+    description: cut(description ?? "", 300),
+    site: cut(site ?? "", 80),
+    image: imageUrl ?? "",
   };
 }
 

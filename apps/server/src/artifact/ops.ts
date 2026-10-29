@@ -72,7 +72,7 @@ const attrNames = ["level", "checked", "language", "src", "width", "height", "al
 /** Lays a set_attrs patch over attrs: what the patch sets is written, the names in unset removed. */
 export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly string[] = []): BlockAttrs {
   const out: Record<string, unknown> = { ...attrs };
-  for (const name of attrNames) if (patch[name] !== undefined && patch[name] !== null) out[name] = patch[name];
+  for (const name of attrNames) if (patch[name] !== undefined) out[name] = patch[name];
   for (const name of unset) {
     if (!(attrNames as readonly string[]).includes(name)) throw new Error(t("server.artifact.op.noAttr", { name }));
     delete out[name];
@@ -189,7 +189,7 @@ export class Page {
         if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
         if (b.deleted) return gone(b);
         try {
-          b.attrs = patched(b.attrs, op.attrs ?? {}, op.unset);
+          b.attrs = patched(b.attrs, op.attrs, op.unset);
         } catch (e) {
           return rejected(b.id, (e as Error).message);
         }

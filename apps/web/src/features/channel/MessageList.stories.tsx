@@ -61,7 +61,7 @@ export default stories({
             { id: "a1", name: "design-review.pdf", type: "application/pdf", size: 1_400_000 },
             { id: "a2", name: "bug.mov", type: "video/quicktime", size: 48_000_000 },
           ],
-          embeds: [{ url: "https://example.com/design", site: "example.com", title: "登录页改版", description: "过期提示、重新登录、记住我" }],
+          embeds: [{ url: "https://example.com/design", image: "", site: "example.com", title: "登录页改版", description: "过期提示、重新登录、记住我" }],
           reactions: [
             { emoji: "👍", by: ["orchestrator", "w1"] },
             { emoji: "👀", by: ["owner"] },

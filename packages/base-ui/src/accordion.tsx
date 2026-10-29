@@ -60,7 +60,7 @@ function Root(props: AccordionRootProps) {
         data-disabled={flag(ctx.disabled())}
         onKeyDown={(e) => {
           call(props.onKeyDown, e);
-          if (!root || e.defaultPrevented || !e.target.matches?.(trigger)) return;
+          if (!root || e.defaultPrevented || !e.target.matches(trigger)) return;
           roveFocus(e, root, trigger, { orientation: ctx.orientation(), loop: true });
         }}
       />

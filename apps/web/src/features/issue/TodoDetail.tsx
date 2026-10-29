@@ -30,7 +30,7 @@ interface Draft {
 
 const draftOf = (i: Issue): Draft => ({
   title: i.title,
-  description: i.description ?? "",
+  description: i.description,
   criteria: i.criteria.join("\n"),
   project: i.project ?? "",
   agent: i.assignee ?? "",

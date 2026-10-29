@@ -298,7 +298,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
     const id = dragged();
     setDragged(undefined);
     if (!id || id === onto.id || onto.default || onto.type !== "channel") return;
-    api.channel.update({ id, before: onto.id, category: onto.category ?? "" }).catch((e) => toast(reasonOf(e), "bad"));
+    api.channel.update({ id, before: onto.id, category: onto.category }).catch((e) => toast(reasonOf(e), "bad"));
   };
   const row = (c: Channel) => (
     <ChannelRow

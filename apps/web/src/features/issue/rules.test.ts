@@ -15,6 +15,7 @@ const issue = (over: Partial<Issue>): Issue =>
     moves: [],
     findings: [],
     questions: [],
+    description: "",
     blockedBy: [],
     criteria: [],
     checks: [],

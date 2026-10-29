@@ -112,7 +112,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   const appIdDirty = () => appId().trim() !== (base().agoraAppId.value ?? "");
   const dictationDirty = () =>
     dictation().via !== base().dictation.via || dictation().url.trim() !== base().dictation.url || dictation().model.trim() !== base().dictation.model;
-  const dirty = () => voiceDirty() || appIdDirty() || dictationDirty() || Object.values(secrets()).some((v) => v?.trim()) || cleared().size > 0;
+  const dirty = () => voiceDirty() || appIdDirty() || dictationDirty() || Object.values(secrets()).some((v) => v.trim()) || cleared().size > 0;
   const problem = useProblem(() => ({ voice: draft(), ...(dictationDirty() ? { dictation: dictation() } : {}) }));
   const atDefaults = () => sameVoice(draft(), withPart(props.part, draft(), base().voiceDefaults));
 
@@ -120,7 +120,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     const update: Record<string, unknown> = {};
     for (const k of cleared()) update[k] = "";
     if (appIdDirty() && !cleared().has("agoraAppId")) update.agoraAppId = appId().trim();
-    for (const [k, v] of Object.entries(secrets())) if (v?.trim()) update[k] = v.trim();
+    for (const [k, v] of Object.entries(secrets())) if (v.trim()) update[k] = v.trim();
     if (voiceDirty()) update.voice = withPart(props.part, base().voice, draft());
     if (dictationDirty()) update.dictation = { via: dictation().via, url: dictation().url.trim(), model: dictation().model.trim() };
     setBusy(true);

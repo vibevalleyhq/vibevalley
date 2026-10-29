@@ -22,7 +22,7 @@ const ring = (kind: InboxKind, label: string, text: string): InboxItem => ({
   text,
   at: Date.now(),
   target: { kind: "session", id: "w1" },
-  words: { label, title: label, body: text },
+  words: { label, title: label, body: text, tray: "" },
 });
 
 export default stories({

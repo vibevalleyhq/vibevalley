@@ -30,7 +30,7 @@ const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 
 
 export const spentText = (spent: Spent) => {
   const tokens = wan(spent.tokens) + " token";
-  return spent.cny !== undefined && spent.cny !== null ? "约 " + yuan(spent.cny) + " · " + tokens : tokens;
+  return spent.cny !== undefined ? "约 " + yuan(spent.cny) + " · " + tokens : tokens;
 };
 
 /** s.slice(-n), without splitting a character. */
@@ -130,8 +130,7 @@ export function issueLine(issue: Issue, who: string, now: number): string {
 /** One issue in full: what it asks, its criteria as far as they got, what it waits on, and its story, newest first. */
 export function issueDetail(issue: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
   const lines = [issueLine(issue, who, now).slice(2)];
-  if (issue.title !== shortTitle(issue.title) || issue.description)
-    lines.push("要做的：" + head([issue.title, issue.description ?? ""].join("\n").trim(), 600));
+  if (issue.title !== shortTitle(issue.title) || issue.description) lines.push("要做的：" + head([issue.title, issue.description].join("\n").trim(), 600));
   const criteria = issue.criteria;
   if (criteria.length > 0) {
     lines.push("验收标准：");

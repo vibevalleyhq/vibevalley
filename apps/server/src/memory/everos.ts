@@ -206,7 +206,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       const project = n.project.trim();
       const at = yield* Clock.currentTimeMillis;
       yield* add(session, project, [
-        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project ?? "", n.text) },
+        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project, n.text) },
         { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
       ]);
       yield* Effect.ensuring(

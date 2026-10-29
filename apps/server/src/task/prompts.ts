@@ -69,7 +69,7 @@ export function taskBrief(graph: TaskGraph, task: Task): string {
     "你这一步的工单：",
     task.brief,
   ];
-  if (task.scope && task.scope.length > 0) lines.push("", "只改这些地方：" + task.scope.join("、") + "。别的步骤可能同时在改别处。");
+  if (task.scope.length > 0) lines.push("", "只改这些地方：" + task.scope.join("、") + "。别的步骤可能同时在改别处。");
   const before = task.needs.flatMap((id) => {
     const n = taskOf(graph, id);
     return n ? [n] : [];
@@ -77,8 +77,8 @@ export function taskBrief(graph: TaskGraph, task: Task): string {
   if (before.length > 0) {
     lines.push("", "前面已经做完、合进你分支里的步骤：");
     for (const n of before) {
-      const commits = n.commits && n.commits.length > 0 ? "（" + n.commits.join("、") + "）" : "";
-      const said = n.state === "skipped" ? "跳过了，没有做" : (n.conclusion ?? "做完了");
+      const commits = n.commits.length > 0 ? "（" + n.commits.join("、") + "）" : "";
+      const said = n.state === "skipped" ? "跳过了，没有做" : n.conclusion || "做完了";
       lines.push("- " + n.title + commits + "：" + said);
     }
   }
@@ -125,7 +125,7 @@ export function issueSplitRefusal(session: Session | undefined, issue: Issue | u
 }
 
 export function graphText(graph: TaskGraph): string {
-  const tasks = graph.tasks ?? [];
+  const tasks = graph.tasks;
   const merged = tasks.filter(isSettled).length;
   let head = "「" + graph.title + "」（" + graph.id + "，项目 " + graph.project;
   if (graph.branch) head += "，分支 " + graph.branch;

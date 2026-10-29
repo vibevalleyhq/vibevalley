@@ -10,7 +10,7 @@ const call = (id: string, kind: InboxItem["kind"], tray?: string): InboxItem => 
   text: "打卡写好了",
   at: 0,
   target: { kind: "session", id: "w1" },
-  words: { label: "", title: "", body: "", ...(tray ? { tray } : {}) },
+  words: { label: "", title: "", body: "", tray: tray ?? "" },
 });
 
 describe("the tray", () => {

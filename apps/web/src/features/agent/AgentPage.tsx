@@ -754,7 +754,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
         </div>
       </Labeled>
       <Labeled label={t("web.agent.ownSkills", { runtime: props.runtime?.preset.label ?? props.draft.runtime })} tip={t("web.agent.ownSkillsTip")}>
-        <Inventory entries={props.runtime?.skills} />
+        <Inventory entries={props.runtime?.skills ?? null} />
       </Labeled>
     </>
   );
@@ -869,13 +869,13 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         </Show>
       </Labeled>
       <Labeled label={t("web.agent.ownMcp", { runtime: props.runtime?.preset.label ?? props.draft.runtime })} tip={t("web.agent.ownMcpTip")}>
-        <Inventory entries={props.runtime?.mcpServers} />
+        <Inventory entries={props.runtime?.mcpServers ?? null} />
       </Labeled>
     </>
   );
 }
 
-function Inventory(props: { entries?: InventoryEntry[] | null | undefined }) {
+function Inventory(props: { entries: InventoryEntry[] | null }) {
   return (
     <Switch
       fallback={

@@ -65,6 +65,7 @@ export function freshTask(draft: StepDraft): Task {
     acceptance: draft.acceptance ?? false,
     frozen: [],
     commits: [],
+    conclusion: "",
     state: "waiting",
     tries: 0,
     ...taskView(),
@@ -156,7 +157,7 @@ export function parseSplit(text: string): ParsedSplit {
     const problems = graphProblems(tasks);
     if (problems.length > 0) return { ok: false, problems };
     const title = (draft.title ?? "").trim();
-    return { ok: true, ...(title ? { title } : {}), tasks };
+    return { ok: true, title: title, tasks };
   }
   return { ok: false, problems: [last] };
 }
@@ -209,9 +210,10 @@ export const changeOf = (e: GraphEvent) => ({
   ...(e.task !== undefined ? { task: e.task } : {}),
   kind: e.kind,
   ...(e.session !== undefined ? { session: e.session } : {}),
-  ...(e.detail !== undefined ? { detail: e.detail } : {}),
-  ...(e.changes !== undefined ? { changes: e.changes } : {}),
-  ...(e.commits !== undefined ? { commits: e.commits } : {}),
+  // A change is sparse: what the event has nothing of is left out.
+  ...(e.detail ? { detail: e.detail } : {}),
+  ...(e.changes.length > 0 ? { changes: e.changes } : {}),
+  ...(e.commits.length > 0 ? { commits: e.commits } : {}),
 });
 
 export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
@@ -246,12 +248,12 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
         assignee: was.get(issueId(graph.id))?.assignee,
         deliver: "change" as const,
         blockedBy: [],
-        graph: omitUndefined({ state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note }),
+        graph: omitUndefined({ state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note || undefined }),
       }),
       graphClosed(graph.state),
     ),
   ];
-  (graph.tasks ?? []).forEach((n, i) => {
+  graph.tasks.forEach((n, i) => {
     out.push(
       keep(
         omitUndefined({
@@ -263,7 +265,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
           assignee: n.agent,
           rank: i > 0 ? i : undefined,
           parent: issueId(graph.id),
-          blockedBy: (n.needs ?? []).map((need) => taskIssueID(graph.id, need)),
+          blockedBy: n.needs.map((need) => taskIssueID(graph.id, need)),
           task: omitUndefined({
             key: n.id,
             state: n.state,
@@ -272,7 +274,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
             acceptance: n.acceptance,
             frozen: n.frozen,
             session: n.session,
-            conclusion: n.conclusion,
+            conclusion: n.conclusion || undefined,
             commits: n.commits,
             spent: n.spent,
             tries: n.tries,
@@ -316,11 +318,11 @@ export const defaultParallel = 3;
 export const autoRetries = 2;
 
 export const readyTasks = (graph: TaskGraph): Task[] =>
-  graph.state !== "running" ? [] : (graph.tasks ?? []).filter((n) => n.state === "waiting" && blockedBy(graph, n).length === 0);
+  graph.state !== "running" ? [] : graph.tasks.filter((n) => n.state === "waiting" && blockedBy(graph, n).length === 0);
 
 export const withTask = (graph: TaskGraph, id: string, change: (n: Task) => Task): TaskGraph => ({
   ...graph,
-  tasks: (graph.tasks ?? []).map((n) => (n.id === id ? change(n) : n)),
+  tasks: graph.tasks.map((n) => (n.id === id ? change(n) : n)),
 });
 
 export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
@@ -330,13 +332,13 @@ export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
     seen.add(id);
     for (const need of taskOf(graph, id)?.needs ?? []) visit(need);
   };
-  for (const need of task.needs ?? []) visit(need);
-  return (graph.tasks ?? []).filter((n) => n.id !== task.id && seen.has(n.id));
+  for (const need of task.needs) visit(need);
+  return graph.tasks.filter((n) => n.id !== task.id && seen.has(n.id));
 }
 
 export const acceptancesOf = (graph: TaskGraph, task: Task) => ancestorsOf(graph, task).filter((n) => isAcceptance(n) && n.state === "merged");
 
-export const isLast = (graph: TaskGraph, task: Task) => !(graph.tasks ?? []).some((n) => (n.needs ?? []).includes(task.id));
+export const isLast = (graph: TaskGraph, task: Task) => !graph.tasks.some((n) => n.needs.includes(task.id));
 
 export function acceptanceChecks(graph: TaskGraph, task: Task): string[] {
   const out: string[] = [];

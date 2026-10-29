@@ -58,15 +58,15 @@ export function Phone(props: { room: { w: number; h: number } }) {
         return router.navigate(`/chat/${call.target.channel}`);
     }
   };
-  const game = () => ringing() === null && games.has(app());
+  const game = () => ringing() === undefined && games.has(app());
   const core = useCore();
   const unfolded = useFarm((s) => s.chatOpen);
   const large = useFarm((s) => s.chatLarge);
   return (
     <Handset
-      screen={ringing() === null ? app() : "ringing"}
+      screen={ringing() === undefined ? app() : "ringing"}
       big={game()}
-      tall={game() || ringing() !== null}
+      tall={game() || ringing() !== undefined}
       unfolded={unfolded()}
       large={large()}
       narrow={props.room.w < 640}
@@ -76,10 +76,10 @@ export function Phone(props: { room: { w: number; h: number } }) {
       onClose={put}
       onHome={() => {
         playSound("tap");
-        if (app() === "home" && ringing() === null) put();
+        if (app() === "home" && ringing() === undefined) put();
         else {
           // A game goes back to the games folder, the rest to the home screen.
-          setApp(ringing() === null && games.has(app()) ? "games" : "home");
+          setApp(ringing() === undefined && games.has(app()) ? "games" : "home");
           phoneCalls.silence();
         }
       }}

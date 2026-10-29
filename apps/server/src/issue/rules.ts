@@ -31,7 +31,7 @@ export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 export function issueBrief(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
   let brief = pick.title;
   if (pick.description) brief += "\n\n" + pick.description;
-  if (pick.criteria && pick.criteria.length > 0) brief += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  if (pick.criteria.length > 0) brief += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
   return pick.deliver === "answer" ? answerOpening + "\n\n" + brief + "\n\n" + answerFormat : brief;
 }
 
@@ -306,7 +306,7 @@ export function pickIssues(all: readonly Issue[], f: IssueFilter, now: number): 
       (f.status ? item.status === f.status : f.closed || (item.status !== "done" && item.status !== "canceled")) &&
       (!f.wantsOwner || attentionWantsOwner(item.attention.state)) &&
       (!project || item.project === project) &&
-      words.every((w) => (item.title + "\n" + (item.description ?? "")).includes(w)),
+      words.every((w) => (item.title + "\n" + item.description).includes(w)),
   );
   if (f.wantsOwner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
   return f.limit && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;

@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
+import { sampleAgent } from "@/testing/agents.ts";
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, BlockOp } from "@vibevalley/protocol";
+import type { BlockOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { Database, Db } from "@/base/db.ts";
@@ -64,7 +65,7 @@ const submit = (s: Service, doc: string, batchId: string, ...ops: BlockOp[]) => 
 
 const texts = (blocks: { text: { t: string }[] }[]) => blocks.map((b) => plain(b.text as never)).join("|");
 
-const helpers = (...list: [string, boolean][]) => list.map(([id, enabled]) => ({ id, enabled }) as Agent);
+const helpers = (...list: [string, boolean][]) => list.map(([id, enabled]) => sampleAgent({ id, enabled }));
 
 const finished = (s: Service) => Effect.promise(() => whenTrue(() => !s.demoRunning(), "the demo finished", 10_000));
 

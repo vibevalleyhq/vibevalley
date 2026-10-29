@@ -103,7 +103,7 @@ export function stageOf(s: IssueStatus): Stage {
 export const newIssueTitle = t("web.issue.boardLabels.newIssue");
 
 /** A draft came back into it (or the owner wrote it out): it has more than a title. */
-export const isRefined = (issue: Issue) => (issue.description ?? "") !== "" || issue.criteria.length > 0;
+export const isRefined = (issue: Issue) => issue.description !== "" || issue.criteria.length > 0;
 
 export function laneOf(s: IssueStatus): Lane {
   if (s === "backlog" || s === "todo") return "todo";

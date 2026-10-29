@@ -1,6 +1,6 @@
 // The farm skin's classes and pixel sizes, framework-free: the kit's components and the rules draw with them.
 
-export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
+export const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" ");
 
 // One weight and no synthesised bold or italics: the pixel font has neither. Line heights are Tailwind's for each size;
 // the skin changes the size, not the line height. Sharp at 12 and 24 px only.

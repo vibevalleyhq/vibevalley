@@ -134,3 +134,11 @@ tester.run("promise-boundary", rule("promise-boundary"), {
     { code: "const a = new Promise((r) => r(1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "promise" }] },
   ],
 });
+
+tester.run("one-absent", rule("one-absent"), {
+  valid: [
+    { code: "let a: string | undefined;", filename: "/repo/apps/server/src/a.ts" },
+    { code: "let a: string | null;", filename: "/repo/apps/server/src/a.ts" },
+  ],
+  invalid: [{ code: "let a: string | null | undefined;", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "both" }] }],
+});

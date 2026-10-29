@@ -629,10 +629,10 @@ function LogRow(props: { e: GraphEvent }) {
     <div class="flex items-start gap-2">
       <span class="w-[88px] shrink-0 text-[12px] text-bark-400">{when(props.e.at)}</span>
       <span class="w-11 shrink-0 py-0.5 text-center text-[10px]" style={{ background: actorTone[props.e.actor][0], color: actorTone[props.e.actor][1] }}>
-        {props.e.actorText ?? ""}
+        {props.e.actorText}
       </span>
       <div class="min-w-0 flex-1">
-        <p class="text-[12px] text-bark-800">{props.e.text ?? ""}</p>
+        <p class="text-[12px] text-bark-800">{props.e.text}</p>
         <Show when={changes().length > 0}>
           <button type="button" onClick={() => setOpen(!open())} class="mt-0.5 cursor-pointer text-[12px] text-bark-600">
             {t("web.farm.graph.beforeAfter")}

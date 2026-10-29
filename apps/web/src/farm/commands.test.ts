@@ -59,13 +59,14 @@ function frame(attention: IssueAttention, session: Session = helper): StateFrame
     moves: [],
     findings: [],
     questions: [],
+    description: "",
     blockedBy: [],
     criteria: [],
     checks: [],
     attention,
   };
   return {
-    state: { call: "idle", sessions: [session], issues: [issue], orchestrators: {}, crons: [], connectors: [] },
+    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], orchestrators: {}, crons: [], connectors: [] },
     inbox: [],
     graphs: [],
     effects: [],

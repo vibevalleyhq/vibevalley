@@ -361,7 +361,7 @@ export function IssueDetail(props: {
                   type="button"
                   aria-label={t("web.issue.detail.copyPath")}
                   title={t("web.issue.detail.copyPath")}
-                  onClick={() => void navigator.clipboard?.writeText(worktree())}
+                  onClick={() => void navigator.clipboard.writeText(worktree())}
                   class="cursor-pointer rounded p-0.5 hover:bg-hover"
                 >
                   <Icon name="copy" size={14} />

@@ -207,7 +207,6 @@ const defaultUsageOf: UsageOf = async (id, runtime, found, settings) => {
 };
 
 /** Only what is there. */
-const optional = <K extends string>(key: K, v: string | undefined) => (v ? ({ [key]: v } as Record<K, string>) : {});
 
 export const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
@@ -273,11 +272,10 @@ export const make = (options: RuntimeOptions = {}) =>
     );
 
     function withSpend(info: RuntimeInfo): RuntimeInfo {
-      const { spentToday: _, stop: __, ...rest } = info;
+      const { spentToday: _, ...rest } = info;
       const cny = tally()[info.id];
       const out: RuntimeInfo = { ...rest, ...(cny !== undefined ? { spentToday: cny } : {}) };
-      const stop = moneyStop(out);
-      return { ...out, ...(stop ? { stop } : {}), quota: quotaOf(out.usage) };
+      return { ...out, stop: moneyStop(out), quota: quotaOf(out.usage) };
     }
 
     /** What the runtime takes: seeds.json's facts, with what it refuses taken from the adapter and the farm's policy laid over it. */
@@ -317,6 +315,7 @@ export const make = (options: RuntimeOptions = {}) =>
         skills: null,
         mcpServers: null,
         tools: null,
+        stop: "",
         settings,
         checkedAt: clock.currentTimeMillisUnsafe(),
       };
@@ -369,23 +368,23 @@ export const make = (options: RuntimeOptions = {}) =>
           usageOf(id, runtime, found, settings),
           inventory(runtime.skills, found, cwd, (s) => ({
             name: s.name,
-            ...optional("description", s.description),
-            ...optional("source", s.path || s.source),
+            description: s.description ?? "",
+            source: s.path || s.source || "",
             ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
           })),
           inventory(runtime.mcpServers, found, cwd, (m) => {
             const parts = [m.status, m.toolCount !== undefined ? t("server.runtime.tools", { n: m.toolCount }) : ""].filter(Boolean);
             return {
               name: m.name,
-              ...optional("description", parts.join(" · ")),
-              ...optional("source", m.source),
+              description: parts.join(" · "),
+              source: m.source ?? "",
               ...(m.enabled !== undefined ? { enabled: m.enabled } : {}),
             };
           }),
           inventory(runtime.tools, found, cwd, (item) => ({
             name: item.name,
-            ...optional("description", item.description),
-            ...optional("source", item.mcpServerId || item.source),
+            description: item.description ?? "",
+            source: item.mcpServerId || item.source || "",
             ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
           })),
         ],
@@ -489,6 +488,7 @@ export const make = (options: RuntimeOptions = {}) =>
             skills: null,
             mcpServers: null,
             tools: null,
+            stop: "",
             settings: store.settings(id),
             checkedAt: 0,
           };

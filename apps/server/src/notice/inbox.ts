@@ -254,7 +254,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.review.tray", { who }),
       };
     case "ask":
-      return { label: t("server.notice.item.ask.label"), title: t("server.notice.item.ask.title", { who }), body: text };
+      return { label: t("server.notice.item.ask.label"), title: t("server.notice.item.ask.title", { who }), body: text, tray: "" };
     case "fix":
       return {
         label: t("server.notice.item.fix.label"),
@@ -263,7 +263,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.fix.tray", { who }),
       };
     case "interrupted":
-      return { label: t("shared.stuck.interrupted"), title: t("server.notice.item.interrupted.title", { who }), body: text };
+      return { label: t("shared.stuck.interrupted"), title: t("server.notice.item.interrupted.title", { who }), body: text, tray: "" };
     case "conflict":
       return {
         label: t("server.notice.item.conflict.label"),
@@ -300,7 +300,7 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
         tray: t("server.notice.item.task-failed.tray", { text }),
       };
     case "mention":
-      return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text };
+      return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text, tray: "" };
     case "cron-ask":
       return {
         label: t("server.notice.item.cron-ask.label"),

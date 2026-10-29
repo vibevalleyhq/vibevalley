@@ -42,8 +42,8 @@ export function TreePage() {
   const tree = mockTree(Date.now(), asked >= 1 && asked <= 5 ? (asked as TreeStage) : undefined);
   const [filter, setFilter] = createSignal<TreeFilter>(allOf);
   const [sown, setSown] = createSignal<ReadonlySet<string>>(new Set(tree.items.filter((m) => m.sown).map((m) => m.id)));
-  const [picked, setPicked] = createSignal<MemoryItem | null>(null);
-  const [hover, setHover] = createSignal<SceneHover | null>(null);
+  const [picked, setPicked] = createSignal<MemoryItem>();
+  const [hover, setHover] = createSignal<SceneHover>();
   const [sky, setSky] = createSignal(false);
   const [until, setUntil] = createSignal(1);
 
@@ -63,7 +63,7 @@ export function TreePage() {
   };
   const lookUp = (up: boolean) => {
     playSound("open");
-    setHover(null);
+    setHover(undefined);
     setSky(up);
   };
 
@@ -104,7 +104,7 @@ export function TreePage() {
             waiting={waiting()}
             picked={picked()}
             pick={setPicked}
-            unpick={() => setPicked(null)}
+            unpick={() => setPicked(undefined)}
             agentName={agentName}
             now={now()}
             onSow={sow}
@@ -193,7 +193,7 @@ function Panel(props: {
   recent: readonly MemoryItem[];
   fading: readonly MemoryItem[];
   waiting: readonly MemoryItem[];
-  picked: MemoryItem | null;
+  picked: MemoryItem | undefined;
   pick: (m: MemoryItem) => void;
   unpick: () => void;
   agentName: (id: string) => string;

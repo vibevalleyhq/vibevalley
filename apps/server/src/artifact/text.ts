@@ -29,7 +29,7 @@ export function normal(spans: readonly TextSpan[] | undefined): TextSpan[] {
   for (const s of spans ?? []) {
     if (s.t === "") continue;
     const last = out.at(-1);
-    if (last && sameMarks(last.marks, s.marks ?? {})) last.t += s.t;
+    if (last && sameMarks(last.marks, s.marks)) last.t += s.t;
     else out.push({ t: s.t, marks: marksOf(s.marks) });
   }
   return out;

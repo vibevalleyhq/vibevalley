@@ -44,7 +44,7 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
     }
     return "canceled";
   }
-  const sessions = t.sessions ?? [];
+  const sessions = t.sessions;
   if (sessions.length > 0) {
     const h = sessionOf(state, sessions[sessions.length - 1]!);
     return !h ? "canceled" : isBusy(h) ? "in_progress" : "in_review";
@@ -56,8 +56,8 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
 export const keepClosedIssues = 50;
 
 export function issueOrder(a: Issue, b: Issue): number {
-  const sentA = (a.sessions ?? []).length > 0;
-  const sentB = (b.sessions ?? []).length > 0;
+  const sentA = a.sessions.length > 0;
+  const sentB = b.sessions.length > 0;
   if (!sentA && !sentB) return or(compare(a.rank ?? 0, b.rank ?? 0), compare(a.createdAt, b.createdAt), compareText(a.id, b.id));
   if (!sentA) return -1;
   if (!sentB) return 1;
@@ -99,7 +99,7 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
 }
 
 /** The findings still open: a failed acceptance's, until the next acceptance passes. */
-export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.resolved).length;
+export const openFindings = (t: Issue) => t.findings.filter((f) => !f.resolved).length;
 
 /** Assigned to an orchestrator (orchestrator: whether a profile id is one's): it answers it, no session works it. */
 export const isForOrchestrator = (t: Issue, orchestrator: (id: string) => boolean) => orchestrator(t.assignee ?? "");

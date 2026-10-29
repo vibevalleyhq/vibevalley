@@ -25,7 +25,7 @@ export function withMessage(chat: Chat | undefined, m: ChatMessage): [Chat | und
 /** Beyond keepChannels the quietest threads go; the channels always stay. */
 export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   const base = chat ?? emptyChat();
-  let all = (base.channels ?? []).filter((x) => x.id !== c.id);
+  let all = base.channels.filter((x) => x.id !== c.id);
   all.push(c);
   const byID = (a: Channel, b: Channel) => compareText(a.id, b.id);
   if (all.length <= keepChannels) return { ...base, channels: all.sort(byID) };
@@ -44,9 +44,9 @@ export function targetOf(c: Pick<Channel, "type" | "rootNumber" | "name">, chann
   return "#" + (c.name ?? channelName);
 }
 
-export const defaultOf = (chat: Chat | undefined) => chat?.channels?.find((c) => c.default);
+export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
 
-export const channelOf = (chat: Chat | undefined, id: string) => chat?.channels?.find((c) => c.id === id);
+export const channelOf = (chat: Chat | undefined, id: string) => chat?.channels.find((c) => c.id === id);
 
 export function topOf(chat: Chat | undefined, c: Channel | undefined): Channel | undefined {
   if (!c) return defaultOf(chat);

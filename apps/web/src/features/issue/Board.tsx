@@ -70,12 +70,12 @@ export interface BoardProps {
   onWrite: () => void;
 }
 
-type Drag = { dragging: () => BoardCard | null; setDragging: (c: BoardCard | null) => void };
+type Drag = { dragging: () => BoardCard | undefined; setDragging: (c: BoardCard | undefined) => void };
 
 /** Four lanes to drag between; narrower than 700, one lane at a time behind tabs. */
 export function IssueBoard(props: BoardProps) {
   const [lane, setLane] = createSignal<Lane>("todo");
-  const [dragging, setDragging] = createSignal<BoardCard | null>(null);
+  const [dragging, setDragging] = createSignal<BoardCard>();
   let addInput: HTMLInputElement | undefined;
   const drag: Drag = { dragging, setDragging: (c) => setDragging(() => c) };
   return (
@@ -123,7 +123,7 @@ function LaneView(props: {
   const ordered = () => laneOrder(props.lane, props.cards, p().ordering);
   const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
-  const accepts = (c: BoardCard | null) => c !== null && (cardMove(c, props.lane) !== undefined || (props.lane === "todo" && c.kind === "todo"));
+  const accepts = (c: BoardCard | undefined) => c !== undefined && (cardMove(c, props.lane) !== undefined || (props.lane === "todo" && c.kind === "todo"));
   const head = () =>
     props.lane === "working"
       ? t("web.issue.board.spots", { taken: props.cards.filter((c) => c.kind === "issue").length, of: maxRunning })
@@ -146,7 +146,7 @@ function LaneView(props: {
         setOver(false);
         const d = props.drag.dragging();
         if (d && accepts(d)) p().onDrop(d, props.lane);
-        props.drag.setDragging(null);
+        props.drag.setDragging(undefined);
       }}
       class={[
         // As tall as what it holds: an empty lane is its head and a place to drop, not a column of nothing.
@@ -233,7 +233,7 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         e.stopPropagation();
         setBefore(false);
         props.onPlace?.(d);
-        props.drag.setDragging(null);
+        props.drag.setDragging(undefined);
       }}
     >
       <Show when={before()}>
@@ -254,7 +254,7 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
           e.dataTransfer!.setData("text/plain", props.card.id);
           props.drag.setDragging(props.card);
         }}
-        onDragEnd={() => props.drag.setDragging(null)}
+        onDragEnd={() => props.drag.setDragging(undefined)}
         onClick={() => props.onOpen(props.card.id)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {

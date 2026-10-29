@@ -169,6 +169,7 @@ export const installedOnly =
     facts: factsOf(id),
     installation: given.some((r) => r.id === id) ? { status: "available", via: "bundled", command: id, version: null } : { status: "not_found" },
     models: null,
+    stop: "",
     usage: given.some((r) => r.id === id) ? usage() : null,
     skills: null,
     mcpServers: null,

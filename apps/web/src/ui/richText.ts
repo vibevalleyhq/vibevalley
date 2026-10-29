@@ -59,7 +59,7 @@ export function richen(root: ParentNode, o: RichOptions = {}): Undo {
   for (const code of [...root.querySelectorAll("pre > code")]) {
     const pre = code.parentElement!;
     const lang = [...code.classList].find((c) => c.startsWith("language-"))?.slice("language-".length) ?? "";
-    const text = (code.textContent ?? "").replace(/\n$/, "");
+    const text = code.textContent.replace(/\n$/, "");
     if (lang === "mermaid") undo.push(diagram(pre, text));
     else codeBlock(pre, code, lang, text, o);
   }
@@ -104,7 +104,7 @@ function codeBlock(pre: HTMLElement, code: Element, lang: string, text: string, 
   copy.title = t("web.base.rich.copy");
   copy.append(iconOf("copy"));
   copy.addEventListener("click", () => {
-    void navigator.clipboard?.writeText(text).then(() => {
+    void navigator.clipboard.writeText(text).then(() => {
       copy.replaceChildren(iconOf("check"));
       copy.title = t("web.base.rich.copied");
       setTimeout(() => {

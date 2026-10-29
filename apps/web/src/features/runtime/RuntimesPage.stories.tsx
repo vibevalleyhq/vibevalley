@@ -11,6 +11,7 @@ const ready: Installation = { status: "available", via: "executable", command: "
 
 const info = (more: Partial<RuntimeInfo> = {}): RuntimeInfo => ({
   id: "claude",
+  stop: "",
   preset: { id: "claude", label: "Claude Code", blurb: "Anthropic 的编码 agent，在终端里干活。", look },
   facts: { steer: true, refused: {}, capabilities: ["listModels", "accountUsage", "checkUpdate", "skills", "mcpServers", "tools"], inProcess: false },
   installation: ready,
@@ -27,8 +28,12 @@ const info = (more: Partial<RuntimeInfo> = {}): RuntimeInfo => ({
     ],
   },
   skills: [{ name: "review", description: "按项目的规矩审一遍改动", source: "~/.claude/skills" }],
-  mcpServers: [{ name: "github", description: "读写 GitHub 的工单和 PR", enabled: true }],
-  tools: [{ name: "Bash" }, { name: "Edit" }, { name: "Read" }],
+  mcpServers: [{ name: "github", description: "读写 GitHub 的工单和 PR", source: "", enabled: true }],
+  tools: [
+    { name: "Bash", description: "", source: "" },
+    { name: "Edit", description: "", source: "" },
+    { name: "Read", description: "", source: "" },
+  ],
   settings: { enabled: true, binPath: "", defaultModel: "opus", defaultEffort: "medium", env: {} },
   checkedAt: now - 2 * 60_000,
   ...more,

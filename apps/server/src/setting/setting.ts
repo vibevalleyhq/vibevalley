@@ -203,10 +203,7 @@ export const make = Effect.gen(function* () {
 
   const shape = Setting.of({
     status,
-    validate: (u) => {
-      const problem = settingsProblem(u);
-      return problem ? { problem } : {};
-    },
+    validate: (u) => ({ problem: settingsProblem(u) }),
     save,
     deepseekApiKey: () => pick(stored.deepseekApiKey, fromConfig.deepseek)?.[0] ?? "",
     agora: () => {

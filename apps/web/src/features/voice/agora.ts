@@ -53,7 +53,7 @@ export const webRtc: Rtc = async (grant, on) => {
   }
   return {
     mute: async (on) => {
-      await mic?.setMuted(on);
+      await mic.setMuted(on);
     },
     renew: (token) => client.renewToken(token),
     leave,

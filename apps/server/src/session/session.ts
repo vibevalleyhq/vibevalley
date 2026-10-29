@@ -315,11 +315,11 @@ export function runOf(r: qr.RunsOfSessionResult): Run {
     triggeredBy: triggerOf(r.triggered_by) ?? { kind: "runtime" },
     heard: heardOf(r.heard) ?? [],
     startedAt: r.started_at,
+    summary: r.summary ?? "",
   };
   if (r.issue !== null) run.issue = issueId(r.issue);
   if (r.ended_at !== null) run.endedAt = r.ended_at;
   if (r.outcome !== null) run.outcome = r.outcome as Outcome;
-  if (r.summary !== null) run.summary = r.summary;
   const spent = spentOf(r.spent);
   if (spent) run.spent = spent;
   return run;
@@ -785,13 +785,13 @@ export const make = (options: SessionOptionsIn = {}) =>
         .join("\n\n");
       const mcp = [
         { name: "vibevalley", type: "http" as const, url: mcpUrl, headers: { authorization: "Bearer " + issueToken(id) } },
-        ...(agent.mcpServers ?? []).map(toOarMcp),
+        ...agent.mcpServers.map(toOarMcp),
       ];
       const own: Partial<SessionOptions> = {
         mcpServers: mcp,
         ...(text && agent.personaMode === "append" ? { appendSystemPrompt: text } : {}),
         ...(text && agent.personaMode === "replace" ? { systemPrompt: text } : {}),
-        ...((agent.disallowedTools ?? []).length > 0 ? { disallowedTools: agent.disallowedTools } : {}),
+        ...(agent.disallowedTools.length > 0 ? { disallowedTools: agent.disallowedTools } : {}),
       };
       const base = r.runtime;
       const resources = new Set<RuntimeSession>();
@@ -909,7 +909,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const again = yield* remind(session.agent, h.id, h.place.project, input, h.recalled);
         opened = yield* open(agent, session, h.place, withRecall(again, restartedNote + input), "");
       }
-      if (!opened.session) return { kind: "refused", reason: t("server.session.life.cannotWake", { name: session.name, why: opened.refused ?? "" }) };
+      if (!opened.session) return { kind: "refused", reason: t("server.session.life.cannotWake", { name: session.name, why: opened.refused }) };
       attach(h, opened.session, session.runtime);
       return { kind: "run", launch: h.launch || h.id, woke: true };
     });
@@ -1136,7 +1136,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (full) return { refused: full };
         hired++;
         const id = sessionId(`w${hired}`);
-        const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? ""));
+        const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree, opt.base ?? ""));
         if (placed._tag === "Failure") return { refused: t("server.session.life.noPlace", { name: agent.name, why: placed.failure.message }) };
         const place = placed.success;
         let committed = false;
@@ -1170,7 +1170,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
             });
           const opened = yield* open(agent, session, place, withRecall(recall, task), "");
-          if (!opened.session) return yield* refuseStart(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused ?? "" }), opened.retained);
+          if (!opened.session) return yield* refuseStart(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused }), opened.retained);
           const registered = yield* Effect.result(
             Effect.gen(function* () {
               if (opt.hiring) yield* opt.hiring(session);

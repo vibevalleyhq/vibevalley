@@ -1,4 +1,6 @@
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
+import { sampleAgent } from "@/testing/agents.ts";
+import { factsOf } from "@/agent/seed.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { agentProblems, chooseAgent, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
@@ -9,15 +11,16 @@ test("the recorded cases", () => {
   const failed = checkCases(cases, (c) => {
     switch (c.fn) {
       case "moneyStop":
-        return moneyStop(c.in as RuntimeInfo | null) || null;
+        return moneyStop((c.in as RuntimeInfo | null) ?? undefined) || null;
       case "quota":
         return {
           left: quotaLeft(c.in as AccountUsage) ?? null,
           text: quotaText(c.in as AccountUsage),
         };
       case "agentProblems": {
-        const i = c.in as { agent: Agent; runtime: RuntimeInfo | null };
-        return agentProblems(i.agent, i.runtime);
+        // Recorded before a runtime always carried its facts: one recorded without them has its own.
+        const i = c.in as { agent: Agent; runtime: (Omit<RuntimeInfo, "facts"> & Partial<Pick<RuntimeInfo, "facts">>) | null };
+        return agentProblems(i.agent, i.runtime ? { ...i.runtime, facts: i.runtime.facts ?? factsOf(i.runtime.id) } : undefined);
       }
       default:
         throw new Error(`line ${c.line}: no rule ${c.fn}`);
@@ -39,8 +42,8 @@ test("quota in words", () => {
 });
 
 test("choose a profile", () => {
-  const a = { id: "a", name: "甲", runtime: "pi", tags: ["前端"] } as Agent;
-  const b = { id: "b", name: "乙", runtime: "claude", tags: ["测试", "后端"] } as Agent;
+  const a = sampleAgent({ id: "a", name: "甲", runtime: "pi", tags: ["前端"] });
+  const b = sampleAgent({ id: "b", name: "乙", runtime: "claude", tags: ["测试", "后端"] });
   const candidates = [
     { agent: a, usable: true },
     { agent: b, usable: true },

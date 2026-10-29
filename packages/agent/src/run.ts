@@ -79,6 +79,7 @@ export class RunAccounting {
     const text = messageText(m).trim();
     this.current = {
       ...this.current,
+      // A transcript written before usage was kept has none.
       usage: addUsage(this.current.usage, m.usage ?? zeroUsage()),
       contextTokens: contextOf(m),
       text: text !== "" ? text : this.current.text,

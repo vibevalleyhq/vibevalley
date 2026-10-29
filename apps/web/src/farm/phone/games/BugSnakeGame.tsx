@@ -18,7 +18,7 @@ import { drawPattern, lcd } from "@/farm/phone/lcd";
 import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad, useTicks } from "@/farm/support";
 
-const game = kept<BugSnake | null>(null);
+const game = kept<BugSnake | undefined>(undefined);
 const best = kept(0);
 
 const cell = 6;
@@ -76,8 +76,8 @@ export function BugSnakeGame() {
     const was = game.get();
     if (was && next.eaten > was.eaten) playSound("pick");
     if (was && next.bugs > was.bugs) playSound("coin");
-    if (was && next.bug !== null && was.bug === null) playSound("bug");
-    if (next.over !== null && was?.over == null) {
+    if (was && next.bug !== undefined && was.bug === undefined) playSound("bug");
+    if (next.over !== undefined && was?.over === undefined) {
       playSound("thud");
       setPlaying(false);
       if (next.score > best.get()) setTop(next.score);
@@ -86,7 +86,7 @@ export function BugSnakeGame() {
   };
 
   useTicks(
-    () => playing() && !!g() && g()!.over === null,
+    () => playing() && !!g() && g()!.over === undefined,
     (ms) => {
       const now = game.get();
       if (!now) return;
@@ -101,7 +101,7 @@ export function BugSnakeGame() {
   usePad((button, down) => {
     if (!down) return;
     const now = game.get();
-    if (!now || now.over !== null) return void (button === "a" && start());
+    if (!now || now.over !== undefined) return void (button === "a" && start());
     if (!playing()) return void (button === "a" && setPlaying(true));
     if (button === "b") {
       setPlaying(false);
@@ -121,7 +121,7 @@ export function BugSnakeGame() {
     const draw = (picture: readonly string[], c: number) => drawPattern(ctx, picture, (c % bugSnakeWidth) * cell, Math.floor(c / bugSnakeWidth) * cell);
     draw(seed, state.food);
     // It blinks its last ten ticks, before it flies off.
-    if (state.bug !== null && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(bug[state.bugLeft % 2]!, state.bug);
+    if (state.bug !== undefined && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(bug[state.bugLeft % 2]!, state.bug);
     state.body.forEach((c, i) => draw(i === 0 ? heads[state.heading] : i === state.body.length - 1 ? tail : segment[i % 2]!, c));
   });
 
@@ -148,14 +148,14 @@ export function BugSnakeGame() {
           class="block [image-rendering:pixelated]"
           style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
-        <Show when={!g() || g()!.over !== null || !playing()}>
+        <Show when={!g() || g()!.over !== undefined || !playing()}>
           <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
             <span>
               {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />
               <span class="phone-blink">
                 {t("web.farm.phone.pressA", {
-                  what: g() && g()!.over === null ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
+                  what: g() && g()!.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
                 })}
               </span>
             </span>

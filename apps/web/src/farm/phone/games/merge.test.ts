@@ -97,7 +97,7 @@ describe("merge", () => {
     const g = play(9, "lu");
     const next = slideMerge(g, "right");
     const back = undoMerge(next);
-    expect(back).toEqual({ ...g, previous: null });
+    expect(back).toEqual({ ...g, previous: undefined });
     expect(slideMerge(back, "right").board).toEqual(next.board);
     expect(undoMerge(back)).toBe(back);
   });

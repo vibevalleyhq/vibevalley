@@ -108,7 +108,7 @@ export interface ServerReady {
 
 /** What checking a form before saving it found: the first thing that would be refused, if any. */
 export interface Validation {
-  problem?: string;
+  problem: string;
 }
 
 export interface RuntimeQuota {
@@ -244,11 +244,11 @@ export interface ChatMessage {
 
 export interface Embed {
   url: string;
-  title?: string;
-  description?: string;
-  site?: string;
+  title: string;
+  description: string;
+  site: string;
   /** An image the page shows for it, at its own address on the web. */
-  image?: string;
+  image: string;
 }
 
 export const NotifyValues = ["all", "mentions", "none"] as const;
@@ -293,13 +293,13 @@ export interface ArtifactCard {
   /** html: the version announced; blocks: 0. */
   version: number;
   /** What this version changed, in the maker's words. */
-  note?: string;
+  note: string;
 }
 
 export interface ArtifactVersion {
   version: number;
   size: number;
-  note?: string;
+  note: string;
   /** Who made it: a profile's id, or the owner's. */
   by: string;
   byName: string;
@@ -384,7 +384,7 @@ export interface Channel {
   /** A thread's channel. */
   parent?: string;
   /** A channel's group in the sidebar. */
-  category?: string;
+  category: string;
   /** Its place in the sidebar, lowest first; none comes after the placed. */
   position?: number;
   archived?: number;
@@ -394,7 +394,7 @@ export interface Channel {
   root?: string;
   rootNumber?: number;
   name?: string;
-  description?: string;
+  description: string;
   project?: string;
   subjectKind?: SubjectKind;
   subjectId?: string;
@@ -404,7 +404,7 @@ export interface Channel {
   /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
   unread?: number;
   /** A thread not on an issue or a task graph, by the server: a talk thread's session, else the head of the message it hangs under. */
-  title?: string;
+  title: string;
   /** The newest message, as a list shows it under the channel. */
   last?: ChannelLast;
   at: number;
@@ -532,7 +532,7 @@ export interface Task {
   frozen: string[];
   state: TaskState;
   session?: SessionId;
-  conclusion?: string;
+  conclusion: string;
   commits: string[];
   spent?: Spent;
   tries: number;
@@ -557,7 +557,7 @@ export interface TaskGraph {
   actions: GraphAction[];
   tasks: Task[];
   parallel: number;
-  note?: string;
+  note: string;
   createdAt: number;
   layers: string[][];
   asksForYou: boolean;
@@ -641,7 +641,7 @@ export interface ChannelReset {
 
 export interface WorkspaceState {
   call: CallState;
-  callReason?: string;
+  callReason: string;
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
   orchestrators: Record<string, OrchestratorNow>;
   sessions: Session[];
@@ -726,8 +726,8 @@ export type AccountUsage = AccountUsageOk | AccountUsageBalance | AccountUsageLo
 
 export interface InventoryEntry {
   name: string;
-  description?: string;
-  source?: string;
+  description: string;
+  source: string;
   enabled?: boolean;
 }
 
@@ -754,7 +754,7 @@ export interface RuntimeInfo {
   settings: RuntimeSettings;
   spentToday?: number;
   quota?: RuntimeQuota;
-  stop?: string;
+  stop: string;
   checkedAt: number;
 }
 
@@ -791,7 +791,7 @@ export interface InboxWords {
   label: string;
   title: string;
   body: string;
-  tray?: string;
+  tray: string;
 }
 
 export interface InboxItem {
@@ -886,12 +886,12 @@ export interface GraphEvent {
   kind: GraphEventKind;
   actor: ActorKind;
   session?: SessionId;
-  detail?: string;
+  detail: string;
   changes: TaskFieldChange[];
   commits: string[];
   at: number;
-  text?: string;
-  actorText?: string;
+  text: string;
+  actorText: string;
 }
 
 export interface LanDevice {
@@ -916,7 +916,7 @@ export interface LanStatus {
   open: boolean;
   hostName: string;
   url?: string;
-  problem?: string;
+  problem: string;
   pairing?: LanPairing;
   devices: LanDevice[];
 }
@@ -931,15 +931,15 @@ export interface LanPairing {
 export interface ConnectorStatus {
   id: ConnectorID;
   state: ConnectorState;
-  qr?: string;
-  pairCode?: string;
+  qr: string;
+  pairCode: string;
   channel?: string;
   owner?: string;
   since?: number;
   lastInbound?: number;
   pausedUntil?: number;
   pending: number;
-  error?: string;
+  error: string;
 }
 
 export const ConnectorStateValues = ["off", "waiting", "scanned", "verify", "pairing", "connected", "paused"] as const;
@@ -1034,7 +1034,7 @@ export interface GitHubStatus {
   /** The logged-in account, when logged in. */
   account?: string;
   /** Why it is not usable, when it is not. */
-  reason?: string;
+  reason: string;
   checkedAt: number;
 }
 
@@ -1143,7 +1143,7 @@ export interface MemorySourceInfo {
   name: string;
   label: string;
   on: boolean;
-  off?: string;
+  off: string;
   canList: boolean;
   canForget: boolean;
   transcripts: boolean;
@@ -1300,7 +1300,7 @@ export interface Issue {
   id: IssueId;
   number: number;
   title: string;
-  description?: string;
+  description: string;
   project?: string;
   assignee?: string;
   priority: Priority;
@@ -1372,7 +1372,7 @@ export type CheckResult = (typeof CheckResultValues)[number];
 export interface CriterionCheck {
   criterion: number;
   result: CheckResult;
-  proof?: string;
+  proof: string;
 }
 
 /** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
@@ -1542,7 +1542,7 @@ export interface Run {
   startedAt: number;
   endedAt?: number;
   outcome?: Outcome;
-  summary?: string;
+  summary: string;
   spent?: Spent;
 }
 
@@ -2121,7 +2121,7 @@ export interface FactCall {
   type: "call";
   at: number;
   state: CallState;
-  reason?: string;
+  reason: string;
 }
 
 /** What an orchestrator is doing now. */
@@ -2443,7 +2443,8 @@ export interface VoiceSaid {
 export interface VoiceHeard {
   agentId: string;
   text: string;
-  agent: string | null;
+  /** The profile the owner picked; absent for none. */
+  agent?: string;
   sendKey?: string;
 }
 
