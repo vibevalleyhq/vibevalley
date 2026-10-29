@@ -1,5 +1,6 @@
 import { maybe, t } from "@vibevalley/i18n";
 
+import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
 import { Predicate } from "effect";
 import { messageOf } from "@/errors.ts";
 import { reportVerdict } from "@/session/rules.ts";
@@ -175,18 +176,17 @@ export function sentTitles(all: readonly Issue[], project: string, orchestrator:
 const commandHoles = /\s?\{(test|lint|build)\}\s?/g;
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
-export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): IssueTemplate {
+export function filledTemplate(s: WrittenTemplate, stack: Partial<ProjectStack>): IssueTemplate {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
   const done = s.done.replace(commandHoles, (hole, name: string) =>
     commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : (maybe(`server.issue.template.commands.${name}`) ?? hole),
   );
   const text = t("server.issue.template.done", { title: s.title, done });
   const blank = firstBlank(text);
-  const { blank: _, ...rest } = s;
-  return { ...rest, done, text, ...(blank ? { blank } : {}) };
+  return { id: s.id, title: s.title, done, text, ...(blank ? { blank } : {}) };
 }
 
-export const filledKinds = (kinds: readonly TemplateKind[], stack: Partial<ProjectStack>): TemplateKind[] =>
+export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<ProjectStack>): TemplateKind[] =>
   kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): TemplateBlank | undefined {

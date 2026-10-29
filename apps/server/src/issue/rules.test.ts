@@ -184,7 +184,7 @@ describe("templates", () => {
       kindIds.add(k.id);
       const ids = new Set<string>();
       for (const s of k.templates) {
-        expect(s.id && !ids.has(s.id) && s.title && s.done && !s.text && !s.blank).toBeTruthy();
+        expect(s.id && !ids.has(s.id) && s.title && s.done).toBeTruthy();
         ids.add(s.id);
         for (const hole of (s.title + s.done).match(/\{[^}]*\}/g) ?? []) expect(["{test}", "{lint}", "{build}"]).toContain(hole);
       }
@@ -199,7 +199,7 @@ describe("templates", () => {
     expect(got.blank).toEqual({ start: 8, end: 12 });
     expect(got.text.slice(got.blank!.start, got.blank!.end)).toBe("〔现象〕");
     expect(filledTemplate(template, {}).done).toBe("构建不再报错；跑一遍测试，再看（代码检查）");
-    const partly = filledTemplate({ id: "", title: "测试挂了就修", done: "{build} 和 {test} 都通过", text: "" }, { name: "node", test: "bun run test" });
+    const partly = filledTemplate({ id: "", title: "测试挂了就修", done: "{build} 和 {test} 都通过" }, { name: "node", test: "bun run test" });
     expect([partly.done, partly.blank]).toEqual(["构建和 `bun run test` 都通过", undefined]);
   });
 
@@ -211,7 +211,6 @@ describe("templates", () => {
           expect(s.text).toContain("\n做到什么程度算完：");
           expect(s.title.includes("〔")).toBe(s.blank !== undefined);
         }
-    expect(templateCatalog()[0]!.templates[0]!.text).toBeFalsy();
   });
 
   it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {

@@ -181,7 +181,7 @@ export const make = Effect.gen(function* () {
     if (u.locale) next.locale = u.locale === "zh" ? undefined : u.locale;
     if (u.dictation) {
       const d = {
-        via: u.dictation.via === "own" ? ("own" as const) : undefined,
+        ...(u.dictation.via === "own" ? { via: "own" as const } : {}),
         url: u.dictation.url.trim().replace(/\/+$/, ""),
         model: u.dictation.model.trim(),
       };
@@ -191,7 +191,7 @@ export const make = Effect.gen(function* () {
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
     if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
-    const kept = Schema.decodeUnknownSync(Stored)(compact(next));
+    const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
     yield* Effect.try({
       try: () => disk.write(() => JSON.stringify(kept, null, 2) + "\n"),
       catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }) }),

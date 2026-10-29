@@ -4,6 +4,8 @@ import { list, t } from "@vibevalley/i18n";
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
 
+import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -44,6 +46,9 @@ const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
 
 /** The plot's issue while the store says so (the inspect layer). */
+/** A word's label when it is one of values; the word itself otherwise. */
+const labelOf = <K extends string>(labels: Record<K, string>, values: readonly K[], word: string) => (isOneOf(values, word) ? labels[word] : word);
+
 export function IssueView() {
   const inspect = useFarm((s) => overlayOf(s, "inspect")?.sessionId);
   const core = useCore();
@@ -491,7 +496,7 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
       </div>
       <p class="mt-2 text-[13px]">{cropLabel[plot().crop]}</p>
       <p class={["text-center", xs]}>
-        {(speciesLabel as Record<string, string>)[kind()[0] ?? ""] ?? kind()[0]} · {(outfitLabel as Record<string, string>)[kind()[1] ?? ""] ?? kind()[1]}
+        {labelOf(speciesLabel, SpeciesValues, kind()[0] ?? "")} · {labelOf(outfitLabel, OutfitValues, kind()[1] ?? "")}
       </p>
       <p class={xs}>{t("web.farm.plot.where", { plot: stationOfSession(props.session) + 1, round: Math.round(props.session.runs) })}</p>
     </div>

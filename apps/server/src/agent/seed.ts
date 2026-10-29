@@ -2,7 +2,7 @@
 // templates, in the farm's language (a profile's templates are folders, template.ts). The .en files say the same as the Chinese but for their words (seed.test.ts).
 
 import * as S from "@vibevalley/protocol/schema";
-import type { RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
+import type { RuntimeFacts, RuntimePreset, RuntimeSettings } from "@vibevalley/protocol";
 import { currentLocale } from "@vibevalley/i18n";
 import { Schema } from "effect";
 import seedsZh from "./seeds.json";
@@ -31,7 +31,13 @@ const Seeds = Schema.Struct({
   fallbackPreset: S.RuntimePreset,
   runtimeFacts: Schema.Record(Schema.String, S.RuntimeFacts),
 });
-const Catalog = Schema.Struct({ kinds: Schema.Array(S.TemplateKind) });
+/** A template as template_catalog.json writes it: done may still hold {test}, {lint} and {build}; its text is made when
+ * it is filled for a project (issue/rules.ts filledTemplate). */
+const WrittenTemplate = Schema.Struct({ id: Schema.String, title: Schema.String, done: Schema.String });
+export type WrittenTemplate = typeof WrittenTemplate.Type;
+const WrittenKind = Schema.Struct({ id: Schema.String, name: Schema.String, icon: Schema.String, templates: Schema.Array(WrittenTemplate) });
+export type WrittenKind = typeof WrittenKind.Type;
+const Catalog = Schema.Struct({ kinds: Schema.Array(WrittenKind) });
 
 // Read once per language; a seed file that does not fit its shape stops the server at its first use.
 const read = <A, I>(schema: Schema.Codec<A, I>, zh: unknown, en: unknown) => {
@@ -68,5 +74,5 @@ export function factsOf(runtime: string): RuntimeFacts {
   return facts ? structuredClone(facts) : { steer: false, refused: {}, capabilities: [], inProcess: false };
 }
 
-/** The issue templates on the sowing form, in its order, as written: done still holds {test}, {lint} and {build}. A copy each call. */
-export const templateCatalog = (): TemplateKind[] => structuredClone([...catalog().kinds]);
+/** The issue templates on the sowing form, in its order, as written. */
+export const templateCatalog = (): readonly WrittenKind[] => catalog().kinds;

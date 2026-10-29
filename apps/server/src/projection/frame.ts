@@ -1,4 +1,4 @@
-import { GraphActionValues, type GraphAction } from "@vibevalley/protocol";
+import { type GraphAction } from "@vibevalley/protocol";
 import { t } from "@vibevalley/i18n";
 // What the client gets. The words for people (a session's phaseText, a cron's
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
@@ -13,7 +13,13 @@ import { canEditTask, canRemoveTask, graphActions, taskActions } from "@/task/gr
 import { viewOf } from "@/game/view.ts";
 
 /** Every graph action in words, for the page to say any of them. */
-const graphActionText = () => Object.fromEntries(GraphActionValues.map((a) => [a, t(`server.task.graphAction.${a}`)])) as Record<GraphAction, string>;
+const graphActionText = (): Record<GraphAction, string> => ({
+  start: t("server.task.graphAction.start"),
+  pause: t("server.task.graphAction.pause"),
+  resume: t("server.task.graphAction.resume"),
+  abandon: t("server.task.graphAction.abandon"),
+  merge: t("server.task.graphAction.merge"),
+});
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): StateFrame {
   const graphs = graphsOf(state).map((g) => {
     const graph = { ...g, stateTag: t(`server.task.graphTag.${g.state}`), actionText: graphActionText(), actions: graphActions(g) };
