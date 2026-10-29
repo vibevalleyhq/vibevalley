@@ -1,6 +1,6 @@
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { agentProblems, chooseAgent, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
 
 test("the recorded cases", () => {

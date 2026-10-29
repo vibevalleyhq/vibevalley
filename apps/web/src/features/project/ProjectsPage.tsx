@@ -5,7 +5,7 @@ import { list, t } from "@vibevalley/i18n";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import {
   calendarOf,
   type CalendarDay,
@@ -22,19 +22,19 @@ import {
   sortProjects,
   streaksOf,
 } from "./rules";
-import { toast } from "../../ui/toasts";
-import { useRouter } from "../../base/router";
-import { autofocus, useNow } from "../../base/util";
-import { useWorkAgents } from "../../base/agents";
-import { ready, useProjects, useQuery } from "../../base/query";
-import { Button } from "../../ui/Button";
-import { Dialog } from "../../ui/Dialog";
-import { AgentFace } from "../../ui/Face";
-import { Field, TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { SpriteIcon } from "../../ui/pixel";
-import { Segmented } from "../../ui/Segmented";
-import { Card, ListCard, ListRow, Quiet } from "../../ui/layout";
+import { toast } from "@/ui/toasts";
+import { useRouter } from "@/base/router";
+import { autofocus, useNow } from "@/base/util";
+import { useWorkAgents } from "@/base/agents";
+import { ready, useProjects, useQuery } from "@/base/query";
+import { Button } from "@/ui/Button";
+import { Dialog } from "@/ui/Dialog";
+import { AgentFace } from "@/ui/Face";
+import { Field, TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { SpriteIcon } from "@/ui/pixel";
+import { Segmented } from "@/ui/Segmented";
+import { Card, ListCard, ListRow, Quiet } from "@/ui/layout";
 import { IslandDetail, ProjectMap, useIslands } from "./ProjectMap";
 
 type Asked<A> = QueryObserverResult<A>;

@@ -4,7 +4,7 @@
 
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
-import { api } from "../../base/api";
+import { api } from "@/base/api";
 import type { Nameable } from "./rules";
 
 export const CommandNames = ["issue", "remember", "stop", "dm"] as const;

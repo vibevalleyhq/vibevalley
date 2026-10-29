@@ -4,10 +4,10 @@ import { describe, expect, it } from "@effect/vitest";
 import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import { emptyProgress } from "../game/progress.ts";
-import { ServerConfig } from "../base/config.ts";
-import { testConfig } from "../testing/layers.ts";
-import { layer as projection } from "../projection/projection.ts";
+import { emptyProgress } from "@/game/progress.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { layer as projection } from "@/projection/projection.ts";
 import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 

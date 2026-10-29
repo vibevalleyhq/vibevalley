@@ -26,11 +26,11 @@ import {
   type Preview,
 } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer, Semaphore } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { Channels } from "../channel/chat.ts";
-import { type ApiError, lookIn, missing, refused } from "../errors.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { Channels } from "@/channel/chat.ts";
+import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qv from "../../db/generated/artifact_version.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";

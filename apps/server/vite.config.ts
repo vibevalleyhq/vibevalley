@@ -5,6 +5,8 @@ import { configDefaults } from "vite-plus/test/config";
 // The rules read the owner's local clock (reset times, night and weekend achievements) and the golden data was
 // recorded at UTC+8: every machine, CI included, runs the tests there.
 export default defineConfig({
+  // @/ is src/, as tsconfig.json says (tsx reads the same at run time).
+  resolve: { tsconfigPaths: true },
   // isolate: false loads the modules once per worker, not once per file (a fifth of the run), and lets Database keep
   // its emptied in-memory databases across files. It holds because no test leans on another's module state; files and
   // tests in shuffled order pass the same (vp test run --sequence.shuffle).

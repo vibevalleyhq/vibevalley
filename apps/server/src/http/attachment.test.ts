@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { attachmentPath } from "@vibevalley/protocol";
 import { Context, Effect, Layer } from "effect";
-import { Channels } from "../channel/chat.ts";
-import { testConfig } from "../testing/layers.ts";
-import { quietApp } from "../testing/world.ts";
+import { Channels } from "@/channel/chat.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { quietApp } from "@/testing/world.ts";
 import { app } from "./app.ts";
 
 const farm = Effect.gen(function* () {

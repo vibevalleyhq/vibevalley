@@ -5,19 +5,19 @@ import { t } from "@vibevalley/i18n";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
-import type { GlyphCell } from "../../ui/pixel/card";
+import type { GlyphCell } from "@/ui/pixel/card";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
-import { aria } from "../../base/util";
-import { AgentFace, OrchestratorFace } from "../../ui/Face";
-import { SpriteIcon } from "../../ui/pixel";
-import { phoneState } from "../support";
-import { type CallPhase, createCall, voiceCall } from "../../features/voice";
+import { aria } from "@/base/util";
+import { AgentFace, OrchestratorFace } from "@/ui/Face";
+import { SpriteIcon } from "@/ui/pixel";
+import { phoneState } from "@/farm/support";
+import { type CallPhase, createCall, voiceCall } from "@/features/voice";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
-import { useAgent } from "../../base/agents";
-import { useCore } from "../../base/frame";
+import { useAgent } from "@/base/agents";
+import { useCore } from "@/base/frame";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 

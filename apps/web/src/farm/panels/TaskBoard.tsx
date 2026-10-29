@@ -4,24 +4,24 @@ import { list, t } from "@vibevalley/i18n";
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
-import { spentText } from "../../base/format";
+import { spentText } from "@/base/format";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { doingOf } from "../hud/rules";
-import { farm } from "../store";
-import { stationOfSession } from "../world/plots";
-import { lineCounts } from "../../features/issue";
-import { aria, Keyed } from "../../base/util";
-import { useCore, useFrames } from "../../base/frame";
-import { ready, useProjects, useQuery } from "../../base/query";
-import { AgentFace } from "../../ui/Face";
-import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../../ui/pixel";
-import { useFarm } from "../state";
+import { api, reasonOf } from "@/base/api";
+import { doingOf } from "@/farm/hud/rules";
+import { farm } from "@/farm/store";
+import { stationOfSession } from "@/farm/world/plots";
+import { lineCounts } from "@/features/issue";
+import { aria, Keyed } from "@/base/util";
+import { useCore, useFrames } from "@/base/frame";
+import { ready, useProjects, useQuery } from "@/base/query";
+import { AgentFace } from "@/ui/Face";
+import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "@/ui/pixel";
+import { useFarm } from "@/farm/state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
-import { type Answer, graphs, useGraphChanges } from "../../features/task";
-import { useAgent, useWorkAgents } from "../../base/agents";
+import { type Answer, graphs, useGraphChanges } from "@/features/task";
+import { useAgent, useWorkAgents } from "@/base/agents";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {

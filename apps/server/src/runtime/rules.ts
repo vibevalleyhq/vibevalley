@@ -5,7 +5,7 @@ import { list, t } from "@vibevalley/i18n";
 
 import type { AccountUsage, Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
 import { sessionAppendSystemPrompt, sessionDisallowedTools, sessionEffort, sessionEnv, sessionMcpServers, sessionSystemPrompt } from "@vibevalley/protocol";
-import { factsOf, runtimeLabel } from "../agent/seed.ts";
+import { factsOf, runtimeLabel } from "@/agent/seed.ts";
 import { yuan } from "./money.ts";
 
 const two = (n: number) => String(n).padStart(2, "0");

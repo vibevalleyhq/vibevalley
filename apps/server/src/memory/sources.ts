@@ -4,10 +4,10 @@ import { t } from "@vibevalley/i18n";
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
-import type { MemorySourceConfig } from "../setting/rules.ts";
+import type { MemorySourceConfig } from "@/setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
 import { termsOf } from "./terms.ts";

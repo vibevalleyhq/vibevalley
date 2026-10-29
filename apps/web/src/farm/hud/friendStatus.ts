@@ -1,5 +1,5 @@
 import type { FarmView, Session } from "@vibevalley/protocol";
-import { isBusy, isRipe, plotOf } from "../world/plots";
+import { isBusy, isRipe, plotOf } from "@/farm/world/plots";
 
 export type FriendStatus = "bug" | "ripe" | "busy" | "rest" | "away";
 

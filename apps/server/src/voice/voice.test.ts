@@ -4,18 +4,18 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice } from "../setting/rules.ts";
+import { defaultVoice } from "@/setting/rules.ts";
 import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
-import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { Setting } from "../setting/setting.ts";
-import { testConfig } from "../testing/layers.ts";
-import { until } from "../testing/until.ts";
-import { world } from "../testing/world.ts";
-import { notificationsStart } from "../services.ts";
-import { Core } from "../core/core.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { Setting } from "@/setting/setting.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { until } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
+import { notificationsStart } from "@/services.ts";
+import { Core } from "@/core/core.ts";
 import { Voice, agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, vendorsFor, voiceAgentUid, voiceUnknown } from "./voice.ts";
 import { sessionId, issueId } from "@vibevalley/protocol/schema";
-import { timeHere, wallTime } from "../base/time.ts";
+import { timeHere, wallTime } from "@/base/time.ts";
 import { TestClock } from "effect/testing";
 
 afterEach(() => {

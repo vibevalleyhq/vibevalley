@@ -3,15 +3,15 @@ import { list, maybe, t } from "@vibevalley/i18n";
 // more helper, which profile a job goes to, and what a session is told about the farm. Lengths are UTF-16 units.
 
 import { Predicate } from "effect";
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { recallHead, recallIntro } from "./prompts.ts";
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, IssueAnswer, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
-import { clip, slice } from "../base/text.ts";
-import { runtimeLabel } from "../agent/seed.ts";
-import type { MergeFailure } from "../project/shapes.ts";
+import { clip, slice } from "@/base/text.ts";
+import { runtimeLabel } from "@/agent/seed.ts";
+import type { MergeFailure } from "@/project/shapes.ts";
 
 const summaryMax = 160;
 

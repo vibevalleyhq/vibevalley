@@ -2,10 +2,10 @@ import type { LiveEvent, SideEvent, StateFrame } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
 import { Effect, Layer, Stream } from "effect";
 import { HttpRouter } from "effect/http";
-import { ServerConfig } from "../base/config.ts";
-import { Core } from "../core/core.ts";
-import { layer as projection } from "../projection/projection.ts";
-import { testConfig } from "../testing/layers.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Core } from "@/core/core.ts";
+import { layer as projection } from "@/projection/projection.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { streams } from "./streams.ts";
 
 const appFor = (change: (core: Core["Service"]) => Core["Service"]) => {

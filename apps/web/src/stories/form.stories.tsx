@@ -1,10 +1,10 @@
 import { createSignal, Show } from "solid-js";
 import { stories, story } from "@vibevalley/stories";
-import { Field, Select, TextInput } from "../ui/Field";
-import { KeyField, SaveBar } from "../ui/KeyField";
-import { SecretInput, Toggle } from "../ui/layout";
-import { ToastHost } from "../ui/ToastHost";
-import { toast } from "../ui/toasts";
+import { Field, Select, TextInput } from "@/ui/Field";
+import { KeyField, SaveBar } from "@/ui/KeyField";
+import { SecretInput, Toggle } from "@/ui/layout";
+import { ToastHost } from "@/ui/ToastHost";
+import { toast } from "@/ui/toasts";
 
 interface Draft {
   name: string;

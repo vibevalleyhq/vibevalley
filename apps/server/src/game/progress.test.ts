@@ -1,7 +1,7 @@
 import type { WorkspaceState, Fact, LedgerEntry } from "@vibevalley/protocol";
-import { reduce } from "../projection/reduce.ts";
+import { reduce } from "@/projection/reduce.ts";
 import { describe, expect, it } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { catchUp, emptyFolded, entriesFor, harvestCoins, progressFold, progressStep } from "./progress.ts";
 
 describe("the ledger's fold", () => {

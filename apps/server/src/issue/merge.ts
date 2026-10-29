@@ -4,12 +4,12 @@ import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@v
 import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
-import type { Channels } from "../channel/chat.ts";
-import type { Core } from "../core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
-import { type Projects } from "../project/project.ts";
-import { type Merged, MergeFailure, type Workplace } from "../project/shapes.ts";
-import { type NotTakenIn, type Sessions } from "../session/session.ts";
+import type { Channels } from "@/channel/chat.ts";
+import type { Core } from "@/core/core.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
+import { type Projects } from "@/project/project.ts";
+import { type Merged, MergeFailure, type Workplace } from "@/project/shapes.ts";
+import { type NotTakenIn, type Sessions } from "@/session/session.ts";
 import { statusMove } from "./moves.ts";
 import { pullRequestConclusion } from "./rules.ts";
 

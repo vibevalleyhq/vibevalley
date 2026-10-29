@@ -4,8 +4,8 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { type Plugin, unified } from "unified";
-import { richen } from "../richText";
-import { remarkIssueRefs } from "../richRules";
+import { richen } from "@/ui/richText";
+import { remarkIssueRefs } from "@/ui/richRules";
 import { mentionHref, withMentions } from "./markdown";
 import { cx, pxText } from "./style";
 

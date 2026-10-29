@@ -7,10 +7,10 @@
 import { dot, particles, type PointLight } from "@vibevalley/engine/pixi";
 import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
 import { Container, type Graphics, Sprite, type Texture } from "pixi.js";
-import type { BedFx } from "../store";
-import type { BedFxKind } from "../tools";
-import type { Point } from "../world/level";
-import { plotH } from "../world/world";
+import type { BedFx } from "@/farm/store";
+import type { BedFxKind } from "@/farm/tools";
+import type { Point } from "@/farm/world/level";
+import { plotH } from "@/farm/world/world";
 
 const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 

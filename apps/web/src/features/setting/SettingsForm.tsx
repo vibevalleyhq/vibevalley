@@ -13,19 +13,19 @@ import {
   type SettingsStatus,
   type SettingsUpdate,
 } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { saveSettings } from "../../base/settings";
-import { ready, useQuery, useSettings } from "../../base/query";
-import { TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { IconButton } from "../../ui/IconButton";
-import { KeyField, SaveBar } from "../../ui/KeyField";
-import { KeyRow, SettingRow, SettingsGroup } from "../../ui/settings";
-import { Segmented } from "../../ui/Segmented";
-import { Hint, Tip } from "../../ui/Tip";
-import { toast } from "../../ui/toasts";
+import { api, reasonOf } from "@/base/api";
+import { saveSettings } from "@/base/settings";
+import { ready, useQuery, useSettings } from "@/base/query";
+import { TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { IconButton } from "@/ui/IconButton";
+import { KeyField, SaveBar } from "@/ui/KeyField";
+import { KeyRow, SettingRow, SettingsGroup } from "@/ui/settings";
+import { Segmented } from "@/ui/Segmented";
+import { Hint, Tip } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
 import { currentLocale } from "@vibevalley/i18n";
-import { Quiet, SecretInput, Toggle } from "../../ui/layout";
+import { Quiet, SecretInput, Toggle } from "@/ui/layout";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export type SettingsPart = "deepseek" | "memory";

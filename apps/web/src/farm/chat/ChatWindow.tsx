@@ -4,11 +4,11 @@ import { t } from "@vibevalley/i18n";
 // lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
 // the phone large.
 
-import { messageOf } from "../../base/format";
+import { messageOf } from "@/base/format";
 import { farmChannelLabel } from "./text";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
-import { newSendKey } from "../../base/api";
+import { newSendKey } from "@/base/api";
 import {
   arrived,
   pending,
@@ -27,18 +27,18 @@ import {
   followed,
   useMessage,
   useFollowed,
-} from "../../features/channel";
-import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "../../features/voice";
-import { playSound } from "../../ui/pixel/sound";
-import { farm } from "../store";
-import { useRouter } from "../../base/router";
-import { useNow } from "../../base/util";
-import { TurnSteps } from "../../features/session";
-import { orchestratorMood, useCore } from "../../base/frame";
-import { ready, useAgents } from "../../base/query";
-import { OrchestratorFace } from "../../ui/Face";
-import { PxButton, SpriteIcon } from "../../ui/pixel";
-import { useFarm } from "../state";
+} from "@/features/channel";
+import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
+import { playSound } from "@/ui/pixel/sound";
+import { farm } from "@/farm/store";
+import { useRouter } from "@/base/router";
+import { useNow } from "@/base/util";
+import { TurnSteps } from "@/features/session";
+import { orchestratorMood, useCore } from "@/base/frame";
+import { ready, useAgents } from "@/base/query";
+import { OrchestratorFace } from "@/ui/Face";
+import { PxButton, SpriteIcon } from "@/ui/pixel";
+import { useFarm } from "@/farm/state";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";

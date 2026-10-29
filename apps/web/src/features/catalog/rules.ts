@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // helper's by animal and outfit; which ones are a walk's frames; how one is drawn again.
 
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
-import { outfitLabel, speciesLabel } from "../../ui/cast";
+import { outfitLabel, speciesLabel } from "@/ui/cast";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Picture {

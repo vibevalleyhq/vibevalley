@@ -1,9 +1,9 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { Issues } from "../issue/issue.ts";
-import { Sessions, type SessionsInside } from "../session/session.ts";
-import { testConfig } from "../testing/layers.ts";
+import { Issues } from "@/issue/issue.ts";
+import { Sessions, type SessionsInside } from "@/session/session.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { farm, lab, mustHire, watch } from "./farm.ts";
 
 describe("a session", () => {

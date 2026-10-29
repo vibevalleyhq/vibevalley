@@ -2,13 +2,13 @@ import { t } from "@vibevalley/i18n";
 // 关于: the server's version, and where the farm keeps its files; copied, or shown in Finder where the host can.
 
 import { For, Show } from "solid-js";
-import { reasonOf } from "../../base/api";
-import { currentHost } from "../../base/host";
-import { ready, useSettings } from "../../base/query";
-import { IconButton } from "../../ui/IconButton";
-import { Quiet } from "../../ui/layout";
-import { SettingRow, SettingsGroup, SettingsPage } from "../../ui/settings";
-import { toast } from "../../ui/toasts";
+import { reasonOf } from "@/base/api";
+import { currentHost } from "@/base/host";
+import { ready, useSettings } from "@/base/query";
+import { IconButton } from "@/ui/IconButton";
+import { Quiet } from "@/ui/layout";
+import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
+import { toast } from "@/ui/toasts";
 
 function PathRow(props: { label: string; hint: string; path: string }) {
   const reveal = currentHost().reveal;

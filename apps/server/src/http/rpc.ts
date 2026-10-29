@@ -4,8 +4,8 @@ import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
 import { Effect, Layer } from "effect";
 import { type Headers, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
-import { Channels } from "../channel/chat.ts";
-import { deviceHeader } from "../lan/lan.ts";
+import { Channels } from "@/channel/chat.ts";
+import { deviceHeader } from "@/lan/lan.ts";
 
 const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
 

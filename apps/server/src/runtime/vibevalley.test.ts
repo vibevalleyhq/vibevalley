@@ -9,7 +9,7 @@ import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { standaloneOwner } from "@vibevalley/agent/brain";
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
-import { wallTime } from "../base/time.ts";
+import { wallTime } from "@/base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {

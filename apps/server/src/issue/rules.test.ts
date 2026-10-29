@@ -1,8 +1,8 @@
 import { type Issue, defaultOrchestrator, type ProjectStack, type Run } from "@vibevalley/protocol";
-import { templateCatalog } from "../agent/seed.ts";
-import { graphsOf } from "../task/issues.ts";
+import { templateCatalog } from "@/agent/seed.ts";
+import { graphsOf } from "@/task/issues.ts";
 import { describe, expect, it, test } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 import {
   pullRequestConclusion,
   refinementDescription,

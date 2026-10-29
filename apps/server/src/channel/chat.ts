@@ -7,7 +7,7 @@ import { list, t } from "@vibevalley/i18n";
 // than lost. Everything that changes the chat runs one at a time.
 
 import { HttpClient } from "effect/http";
-import { scopedPubSub } from "../base/pubsub.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import {
   type Chat,
@@ -43,7 +43,7 @@ import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { keepChannels, targetOf } from "./state.ts";
-import { head } from "../base/text.ts";
+import { head } from "@/base/text.ts";
 import {
   agentWakeCooldownMs,
   channelNameProblem,
@@ -65,19 +65,19 @@ import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Agents } from "../agent/agent.ts";
-import { ServerConfig } from "../base/config.ts";
-import { Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { jsonOrNone } from "../base/json.ts";
-import { bounded } from "../core/bounded.ts";
-import { Core } from "../core/core.ts";
+import { Agents } from "@/agent/agent.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
+import { bounded } from "@/core/bounded.ts";
+import { Core } from "@/core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import { Audience } from "./audience.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
-import { type ApiError, refused, lookIn, missing, Inconsistent } from "../errors.ts";
+import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";

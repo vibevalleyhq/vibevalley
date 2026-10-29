@@ -3,7 +3,7 @@
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { attachmentPath } from "@vibevalley/protocol";
-import { Channels } from "../channel/chat.ts";
+import { Channels } from "@/channel/chat.ts";
 
 const prefix = attachmentPath("");
 const inline = (type: string) => /^(image|video|audio)\//.test(type) || type === "application/pdf";

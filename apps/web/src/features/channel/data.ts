@@ -3,7 +3,7 @@
 import { type Accessor, createEffect, createSignal } from "solid-js";
 
 import type { Channel } from "@vibevalley/protocol";
-import { api } from "../../base/api";
+import { api } from "@/base/api";
 import { newestUnread } from "./rules";
 
 // Channels the owner marked unread while looking at them: they stay unread until the owner leaves and comes back.

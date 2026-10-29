@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 // grows it back or on. Looking up, the meadow sinks, the sky goes dark and every leaf and fruit rises to its star.
 
 import { onSettled } from "solid-js";
-import { reducedMotion } from "../ui/pixel";
+import { reducedMotion } from "@/ui/pixel";
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
 import type { MemoryItem, MemoryKind, MemoryTree } from "./mock";
 import { constellation, flashFor, hash01, kept, type Star, starsOf, tiesOf, type TreeFilter } from "./rules";

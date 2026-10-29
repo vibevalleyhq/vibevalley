@@ -7,10 +7,10 @@ import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "s
 import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
-import { api, newSendKey, reasonOf } from "../../base/api";
-import { badgeColors, CardColors } from "../../ui/pixel/card";
-import { type SpriteAtlas, type SpriteInfo, useAtlas } from "../../ui/pixel/atlas";
-import { castOf, castSprite, cropSprite } from "../../ui/cast";
+import { api, newSendKey, reasonOf } from "@/base/api";
+import { badgeColors, CardColors } from "@/ui/pixel/card";
+import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
+import { castOf, castSprite, cropSprite } from "@/ui/cast";
 import {
   growthOf,
   homeless,
@@ -28,21 +28,21 @@ import {
   since,
   spotText,
 } from "./rules";
-import { toast } from "../../ui/toasts";
-import { writeIssue } from "../issue";
-import { useRouter } from "../../base/router";
-import { autofocus } from "../../base/util";
-import { useCore, useFrames } from "../../base/frame";
-import { defaultOf } from "../channel";
-import { ready, useAgents, useProjects } from "../../base/query";
-import { PixelCard } from "../../ui/pixel";
-import { Button } from "../../ui/Button";
-import { Dialog } from "../../ui/Dialog";
-import { AgentFace } from "../../ui/Face";
-import { TextArea } from "../../ui/Field";
-import { SpriteIcon } from "../../ui/pixel";
-import { PoseSprite } from "../../ui/PoseSprite";
-import { Card, Quiet } from "../../ui/layout";
+import { toast } from "@/ui/toasts";
+import { writeIssue } from "@/features/issue";
+import { useRouter } from "@/base/router";
+import { autofocus } from "@/base/util";
+import { useCore, useFrames } from "@/base/frame";
+import { defaultOf } from "@/features/channel";
+import { ready, useAgents, useProjects } from "@/base/query";
+import { PixelCard } from "@/ui/pixel";
+import { Button } from "@/ui/Button";
+import { Dialog } from "@/ui/Dialog";
+import { AgentFace } from "@/ui/Face";
+import { TextArea } from "@/ui/Field";
+import { SpriteIcon } from "@/ui/pixel";
+import { PoseSprite } from "@/ui/PoseSprite";
+import { Card, Quiet } from "@/ui/layout";
 
 const gap = 24;
 const parchment = "#ebd9ae";

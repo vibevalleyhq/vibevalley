@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // to what each app takes; a digest of what waited; the pairing words.
 
 import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
-import { slice } from "../base/text.ts";
+import { slice } from "@/base/text.ts";
 
 /** In UTF-16 units; longer ones are cut. */
 export const maxChars: Record<ConnectorID, number> = { weixin: 1800, feishu: 4000, qq: 2000 };

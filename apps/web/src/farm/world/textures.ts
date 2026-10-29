@@ -2,7 +2,7 @@
 // its art width and the scene drawn at that density keeps every picture pixel.
 
 import { Assets, Texture, TextureStyle } from "pixi.js";
-import type { SpriteAtlas } from "../../ui/pixel/atlas";
+import type { SpriteAtlas } from "@/ui/pixel/atlas";
 
 const loaded = new Map<string, Promise<Texture>>();
 const ready = new Map<string, Texture>();

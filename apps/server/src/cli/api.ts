@@ -11,7 +11,7 @@ import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http
 import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/protocol";
 import { ApiError, type Endpoint, endpoints, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
-import { announced, homeOf } from "../base/lease.ts";
+import { announced, homeOf } from "@/base/lease.ts";
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";
 
 const fallbackServer = "http://127.0.0.1:8787";

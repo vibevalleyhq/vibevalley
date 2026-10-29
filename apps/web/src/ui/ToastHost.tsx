@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 
 import { For } from "solid-js";
 import { toasts } from "./toasts";
-import { createExternal } from "../base/external";
+import { createExternal } from "@/base/external";
 
 /** Draws the toasts (ui/toasts.ts) at the bottom of the page. */
 export function ToastHost() {

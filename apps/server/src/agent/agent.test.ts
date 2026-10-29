@@ -3,11 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { Cause, Effect, Exit, Layer } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { testConfig } from "../testing/layers.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { Agents, withCast } from "./agent.ts";
 import { defaultSettings } from "./seed.ts";
-import { starter } from "../testing/layers.ts";
+import { starter } from "@/testing/layers.ts";
 
 const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(Agents.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config))))));

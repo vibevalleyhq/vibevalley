@@ -4,9 +4,9 @@ import { t } from "@vibevalley/i18n";
 
 import { For, Show } from "solid-js";
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
-import { lcd } from "../lcd";
-import { playSound } from "../../../ui/pixel/sound";
-import { kept, usePad } from "../../support";
+import { lcd } from "@/farm/phone/lcd";
+import { playSound } from "@/ui/pixel/sound";
+import { kept, usePad } from "@/farm/support";
 
 const warehouse = kept(newWarehouse());
 

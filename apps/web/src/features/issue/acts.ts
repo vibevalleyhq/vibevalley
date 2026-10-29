@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal } from "solid-js";
 import type { Issue, IssueAct, IssueAction } from "@vibevalley/protocol";
-import { api, newSendKey } from "../../base/api";
+import { api, newSendKey } from "@/base/api";
 
 /** Words said again with the same sendKey are said once. */
 export function perform(issue: Issue, a: IssueAction, words = "", sendKey = newSendKey()): Promise<unknown> {

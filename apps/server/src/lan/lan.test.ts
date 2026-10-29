@@ -8,11 +8,11 @@ import { describe, expect, it } from "@effect/vitest";
 import { attachmentPath, lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Layer } from "effect";
-import { app } from "../http/app.ts";
-import { testConfig } from "../testing/layers.ts";
+import { app } from "@/http/app.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { Lan, remoteMay } from "./lan.ts";
-import { until } from "../testing/until.ts";
-import { quietApp } from "../testing/world.ts";
+import { until } from "@/testing/until.ts";
+import { quietApp } from "@/testing/world.ts";
 
 const web = mkdtempSync(join(tmpdir(), "vv-lan-web-"));
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");

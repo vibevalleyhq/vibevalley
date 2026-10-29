@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { actionIcon, type IconName } from "../../ui/icons";
+import { actionIcon, type IconName } from "@/ui/icons";
 
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -20,10 +20,10 @@ import {
   spansOf,
   turnLabel,
 } from "./rounds";
-import { ago, tookText } from "../../base/format";
-import { aria, useNow } from "../../base/util";
-import { Icon } from "../../ui/Icon";
-import { Markdown } from "../../ui/Markdown";
+import { ago, tookText } from "@/base/format";
+import { aria, useNow } from "@/base/util";
+import { Icon } from "@/ui/Icon";
+import { Markdown } from "@/ui/Markdown";
 import { createSessionEvents } from "./data";
 
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */

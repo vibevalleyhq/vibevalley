@@ -2,11 +2,11 @@
 // facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 
 import type { WorkspaceState, Fact, OrchestratorState, Outcome, Phase, Session } from "@vibevalley/protocol";
-import { withChannel, withMessage, withOwnerMentions } from "../channel/state.ts";
-import { withIssue, withIssueStatuses } from "../issue/state.ts";
+import { withChannel, withMessage, withOwnerMentions } from "@/channel/state.ts";
+import { withIssue, withIssueStatuses } from "@/issue/state.ts";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
-import { freeStation, playedDoing, playedRun, playOf, stationed } from "../game/play.ts";
-import { sessionOf, whileWorking, withSession } from "../session/state.ts";
+import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
+import { sessionOf, whileWorking, withSession } from "@/session/state.ts";
 
 const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 

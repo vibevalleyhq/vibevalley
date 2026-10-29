@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
 import type { SessionEvent } from "@vibevalley/protocol";
-import { big, tookText } from "../../base/format";
+import { big, tookText } from "@/base/format";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** The steps kept for one session's log in the page. */

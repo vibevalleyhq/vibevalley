@@ -5,9 +5,9 @@ import { t } from "@vibevalley/i18n";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChangedFile } from "@vibevalley/protocol";
-import { changeKind, patchLines, patchMarkOf } from "../../features/issue";
-import { aria } from "../../base/util";
-import { SpriteIcon } from "../../ui/pixel";
+import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
+import { aria } from "@/base/util";
+import { SpriteIcon } from "@/ui/pixel";
 
 /** A colour at `alpha` of its strength over cream. */
 export const tint = (hex: string, alpha: number) => `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, #f7e8c4)`;

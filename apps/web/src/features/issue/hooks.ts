@@ -2,10 +2,10 @@ import { t } from "@vibevalley/i18n";
 
 import { createMemo } from "solid-js";
 import { defaultOrchestrator, type TaskGraph } from "@vibevalley/protocol";
-import { reasonOf } from "../../base/api";
-import { toast } from "../../ui/toasts";
-import { useFrames } from "../../base/frame";
-import { ready, queries, useAgents } from "../../base/query";
+import { reasonOf } from "@/base/api";
+import { toast } from "@/ui/toasts";
+import { useFrames } from "@/base/frame";
+import { ready, queries, useAgents } from "@/base/query";
 
 const noGraphs: TaskGraph[] = [];
 

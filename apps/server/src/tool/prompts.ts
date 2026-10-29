@@ -17,14 +17,14 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
-import { runtimeLabel } from "../agent/seed.ts";
-import { nextText, whenText } from "../cron/when.ts";
-import { head } from "../base/text.ts";
-import { yuan } from "../runtime/money.ts";
+import { runtimeLabel } from "@/agent/seed.ts";
+import { nextText, whenText } from "@/cron/when.ts";
+import { head } from "@/base/text.ts";
+import { yuan } from "@/runtime/money.ts";
 import type { Handlers } from "@vibevalley/protocol/api";
 
 type Op = keyof Handlers;
-import type { Roster } from "../session/session.ts";
+import type { Roster } from "@/session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));
 

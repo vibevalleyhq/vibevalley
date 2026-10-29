@@ -1,12 +1,12 @@
 import { For, Match, Show, Switch } from "solid-js";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { phaseIcon } from "./rules";
-import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
-import { Icon, type IconSize } from "../../ui/Icon";
-import { useAgent } from "../../base/agents";
-import { useCore } from "../../base/frame";
+import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
+import { Icon, type IconSize } from "@/ui/Icon";
+import { useAgent } from "@/base/agents";
+import { useCore } from "@/base/frame";
 
-export { Dot } from "../../ui/Dot";
+export { Dot } from "@/ui/Dot";
 
 export function PhaseGlyph(props: { phase: Phase; size?: IconSize }) {
   return (

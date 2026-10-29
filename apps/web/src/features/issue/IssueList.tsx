@@ -2,16 +2,16 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useOrchestrators } from "../../base/agents";
+import { useOrchestrators } from "@/base/agents";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
 import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
 import type { IssueStatus } from "@vibevalley/protocol";
 import { closedShown, laneLabel, laneStatus } from "./rules";
-import { ago } from "../../base/format";
-import { OrchestratorFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
+import { ago } from "@/base/format";
+import { OrchestratorFace } from "@/ui/Face";
+import { Icon } from "@/ui/Icon";
 import { EmptyNote, OlderLink, QuickAdd } from "./Board";
-import { IconButton } from "../../ui/IconButton";
+import { IconButton } from "@/ui/IconButton";
 import { useGraphs, useNameOf } from "./hooks";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 

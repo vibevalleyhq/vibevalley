@@ -272,6 +272,11 @@ export default defineConfig({
         rules: { "vibevalley/page-layers": "error" },
       },
       {
+        // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).
+        files: ["apps/web/src/**", "apps/server/src/**"],
+        rules: { "vibevalley/parent-import": "error" },
+      },
+      {
         // eslint-plugin-solid's v2 config, for the page: the 1.x APIs, one-argument effects, destructured props, accessors
         // passed as props, writes inside computations. Its server-function rules are left out: there are none here.
         files: ["apps/web/src/**"],

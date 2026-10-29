@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // words, when it resets.
 
 import type { RuntimeInfo } from "@vibevalley/protocol";
-import { numberText } from "../../base/format";
+import { numberText } from "@/base/format";
 
 /** A switched-off runtime's account is not the farm's business. */
 export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);

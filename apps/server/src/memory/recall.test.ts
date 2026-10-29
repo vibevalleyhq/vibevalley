@@ -1,6 +1,6 @@
 import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { lineOf, memoryNotesOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
 import { termsOf } from "./terms.ts";
 import { sessionId } from "@vibevalley/protocol/schema";

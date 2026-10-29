@@ -4,9 +4,9 @@ import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
-import { lcd } from "../lcd";
-import { playSound } from "../../../ui/pixel/sound";
-import { kept, usePad, useTicks } from "../../support";
+import { lcd } from "@/farm/phone/lcd";
+import { playSound } from "@/ui/pixel/sound";
+import { kept, usePad, useTicks } from "@/farm/support";
 
 const game = kept<Blocks | null>(null);
 const best = kept(0);

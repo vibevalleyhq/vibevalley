@@ -1,12 +1,12 @@
-import { Tabs } from "../../ui/Tabs";
+import { Tabs } from "@/ui/Tabs";
 import { t } from "@vibevalley/i18n";
-import { tookText } from "../../base/format";
-import { Splitter, usePaneWidth } from "../../ui/Splitter";
-import type { IconName } from "../../ui/icons";
+import { tookText } from "@/base/format";
+import { Splitter, usePaneWidth } from "@/ui/Splitter";
+import type { IconName } from "@/ui/icons";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import {
   archivedOf,
   groupsOf,
@@ -30,20 +30,20 @@ import {
   defaultOf,
   workbenchClock,
 } from "./rules";
-import { aria, autofocus, Keyed, useNow } from "../../base/util";
-import { useRouter } from "../../base/router";
-import { orchestratorMood, useCore } from "../../base/frame";
-import { OrchestratorFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
+import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { useRouter } from "@/base/router";
+import { orchestratorMood, useCore } from "@/base/frame";
+import { OrchestratorFace } from "@/ui/Face";
+import { Icon } from "@/ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer, FileDrop } from "./Composer";
 import { switcher } from "./QuickSwitcher";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
-import { ready, useAgents } from "../../base/query";
-import { useAgent, useOrchestrators } from "../../base/agents";
-import { toast } from "../../ui/toasts";
-import { Dialog } from "../../ui/Dialog";
-import { Select } from "../../ui/Field";
+import { ready, useAgents } from "@/base/query";
+import { useAgent, useOrchestrators } from "@/base/agents";
+import { toast } from "@/ui/toasts";
+import { Dialog } from "@/ui/Dialog";
+import { Select } from "@/ui/Field";
 import { MessageList } from "./MessageList";
 import { Jobs, Crons } from "./Tabs";
 

@@ -18,9 +18,9 @@ import type {
 } from "@vibevalley/protocol";
 import { Clock, Effect, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
-import { Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { type ApiError, lookIn, refused } from "../errors.ts";
+import { Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { type ApiError, lookIn, refused } from "@/errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
@@ -30,7 +30,7 @@ import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qb from "../../db/generated/artifact_block.sql.ts";
 import * as qr from "../../db/generated/artifact_block_revision.sql.ts";
 import * as qc from "../../db/generated/artifact_change.sql.ts";
-import { jsonOf } from "../base/json.ts";
+import { jsonOf } from "@/base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
 
 const attrsOf = jsonOf(S.BlockAttrs);

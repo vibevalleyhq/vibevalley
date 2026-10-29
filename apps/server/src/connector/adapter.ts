@@ -3,7 +3,7 @@
 
 import { Data, type Effect } from "effect";
 import type { ConnectorID, ConnectorLogin, ConnectorState } from "@vibevalley/protocol";
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 
 export interface Inbound {
   /** Each is taken once. */

@@ -1,7 +1,7 @@
 import type { Changes, Issue, Session } from "@vibevalley/protocol";
 import { stories, story, type Story } from "@vibevalley/stories";
-import { answer } from "../../base/storyApi";
-import { ToastHost } from "../../ui/ToastHost";
+import { answer } from "@/base/storyApi";
+import { ToastHost } from "@/ui/ToastHost";
 import { AnswerView, IssueDetail } from "./IssueDetail";
 import { TodoDetail } from "./TodoDetail";
 import { acts, min, now, sampleChanges, sampleIssue, sampleSession, working } from "./issue.samples";

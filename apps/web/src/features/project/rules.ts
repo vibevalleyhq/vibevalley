@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { type Crop, dayMs, type Issue, type LanguageCount, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
-import type { Pose } from "../../ui/cast";
+import type { Pose } from "@/ui/cast";
 
 interface LangDef {
   readonly label: string;

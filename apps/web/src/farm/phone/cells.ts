@@ -1,4 +1,4 @@
-import type { GlyphCell } from "../../ui/pixel/card";
+import type { GlyphCell } from "@/ui/pixel/card";
 
 /** The phone, drawn in cells on a 10 × 16 grid; lit while it rings. */
 export const phoneCells = (lit: boolean): GlyphCell[] => [

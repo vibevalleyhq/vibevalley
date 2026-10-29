@@ -5,8 +5,8 @@
 import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
 import { type Accessor, createEffect, createSignal } from "solid-js";
 import { chatPage } from "./rules";
-import { api } from "../../base/api";
-import { followReports, followChannel } from "../../base/gateway";
+import { api } from "@/base/api";
+import { followReports, followChannel } from "@/base/gateway";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Followed {

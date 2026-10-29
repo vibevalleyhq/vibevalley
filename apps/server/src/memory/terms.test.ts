@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { goldenCases } from "../testing/golden.ts";
+import { goldenCases } from "@/testing/golden.ts";
 import { termsList, termsOf } from "./terms.ts";
 
 test("the words are gse's, as recorded", () => {

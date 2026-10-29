@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Effect, FiberSet, Predicate, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
-import { jsonOrNone } from "../base/json.ts";
+import { jsonOrNone } from "@/base/json.ts";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { type Adapter, AppFailed, failedOf, failedWith } from "./adapter.ts";
 

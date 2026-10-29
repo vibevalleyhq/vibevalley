@@ -48,8 +48,9 @@ describe("the modules", () => {
     for (const file of files(src)) {
       const from = rel(file);
       if (from.endsWith(".test.ts") || outside.includes(from.split("/")[0]!)) continue;
-      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"(\.{1,2}\/[^"]+)"/g)) {
-        const to = rel(normalize(join(dirname(file), m[1]!)));
+      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"((?:\.{1,2}|@)\/[^"]+)"/g)) {
+        const spec = m[1]!;
+        const to = spec.startsWith("@/") ? normalize(spec.slice(2)) : rel(normalize(join(dirname(file), spec)));
         if (moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)) found.push(`${from} -> ${to}`);
       }
     }

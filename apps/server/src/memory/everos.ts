@@ -10,9 +10,9 @@ import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 import { createHash } from "node:crypto";
-import { newId } from "../base/ids.ts";
-import { redact } from "../base/redact.ts";
-import type { MemorySourceConfig } from "../setting/rules.ts";
+import { newId } from "@/base/ids.ts";
+import { redact } from "@/base/redact.ts";
+import type { MemorySourceConfig } from "@/setting/rules.ts";
 import { clip, recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 

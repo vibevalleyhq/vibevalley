@@ -4,9 +4,9 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./rules";
-import { aria } from "../../base/util";
-import { Select } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
+import { aria } from "@/base/util";
+import { Select } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
 import { toneVar } from "./Marks";
 
 /** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right.

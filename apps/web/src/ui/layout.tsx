@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { createSignal, omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "./A";
-import { aria } from "../base/util";
+import { aria } from "@/base/util";
 import { TextInput } from "./Field";
 import { Icon } from "./Icon";
 import { Hint } from "./Tip";

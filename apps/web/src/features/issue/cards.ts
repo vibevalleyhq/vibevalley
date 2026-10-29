@@ -1,4 +1,4 @@
-import { matches } from "../../base/search";
+import { matches } from "@/base/search";
 import { list, t } from "@vibevalley/i18n";
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
@@ -21,7 +21,7 @@ import {
   tagOpen,
   taskLine,
 } from "./rules";
-import { ago, tookText } from "../../base/format";
+import { ago, tookText } from "@/base/format";
 import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
 import { attentionTone } from "./state";
 

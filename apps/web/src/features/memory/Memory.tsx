@@ -6,15 +6,15 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { ago } from "../../base/format";
-import { toast } from "../../ui/toasts";
-import { aria, useNow } from "../../base/util";
-import { useCore } from "../../base/frame";
-import { queries, ready, useProjects, useQuery } from "../../base/query";
-import { Button } from "../../ui/Button";
-import { Select, TextArea, TextInput } from "../../ui/Field";
-import { Quiet } from "../../ui/layout";
+import { api, reasonOf } from "@/base/api";
+import { ago } from "@/base/format";
+import { toast } from "@/ui/toasts";
+import { aria, useNow } from "@/base/util";
+import { useCore } from "@/base/frame";
+import { queries, ready, useProjects, useQuery } from "@/base/query";
+import { Button } from "@/ui/Button";
+import { Select, TextArea, TextInput } from "@/ui/Field";
+import { Quiet } from "@/ui/layout";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Notes not tied to a project. */

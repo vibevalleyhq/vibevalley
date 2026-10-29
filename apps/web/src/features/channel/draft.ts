@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { createSignal } from "solid-js";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
 
-import { reasonOf } from "../../base/api";
+import { reasonOf } from "@/base/api";
 
 export interface Draft {
   readonly text?: string;

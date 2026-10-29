@@ -6,17 +6,17 @@ import { t } from "@vibevalley/i18n";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { Session, SessionId } from "@vibevalley/protocol";
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./rules";
-import { farmState } from "../store";
-import { aimTool } from "../tools";
-import { yardPlaces } from "../world/places";
-import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "../world/plots";
-import type { Village } from "../world/load";
-import { plotH } from "../world/world";
-import { useFrames } from "../../base/frame";
-import { useFollowed, defaultOf } from "../../features/channel";
-import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../../ui/pixel";
-import { useFarm } from "../state";
-import { useVillage } from "../support";
+import { farmState } from "@/farm/store";
+import { aimTool } from "@/farm/tools";
+import { yardPlaces } from "@/farm/world/places";
+import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "@/farm/world/plots";
+import type { Village } from "@/farm/world/load";
+import { plotH } from "@/farm/world/world";
+import { useFrames } from "@/base/frame";
+import { useFollowed, defaultOf } from "@/features/channel";
+import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
+import { useFarm } from "@/farm/state";
+import { useVillage } from "@/farm/support";
 
 /** Rows of art pixels above the plot's bottom where its rail is. */
 const rail = 5;

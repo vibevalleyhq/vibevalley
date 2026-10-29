@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { ownerId } from "@vibevalley/protocol";
 import { artifactMax } from "./rules.ts";
 import { Effect } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { Channels } from "../channel/chat.ts";
-import { worldBelowTasks } from "../testing/world.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Channels } from "@/channel/chat.ts";
+import { worldBelowTasks } from "@/testing/world.ts";
 import { Artifacts } from "./artifact.ts";
 
 const owner = { from: ownerId, by: ownerId };

@@ -1,9 +1,9 @@
 import { t } from "@vibevalley/i18n";
 // 通用: the farm's language, and where this machine's page opens.
 
-import { setStart, StartValues, usePrefs } from "../../base/prefs";
-import { Segmented } from "../../ui/Segmented";
-import { SettingRow, SettingsGroup, SettingsPage } from "../../ui/settings";
+import { setStart, StartValues, usePrefs } from "@/base/prefs";
+import { Segmented } from "@/ui/Segmented";
+import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
 import { LanguageChoice } from "./SettingsForm";
 
 export function GeneralPage() {

@@ -1,7 +1,7 @@
 // Where the village is on the page, the tool's cursor, and the page's switches for the canvas: framework-free.
 
-import { clock, type VillageScreen } from "../store";
-import type { Village } from "../world/load";
+import { clock, type VillageScreen } from "@/farm/store";
+import type { Village } from "@/farm/world/load";
 import type { Scene } from "./scene";
 
 export const background = "#2b3320";

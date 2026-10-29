@@ -3,9 +3,9 @@
 // do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model, and
 // VIBEVALLEY_EVAL_ONLY (names, comma-separated) replays only those cases: after a prompt is mended for one, only it is paid for.
 
-import { standaloneLlm } from "../cli/llm.ts";
+import { standaloneLlm } from "@/cli/llm.ts";
 import type { Tool } from "@vibevalley/agent/core/loop";
-import { orchestrator } from "../base/actor.ts";
+import { orchestrator } from "@/base/actor.ts";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -16,8 +16,8 @@ import { openBrain, standaloneOwner } from "@vibevalley/agent/brain";
 import { deepseek } from "@vibevalley/ai/client";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, transcript } from "@vibevalley/agent/messages";
-import { world } from "../testing/world.ts";
-import { Tools } from "../tool/tool.ts";
+import { world } from "@/testing/world.ts";
+import { Tools } from "@/tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./prompts.ts";
 

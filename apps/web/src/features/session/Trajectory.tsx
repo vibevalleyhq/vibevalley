@@ -7,7 +7,7 @@ import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Sw
 import type { JSX } from "@solidjs/web";
 
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import {
   cacheHit,
   farmToolText,
@@ -25,15 +25,15 @@ import {
   type TrajectorySummary,
   waterfallOf,
 } from "./rounds";
-import { ago } from "../../base/format";
-import { toast } from "../../ui/toasts";
-import { aria, autofocus, Keyed, useNow } from "../../base/util";
+import { ago } from "@/base/format";
+import { toast } from "@/ui/toasts";
+import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { createSessionEvents } from "./data";
-import { ready, useQuery } from "../../base/query";
-import { TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { Markdown } from "../../ui/Markdown";
-import { Quiet } from "../../ui/layout";
+import { ready, useQuery } from "@/base/query";
+import { TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { Markdown } from "@/ui/Markdown";
+import { Quiet } from "@/ui/layout";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */

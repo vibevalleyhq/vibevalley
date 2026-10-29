@@ -3,7 +3,7 @@
 // system messages and tools in the request are not. Only the agent's words come back, without usage. Who may ask (paths,
 // keys) is the mounting side's business.
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { randomBytes } from "node:crypto";
 import { Schema } from "effect";
 

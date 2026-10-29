@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { testConfig } from "../testing/layers.ts";
-import { aTurn, until } from "../testing/until.ts";
-import { world } from "../testing/world.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { aTurn, until } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
 import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { Sessions } from "./session.ts";

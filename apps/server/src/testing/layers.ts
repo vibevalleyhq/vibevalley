@@ -6,10 +6,10 @@ import { join } from "node:path";
 import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
-import { withCast } from "../agent/agent.ts";
-import { builtInDir, builtInIds, profileOf, readTemplate } from "../agent/template.ts";
-import { defaults, ServerConfig } from "../base/config.ts";
-import { Database } from "../base/db.ts";
+import { withCast } from "@/agent/agent.ts";
+import { builtInDir, builtInIds, profileOf, readTemplate } from "@/agent/template.ts";
+import { defaults, ServerConfig } from "@/base/config.ts";
+import { Database } from "@/base/db.ts";
 
 /** A built-in template as a farm whose agent.starters names it has it: under the template's own id. */
 export const starter = (id: string): Agent => {

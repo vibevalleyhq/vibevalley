@@ -1,23 +1,23 @@
 import { Toolbar } from "@vibevalley/base-ui";
-import { MoreMenu } from "../../ui/MoreMenu";
+import { MoreMenu } from "@/ui/MoreMenu";
 import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
-import { Lightbox } from "../../ui/Lightbox";
-import { fileKind, sizeText } from "../../ui/AttachmentTile";
+import { Lightbox } from "@/ui/Lightbox";
+import { fileKind, sizeText } from "@/ui/AttachmentTile";
 import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { useRouter } from "../../base/router";
-import { Icon } from "../../ui/Icon";
-import { Markdown } from "../../ui/Markdown";
-import { toast } from "../../ui/toasts";
-import { aria, autofocus } from "../../base/util";
+import { api, reasonOf } from "@/base/api";
+import { useRouter } from "@/base/router";
+import { Icon } from "@/ui/Icon";
+import { Markdown } from "@/ui/Markdown";
+import { toast } from "@/ui/toasts";
+import { aria, autofocus } from "@/base/util";
 import { drafts } from "./draft";
 import { useMessage } from "./follow";
 import { quickReactions } from "./emoji";
 import { EmojiPicker } from "./EmojiPicker";
-import { useCore } from "../../base/frame";
+import { useCore } from "@/base/frame";
 import { markUnread } from "./data";
 import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePath, workbenchClock } from "./rules";
 

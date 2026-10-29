@@ -6,16 +6,16 @@ import { execFileSync } from "node:child_process";
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
-import { starter } from "../testing/layers.ts";
+import { starter } from "@/testing/layers.ts";
 import { Effect, Stream } from "effect";
-import type { ServerConfig } from "../base/config.ts";
-import { Core } from "../core/core.ts";
-import { type Hired } from "../session/session.ts";
-import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart } from "../services.ts";
-import { helper } from "../testing/helper.ts";
-import { testConfig } from "../testing/layers.ts";
-import { world, type WorldOptions } from "../testing/world.ts";
-import { until as untilHeld, waitFor } from "../testing/until.ts";
+import type { ServerConfig } from "@/base/config.ts";
+import { Core } from "@/core/core.ts";
+import { type Hired } from "@/session/session.ts";
+import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart } from "@/services.ts";
+import { helper } from "@/testing/helper.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { world, type WorldOptions } from "@/testing/world.ts";
+import { until as untilHeld, waitFor } from "@/testing/until.ts";
 
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): Agent => ({ ...starter("lab"), effort: "" });

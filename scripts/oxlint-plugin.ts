@@ -40,6 +40,10 @@
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
+ *
+ *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
+ *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
+ *   and moving a file does not change what its imports say. Siblings and children stay ./x.
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
@@ -261,8 +265,8 @@ const pageLayersRule = defineRule({
     if (at === undefined) return {};
     const from = pageUnit(at);
     const verdict = (spec: unknown): "layer" | "index" | undefined => {
-      if (typeof spec !== "string" || !spec.startsWith(".")) return;
-      const target = joinPath(at, spec);
+      if (typeof spec !== "string" || !(spec.startsWith(".") || spec.startsWith("@/"))) return;
+      const target = spec.startsWith("@/") ? spec.slice(2) : joinPath(at, spec);
       if (target.startsWith("..")) return;
       const to = pageUnit(target);
       if (to.unit === from.unit) return;
@@ -289,6 +293,30 @@ const pageLayersRule = defineRule({
   },
 });
 
+const parentImportRule = defineRule({
+  meta: {
+    messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
+  },
+  create(context) {
+    const [, app, at] = /\/apps\/(web|server)\/src\/(.+)$/.exec(context.filename.replaceAll("\\", "/")) ?? [];
+    if (app === undefined || at === undefined) return {};
+    const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
+      if (typeof spec !== "string" || !spec.startsWith("../")) return;
+      const ups = spec.split("/").filter((p) => p === "..").length;
+      // Out of src (the server's db/generated): no alias reaches it.
+      if (ups >= at.split("/").length) return;
+      const target = joinPath(at, spec);
+      context.report({ node, messageId: "parent", data: { alias: `@/${target}` } });
+    };
+    return {
+      ImportDeclaration: (node) => check(node, node.source.value),
+      ImportExpression: (node) => check(node, node.source.type === "Literal" ? node.source.value : undefined),
+      ExportNamedDeclaration: (node) => check(node, node.source?.value),
+      ExportAllDeclaration: (node) => check(node, node.source.value),
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -300,6 +328,7 @@ export default definePlugin({
     "no-copy-selector": noCopySelector,
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,
+    "parent-import": parentImportRule,
     "native-control": nativeControl,
   },
 });

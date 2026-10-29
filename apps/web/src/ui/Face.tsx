@@ -4,8 +4,8 @@ import { t } from "@vibevalley/i18n";
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
 import { castPrefix } from "./cast";
-import { orchestratorLookOf } from "../base/agents";
-import { ready, useAgents, useSprites } from "../base/query";
+import { orchestratorLookOf } from "@/base/agents";
+import { ready, useAgents, useSprites } from "@/base/query";
 import { RuntimeBadge } from "./RuntimeBadge";
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */

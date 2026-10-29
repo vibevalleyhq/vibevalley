@@ -3,10 +3,10 @@ import { t } from "@vibevalley/i18n";
 // (voice.moss.verify); the answer is a mark, its reason on hover.
 
 import { createSignal, Match, Switch } from "solid-js";
-import { api, reasonOf } from "../../base/api";
-import { Icon } from "../../ui/Icon";
-import { IconButton } from "../../ui/IconButton";
-import { Tip } from "../../ui/Tip";
+import { api, reasonOf } from "@/base/api";
+import { Icon } from "@/ui/Icon";
+import { IconButton } from "@/ui/IconButton";
+import { Tip } from "@/ui/Tip";
 
 export type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 

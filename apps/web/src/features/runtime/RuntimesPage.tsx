@@ -18,24 +18,24 @@ import {
   type UsageWindow,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
-import { momentText, wallClockText, yuan } from "../../base/format";
-import { toast } from "../../ui/toasts";
-import { A } from "../../ui/A";
-import { Keyed } from "../../base/util";
-import { useWorkAgents } from "../../base/agents";
-import { ready, useRuntimes } from "../../base/query";
-import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
-import { Button } from "../../ui/Button";
-import { KeyValueEditor } from "../../ui/Chips";
-import { AgentFace } from "../../ui/Face";
-import { Select, TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { SpriteIcon } from "../../ui/pixel";
-import { Segmented } from "../../ui/Segmented";
-import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../../ui/layout";
-import { Hint } from "../../ui/Tip";
+import { momentText, wallClockText, yuan } from "@/base/format";
+import { toast } from "@/ui/toasts";
+import { A } from "@/ui/A";
+import { Keyed } from "@/base/util";
+import { useWorkAgents } from "@/base/agents";
+import { ready, useRuntimes } from "@/base/query";
+import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { Button } from "@/ui/Button";
+import { KeyValueEditor } from "@/ui/Chips";
+import { AgentFace } from "@/ui/Face";
+import { Select, TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { SpriteIcon } from "@/ui/pixel";
+import { Segmented } from "@/ui/Segmented";
+import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "@/ui/layout";
+import { Hint } from "@/ui/Tip";
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: t("web.runtime.capability.listModels"),

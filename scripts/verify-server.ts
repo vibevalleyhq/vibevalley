@@ -71,13 +71,11 @@ export async function runVerification(command: string[] = [], options: Verificat
   for (const path of [home, work, binaries]) mkdirSync(path);
   const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
   const serverDir = join(root, "apps", "server");
-  // The command line from any folder: tsx is the server's own.
+  // The command line from any folder: tsx is the server's own, and so is its tsconfig (tsx looks for one from the cwd,
+  // and the server's @/ imports are its paths).
   const cli = join(binaries, "vv");
-  writeFileSync(
-    cli,
-    `#!/bin/sh\nexec ${JSON.stringify(join(serverDir, "node_modules", ".bin", "tsx"))} ${JSON.stringify(join(serverDir, "src", "cli.ts"))} "$@"\n`,
-    { mode: 0o755 },
-  );
+  const tsx = [join(serverDir, "node_modules", ".bin", "tsx"), "--tsconfig", join(serverDir, "tsconfig.json"), join(serverDir, "src", "cli.ts")];
+  writeFileSync(cli, `#!/bin/sh\nexec ${tsx.map((a) => JSON.stringify(a)).join(" ")} "$@"\n`, { mode: 0o755 });
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {

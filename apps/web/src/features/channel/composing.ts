@@ -7,10 +7,10 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
-import { api, newSendKey, reasonOf } from "../../base/api";
+import { api, newSendKey, reasonOf } from "@/base/api";
 import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
-import { orchestratorMood } from "../../base/frame";
-import { useOrchestrators } from "../../base/agents";
+import { orchestratorMood } from "@/base/frame";
+import { useOrchestrators } from "@/base/agents";
 
 export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
   await api.channel.message.send(omitUndefined({ id: channel.id, text, agent, sendKey }));

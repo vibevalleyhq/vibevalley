@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // (voice.dictate), which hands it to the transcription address in 声音's 听写, and the words come back for the field it
 // was started from. Recorded as 16 kHz mono WAV, which every transcriber takes. One recording at a time.
 
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 
 export type DictationPhase = "idle" | "recording" | "transcribing";
 

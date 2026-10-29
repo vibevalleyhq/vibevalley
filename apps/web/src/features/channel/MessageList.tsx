@@ -1,14 +1,14 @@
 import { t } from "@vibevalley/i18n";
 import { plainText } from "@vibevalley/protocol/rules";
-import { tookText } from "../../base/format";
-import type { IconName } from "../../ui/icons";
-import { spentText } from "../../base/format";
+import { tookText } from "@/base/format";
+import type { IconName } from "@/ui/icons";
+import { spentText } from "@/base/format";
 
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
-import { api } from "../../base/api";
-import { ArtifactCard } from "../artifact";
+import { api } from "@/base/api";
+import { ArtifactCard } from "@/features/artifact";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import {
   channelOf,
@@ -25,20 +25,20 @@ import {
   orchestratorTyping,
   workbenchClock,
 } from "./rules";
-import { aria, useNow } from "../../base/util";
-import { useRouter } from "../../base/router";
-import { useCore } from "../../base/frame";
-import { OrchestratorFace } from "../../ui/Face";
-import { Icon } from "../../ui/Icon";
-import { A } from "../../ui/A";
-import { Markdown } from "../../ui/Markdown";
+import { aria, useNow } from "@/base/util";
+import { useRouter } from "@/base/router";
+import { useCore } from "@/base/frame";
+import { OrchestratorFace } from "@/ui/Face";
+import { Icon } from "@/ui/Icon";
+import { A } from "@/ui/A";
+import { Markdown } from "@/ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
-import { Tag, type TagTone } from "../../ui/Tag";
+import { Tag, type TagTone } from "@/ui/Tag";
 import { useMarkRead } from "./data";
 import { editingId, setEditingId } from "./draft";
 import { followed, useFollowed, useMessage } from "./follow";
-import { TurnSteps } from "../session";
-import { useAgent, useOrchestrators } from "../../base/agents";
+import { TurnSteps } from "@/features/session";
+import { useAgent, useOrchestrators } from "@/base/agents";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },

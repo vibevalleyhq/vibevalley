@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // The chat's words: channels and threads, feeds and unread counts, names to @, the clocks and a helper's
 // phase. Nothing here folds facts: it only reads the chat the server sent.
 
-import { actionIcon, type IconName } from "../../ui/icons";
+import { actionIcon, type IconName } from "@/ui/icons";
 
 import {
   type Agent,

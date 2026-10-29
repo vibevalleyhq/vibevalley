@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 // go. An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so
 // they go to the route of the input taken last, and the tools read that route too.
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Usage } from "@vibevalley/ai/messages";
@@ -19,14 +19,14 @@ import type { ModelClient } from "@vibevalley/ai/client";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, type CustomMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { readLines, replay } from "@vibevalley/agent/session";
-import { newId } from "../base/ids.ts";
-import { type ApiError, missing, refused } from "../errors.ts";
+import { newId } from "@/base/ids.ts";
+import { type ApiError, missing, refused } from "@/errors.ts";
 import { AgentExecution, type RunInput } from "./execution.ts";
 import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
-import type { Time } from "../base/time.ts";
+import type { Time } from "@/base/time.ts";
 
 /** One answer streamed to a caller (a call's line, a chat/completions request). A newer one ends the one before. */
 export class Caller {

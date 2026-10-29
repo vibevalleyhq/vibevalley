@@ -8,7 +8,7 @@ import { t } from "@vibevalley/i18n";
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
@@ -31,10 +31,10 @@ import {
   type PullRequestState,
   type Repo,
 } from "@vibevalley/protocol";
-import { slice } from "../base/text.ts";
+import { slice } from "@/base/text.ts";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
-import { jsonOf, jsonOrNone } from "../base/json.ts";
-import { ServerConfig } from "../base/config.ts";
+import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { ServerConfig } from "@/base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import {

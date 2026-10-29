@@ -2,16 +2,16 @@ import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, Show } from "solid-js";
 import type { Channel, Cron } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import { chatPath, jobThreadOf, phaseText } from "./rules";
-import { toast } from "../../ui/toasts";
-import { aria, useNow } from "../../base/util";
-import { useRouter } from "../../base/router";
-import { useCore } from "../../base/frame";
-import { Button } from "../../ui/Button";
-import { Icon } from "../../ui/Icon";
+import { toast } from "@/ui/toasts";
+import { aria, useNow } from "@/base/util";
+import { useRouter } from "@/base/router";
+import { useCore } from "@/base/frame";
+import { Button } from "@/ui/Button";
+import { Icon } from "@/ui/Icon";
 import { HelperFace, PhaseGlyph } from "./bits";
-import { Empty } from "../../ui/Empty";
+import { Empty } from "@/ui/Empty";
 
 const card = "rounded-lg border border-line bg-page p-3";
 

@@ -6,14 +6,14 @@ import { t } from "@vibevalley/i18n";
 import { Show } from "solid-js";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
-import { playSound } from "../../ui/pixel/sound";
-import { farm } from "../store";
-import { aria } from "../../base/util";
-import { PixelCard } from "../../ui/pixel";
-import { useFarm } from "../state";
-import { phoneState } from "../support";
-import { useCore } from "../../base/frame";
-import { unreadTotal } from "../../features/channel";
+import { playSound } from "@/ui/pixel/sound";
+import { farm } from "@/farm/store";
+import { aria } from "@/base/util";
+import { PixelCard } from "@/ui/pixel";
+import { useFarm } from "@/farm/state";
+import { phoneState } from "@/farm/support";
+import { useCore } from "@/base/frame";
+import { unreadTotal } from "@/features/channel";
 
 export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);

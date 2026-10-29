@@ -24,7 +24,7 @@ import {
   type PointLight,
 } from "@vibevalley/engine/pixi";
 import { Container, Sprite, type Texture } from "pixi.js";
-import { playSound } from "../../ui/pixel/sound";
+import { playSound } from "@/ui/pixel/sound";
 
 /** x0, y0, x1, y1. */
 export type Box = readonly [number, number, number, number];

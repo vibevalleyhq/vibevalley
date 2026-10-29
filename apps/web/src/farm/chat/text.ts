@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // enough to fold.
 
 import type { Channel } from "@vibevalley/protocol";
-import { channelLabel } from "../../features/channel";
+import { channelLabel } from "@/features/channel";
 
 /** The farm calls the default channel by its words' chat.label (田头). */
 export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? t("web.farm.chat.label") : channelLabel(c));

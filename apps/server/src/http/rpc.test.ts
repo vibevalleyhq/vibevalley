@@ -5,9 +5,9 @@ import { Context, Effect, Fiber, Layer, Stream } from "effect";
 import { Headers } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
-import { Channels } from "../channel/chat.ts";
-import { testConfig } from "../testing/layers.ts";
-import { quietApp } from "../testing/world.ts";
+import { Channels } from "@/channel/chat.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { quietApp } from "@/testing/world.ts";
 import { app } from "./app.ts";
 import { fromTheFarm } from "./rpc.ts";
 

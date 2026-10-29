@@ -4,7 +4,7 @@
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
-import { scopedPubSub } from "../base/pubsub.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { join } from "node:path";
 import type {
   CommitCount,
@@ -23,9 +23,9 @@ import type {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { FileWriter, readOrSetAside } from "../base/files.ts";
-import { jsonOf } from "../base/json.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { FileWriter, readOrSetAside } from "@/base/files.ts";
+import { jsonOf } from "@/base/json.ts";
 
 export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessions: [] });
 

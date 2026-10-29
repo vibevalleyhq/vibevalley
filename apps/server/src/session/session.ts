@@ -10,8 +10,8 @@ import { t } from "@vibevalley/i18n";
 // the sender leaves its trigger on the hand first and the turn takes the oldest. Admission serializes room and opening
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
-import { messageOf } from "../errors.ts";
-import { scopedPubSub } from "../base/pubsub.ts";
+import { messageOf } from "@/errors.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { join, resolve } from "node:path";
@@ -42,21 +42,21 @@ import * as S from "@vibevalley/protocol/schema";
 import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream, Metric } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
-import { Agents } from "../agent/agent.ts";
-import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
+import { Agents } from "@/agent/agent.ts";
+import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 
 export type { SessionNews };
-import { serverAddress, ServerConfig } from "../base/config.ts";
-import { causeMessage, Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { jsonOrNone } from "../base/json.ts";
-import { Core, type FactIn } from "../core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
+import { serverAddress, ServerConfig } from "@/base/config.ts";
+import { causeMessage, Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
+import { Core, type FactIn } from "@/core/core.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
-import { Memories } from "../memory/memory.ts";
-import { Projects } from "../project/project.ts";
-import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "../project/shapes.ts";
-import { probeInstallation, Runtimes } from "../runtime/runtime.ts";
+import { Memories } from "@/memory/memory.ts";
+import { Projects } from "@/project/project.ts";
+import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
+import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { type Journal, Trajectories } from "./journal.ts";
 import { AgentHost, type HostOptions } from "./host.ts";
@@ -81,7 +81,7 @@ import { sessionOnIssue } from "./state.ts";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";
-import { timeHere } from "../base/time.ts";
+import { timeHere } from "@/base/time.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;

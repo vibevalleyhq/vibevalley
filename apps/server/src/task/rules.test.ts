@@ -1,6 +1,6 @@
 import type { TaskEdit, TaskGraph } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { allSettled, editTask, type EditResult, frozenTouched, parseSplit, removeTask, startable } from "./rules.ts";
 import { acceptancePassedText, checkFailedText, frozenTouchedText, taskBrief } from "./prompts.ts";
 

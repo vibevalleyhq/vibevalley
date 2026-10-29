@@ -1,8 +1,8 @@
-import { Checkbox } from "../../ui/Checkbox";
+import { Checkbox } from "@/ui/Checkbox";
 import { list, t } from "@vibevalley/i18n";
 import { plainText } from "@vibevalley/protocol/rules";
-import { Dot } from "../../ui/Dot";
-import type { IconName } from "../../ui/icons";
+import { Dot } from "@/ui/Dot";
+import type { IconName } from "@/ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import {
@@ -17,26 +17,26 @@ import {
   type Session,
   type SessionEvent,
 } from "@vibevalley/protocol";
-import { api } from "../../base/api";
+import { api } from "@/base/api";
 import { createIssueActs, perform } from "./acts";
 import { issueTag, runText, tagOpen, tagText } from "./rules";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "./state";
 import { closedText } from "@vibevalley/protocol/rules";
-import { tookText, wallClockText } from "../../base/format";
-import { toast } from "../../ui/toasts";
-import { ready } from "../../base/query";
-import { useNow } from "../../base/util";
-import { Button } from "../../ui/Button";
-import { TextArea } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { Markdown } from "../../ui/Markdown";
+import { tookText, wallClockText } from "@/base/format";
+import { toast } from "@/ui/toasts";
+import { ready } from "@/base/query";
+import { useNow } from "@/base/util";
+import { Button } from "@/ui/Button";
+import { TextArea } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { Markdown } from "@/ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
-import { IssueArtifacts } from "../artifact";
+import { IssueArtifacts } from "@/features/artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
-import { useAgent } from "../../base/agents";
-import { createSessionEvents } from "../session";
+import { useAgent } from "@/base/agents";
+import { createSessionEvents } from "@/features/session";
 
 /** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
  * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the
