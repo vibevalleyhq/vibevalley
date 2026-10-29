@@ -15,7 +15,6 @@ import { notificationsStart } from "@/services.ts";
 import { Core } from "@/core/core.ts";
 import { Voice, agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, vendorsFor, voiceAgentUid, voiceUnknown } from "./voice.ts";
 import { sessionId, issueId } from "@vibevalley/protocol/schema";
-import { timeHere, wallTime } from "@/base/time.ts";
 import { TestClock } from "effect/testing";
 
 afterEach(() => {
@@ -94,7 +93,7 @@ describe("a call's agent", () => {
       );
       if ("_tag" in vendors) throw new Error(vendors.reason);
       const capture = new Capture();
-      const client = clientOf({ appId, appCertificate: cert }, c.voice.area, wallTime, capture.fetch);
+      const client = clientOf({ appId, appCertificate: cert }, c.voice.area, (e, o) => Effect.runPromise(e, o), capture.fetch);
       const id = await agentFor(client, c.voice, vendors)
         .createSession({
           name: "parity",
@@ -248,7 +247,7 @@ describe("voice", () => {
   // Agora's retries, on the service's Clock (voice.ts retrying): moved through, not waited for.
   it.effect("retries 408, 429 and 5xx twice on the Clock, as Agora's SDK would, and nothing else", () =>
     Effect.gen(function* () {
-      const time = yield* timeHere;
+      const run = Effect.runPromiseWith(yield* Effect.context<never>());
       // A retry's sleep is taken after the answer comes back: let it be taken, then move the clock.
       const step = (ms: number) =>
         Effect.andThen(
@@ -262,7 +261,7 @@ describe("voice", () => {
           seen.push(status);
           return new Response("{}", { status, headers: headers ?? {} });
         }) as unknown as typeof fetch;
-        return { seen, call: Effect.forkChild(Effect.promise(() => retrying(fetcher, time)("https://api.example"))) };
+        return { seen, call: Effect.forkChild(Effect.promise(() => retrying(fetcher, (e, o) => run(e, o))("https://api.example"))) };
       };
 
       const flaky = answering([503], [502], [200]);
