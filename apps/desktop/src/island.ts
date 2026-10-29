@@ -120,7 +120,7 @@ export function startIsland(o: IslandOptions): { stop: () => void } {
 
   // Reconnects a second after the stream drops (the server restarting, in development).
   const follow = () => {
-    readStream<StateFrame>(o.server().replace(/\/$/, "") + statePath, (frame) => send(glanceOf(frame, Date.now())), abort.signal).catch(() => {
+    readStream(o.server(), statePath, (frame) => send(glanceOf(frame, Date.now())), abort.signal).catch(() => {
       if (!abort.signal.aborted) setTimeout(follow, 1000);
     });
   };

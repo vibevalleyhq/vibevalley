@@ -8,7 +8,7 @@ import { setAppMenu } from "./menu";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { pathOf } from "@vibevalley/protocol";
+import { VibeValleyApi } from "@vibevalley/protocol";
 import { farmFraming, type Notice, type TraySummary } from "@vibevalley/protocol/host";
 import { filledNear } from "@vibevalley/engine/framing";
 import { watchForDev } from "./dev";
@@ -228,8 +228,7 @@ if (!app.requestSingleInstanceLock()) {
         working: async () => {
           if (!server) return 0;
           try {
-            const res = await fetch(server.url.replace(/\/$/, "") + pathOf("session.list"), { method: "POST", body: "{}" });
-            const sessions = (await res.json()) as readonly { readonly phase: { readonly _tag: string } }[];
+            const sessions = await new VibeValleyApi(server.url.replace(/\/$/, "")).session.list({});
             return sessions.filter((s) => s.phase._tag === "working").length;
           } catch {
             return 0;

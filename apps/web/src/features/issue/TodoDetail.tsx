@@ -318,7 +318,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.todo.priority")}
           testid="issue-priority"
           value={d().priority}
-          onChange={(v) => edit({ priority: v as Priority })}
+          onChange={(v) => edit({ priority: v })}
           options={PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) }))}
         />
       </Property>
@@ -327,7 +327,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.detail.deliver")}
           testid="issue-deliver"
           value={d().deliver}
-          onChange={(v) => edit({ deliver: v as Deliverable })}
+          onChange={(v) => edit({ deliver: v })}
           options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
         />
       </Property>

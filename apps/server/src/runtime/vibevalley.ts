@@ -2,12 +2,13 @@ import { t } from "@vibevalley/i18n";
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { messageOf } from "@/errors.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { models, type ThinkingLevel } from "@vibevalley/ai/models";
+import { models } from "@vibevalley/ai/models";
 import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 import { type BrainEvent, type BrainOwner, openBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
@@ -57,7 +58,8 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     // oar's refusableOrder, for these two.
     for (const option of ["serviceTier", "launchArgs"] as const)
       if (o[option] !== undefined) throw new UnsupportedOptionError(option, t(`server.agent.refused.${option}`));
-    if (o.effort && !(efforts as readonly string[]).includes(o.effort))
+    const effort = o.effort && isOneOf(efforts, o.effort) ? o.effort : undefined;
+    if (o.effort && !effort)
       throw new Error(t("server.agent.efforts", { runtime: vibevalleyRuntime, efforts: efforts.join(t("server.agent.effortsAnd")), asked: o.effort }));
     const llm = llmOf(o.model ?? "");
     const kernel = createSessionKernel(o.resume);
@@ -67,7 +69,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       name: "helper",
       instructions,
       llm,
-      ...(o.effort ? { thinkingLevel: o.effort as ThinkingLevel } : {}),
+      ...(effort ? { thinkingLevel: effort } : {}),
       home: join(home(), "helpers"),
       cwd: o.cwd,
       tools: codingTools({ cwd: o.cwd, ...(o.env ? { env: { ...o.env } } : {}) }),

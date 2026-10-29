@@ -191,7 +191,7 @@ export const make = Effect.gen(function* () {
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
     if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
-    const kept = compact(next) as Stored;
+    const kept = Schema.decodeUnknownSync(Stored)(compact(next));
     yield* Effect.try({
       try: () => disk.write(() => JSON.stringify(kept, null, 2) + "\n"),
       catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }) }),

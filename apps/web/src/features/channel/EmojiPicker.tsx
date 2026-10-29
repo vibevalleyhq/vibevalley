@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { For, onSettled, untrack } from "solid-js";
 import { Portal } from "@solidjs/web";
 import { emojiGroups, quickReactions } from "./emoji";
@@ -22,7 +23,7 @@ function placeBy(anchor: HTMLElement | undefined) {
 
 const groupKeys = ["frequent", "faces", "hands", "things", "nature", "signs"] as const;
 /** A group of the picker by its id; an id with no name is shown as it is. */
-const groupName = (id: string) => ((groupKeys as readonly string[]).includes(id) ? t(`web.channel.emoji.groups.${id as (typeof groupKeys)[number]}`) : id);
+const groupName = (id: string) => (isOneOf(groupKeys, id) ? t(`web.channel.emoji.groups.${id}`) : id);
 export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (emoji: string) => void; onClose: () => void }) {
   let box: HTMLDivElement | undefined;
   const at = untrack(() => placeBy(props.anchor));

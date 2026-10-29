@@ -26,6 +26,17 @@ export type FarmChoice = { readonly kind: "loading" } | { readonly kind: "farm";
 
 const where = "vibevalley.farm";
 
+/** The farm's answer to a pairing, as LanPaired says: checked, it comes from the network. */
+const isPaired = (v: unknown): v is LanPaired =>
+  typeof v === "object" &&
+  v !== null &&
+  "device" in v &&
+  typeof v.device === "string" &&
+  "key" in v &&
+  typeof v.key === "string" &&
+  "hostName" in v &&
+  typeof v.hostName === "string";
+
 async function readFarm(): Promise<Farm | undefined> {
   const text = await SecureStore.getItemAsync(where);
   if (!text) return undefined;
@@ -155,7 +166,8 @@ export class FarmConnection {
         }
         throw new Error(problem || t("mobile.answered", { status: response.status }));
       }
-      const paired = JSON.parse(text) as LanPaired;
+      const paired: unknown = JSON.parse(text);
+      if (!isPaired(paired)) throw new Error(t("mobile.answered", { status: response.status }));
       const farm: Farm = { url: choice.link.url, key: paired.key, hostName: paired.hostName };
       await this.serialize(async () => {
         if (!this.owns(revision)) return;

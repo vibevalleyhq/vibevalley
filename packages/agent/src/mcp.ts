@@ -3,7 +3,7 @@
 
 import { messageOf } from "./core/errors.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { Schema } from "effect";
+import { Schema, Option } from "effect";
 import type { Tool } from "./core/loop.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -18,11 +18,14 @@ import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
 /** Also for connecting. */
 export const callTimeoutMs = 120_000;
 
-interface Block {
-  readonly type: string;
-  readonly text?: string;
-  readonly resource?: { readonly text?: string; readonly uri?: string };
-}
+// A tool's result as its server sends it: only the fields read here, the rest let through.
+const Block = Schema.Struct({
+  type: Schema.String,
+  text: Schema.optionalKey(Schema.String),
+  resource: Schema.optionalKey(Schema.Struct({ text: Schema.optionalKey(Schema.String), uri: Schema.optionalKey(Schema.String) })),
+});
+type Block = typeof Block.Type;
+const contentOf = Schema.decodeUnknownOption(Schema.Array(Block));
 
 export function mcpContentText(content: readonly Block[]): string {
   const parts: string[] = [];
@@ -97,7 +100,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
       args: server.args ?? [],
       env: {
         ...getDefaultEnvironment(),
-        ...(process.env as Record<string, string>),
+        ...Object.fromEntries(Object.entries(process.env).flatMap(([k, v]) => (v === undefined ? [] : [[k, v]]))),
         ...server.env,
       },
       ...(server.cwd ? { cwd: server.cwd } : {}),
@@ -135,7 +138,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
 }
 
 function mcpTool(client: Client, server: string, t: { name: string; description?: string | undefined; inputSchema?: object | undefined }): Tool {
-  const parameters = (t.inputSchema as JsonSchema | undefined) ?? { type: "object", properties: {} };
+  const parameters: JsonSchema = t.inputSchema ? Object.fromEntries(Object.entries(t.inputSchema)) : { type: "object", properties: {} };
   return textTool<Record<string, unknown> | null>({
     name: mcpToolName(server, t.name),
     description: mcpWords.toolDescription(server, t.description || t.name),
@@ -150,7 +153,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
       } catch (e) {
         throw new Error(mcpWords.callFailed(server, t.name, messageOf(e)), { cause: e });
       }
-      let text = mcpContentText((r.content as Block[] | undefined) ?? []);
+      let text = mcpContentText(Option.getOrElse(contentOf(r.content), () => []));
       if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : mcpWords.noContent;
       if (r.isError) throw new Error(text);
       return text;

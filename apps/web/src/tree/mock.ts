@@ -53,7 +53,8 @@ export interface MemoryLink {
   readonly times: number;
 }
 
-export type TreeStage = 1 | 2 | 3 | 4 | 5;
+export const TreeStageValues = [1, 2, 3, 4, 5] as const;
+export type TreeStage = (typeof TreeStageValues)[number];
 
 export interface MemoryTree {
   /** The first memory, ms. */

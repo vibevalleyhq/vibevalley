@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
 // What an artifact may be, and the headers its content is served with (docs/subsystems/artifact.md).
 
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { ArtifactKindValues } from "@vibevalley/protocol";
 
 /** The largest artifact body, bytes, and title, characters. */
@@ -15,8 +16,7 @@ export function artifactProblem(a: { readonly title?: string; readonly kind?: st
     if (n === 0) return t("server.artifact.noTitle");
     if (n > artifactTitleMax) return t("server.artifact.longTitle", { max: artifactTitleMax });
   }
-  if (a.kind !== undefined && !(ArtifactKindValues as readonly string[]).includes(a.kind))
-    return t("server.artifact.badKind", { kind: a.kind, kinds: ArtifactKindValues.join(", ") });
+  if (a.kind !== undefined && !isOneOf(ArtifactKindValues, a.kind)) return t("server.artifact.badKind", { kind: a.kind, kinds: ArtifactKindValues.join(", ") });
   if (a.size === undefined) return "";
   if (a.size === 0) return t("server.artifact.empty");
   if (a.size > artifactMax) return t("server.artifact.tooBig", { mb: artifactMax / 1024 / 1024 });

@@ -1003,20 +1003,16 @@ export const make = Effect.gen(function* () {
     ...inboxMore(r, filesAt),
   });
 
-  const groupRows = (rows: readonly DeliveryRow[]) => {
-    const out: { target: string; unread: number; mentionsYou: boolean; latest?: string }[] = [];
+  const groupRows = (rows: readonly DeliveryRow[]): UnreadRow[] => {
+    // A Map keeps the order targets were first met in.
+    const out = new Map<string, UnreadRow>();
     for (const r of rows) {
       const target = deliveryTarget(r);
-      let row = out.find((u) => u.target === target);
-      if (!row) {
-        row = { target, unread: 0, mentionsYou: false };
-        out.push(row);
-      }
-      row.unread++;
-      row.mentionsYou ||= r.reason === "mention" || r.reason === "everyone";
-      row.latest = r.name;
+      const was = out.get(target);
+      const mentions = r.reason === "mention" || r.reason === "everyone";
+      out.set(target, { target, unread: (was?.unread ?? 0) + 1, mentionsYou: (was?.mentionsYou ?? false) || mentions, latest: r.name });
     }
-    return out as UnreadRow[];
+    return [...out.values()];
   };
 
   const inboxRows = Effect.fn("Channels.inboxRows")(function* (who: string) {

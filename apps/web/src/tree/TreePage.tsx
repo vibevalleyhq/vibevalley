@@ -13,7 +13,8 @@ import { useRouter, useSearch } from "@/base/router";
 import { useNow, useViewport } from "@/base/util";
 import { ago } from "@/base/format";
 import { toast } from "@/ui/toasts";
-import { type MemoryItem, type MemoryKind, type MemoryTree, mockTree, type TreeStage } from "./mock";
+import { type MemoryItem, type MemoryKind, type MemoryTree, mockTree, TreeStageValues } from "./mock";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { allOf, counts, kept, newest, stageName, type Ties, tiesOf, type TreeFilter } from "./rules";
 import { type SceneArea, type SceneHover, Scene } from "./Scene";
 
@@ -39,7 +40,7 @@ export function TreePage() {
   const view = useViewport();
   const now = useNow(60_000);
   const asked = untrack(() => Number(search().get("stage")));
-  const tree = mockTree(Date.now(), asked >= 1 && asked <= 5 ? (asked as TreeStage) : undefined);
+  const tree = mockTree(Date.now(), isOneOf(TreeStageValues, asked) ? asked : undefined);
   const [filter, setFilter] = createSignal<TreeFilter>(allOf);
   const [sown, setSown] = createSignal<ReadonlySet<string>>(new Set(tree.items.filter((m) => m.sown).map((m) => m.id)));
   const [picked, setPicked] = createSignal<MemoryItem>();
@@ -203,6 +204,13 @@ function Panel(props: {
 }) {
   const [showFading, setShowFading] = createSignal(false);
   const days = () => Math.max(1, Math.ceil((props.now - props.tree.since) / 86_400_000));
+  // Stages count from 1: the one after stage n is at index n.
+  const growth = () => {
+    const next = TreeStageValues.at(props.tree.stage);
+    return props.tree.nextStageIn !== undefined && next !== undefined
+      ? t("web.tree.nextStage", { rounds: props.tree.nextStageIn, stage: stageName(next) })
+      : t("web.tree.grown");
+  };
   return (
     <PxWindow
       testid="tree-panel"
@@ -216,11 +224,7 @@ function Panel(props: {
       <div class="flex items-center gap-2 border-2 border-cream-300 bg-cream-100 px-2 py-1.5">
         <SpriteIcon name="icon-rings" size={20} />
         <span class={pxText.sm}>{stageName(props.tree.stage)}</span>
-        <span class={[pxText.xs, "ml-auto text-bark-500"]}>
-          {props.tree.nextStageIn !== undefined
-            ? t("web.tree.nextStage", { rounds: props.tree.nextStageIn, stage: stageName((props.tree.stage + 1) as TreeStage) })
-            : t("web.tree.grown")}
-        </span>
+        <span class={[pxText.xs, "ml-auto text-bark-500"]}>{growth()}</span>
       </div>
       <div class="grid grid-cols-3 gap-2" data-testid="memory-counts">
         <Count icon="icon-leaf" label={t("web.tree.kind.leaf")} n={props.tally.leaf} />

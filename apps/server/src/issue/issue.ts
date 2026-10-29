@@ -32,7 +32,7 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { closedText, shortTitle } from "@vibevalley/protocol/rules";
+import { closedText, shortTitle, isOneOf } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "@/base/text.ts";
 import { templateCatalog } from "@/agent/seed.ts";
@@ -717,7 +717,7 @@ export const make = (options: IssueOptions = {}) =>
     /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
      * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
     const settledMove = Effect.fn("Issues.settledMove")(function* (issue: Issue, to: IssueStatus, text: string, opt: StatusOptions) {
-      if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused(t("server.issue.noStatus", { to })));
+      if (!isOneOf(IssueStatusValues, to)) return yield* Effect.fail(refused(t("server.issue.noStatus", { to })));
       const taker = opt.assignee ? yield* takerOf(issue, to, opt.assignee) : undefined;
       const [move, why] = statusMove(issue, to);
       const said = text.trim();
@@ -1052,7 +1052,7 @@ export const make = (options: IssueOptions = {}) =>
         if (cleared.kept) return yield* Effect.fail(refused(t("server.issue.cannotDelete", { n: item.number, why: cleared.reason })));
         yield* db(q.removeIssue({ id }));
         yield* reloadSessions;
-        yield* core.apply({ type: "issueGone", id } as never);
+        yield* core.apply({ type: "issueGone", id: issueId(id) });
       }),
       queue: (id, queued) => queueRow(id, queued, chat.defaultChannel()),
       start: (id, channel) => start(id, channel),
@@ -1252,7 +1252,10 @@ export const make = (options: IssueOptions = {}) =>
         if (gone.length > 0) yield* reloadSessions;
         // Published in one core.apply, once the transaction has succeeded.
         const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (item) => get(item.id).pipe(Effect.orDie));
-        yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
+        yield* core.apply(
+          ...gone.map((id) => ({ type: "issueGone" as const, id: issueId(id) })),
+          ...updated.map((issue) => ({ type: "issue" as const, issue })),
+        );
       }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),

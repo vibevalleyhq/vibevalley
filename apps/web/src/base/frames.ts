@@ -23,7 +23,7 @@ function set(next: Frames) {
 
 // One stream while anyone listens; it reconnects a second after it drops and closes with the last listener.
 function connect(signal: AbortSignal) {
-  readStream<StateFrame>(statePath, (frame) => set({ frame, link: "open", count: current.count + 1 }), signal).catch(() => {
+  readStream("", statePath, (frame) => set({ frame, link: "open", count: current.count + 1 }), signal).catch(() => {
     if (signal.aborted) return;
     set({ ...current, link: "lost" });
     setTimeout(() => !signal.aborted && connect(signal), 1000);

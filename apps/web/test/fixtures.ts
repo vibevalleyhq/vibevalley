@@ -139,7 +139,7 @@ export function gate() {
 export async function defaultChannel(api: VibeValleyApi): Promise<string> {
   const abort = new AbortController();
   const frame = await new Promise<StateFrame>((resolve, reject) => {
-    readStream<StateFrame>(api.base + statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e: unknown) => abort.signal.aborted || reject(e));
+    readStream(api.base, statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e: unknown) => abort.signal.aborted || reject(e));
   });
   return frame.state.chat?.channels.find((c) => c.default)?.id ?? "";
 }

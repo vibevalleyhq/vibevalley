@@ -17,7 +17,7 @@ import type {
   BlockOpUpdateText,
   TextSpan,
 } from "@vibevalley/protocol";
-import { keyBetween, validKey } from "@vibevalley/protocol/rules";
+import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
 import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./text.ts";
 
 const withText: Readonly<Record<string, boolean>> = {
@@ -75,7 +75,7 @@ export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly st
   const out: Record<string, unknown> = { ...attrs };
   for (const name of attrNames) if (patch[name] !== undefined) out[name] = patch[name];
   for (const name of unset) {
-    if (!(attrNames as readonly string[]).includes(name)) throw new Error(t("server.artifact.op.noAttr", { name }));
+    if (!isOneOf(attrNames, name)) throw new Error(t("server.artifact.op.noAttr", { name }));
     delete out[name];
   }
   return out;

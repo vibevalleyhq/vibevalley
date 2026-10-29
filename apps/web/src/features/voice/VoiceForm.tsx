@@ -83,10 +83,10 @@ export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
 
 /** What the server says is wrong with the draft, asked a moment after it last changed. */
 function useProblem(update: () => SettingsUpdate) {
-  const asked = createSettled(() => JSON.stringify(update()));
+  const asked = createSettled(update);
   const check = useQuery(() => ({
-    queryKey: ["settings-check", asked()],
-    queryFn: () => api.setting.validate(JSON.parse(asked()) as SettingsUpdate),
+    queryKey: ["settings-check", JSON.stringify(asked())],
+    queryFn: () => api.setting.validate(asked()),
     placeholderData: keepPreviousData,
   }));
   return () => ready(check, undefined)?.problem;
@@ -288,7 +288,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       label={t("web.voice.voice.language")}
                       value={draft().language}
                       options={LanguageValues.map((l) => ({ value: l, label: t("shared.join.aside", { text: languageLabel[l], aside: l }) }))}
-                      onChange={(l) => l && set({ ...draft(), language: l as VoiceSettings["language"] })}
+                      onChange={(l) => set({ ...draft(), language: l })}
                     />
                   </Labeled>
                   <Show when={variant(asr(), "vendor", "deepgram")}>

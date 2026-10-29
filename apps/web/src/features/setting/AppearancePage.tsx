@@ -27,7 +27,10 @@ export function AppearancePage() {
             testid="scale"
             value={String(scale())}
             options={ScaleValues.map((v) => ({ value: String(v), label: `${v}%` }))}
-            onChange={(v) => setScale(Number(v) as (typeof ScaleValues)[number])}
+            onChange={(v) => {
+              const scale = ScaleValues.find((s) => String(s) === v);
+              if (scale !== undefined) setScale(scale);
+            }}
           />
         </SettingRow>
       </SettingsGroup>

@@ -119,12 +119,12 @@ export function Stages(props: { at: Stage }) {
 }
 
 /** A small menu-like pick in the side column. */
-export function Pick(props: {
+export function Pick<V extends string>(props: {
   label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  onChange: (v: string) => void;
+  value: V;
+  options: readonly { value: V; label: string }[];
+  placeholder?: "" extends V ? string : never;
+  onChange: (v: V) => void;
   disabled?: boolean;
   testid?: string;
 }) {

@@ -19,17 +19,21 @@ export function FxLayer() {
   const loaded = useVillage();
   const [banner, setBanner] = createSignal<{ id: number; level: number }>();
 
+  // An achievement's toast by its id: its medal and how far it reached.
+  const earned = new Map<number, GameEffectAchievement>();
   const show = (f: GameEffect) => {
     if (f.kind === "levelUp") setBanner({ id: Date.now(), level: Math.round(f.level) });
     if (f.kind === "achievement")
       // The words are the server's (the effect carries them).
-      toasts.add({
-        type: ToastType.achievement,
-        title: f.title,
-        description: t("web.farm.fx.coins", { detail: f.detail, coins: Math.round(f.coins) }),
-        timeout: 5000,
-        data: f,
-      });
+      earned.set(
+        toasts.add({
+          type: ToastType.achievement,
+          title: f.title,
+          description: t("web.farm.fx.coins", { detail: f.detail, coins: Math.round(f.coins) }),
+          timeout: 5000,
+        }),
+        f,
+      );
   };
 
   createEffect(raw, (frame) => {
@@ -52,18 +56,15 @@ export function FxLayer() {
   );
 
   const leading = (toast: ToastData) => {
-    const data = toast.data as GameEffectAchievement | undefined;
+    const data = earned.get(toast.id);
     const village = loaded().village;
-    if (toast.type !== ToastType.achievement || data?.kind !== "achievement" || !village) return undefined;
+    if (!data || !village) return undefined;
     return <EarnedMedal atlas={village.atlas} achievement={data.achievement} tier={Math.round(data.tier)} oneOff={data.oneOff} />;
   };
 
   return (
     <>
-      <ToastViewport
-        leading={leading}
-        kicker={(t) => (t.type === ToastType.achievement ? (t.data as GameEffectAchievement | undefined)?.reached : undefined)}
-      />
+      <ToastViewport leading={leading} kicker={(t) => earned.get(t.id)?.reached} />
       <Show when={banner()} keyed>
         {(b) => (
           <div

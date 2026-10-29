@@ -22,7 +22,7 @@ import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
-import { keyBetween } from "@vibevalley/protocol/rules";
+import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
 import { unmarked } from "./text.ts";
 import { demoJitter, demoPieces } from "./demo.ts";
@@ -77,7 +77,7 @@ export interface Blocks {
 
 /** The block kinds an agent appends; the editor has more (dividers, images), which an agent does not write. */
 const appendTypes: readonly BlockType[] = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
-const isAppendType = (type: string): type is BlockType => (appendTypes as readonly string[]).includes(type);
+const isAppendType = (type: string): type is BlockType => isOneOf(appendTypes, type);
 
 const blockOf = (r: qb.ArtifactBlocksResult): Block =>
   wire({

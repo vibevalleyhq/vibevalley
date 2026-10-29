@@ -7,8 +7,12 @@ import { Option, Schema } from "effect";
 const empty: ProjectStack = { name: "", label: "" };
 
 /** Commands the project has none of are left out, as the Go leaves out an empty one. */
-const withCommands = (s: ProjectStack): ProjectStack =>
-  Object.fromEntries(Object.entries(s).filter(([k, v]) => v !== "" || k === "name" || k === "label")) as ProjectStack;
+const withCommands = ({ test, lint, build, ...s }: ProjectStack): ProjectStack => ({
+  ...s,
+  ...(test ? { test } : {}),
+  ...(lint ? { lint } : {}),
+  ...(build ? { build } : {}),
+});
 
 export const stackFiles = [
   "go.mod",

@@ -11,7 +11,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
   return new Promise<StateFrame>((resolve, reject) => {
-    readStream<StateFrame>(url + statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
+    readStream(url, statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
   });
 }
 

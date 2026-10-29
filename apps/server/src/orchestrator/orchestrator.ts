@@ -362,7 +362,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         let line = lineWords.issue(w.issue.title, w.issue.description, again, channel.name);
         const s = w.cron;
         if (s) {
-          const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";
+          const missed = w.by.missed ? lineWords.missed : "";
           line = lineWords.cron(s.name, missed, s.text, channel.name, s.id);
         }
         // The issue's assignee is the orchestrator it is for; a cron that names none is its channel's orchestrator's.

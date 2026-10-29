@@ -16,7 +16,7 @@ import {
   voiceSilenceMsMax,
   voiceSilenceMsMin,
 } from "@vibevalley/protocol";
-import { same } from "@vibevalley/protocol/rules";
+import { same, isOneOf } from "@vibevalley/protocol/rules";
 
 /** A memory source as settings.json keeps it, with its key: read together, so an address is never paired with another one's key. */
 export interface MemorySourceConfig {
@@ -60,7 +60,7 @@ export function settingsProblem(u: SettingsUpdate): string {
 export function memorySourcesProblem(sources: readonly MemorySourceUpdate[]): string {
   const seen = new Set<string>();
   for (const m of sources) {
-    if (!(MemorySourceKindValues as readonly string[]).includes(m.kind)) return t("server.setting.memory.unknown", { kind: m.kind });
+    if (!isOneOf(MemorySourceKindValues, m.kind)) return t("server.setting.memory.unknown", { kind: m.kind });
     if (seen.has(m.kind)) return t("server.setting.memory.twice", { kind: m.kind });
     seen.add(m.kind);
     const url = m.url.trim();

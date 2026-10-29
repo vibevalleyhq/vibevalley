@@ -6,7 +6,6 @@ import type { IconName } from "@/ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import {
-  type Deliverable,
   DeliverableValues,
   type Question,
   type Issue,
@@ -336,7 +335,7 @@ export function IssueDetail(props: {
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, deliver: v as Deliverable }));
+              void act(() => api.issue.update({ id, deliver: v }));
             }}
             options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
           />

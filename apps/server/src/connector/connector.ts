@@ -502,8 +502,8 @@ export const make = (options: ConnectorOptions = {}) =>
             if (g !== current) return;
             yield* stopGeneration;
             let failure = result instanceof AppFailed ? result.message : undefined;
-            if (failure === undefined && !closing) {
-              const linked = result as Linked;
+            if (!(result instanceof AppFailed) && !closing) {
+              const linked = result;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
               const at = yield* Clock.currentTimeMillis;
               const connectedNow = yield* Effect.result(

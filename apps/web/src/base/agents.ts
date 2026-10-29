@@ -34,10 +34,10 @@ export function useAgent(id: () => string | undefined) {
 
 /** What the server says is wrong with each of these drafts (agent.validate), by id; empty until it answers. */
 export function useAgentProblems(agents: () => readonly Agent[]) {
-  const json = createSettled(() => JSON.stringify(agents()));
+  const settled = createSettled(agents);
   const got = useQuery(() => ({
-    queryKey: ["agent-check", json()],
-    queryFn: () => api.agent.validate({ agents: JSON.parse(json()) as Agent[] }),
+    queryKey: ["agent-check", JSON.stringify(settled())],
+    queryFn: () => api.agent.validate({ agents: [...settled()] }),
     placeholderData: keepPreviousData,
   }));
   return (): Record<string, AgentProblem[]> => Object.fromEntries(ready(got, []).map((c) => [c.id, c.problems]));

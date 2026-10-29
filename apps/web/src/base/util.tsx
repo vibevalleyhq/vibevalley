@@ -76,3 +76,7 @@ export function variant<T, K extends keyof T, const V extends T[K]>(value: T, ke
   const is = (v: T): v is Extract<T, Record<K, V>> => v[key] === tag;
   return is(value) ? value : undefined;
 }
+
+/** A JSON object's fields, each still to be checked; undefined for anything that is not an object. */
+export const recordOf = (v: unknown): Record<string, unknown> | undefined =>
+  typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v)) : undefined;

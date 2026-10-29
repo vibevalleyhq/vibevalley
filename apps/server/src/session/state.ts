@@ -21,7 +21,7 @@ export function withSession(state: WorkspaceState, id: string, change: (h: Sessi
 }
 
 export function whileWorking(state: WorkspaceState, id: string, change: (p: PhaseWorking) => PhaseWorking): [WorkspaceState, boolean] {
-  const h = sessionOf(state, id);
-  if (!h || h.phase._tag !== "working") return [state, false];
-  return withSession(state, id, (h) => ({ ...h, phase: change(h.phase as PhaseWorking) }));
+  const phase = sessionOf(state, id)?.phase;
+  if (phase?._tag !== "working") return [state, false];
+  return withSession(state, id, (h) => ({ ...h, phase: change(phase) }));
 }

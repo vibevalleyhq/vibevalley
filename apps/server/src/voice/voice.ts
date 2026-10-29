@@ -175,7 +175,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
   }
 }
 
-const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area];
+const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
 
 /** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
  * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
@@ -200,7 +200,7 @@ export type Run = <A>(effect: Effect.Effect<A, unknown>, options?: { readonly si
 
 export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
-    area: areaOf(area) as never,
+    area: areaOf(area),
     appId: c.appId,
     appCertificate: c.appCertificate,
     maxRetries: 0,
@@ -221,7 +221,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
         },
         end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
       },
-    } as never,
+    },
     // RTM carries transcripts and the agent's state; a client without RTM asks for the RTC data stream, which carries
     // the transcripts (chunked); RTM is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
     advancedFeatures: { enable_rtm: false, enable_tools: true },
@@ -230,7 +230,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
       data_channel: "datastream",
       enable_error_message: true,
       enable_metrics: true,
-    } as never,
+    },
   })
     .withStt(vendors.stt)
     .withLlm(vendors.llm)
