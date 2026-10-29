@@ -94,7 +94,8 @@
     "linked": "跳到 {where} 的第 {number} 条",
     "newBelow": "有 {n} 条新消息",
     "toLatest": "回到最新",
-    "roundFor": "{what} · {took}"
+    "roundFor": "{what} · {took}",
+    "sentTo": "派 {who} 去做"
   },
   "tools": {
     "label": "这条消息能做的",

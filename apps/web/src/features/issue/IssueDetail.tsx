@@ -1,4 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
+import { plainText } from "../../ui/richRules";
 import { Dot } from "../../ui/Dot";
 import type { IconName } from "../../ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
@@ -119,7 +120,7 @@ export function IssueDetail(props: {
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
               <Show when={ask().line}>
-                <div class="mt-1 line-clamp-4 whitespace-pre-wrap">{ask().line}</div>
+                <div class="mt-1 line-clamp-4">{plainText(ask().line!)}</div>
               </Show>
               <Show when={s().attention.state === "asking"}>
                 <For each={props.issue.questions}>
@@ -463,7 +464,7 @@ function Story(props: { milestones: Milestone[] }) {
               <Show when={m.who}>
                 <span class="text-muted">{m.who} · </span>
               </Show>
-              {m.text}
+              {plainText(m.text)}
             </span>
           </li>
         )}
