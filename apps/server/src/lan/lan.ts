@@ -29,7 +29,7 @@ import {
 } from "@vibevalley/protocol";
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
-import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
@@ -142,8 +142,8 @@ export interface LanOptions {
 export const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
-    // Writes set off by a request belong to this service: they end with it and keep its services.
-    const runHere = yield* FiberSet.makeRuntimePromise<never>();
+    // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.
+    const forkHere = yield* FiberSet.makeRuntime<never>();
     const config = yield* ServerConfig;
     const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;
@@ -175,8 +175,13 @@ export const make = (options: LanOptions = {}) =>
     // bound after it listening. One open or shut at a time.
     const opening = yield* Semaphore.make(1);
     let upstream = "";
-    /** Forgetting a device ends them. */
-    const conns = new Map<string, Set<AbortController>>();
+    /** What cuts each of a device's open connections; forgetting the device cuts them. */
+    const conns = new Map<string, Set<() => void>>();
+    const held = (device: string) => {
+      const mine = conns.get(device) ?? new Set();
+      conns.set(device, mine);
+      return mine;
+    };
 
     // forget and its dry run judge by this.
     const known = (id: string) => {
@@ -207,7 +212,9 @@ export const make = (options: LanOptions = {}) =>
       found.lastSeen = at;
       if (at - found.written >= seenEveryMs) {
         found.written = at;
-        void runHere(db(q.seenLanDevice({ last_seen: at, id: found.id }))).catch((e) => logs.error("vibevalley: lan access:", e));
+        forkHere(
+          db(q.seenLanDevice({ last_seen: at, id: found.id })).pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: lan access: ${Cause.pretty(c)}`))),
+        );
       }
       return found.id;
     };
@@ -218,50 +225,56 @@ export const make = (options: LanOptions = {}) =>
     };
 
     /** Handed to the loopback server as it came, the device said; the answer streams back. */
-    const forward = async (req: IncomingMessage, res: ServerResponse, device: string, signal: AbortSignal) => {
-      const headers = new Headers();
-      for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
-      if (device) headers.set(deviceHeader, device);
-      const body = req.method === "GET" || req.method === "HEAD" ? undefined : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
-      const answer = await fetch(`http://${upstream}${req.url ?? "/"}`, {
-        method: req.method ?? "GET",
-        headers,
-        ...(body ? { body, duplex: "half" } : {}),
-        signal,
+    const forward = (req: IncomingMessage, res: ServerResponse, device: string) =>
+      Effect.gen(function* () {
+        const headers = new Headers();
+        for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
+        if (device) headers.set(deviceHeader, device);
+        const body = req.method === "GET" || req.method === "HEAD" ? undefined : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
+        const answer = yield* Effect.tryPromise((signal) =>
+          fetch(`http://${upstream}${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(body ? { body, duplex: "half" } : {}), signal }),
+        );
+        res.writeHead(answer.status, Object.fromEntries(answer.headers));
+        const streamed = answer.body;
+        if (!streamed) return void res.end();
+        yield* Effect.tryPromise((signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }));
       });
-      res.writeHead(answer.status, Object.fromEntries(answer.headers));
-      if (!answer.body) return void res.end();
-      await pipeline(Readable.fromWeb(answer.body as NodeReadableStream<Uint8Array>), res, { signal });
-    };
 
+    /** One request on the listener, on the service's fibers: the client leaving, or its device being forgotten, interrupts
+     * it, and what was under way ends there. */
     const guard = (req: IncomingMessage, res: ServerResponse) => {
       const path = new URL(req.url ?? "/", "http://lan").pathname;
-      const done = new AbortController();
-      res.on("close", () => done.abort());
-      const go = async () => {
+      const handled = Effect.gen(function* () {
         if (!upstream) return refuseHttp(res, 503, t("server.lan.notUp"));
-        if (req.method === "POST" && path === pathOf("lan.pair")) return forward(req, res, "", done.signal);
+        if (req.method === "POST" && path === pathOf("lan.pair")) return yield* forward(req, res, "");
         if (!path.startsWith("/api/v1/")) {
-          if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return forward(req, res, "", done.signal);
+          if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return yield* forward(req, res, "");
           res.writeHead(404, { "content-type": "text/plain" });
           return void res.end("404 page not found\n");
         }
         const d = deviceOf(req);
         if (!d) return refuseHttp(res, 401, t("server.lan.unpaired"));
         if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, t("server.lan.notRemote"));
-        const mine = conns.get(d) ?? new Set();
-        conns.set(d, mine);
-        mine.add(done);
-        try {
-          await forward(req, res, d, done.signal);
-        } finally {
-          mine.delete(done);
-        }
-      };
-      go().catch(() => {
-        if (!res.headersSent) refuseHttp(res, 502, t("server.lan.badGateway"));
-        else res.end();
-      });
+        const mine = held(d);
+        return yield* Effect.withFiber((fiber) => {
+          const cut = () => fiber.interruptUnsafe();
+          mine.add(cut);
+          return Effect.ensuring(
+            forward(req, res, d),
+            Effect.sync(() => mine.delete(cut)),
+          );
+        });
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() => {
+            if (Cause.hasInterruptsOnly(cause)) res.end();
+            else if (!res.headersSent) refuseHttp(res, 502, t("server.lan.badGateway"));
+            else res.end();
+          }),
+        ),
+      );
+      const fiber = forkHere(handled);
+      res.on("close", () => fiber.interruptUnsafe());
     };
 
     /** The page's WebSocket from a paired device: the upgrade goes to the loopback server as it came, saying which
@@ -277,10 +290,7 @@ export const make = (options: LanOptions = {}) =>
       const [host, port] = [upstream.slice(0, upstream.lastIndexOf(":")), Number(upstream.slice(upstream.lastIndexOf(":") + 1))];
       const lines = [`GET ${req.url ?? rpcPath} HTTP/1.1`, `host: ${upstream}`, "connection: Upgrade", `${deviceHeader}: ${d}`];
       for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) for (const one of [v].flat()) lines.push(`${k}: ${one}`);
-      const done = new AbortController();
-      const mine = conns.get(d) ?? new Set();
-      conns.set(d, mine);
-      mine.add(done);
+      const mine = held(d);
       const up = connect(port, host, () => {
         up.write(lines.join("\r\n") + "\r\n\r\n");
         if (head.length > 0) up.write(head);
@@ -288,11 +298,11 @@ export const make = (options: LanOptions = {}) =>
         client.pipe(up);
       });
       const end = () => {
-        mine.delete(done);
+        mine.delete(end);
         client.destroy();
         up.destroy();
       };
-      done.signal.addEventListener("abort", end);
+      mine.add(end);
       for (const side of [client, up]) {
         side.on("error", end);
         side.on("close", end);
@@ -300,37 +310,37 @@ export const make = (options: LanOptions = {}) =>
     };
 
     // A port taken is said in the status; the farm runs on.
-    const listen = () =>
-      new Promise<void>((resolve) => {
-        if (server) return resolve();
-        const s = createServer(guard);
-        s.on("upgrade", tunnel);
-        s.once("error", (e) => {
-          problem = t("server.lan.cannotOpen", { why: e.message });
-          logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
-          resolve();
-        });
-        s.listen(config.lan.port, options.host, () => {
-          problem = "";
-          server = s;
-          const a = s.address();
-          port = a && typeof a === "object" ? a.port : config.lan.port;
-          logs.info(`vibevalley: lan access is open on port ${port}`);
-          resolve();
-        });
+    const listen = Effect.callback<void>((resume) => {
+      if (server) return resume(Effect.void);
+      const s = createServer(guard);
+      s.on("upgrade", tunnel);
+      s.once("error", (e) => {
+        problem = t("server.lan.cannotOpen", { why: e.message });
+        logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
+        resume(Effect.void);
       });
+      s.listen(config.lan.port, options.host, () => {
+        problem = "";
+        server = s;
+        const a = s.address();
+        port = a && typeof a === "object" ? a.port : config.lan.port;
+        logs.info(`vibevalley: lan access is open on port ${port}`);
+        resume(Effect.void);
+      });
+    });
 
-    const shut = async () => {
+    const shut = Effect.suspend(() => {
       dropPairing();
       const current = server;
       server = undefined;
-      if (!current) return;
+      if (!current) return Effect.void;
       // An upgraded socket is no longer the server's to close.
-      for (const mine of conns.values()) for (const c of mine) c.abort();
+      for (const mine of conns.values()) for (const cut of mine) cut();
       current.closeAllConnections();
-      await new Promise<void>((resolve) => current.close(() => resolve()));
-      logs.info("vibevalley: lan access is shut");
-    };
+      return Effect.callback<void>((resume) => void current.close(() => resume(Effect.void))).pipe(
+        Effect.andThen(Effect.sync(() => logs.info("vibevalley: lan access is shut"))),
+      );
+    });
 
     const status = (): LanStatus => {
       const s: LanStatus = { open, hostName: hostName(), devices: [] };
@@ -346,8 +356,8 @@ export const make = (options: LanOptions = {}) =>
       return s;
     };
 
-    if (open) yield* Effect.promise(listen);
-    yield* Effect.addFinalizer(() => Effect.promise(() => shut()));
+    if (open) yield* listen;
+    yield* Effect.addFinalizer(() => shut);
 
     const addDevice = Effect.fn("Lan.addDevice")(function* (name: string) {
       const key = randomBytes(32).toString("base64url");
@@ -363,10 +373,10 @@ export const make = (options: LanOptions = {}) =>
       setOpen: Effect.fn("Lan.setOpen")(function* (want) {
         yield* db(lanQ.setLanOpen({ open: want }));
         open = want;
-        if (want) yield* Effect.promise(listen);
+        if (want) yield* listen;
         else {
           problem = "";
-          yield* Effect.promise(() => shut());
+          yield* shut;
         }
         return status();
       }, opening.withPermits(1)),
@@ -429,7 +439,7 @@ export const make = (options: LanOptions = {}) =>
         yield* known(id);
         yield* db(q.removeLanDevice({ id }));
         devices.delete(id);
-        for (const c of conns.get(id) ?? []) c.abort();
+        for (const cut of conns.get(id) ?? []) cut();
         conns.delete(id);
         return status();
       }),
