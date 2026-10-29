@@ -4,10 +4,10 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { maxRunning } from "@vibevalley/protocol";
 import type { Ordering } from "./display";
-import { type BoardCard, cardLook, cardMove, cardProject, laneOrder } from "./cards";
+import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus } from "./rules";
 import { autofocus } from "../../base/util";
-import { IconButton } from "../../ui/IconButton";
+import { Hint } from "../../ui/Tip";
 import { Segmented } from "../../ui/Segmented";
 import { useGraphs, useNameOf } from "./hooks";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
@@ -149,7 +149,8 @@ function LaneView(props: {
         props.drag.setDragging(null);
       }}
       class={[
-        "min-w-[220px] flex-1 flex-col rounded-lg border px-2 pt-1.5 pb-2",
+        // As tall as what it holds: an empty lane is its head and a place to drop, not a column of nothing.
+        "h-fit max-h-full min-w-[220px] flex-1 flex-col self-start rounded-lg border px-2 pt-1.5 pb-2",
         props.shownNarrow ? "flex" : "hidden @min-[700px]:flex",
         over() ? "border-leaf bg-leaf/15" : "border-transparent bg-hover",
       ]}
@@ -158,12 +159,7 @@ function LaneView(props: {
         <StatusMark status={laneStatus[props.lane]} />
         <h2 class="text-sm font-semibold">{laneLabel[props.lane]}</h2>
         <span class="text-xs text-muted">{head()}</span>
-        <Show when={props.lane === "todo"}>
-          <span class="ml-auto flex">
-            <IconButton icon="add" label={t("web.issue.board.write")} onClick={props.focusAdd} />
-            <IconButton icon="edit" label={t("web.issue.board.writeFull")} onClick={p().onWrite} />
-          </span>
-        </Show>
+        <Hint text={emptyText[props.lane]} />
       </header>
       <Show when={props.lane === "todo"}>
         <div class="mt-1.5">
@@ -196,7 +192,7 @@ function LaneView(props: {
             <p class="px-1 text-xs text-faint">{t("web.issue.reading")}</p>
           </Match>
           <Match when={props.cards.length === 0}>
-            <p class="px-1 text-xs leading-relaxed text-faint">{emptyText[props.lane]}</p>
+            <div data-testid="lane-empty" class={["h-12 rounded-md border border-dashed", over() ? "border-leaf" : "border-line"]} />
           </Match>
         </Switch>
       </div>
@@ -210,6 +206,13 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
   const look = () => cardLook(props.card, nameOf(), graphs(), Date.now());
   const [before, setBefore] = createSignal(false);
   const where = () => [look().number, cardProject(props.card)].filter(Boolean).join(" · ");
+  const loud = () => {
+    const pr = look().priority;
+    return pr === "urgent" || pr === "high" ? pr : undefined;
+  };
+  // Its own status, when the lane does not say it: a draft in 待办 says so by its 草稿 flag.
+  const ownStatus = () => look().status !== laneStatus[props.card.lane] && !(props.card.lane === "todo" && look().status === "backlog");
+  const marks = () => ownStatus() || !!loud() || !!cardAgent(props.card) || props.card.kind === "orchestrator" || !!look().progress || look().flags.length > 0;
   const placing = () => {
     const d = props.drag.dragging();
     return !!props.onPlace && d?.kind === "todo" && d.id !== props.card.id;
@@ -269,13 +272,20 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
           <div class="truncate text-2xs leading-[14px] text-muted">{where()}</div>
         </Show>
         <div class="mt-0.5 line-clamp-2 text-sm font-medium break-words">{look().title}</div>
-        <div class="mt-2 flex flex-wrap items-center gap-1.5">
-          <StatusMark status={look().status} tone={look().statusTone} size={13} />
-          <Show when={look().priority}>{(pr) => <PriorityMark priority={pr()} size={13} />}</Show>
-          <CardFace card={props.card} size={18} />
-          <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
-          <For each={look().flags}>{(f) => <FlagChip text={f.text} tone={f.tone} />}</For>
-        </div>
+        {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
+        <Show when={marks()}>
+          <div data-testid="card-marks" class="mt-2 flex flex-wrap items-center gap-1.5">
+            <Show when={ownStatus()}>
+              <StatusMark status={look().status} tone={look().statusTone} size={13} />
+            </Show>
+            <Show when={loud()}>{(pr) => <PriorityMark priority={pr()} size={13} />}</Show>
+            <Show when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
+              <CardFace card={props.card} size={18} />
+            </Show>
+            <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
+            <For each={look().flags}>{(f) => <FlagChip text={f.text} tone={f.tone} />}</For>
+          </div>
+        </Show>
       </div>
     </div>
   );

@@ -1566,14 +1566,14 @@ export const catalogs = {
       findMessages: "找消息",
       settings: "频道设置",
       inChannel: "频道里的",
-      empty: "{label} 里还没人说话。跟管家说一件要做的事，比如「让测试小吴跑一遍测试」。",
+      empty: "{label} 还没人说话：跟管家说一件要做的事。",
       sendTo: "发送消息至 {label}",
       side: "频道和帮工",
       channelsTitle: "频道",
       directsTitle: "私聊",
       newChannel: "创建频道",
       helpers: "帮工",
-      noHelpers: "还没有在场的帮工：在频道里跟管家说一件活。",
+      noHelpers: "没有在场的帮工",
       mood: { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" },
       orchestrator: "管家",
       nobodyOnIt: "现在没有帮工在干，串还留着",
@@ -1599,7 +1599,7 @@ export const catalogs = {
       },
       jobs: { empty: "这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。", thread: "工单串" },
       crons: {
-        empty: "这个频道还没有定时任务。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。",
+        empty: "还没有定时任务：跟管家说「每天九点跑一遍测试」。",
         next: "下次 {next}",
         direct: "直接派 {agent}",
         byOrchestrator: "管家定的",
@@ -2432,8 +2432,6 @@ export const catalogs = {
         },
         whichLane: "看哪一列",
         spots: "{taken} / {of} 个空位",
-        write: "写一张",
-        writeFull: "详细写一张",
       },
       display: {
         boardNote: "看板总按状态分列，拖过去就改状态；分组用在列表上。",
@@ -2444,15 +2442,13 @@ export const catalogs = {
         order: "排序",
         reset: "恢复默认",
       },
-      list: { noProject: "没有项目", all: "全部工单", unfold: "展开 {group}", fold: "收起 {group}", writeIn: "在「{group}」写一张", none: "没有工单" },
+      list: { noProject: "没有项目", all: "全部工单", unfold: "展开 {group}", fold: "收起 {group}", writeIn: "在「{group}」写一张" },
       page: {
         pickFirst: "还差一点：选好派哪个帮工、在哪个项目里做，再点「开工」。",
         notDrafted: "先没起草：{why}",
         historyUnread: "工单记录没读到：",
         notFound: "找不到这张工单",
         notFoundLine: "没有 {id} 这张工单：可能已经删掉了，或者链接写错了。",
-        sheet: "工单",
-        close: "关掉",
         find: "找工单：标题、帮工、项目",
         findLabel: "找工单",
         filter: "筛选",
@@ -2464,6 +2460,7 @@ export const catalogs = {
         clear: "清掉筛选",
         view: "看法",
         missing: "执行记录缺失：{what}。执行动作暂不可用。",
+        backToBoard: "工单",
       },
       marks: { priority: "优先级：{word}" },
       sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
@@ -2656,6 +2653,7 @@ export const catalogs = {
         projectHint: "项目名，也是工作目录下的文件夹名",
         projectName: "项目名",
         create: "新建",
+        writeOwn: "自己写说明",
       },
       boardLabels: {
         view: { board: "看板", list: "列表" },
@@ -5210,14 +5208,14 @@ export const catalogs = {
       findMessages: "Find messages",
       settings: "Channel settings",
       inChannel: "In the channel",
-      empty: 'Nobody has spoken in {label} yet. Tell the manager something to do, such as "have the tester run the tests".',
+      empty: "Nobody has spoken in {label}: tell the orchestrator something to do.",
       sendTo: "Message {label}",
       side: "Channels and helpers",
       channelsTitle: "Channels",
       directsTitle: "Direct messages",
       newChannel: "Create a channel",
       helpers: "Helpers",
-      noHelpers: "No helpers here yet: tell the manager a job in a channel.",
+      noHelpers: "No helpers here",
       mood: { idle: "resting", listening: "listening", thinking: "thinking", speaking: "speaking" },
       orchestrator: "Manager",
       nobodyOnIt: "No helper is on it now; the thread stays",
@@ -5246,8 +5244,7 @@ export const catalogs = {
         thread: "Ticket thread",
       },
       crons: {
-        empty:
-          'No scheduled tasks in this channel yet. Tell the manager "run the tests at nine every morning" and it schedules it here; when due, a line appears in the channel and the work is sent.',
+        empty: 'No scheduled tasks: tell the orchestrator "run the tests every day at nine".',
         next: "next {next}",
         direct: "straight to {agent}",
         byOrchestrator: "set by the manager",
@@ -6135,8 +6132,6 @@ export const catalogs = {
         },
         whichLane: "Which column",
         spots: "{taken} / {of} spots",
-        write: "Write one",
-        writeFull: "Write one in full",
       },
       display: {
         boardNote: "The board always has a column per status, and dragging changes the status; grouping is for the list.",
@@ -6147,22 +6142,13 @@ export const catalogs = {
         order: "Order",
         reset: "Reset",
       },
-      list: {
-        noProject: "No project",
-        all: "All tickets",
-        unfold: "Unfold {group}",
-        fold: "Fold {group}",
-        writeIn: 'Write one in "{group}"',
-        none: "No tickets",
-      },
+      list: { noProject: "No project", all: "All tickets", unfold: "Unfold {group}", fold: "Fold {group}", writeIn: 'Write one in "{group}"' },
       page: {
         pickFirst: "Almost: pick which helper and which project, then press Start.",
         notDrafted: "Not drafted: {why}",
         historyUnread: "The tickets' records could not be read: ",
         notFound: "No such ticket",
         notFoundLine: "There is no ticket {id}: it may have been deleted, or the link is wrong.",
-        sheet: "Ticket",
-        close: "Close",
         find: "Find a ticket: title, helper, project",
         findLabel: "Find a ticket",
         filter: "Filter",
@@ -6174,6 +6160,7 @@ export const catalogs = {
         clear: "Clear the filter",
         view: "View",
         missing: "The run's record is missing: {what}. Its acts are not available.",
+        backToBoard: "Issues",
       },
       marks: { priority: "Priority: {word}" },
       sheet: { less: "Less", more: "More", at: 'At "{stage}"', stageDone: "{stage}: done" },
@@ -6368,6 +6355,7 @@ export const catalogs = {
         projectHint: "The project's name, which is also its folder under the work folder",
         projectName: "Project name",
         create: "Create",
+        writeOwn: "Write it yourself",
       },
       boardLabels: {
         view: { board: "Board", list: "List" },
@@ -9791,8 +9779,6 @@ export interface Messages {
   "web.issue.board.recent": undefined;
   "web.issue.board.spots": { readonly of: string | number; readonly taken: string | number };
   "web.issue.board.whichLane": undefined;
-  "web.issue.board.write": undefined;
-  "web.issue.board.writeFull": undefined;
   "web.issue.boardLabels.grouping.agent": undefined;
   "web.issue.boardLabels.grouping.none": undefined;
   "web.issue.boardLabels.grouping.project": undefined;
@@ -9995,7 +9981,6 @@ export interface Messages {
   "web.issue.list.all": undefined;
   "web.issue.list.fold": { readonly group: string | number };
   "web.issue.list.noProject": undefined;
-  "web.issue.list.none": undefined;
   "web.issue.list.unfold": { readonly group: string | number };
   "web.issue.list.writeIn": { readonly group: string | number };
   "web.issue.marks.priority": { readonly word: string | number };
@@ -10004,10 +9989,10 @@ export interface Messages {
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allProjects": undefined;
+  "web.issue.page.backToBoard": undefined;
   "web.issue.page.byHelper": undefined;
   "web.issue.page.byProject": undefined;
   "web.issue.page.clear": undefined;
-  "web.issue.page.close": undefined;
   "web.issue.page.filter": undefined;
   "web.issue.page.find": undefined;
   "web.issue.page.findLabel": undefined;
@@ -10017,7 +10002,6 @@ export interface Messages {
   "web.issue.page.notFound": undefined;
   "web.issue.page.notFoundLine": { readonly id: string | number };
   "web.issue.page.pickFirst": undefined;
-  "web.issue.page.sheet": undefined;
   "web.issue.page.shown": { readonly of: string | number; readonly shown: string | number };
   "web.issue.page.view": undefined;
   "web.issue.reading": undefined;
@@ -10108,6 +10092,7 @@ export interface Messages {
   "web.issue.todo.whatLabel": undefined;
   "web.issue.todo.whatLine": undefined;
   "web.issue.todo.whichProject": undefined;
+  "web.issue.todo.writeOwn": undefined;
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
   "web.issue.trigger.cron": undefined;

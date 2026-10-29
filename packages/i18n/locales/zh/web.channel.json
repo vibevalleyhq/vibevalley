@@ -12,14 +12,14 @@
   "findMessages": "找消息",
   "settings": "频道设置",
   "inChannel": "频道里的",
-  "empty": "{label} 里还没人说话。跟管家说一件要做的事，比如「让测试小吴跑一遍测试」。",
+  "empty": "{label} 还没人说话：跟管家说一件要做的事。",
   "sendTo": "发送消息至 {label}",
   "side": "频道和帮工",
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
   "helpers": "帮工",
-  "noHelpers": "还没有在场的帮工：在频道里跟管家说一件活。",
+  "noHelpers": "没有在场的帮工",
   "mood": {
     "idle": "在歇着",
     "listening": "在听",
@@ -53,7 +53,7 @@
     "thread": "工单串"
   },
   "crons": {
-    "empty": "这个频道还没有定时任务。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。",
+    "empty": "还没有定时任务：跟管家说「每天九点跑一遍测试」。",
     "next": "下次 {next}",
     "direct": "直接派 {agent}",
     "byOrchestrator": "管家定的",

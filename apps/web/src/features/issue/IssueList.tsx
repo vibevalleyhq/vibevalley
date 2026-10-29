@@ -90,7 +90,8 @@ export function IssueList(props: {
             };
             return (
               <section aria-label={label()} data-testid="issue-group" data-key={g().key} class="mb-1">
-                <header class="sticky top-0 z-10 mt-1.5 flex h-[34px] items-center rounded-md bg-side pr-1">
+                {/* A head of words on the page, not a bar: its line under it sets the group off. */}
+                <header class="sticky top-0 z-10 mt-2 flex h-[34px] items-center border-b border-line bg-page pr-1">
                   <button
                     type="button"
                     onClick={() => fold(g().key)}
@@ -123,9 +124,6 @@ export function IssueList(props: {
                   </For>
                   <Show when={hidden() > 0 || (g().lane === "closed" && props.older && g().rows.length > closedShown)}>
                     <OlderLink hidden={hidden()} onClick={props.onOlder} />
-                  </Show>
-                  <Show when={g().rows.length === 0 && adding() !== g().key}>
-                    <p class="py-1.5 pr-3 pl-9 text-xs text-faint">{t("web.issue.list.none")}</p>
                   </Show>
                 </Show>
               </section>
@@ -172,8 +170,8 @@ function Row(props: { card: BoardCard; selected: boolean; showProject: boolean; 
           </span>
         )}
       </For>
-      <Show when={props.showProject && project()}>
-        <span class="hidden max-w-[120px] truncate text-xs text-muted @min-[640px]:block">{project()}</span>
+      <Show when={props.showProject}>
+        <span class="hidden w-[120px] shrink-0 truncate text-xs text-muted @min-[640px]:block">{project()}</span>
       </Show>
       <span class="flex w-[18px] shrink-0 justify-center">
         <CardFace card={props.card} size={18} />

@@ -12,14 +12,14 @@
   "findMessages": "Find messages",
   "settings": "Channel settings",
   "inChannel": "In the channel",
-  "empty": "Nobody has spoken in {label} yet. Tell the manager something to do, such as \"have the tester run the tests\".",
+  "empty": "Nobody has spoken in {label}: tell the orchestrator something to do.",
   "sendTo": "Message {label}",
   "side": "Channels and helpers",
   "channelsTitle": "Channels",
   "directsTitle": "Direct messages",
   "newChannel": "Create a channel",
   "helpers": "Helpers",
-  "noHelpers": "No helpers here yet: tell the manager a job in a channel.",
+  "noHelpers": "No helpers here",
   "mood": {
     "idle": "resting",
     "listening": "listening",
@@ -53,7 +53,7 @@
     "thread": "Ticket thread"
   },
   "crons": {
-    "empty": "No scheduled tasks in this channel yet. Tell the manager \"run the tests at nine every morning\" and it schedules it here; when due, a line appears in the channel and the work is sent.",
+    "empty": "No scheduled tasks: tell the orchestrator \"run the tests every day at nine\".",
     "next": "next {next}",
     "direct": "straight to {agent}",
     "byOrchestrator": "set by the manager",

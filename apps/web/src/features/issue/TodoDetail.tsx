@@ -176,35 +176,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     </div>
   );
 
-  const main = (
+  // One place to start from: a new draft is one sentence to draft from; its description and criteria come in once drafted,
+  // written, or asked for (自己写).
+  const [own, setOwn] = createSignal(false);
+  const written = () => refined() || d().description.trim() !== "" || criteria().length > 0;
+  const fields = () => written() || own() || !backlog();
+  const talk = (
     <>
-      <textarea
-        data-testid="issue-description"
-        value={d().description}
-        onInput={(e) => edit({ description: e.currentTarget.value })}
-        rows={6}
-        placeholder={t("web.issue.todo.descriptionHint")}
-        aria-label={t("web.issue.todo.description")}
-        class="w-full resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-faint hover:border-line focus:border-focus"
-      />
-      <div class="mt-3 border-t border-line">
-        <Fold
-          label={t("web.issue.todo.criteria")}
-          summary={
-            criteria().length === 0 ? t("web.issue.todo.noCriteria") : t("web.issue.todo.criteriaSummary", { n: criteria().length, first: criteria()[0] ?? "" })
-          }
-          open={criteria().length === 0}
-        >
-          <TextArea
-            rows={3}
-            value={d().criteria}
-            onInput={(e) => edit({ criteria: e.currentTarget.value })}
-            placeholder={t("web.issue.todo.criteriaHint")}
-            aria-label={t("web.issue.todo.criteria")}
-          />
-        </Fold>
-      </div>
-      <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
       <Show when={backlog()}>
         <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
         <Note tone={drafting() ? "water" : "wheat"}>
@@ -244,11 +222,62 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           aria-label={t("web.issue.todo.whatLabel")}
         />
         <div class="mt-2.5">
-          <Button tone={refined() ? "plain" : "primary"} disabled={!canRefine()} onClick={() => void draft()}>
+          <Button tone={written() ? "plain" : "primary"} disabled={!canRefine()} onClick={() => void draft()}>
             {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
           </Button>
         </div>
       </Show>
+    </>
+  );
+  const main = (
+    <>
+      <Show
+        when={fields()}
+        fallback={
+          <>
+            {talk}
+            <button
+              type="button"
+              data-testid="issue-write-own"
+              onClick={() => setOwn(true)}
+              class="mt-3 cursor-pointer rounded-sm text-sm text-muted hover:text-ink hover:underline"
+            >
+              {t("web.issue.todo.writeOwn")}
+            </button>
+          </>
+        }
+      >
+        <textarea
+          data-testid="issue-description"
+          value={d().description}
+          onInput={(e) => edit({ description: e.currentTarget.value })}
+          rows={6}
+          placeholder={t("web.issue.todo.descriptionHint")}
+          aria-label={t("web.issue.todo.description")}
+          class="w-full resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-faint hover:border-line focus:border-focus"
+        />
+        <div class="mt-3 border-t border-line">
+          <Fold
+            label={t("web.issue.todo.criteria")}
+            summary={
+              criteria().length === 0
+                ? t("web.issue.todo.noCriteria")
+                : t("web.issue.todo.criteriaSummary", { n: criteria().length, first: criteria()[0] ?? "" })
+            }
+            open={criteria().length === 0}
+          >
+            <TextArea
+              rows={3}
+              value={d().criteria}
+              onInput={(e) => edit({ criteria: e.currentTarget.value })}
+              placeholder={t("web.issue.todo.criteriaHint")}
+              aria-label={t("web.issue.todo.criteria")}
+            />
+          </Fold>
+        </div>
+        {talk}
+      </Show>
+      <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
     </>
   );
 
@@ -314,10 +343,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </Note>
         )}
       </Show>
-      <div class="mt-4 flex flex-col gap-2">
+      <div class="mt-4 flex flex-wrap gap-2">
         <Show when={backlog()}>
           <Button
-            tone={refined() ? "primary" : "plain"}
+            tone={written() ? "primary" : "plain"}
             data-testid="issue-start"
             disabled={!startable()}
             title={d().agent ? undefined : t("web.issue.todo.pickHelper")}
@@ -326,17 +355,19 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             {t("web.issue.todo.start")}
           </Button>
         </Show>
-        <Button
-          data-testid="issue-save"
-          disabled={!canSave() || !edited()}
-          onClick={() => {
-            const id = props.item.id;
-            const edit = unsaved();
-            if (edit) void busyWith(async () => saved(await api.issue.update({ id, ...edit })));
-          }}
-        >
-          {t("web.issue.todo.save")}
-        </Button>
+        <Show when={edited()}>
+          <Button
+            data-testid="issue-save"
+            disabled={!canSave()}
+            onClick={() => {
+              const id = props.item.id;
+              const edit = unsaved();
+              if (edit) void busyWith(async () => saved(await api.issue.update({ id, ...edit })));
+            }}
+          >
+            {t("web.issue.todo.save")}
+          </Button>
+        </Show>
         <Button tone="quiet" data-testid="issue-remove" disabled={busy()} onClick={() => void remove()}>
           {t("web.issue.todo.remove")}
         </Button>

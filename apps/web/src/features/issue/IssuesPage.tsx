@@ -1,5 +1,6 @@
 import { list, t } from "@vibevalley/i18n";
-import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+import { Choice } from "../../ui/Choice";
+import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
@@ -9,14 +10,13 @@ import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, card
 import { issueIs, type Lane } from "./rules";
 import { toast } from "../../ui/toasts";
 import { useRouter } from "../../base/router";
-import { useSelectValue } from "../../base/util";
+
 import { useCore } from "../../base/frame";
 import { useOrchestrators } from "../../base/agents";
 import { useIssueHistory } from "./data";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
 import { IssueBoard } from "./Board";
-import { IconButton } from "../../ui/IconButton";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
 import { run, useGraphs, useNameOf } from "./hooks";
@@ -100,54 +100,63 @@ export function IssuesPage(props: { rest: string }) {
     const made = await run(() => writeIssue(text, where.agent || f.agent, where.project || f.project));
     if (!made) return;
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
-    open(made.issue.id);
+    // A line written in a lane stays on the board, among the others; only a blank one to write out opens its page.
+    if (!text.trim()) open(made.issue.id);
   };
   const addInList: ListAdd = (text, where) => void add(text, where);
   const write = () => void add("");
 
+  // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or 工单 comes back.
   return (
     <div class="relative flex h-full flex-col">
-      <Show when={history.error()}>
-        <p class="px-3 pt-2 text-sm text-berry">
-          {t("web.issue.page.historyUnread")}
-          {reasonOf(history.error())}
-        </p>
-      </Show>
-      <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} />
       <Show
-        when={look().view === "board"}
+        when={id()}
+        keyed
         fallback={
-          <IssueList
-            cards={shown()}
-            loading={history.loading()}
-            selected={card()?.id ?? id()}
-            older={older()}
-            grouping={look().grouping}
-            ordering={look().ordering}
-            onOlder={() => setOlder(!older())}
-            onOpen={open}
-            onAdd={addInList}
-          />
+          <>
+            <Show when={history.error()}>
+              <p class="px-3 pt-2 text-sm text-berry">
+                {t("web.issue.page.historyUnread")}
+                {reasonOf(history.error())}
+              </p>
+            </Show>
+            <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} />
+            <Show
+              when={look().view === "board"}
+              fallback={
+                <IssueList
+                  cards={shown()}
+                  loading={history.loading()}
+                  selected={card()?.id ?? id()}
+                  older={older()}
+                  grouping={look().grouping}
+                  ordering={look().ordering}
+                  onOlder={() => setOlder(!older())}
+                  onOpen={open}
+                  onAdd={addInList}
+                />
+              }
+            >
+              <IssueBoard
+                cards={shown()}
+                loading={history.loading()}
+                selected={card()?.id ?? id()}
+                older={older()}
+                ordering={look().ordering}
+                onOlder={() => setOlder(!older())}
+                onOpen={open}
+                onDrop={(c, to) => void drop(c, to)}
+                onPlace={(c, before) => void place(c, before)}
+                onAdd={(t) => void add(t)}
+                onWrite={write}
+              />
+            </Show>
+          </>
         }
       >
-        <IssueBoard
-          cards={shown()}
-          loading={history.loading()}
-          selected={card()?.id ?? id()}
-          older={older()}
-          ordering={look().ordering}
-          onOlder={() => setOlder(!older())}
-          onOpen={open}
-          onDrop={(c, to) => void drop(c, to)}
-          onPlace={(c, before) => void place(c, before)}
-          onAdd={(t) => void add(t)}
-          onWrite={write}
-        />
-      </Show>
-      {/* Keyed by the id, a plain value; the detail keeps the card it last found (see Detail). */}
-      <Show when={id()} keyed>
+        {/* Keyed by the id, a plain value; the detail keeps the card it last found (see Detail). */}
         {(at) => (
-          <Overlay onClose={() => open(undefined)}>
+          <IssueView onBack={() => open(undefined)}>
             <Detail
               id={at}
               cards={all}
@@ -156,7 +165,7 @@ export function IssuesPage(props: { rest: string }) {
               open={open}
               onClose={(issue, session, review) => setClosing({ issue, session, review })}
             />
-          </Overlay>
+          </IssueView>
         )}
       </Show>
       <Show when={closing()}>{(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} onClose={() => setClosing(null)} />}</Show>
@@ -244,31 +253,31 @@ function Detail(props: {
   );
 }
 
-/** The detail over the board, sharing its URL: Escape or a click beside it goes back to the board. */
-function Overlay(props: { onClose: () => void; children: JSX.Element }) {
+/** An issue's own page, at its URL: 工单 or Escape goes back to the board as it was left. */
+function IssueView(props: { onBack: () => void; children: JSX.Element }) {
   onSettled(() => {
     const esc = (e: KeyboardEvent) => {
-      // A dialog over the detail closes first.
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) props.onClose();
+      // A dialog over the issue, or a field being written in, has Escape first.
+      const at = document.activeElement;
+      if (e.key !== "Escape" || document.querySelector("dialog[open]") || (at instanceof HTMLElement && at.closest("input, textarea, [contenteditable]")))
+        return;
+      props.onBack();
     };
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   });
   return (
-    <div
-      class="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-ink/20 px-3 py-6 sm:px-6"
-      onClick={(e) => e.target === e.currentTarget && props.onClose()}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("web.issue.page.sheet")}
-        data-testid="issue"
-        class="relative h-fit w-full max-w-[1080px] animate-pop-in rounded-xl border border-line bg-page px-6 py-5 shadow-float"
-      >
-        <div class="absolute top-3 right-3">
-          <IconButton icon="close" label={t("web.issue.page.close")} testid="issue-close" onClick={props.onClose} />
-        </div>
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <div data-testid="issue" class="mx-auto w-full max-w-[1200px] px-6 pt-3 pb-10">
+        <button
+          type="button"
+          data-testid="issue-close"
+          onClick={() => props.onBack()}
+          class="mb-3 inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-muted transition-colors duration-120 hover:bg-hover hover:text-ink"
+        >
+          <Icon name="back" size={14} />
+          {t("web.issue.page.backToBoard")}
+        </button>
         {props.children}
       </div>
     </div>
@@ -286,7 +295,6 @@ function Toolbar(props: {
   const nameOf = useNameOf();
   const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].sort();
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].sort((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
-  const select = "h-7 max-w-[150px] cursor-pointer rounded-md border border-line bg-page px-2 text-sm outline-none hover:bg-hover focus:border-focus";
   return (
     // Narrow, the views go on their own line above the filters, at the right where the 显示 panel opens leftwards.
     <div class="@container px-3 pt-3 pb-2.5">
@@ -304,20 +312,20 @@ function Toolbar(props: {
             />
           </label>
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
-          <SelectOf
+          <Choice
             label={t("web.issue.page.byProject")}
+            testid="filter-project"
+            filter
             value={props.filter.project}
-            class={select}
-            none={t("web.issue.page.allProjects")}
-            options={projects().map((p) => ({ value: p, label: p }))}
+            options={[{ value: "", label: t("web.issue.page.allProjects") }, ...projects().map((p) => ({ value: p, label: p }))]}
             onChange={(project) => props.onFilter({ ...props.filter, project })}
           />
-          <SelectOf
+          <Choice
             label={t("web.issue.page.byHelper")}
+            testid="filter-agent"
+            filter
             value={props.filter.agent}
-            class={select}
-            none={t("web.issue.page.allHelpers")}
-            options={agents().map((a) => ({ value: a, label: nameOf()(a) }))}
+            options={[{ value: "", label: t("web.issue.page.allHelpers") }, ...agents().map((a) => ({ value: a, label: nameOf()(a) }))]}
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
           <Show when={filterAny(props.filter)}>
@@ -339,26 +347,5 @@ function Toolbar(props: {
         </div>
       </div>
     </div>
-  );
-}
-
-/** A filter's select: everything, or one of the values the cards have. */
-function SelectOf(props: {
-  label: string;
-  value: string;
-  class: string;
-  none: string;
-  options: { value: string; label: string }[];
-  onChange: (v: string) => void;
-}) {
-  const ref = useSelectValue(
-    () => props.value,
-    () => props.options,
-  );
-  return (
-    <select ref={ref} aria-label={props.label} value={props.value} onChange={(e) => props.onChange(e.currentTarget.value)} class={props.class}>
-      <option value="">{props.none}</option>
-      <For each={props.options}>{(o) => <option value={o.value}>{o.label}</option>}</For>
-    </select>
   );
 }
