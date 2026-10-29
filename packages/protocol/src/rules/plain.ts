@@ -1,21 +1,14 @@
-// A report or a message written in Markdown, said in one plain line where there is room for one line: its marks (#, **,
-// `, links, list bullets) taken off, its lines joined. The server words an issue's timeline with it, the page a summary
-// card and a thread's preview.
+// Markdown read as one plain line, where its marks (#, -, *, `, fences) would show as they are: a card, a timeline, a
+// preview. The server words an issue's timeline with it, the page its summary card, previews and the farm's bubbles.
 
-export function plainLine(markdown: string): string {
+export function plainText(markdown: string): string {
   return markdown
-    .replace(/```[^\n]*\n?/g, "")
-    .split("\n")
-    .map((line) =>
-      line
-        .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, "")
-        .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/(\*\*|__)(.+?)\1/g, "$2")
-        .replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?=[^\w*]|$)/g, "$1$2")
-        .replace(/`([^`]+)`/g, "$1")
-        .trim(),
-    )
-    .filter(Boolean)
-    .join(" ")
-    .replace(/\s+/g, " ");
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gm, "")
+    .replace(/(\*\*|__|\*|_|~~)(.+?)\1/g, "$2")
+    .replaceAll("|", " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

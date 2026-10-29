@@ -1,6 +1,6 @@
-import { plainLine } from "@vibevalley/protocol/rules";
 import { Checkbox } from "../../ui/Checkbox";
 import { list, t } from "@vibevalley/i18n";
+import { plainText } from "@vibevalley/protocol/rules";
 import { Dot } from "../../ui/Dot";
 import type { IconName } from "../../ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
@@ -120,7 +120,7 @@ export function IssueDetail(props: {
             <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
-              <Show when={ask().line}>{(line) => <div class="mt-1 line-clamp-4">{plainLine(line())}</div>}</Show>
+              <Show when={ask().line}>{(line) => <div class="mt-1 line-clamp-4">{plainText(line())}</div>}</Show>
               <Show when={s().attention.state === "asking"}>
                 <For each={props.issue.questions}>
                   {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
@@ -462,7 +462,7 @@ function Story(props: { milestones: Milestone[] }) {
               <Show when={m.who}>
                 <span class="text-muted">{m.who} · </span>
               </Show>
-              {m.text}
+              {plainText(m.text)}
             </span>
           </li>
         )}

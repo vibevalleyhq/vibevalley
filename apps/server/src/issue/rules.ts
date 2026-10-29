@@ -18,7 +18,7 @@ import type {
   TemplateBlank,
   TemplateKind,
 } from "@vibevalley/protocol";
-import { attentionWantsOwner, closedText, plainLine, shortTitle } from "@vibevalley/protocol/rules";
+import { attentionWantsOwner, closedText, plainText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
 import { clip } from "../base/text.ts";
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
@@ -221,7 +221,7 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
     const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "refine"));
     out.push({ at: r.startedAt, kind, ...by, text });
     if (r.endedAt === undefined || r.outcome === undefined) return;
-    const said = r.summary ? t("server.issue.timeline.said", { summary: plainLine(r.summary) }) : "";
+    const said = r.summary ? t("server.issue.timeline.said", { summary: plainText(r.summary) }) : "";
     switch (r.outcome) {
       case "completed":
         if (i === lastDone && issue.questions.length > 0)

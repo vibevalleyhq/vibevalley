@@ -1641,6 +1641,7 @@ export const catalogs = {
         newBelow: "有 {n} 条新消息",
         toLatest: "回到最新",
         roundFor: "{what} · {took}",
+        sentTo: "派 {who} 去做",
       },
       tools: {
         label: "这条消息能做的",
@@ -2726,9 +2727,9 @@ export const catalogs = {
         editing: "{who}在改代码",
         history: "{n} 次：{line}",
         historyItem: "{name}（{id}）",
-        since: "已经 {span}",
-        ran: "跑了 {n} 轮",
-        used: "用了 {span}",
+        since: "{span}了",
+        ran: "第 {n} 轮",
+        used: "共用 {span}",
         noSteps: "还没有步骤。",
         stepsGone: "干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。",
         change: { A: { mark: "新", label: "新增" }, M: { mark: "改", label: "修改" }, D: { mark: "删", label: "删除" } },
@@ -2740,6 +2741,7 @@ export const catalogs = {
         changes: "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
         graphStep: "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
+        justNow: "刚刚",
       },
     },
     "web.lan": {
@@ -5289,6 +5291,7 @@ export const catalogs = {
         newBelow: "{n} new below",
         toLatest: "Back to the newest",
         roundFor: "{what} · {took}",
+        sentTo: "Sent {who} on",
       },
       tools: {
         label: "What this message offers",
@@ -6439,8 +6442,8 @@ export const catalogs = {
         history: "{n} times: {line}",
         historyItem: "{name} ({id})",
         since: "for {span}",
-        ran: "{n, plural, one {ran # round} other {ran # rounds}}",
-        used: "took {span}",
+        ran: "round {n}",
+        used: "{span} in all",
         noSteps: "No steps yet.",
         stepsGone: "Work steps are kept for 30 days (session.trajectory_days in the configuration); this ticket's are cleared.",
         change: { A: { mark: "A", label: "Added" }, M: { mark: "M", label: "Modified" }, D: { mark: "D", label: "Deleted" } },
@@ -6452,6 +6455,7 @@ export const catalogs = {
         changes: "{branch} → {base} · {commits} commits · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
         graphStep: 'A step of the plan "{graph}": {step}. When done it merges into the plan\'s branch by itself, and reaches main when the whole plan does.',
+        justNow: "just now",
       },
     },
     "web.lan": {
@@ -9038,6 +9042,7 @@ export interface Messages {
   "web.channel.messages.replyGone": undefined;
   "web.channel.messages.roundFor": { readonly took: string | number; readonly what: string | number };
   "web.channel.messages.searching": undefined;
+  "web.channel.messages.sentTo": { readonly who: string | number };
   "web.channel.messages.spent": { readonly spent: string | number };
   "web.channel.messages.start": undefined;
   "web.channel.messages.thinking": undefined;
@@ -9977,11 +9982,12 @@ export interface Messages {
   "web.issue.issue.historyItem": { readonly id: string | number; readonly name: string | number };
   "web.issue.issue.inGraph": undefined;
   "web.issue.issue.interrupted": undefined;
+  "web.issue.issue.justNow": undefined;
   "web.issue.issue.main": undefined;
   "web.issue.issue.noSteps": undefined;
   "web.issue.issue.quiet": { readonly who: string | number };
   "web.issue.issue.quietLine": undefined;
-  "web.issue.issue.ran": { readonly n: number };
+  "web.issue.issue.ran": { readonly n: string | number };
   "web.issue.issue.reopenLine": undefined;
   "web.issue.issue.reviewed": undefined;
   "web.issue.issue.since": { readonly span: string | number };

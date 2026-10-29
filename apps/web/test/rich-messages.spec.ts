@@ -33,7 +33,6 @@ test("a message's code, diagrams, links and lists", async ({ page, api }) => {
   await expect(page.locator('[data-testid="diagram"][data-failed]')).toHaveCount(1);
 
   await expect(page.locator('a[href^="javascript"]')).toHaveCount(0);
-  // In the text: a preview card of the same link may come too, when the server reaches the site.
   await expect(page.getByTestId("message-body").locator('a[href="https://example.com"]')).toHaveAttribute("target", "_blank");
   await expect(page.locator("li.task")).toHaveCount(2);
 

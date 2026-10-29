@@ -1,5 +1,5 @@
-import { plainLine } from "@vibevalley/protocol/rules";
 import { t } from "@vibevalley/i18n";
+import { plainText } from "@vibevalley/protocol/rules";
 import { tookText } from "../../base/format";
 import type { IconName } from "../../ui/icons";
 import { spentText } from "../../base/format";
@@ -30,6 +30,7 @@ import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
+import { A } from "../../ui/A";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { Tag, type TagTone } from "../../ui/Tag";
@@ -305,20 +306,43 @@ function Frame(props: {
 }
 
 /** A dispatch: one line until it is opened, then the whole task in its place. */
-function Dispatch(props: { text: string }) {
+/** A dispatch said as what it is for the owner: who went to which issue. The words the helper was given, its brief and how
+ * to report, stay folded: they are the helper's, not the owner's to read. */
+function Dispatch(props: { m: ChatMessage }) {
+  const core = useCore();
   const [open, setOpen] = createSignal(false);
+  const sent = () => (core()?.sessions ?? []).find((s) => s.id === props.m.session);
+  const issue = () => {
+    const id = sent()?.issue;
+    return id ? (core()?.issues ?? []).find((i) => i.id === id) : undefined;
+  };
   return (
-    <div class="group/d flex items-start gap-1.5">
+    <div class="group/d flex items-start gap-1.5" data-testid="dispatch">
       <div class="min-w-0 flex-1">
         <Show
           when={open()}
           fallback={
-            <button type="button" onClick={() => setOpen(true)} class="block w-full cursor-pointer truncate text-left text-base">
-              {props.text.replace(/\s+/g, " ").trim()}
-            </button>
+            <Show
+              when={issue()}
+              fallback={
+                <button type="button" onClick={() => setOpen(true)} class="block w-full cursor-pointer truncate text-left text-base">
+                  {plainText(props.m.text)}
+                </button>
+              }
+            >
+              {(i) => (
+                <p class="flex min-w-0 items-baseline gap-1.5 text-base">
+                  <span class="shrink-0">{t("web.channel.messages.sentTo", { who: sent()!.name })}</span>
+                  <A href={`/issues/${i().id}`} data-testid="dispatch-issue" class="min-w-0 truncate font-medium text-water hover:underline">
+                    #{i().number} {i().title}
+                  </A>
+                  <Show when={i().project}>{(p) => <span class="shrink-0 text-xs text-muted">{p()}</span>}</Show>
+                </p>
+              )}
+            </Show>
           }
         >
-          <Markdown text={props.text} mentions />
+          <Markdown text={props.m.text} mentions />
         </Show>
       </div>
       <button
@@ -399,7 +423,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
           </Show>
         }
       >
-        <Dispatch text={props.m.text} />
+        <Dispatch m={props.m} />
       </Show>
       <Show when={props.m.attachments}>{(files) => <Attachments files={files()} />}</Show>
       <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</Show>
@@ -471,7 +495,7 @@ function ThreadPreview(props: { thread: Channel }) {
         {(m) => (
           <span class="flex w-full items-center gap-2 text-sm">
             <span class="shrink-0 font-medium">{m().from === ownerId ? t("web.channel.messages.owner") : m().name}</span>
-            <span class="min-w-0 flex-1 truncate text-muted">{plainLine(m().text)}</span>
+            <span class="min-w-0 flex-1 truncate text-muted">{plainText(m().text)}</span>
             <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
           </span>
         )}

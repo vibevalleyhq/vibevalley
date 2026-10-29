@@ -161,12 +161,13 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 ## 原子和模式
 
 - **消息和说明里的字**（`ui/Markdown.tsx`、像素皮的 `PxMarkdown`，都经 `ui/richText.ts` 加工）：GitHub 的 Markdown，原始 HTML 丢掉；链接只留 http、https、mailto 和站内地址，站内的不整页刷新，外面的开新标签页；`#12` 链到那张工单；代码块带语言、复制按钮，按语言上色（像素皮不上色），超过 16 行先折起；` ```mermaid ` 由 [Pele](https://github.com/obsidianmd/pele) 画，第一次出现才加载，颜色跟令牌，画出来的图去掉脚本、链接和外来的元素，画不出来留原文并说为什么；任务清单是勾选框，不是圆点。聊天里一条超过 360px 高的先折起，带「展开全文」。
+- **等你的事看得见**：帮工在问你、等你验收、要你修的件数在左边栏「工单」上是一个麦色的数，窗口标题前面是「(2!)」，聊天的未读跟在后面（`features/notice/tray.ts`）。派活的消息说「派谁去做哪张」并链到工单，给帮工的整段话收起来；预览里的 Markdown 先去掉记号（`plainText`）再截断。
 - **说明放在哪**：一页、一处是什么，写在标题旁的 ⓘ（`Hint`）里，悬停才出；标题下面不放整段话，页头也不挂副标题句。同一处只有一个 ⓘ，别的事（设置存在哪个文件）用它自己的图标。
 - **链接**：站内只有图标的链接用 `IconLink`（地址只收 `/…`）；去别的网站的一律是 `OutLink`，写出去哪（「MOSS 开放平台 ↗」），不用一个光秃秃的箭头。
 - **钥匙和占位**：钥匙的状态写出来（「还没设」，或在用的最后四位），不只画一个点。输入框的示例值写成「比如：…」，不让它看着像已经填好的值。分段放在一列里时只有它的内容那么宽（`Segmented` 自己管）。
 - **按钮**（`ui/Button.tsx`）：`primary` 一个区域只有一个，是那里最要紧的一步；`plain` 是其余的；`quiet` 放在工具条和行里；`danger` 是字变莓色的 `plain`，不填满。只有图标的用 `IconButton`，它的名字就是悬停的提示和读屏的话。
 - **选择框和勾选框**（`ui/Field.tsx` 的 `Select`、`ui/Checkbox.tsx`，行为来自 `@vibevalley/base-ui`）：选择框是一个按钮，显示选中的那项、右边一个向下的小箭头，列表和菜单一个样子（`rounded-lg`、`shadow-float`、选中的那项后面一个勾），至少和按钮一样宽；`quiet` 是侧栏里平时不画框的那种，`size="control"` 是工具条上 28px 高的。勾选框是 16px 的 `rounded-xs` 方块，勾上了填 `accent`。单选、滑块用 base-ui 的 `RadioGroup`、`Slider`，样子照这两个配。系统自带的 `<select>`、勾选框、单选、滑块每台机器画得不一样，深色主题里还是浅的，工作台不用（lint `vibevalley/native-control`）；像素皮画自己的。
-- **一行里的报告**（`ui/plainLine.ts`）：帮工的汇报、消息是 Markdown，放在只有一行、几行的地方（工单的「要你做的」、经过、串的预览）时去掉 `#`、`**`、反引号、链接和列表的记号，连成一行，不露出原始的记号；整段看的地方才渲染 Markdown。
+- **一行里的报告**（`packages/protocol/src/rules/plain.ts` 的 `plainText`，服务端和页面共用）：帮工的汇报、消息是 Markdown，放在只有一行、几行的地方（工单的「要你做的」、经过、串的预览、农场的气泡）时去掉 `#`、`**`、反引号、链接和列表的记号，连成一行，不露出原始的记号；整段看的地方才渲染 Markdown。
 - **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `bg-hover`，页面色加 `shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
 - **状态点**（`ui/Dot.tsx` 的 `Dot`，`features/channel/bits.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
 - **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/modal.ts` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。

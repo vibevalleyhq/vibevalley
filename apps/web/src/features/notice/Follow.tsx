@@ -6,7 +6,8 @@ import { createEffect, onSettled } from "solid-js";
 import { currentHost } from "../../base/host";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { currentLocale } from "@vibevalley/i18n";
-import { traySummary } from "./tray";
+import { tabTitle, traySummary, waitingOnOwner } from "./tray";
+import { unreadTotal } from "../channel";
 import { voiceCall } from "../voice";
 import { rawFrame } from "../../base/frame";
 
@@ -17,6 +18,7 @@ export function Follow() {
   let tray = "";
   createEffect(frame, (f) => {
     if (!f) return;
+    document.title = tabTitle(waitingOnOwner(f.inbox), unreadTotal(f.state.chat));
     const host = currentHost();
     const news = freshOf(known, f.inbox);
     known = news.known;

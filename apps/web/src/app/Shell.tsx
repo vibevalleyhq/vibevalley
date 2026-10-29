@@ -15,6 +15,7 @@ import { useRouter } from "../base/router";
 import { titleBar } from "../ui/TitleBar";
 import { QuickSwitcher, switcher } from "../features/channel";
 import { pressed } from "../base/shortcuts";
+import { waitingOnOwner } from "../features/notice";
 import { ShortcutSheet } from "../ui/ShortcutSheet";
 
 /** The head's height, the rail's top slot's too. */
@@ -26,7 +27,7 @@ function PlaceIcon(props: { place: Place }) {
   return <Icon name={props.place.icon} size={20} />;
 }
 
-function Slot(props: { to: string; place: string; label: string; current?: boolean; fill?: string; children: JSX.Element }) {
+function Slot(props: { to: string; place: string; label: string; current?: boolean; fill?: string; badge?: number; children: JSX.Element }) {
   return (
     <A
       href={props.to}
@@ -34,16 +35,29 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
       title={props.label}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
-      class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
+      data-badge={props.badge || undefined}
+      class="relative flex h-11 w-11 items-center justify-center rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
       style={props.current ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
     >
       {props.children}
+      {/* How many wait on the owner there: the place to go next, seen from anywhere. */}
+      <Show when={props.badge}>
+        {(n) => (
+          <span
+            data-testid="rail-badge"
+            class="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-wheat px-1 text-center text-2xs leading-4 font-semibold text-ink"
+          >
+            {n()}
+          </span>
+        )}
+      </Show>
     </A>
   );
 }
 
 function Rail(props: { here?: Place }) {
   const frames = useFrames();
+  const waiting = () => waitingOnOwner(frames.frame?.inbox ?? []);
   const settings = places.find((p) => p.id === "settings")!;
   return (
     <nav
@@ -63,7 +77,7 @@ function Rail(props: { here?: Place }) {
       <div class="flex flex-col gap-2">
         <For each={places.filter((p) => p.id !== "settings")}>
           {(p) => (
-            <Slot to={p.path} place={p.id} label={`${p.label} · ${p.hint}`} current={p === props.here}>
+            <Slot to={p.path} place={p.id} label={`${p.label} · ${p.hint}`} current={p === props.here} badge={p.id === "issues" ? waiting() : 0}>
               <PlaceIcon place={p} />
             </Slot>
           )}
