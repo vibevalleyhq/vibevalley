@@ -24,7 +24,6 @@ for (const theme of ["light", "dark"] as const)
       "/runtimes",
       "/projects",
       "/catalog",
-      "/catalog/kit",
       ...sections.map((s) => `/settings/${s}`),
     ];
     const found: string[] = [];

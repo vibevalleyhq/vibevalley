@@ -66,7 +66,7 @@ export function SettingRow(props: { label: string; hint?: string; tip?: string; 
         <Show when={props.hint}>{(hint) => <span class="text-xs text-muted">{hint()}</span>}</Show>
       </div>
       <Show when={props.children}>
-        <div class={["flex items-center gap-2", props.wide ? "w-full" : "shrink-0"]}>{props.children}</div>
+        <div class={["flex max-w-full flex-wrap items-center gap-2", props.wide ? "w-full" : "shrink-0"]}>{props.children}</div>
       </Show>
     </div>
   );
@@ -93,7 +93,7 @@ export function KeyRow(props: {
   return (
     <SettingRow label={props.label} hint={props.hint} tip={props.tip} testid={props.testid}>
       <KeyMark status={props.status} removing={props.removing} />
-      <div class={["w-64", { "pointer-events-none opacity-40": props.removing }]}>
+      <div class={["w-64 max-w-full", { "pointer-events-none opacity-40": props.removing }]}>
         <SecretInput
           data-testid="secret"
           aria-label={props.label}

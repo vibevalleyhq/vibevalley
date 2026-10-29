@@ -1,7 +1,6 @@
-import { Slider, Tabs } from "@vibevalley/base-ui";
+import { Slider } from "@vibevalley/base-ui";
+import { Tabs } from "../../ui/Tabs";
 import { t } from "@vibevalley/i18n";
-// 图鉴: every drawing the farm uses, its pointers and its sounds, and the workbench's own kit. /catalog is the drawings,
-// /catalog/<name> one of them large, /catalog/cursors, /catalog/sounds and /catalog/kit the other shelves.
 
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -9,7 +8,6 @@ import type { JSX } from "@solidjs/web";
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../ui/pixel/sound";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./rules";
 import { numberText } from "../../base/format";
-import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { ready, useQuery } from "../../base/query";
@@ -18,7 +16,6 @@ import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
 import { Card, Quiet, Toggle } from "../../ui/layout";
-import { KitShelf } from "./Kit";
 
 type Ground = "check" | "grass" | "night";
 const grounds: { value: Ground; label: string }[] = [
@@ -63,33 +60,12 @@ const shelfTabs = [
   { id: "sprites", label: t("web.catalog.tab.sprites"), to: "/catalog" },
   { id: "cursors", label: t("web.catalog.tab.cursors"), to: "/catalog/cursors" },
   { id: "sounds", label: t("web.catalog.tab.sounds"), to: "/catalog/sounds" },
-  { id: "kit", label: t("web.catalog.tab.kit"), to: "/catalog/kit" },
 ] as const;
 
 /** `rest` is the path after /catalog/. */
 export function CatalogPage(props: { rest: string }) {
-  const shelf = () => (props.rest === "cursors" || props.rest === "sounds" || props.rest === "kit" ? props.rest : "sprites");
-  const tabs = () => (
-    <Tabs.Root value={shelf()}>
-      <Tabs.List aria-label={t("web.catalog.shelves")} class="flex gap-0.5 rounded-lg bg-hover p-0.5">
-        <For each={shelfTabs}>
-          {(t) => (
-            <Tabs.Tab
-              value={t.id}
-              render={(p) => <A {...p} href={t.to} />}
-              data-key={t.id}
-              class={[
-                "flex h-[26px] flex-1 items-center justify-center rounded-md text-sm",
-                t.id === shelf() ? "bg-page font-medium shadow-raise" : "text-muted hover:bg-hover",
-              ]}
-            >
-              {t.label}
-            </Tabs.Tab>
-          )}
-        </For>
-      </Tabs.List>
-    </Tabs.Root>
-  );
+  const shelf = () => (props.rest === "cursors" || props.rest === "sounds" ? props.rest : "sprites");
+  const tabs = () => <Tabs label={t("web.catalog.shelves")} value={shelf()} items={shelfTabs.map((s) => ({ value: s.id, label: s.label, href: s.to }))} />;
   return (
     <div class="h-full p-3">
       <Switch fallback={<Sprites id={props.rest ? decodeURIComponent(props.rest) : undefined} tabs={tabs()} />}>
@@ -98,9 +74,6 @@ export function CatalogPage(props: { rest: string }) {
         </Match>
         <Match when={shelf() === "sounds"}>
           <Sounds tabs={tabs()} />
-        </Match>
-        <Match when={shelf() === "kit"}>
-          <KitShelf tabs={tabs()} />
         </Match>
       </Switch>
     </div>

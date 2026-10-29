@@ -550,6 +550,9 @@ importers:
       '@vibevalley/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@vibevalley/stories':
+        specifier: workspace:*
+        version: link:../../packages/stories
       agora-rtc-sdk-ng:
         specifier: 'catalog:'
         version: 4.24.9(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
@@ -721,6 +724,19 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+
+  packages/stories:
+    dependencies:
+      '@solidjs/web':
+        specifier: 'catalog:'
+        version: 2.0.0-rc.16(solid-js@2.0.0-rc.16)
+      solid-js:
+        specifier: 'catalog:'
+        version: 2.0.0-rc.16
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   packages/testkit:
     dependencies:

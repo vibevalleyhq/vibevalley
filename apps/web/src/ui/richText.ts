@@ -50,8 +50,9 @@ export type Undo = () => void;
 export function richen(root: ParentNode, o: RichOptions = {}): Undo {
   const undo: Undo[] = [];
   links(root, o);
-  for (const box of [...root.querySelectorAll("input[type=checkbox]")]) {
+  for (const box of [...root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")]) {
     box.setAttribute("aria-readonly", "true");
+    box.setAttribute("aria-label", box.checked ? t("web.base.rich.taskDone") : t("web.base.rich.taskOpen"));
     box.closest("li")?.classList.add("task");
   }
   for (const code of [...root.querySelectorAll("pre > code")]) {
@@ -113,6 +114,8 @@ function codeBlock(pre: HTMLElement, code: Element, lang: string, text: string, 
   });
   head.append(copy);
   pre.replaceWith(box);
+  // A long line scrolls sideways: the keyboard reaches it too.
+  pre.tabIndex = 0;
   box.append(head, pre);
   if (lines.length > foldLines) {
     box.dataset.folded = "";
