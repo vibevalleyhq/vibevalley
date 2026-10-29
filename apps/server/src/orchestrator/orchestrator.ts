@@ -417,7 +417,16 @@ export const make = (options: OrchestratorOptions = {}) =>
       }
     }
 
-    yield* Effect.addFinalizer(() => Effect.promise(() => Promise.all([...instances.values()].map((me) => me.host.close()))));
+    yield* Effect.addFinalizer(() =>
+      Effect.forEach(
+        [...instances.values()],
+        (me) =>
+          Effect.tryPromise(() => me.host.close()).pipe(
+            Effect.catch((e) => Effect.logWarning("an orchestrator did not close", e).pipe(Effect.annotateLogs({ orchestrator: me.id }))),
+          ),
+        { concurrency: "unbounded", discard: true },
+      ),
+    );
 
     const modelId = (id: string) => {
       try {

@@ -1037,9 +1037,14 @@ export const make = (options: SessionOptionsIn = {}) =>
           }
         }).pipe(
           Effect.andThen(
-            Effect.promise(() => Promise.all([...allocations.values()].map((allocation) => closeAllocation(allocation).catch(() => {})))).pipe(
-              Effect.timeoutOption(closeWaitMs),
-            ),
+            Effect.forEach(
+              [...allocations],
+              ([id, allocation]) =>
+                Effect.tryPromise(() => closeAllocation(allocation)).pipe(
+                  Effect.catch((e) => Effect.logWarning("an execution did not close", e).pipe(Effect.annotateLogs({ session: id }))),
+                ),
+              { concurrency: "unbounded", discard: true },
+            ).pipe(Effect.timeoutOption(closeWaitMs)),
           ),
           Effect.andThen(Effect.sync(() => trajectories.close())),
         ),
