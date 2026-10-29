@@ -16,7 +16,7 @@ import { chooseAgent } from "../runtime/rules.ts";
 import type { RuntimeShape } from "../runtime/runtime.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
 import { isForOrchestrator } from "./state.ts";
-import { refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
+import { refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitBrief } from "./rules.ts";
 
 export interface RefinementDeps {
   readonly core: CoreShape;
@@ -57,7 +57,7 @@ export function refinement(d: RefinementDeps) {
 
   const beforeRefinement = Effect.fnUntraced(function* (issue: Issue, word: string, agent: string, where: string) {
     let [title, description] = [issue.title, issue.description ?? ""];
-    if (word && issue.questions.length === 0 && !description && (issue.criteria ?? []).length === 0) [title, description] = splitJob(word);
+    if (word && issue.questions.length === 0 && !description && (issue.criteria ?? []).length === 0) [title, description] = splitBrief(word);
     yield* inTx(
       Effect.gen(function* () {
         yield* db(

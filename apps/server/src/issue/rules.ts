@@ -25,21 +25,21 @@ import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 
-/** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's job ends with the block parseAnswer reads. */
-export function issueJob(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
-  let job = pick.title;
-  if (pick.description) job += "\n\n" + pick.description;
-  if (pick.criteria && pick.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
-  return pick.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
+/** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's brief ends with the block parseAnswer reads. */
+export function issueBrief(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
+  let brief = pick.title;
+  if (pick.description) brief += "\n\n" + pick.description;
+  if (pick.criteria && pick.criteria.length > 0) brief += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  return pick.deliver === "answer" ? answerOpening + "\n\n" + brief + "\n\n" + answerFormat : brief;
 }
 
 /** 接着修 for an answer that could not be read; cureWords is the one for a failed round. */
-export const answerCureWords = (problem: string) => t("server.issue.job.answerUnread", { problem }) + "\n" + answerFormat;
+export const answerCureWords = (problem: string) => t("server.issue.brief.answerUnread", { problem }) + "\n" + answerFormat;
 
 /** The first line with words is the title, the rest the description; a first line too long for a title gives its
- * short title (shortTitle) and the whole job is the description. */
-export function splitJob(job: string): [string, string] {
-  const lines = job.replaceAll("\r\n", "\n").split("\n");
+ * short title (shortTitle) and the whole brief is the description. */
+export function splitBrief(brief: string): [string, string] {
+  const lines = brief.replaceAll("\r\n", "\n").split("\n");
   const i = lines.findIndex((l) => l.trim() !== "");
   if (i < 0) return ["", ""];
   const first = lines[i]!.trim();
@@ -266,14 +266,14 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
   return { milestones, ...(spent ? { spent } : {}) };
 }
 
-export const resumeWords = () => t("server.issue.job.resume");
+export const resumeWords = () => t("server.issue.brief.resume");
 
-/** Calling it twice gives the same job: a 接着修 told before is taken off first. */
-export function cureWords(job: string): string {
-  let original = job;
-  if (original.startsWith(t("server.issue.job.cureHead"))) original = original.slice(t("server.issue.job.cureHead").length);
-  if (original.endsWith(t("server.issue.job.cureTail"))) original = original.slice(0, -t("server.issue.job.cureTail").length);
-  return t("server.issue.job.cure", { job: original });
+/** Calling it twice gives the same brief: a 接着修 told before is taken off first. */
+export function cureWords(brief: string): string {
+  let original = brief;
+  if (original.startsWith(t("server.issue.brief.cureHead"))) original = original.slice(t("server.issue.brief.cureHead").length);
+  if (original.endsWith(t("server.issue.brief.cureTail"))) original = original.slice(0, -t("server.issue.brief.cureTail").length);
+  return t("server.issue.brief.cure", { brief: original });
 }
 
 export const findingsOf = (text: string) =>

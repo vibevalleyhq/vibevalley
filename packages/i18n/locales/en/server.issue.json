@@ -81,12 +81,12 @@
     "merge": "Merge into {base} ({commits} commits), close as done, and {helper} leaves",
     "mainBranch": "main"
   },
-  "job": {
+  "brief": {
     "reopenDefault": "Finish this ticket",
     "handedOver": "This ticket is handed over to you; {name} ({id}) was on it before",
     "reopened": "This ticket is reopened; {name} ({id}) did it last time",
     "how": "\n\n({how}.)",
-    "original": "\nThe ticket was: {job}",
+    "original": "\nThe ticket was: {brief}",
     "answer": "\nLast time's answer: {conclusion}",
     "closed": "\nHow it was closed: {closed}",
     "lastRun": "\nThe last round {outcome}: {summary}",
@@ -95,7 +95,7 @@
     "failedHead": "The acceptance failed; these need fixing:",
     "failedEnd": "\n\nOnce fixed, say how each was fixed in your conclusion.",
     "resume": "The last round stopped halfway; carry on and finish it.",
-    "cure": "Fix it: {job}. Look at the errors, fix them, and run the tests again",
+    "cure": "Fix it: {brief}. Look at the errors, fix them, and run the tests again",
     "cureHead": "Fix it: ",
     "cureTail": ". Look at the errors, fix them, and run the tests again",
     "answerUnread": "Fix it: the answer handed back last round could not be read ({problem}). Find it out, and hand it back in this format at the end:"

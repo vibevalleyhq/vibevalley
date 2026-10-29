@@ -484,12 +484,12 @@ export const catalogs = {
         merge: "合进 {base}（{commits} 个提交），关成已完成，{helper} 收工",
         mainBranch: "主分支",
       },
-      job: {
+      brief: {
         reopenDefault: "接着把这张工单做完",
         handedOver: "这张工单换你接手了，之前是 {name}（{id}）在做",
         reopened: "这张工单重开了，上一次是 {name}（{id}）做的",
         how: "\n\n（{how}。）",
-        original: "\n这张工单原来是：{job}",
+        original: "\n这张工单原来是：{brief}",
         answer: "\n上一次的结论：{conclusion}",
         closed: "\n它是怎么关的：{closed}",
         lastRun: "\n最后一轮{outcome}：{summary}",
@@ -498,7 +498,7 @@ export const catalogs = {
         failedHead: "验收没过，这几处要修：",
         failedEnd: "\n\n修好以后在结论里逐条说怎么修的。",
         resume: "上一轮停在了半路，接着把它做完。",
-        cure: "接着修：{job}。看一下报错，修好再跑一遍测试",
+        cure: "接着修：{brief}。看一下报错，修好再跑一遍测试",
         cureHead: "接着修：",
         cureTail: "。看一下报错，修好再跑一遍测试",
         answerUnread: "接着修：上一轮交回的结论读不出来（{problem}）。接着查清楚，最后照这个格式交：",
@@ -4024,12 +4024,12 @@ export const catalogs = {
         merge: "Merge into {base} ({commits} commits), close as done, and {helper} leaves",
         mainBranch: "main",
       },
-      job: {
+      brief: {
         reopenDefault: "Finish this ticket",
         handedOver: "This ticket is handed over to you; {name} ({id}) was on it before",
         reopened: "This ticket is reopened; {name} ({id}) did it last time",
         how: "\n\n({how}.)",
-        original: "\nThe ticket was: {job}",
+        original: "\nThe ticket was: {brief}",
         answer: "\nLast time's answer: {conclusion}",
         closed: "\nHow it was closed: {closed}",
         lastRun: "\nThe last round {outcome}: {summary}",
@@ -4038,7 +4038,7 @@ export const catalogs = {
         failedHead: "The acceptance failed; these need fixing:",
         failedEnd: "\n\nOnce fixed, say how each was fixed in your conclusion.",
         resume: "The last round stopped halfway; carry on and finish it.",
-        cure: "Fix it: {job}. Look at the errors, fix them, and run the tests again",
+        cure: "Fix it: {brief}. Look at the errors, fix them, and run the tests again",
         cureHead: "Fix it: ",
         cureTail: ". Look at the errors, fix them, and run the tests again",
         answerUnread: "Fix it: the answer handed back last round could not be read ({problem}). Find it out, and hand it back in this format at the end:",
@@ -7624,6 +7624,23 @@ export interface Messages {
   "server.game.tier.gold": { readonly title: string | number };
   "server.game.tier.silver": { readonly title: string | number };
   "server.helperRef": { readonly id: string | number };
+  "server.issue.brief.answer": { readonly conclusion: string | number };
+  "server.issue.brief.answerUnread": { readonly problem: string | number };
+  "server.issue.brief.closed": { readonly closed: string | number };
+  "server.issue.brief.cure": { readonly brief: string | number };
+  "server.issue.brief.cureHead": undefined;
+  "server.issue.brief.cureTail": undefined;
+  "server.issue.brief.end": undefined;
+  "server.issue.brief.failedEnd": undefined;
+  "server.issue.brief.failedHead": undefined;
+  "server.issue.brief.handedOver": { readonly id: string | number; readonly name: string | number };
+  "server.issue.brief.how": { readonly how: string | number };
+  "server.issue.brief.lastRun": { readonly outcome: string | number; readonly summary: string | number };
+  "server.issue.brief.original": { readonly brief: string | number };
+  "server.issue.brief.previous": undefined;
+  "server.issue.brief.reopenDefault": undefined;
+  "server.issue.brief.reopened": { readonly id: string | number; readonly name: string | number };
+  "server.issue.brief.resume": undefined;
   "server.issue.cannotDelete": { readonly n: string | number; readonly why: string | number };
   "server.issue.cannotMoveProject": { readonly n: string | number; readonly why: string | number };
   "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
@@ -7675,23 +7692,6 @@ export interface Messages {
   "server.issue.inGraph": undefined;
   "server.issue.issueNumbered": { readonly n: string | number };
   "server.issue.issueRef": { readonly ref: string | number };
-  "server.issue.job.answer": { readonly conclusion: string | number };
-  "server.issue.job.answerUnread": { readonly problem: string | number };
-  "server.issue.job.closed": { readonly closed: string | number };
-  "server.issue.job.cure": { readonly job: string | number };
-  "server.issue.job.cureHead": undefined;
-  "server.issue.job.cureTail": undefined;
-  "server.issue.job.end": undefined;
-  "server.issue.job.failedEnd": undefined;
-  "server.issue.job.failedHead": undefined;
-  "server.issue.job.handedOver": { readonly id: string | number; readonly name: string | number };
-  "server.issue.job.how": { readonly how: string | number };
-  "server.issue.job.lastRun": { readonly outcome: string | number; readonly summary: string | number };
-  "server.issue.job.original": { readonly job: string | number };
-  "server.issue.job.previous": undefined;
-  "server.issue.job.reopenDefault": undefined;
-  "server.issue.job.reopened": { readonly id: string | number; readonly name: string | number };
-  "server.issue.job.resume": undefined;
   "server.issue.merge.merged": { readonly name: string | number; readonly text: string | number };
   "server.issue.merge.tellFailed": { readonly why: string | number };
   "server.issue.move.byHelpers": undefined;

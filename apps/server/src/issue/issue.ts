@@ -47,14 +47,14 @@ import {
   filledKinds,
   findingsOf,
   isClosed,
-  issueJob,
+  issueBrief,
   kept,
   milestonesOf,
   nextTaskId,
   openQuestions,
   resumeWords,
   sentTitles,
-  splitJob,
+  splitBrief,
   pickIssues,
 } from "./rules.ts";
 import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
@@ -133,7 +133,7 @@ export interface IssueShape {
   readonly history: () => Effect.Effect<IssueHistory[]>;
   readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
-  /** Sends a session for a job that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the job. */
+  /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
   readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
   /** A session starts on an existing issue: open it and link the session in one write. */
   readonly ran: (id: string, session: Session) => Effect.Effect<void, Error>;
@@ -191,24 +191,24 @@ const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | 
 
 export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
   const how = handedOver
-    ? t("server.issue.job.handedOver", { name: last.name, id: last.id })
-    : t("server.issue.job.reopened", { name: last.name, id: last.id });
-  let out = (text.trim() || t("server.issue.job.reopenDefault")) + t("server.issue.job.how", { how });
-  out += t("server.issue.job.original", { job: cut(issueJob(issue), askedMax) });
-  if (issue.answer) out += t("server.issue.job.answer", { conclusion: cut(issue.answer.conclusion, askedMax) });
-  if (issue.closedAt !== undefined) out += t("server.issue.job.closed", { closed: closedText(issue) });
+    ? t("server.issue.brief.handedOver", { name: last.name, id: last.id })
+    : t("server.issue.brief.reopened", { name: last.name, id: last.id });
+  let out = (text.trim() || t("server.issue.brief.reopenDefault")) + t("server.issue.brief.how", { how });
+  out += t("server.issue.brief.original", { brief: cut(issueBrief(issue), askedMax) });
+  if (issue.answer) out += t("server.issue.brief.answer", { conclusion: cut(issue.answer.conclusion, askedMax) });
+  if (issue.closedAt !== undefined) out += t("server.issue.brief.closed", { closed: closedText(issue) });
   if (last.lastRun)
-    out += t("server.issue.job.lastRun", { outcome: t(`shared.outcome.${last.lastRun.outcome}`), summary: cut(last.lastRun.summary.trim(), askedMax) });
-  if (previous) out += t("server.issue.job.previous");
-  return out + t("server.issue.job.end");
+    out += t("server.issue.brief.lastRun", { outcome: t(`shared.outcome.${last.lastRun.outcome}`), summary: cut(last.lastRun.summary.trim(), askedMax) });
+  if (previous) out += t("server.issue.brief.previous");
+  return out + t("server.issue.brief.end");
 }
 
 function failedText(findings: readonly Finding[], text: string): string {
-  let out = t("server.issue.job.failedHead");
+  let out = t("server.issue.brief.failedHead");
   let n = 0;
   for (const f of findings) if (!f.resolved) out += `\n${++n}. ${f.text}`;
   if (text) out += "\n\n" + text;
-  return out + t("server.issue.job.failedEnd");
+  return out + t("server.issue.brief.failedEnd");
 }
 
 /** A talk's session stays this long with nothing said after its round. */
@@ -347,7 +347,7 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     const issueWords = (req: Pick<IssueRequest, "title" | "description">) => {
-      const [title, rest] = splitJob(req.title);
+      const [title, rest] = splitBrief(req.title);
       if (!title) return Effect.fail(refused(t("server.issue.noTitle")));
       let description = (req.description ?? "").trim();
       if (rest) description = (rest + "\n\n" + description).trim();
@@ -524,7 +524,7 @@ export const make = (options: IssueOptions = {}) =>
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
     const send = (issue: Issue, agent: Agent, project: string, channel: string, by?: RunTrigger) =>
-      Effect.flatMap(hire(agent, issueJob(issue), project, { channel, issue: issue.id, ...(by ? { trigger: by } : {}) }), (hired) =>
+      Effect.flatMap(hire(agent, issueBrief(issue), project, { channel, issue: issue.id, ...(by ? { trigger: by } : {}) }), (hired) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed"))),
       );
 
@@ -1079,7 +1079,7 @@ export const make = (options: IssueOptions = {}) =>
               break;
             }
             // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again. While it
-            // waits for acceptance the words are the findings, written down and given as the next round's job.
+            // waits for acceptance the words are the findings, written down and given as the next round's brief.
             if (item.sessions.length === 0) yield* start(id, channel, { kind: "comment" }, said);
             else if (said && item.attention.state === "reviewing") yield* shape.review(id, { pass: false, findings: findingsOf(said) });
             else yield* comment(id, said || (yield* stuckWords(item)));
