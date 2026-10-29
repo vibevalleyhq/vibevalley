@@ -42,7 +42,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
         {(m) => (
           <Show when={m().deleted === undefined} fallback={<span class="italic">{t("web.channel.messages.replyGone")}</span>}>
             <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
-            <span class="min-w-0 truncate">{m().text || list(m().attachments?.map((a) => a.name) ?? [])}</span>
+            <span class="min-w-0 truncate">{m().text || list(m().attachments.map((a) => a.name) ?? [])}</span>
           </Show>
         )}
       </Show>
@@ -213,7 +213,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
 export function Reactions(props: { m: ChatMessage; names: (id: string) => string }) {
   return (
     <div class="mt-1 flex flex-wrap gap-1">
-      <For each={props.m.reactions ?? []} keyed={(r) => r.emoji}>
+      <For each={props.m.reactions} keyed={(r) => r.emoji}>
         {(r) => {
           const mine = () => r().by.includes(ownerId);
           return (
@@ -454,7 +454,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
 
 export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
   // The words as they were when editing began: a change heard meanwhile does not move the box under the owner's hands.
-  const { id, text: was, attachments: files = [] } = untrack(() => props.m);
+  const { id, text: was, attachments: files } = untrack(() => props.m);
   const done = () => untrack(() => props.onDone)();
   const [text, setText] = createSignal(was);
   const [kept, setKept] = createSignal<readonly string[]>(files.map((f) => f.id));
@@ -558,7 +558,7 @@ function LinkedCard(props: { at: LinkedMessage }) {
       <Show when={m()}>
         {(said) => (
           <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</span>}>
-            <span class="line-clamp-3 text-sm">{said().text || list(said().attachments?.map((a) => a.name) ?? [])}</span>
+            <span class="line-clamp-3 text-sm">{said().text || list(said().attachments.map((a) => a.name) ?? [])}</span>
           </Show>
         )}
       </Show>

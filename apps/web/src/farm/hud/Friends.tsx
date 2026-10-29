@@ -49,7 +49,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
   const runtime = () => ready(runtimes, []).find((r) => r.id === props.agent.runtime);
   const quota = () => quotaOf(runtime());
   const picked = () => pick() === props.agent.id;
-  const tally = () => core()?.progress?.agents?.[props.agent.id];
+  const tally = () => core()?.progress?.agents[props.agent.id];
   const box = useClickAway(open, () => setOpen(false));
   return (
     <div ref={box} class="relative" data-testid="friend" data-key={props.agent.id} data-state={props.st} data-picked={picked() ? "" : undefined}>

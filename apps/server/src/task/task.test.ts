@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
+import { freshTask } from "./rules.ts";
+import { graphView } from "./graph.ts";
 import { orchestrator, owner } from "@/base/actor.ts";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
 import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
@@ -113,7 +115,7 @@ class FakeWork implements TaskWork {
     this.last.set(id, said);
     const at = said.lastIndexOf("结论：");
     const summary = outcome === "failed" || at < 0 ? said : said.slice(at + 3);
-    await Effect.runPromise(this.core.apply({ type: "report", id: sessionId(id), outcome: outcome as never, summary, runs: 1 }));
+    await Effect.runPromise(this.core.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: outcome as never, summary, runs: 1 }));
   }
 
   hire = (agent: Agent, task: string, project: string, opt: HireOptions): Effect.Effect<Hired> => {
@@ -132,6 +134,7 @@ class FakeWork implements TaskWork {
         runs: 0,
         phase: { _tag: "working", doing: { action: "thinking", label: "" } },
         ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
+        refining: false,
       } as Session;
       yield* self.core.apply({ type: "hired", session: h });
       if (opt.issue) yield* self.issues.ran(opt.issue, h).pipe(Effect.orDie);
@@ -251,7 +254,7 @@ describe("task graphs", () => {
         );
         const bad = (yield* f.tasks.events(id)).find((e) => e.id === "bad-payload")!;
         expect(bad).toMatchObject({ id: "bad-payload", graph: id, kind: "splitting", actor: "system" });
-        expect([bad.session, bad.changes]).toEqual([undefined, undefined]);
+        expect([bad.session, bad.changes]).toEqual([undefined, []]);
       }),
     ),
   );
@@ -287,7 +290,7 @@ describe("task graphs", () => {
         const d = mine.find((g) => state(g, "d") === "working")!;
         expect([state(d, "b"), state(d, "c")]).toEqual(["merged", "merged"]);
         for (const n of ready.tasks)
-          expect([n.state, (n.commits ?? []).length > 0, n.conclusion, n.session]).toEqual(["merged", true, "写好了 steps/" + n.id + ".txt", undefined]);
+          expect([n.state, n.commits.length > 0, n.conclusion, n.session]).toEqual(["merged", true, "写好了 steps/" + n.id + ".txt", undefined]);
         expect(yield* f.tasks.act(id, "merge", owner)).toContain("合进了 diamond 的 main");
         yield* f.until(id, (g) => g.state === "done");
         const history = yield* f.tasks.events(id);
@@ -298,7 +301,7 @@ describe("task graphs", () => {
             .join(" "),
         ).toBe("splitting/owner drafted/system started/owner ready/system merged/owner");
         const edit = history.find((e) => e.kind === "task_edited")!;
-        expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "orchestrator", "管家", 1, "检查"]);
+        expect([edit.task, edit.actor, edit.actorText, edit.changes.length, edit.changes[0]?.field]).toEqual(["d", "orchestrator", "管家", 1, "检查"]);
         expect(edit.text).toMatch(/^改了「.+」的检查$/);
         for (const s of ["a", "b", "c", "d"])
           expect(
@@ -308,7 +311,7 @@ describe("task graphs", () => {
               .join(" "),
           ).toBe("task_started task_merged");
         const merged = history.find((e) => e.task === "a" && e.kind === "task_merged")!;
-        expect([merged.session !== undefined, (merged.commits ?? []).length > 0, merged.detail]).toEqual([true, true, "写好了 steps/a.txt"]);
+        expect([merged.session !== undefined, merged.commits.length > 0, merged.detail]).toEqual([true, true, "写好了 steps/a.txt"]);
         for (let i = 1; i < history.length; i++) expect(history[i]!.id > history[i - 1]!.id).toBe(true);
       }),
     ),
@@ -324,7 +327,7 @@ describe("task graphs", () => {
         const ready = yield* f.until(id, (g) => g.state === "ready");
         const repro = taskOf(ready, "repro")!;
         const fix = taskOf(ready, "fix")!;
-        expect([repro.frozen, fix.frozen, repro.tries, fix.tries]).toEqual([["steps/repro_test.txt"], undefined, 1, 1]);
+        expect([repro.frozen, fix.frozen, repro.tries, fix.tries]).toEqual([["steps/repro_test.txt"], [], 1, 1]);
         const told = (s: string) =>
           [...f.work.told.entries()]
             .filter(([w]) => f.core.session(w)?.graph?.task === s)
@@ -412,7 +415,15 @@ describe("task graphs", () => {
             const paused = yield* f.until(id, (g) => g.state === "paused");
             expect(paused.note).toContain("重启");
             // What the sessions do as the farm comes back: the run cut off is reported.
-            yield* f.core.apply({ type: "report", id: sessionId(session), outcome: "interrupted", summary: "VibeValley 重启了", runs: 1 });
+            yield* f.core.apply({
+              type: "report",
+              questions: [],
+              checks: [],
+              id: sessionId(session),
+              outcome: "interrupted",
+              summary: "VibeValley 重启了",
+              runs: 1,
+            });
             f.work.release();
             yield* f.tasks.act(id, "resume", owner);
             const ready = yield* f.until(id, (g) => g.state === "ready");
@@ -490,6 +501,7 @@ describe("task graphs", () => {
           hiredAt: Date.now(),
           runs: 0,
           phase: { _tag: "working", doing: { action: "thinking", label: "" } },
+          refining: false,
         } as Session;
         yield* f.core.apply({ type: "hired", session: helper });
         yield* f.issues.ran(issue.id, helper).pipe(Effect.orDie);
@@ -506,7 +518,7 @@ describe("task graphs", () => {
         expect([parent.number, parent.assignee, parent.criteria, parent.sessions[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], "h1"]);
         expect((yield* f.issues.get(taskIssueID(issue.id, "c"))).parent).toBe(issue.id);
         expect((yield* Effect.exit(f.tasks.splitIssue("h1", "", steps)))._tag).toBe("Failure");
-        yield* f.core.apply({ type: "report", id: sessionId("h1"), outcome: "completed", summary: "拆成了三步", runs: 1 });
+        yield* f.core.apply({ type: "report", questions: [], checks: [], id: sessionId("h1"), outcome: "completed", summary: "拆成了三步", runs: 1 });
         yield* untilGot(() => !f.core.session("h1"), "h1 gone");
         expect(f.core.session("h1")).toBeUndefined();
         expect((yield* f.issues.get(issue.id)).closedAt).toBeUndefined();
@@ -527,12 +539,23 @@ describe("task graphs", () => {
             state: action === "resume" ? "paused" : "running",
             parallel: 1,
             createdAt: 0,
-            tasks: [{ id: "a", title: "步骤", brief: "做事", needs: [], state: "failed", session: sessionId("w900"), tries: 0 }],
-          } as TaskGraph;
+            tasks: [{ ...freshTask({ id: "a", title: "步骤", brief: "做事" }), state: "failed", session: sessionId("w900") }],
+            ...graphView(),
+          } satisfies TaskGraph;
           yield* f.issues.putTask(graph);
           yield* f.core.apply({
             type: "hired",
-            session: { id: "w900", name: "帮工", agent: "lab", runtime: "pi", brief: "", hiredAt: 0, runs: 0, phase: { _tag: "resting" } } as Session,
+            session: {
+              id: "w900",
+              name: "帮工",
+              agent: "lab",
+              runtime: "pi",
+              brief: "",
+              hiredAt: 0,
+              runs: 0,
+              phase: { _tag: "resting" },
+              refining: false,
+            } as Session,
           });
           yield* sql
             .unsafe(`create function fail_save() returns trigger language plpgsql as $$ begin raise exception 'injected write failure'; end $$`)

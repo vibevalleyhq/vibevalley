@@ -56,7 +56,7 @@ export interface Folded {
   readonly seen: Seen;
 }
 
-export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1 });
+export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1, agents: {} });
 
 export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 
@@ -68,7 +68,7 @@ function tallied(p: Progress, e: LedgerEntry): Progress {
   const field = e.kind === "hired" ? "hired" : e.kind === "harvested" ? "harvested" : e.kind === "failed" ? "failed" : undefined;
   const agent = field ? (e as { agent?: string }).agent : undefined;
   if (!field || !agent) return p;
-  const was = p.agents?.[agent] ?? { hired: 0, harvested: 0, failed: 0 };
+  const was = p.agents[agent] ?? { hired: 0, harvested: 0, failed: 0 };
   return { ...p, agents: { ...p.agents, [agent]: { ...was, [field]: was[field] + 1 } } };
 }
 
@@ -170,7 +170,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
   }
   const next: Progress = { ...tallied(p, entry), coins: p.coins + coins, counts, unlocked: [...p.unlocked, ...unlocked] };
   next.multiplier = streakMultiplier(next.streak);
-  const news: ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), ...(unlocked.length > 0 ? { unlocked } : {}) };
+  const news: ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), unlocked };
   return [{ progress: next, seen }, news];
 }
 
@@ -238,7 +238,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           const h = sessionOnIssue(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
-        for (const named of fact.message.mentions ?? []) {
+        for (const named of fact.message.mentions) {
           const h = named !== defaultOrchestrator && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }

@@ -1,8 +1,9 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
 import { pathOf } from "@vibevalley/protocol/api";
 import { createServer, request as httpRequest } from "node:http";
 import type { Socket } from "node:net";
-import { tmpdir } from "node:os";
+
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { attachmentPath, lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
@@ -14,7 +15,7 @@ import { Lan, remoteMay } from "./lan.ts";
 import { until } from "@/testing/until.ts";
 import { quietApp } from "@/testing/world.ts";
 
-const web = mkdtempSync(join(tmpdir(), "vv-lan-web-"));
+const web = tempDir("vv-lan-web-");
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");
 
 /** The whole farm on a free port, with a page, its lan listener on loopback, which it calls its network address. */

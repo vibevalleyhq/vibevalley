@@ -269,5 +269,5 @@ test("a link to a farm message shows that message under it, and a press goes the
   await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`));
   // The server reads no preview of the farm's own address.
   const [linking] = (await api.channel.message.list({ id: to })).filter((m) => m.text.startsWith("look "));
-  expect(linking!.embeds ?? []).toEqual([]);
+  expect(linking!.embeds).toEqual([]);
 });

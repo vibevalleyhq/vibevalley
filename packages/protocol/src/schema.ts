@@ -289,12 +289,12 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,
   text: Schema.String,
-  mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  mentions: Schema.mutable(Schema.Array(Schema.String)),
   session: Schema.optionalKey(SessionId),
   run: Schema.optionalKey(Schema.String),
   outcome: Schema.optionalKey(Outcome),
   spent: Schema.optionalKey(Spent),
-  spoken: Schema.optionalKey(Schema.Boolean),
+  spoken: Schema.Boolean,
   sendKey: Schema.optionalKey(Schema.String),
   at: Schema.Finite,
   revision: Schema.Finite,
@@ -302,9 +302,9 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   edited: Schema.optionalKey(Schema.Finite),
   deleted: Schema.optionalKey(Schema.Finite),
   pinned: Schema.optionalKey(Schema.Finite),
-  reactions: Schema.optionalKey(Schema.mutable(Schema.Array(Reaction))),
-  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Attachment))),
-  embeds: Schema.optionalKey(Schema.mutable(Schema.Array(Embed))),
+  reactions: Schema.mutable(Schema.Array(Reaction)),
+  attachments: Schema.mutable(Schema.Array(Attachment)),
+  embeds: Schema.mutable(Schema.Array(Embed)),
   artifact: Schema.optionalKey(ArtifactCard),
 });
 
@@ -315,7 +315,7 @@ export const SubjectKind: Codec<T.SubjectKind> = Schema.Literals(T.SubjectKindVa
 export const Channel: Codec<T.Channel> = Schema.Struct({
   id: Schema.String,
   type: ChannelType,
-  default: Schema.optionalKey(Schema.Boolean),
+  default: Schema.Boolean,
   peer: Schema.optionalKey(Schema.String),
   orchestrator: Schema.optionalKey(Schema.String),
   parent: Schema.optionalKey(Schema.String),
@@ -436,7 +436,7 @@ export const Session: Codec<T.Session> = Schema.Struct({
   channel: Schema.optionalKey(Schema.String),
   play: Schema.optionalKey(SessionPlay),
   issue: Schema.optionalKey(IssueId),
-  refining: Schema.optionalKey(Schema.Boolean),
+  refining: Schema.Boolean,
   phaseText: Schema.optionalKey(Schema.String),
 });
 
@@ -463,22 +463,22 @@ export const Task: Codec<T.Task> = Schema.Struct({
   needs: Schema.mutable(Schema.Array(Schema.String)),
   agent: Schema.optionalKey(Schema.String),
   check: Schema.optionalKey(Schema.String),
-  scope: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  acceptance: Schema.optionalKey(Schema.Boolean),
-  frozen: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  scope: Schema.mutable(Schema.Array(Schema.String)),
+  acceptance: Schema.Boolean,
+  frozen: Schema.mutable(Schema.Array(Schema.String)),
   state: TaskState,
   session: Schema.optionalKey(SessionId),
   conclusion: Schema.optionalKey(Schema.String),
-  commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  commits: Schema.mutable(Schema.Array(Schema.String)),
   spent: Schema.optionalKey(Spent),
   tries: Schema.Finite,
   failures: Schema.optionalKey(Schema.Finite),
-  blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  blockedBy: Schema.mutable(Schema.Array(Schema.String)),
   stateText: Schema.optionalKey(Schema.String),
-  actions: Schema.optionalKey(Schema.mutable(Schema.Array(TaskAction))),
-  actionText: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  canEdit: Schema.optionalKey(Schema.Boolean),
-  canRemove: Schema.optionalKey(Schema.Boolean),
+  actions: Schema.mutable(Schema.Array(TaskAction)),
+  actionText: Schema.Record(Schema.String, Schema.String),
+  canEdit: Schema.Boolean,
+  canRemove: Schema.Boolean,
 });
 
 export const GraphAction: Codec<T.GraphAction> = Schema.Literals(T.GraphActionValues);
@@ -491,14 +491,14 @@ export const TaskGraph: Codec<T.TaskGraph> = Schema.Struct({
   branch: Schema.optionalKey(Schema.String),
   state: GraphState,
   stateTag: Schema.optionalKey(Schema.String),
-  actionText: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  actions: Schema.optionalKey(Schema.mutable(Schema.Array(GraphAction))),
+  actionText: Schema.Record(Schema.String, Schema.String),
+  actions: Schema.mutable(Schema.Array(GraphAction)),
   tasks: Schema.mutable(Schema.Array(Task)),
   parallel: Schema.Finite,
   note: Schema.optionalKey(Schema.String),
   createdAt: Schema.Finite,
-  layers: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.mutable(Schema.Array(Schema.String))))),
-  asksForYou: Schema.optionalKey(Schema.Boolean),
+  layers: Schema.mutable(Schema.Array(Schema.mutable(Schema.Array(Schema.String)))),
+  asksForYou: Schema.Boolean,
   spent: Schema.optionalKey(Spent),
   settled: Schema.optionalKey(Schema.Finite),
 });
@@ -527,14 +527,14 @@ export const Progress: Codec<T.Progress> = Schema.Struct({
   counts: Schema.Record(Schema.String, Schema.Finite),
   unlocked: Schema.mutable(Schema.Array(Unlock)),
   title: Schema.optionalKey(ProgressTitle),
-  agents: Schema.optionalKey(Schema.Record(Schema.String, AgentTally)),
+  agents: Schema.Record(Schema.String, AgentTally),
   multiplier: Schema.optionalKey(Schema.Finite),
 });
 
 export const ProgressNews: Codec<T.ProgressNews> = Schema.Struct({
   coins: Schema.optionalKey(Schema.Finite),
   session: Schema.optionalKey(SessionId),
-  unlocked: Schema.optionalKey(Schema.mutable(Schema.Array(Unlock))),
+  unlocked: Schema.mutable(Schema.Array(Unlock)),
 });
 
 export const CronWhenOnce: Codec<T.CronWhenOnce> = Schema.Struct({
@@ -578,7 +578,7 @@ export const Cron: Codec<T.Cron> = Schema.Struct({
   created: Schema.Finite,
   lastRun: Schema.optionalKey(Schema.Finite),
   by: ActorKind,
-  pending: Schema.optionalKey(Schema.Boolean),
+  pending: Schema.Boolean,
   whenText: Schema.optionalKey(Schema.String),
   nextText: Schema.optionalKey(Schema.String),
 });
@@ -591,7 +591,7 @@ export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
 
 export const Chat: Codec<T.Chat> = Schema.Struct({
   channels: Schema.mutable(Schema.Array(Channel)),
-  ownerMentions: Schema.optionalKey(Schema.mutable(Schema.Array(OwnerMention))),
+  ownerMentions: Schema.mutable(Schema.Array(OwnerMention)),
 });
 
 export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([Schema.TaggedStruct("Message", { message: ChatMessage }), Schema.TaggedStruct("Reset", {})]);
@@ -609,12 +609,12 @@ export const IssueTask: Codec<T.IssueTask> = Schema.Struct({
   key: Schema.String,
   state: TaskState,
   check: Schema.optionalKey(Schema.String),
-  scope: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  acceptance: Schema.optionalKey(Schema.Boolean),
-  frozen: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  scope: Schema.mutable(Schema.Array(Schema.String)),
+  acceptance: Schema.Boolean,
+  frozen: Schema.mutable(Schema.Array(Schema.String)),
   session: Schema.optionalKey(SessionId),
   conclusion: Schema.optionalKey(Schema.String),
-  commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  commits: Schema.mutable(Schema.Array(Schema.String)),
   spent: Schema.optionalKey(Spent),
   tries: Schema.Finite,
   failures: Schema.optionalKey(Schema.Finite),
@@ -634,7 +634,7 @@ export const Finding: Codec<T.Finding> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
   at: Schema.Finite,
-  resolved: Schema.optionalKey(Schema.Boolean),
+  resolved: Schema.Boolean,
 });
 
 export const IssueRefining: Codec<T.IssueRefining> = Schema.Struct({
@@ -644,7 +644,7 @@ export const IssueRefining: Codec<T.IssueRefining> = Schema.Struct({
 
 export const Question: Codec<T.Question> = Schema.Struct({
   question: Schema.String,
-  options: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  options: Schema.mutable(Schema.Array(Schema.String)),
 });
 
 export const CheckResult: Codec<T.CheckResult> = Schema.Literals(T.CheckResultValues);
@@ -717,7 +717,7 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   delivered: Schema.optionalKey(Delivery),
   canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(IssueId),
-  blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  blockedBy: Schema.mutable(Schema.Array(Schema.String)),
   graph: Schema.optionalKey(IssueGraph),
   task: Schema.optionalKey(IssueTask),
   cron: Schema.optionalKey(Schema.String),
@@ -729,8 +729,8 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   reviewedAt: Schema.optionalKey(Schema.Finite),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
-  criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
+  criteria: Schema.mutable(Schema.Array(Schema.String)),
+  checks: Schema.mutable(Schema.Array(CriterionCheck)),
   refining: Schema.optionalKey(IssueRefining),
   lastRun: Schema.optionalKey(IssueRun),
   answer: Schema.optionalKey(IssueAnswer),
@@ -758,14 +758,14 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
 export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
-  orchestrators: Schema.optionalKey(Schema.Record(Schema.String, OrchestratorNow)),
+  orchestrators: Schema.Record(Schema.String, OrchestratorNow),
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
   progress: Schema.optionalKey(Progress),
-  crons: Schema.optionalKey(Schema.mutable(Schema.Array(Cron))),
-  issues: Schema.optionalKey(Schema.mutable(Schema.Array(Issue))),
-  connectors: Schema.optionalKey(Schema.mutable(Schema.Array(ConnectorStatus))),
+  crons: Schema.mutable(Schema.Array(Cron)),
+  issues: Schema.mutable(Schema.Array(Issue)),
+  connectors: Schema.mutable(Schema.Array(ConnectorStatus)),
 });
 
 export const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.SessionEventTypeValues);
@@ -999,7 +999,7 @@ export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Stru
   reached: Schema.String,
   detail: Schema.String,
   coins: Schema.Finite,
-  oneOff: Schema.optionalKey(Schema.Boolean),
+  oneOff: Schema.Boolean,
 });
 
 export const GameEffect: Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
@@ -1128,8 +1128,8 @@ export const GraphEvent: Codec<T.GraphEvent> = Schema.Struct({
   actor: ActorKind,
   session: Schema.optionalKey(SessionId),
   detail: Schema.optionalKey(Schema.String),
-  changes: Schema.optionalKey(Schema.mutable(Schema.Array(TaskFieldChange))),
-  commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  changes: Schema.mutable(Schema.Array(TaskFieldChange)),
+  commits: Schema.mutable(Schema.Array(Schema.String)),
   at: Schema.Finite,
   text: Schema.optionalKey(Schema.String),
   actorText: Schema.optionalKey(Schema.String),
@@ -1334,7 +1334,7 @@ const memoryFields = {
   at: Schema.Finite,
   recalled: Schema.Finite,
   recalledAt: Schema.optionalKey(Schema.Finite),
-  fading: Schema.optionalKey(Schema.Boolean),
+  fading: Schema.Boolean,
   source: Schema.optionalKey(Schema.String),
 };
 
@@ -1614,7 +1614,7 @@ export const MemorySource: Codec<T.MemorySource> = Schema.Struct({
   enabled: Schema.Boolean,
   read: Schema.Boolean,
   write: Schema.Boolean,
-  everything: Schema.optionalKey(Schema.Boolean),
+  everything: Schema.Boolean,
   user: Schema.optionalKey(Schema.String),
   key: KeyStatus,
 });
@@ -1782,8 +1782,8 @@ export const FactReport: Codec<T.FactReport> = Schema.Struct({
   summary: Schema.String,
   runs: Schema.Finite,
   spent: Schema.optionalKey(Spent),
-  questions: Schema.optionalKey(Schema.mutable(Schema.Array(Question))),
-  checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
+  questions: Schema.mutable(Schema.Array(Question)),
+  checks: Schema.mutable(Schema.Array(CriterionCheck)),
   answer: Schema.optionalKey(IssueAnswer),
 });
 

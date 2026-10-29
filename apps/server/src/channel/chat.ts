@@ -235,12 +235,12 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(row.sender_agent ? { agent: row.sender_agent } : {}),
     kind: messageKind(row.kind),
     text: row.body,
-    ...(meta.mentions && meta.mentions.length > 0 ? { mentions: meta.mentions } : {}),
+    mentions: meta.mentions ?? [],
     ...(meta.session ? { session: meta.session } : {}),
     ...(meta.run ? { run: meta.run } : {}),
     ...(meta.outcome ? { outcome: meta.outcome } : {}),
     ...(meta.spent ? { spent: meta.spent } : {}),
-    ...(meta.spoken ? { spoken: true } : {}),
+    spoken: meta.spoken ?? false,
     ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
     at: row.created_at,
     revision: row.revision,
@@ -248,9 +248,9 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(row.edited_at !== null ? { edited: row.edited_at } : {}),
     ...(row.deleted_at !== null ? { deleted: row.deleted_at } : {}),
     ...(row.pinned_at !== null ? { pinned: row.pinned_at } : {}),
-    ...(row.reactions !== null ? { reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })) } : {}),
-    ...(meta.attachments && meta.attachments.length > 0 ? { attachments: meta.attachments } : {}),
-    ...(meta.embeds && meta.embeds.length > 0 ? { embeds: meta.embeds } : {}),
+    reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })),
+    attachments: meta.attachments ?? [],
+    embeds: meta.embeds ?? [],
     ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
   };
 }
@@ -606,11 +606,12 @@ export const make = Effect.gen(function* () {
   const presentSessions = () => helpers?.presentSessions() ?? [];
 
   const targetOfRow = (type: string, rootNumber: number | null, name: string | null, channelId: string | null, channelNameOf: string | null) => {
+    const shown = name ?? channelNameOf;
     const ch = {
       type: channelType(type),
       ...(rootNumber !== null ? { rootNumber } : {}),
-      ...((name ?? channelNameOf) !== null ? { name: (name ?? channelNameOf)! } : {}),
-    } as Channel;
+      ...(shown !== null ? { name: shown } : {}),
+    };
     const channel = channelNameOf ?? (channelId ? channelName(channelId) : undefined) ?? undefined;
     return targetOf(ch, channel ?? "");
   };
@@ -622,7 +623,7 @@ export const make = Effect.gen(function* () {
     return {
       id: row.id,
       type: channelType(row.type),
-      ...(row.is_default ? { default: true } : {}),
+      default: !!row.is_default,
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
       orchestrator: orchestratorOfRow(row),
       ...(row.category !== null ? { category: row.category } : {}),

@@ -3,13 +3,14 @@
 // do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model, and
 // VIBEVALLEY_EVAL_ONLY (names, comma-separated) replays only those cases: after a prompt is mended for one, only it is paid for.
 
+import { tempDir } from "@vibevalley/testkit/temp";
 import { standaloneLlm } from "@/cli/llm.ts";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import { orchestrator } from "@/base/actor.ts";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect } from "effect";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
+
 import { basename, join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 import { openBrain, standaloneOwner } from "@vibevalley/agent/brain";
@@ -38,7 +39,7 @@ const orchestratorTools = () =>
 /** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
 async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
-  const home = mkdtempSync(join(tmpdir(), "vibevalley-eval-"));
+  const home = tempDir("vibevalley-eval-");
   writeFileSync(memoryFile(home), c.memory);
   writeFileSync(join(home, defaultOrchestrator + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
   const brain = await openBrain(standaloneOwner(), {

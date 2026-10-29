@@ -38,6 +38,11 @@ describe("what reaches the owner off the farm", () => {
     text: "好",
     at: 0,
     revision: 1,
+    mentions: [],
+    spoken: false,
+    reactions: [],
+    attachments: [],
+    embeds: [],
     ...more,
   });
   it("follows how much the place it is said in counts", () => {

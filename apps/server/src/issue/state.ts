@@ -85,14 +85,14 @@ export function issueRefiningOf(t: Issue, state: WorkspaceState): IssueRefining 
 /** The same array when none changed. */
 export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   let next: Issue[] | undefined;
-  (state.issues ?? []).forEach((t, i) => {
+  state.issues.forEach((t, i) => {
     const status = issueStatusOf(t, state);
     const drafting = issueRefiningOf(t, state);
     const attention = attentionIn(omitUndefined({ ...t, status, refining: drafting }), state);
     // The moves read the attention: a round that failed is not completed, from the moment it fails.
     const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, attention }));
     if (status === t.status && same(drafting, t.refining) && same(attention, t.attention) && same(moves, t.moves)) return;
-    next ??= [...state.issues!];
+    next ??= [...state.issues];
     next[i] = omitUndefined({ ...t, status, refining: drafting, attention, moves });
   });
   return next ? { ...state, issues: next } : state;

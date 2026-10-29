@@ -49,6 +49,6 @@ function withWords(state: WorkspaceState): WorkspaceState {
       }),
     };
   }
-  if ((state.crons ?? []).length > 0) next = { ...next, crons: state.crons!.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
+  if (state.crons.length > 0) next = { ...next, crons: state.crons.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
   return next;
 }

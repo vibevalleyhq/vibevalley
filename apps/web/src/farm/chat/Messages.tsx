@@ -320,7 +320,7 @@ export function ChatBubble(props: {
         <Show when={props.m.edited !== undefined}>
           <span class={small}>{t("web.farm.chat.edited")}</span>
         </Show>
-        <Show when={props.m.attachments}>
+        <Show when={props.m.attachments.length > 0 ? props.m.attachments : undefined}>
           {(files) => (
             <div class="mt-1 flex flex-wrap gap-1.5">
               <For each={files()} keyed={(f) => f.id}>
@@ -353,9 +353,9 @@ export function ChatBubble(props: {
           </A>
         )}
       </Show>
-      <Show when={(props.m.reactions ?? []).length > 0}>
+      <Show when={props.m.reactions.length > 0}>
         <div class="mt-1 flex flex-wrap gap-1">
-          <For each={props.m.reactions ?? []} keyed={(r) => r.emoji}>
+          <For each={props.m.reactions} keyed={(r) => r.emoji}>
             {(r) => (
               <span data-testid="reaction" data-key={r().emoji} data-count={r().by.length} class="bg-cream-200 px-1.5 text-[12px] text-bark-800">
                 {r().emoji} {r().by.length}

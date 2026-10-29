@@ -11,7 +11,17 @@ import { layer as projection } from "@/projection/projection.ts";
 import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-const helper: Session = { id: sessionId("w1"), name: "帮工", agent: "lab", runtime: "pi", brief: "写", hiredAt: 0, runs: 0, phase: { _tag: "done" } };
+const helper: Session = {
+  id: sessionId("w1"),
+  name: "帮工",
+  agent: "lab",
+  runtime: "pi",
+  brief: "写",
+  hiredAt: 0,
+  runs: 0,
+  phase: { _tag: "done" },
+  refining: false,
+};
 
 describe("core", () => {
   it.effect("started again from state.json: idle, without the database's parts, the sessions at their stations", () => {
@@ -29,8 +39,8 @@ describe("core", () => {
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
-      expect([s.call, s.callReason, s.orchestrators]).toEqual(["idle", undefined, undefined]);
-      expect([s.progress, s.crons, s.issues]).toEqual([undefined, undefined, undefined]);
+      expect([s.call, s.callReason, s.orchestrators]).toEqual(["idle", undefined, {}]);
+      expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)))));
@@ -99,12 +109,12 @@ describe("core", () => {
         Stream.runForEach((f) => Queue.offer(frames, f)),
         Effect.forkScoped,
       );
-      expect((yield* Queue.take(frames)).state.orchestrators).toBeUndefined();
+      expect((yield* Queue.take(frames)).state.orchestrators).toEqual({});
       yield* core.setOrchestrator("orchestrator", "speaking");
       yield* core.setCommits({ total: 2 } as never);
       yield* TestClock.adjust(stateEveryMs);
       const next = yield* Queue.take(frames);
-      expect([next.state.orchestrators?.orchestrator?.state, next.state.commits?.total]).toEqual(["speaking", 2]);
+      expect([next.state.orchestrators.orchestrator?.state, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
@@ -161,15 +171,15 @@ describe("core", () => {
         lead: { state: "speaking", channel: "c2", since: expect.any(Number) },
       });
       // A round begins when it starts thinking and goes on while it writes.
-      const began = core.state().orchestrators!.orchestrator!.since;
+      const began = core.state().orchestrators.orchestrator!.since;
       yield* TestClock.adjust(5_000);
       yield* core.setOrchestrator("orchestrator", "speaking", "c1");
-      expect(core.state().orchestrators?.orchestrator?.since).toBe(began);
+      expect(core.state().orchestrators.orchestrator?.since).toBe(began);
       yield* core.setOrchestrator("orchestrator", "listening");
-      expect(core.state().orchestrators?.orchestrator).toEqual({ state: "listening" });
+      expect(core.state().orchestrators.orchestrator).toEqual({ state: "listening" });
       yield* core.setOrchestrator("orchestrator", "idle");
       yield* core.setOrchestrator("lead", "idle");
-      expect("orchestrators" in core.state()).toBe(false);
+      expect(core.state().orchestrators).toEqual({});
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
   );
 
@@ -178,7 +188,7 @@ describe("core", () => {
       const runSync = Effect.runSyncWith(yield* Effect.context<never>());
       const core = yield* Core;
       yield* Effect.sync(() => runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
-      expect(core.state().orchestrators?.orchestrator?.state).toBe("thinking");
+      expect(core.state().orchestrators.orchestrator?.state).toBe("thinking");
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
   );
 });

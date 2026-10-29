@@ -132,11 +132,11 @@ export function issueDetail(issue: Issue, who: string, timeline: IssueTimeline |
   const lines = [issueLine(issue, who, now).slice(2)];
   if (issue.title !== shortTitle(issue.title) || issue.description)
     lines.push("要做的：" + head([issue.title, issue.description ?? ""].join("\n").trim(), 600));
-  const criteria = issue.criteria ?? [];
+  const criteria = issue.criteria;
   if (criteria.length > 0) {
     lines.push("验收标准：");
     criteria.forEach((c, i) => {
-      const check = (issue.checks ?? []).find((x) => x.criterion === i);
+      const check = issue.checks.find((x) => x.criterion === i);
       const mark = check ? { met: "做到了", unmet: "没做到", unsure: "不确定" }[check.result] : "还没说";
       lines.push(`  ${i + 1}. ${c}（${mark}）`);
     });

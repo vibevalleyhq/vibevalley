@@ -23,7 +23,7 @@ import { useCore } from "@/base/frame";
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
   const core = useCore();
-  const live = () => core()?.issues?.find((i) => i.id === props.issue.id);
+  const live = () => core()?.issues.find((i) => i.id === props.issue.id);
   const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const cancel = async () => {
@@ -69,7 +69,7 @@ async function pressed(issue: Issue | undefined, act: IssueAct) {
 export function ChangesReview(props: { issue: string; onDone: () => void }) {
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
-  const live = () => core()?.issues?.find((i) => i.id === props.issue);
+  const live = () => core()?.issues.find((i) => i.id === props.issue);
   const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
   const take = async () => {
     if (await pressed(live(), "complete")) props.onDone();

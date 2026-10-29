@@ -1,12 +1,13 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { join } from "node:path";
 import { NodeServices } from "@effect/platform-node";
 import { Effect } from "effect";
 import { expect, it } from "@effect/vitest";
 import { type ServerConfig, dbDir, loadConfig, serverAddress } from "./config.ts";
 
-const temp = () => mkdtempSync(join(tmpdir(), "vibevalley-config-"));
+const temp = () => tempDir("vibevalley-config-");
 const load = loadConfig;
 const refused = (file: string, env: Record<string, string>) => Effect.map(Effect.flip(loadConfig(file, env)), (e) => e.message);
 

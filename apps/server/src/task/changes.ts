@@ -25,7 +25,7 @@ const taskFields: readonly { field: TaskField; text: (n: Task) => string }[] = [
   { field: "needs", text: (n) => list(n.needs ?? []) },
   { field: "agent", text: (n) => n.agent ?? "" },
   { field: "check", text: (n) => n.check ?? "" },
-  { field: "scope", text: (n) => list(n.scope ?? []) },
+  { field: "scope", text: (n) => list(n.scope) },
 ];
 
 const isField = (f: string): f is TaskField => taskFields.some((x) => x.field === f);

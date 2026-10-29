@@ -30,6 +30,7 @@ const helper = (id: string, station: number, phase: Session["phase"], crop: stri
     hiredAt: 0,
     runs: 1,
     phase,
+    refining: false,
     issue: issueId(`issue-${id}`),
     play: { station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   },

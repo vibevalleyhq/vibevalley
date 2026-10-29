@@ -137,7 +137,7 @@ export function questionsOf(said: string): Question[] {
         .map((o) => o.trim())
         .filter(Boolean);
       if (!question) return [];
-      return [options.length >= 2 ? { question, options } : { question }];
+      return [{ question, options: options.length >= 2 ? options : [] }];
     });
 }
 

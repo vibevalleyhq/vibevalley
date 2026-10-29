@@ -175,7 +175,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       return {
         found: hits
           .filter((h) => h.text !== "")
-          .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
+          .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, fading: false, source: "everos", score: h.score, scope: h.scope })),
       };
     }),
     list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),

@@ -216,7 +216,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
           event.code !== null && event.code !== undefined
             ? t("server.session.log.exitedCode", { runtime: ctx.runtime, code: event.code })
             : t("server.session.log.exited", { runtime: ctx.runtime });
-        facts.push({ type: "report", id, outcome: "failed", summary: why, runs: session.runs });
+        facts.push({ type: "report", id, outcome: "failed", summary: why, runs: session.runs, questions: [], checks: [] });
         warn = t("server.session.log.exitedNotice", { name: session.name, why });
       }
       break;

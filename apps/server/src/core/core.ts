@@ -27,7 +27,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf } from "@/base/json.ts";
 
-export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessions: [] });
+export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", sessions: [], orchestrators: {}, crons: [], issues: [], connectors: [] });
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
@@ -96,13 +96,14 @@ export class Core extends Context.Service<
   );
 }
 
-/** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'. */
-const toKeep = ({ chat: _chat, progress: _progress, crons: _crons, issues: _issues, connectors: _connectors, ...kept }: WorkspaceState): WorkspaceState => kept;
+/** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'
+ * (kept empty: they are filled from their homes). */
+const toKeep = ({ chat: _chat, progress: _progress, ...kept }: WorkspaceState): WorkspaceState => ({ ...kept, crons: [], issues: [], connectors: [] });
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
 const restarted = (kept: WorkspaceState): WorkspaceState => {
-  const { callReason: _callReason, orchestrators: _orchestrators, ...rest } = toKeep(kept);
-  return { ...rest, call: "idle" };
+  const { callReason: _callReason, ...rest } = toKeep(kept);
+  return { ...rest, orchestrators: {}, call: "idle" };
 };
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {

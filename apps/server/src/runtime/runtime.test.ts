@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+
 import { join } from "node:path";
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "@effect/vitest";
@@ -685,7 +686,7 @@ describe("runtime", () => {
       return `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
     };
     const piHome = (models: string, auth: string, settings = `{"defaultProvider":"deepseek","defaultModel":"deepseek-chat"}`) => {
-      const dir = mkdtempSync(join(tmpdir(), "pi-"));
+      const dir = tempDir("pi-");
       dirs.push(dir);
       process.env.OAR_PI_AGENT_DIR = dir;
       writeFileSync(join(dir, "settings.json"), settings);

@@ -13,6 +13,7 @@ const memory = (text: string, more: Partial<Memory> = {}): Memory => ({
   at: now - 3 * day,
   recalled: 4,
   recalledAt: now - day,
+  fading: false,
   ...more,
 });
 

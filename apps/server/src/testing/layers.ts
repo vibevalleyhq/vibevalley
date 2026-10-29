@@ -1,7 +1,7 @@
 // What tests run the services on: a configuration in a temporary home and an in-memory database.
 
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { join } from "node:path";
 import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
@@ -21,7 +21,7 @@ export const starter = (id: string): Agent => {
 const starters = () => builtInIds().filter((id) => id !== defaultOrchestrator);
 
 export function testConfig(change: Partial<ServerConfig["Service"]> = {}): ServerConfig["Service"] {
-  const home = mkdtempSync(join(tmpdir(), "vibevalley-test-"));
+  const home = tempDir("vibevalley-test-");
   const config = defaults(home);
   // Every listener on a free port: two farms in tests (or worktrees) never take each other's 8787, 8788, 8790.
   return {

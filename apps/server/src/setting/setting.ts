@@ -161,6 +161,7 @@ export const make = Effect.gen(function* () {
       mossKey: secret(s.mossKey, "settings"),
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
+        everything: m.everything ?? false,
         enabled: !!m.enabled,
         read: !!m.read,
         write: !!m.write,

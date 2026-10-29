@@ -160,7 +160,7 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
       if (!news) return [];
       const out: GameEffect[] = [];
       if (news.coins) out.push({ kind: "reward", ...(news.session ? { sessionId: news.session } : {}), coins: news.coins, streak: fact.progress.streak });
-      for (const u of news.unlocked ?? []) out.push(achievementEffect(u.id, u.tier));
+      for (const u of news.unlocked) out.push(achievementEffect(u.id, u.tier));
       return out;
     }
     case "report":
@@ -176,7 +176,7 @@ export function viewOf(state: WorkspaceState): FarmView {
   for (const h of state.sessions)
     plots[h.id] = plotOf(
       h,
-      (state.issues ?? []).find((item) => item.id === h.issue),
+      state.issues.find((item) => item.id === h.issue),
     );
   return { level: farmLevelOf(state), plots, achievements: standingsOf(state.progress) };
 }
@@ -199,12 +199,12 @@ function reachedText(a: AchievementDef, tier: number): string {
 }
 
 function achievementEffect(id: string, tier: number): GameEffectAchievement {
-  const e: GameEffectAchievement = { kind: "achievement", achievement: id, tier, title: "", reached: "", detail: "", coins: 0 };
+  const e: GameEffectAchievement = { kind: "achievement", achievement: id, tier, title: "", reached: "", detail: "", coins: 0, oneOff: false };
   for (const a of achievements()) {
     if (a.id !== id) continue;
     const words = achievementInWords(a);
     e.detail = a.detail;
-    if (a.tiers.length === 1) e.oneOff = true;
+    e.oneOff = a.tiers.length === 1;
     const item = tier >= 1 && tier <= words.tiers.length ? words.tiers[tier - 1] : undefined;
     if (item) Object.assign(e, { title: item.title, reached: item.reached, coins: item.coins });
   }
@@ -216,7 +216,7 @@ function standingsOf(p: Progress | undefined): AchievementStanding[] {
     const s: AchievementStanding = { id: a.id, tier: 0, count: 0 };
     if (p) {
       s.count = p.counts?.[a.id] ?? 0;
-      for (const u of p.unlocked ?? []) if (u.id === a.id && u.tier > s.tier) s.tier = u.tier;
+      for (const u of p.unlocked) if (u.id === a.id && u.tier > s.tier) s.tier = u.tier;
     }
     const next = a.tiers[s.tier];
     if (next !== undefined) s.next = next;

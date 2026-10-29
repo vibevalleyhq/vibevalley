@@ -15,6 +15,7 @@ const cron = (more: Partial<Cron>): Cron => ({
   created: now - 7 * 86_400_000,
   lastRun: now - 86_400_000,
   by: "owner",
+  pending: false,
   ...more,
 });
 

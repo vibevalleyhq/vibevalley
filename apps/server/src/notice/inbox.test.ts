@@ -18,6 +18,7 @@ test("a helper handed back with questions asks the owner to answer, not to compl
     issue: "t1",
     phase: { _tag: "done" },
     lastRun: { outcome: "completed", summary: "做完了", at: 2000 },
+    refining: false,
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [{ question: "用 8787 还是 8797？" }] } as unknown as Issue;
   // As the server writes it: the questions make the attention.
@@ -42,6 +43,7 @@ test("the inbox says what the issue's attention says: a round stopped halfway wa
     issue: "t1",
     phase: { _tag: "done" },
     lastRun: { outcome: "interrupted", summary: "停下了", at: 2 },
+    refining: false,
   } as unknown as Session;
   const issue = {
     id: "t1",
@@ -68,6 +70,7 @@ test("each item is worded for every route: the phone, the system notice, the tra
     issue: "t1",
     phase: { _tag: "done" },
     lastRun: { outcome: "completed", summary: "打卡\n  写好了", at: 2 },
+    refining: false,
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [], attention: { state: "reviewing", acts: [] } } as unknown as Issue;
   const cron = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<WorkspaceState["crons"]>[number];

@@ -215,12 +215,12 @@ export interface ChatMessage {
   agent?: string;
   kind: MessageKind;
   text: string;
-  mentions?: string[];
+  mentions: string[];
   session?: SessionId;
   run?: string;
   outcome?: Outcome;
   spent?: Spent;
-  spoken?: boolean;
+  spoken: boolean;
   /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
   sendKey?: string;
   at: number;
@@ -234,10 +234,10 @@ export interface ChatMessage {
   deleted?: number;
   pinned?: number;
   /** In the order they first came. */
-  reactions?: Reaction[];
-  attachments?: Attachment[];
+  reactions: Reaction[];
+  attachments: Attachment[];
   /** Previews of the links in its words, as the server read them. */
-  embeds?: Embed[];
+  embeds: Embed[];
   /** The artifact it announces, as it was at that version (docs/subsystems/artifact.md). */
   artifact?: ArtifactCard;
 }
@@ -374,7 +374,7 @@ export interface Channel {
   id: string;
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
-  default?: boolean;
+  default: boolean;
   /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
   /** The orchestrator that looks after the place, by its profile id, as the server resolves it: a channel's own (the
@@ -505,7 +505,7 @@ export interface Session {
   channel?: string;
   play?: SessionPlay;
   issue?: IssueId;
-  refining?: boolean;
+  refining: boolean;
   phaseText?: string;
 }
 
@@ -527,22 +527,22 @@ export interface Task {
   needs: string[];
   agent?: string;
   check?: string;
-  scope?: string[];
-  acceptance?: boolean;
-  frozen?: string[];
+  scope: string[];
+  acceptance: boolean;
+  frozen: string[];
   state: TaskState;
   session?: SessionId;
   conclusion?: string;
-  commits?: string[];
+  commits: string[];
   spent?: Spent;
   tries: number;
   failures?: number;
-  blockedBy?: string[];
+  blockedBy: string[];
   stateText?: string;
-  actions?: TaskAction[];
-  actionText?: Record<string, string>;
-  canEdit?: boolean;
-  canRemove?: boolean;
+  actions: TaskAction[];
+  actionText: Record<string, string>;
+  canEdit: boolean;
+  canRemove: boolean;
 }
 
 export interface TaskGraph {
@@ -553,14 +553,14 @@ export interface TaskGraph {
   branch?: string;
   state: GraphState;
   stateTag?: string;
-  actionText?: Record<string, string>;
-  actions?: GraphAction[];
+  actionText: Record<string, string>;
+  actions: GraphAction[];
   tasks: Task[];
   parallel: number;
   note?: string;
   createdAt: number;
-  layers?: string[][];
-  asksForYou?: boolean;
+  layers: string[][];
+  asksForYou: boolean;
   spent?: Spent;
   settled?: number;
 }
@@ -584,14 +584,14 @@ export interface Progress {
   counts: Record<string, number>;
   unlocked: Unlock[];
   title?: ProgressTitle;
-  agents?: Record<string, AgentTally>;
+  agents: Record<string, AgentTally>;
   multiplier?: number;
 }
 
 export interface ProgressNews {
   coins?: number;
   session?: SessionId;
-  unlocked?: Unlock[];
+  unlocked: Unlock[];
 }
 
 /** Told apart by `kind`. */
@@ -610,7 +610,7 @@ export interface Cron {
   created: number;
   lastRun?: number;
   by: ActorKind;
-  pending?: boolean;
+  pending: boolean;
   whenText?: string;
   nextText?: string;
 }
@@ -624,7 +624,7 @@ export interface OwnerMention {
 /** The channels, not what is said in them: a page follows a channel for that (rpc.ts). */
 export interface Chat {
   channels: Channel[];
-  ownerMentions?: OwnerMention[];
+  ownerMentions: OwnerMention[];
 }
 
 /** What a channel's follower gets: each message said there, by its number; Reset when it is too far behind to catch up. */
@@ -643,15 +643,15 @@ export interface WorkspaceState {
   call: CallState;
   callReason?: string;
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
-  orchestrators?: Record<string, OrchestratorNow>;
+  orchestrators: Record<string, OrchestratorNow>;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
-  crons?: Cron[];
-  issues?: Issue[];
+  crons: Cron[];
+  issues: Issue[];
   /** Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json. */
-  connectors?: ConnectorStatus[];
+  connectors: ConnectorStatus[];
 }
 
 export const SessionEventTypeValues = [
@@ -887,8 +887,8 @@ export interface GraphEvent {
   actor: ActorKind;
   session?: SessionId;
   detail?: string;
-  changes?: TaskFieldChange[];
-  commits?: string[];
+  changes: TaskFieldChange[];
+  commits: string[];
   at: number;
   text?: string;
   actorText?: string;
@@ -1104,7 +1104,7 @@ export interface Memory {
   at: number;
   recalled: number;
   recalledAt?: number;
-  fading?: boolean;
+  fading: boolean;
   source?: string;
 }
 
@@ -1314,7 +1314,7 @@ export interface Issue {
   /** Canceled: why. */
   canceled?: IssueCanceled;
   parent?: IssueId;
-  blockedBy?: string[];
+  blockedBy: string[];
   graph?: IssueGraph;
   task?: IssueTask;
   cron?: string;
@@ -1327,8 +1327,8 @@ export interface Issue {
   reviewedAt?: number;
   findings: Finding[];
   questions: Question[];
-  criteria?: string[];
-  checks?: CriterionCheck[];
+  criteria: string[];
+  checks: CriterionCheck[];
   refining?: IssueRefining;
   /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the
    * orchestrator's): going on while it has no end; ended, the issue waits on the owner. */
@@ -1362,7 +1362,7 @@ export interface IssueRun {
 /** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
 export interface Question {
   question: string;
-  options?: string[];
+  options: string[];
 }
 
 export const CheckResultValues = ["met", "unmet", "unsure"] as const;
@@ -1458,12 +1458,12 @@ export interface IssueTask {
   key: string;
   state: TaskState;
   check?: string;
-  scope?: string[];
-  acceptance?: boolean;
-  frozen?: string[];
+  scope: string[];
+  acceptance: boolean;
+  frozen: string[];
   session?: SessionId;
   conclusion?: string;
-  commits?: string[];
+  commits: string[];
   spent?: Spent;
   tries: number;
   failures?: number;
@@ -1492,7 +1492,7 @@ export interface Finding {
   text: string;
   at: number;
   /** Settled: the next acceptance that passed after it was written. */
-  resolved?: boolean;
+  resolved: boolean;
 }
 
 export interface IssueRequest {
@@ -1628,7 +1628,7 @@ export interface MemorySource {
   enabled: boolean;
   read: boolean;
   write: boolean;
-  everything?: boolean;
+  everything: boolean;
   user?: string;
   key: KeyStatus;
 }
@@ -1879,7 +1879,7 @@ export interface GameEffectAchievement {
   reached: string;
   detail: string;
   coins: number;
-  oneOff?: boolean;
+  oneOff: boolean;
 }
 
 export interface LedgerEntryHarvested {
@@ -2229,8 +2229,8 @@ export interface FactReport {
   summary: string;
   runs: number;
   spent?: Spent;
-  questions?: Question[];
-  checks?: CriterionCheck[];
+  questions: Question[];
+  checks: CriterionCheck[];
   answer?: IssueAnswer;
 }
 

@@ -57,7 +57,7 @@ export function refinement(d: RefinementDeps) {
 
   const beforeRefinement = Effect.fnUntraced(function* (issue: Issue, word: string, agent: string, where: string) {
     let [title, description] = [issue.title, issue.description ?? ""];
-    if (word && issue.questions.length === 0 && !description && (issue.criteria ?? []).length === 0) [title, description] = splitBrief(word);
+    if (word && issue.questions.length === 0 && !description && issue.criteria.length === 0) [title, description] = splitBrief(word);
     yield* inTx(
       Effect.gen(function* () {
         yield* db(
@@ -67,7 +67,7 @@ export function refinement(d: RefinementDeps) {
             project: nullText(issue.project ?? where),
             assignee: nullText(issue.assignee ?? agent),
             priority: issue.priority,
-            criteria: jsonOrNull(issue.criteria, (issue.criteria ?? []).length > 0),
+            criteria: jsonOrNull(issue.criteria, issue.criteria.length > 0),
             deliver: issue.deliver,
             id: issue.id,
           }),

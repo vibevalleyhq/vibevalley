@@ -8,7 +8,7 @@ export const keepChannels = 100;
 
 export const isTop = (c: Channel) => c.type !== "thread";
 
-const emptyChat = (): Chat => ({ channels: [] });
+const emptyChat = (): Chat => ({ channels: [], ownerMentions: [] });
 
 export const withOwnerMentions = (chat: Chat | undefined, ownerMentions: OwnerMention[]): Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
 
@@ -38,7 +38,7 @@ export function withChannel(chat: Chat | undefined, c: Channel): Chat {
 
 /** A channel is #<name> (#general), a thread #<its channel's name>:<the number of the message it hangs under>, and a
  * direct channel @owner: only its peer reads an address, and the one there with it is the owner. */
-export function targetOf(c: Channel, channelName: string): string {
+export function targetOf(c: Pick<Channel, "type" | "rootNumber" | "name">, channelName: string): string {
   if (c.type === "direct") return "@" + ownerId;
   if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
   return "#" + (c.name ?? channelName);

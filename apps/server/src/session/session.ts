@@ -326,6 +326,9 @@ export function runOf(r: qr.RunsOfSessionResult): Run {
 }
 
 /** An ended session as the core state would have had it: its runs counted, its last one's word, what it spent in all. */
+
+/** A turn submitted and not opened yet, counted from since: its slot is taken, as one thinking. */
+const reserved = (since: number): Session["phase"] => ({ _tag: "working", since, doing: { action: "thinking", label: "" } });
 function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): Session {
   const s: Session = {
     id: sessionId(r.id),
@@ -336,6 +339,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
     hiredAt: r.hired_at,
     runs: runs.length,
     phase: { _tag: "closed", at: r.ended_at ?? 0, closed: (r.closed ?? "dismissed") as SessionClose },
+    refining: false,
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
   };
@@ -648,8 +652,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         runs: report.turn,
         ...(spent ? { spent } : {}),
         ...(h.run ? { run: h.run } : {}),
-        ...(read.questions.length > 0 ? { questions: read.questions } : {}),
-        ...(read.checks.length > 0 ? { checks: read.checks } : {}),
+        questions: read.questions,
+        checks: read.checks,
         ...(read.answer ? { answer: read.answer } : {}),
       });
       endRun(h, read.outcome, read.summary, spent);
@@ -872,9 +876,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           const allocation = allocations.get(s.id);
           const opening = allocation && (!allocation.attached || allocation.closing);
           // A submitted turn owns its slot before oar opens it: its trigger is the reservation.
-          return (opening || (h && h.triggers.length > 0)) && !isBusy(s)
-            ? ({ ...s, phase: { _tag: "working", doing: { action: "thinking", label: "" } } } as Session)
-            : s;
+          return (opening || (h && h.triggers.length > 0)) && !isBusy(s) ? { ...s, phase: reserved(clock.currentTimeMillisUnsafe()) } : s;
         }),
         ...[...allocations.values()].filter((a) => !visible.some((s) => s.id === a.owner.id)).map((a) => a.owner),
       ];
@@ -1059,7 +1061,15 @@ export const make = (options: SessionOptionsIn = {}) =>
           heard: [],
         });
         if (isBusy(session)) {
-          yield* core.apply({ type: "report", id: session.id, outcome: "interrupted", summary: t("server.session.log.restarted"), runs: session.runs });
+          yield* core.apply({
+            type: "report",
+            id: session.id,
+            outcome: "interrupted",
+            summary: t("server.session.log.restarted"),
+            runs: session.runs,
+            questions: [],
+            checks: [],
+          });
           yield* core.notice("info", t("server.session.life.restartedNotice", { name: session.name }));
         }
       }
@@ -1146,7 +1156,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             phase: { _tag: "arriving" },
             ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
             ...(opt.channel ? { channel: opt.channel } : {}),
-            ...(opt.refining ? { refining: true } : {}),
+            refining: opt.refining ?? false,
             issue: opt.issue.id,
             ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
           };

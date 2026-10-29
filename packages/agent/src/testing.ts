@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { tempDir } from "@vibevalley/testkit/temp";
+import { rmSync } from "node:fs";
+
 import type { Message } from "@vibevalley/ai/messages";
 import { type Reply, type Request, scriptedLlm, type Step, testModel } from "@vibevalley/ai/testing";
 import { type BrainEvent, type BrainHandle, type BrainOptions, type BrainOwner, openBrain, standaloneOwner } from "./brain.ts";
@@ -33,7 +33,7 @@ export function scriptedLLM(steps: readonly Step[] = []) {
 }
 
 export function tempHome(): { dir: string; done: () => void } {
-  const dir = mkdtempSync(join(tmpdir(), "vibevalley-agent-"));
+  const dir = tempDir("vibevalley-agent-");
   return { dir, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 

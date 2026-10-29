@@ -27,7 +27,7 @@ import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionOf } from "@/session/state.ts";
-import { graphActions, graphProblems, isAcceptance, isOpen, taskActions, taskOf } from "./graph.ts";
+import { graphActions, graphProblems, graphView, isAcceptance, isOpen, taskActions, taskOf } from "./graph.ts";
 import { graphsOf } from "./issues.ts";
 import { clip } from "@/base/text.ts";
 import {
@@ -84,7 +84,13 @@ import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
-type EventPayload = Pick<GraphEvent, "session" | "detail" | "changes" | "commits">;
+/** What an event row keeps beside its kind: only what it has (an empty list is left out). */
+interface EventPayload {
+  readonly session?: GraphEvent["session"];
+  readonly detail?: string;
+  readonly changes?: GraphEvent["changes"];
+  readonly commits?: string[];
+}
 const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schema.Struct({
   session: Schema.optionalKey(S.SessionId),
   detail: Schema.optionalKey(Schema.String),
@@ -502,7 +508,18 @@ export const make = (options: TaskOptions = {}) =>
 
     const shape = Tasks.of({
       splitIssueOf: (issue, title, steps) =>
-        Effect.suspend(() => shape.splitIssue(String((core.state().issues ?? []).find((item) => item.id === issue)?.sessions.at(-1) ?? ""), title, steps)),
+        Effect.suspend(() =>
+          shape.splitIssue(
+            String(
+              core
+                .state()
+                .issues.find((item) => item.id === issue)
+                ?.sessions.at(-1) ?? "",
+            ),
+            title,
+            steps,
+          ),
+        ),
       graphs: () => graphsOf(core.state()),
       graph: need,
       comeBack,
@@ -523,6 +540,7 @@ export const make = (options: TaskOptions = {}) =>
           tasks: [],
           parallel: defaultParallel,
           createdAt: yield* Clock.currentTimeMillis,
+          ...graphView(),
         };
         yield* put(graph, by);
         const hired = yield* work.hire(
@@ -546,7 +564,7 @@ export const make = (options: TaskOptions = {}) =>
       splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
         const state = core.state();
         const session = sessionOf(state, sessionId);
-        const issue = session?.issue ? (state.issues ?? []).find((item) => item.id === session.issue) : undefined;
+        const issue = session?.issue ? state.issues.find((item) => item.id === session.issue) : undefined;
         const why = issueSplitRefusal(session, issue, store.isOrchestrator);
         if (why) return yield* Effect.fail(refused(why));
         const tasks = steps.map(freshTask);
@@ -561,6 +579,7 @@ export const make = (options: TaskOptions = {}) =>
           parallel: defaultParallel,
           createdAt: issue!.createdAt,
           state: "running",
+          ...graphView(),
         };
         const branch = yield* openBranch(graph, session!.branch ?? "");
         graph = { ...graph, branch };
@@ -710,7 +729,7 @@ export const make = (options: TaskOptions = {}) =>
         return rows.flatMap((row): GraphEvent[] => {
           // A row this code no longer knows how to read is left out.
           if (!(GraphEventKindValues as readonly string[]).includes(row.kind) || !(ActorKindValues as readonly string[]).includes(row.actor)) return [];
-          const p = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
+          const p: EventPayload = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
           const e: GraphEvent = {
             id: row.id,
             graph: row.graph_id,
@@ -719,14 +738,14 @@ export const make = (options: TaskOptions = {}) =>
             actor: row.actor as ActorKind,
             ...(p.session ? { session: p.session } : {}),
             ...(p.detail ? { detail: p.detail } : {}),
-            ...(p.changes ? { changes: p.changes } : {}),
-            ...(p.commits ? { commits: p.commits } : {}),
+            changes: p.changes ?? [],
+            commits: p.commits ?? [],
             at: row.created_at,
           };
           return [
             {
               ...e,
-              ...(e.changes ? { changes: renderedChanges(e.changes) } : {}),
+              changes: renderedChanges(e.changes),
               text: graphEventText(changeOf(e), titleOf),
               actorText: t(`server.task.actor.${e.actor}`),
             },

@@ -33,9 +33,9 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
   const settled = () => Math.round(g().settled ?? 0);
   const byId = () => new Map(g().tasks.map((t) => [t.id, t]));
   // The order they can run in; before the server has laid them out, the order they were written in.
-  const layers = () => (g().layers?.length ? g().layers! : g().tasks.map((t) => [t.id]));
-  const actions = () => g().actions ?? [];
-  const word = (a: GraphAction) => g().actionText?.[a] ?? "";
+  const layers = () => (g().layers.length ? g().layers : g().tasks.map((t) => [t.id]));
+  const actions = () => g().actions;
+  const word = (a: GraphAction) => g().actionText[a] ?? "";
   const act = async (a: GraphAction) => {
     const id = g().id;
     setSaid(await graphs.act(id, a));
@@ -115,7 +115,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                     {(task) => {
                       const summary = () => {
                         const step = task();
-                        const waitsOn = (step.blockedBy ?? []).map((b) => byId().get(b)?.title ?? b);
+                        const waitsOn = step.blockedBy.map((b) => byId().get(b)?.title ?? b);
                         return [
                           step.stateText ?? step.state,
                           ...(step.agent ? [nameOf()(step.agent)] : []),
@@ -146,9 +146,9 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                               <span class="font-mono text-xs">{task().check}</span>
                             </Property>
                           </Show>
-                          <Show when={task().scope?.length}>
+                          <Show when={task().scope.length}>
                             <Property label={t("web.issue.task.scope")}>
-                              <span class="font-mono text-xs">{list(task().scope!)}</span>
+                              <span class="font-mono text-xs">{list(task().scope)}</span>
                             </Property>
                           </Show>
                           <Show when={task().conclusion}>
@@ -166,9 +166,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                                 </Button>
                               )}
                             </Show>
-                            <For each={task().actions ?? []}>
-                              {(a) => <Button onClick={() => void actOnStep(task(), a)}>{task().actionText?.[a] ?? a}</Button>}
-                            </For>
+                            <For each={task().actions}>{(a) => <Button onClick={() => void actOnStep(task(), a)}>{task().actionText[a] ?? a}</Button>}</For>
                           </div>
                         </Fold>
                       );

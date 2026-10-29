@@ -16,7 +16,7 @@ import {
   type IssueId,
 } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
-import { blockedBy, canEditTask, canRemoveTask, graphProblems, isAcceptance, isSettled, taskOf } from "./graph.ts";
+import { blockedBy, canEditTask, canRemoveTask, graphProblems, isAcceptance, isSettled, taskOf, taskView } from "./graph.ts";
 import { graphFrom } from "./issues.ts";
 
 /** The farm's limits come on top. */
@@ -29,7 +29,7 @@ export const allSettled = (graph: TaskGraph) => graph.tasks.length > 0 && graph.
 
 export function frozenOf(graph: TaskGraph, task: Task): string[] {
   const out: string[] = [];
-  for (const n of acceptancesOf(graph, task)) for (const f of n.frozen ?? []) if (!out.includes(f)) out.push(f);
+  for (const n of acceptancesOf(graph, task)) for (const f of n.frozen) if (!out.includes(f)) out.push(f);
   return out;
 }
 
@@ -61,10 +61,13 @@ export function freshTask(draft: StepDraft): Task {
     needs: (draft.needs ?? []).map((x) => x.trim()),
     ...(agent ? { agent } : {}),
     ...(check ? { check } : {}),
-    ...(draft.scope && draft.scope.length > 0 ? { scope: [...draft.scope] } : {}),
-    ...(draft.acceptance ? { acceptance: true } : {}),
+    scope: [...(draft.scope ?? [])],
+    acceptance: draft.acceptance ?? false,
+    frozen: [],
+    commits: [],
     state: "waiting",
     tries: 0,
+    ...taskView(),
   };
 }
 
@@ -175,11 +178,11 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
         ? t("server.task.edit.taskSettled", { title: task.title, state: t(`server.task.taskState.${task.state}`) })
         : t("server.task.edit.graphSettled", { state: t(`server.task.graphState.${graph.state}`) }),
     };
-  const base: Task = task ?? { id, title: id, brief: "", needs: [], state: "waiting", tries: 0 };
+  const base: Task = task ?? freshTask({ id, brief: "" });
   const agent = edit.agent !== undefined ? edit.agent.trim() : base.agent;
   const check = edit.check !== undefined ? edit.check.trim() : base.check;
-  const scope = edit.scope !== undefined ? edit.scope : base.scope;
-  const { agent: _a, check: _c, scope: _s, ...rest } = base;
+  const scope = edit.scope ?? base.scope;
+  const { agent: _a, check: _c, ...rest } = base;
   const next: Task = {
     ...rest,
     ...(edit.title !== undefined ? { title: edit.title.trim() || id } : {}),
@@ -187,7 +190,7 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
     ...(edit.needs !== undefined ? { needs: [...edit.needs] } : {}),
     ...(agent ? { agent } : {}),
     ...(check ? { check } : {}),
-    ...(scope && scope.length > 0 ? { scope: [...scope] } : {}),
+    scope: [...scope],
   };
   if (task) return checked(withTask(graph, id, () => next));
   return checked({ ...graph, tasks: [...graph.tasks, next] });
@@ -242,13 +245,13 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
         // A helper's issue split under it keeps who it was given to.
         assignee: was.get(issueId(graph.id))?.assignee,
         deliver: "change" as const,
+        blockedBy: [],
         graph: omitUndefined({ state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note }),
       }),
       graphClosed(graph.state),
     ),
   ];
   (graph.tasks ?? []).forEach((n, i) => {
-    const blocked = (n.needs ?? []).map((need) => taskIssueID(graph.id, need));
     out.push(
       keep(
         omitUndefined({
@@ -260,7 +263,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
           assignee: n.agent,
           rank: i > 0 ? i : undefined,
           parent: issueId(graph.id),
-          blockedBy: blocked.length > 0 ? blocked : undefined,
+          blockedBy: (n.needs ?? []).map((need) => taskIssueID(graph.id, need)),
           task: omitUndefined({
             key: n.id,
             state: n.state,
@@ -284,7 +287,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
 }
 
 export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
-  const issues = state.issues ?? [];
+  const issues = state.issues;
   const item = issues.find((issue) => issue.id === id && issue.graph);
   return item ? graphFrom(item, issues) : undefined;
 }
@@ -302,7 +305,11 @@ function taskClosed(graph: GraphState, n: Task): Closing | undefined {
   return undefined;
 }
 
-type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "review" | "findings" | "questions" | "attention">;
+// Criteria and checks are no graph's: the issues it writes carry none (Issues.putTask).
+type Draft = Omit<
+  Issue,
+  "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "review" | "findings" | "questions" | "attention" | "criteria" | "checks"
+>;
 
 export const defaultParallel = 3;
 

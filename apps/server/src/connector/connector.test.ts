@@ -154,7 +154,7 @@ const statusOf = (id: ConnectorID) =>
 /** The chat app's status once ok holds for it, as the connectors say it to the core whenever it changes. */
 const statusIs = (id: ConnectorID, ok: (s: ConnectorStatus) => boolean, what: string) =>
   whenState((state) => {
-    const s = state.connectors?.find((c) => c.id === id);
+    const s = state.connectors.find((c) => c.id === id);
     return s && ok(s) ? s : undefined;
   }, `${id}: ${what}`);
 

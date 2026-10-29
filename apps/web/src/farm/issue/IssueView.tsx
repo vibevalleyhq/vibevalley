@@ -67,7 +67,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
   const router = useRouter();
   const history = useIssueHistory(() => true);
   const id = () => issueOf(props.session);
-  const issue = () => core()?.issues?.find((i) => i.id === id());
+  const issue = () => core()?.issues.find((i) => i.id === id());
   const sessions = () => {
     const found = history.rows()?.find((h) => h.issue.id === id())?.sessions ?? [props.session];
     return found.length ? found : [props.session];
@@ -220,7 +220,7 @@ function IssueBody(props: {
                   {(q) => (
                     <div class="mt-2">
                       <p class={body}>{q.question}</p>
-                      <Show when={q.options?.length}>
+                      <Show when={q.options.length}>
                         <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.farm.plot.answerTo", { question: q.question })}>
                           <For each={q.options}>
                             {(o) => (

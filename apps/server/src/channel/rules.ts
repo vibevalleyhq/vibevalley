@@ -145,7 +145,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     if (!i.forTask) add(i.orchestrator, "addressed", i.outcome === "failed");
     return out;
   }
-  const mentions = i.mentions ?? [];
+  const mentions = i.mentions;
   for (const m of mentions) {
     if (m === everyone) {
       if (i.fromKind === "owner") for (const h of i.sessions ?? []) add(h, "everyone", true);

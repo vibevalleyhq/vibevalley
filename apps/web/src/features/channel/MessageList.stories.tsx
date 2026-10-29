@@ -18,6 +18,11 @@ const msg = (fromKind: ChatMessage["fromKind"], from: string, name: string, text
   text,
   at: now - (40 - n) * min,
   revision: 1,
+  mentions: [],
+  spoken: false,
+  reactions: [],
+  attachments: [],
+  embeds: [],
   ...more,
 });
 

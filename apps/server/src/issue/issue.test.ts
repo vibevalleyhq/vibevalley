@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { freshTask } from "@/task/rules.ts";
+import { graphView } from "@/task/graph.ts";
 import { owner } from "@/base/actor.ts";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -55,6 +57,7 @@ const occupied = (core: Core["Service"], runtime: string) =>
       hiredAt: 0,
       runs: 0,
       phase: { _tag: "working", doing: { action: "thinking", label: "" } },
+      refining: false,
     } as Session,
   });
 
@@ -452,10 +455,8 @@ describe("issues", () => {
         state: "draft",
         parallel: 1,
         createdAt: 0,
-        tasks: [
-          { id: "a", title: "first", brief: "first", needs: [], state: "waiting", tries: 0 },
-          { id: "b", title: "second", brief: "second", needs: ["a"], state: "waiting", tries: 0 },
-        ],
+        tasks: [freshTask({ id: "a", title: "first", brief: "first" }), freshTask({ id: "b", title: "second", brief: "second", needs: ["a"] })],
+        ...graphView(),
       };
       yield* issues.putTask(graph);
       const ranks = () => sql<{ id: string; rank: number }>`select id, rank from issue where id = 'p1' or parent = 'p1' order by id`.pipe(Effect.orDie);
@@ -662,7 +663,17 @@ describe("issues", () => {
       yield* sql`insert into session (id, agent, name, runtime, brief, hired_at, ended_at, closed) values ('ended', 'lab', 'old', 'pi', 'history', 1, 2, 'merged')`.pipe(
         Effect.orDie,
       );
-      const live = { id: "live", agent: "lab", name: "current", runtime: "pi", brief: "history", hiredAt: 3, runs: 0, phase: { _tag: "done" } } as Session;
+      const live = {
+        id: "live",
+        agent: "lab",
+        name: "current",
+        runtime: "pi",
+        brief: "history",
+        hiredAt: 3,
+        runs: 0,
+        phase: { _tag: "done" },
+        refining: false,
+      } as Session;
       yield* core.apply({ type: "hired", session: live });
       // Through the issues, as a send records them: they are the only writer of issue_session.
       for (const [id, at] of [

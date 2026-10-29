@@ -31,7 +31,7 @@ interface Draft {
 const draftOf = (i: Issue): Draft => ({
   title: i.title,
   description: i.description ?? "",
-  criteria: (i.criteria ?? []).join("\n"),
+  criteria: i.criteria.join("\n"),
   project: i.project ?? "",
   agent: i.assignee ?? "",
   priority: i.priority,
@@ -193,7 +193,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             {(a) => (
               <div class="mt-1.5">
                 <div>· {a.question}</div>
-                <Show when={a.options?.length}>
+                <Show when={a.options.length}>
                   <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={t("web.issue.todo.answerTo", { question: a.question })}>
                     <For each={a.options}>
                       {(o) => (

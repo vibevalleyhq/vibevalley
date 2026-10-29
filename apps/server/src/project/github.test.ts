@@ -1,6 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
 import { NodeServices } from "@effect/platform-node";
-import { tmpdir } from "node:os";
+
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue } from "@vibevalley/protocol";
@@ -297,7 +298,7 @@ describe("GitHub", () => {
             const p = yield* Projects;
             yield* p.create({ name: "sample" });
             const path = join(root, "sample");
-            const origin = join(mkdtempSync(join(tmpdir(), "vibevalley-origin-")), "origin.git");
+            const origin = join(tempDir("vibevalley-origin-"), "origin.git");
             gitSync(path, "clone", "-q", "--bare", path, origin);
             // gh sees a GitHub repository; git fetches the local one.
             gitSync(path, "remote", "add", "origin", "https://github.com/test/sample.git");
@@ -305,7 +306,7 @@ describe("GitHub", () => {
             originPath = origin;
             yield* p.refreshGitHub();
             const old = gitSync(path, "rev-parse", "main");
-            const remote = join(mkdtempSync(join(tmpdir(), "vibevalley-remote-")), "remote");
+            const remote = join(tempDir("vibevalley-remote-"), "remote");
             gitSync(path, "clone", "-q", origin, remote);
             gitSync(remote, "commit", "--allow-empty", "-m", "remote change");
             gitSync(remote, "push", "-q", "origin", "main");

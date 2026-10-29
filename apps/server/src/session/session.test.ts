@@ -291,7 +291,18 @@ describe("sessions", () => {
       const s = sessions as SessionsInside;
       yield* core.apply({
         type: "hired",
-        session: { id: "w1", name: "w1", agent: "lab", runtime: "pi", brief: "", project: "demo", hiredAt: 0, runs: 0, phase: { _tag: "done" } } as Session,
+        session: {
+          id: "w1",
+          name: "w1",
+          agent: "lab",
+          runtime: "pi",
+          brief: "",
+          project: "demo",
+          hiredAt: 0,
+          runs: 0,
+          phase: { _tag: "done" },
+          refining: false,
+        } as Session,
       });
       const h: Parameters<typeof s.expect>[0] = {
         id: sessionId("w1"),
@@ -324,7 +335,7 @@ describe("sessions", () => {
         const got = yield* sessions.send(lab(), "another", "demo", { issue: { id: issueId("i2"), number: 2 } });
         expect([got.session, got.refused !== undefined, s.hired()]).toEqual([undefined, true, 0]);
       }
-      yield* core.apply({ type: "report", id: sessionId("w1"), outcome: "completed", summary: "", runs: 1 });
+      yield* core.apply({ type: "report", questions: [], checks: [], id: sessionId("w1"), outcome: "completed", summary: "", runs: 1 });
       expect(sessions.noRoom("pi", "demo")).toBe("");
     }).pipe(Effect.scoped, Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, repos: ["demo"] }))),
   );

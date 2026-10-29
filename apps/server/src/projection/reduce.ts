@@ -13,7 +13,7 @@ const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "d
 /** A fact that changes nothing says so (false), and is not sent; facts about sessions not on the farm change nothing. The issues' statuses follow whatever changed. */
 export function reduce(state: WorkspaceState, fact: Fact): [WorkspaceState, boolean] {
   const [next, changed] = fold(state, fact);
-  return changed && (next.issues ?? []).length > 0 ? [withIssueStatuses(next), true] : [next, changed];
+  return changed && next.issues.length > 0 ? [withIssueStatuses(next), true] : [next, changed];
 }
 
 function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
@@ -24,10 +24,10 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return [omitUndefined({ ...state, call: f.state, callReason: reason }), true];
     }
     case "orchestrator": {
-      const was = state.orchestrators?.[f.agent];
+      const was = state.orchestrators[f.agent];
       if ((was?.state ?? "idle") === f.state && was?.channel === f.channel) return [state, false];
       // At rest it leaves the map: idle is what an orchestrator not in it is.
-      const { [f.agent]: _was, ...others } = state.orchestrators ?? {};
+      const { [f.agent]: _was, ...others } = state.orchestrators;
       // A round runs from its first thinking through its writing: its start stays while it goes on.
       const busy = (s: OrchestratorState | undefined) => s === "thinking" || s === "speaking";
       const since = busy(f.state) ? (busy(was?.state) ? was?.since : f.at) : undefined;
@@ -35,8 +35,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
         f.state === "idle" && !f.channel
           ? others
           : { ...others, [f.agent]: { state: f.state, ...(f.channel ? { channel: f.channel } : {}), ...(since !== undefined ? { since } : {}) } };
-      const { orchestrators: _all, ...rest } = state;
-      return [{ ...rest, ...(Object.keys(now).length > 0 ? { orchestrators: now } : {}) }, true];
+      return [{ ...state, orchestrators: now }, true];
     }
     case "message": {
       const [chat, news] = withMessage(state.chat, f.message);
@@ -51,7 +50,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return kept.length === all.length || !state.chat ? [state, false] : [{ ...state, chat: { ...state.chat, channels: kept } }, true];
     }
     case "ownerMentions":
-      return same(state.chat?.ownerMentions ?? [], f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
+      return same(state.chat?.ownerMentions, f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
     case "hired": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
@@ -101,7 +100,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       if (state.progress && same(state.progress, f.progress)) return [state, false];
       return [{ ...state, progress: f.progress }, true];
     case "cron": {
-      const all = [...(state.crons ?? [])];
+      const all = [...state.crons];
       const i = all.findIndex((x) => x.id === f.cron.id);
       if (i >= 0 && same(all[i], f.cron)) return [state, false];
       if (i >= 0) all[i] = f.cron;
@@ -109,16 +108,16 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return [{ ...state, crons: all }, true];
     }
     case "cronGone":
-      if (!(state.crons ?? []).some((x) => x.id === f.id)) return [state, false];
-      return [{ ...state, crons: state.crons!.filter((x) => x.id !== f.id) }, true];
+      if (!state.crons.some((x) => x.id === f.id)) return [state, false];
+      return [{ ...state, crons: state.crons.filter((x) => x.id !== f.id) }, true];
     case "issue":
-      if ((state.issues ?? []).some((t) => t.id === f.issue.id && same(t, f.issue))) return [state, false];
+      if (state.issues.some((t) => t.id === f.issue.id && same(t, f.issue))) return [state, false];
       return [{ ...state, issues: withIssue(state.issues, f.issue) }, true];
     case "issueGone":
-      if (!(state.issues ?? []).some((x) => x.id === f.id)) return [state, false];
-      return [{ ...state, issues: state.issues!.filter((x) => x.id !== f.id) }, true];
+      if (!state.issues.some((x) => x.id === f.id)) return [state, false];
+      return [{ ...state, issues: state.issues.filter((x) => x.id !== f.id) }, true];
     case "connector": {
-      const all = [...(state.connectors ?? [])];
+      const all = [...state.connectors];
       const i = all.findIndex((x) => x.id === f.status.id);
       if (i >= 0 && same(all[i], f.status)) return [state, false];
       if (i >= 0) all[i] = f.status;

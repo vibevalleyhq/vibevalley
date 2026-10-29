@@ -365,7 +365,7 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   const channel = () => topOf(chat(), props.thread);
   const backTo = () => (channel()?.type === "channel" ? channel()!.id : null);
   const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
-  const title = () => threadTitle(props.thread, core()?.issues ?? [], core()?.sessions ?? []);
+  const title = () => threadTitle(props.thread, core()?.issues, core()?.sessions ?? []);
   const status = () => {
     const s = session();
     return s

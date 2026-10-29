@@ -208,6 +208,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           text: hitText(h),
           at: 0,
           recalled: 0,
+          fading: false,
           source: "nowledge",
           score: h.relevance_score ?? 0,
           scope: scopes[index]!,
@@ -218,7 +219,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     list: Effect.fnUntraced(function* (agent) {
       if (!c.read) return [];
       const hits = yield* find(agent, "", most, false);
-      return hits.map((h): Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0 }));
+      return hits.map((h): Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
     }),
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: Effect.fnUntraced(function* (run) {
@@ -231,7 +232,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const project = n.project.trim();
       const id = yield* add(n.agent, n.text, project);
       const at = yield* Clock.currentTimeMillis;
-      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, ...(project ? { project } : {}) } satisfies Memory;
+      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, fading: false, ...(project ? { project } : {}) } satisfies Memory;
     }),
     forget: () => Effect.fail(new SourceError({ message: t("server.memory.nowledgeForget") })),
     can: { list: true, forget: false, transcripts: false },

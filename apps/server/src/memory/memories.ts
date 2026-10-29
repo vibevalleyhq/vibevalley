@@ -71,6 +71,7 @@ export const makeMemories = Effect.gen(function* () {
             author: r.author as ActorKind,
             at: r.created_at,
             recalled: r.recalled,
+            fading: false,
             ...(r.project !== null ? { project: r.project } : {}),
             ...(r.session !== null ? { session: sessionId(r.session) } : {}),
             ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
@@ -138,12 +139,12 @@ export const makeMemories = Effect.gen(function* () {
       : sql
           .withTransaction(
             Effect.gen(function* () {
-              let known = yield* list(run.agent);
+              let known: readonly Pick<Memory, "kind" | "text" | "project">[] = yield* list(run.agent);
               for (const note of memoryNotesOf(run.said)) {
                 const project = note.everywhere ? undefined : run.project;
                 if (!memoryIsNewNote(known, note.text, project)) continue;
                 yield* insertNote(run.agent, note.text, project, run.session, "session");
-                known = [...known, { kind: "note", text: note.text, project } as Memory];
+                known = [...known, { kind: "note", text: note.text, ...(project ? { project } : {}) }];
               }
               const job = memoryJobText(run.job, run.summary, run.outcome);
               yield* db(
@@ -190,9 +191,10 @@ export const makeMemories = Effect.gen(function* () {
       author: n.by.kind,
       at,
       recalled: 0,
+      fading: false,
       ...(project ? { project } : {}),
-      ...(session ? { session } : {}),
-    } as Memory;
+      ...(session ? { session: sessionId(session) } : {}),
+    } satisfies Memory;
   });
 
   const forget = (agent: string, id: string) => db(q.forget({ agent, id })).pipe(Effect.orDie);

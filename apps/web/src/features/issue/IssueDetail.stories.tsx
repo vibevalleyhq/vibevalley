@@ -105,7 +105,7 @@ const pages: Record<string, Page> = {
       note: "这一轮失败了：主动作是补救。",
       issue: base({
         sessions: [s.id],
-        findings: [{ id: "f1", text: "登录页的文案没改", at: now - 30 * min }],
+        findings: [{ id: "f1", text: "登录页的文案没改", at: now - 30 * min, resolved: false }],
         attention: { state: "stuck", stuck: "failed", since: now - 6 * min, lead: "cure", acts: [acts.cure, acts.tell, acts.close] },
       }),
       sessions: [s],

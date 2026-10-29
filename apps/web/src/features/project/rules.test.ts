@@ -113,7 +113,7 @@ const project = (name: string, last?: number, maxSessions = 3): ProjectSummary =
 const todo = (id: string, p: string, queuedAt?: number) =>
   ({ id, title: `活 ${id}`, project: p, status: queuedAt === undefined ? "backlog" : "todo", ...(queuedAt !== undefined ? { queuedAt } : {}) }) as Issue;
 const hired = (id: string, p: string | undefined, phase: Phase, at = 0, more: Partial<Session> = {}) =>
-  ({ id, name: `帮工${id}`, agent: "a", hiredAt: at, phase, brief: "", ...(p ? { project: p } : {}), ...more }) as Session;
+  ({ id, name: `帮工${id}`, agent: "a", hiredAt: at, phase, brief: "", ...(p ? { project: p } : {}), ...more, refining: false }) as Session;
 const kinds = (i: Island) => i.spots.map((s) => (s.kind === "taken" ? s.session.id : s.kind));
 
 describe("islands", () => {

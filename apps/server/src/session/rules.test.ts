@@ -179,7 +179,7 @@ describe("a session's events", () => {
     expect(failed.journal[0]!.type).toBe("note");
     expect((failed.journal[0] as { text: string }).text).toMatch(/^余额不够了：Insufficient Balance/);
     const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
-    expect(exited.facts).toEqual([{ type: "report", id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
+    expect(exited.facts).toEqual([{ type: "report", questions: [], checks: [], id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
     expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } }, none, ctx).facts).toEqual([]);
   });
@@ -234,8 +234,8 @@ describe("a run's report", () => {
 
   it("questions are the lines for the owner", () => {
     expect(questionsOf("看了一下。\n\n要问主人：用 8787 还是 8797？\n- **要问主人**：要不要顺手改文档？\n\n结论：先停下等回答。")).toEqual([
-      { question: "用 8787 还是 8797？" },
-      { question: "要不要顺手改文档？" },
+      { question: "用 8787 还是 8797？", options: [] },
+      { question: "要不要顺手改文档？", options: [] },
     ]);
     expect(questionsOf("结论：做完了")).toEqual([]);
   });
@@ -246,7 +246,7 @@ describe("a run's report", () => {
     ).toEqual([
       { question: "全交给 w3，还是分着做？", options: ["全交给 w3", "分着做"] },
       { question: "端口？", options: ["8787", "8797"] },
-      { question: "就这样？" },
+      { question: "就这样？", options: [] },
     ]);
   });
 
@@ -328,7 +328,7 @@ describe("work that does not go in", () => {
 });
 
 it("makes room with whoever has been idle longest", () => {
-  const s = (id: string, hiredAt: number, tag: string) => ({ id, hiredAt, phase: { _tag: tag } }) as unknown as Session;
+  const s = (id: string, hiredAt: number, tag: string) => ({ id, hiredAt, phase: { _tag: tag }, refining: false }) as unknown as Session;
   const farm = [s("a", 3, "done"), s("b", 1, "working"), s("c", 2, "resting")];
   expect(whoMakesRoom(farm, 4)).toBeUndefined();
   expect(whoMakesRoom(farm, 3)?.id).toBe("c");

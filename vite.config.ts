@@ -113,6 +113,22 @@ export default defineConfig({
         rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }] }] },
       },
       {
+        // The server's tests make their folders with tempDir, which removes them when the run ends.
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.stories.tsx"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
+                { name: "node:fs", importNames: ["mkdtempSync"], message: "Use tempDir (@vibevalley/testkit/temp): it removes the folder when the run ends." },
+              ],
+            },
+          ],
+        },
+      },
+      {
         // Shipped code lets no any through: what JSON, a library or a cast gives untyped is typed where it comes in.
         // Tests and scripts read JSON they wrote themselves.
         files: ["apps/*/src/**", "packages/*/src/**"],

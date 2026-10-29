@@ -5,6 +5,23 @@ import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalle
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/agent/dag";
 
 /** More steps than this means the job should be split into tasks. */
+/** A step as the frame shows it before its acts are worked out (graphFrom does that): none yet. */
+export const taskView = (): Pick<Task, "blockedBy" | "actions" | "actionText" | "canEdit" | "canRemove"> => ({
+  blockedBy: [],
+  actions: [],
+  actionText: {},
+  canEdit: false,
+  canRemove: false,
+});
+
+/** A graph as the frame shows it before its acts and layers are worked out: none yet. */
+export const graphView = (): Pick<TaskGraph, "actionText" | "actions" | "layers" | "asksForYou"> => ({
+  actionText: {},
+  actions: [],
+  layers: [],
+  asksForYou: false,
+});
+
 export const isOpen = (graph: { state: string }) => graph.state !== "done" && graph.state !== "abandoned";
 
 export const maxTasks = 12;

@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
+import { sessionId } from "@vibevalley/protocol/schema";
 import { messageOf } from "@/errors.ts";
 import { fromOwner } from "./prompts.ts";
 import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
@@ -73,8 +74,9 @@ const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory =
     text: person ? line.text.slice(fromOwner.length).trim() : line.text,
     at,
     recalled: 0,
-    ...(person ? {} : { session: agent }),
-  } as Memory;
+    fading: false,
+    ...(person ? {} : { session: sessionId(agent) }),
+  } satisfies Memory;
 };
 
 /** Which outside source a configured one is; tests put their own. */

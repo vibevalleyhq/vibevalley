@@ -92,13 +92,13 @@ export const make = Effect.gen(function* () {
       created: row.created_at,
       ...(row.last_run ? { lastRun: row.last_run } : {}),
       by: row.set_by,
-      ...(row.pending ? { pending: true } : {}),
+      pending: !!row.pending,
     };
     yield* core.apply({ type: "cron", cron: s });
   }
 
   const find = (id: string) => {
-    const s = (core.state().crons ?? []).find((x) => x.id === id);
+    const s = core.state().crons.find((x) => x.id === id);
     return s ? Effect.succeed(s) : Effect.fail(missing(t("server.cron.noCron", { id }), [lookIn.cron]));
   };
 
@@ -107,7 +107,7 @@ export const make = Effect.gen(function* () {
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
       const at = now();
-      for (const s of dueCrons(core.state().crons ?? [], at)) {
+      for (const s of dueCrons(core.state().crons, at)) {
         const missed = isMissed(s, at);
         const after = afterRun(s, at);
         const written = yield* Effect.result(
@@ -126,7 +126,7 @@ export const make = Effect.gen(function* () {
   );
 
   const shape = Crons.of({
-    list: () => [...(core.state().crons ?? [])],
+    list: () => [...core.state().crons],
     add: Effect.fn("Crons.add")(function* (req, by) {
       const at = now();
       const problem = cronProblem(req, at);
@@ -155,7 +155,7 @@ export const make = Effect.gen(function* () {
         enabled: !pending,
         created: at,
         by: by.kind,
-        ...(pending ? { pending: true } : {}),
+        pending,
       };
       yield* db(
         q.addCron({
@@ -178,8 +178,7 @@ export const make = Effect.gen(function* () {
     setEnabled: Effect.fn("Crons.setEnabled")(function* (id, enabled) {
       const was = yield* find(id);
       // Turned on is the owner's yes (only the owner may: cron.update); the queries clear pending the same way.
-      const { pending: _, ...rest } = was;
-      let s: Cron = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
+      let s: Cron = { ...was, enabled, pending: was.pending && !enabled };
       // Switched back on: it counts from now, not from runs it skipped while off.
       if (enabled && !was.enabled && was.when.kind !== "once") {
         const at = now();

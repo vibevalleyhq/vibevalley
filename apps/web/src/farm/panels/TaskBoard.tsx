@@ -36,7 +36,7 @@ const stateTone: Record<GraphState, [fill: string, ink: string]> = {
 
 const isOpen = (g: TaskGraph) => g.state !== "done" && g.state !== "abandoned";
 const taskOf = (g: TaskGraph, id: string) => g.tasks.find((n) => n.id === id);
-const actionText = (g: TaskGraph, a: GraphAction) => g.actionText?.[a] ?? "";
+const actionText = (g: TaskGraph, a: GraphAction) => g.actionText[a] ?? "";
 
 const StateTag = (props: { g: TaskGraph }) => <FarmTag text={props.g.stateTag ?? ""} fill={stateTone[props.g.state][0]} ink={stateTone[props.g.state][1]} />;
 
@@ -194,7 +194,7 @@ function TaskView(props: { graph: TaskGraph }) {
         </Show>
         <Show when={isOpen(props.graph)}>
           <div class="mt-2.5 flex flex-wrap gap-2">
-            <Show when={props.graph.actions?.includes("start")}>
+            <Show when={props.graph.actions.includes("start")}>
               <PxButton tone="primary" onClick={() => void act("start")}>
                 {actionText(props.graph, "start")}
               </PxButton>
@@ -202,7 +202,7 @@ function TaskView(props: { graph: TaskGraph }) {
                 {t("web.farm.graph.addStep")}
               </PxButton>
             </Show>
-            <Show when={props.graph.actions?.includes("pause")}>
+            <Show when={props.graph.actions.includes("pause")}>
               <PxButton onClick={() => void act("pause")}>{actionText(props.graph, "pause")}</PxButton>
             </Show>
             <Show when={props.graph.state === "paused"}>
@@ -215,7 +215,7 @@ function TaskView(props: { graph: TaskGraph }) {
                 {t("web.farm.graph.review", { merge: actionText(props.graph, "merge") })}
               </PxButton>
             </Show>
-            <Show when={props.graph.actions?.includes("abandon")}>
+            <Show when={props.graph.actions.includes("abandon")}>
               <Confirm
                 label={t("web.farm.graph.abandon", { abandon: actionText(props.graph, "abandon") })}
                 sure={t("web.farm.graph.abandonSure")}
@@ -361,7 +361,7 @@ function Steps(props: { graph: TaskGraph; adding: boolean; onSaid: (a: Answer) =
   return (
     <Show when={props.graph.tasks.length > 0 || props.adding} fallback={<FarmEmpty text={t("web.farm.graph.noSteps")} />}>
       <div class="flex items-start overflow-x-auto pb-2">
-        <For each={props.graph.layers ?? []} keyed={false}>
+        <For each={props.graph.layers} keyed={false}>
           {(ids, i) => (
             <div class="flex items-start">
               <Show when={i > 0}>
@@ -429,7 +429,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
   const agent = useAgent(() => props.node.agent);
   const session = () => (props.node.session ? core()?.sessions.find((s) => s.id === props.node.session) : undefined);
   const titleOf = (id: string) => taskOf(props.graph, id)?.title ?? id;
-  const waits = () => (props.node.state === "waiting" ? (props.node.blockedBy ?? []) : []);
+  const waits = () => (props.node.state === "waiting" ? props.node.blockedBy : []);
   const doing = () => {
     const s = session();
     return s ? doingOf(s) : undefined;
@@ -443,7 +443,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.title}
         </span>
         <Show when={props.node.acceptance}>
-          <span title={props.node.frozen?.length ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
+          <span title={props.node.frozen.length ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
             <FarmTag text={t("web.farm.plot.review")} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
@@ -485,16 +485,16 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.conclusion}
         </p>
       </Show>
-      <Show when={(props.node.commits ?? []).length > 0}>
-        <p class="mt-1 truncate font-mono text-[10px] text-bark-500">{props.node.commits!.join(" ")}</p>
+      <Show when={props.node.commits.length > 0}>
+        <p class="mt-1 truncate font-mono text-[10px] text-bark-500">{props.node.commits.join(" ")}</p>
       </Show>
       <Show when={props.node.spent}>{(spent) => <p class="text-[10px] text-bark-500">{spentText(spent())}</p>}</Show>
       <div class="mt-2 flex flex-wrap gap-1">
-        <Show when={props.node.actions?.includes("retry")}>
-          <SmallBtn label={props.node.actionText?.retry ?? ""} onClick={() => void nodeAct("retry")} />
+        <Show when={props.node.actions.includes("retry")}>
+          <SmallBtn label={props.node.actionText.retry ?? ""} onClick={() => void nodeAct("retry")} />
         </Show>
-        <Show when={props.node.actions?.includes("skip")}>
-          <SmallBtn label={props.node.actionText?.skip ?? ""} onClick={() => void nodeAct("skip")} />
+        <Show when={props.node.actions.includes("skip")}>
+          <SmallBtn label={props.node.actionText.skip ?? ""} onClick={() => void nodeAct("skip")} />
         </Show>
         <Show when={props.node.canEdit}>
           <SmallBtn label={t("web.farm.graph.edit")} onClick={() => props.onEdit()} />
@@ -624,7 +624,7 @@ function TaskLog(props: { graph: TaskGraph; only?: string | undefined; onAll: ()
 
 function LogRow(props: { e: GraphEvent }) {
   const [open, setOpen] = createSignal(false);
-  const changes = () => props.e.changes ?? [];
+  const changes = () => props.e.changes;
   return (
     <div class="flex items-start gap-2">
       <span class="w-[88px] shrink-0 text-[12px] text-bark-400">{when(props.e.at)}</span>

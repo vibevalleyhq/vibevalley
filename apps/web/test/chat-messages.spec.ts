@@ -85,7 +85,7 @@ test("a picture picked for a message shows in it and opens at its own address", 
   await expect(image).toBeVisible();
   const src = await image.getAttribute("src");
   const [said] = await api.channel.message.list({ id });
-  expect(src).toBe(attachmentPath(said!.attachments![0]!.id));
+  expect(src).toBe(attachmentPath(said!.attachments[0]!.id));
   const res = await fetch(server.url + src);
   expect([res.status, res.headers.get("content-type")]).toEqual([200, "image/png"]);
   // Clicked, it opens over the page with the original a tab away, and Escape closes it.

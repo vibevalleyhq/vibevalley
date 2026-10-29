@@ -1,12 +1,13 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
+import { tempDir } from "./temp.ts";
+
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCasesAt, jsonDiff } from "./golden.ts";
 
 const file = (rows: object[]) => {
-  const path = join(mkdtempSync(join(tmpdir(), "golden-")), "rules.jsonl.gz");
+  const path = join(tempDir("golden-"), "rules.jsonl.gz");
   writeFileSync(path, gzipSync(rows.map((r) => JSON.stringify(r)).join("\n") + "\n"));
   return path;
 };

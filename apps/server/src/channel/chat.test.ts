@@ -73,7 +73,7 @@ class FakeSessions {
     const runs = this.runsOf(id).length;
     if (input.includes("必败")) {
       this.running.delete(id);
-      this.apply({ type: "report", id: sessionId(id), outcome: "failed", summary: "provider said no", runs });
+      this.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: "failed", summary: "provider said no", runs });
       this.publish({ kind: "ended", id, launch, outcome: "failed", spoke: false });
       return;
     }
@@ -81,7 +81,7 @@ class FakeSessions {
     this.last.set(id, "结论：收到了（" + line + "）");
     this.publish({ kind: "spoke", id, launch });
     this.running.delete(id);
-    this.apply({ type: "report", id: sessionId(id), outcome: "completed", summary: "收到了", runs });
+    this.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: "completed", summary: "收到了", runs });
     this.publish({ kind: "ended", id, launch, outcome: "completed", spoke: true });
   }
 }
@@ -176,6 +176,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: strin
         phase: { _tag: "resting" },
         ...(channel ? { channel } : {}),
         ...(issue ? { issue } : {}),
+        refining: false,
       } as Session,
     });
     let thread: Channel | undefined;
@@ -293,7 +294,7 @@ describe("the chat", () => {
             expect(yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, said.id))).toMatchObject({ reason: "direct", wakes: true });
             expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toBeUndefined();
             expect(x.runsOf("w3")).toHaveLength(before);
-            expect(f.messagesOf(direct!.id).at(-1)?.mentions).toBeUndefined();
+            expect(f.messagesOf(direct!.id).at(-1)?.mentions).toEqual([]);
             yield* f.chat.orchestratorSays(direct!.id, "好，说吧", "", defaultOrchestrator);
             yield* until(() => (f.channel(direct!.id)?.unread ?? 0) === 1, "the answer unread");
             expect((yield* f.chat.read(defaultOrchestrator, { target: "@主人" })).messages.map((m) => m.text)).toEqual([
@@ -343,7 +344,7 @@ describe("the chat", () => {
         expect(f.channel(a)?.unread).toBe(1);
         expect(f.chat.notifyOf(thread)).toBe("mentions");
         yield* f.chat.setNotify(a, "none");
-        expect([f.channel(a)?.unread, f.core.state().chat?.ownerMentions?.length ?? 0, f.chat.notifyOf(thread)]).toEqual([undefined, 0, "none"]);
+        expect([f.channel(a)?.unread, f.core.state().chat?.ownerMentions.length ?? 0, f.chat.notifyOf(thread)]).toEqual([undefined, 0, "none"]);
 
         yield* f.chat.setNotify(a, "all");
         yield* f.chat.markRead(a, 99);
@@ -381,8 +382,8 @@ describe("the chat", () => {
         expect(yield* Effect.flip(f.chat.search("in:#nowhere"))).toMatchObject({ _tag: "Missing" });
 
         const bare = yield* f.chat.edit(pictured.id, "看图（图去掉了）", []);
-        expect([bare.attachments, bare.text]).toEqual([undefined, "看图（图去掉了）"]);
-        expect((yield* f.chat.history(general)).find((m) => m.id === pictured.id)?.attachments).toBeUndefined();
+        expect([bare.attachments, bare.text]).toEqual([[], "看图（图去掉了）"]);
+        expect((yield* f.chat.history(general)).find((m) => m.id === pictured.id)?.attachments).toEqual([]);
       }),
     ),
   );
@@ -420,7 +421,7 @@ describe("the chat", () => {
         expect([f.chat.defaultChannel(), defaultOf(f.core.state().chat)?.id, channelOf(f.core.state().chat, general)?.default]).toEqual([
           channel.id,
           channel.id,
-          undefined,
+          false,
         ]);
         expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["clock-in", "general"]);
         expect((yield* f.chat.say("没写频道", undefined, "")).message.channel).toBe(channel.id);
@@ -603,7 +604,7 @@ describe("the chat", () => {
           Effect.gen(function* () {
             y.holds = false;
             expect(g.core.session("w14")).toBeDefined();
-            yield* g.core.apply({ type: "report", id: sessionId("w14"), outcome: "interrupted", summary: "重启了", runs: 1 });
+            yield* g.core.apply({ type: "report", questions: [], checks: [], id: sessionId("w14"), outcome: "interrupted", summary: "重启了", runs: 1 });
             yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
             expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
             expect(yield* g.chat.jobThread("w14")).toBe(thread.id);
@@ -629,7 +630,7 @@ describe("the chat", () => {
         yield* Effect.orDie(qm.updateMessageMeta({ meta: `{"mentions":{},"spent":{"tokens":1e999}}`, id: message.id }));
         const saved = (yield* f.chat.history(f.chat.defaultChannel())).find((m) => m.id === message.id)!;
         expect(saved.text).toBe("带元数据");
-        expect([saved.mentions, saved.spent, saved.run]).toEqual([undefined, undefined, undefined]);
+        expect([saved.mentions, saved.spent, saved.run]).toEqual([[], undefined, undefined]);
       }),
     ),
   );
@@ -646,7 +647,16 @@ describe("the chat", () => {
           ["unlinked", undefined],
         ]);
         yield* hireAndRun(f, x, "run-helper", "test run metadata", "chat-k");
-        yield* f.core.apply({ type: "report", id: sessionId("run-helper"), outcome: "completed", summary: "done", run: "finished-run", runs: 2 });
+        yield* f.core.apply({
+          type: "report",
+          questions: [],
+          checks: [],
+          id: sessionId("run-helper"),
+          outcome: "completed",
+          summary: "done",
+          run: "finished-run",
+          runs: 2,
+        });
         yield* until(
           () =>
             f
@@ -703,7 +713,7 @@ describe("the chat", () => {
           expect(yield* Effect.flip(f.chat.edit(theirs.id, "不是你的"))).toMatchObject({ _tag: "Refused" });
           const liked = yield* f.chat.react(theirs.id, "owner", "👍");
           expect(liked.reactions).toEqual([{ emoji: "👍", by: ["owner"] }]);
-          expect((yield* f.chat.react(theirs.id, "owner", "👍")).reactions).toBeUndefined();
+          expect((yield* f.chat.react(theirs.id, "owner", "👍")).reactions).toEqual([]);
           expect((yield* f.chat.pin(reply.id)).pinned).toBeDefined();
           expect((yield* f.chat.pins(general)).map((m) => m.id)).toEqual([reply.id]);
           expect((yield* f.chat.previewRemove(theirs.id)).does[0]).toContain(`第 ${theirs.number} 条`);
@@ -838,6 +848,7 @@ describe("the chat", () => {
             hiredAt: Date.now(),
             runs: 0,
             phase: { _tag: "resting" },
+            refining: false,
           } as Session,
         });
         yield* waitFor(
@@ -850,7 +861,17 @@ describe("the chat", () => {
         // Another hire opens every job on the farm again.
         yield* f.core.apply({
           type: "hired",
-          session: { id: "w2", name: "other", agent: "lab", runtime: "pi", brief: "more", hiredAt: Date.now(), runs: 0, phase: { _tag: "resting" } } as Session,
+          session: {
+            id: "w2",
+            name: "other",
+            agent: "lab",
+            runtime: "pi",
+            brief: "more",
+            hiredAt: Date.now(),
+            runs: 0,
+            phase: { _tag: "resting" },
+            refining: false,
+          } as Session,
         });
         yield* until(() => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
         const thread = (yield* f.chat.jobThread("w1"))!;

@@ -95,7 +95,7 @@ function AgentsPage() {
               <AgentCard
                 agent={a}
                 runtime={ready(runtimes, []).find((r) => r.id === a.runtime)}
-                tally={core()?.progress?.agents?.[a.id]}
+                tally={core()?.progress?.agents[a.id]}
                 here={(core()?.sessions ?? []).filter((h) => h.agent === a.id).length}
                 skillName={skills()}
                 errors={(problems()[a.id] ?? []).filter((i) => i.level === "error").map((i) => i.text)}

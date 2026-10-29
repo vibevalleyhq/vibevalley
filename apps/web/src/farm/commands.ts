@@ -41,7 +41,7 @@ export interface FarmCommands {
 
 /** The commands over the latest frame `frame()` gives. */
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
-  const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
+  const issue = (s: Session) => frame()?.state.issues.find((i) => i.id === issueOf(s));
   const send = async (s: Session, act: IssueAct, words = "", sendKey?: string) => {
     const found = issue(s);
     const action = found && actionOf(found, act);
@@ -53,7 +53,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     const session = f ? sessionAtStation(f.state.sessions, bed.station) : undefined;
     const level = f ? Math.round(f.view.level.level) : 1;
     const plot = f ? plotOf(f.view, session) : { crop: "empty" as const };
-    const current = session ? f?.state.issues?.find((i) => i.id === issueOf(session)) : undefined;
+    const current = session ? f?.state.issues.find((i) => i.id === issueOf(session)) : undefined;
     return { bed, tool, session, aim: aimTool(tool, bed, session, plot, level, current) };
   };
   const commands: FarmCommands = {

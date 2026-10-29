@@ -1,4 +1,5 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { tempDir } from "@vibevalley/testkit/temp";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
@@ -9,7 +10,7 @@ const answers = JSON.parse(readFileSync(answersFile, "utf8")) as Record<string, 
 
 /** `dsh --profile acp` played: it answers with what dsh 0.2.1-rc.2 answered (testdata), and logs every request. */
 function fakeDsh() {
-  const dir = mkdtempSync(join(tmpdir(), "vibevalley-dsh-"));
+  const dir = tempDir("vibevalley-dsh-");
   const log = join(dir, "log.jsonl");
   const script = join(dir, "dsh");
   writeFileSync(
