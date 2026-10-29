@@ -33,6 +33,8 @@ export default defineConfig({
         "vp run --filter @vibevalley/web build",
         "vp run --filter @vibevalley/web build:stories",
       ],
+      // The health package's tests, then the escape ratchet (scripts/health.config.ts); the report is `vp run health`.
+      "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/health.config.ts --check"],
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
     },
   },

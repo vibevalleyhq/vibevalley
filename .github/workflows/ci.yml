@@ -61,6 +61,7 @@ jobs:
       - run: vp check --deny-warnings
       - run: vp run docs:verify
       - run: vp run scripts:test
+      - run: vp run health:verify
 
       # The server's tests in three parts at once; the types are the check job's (vp check covers every package).
       - name: Save Vite Task cache
