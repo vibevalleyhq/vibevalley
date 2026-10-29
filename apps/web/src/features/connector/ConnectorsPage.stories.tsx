@@ -5,7 +5,6 @@ import { ConnectorCard } from "./ConnectorsPage";
 const now = Date.now();
 const min = 60_000;
 
-// A QR code's text: what the phone's camera reads, drawn by the card.
 const qr = "https://login.weixin.qq.com/l/story-sample";
 
 const statusOf = (id: ConnectorID, state: ConnectorState, more: Partial<ConnectorStatus> = {}): ConnectorStatus => {

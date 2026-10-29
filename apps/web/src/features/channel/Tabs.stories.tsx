@@ -19,7 +19,7 @@ const cron = (more: Partial<Cron>): Cron => ({
 });
 
 export default stories({
-  title: "组件/群聊/定时任务",
+  title: "组件/频道/定时任务",
   stories: {
     States: story({
       note: "开着、关着、管家提的等你批准。",

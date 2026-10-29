@@ -29,7 +29,7 @@ const poor: MossQos = {
 };
 
 const turns: MossLineState["turns"] = [
-  { who: "owner", key: "t1", text: "今天地里有什么要我看的？", done: true },
+  { who: "owner", key: "t1", text: "今天有什么要我看的？", done: true },
   { who: "moss", key: "t1", text: "两块地熟了：修好登录、补齐看板的测试。要先看哪个？", done: true },
   { who: "owner", key: "t2", text: "先看登录那个", done: false },
 ];

@@ -16,13 +16,11 @@ const ev = (s: number, type: SessionEventType, text: string, more: Partial<Sessi
   ...more,
 });
 
-/** A tool call and its result, the result pointing back at the call. */
 const tool = (s: number, took: number, action: ToolAction, tool: string, input: string, output: string | undefined, ok = true): SessionEvent[] => {
   const call = ev(s, "tool/call", "", { action, tool, input, actionText: input });
   return output === undefined ? [call] : [call, ev(s + took, "tool/result", "", { call: call.seq, output, ok })];
 };
 
-/** One finished round: read, edit, a failing test, a retry of the model, the fix, the answer. */
 export const finishedRound: SessionEvent[] = [
   ev(0, "run/start", ""),
   ev(0, "user/message", "修好登录过期：过期就回到登录页，说清楚为什么。"),
@@ -47,7 +45,6 @@ export const finishedRound: SessionEvent[] = [
   ev(66, "run/end", ""),
 ];
 
-/** A second round still going: asked, thinking, a command running with no result yet. */
 export const liveRound: SessionEvent[] = [
   ev(300, "run/start", ""),
   ev(300, "user/message", "再补一条跨过期限的测试。"),
@@ -55,7 +52,6 @@ export const liveRound: SessionEvent[] = [
   ...tool(306, 0, "run_command", "bash", "vp test run src/base/session.test.ts", undefined),
 ];
 
-/** A round that ended in an error before it got anywhere. */
 export const failedRound: SessionEvent[] = [
   ev(500, "run/start", ""),
   ev(500, "user/message", "跑一遍全部测试。"),
@@ -63,5 +59,4 @@ export const failedRound: SessionEvent[] = [
   ev(506, "run/error", "这一轮没跑完：模型的钥匙没设（设置 › 模型）"),
 ];
 
-/** When the last step of a log happened, a little after: "now" for the stories. */
 export const nowAfter = (log: readonly SessionEvent[]) => (log.at(-1)?.time ?? start) + 20_000;

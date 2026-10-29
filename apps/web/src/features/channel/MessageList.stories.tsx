@@ -37,9 +37,9 @@ const list = (note: string, rows: { m: ChatMessage; continues?: boolean }[]): St
   });
 
 export default stories({
-  title: "界面/群聊/消息",
+  title: "界面/频道/消息",
   stories: {
-    Conversation: list("主人、管家、帮工在田头说话；同一个人接着说，头像和名字只出现一次。", [
+    Talk: list("主人、管家、帮工在频道里说话；同一个人接着说，头像和名字只出现一次。", [
       { m: owner("登录过期的问题谁来修？") },
       { m: orchestrator("派给老周了，在工单 #18 里。") },
       { m: orchestrator("他说半小时左右。"), continues: true },
