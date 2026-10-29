@@ -6,9 +6,9 @@ import { maxRunning } from "@vibevalley/protocol";
 import type { Ordering } from "./display";
 import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./rules";
-import { autofocus } from "../../base/util";
-import { Hint } from "../../ui/Tip";
-import { Segmented } from "../../ui/Segmented";
+import { autofocus } from "@/base/util";
+import { Hint } from "@/ui/Tip";
+import { Segmented } from "@/ui/Segmented";
 import { useGraphs, useNameOf } from "./hooks";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 

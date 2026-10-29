@@ -93,7 +93,14 @@ export function pyramid(root: string) {
         found = [file, spec];
         break;
       }
-      const target = spec.startsWith(".") ? relative(root, join(root, dirname(file), spec)) : spec.startsWith("@vibevalley/") ? inWorkspace(spec) : undefined;
+      const target = spec.startsWith(".")
+        ? relative(root, join(root, dirname(file), spec))
+        : spec.startsWith("@vibevalley/")
+          ? inWorkspace(spec)
+          : // An app's @/ is its own src/ (its tsconfig.json paths); the workspace packages do not use it.
+            spec.startsWith("@/") && !file.startsWith("..")
+            ? join("src", spec.slice(2))
+            : undefined;
       if (target === undefined) continue;
       const next = normalize(target).split("\\").join("/");
       const chain = reach(next, inner);

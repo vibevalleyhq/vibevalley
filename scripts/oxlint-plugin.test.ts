@@ -92,11 +92,30 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '../../features/issue';", filename: page("farm/panels/Board.tsx") },
     { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
+    { code: "import { a } from '@/base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '@/features/issue';", filename: page("farm/panels/Board.tsx") },
   ],
   invalid: [
     { code: "import { a } from '../features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../../farm/scene';", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
     { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/features/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
+  ],
+});
+
+tester.run("parent-import", rule("parent-import"), {
+  valid: [
+    { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
+    { code: "import { a } from '@/base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '../../db/generated/x.ts';", filename: "/repo/apps/server/src/issue/issue.ts" },
+    { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
+  ],
+  invalid: [
+    { code: "import { a } from '../base/router';", filename: page("ui/A.tsx"), errors: [{ messageId: "parent" }] },
+    { code: "export * from '../issue/rules.ts';", filename: "/repo/apps/server/src/task/x.ts", errors: [{ messageId: "parent" }] },
+    { code: "const m = import('../../ui/A');", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "parent" }] },
   ],
 });

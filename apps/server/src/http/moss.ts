@@ -4,7 +4,7 @@
 import { mossLinePath } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { Voice } from "../voice/voice.ts";
+import { Voice } from "@/voice/voice.ts";
 import { fromTheFarm } from "./rpc.ts";
 
 export const mossLine = HttpRouter.use((router) =>

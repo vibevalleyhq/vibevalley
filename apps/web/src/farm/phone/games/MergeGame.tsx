@@ -5,9 +5,9 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show } from "solid-js";
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
-import { lcd } from "../lcd";
-import { playSound } from "../../../ui/pixel/sound";
-import { kept, usePad } from "../../support";
+import { lcd } from "@/farm/phone/lcd";
+import { playSound } from "@/ui/pixel/sound";
+import { kept, usePad } from "@/farm/support";
 
 const game = kept<Merge | null>(null);
 const best = kept(0);

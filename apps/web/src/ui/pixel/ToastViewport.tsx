@@ -2,7 +2,7 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { pxDrop, pxText } from "./style";
 import { type ToastData, type ToastStore, toasts } from "./toasts";
-import { createExternal } from "../../base/external";
+import { createExternal } from "@/base/external";
 import { SpriteIcon } from "./icons";
 
 const tone: Record<string, string> = { warn: "bg-peach/30", error: "bg-berry/15" };

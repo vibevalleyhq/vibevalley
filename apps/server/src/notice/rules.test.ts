@@ -1,7 +1,7 @@
 import { type ChatMessage, ownerId, type WorkspaceState } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
-import { emptyWorkspaceState } from "../core/core.ts";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { emptyWorkspaceState } from "@/core/core.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { emptyPatrol, forOwner, type PatrolNote, patrolStep } from "./rules.ts";
 
 describe("the patrol", () => {

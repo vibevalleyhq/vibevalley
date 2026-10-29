@@ -3,7 +3,7 @@
 // edited in place: an old database is not upgraded, it is made again (AGENTS.md: no compatibility). The queries in
 // db/queries are compiled by effect-sqlc into db/generated (scripts/db-generate.ts).
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { PGlite } from "@electric-sql/pglite";
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
 import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";

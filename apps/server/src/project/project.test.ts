@@ -4,10 +4,10 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkS
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
-import { testConfig } from "../testing/layers.ts";
-import { untilGot as until } from "../testing/until.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { untilGot as until } from "@/testing/until.ts";
 import { Projects, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
 import { type MergeFailure } from "./shapes.ts";
 

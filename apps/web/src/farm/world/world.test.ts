@@ -6,7 +6,7 @@ import { frameVillage, villageCutAcross, villageCutDown } from "./framing";
 import { Level } from "./level";
 import { beds, cropOfBed } from "./plots";
 import { yardPlaces } from "./places";
-import { SpriteAtlas, levelWidth } from "../../ui/pixel/atlas";
+import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
 import { VillageWorld } from "./world";
 
 const assets = join(import.meta.dirname, "../../../public");

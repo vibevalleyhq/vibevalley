@@ -7,7 +7,7 @@ import { type Plugin, unified } from "unified";
 import { markdownClass, remarkMentions } from "./mentions";
 import { richen } from "./richText";
 import { remarkIssueRefs } from "./richRules";
-import { useRouter } from "../base/router";
+import { useRouter } from "@/base/router";
 
 // Raw HTML in the text is dropped (remark-rehype's default); the tree becomes DOM nodes directly, without innerHTML.
 const plain = unified()

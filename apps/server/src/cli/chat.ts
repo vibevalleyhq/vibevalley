@@ -15,16 +15,16 @@ import { promptAndWait } from "@botiverse/oar/observe";
 import { type BrainEvent, openBrain, standaloneOwner } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
-import { modelClient } from "../agent/model.ts";
+import { modelClient } from "@/agent/model.ts";
 import { userMessage } from "@vibevalley/agent/messages";
-import { vibevalleyRuntimeOf } from "../runtime/vibevalley.ts";
+import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
 import { NodeServices } from "@effect/platform-node";
 import { Effect } from "effect";
-import { loadConfig } from "../base/config.ts";
-import { dshRuntime } from "../runtime/dsh.ts";
-import { registryOf } from "../runtime/runtime.ts";
+import { loadConfig } from "@/base/config.ts";
+import { dshRuntime } from "@/runtime/dsh.ts";
+import { registryOf } from "@/runtime/runtime.ts";
 import { memoryStore } from "@vibevalley/agent/agentTaskStore";
-import { wallTime } from "../base/time.ts";
+import { wallTime } from "@/base/time.ts";
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {

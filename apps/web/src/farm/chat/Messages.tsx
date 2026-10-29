@@ -4,21 +4,21 @@ const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyTo
 // The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
-import { spentText } from "../../base/format";
+import { spentText } from "@/base/format";
 
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
-import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage } from "../../features/channel";
-import { api, reasonOf } from "../../base/api";
-import { toast } from "../../ui/toasts";
-import { aria, autofocus } from "../../base/util";
+import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage } from "@/features/channel";
+import { api, reasonOf } from "@/base/api";
+import { toast } from "@/ui/toasts";
+import { aria, autofocus } from "@/base/util";
 import { farmClock, readsLong } from "./text";
-import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
-import { useCore } from "../../base/frame";
-import { PxMarkdown, SpriteIcon } from "../../ui/pixel";
-import { A } from "../../ui/A";
-import { artifactHref } from "../../features/artifact";
+import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
+import { useCore } from "@/base/frame";
+import { PxMarkdown, SpriteIcon } from "@/ui/pixel";
+import { A } from "@/ui/A";
+import { artifactHref } from "@/features/artifact";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 

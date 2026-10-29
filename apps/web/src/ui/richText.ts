@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // by Pele, task lists that read as lists. Messages, reports, descriptions and artifacts are agents' words: nothing here
 // may let them run as the farm's page.
 
-import { messageOf } from "../base/format";
+import { messageOf } from "@/base/format";
 import type { MountOptions, Mounted } from "pele/lazy";
 import { highlight } from "./code/highlight";
 import { icons } from "./icons";

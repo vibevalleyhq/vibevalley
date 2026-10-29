@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 import { type Fact, type Issue, type IssueStatus, type Session } from "@vibevalley/protocol";
-import { emptyWorkspaceState } from "../core/core.ts";
+import { emptyWorkspaceState } from "@/core/core.ts";
 import { attentionOf } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { reduce } from "../projection/reduce.ts";
+import { reduce } from "@/projection/reduce.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 describe("status moves", () => {

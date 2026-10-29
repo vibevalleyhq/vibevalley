@@ -52,7 +52,7 @@ export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0
   mkdirSync(dirname(files.log), { recursive: true });
   const log = createWriteStream(files.log, { flags: "a" });
   log.write(`--- ${new Date().toISOString()} vibevalley: starting ${files.server}\n`);
-  // tsx is resolved from the cwd: the server's own.
+  // tsx and the tsconfig (whose paths are the server's @/ imports) are found from the cwd: the server's own.
   const child = spawn(process.execPath, ["--import", "tsx", "src/main.ts", "--ready-json", "--web", files.web], {
     cwd: files.server,
     env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port) },

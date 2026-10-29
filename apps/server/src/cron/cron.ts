@@ -3,22 +3,22 @@ import { t } from "@vibevalley/i18n";
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
-import { messageOf } from "../errors.ts";
-import { scopedPubSub } from "../base/pubsub.ts";
+import { messageOf } from "@/errors.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
-import type { Actor } from "../base/actor.ts";
+import type { Actor } from "@/base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./rules.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import { Agents } from "../agent/agent.ts";
-import { ServerConfig } from "../base/config.ts";
-import { Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { jsonOrNone } from "../base/json.ts";
-import { Channels } from "../channel/chat.ts";
-import { Core } from "../core/core.ts";
-import { type ApiError, missing, refused, lookIn } from "../errors.ts";
+import { Agents } from "@/agent/agent.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
+import { Channels } from "@/channel/chat.ts";
+import { Core } from "@/core/core.ts";
+import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import * as q from "../../db/generated/cron.sql.ts";
 
 export interface Due {

@@ -8,7 +8,7 @@ import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js"
 import type { JSX } from "@solidjs/web";
 
 import { type Agent, type Deliverable, DeliverableValues, type Issue, type IssueAct, type Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import {
   createIssueActs,
   changesLine,
@@ -21,23 +21,23 @@ import {
   useIssueHistory,
   useIssueRuns,
   useIssueTimeline,
-} from "../../features/issue";
-import { farm, overlayOf } from "../store";
-import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
-import { castPrefix, outfitLabel, speciesLabel } from "../../ui/cast";
-import { issueThreadOf } from "../../features/channel";
-import { tookText, wallClockText } from "../../base/format";
-import { aria, useNow } from "../../base/util";
-import { useRouter } from "../../base/router";
-import { createSessionEvents, WorkLog } from "../../features/session";
-import { useCore, useFrames } from "../../base/frame";
-import { ready } from "../../base/query";
-import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../../ui/pixel";
-import { farmActWords } from "../labels";
-import { tint } from "../panels/bits";
-import { commands, useFarm } from "../state";
-import { useVillage } from "../support";
-import { useAgent } from "../../base/agents";
+} from "@/features/issue";
+import { farm, overlayOf } from "@/farm/store";
+import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
+import { castPrefix, outfitLabel, speciesLabel } from "@/ui/cast";
+import { issueThreadOf } from "@/features/channel";
+import { tookText, wallClockText } from "@/base/format";
+import { aria, useNow } from "@/base/util";
+import { useRouter } from "@/base/router";
+import { createSessionEvents, WorkLog } from "@/features/session";
+import { useCore, useFrames } from "@/base/frame";
+import { ready } from "@/base/query";
+import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
+import { farmActWords } from "@/farm/labels";
+import { tint } from "@/farm/panels/bits";
+import { commands, useFarm } from "@/farm/state";
+import { useVillage } from "@/farm/support";
+import { useAgent } from "@/base/agents";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";

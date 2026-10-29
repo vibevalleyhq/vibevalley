@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -17,17 +17,17 @@ import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
 import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream, Data } from "effect";
-import { chatCompletions } from "../orchestrator/openai.ts";
-import { ServerConfig } from "../base/config.ts";
-import { Channels } from "../channel/chat.ts";
-import { Core } from "../core/core.ts";
-import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { orchestratorModel } from "../orchestrator/rules.ts";
-import { Notices } from "../notice/notice.ts";
-import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
-import { callbackLog } from "../base/log.ts";
-import { afterRealTime, timeHere, wallTime } from "../base/time.ts";
-import type { Time } from "../base/time.ts";
+import { chatCompletions } from "@/orchestrator/openai.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Channels } from "@/channel/chat.ts";
+import { Core } from "@/core/core.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { orchestratorModel } from "@/orchestrator/rules.ts";
+import { Notices } from "@/notice/notice.ts";
+import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
+import { callbackLog } from "@/base/log.ts";
+import { afterRealTime, timeHere, wallTime } from "@/base/time.ts";
+import type { Time } from "@/base/time.ts";
 
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 

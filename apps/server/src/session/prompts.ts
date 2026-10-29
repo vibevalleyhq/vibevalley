@@ -1,9 +1,9 @@
 // What a helper is told about the farm: the rules it works by, what it remembers, and the word that the farm restarted.
 // Said to models, in Chinese whatever the owner's locale: the helper answers in the owner's (ownersLanguage).
 
-import { ownersLanguage } from "../prompts.ts";
-import { pullRequestFile } from "../project/shapes.ts";
-import type { Workplace } from "../project/shapes.ts";
+import { ownersLanguage } from "@/prompts.ts";
+import { pullRequestFile } from "@/project/shapes.ts";
+import type { Workplace } from "@/project/shapes.ts";
 
 /** pullRequest: the project delivers by pull request, so the helper writes its title and body (pullRequestText). */
 export function workplaceRules(place: Workplace, house: string, id: string, pullRequest = false): string {

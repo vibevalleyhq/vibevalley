@@ -14,9 +14,9 @@ import {
   type SnakeHeading,
   steerBugSnake,
 } from "./bugSnake";
-import { drawPattern, lcd } from "../lcd";
-import { playSound } from "../../../ui/pixel/sound";
-import { kept, usePad, useTicks } from "../../support";
+import { drawPattern, lcd } from "@/farm/phone/lcd";
+import { playSound } from "@/ui/pixel/sound";
+import { kept, usePad, useTicks } from "@/farm/support";
 
 const game = kept<BugSnake | null>(null);
 const best = kept(0);

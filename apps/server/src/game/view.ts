@@ -21,9 +21,9 @@ import type {
 } from "@vibevalley/protocol";
 import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { playOf } from "./play.ts";
-import { type AchievementDef, achievements } from "../agent/seed.ts";
-import { sessionOf } from "../session/state.ts";
-import { openFindings } from "../issue/state.ts";
+import { type AchievementDef, achievements } from "@/agent/seed.ts";
+import { sessionOf } from "@/session/state.ts";
+import { openFindings } from "@/issue/state.ts";
 
 export const xpToNext = (level: number) => 10 * level;
 

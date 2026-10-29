@@ -1,16 +1,16 @@
 import { join } from "node:path";
-import { owner } from "../base/actor.ts";
+import { owner } from "@/base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Memory } from "@vibevalley/protocol";
 import { Effect } from "effect";
-import { Agents } from "../agent/agent.ts";
-import { Core } from "../core/core.ts";
-import { Issues } from "../issue/issue.ts";
-import { Memories } from "../memory/memory.ts";
-import { jobBreak } from "../session/rules.ts";
-import { recallHead } from "../session/prompts.ts";
-import { Sessions } from "../session/session.ts";
-import { testConfig } from "../testing/layers.ts";
+import { Agents } from "@/agent/agent.ts";
+import { Core } from "@/core/core.ts";
+import { Issues } from "@/issue/issue.ts";
+import { Memories } from "@/memory/memory.ts";
+import { jobBreak } from "@/session/rules.ts";
+import { recallHead } from "@/session/prompts.ts";
+import { Sessions } from "@/session/session.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";
 
 const scribe = (): Agent => ({ ...lab(), id: "scribe", name: "记录员" });

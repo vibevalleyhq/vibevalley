@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // each step is told, and which steps start.
 
 import { Result, Schema, SchemaIssue } from "effect";
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import {
   type WorkspaceState,
   type GraphEvent,

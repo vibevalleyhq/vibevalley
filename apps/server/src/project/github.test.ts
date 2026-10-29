@@ -5,9 +5,9 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
-import { testConfig } from "../testing/layers.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { Projects, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });

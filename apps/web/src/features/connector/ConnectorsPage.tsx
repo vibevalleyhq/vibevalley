@@ -5,17 +5,17 @@ import { t } from "@vibevalley/i18n";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { channelLabel, defaultOf, topsOf } from "../channel";
-import { momentText, wallClockText } from "../../base/format";
-import { toast } from "../../ui/toasts";
-import { Keyed } from "../../base/util";
-import { useCore } from "../../base/frame";
-import { Button } from "../../ui/Button";
-import { Field, Select, TextInput } from "../../ui/Field";
-import { SpriteIcon } from "../../ui/pixel";
-import { Qr } from "../../ui/Qr";
-import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "../../ui/layout";
+import { api, reasonOf } from "@/base/api";
+import { channelLabel, defaultOf, topsOf } from "@/features/channel";
+import { momentText, wallClockText } from "@/base/format";
+import { toast } from "@/ui/toasts";
+import { Keyed } from "@/base/util";
+import { useCore } from "@/base/frame";
+import { Button } from "@/ui/Button";
+import { Field, Select, TextInput } from "@/ui/Field";
+import { SpriteIcon } from "@/ui/pixel";
+import { Qr } from "@/ui/Qr";
+import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "@/ui/layout";
 
 export const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),

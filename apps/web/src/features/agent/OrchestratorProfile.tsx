@@ -7,15 +7,15 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
-import { api, reasonOf } from "../../base/api";
-import { useRouter } from "../../base/router";
-import { toast } from "../../ui/toasts";
-import { ConfirmButton } from "../../ui/ConfirmButton";
-import { A } from "../../ui/A";
-import { Button } from "../../ui/Button";
-import { OrchestratorFace } from "../../ui/Face";
-import { Field, TextArea, TextInput } from "../../ui/Field";
-import { orchestratorHref, orchestratorLooks } from "../orchestrator";
+import { api, reasonOf } from "@/base/api";
+import { useRouter } from "@/base/router";
+import { toast } from "@/ui/toasts";
+import { ConfirmButton } from "@/ui/ConfirmButton";
+import { A } from "@/ui/A";
+import { Button } from "@/ui/Button";
+import { OrchestratorFace } from "@/ui/Face";
+import { Field, TextArea, TextInput } from "@/ui/Field";
+import { orchestratorHref, orchestratorLooks } from "@/features/orchestrator";
 import { FromTemplate } from "./FromTemplate";
 
 export function newOrchestrator(): Agent {

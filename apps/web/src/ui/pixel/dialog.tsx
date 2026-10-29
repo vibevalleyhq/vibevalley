@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { createModal } from "../modal";
+import { createModal } from "@/ui/modal";
 import { pxFocus, pxText, pxWindow } from "./style";
 import { DashedLine } from "./base";
 import { PxButton } from "./button";

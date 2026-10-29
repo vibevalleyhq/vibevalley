@@ -7,7 +7,7 @@ import { it } from "@effect/vitest";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
 import { readJournal, Trajectories } from "./journal.ts";
-import { timeHere, wallTime } from "../base/time.ts";
+import { timeHere, wallTime } from "@/base/time.ts";
 
 const open: Trajectories[] = [];
 afterEach(() => {

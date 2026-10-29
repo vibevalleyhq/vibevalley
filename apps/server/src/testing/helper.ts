@@ -7,9 +7,9 @@ import { join } from "node:path";
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { factsOf, presetOf } from "../agent/seed.ts";
-import { answerOpening, criteriaHead } from "../issue/prompts.ts";
-import { jobBreak } from "../session/rules.ts";
+import { factsOf, presetOf } from "@/agent/seed.ts";
+import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
+import { jobBreak } from "@/session/rules.ts";
 import { Effect } from "effect";
 import { until } from "./until.ts";
 

@@ -1,23 +1,23 @@
 import { t } from "@vibevalley/i18n";
 
-import { highlight, type Tokens } from "../../ui/code/highlight";
+import { highlight, type Tokens } from "@/ui/code/highlight";
 import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
+import { api, reasonOf } from "@/base/api";
 import { actionOf, perform } from "./acts";
 import { issueTitle } from "./rules";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./state";
-import { ago } from "../../base/format";
-import { aria, autofocus } from "../../base/util";
-import { ready } from "../../base/query";
-import { Button } from "../../ui/Button";
-import { Dialog } from "../../ui/Dialog";
-import { TextArea } from "../../ui/Field";
+import { ago } from "@/base/format";
+import { aria, autofocus } from "@/base/util";
+import { ready } from "@/base/query";
+import { Button } from "@/ui/Button";
+import { Dialog } from "@/ui/Dialog";
+import { TextArea } from "@/ui/Field";
 import { run } from "./hooks";
 import { Note } from "./Sheet";
 import { useIssueChanges } from "./data";
-import { useCore } from "../../base/frame";
+import { useCore } from "@/base/frame";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {

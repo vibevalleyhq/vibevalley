@@ -1,4 +1,4 @@
-import { Tabs } from "../../ui/Tabs";
+import { Tabs } from "@/ui/Tabs";
 import { t } from "@vibevalley/i18n";
 // 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
 // folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
@@ -6,15 +6,15 @@ import { t } from "@vibevalley/i18n";
 
 import { Match, Show, Switch } from "solid-js";
 import { defaultOrchestrator } from "@vibevalley/protocol";
-import { api } from "../../base/api";
-import { useAgent } from "../../base/agents";
+import { api } from "@/base/api";
+import { useAgent } from "@/base/agents";
 import { orchestratorLooks } from "./looks";
-import { A } from "../../ui/A";
-import { useRouter } from "../../base/router";
-import { OrchestratorFace } from "../../ui/Face";
-import { ArchivePanel, OrchestratorMemoryPanel } from "../memory";
-import { VoiceForm } from "../voice";
-import { TrajectoryLog } from "../session";
+import { A } from "@/ui/A";
+import { useRouter } from "@/base/router";
+import { OrchestratorFace } from "@/ui/Face";
+import { ArchivePanel, OrchestratorMemoryPanel } from "@/features/memory";
+import { VoiceForm } from "@/features/voice";
+import { TrajectoryLog } from "@/features/session";
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },

@@ -1,7 +1,7 @@
 import type { SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice, keyHint, memorySourcesProblem, settingsProblem, voiceOverrides, voiceProblem, voiceSettingsOver } from "./rules.ts";
 import { expect, test } from "vite-plus/test";
-import { checkCases, goldenCases } from "../testing/golden.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("setting");

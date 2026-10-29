@@ -4,9 +4,9 @@ import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, Show } from "solid-js";
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
-import { drawPattern, lcd } from "../lcd";
-import { playSound } from "../../../ui/pixel/sound";
-import { kept, usePad, useTicks } from "../../support";
+import { drawPattern, lcd } from "@/farm/phone/lcd";
+import { playSound } from "@/ui/pixel/sound";
+import { kept, usePad, useTicks } from "@/farm/support";
 
 const best = kept(0);
 

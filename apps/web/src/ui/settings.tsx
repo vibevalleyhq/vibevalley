@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type { KeyStatus } from "@vibevalley/protocol";
 import type { JSX } from "@solidjs/web";
 import { createContext, Show, useContext, type Accessor } from "solid-js";
-import { matches } from "../base/search";
+import { matches } from "@/base/search";
 import { IconButton, OutLink } from "./IconButton";
 import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";

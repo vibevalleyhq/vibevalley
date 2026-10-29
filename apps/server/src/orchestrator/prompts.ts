@@ -2,7 +2,7 @@
 // is shown, its inbox's lines, the patrol's and the issues' and crons' lines. Said to the model, in Chinese
 // whatever the owner's locale; what it answers goes to the owner as it wrote it.
 
-import type { PatrolNote } from "../notice/rules.ts";
+import type { PatrolNote } from "@/notice/rules.ts";
 
 /** Who an orchestrator other than the default one is, after the prompt every orchestrator shares. */
 export const identityNote = (name: string, persona: string) =>

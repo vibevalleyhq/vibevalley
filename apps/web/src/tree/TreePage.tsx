@@ -7,12 +7,12 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "../ui/pixel";
-import { playSound } from "../ui/pixel/sound";
-import { useRouter, useSearch } from "../base/router";
-import { useNow, useViewport } from "../base/util";
-import { ago } from "../base/format";
-import { toast } from "../ui/toasts";
+import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "@/ui/pixel";
+import { playSound } from "@/ui/pixel/sound";
+import { useRouter, useSearch } from "@/base/router";
+import { useNow, useViewport } from "@/base/util";
+import { ago } from "@/base/format";
+import { toast } from "@/ui/toasts";
 import { type MemoryItem, type MemoryKind, type MemoryTree, mockTree, type TreeStage } from "./mock";
 import { allOf, counts, kept, newest, stageName, type Ties, tiesOf, type TreeFilter } from "./rules";
 import { type SceneArea, type SceneHover, Scene } from "./Scene";

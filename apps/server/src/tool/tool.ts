@@ -1,8 +1,8 @@
 import { maybe, t } from "@vibevalley/i18n";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
-import { messageOf } from "../errors.ts";
-import { artifactMax } from "../artifact/rules.ts";
+import { messageOf } from "@/errors.ts";
+import { artifactMax } from "@/artifact/rules.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 // The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
@@ -11,28 +11,28 @@ import { resolve, sep } from "node:path";
 
 import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
-import { openFindings } from "../issue/state.ts";
-import { isOpen, maxTasks } from "../task/graph.ts";
-import { head } from "../base/text.ts";
-import { graphText } from "../task/prompts.ts";
-import { inboxLines } from "../channel/prompts.ts";
+import { openFindings } from "@/issue/state.ts";
+import { isOpen, maxTasks } from "@/task/graph.ts";
+import { head } from "@/base/text.ts";
+import { graphText } from "@/task/prompts.ts";
+import { inboxLines } from "@/channel/prompts.ts";
 import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
-import { Agents } from "../agent/agent.ts";
-import { Artifacts } from "../artifact/artifact.ts";
-import type { Actor } from "../base/actor.ts";
+import { Agents } from "@/agent/agent.ts";
+import { Artifacts } from "@/artifact/artifact.ts";
+import type { Actor } from "@/base/actor.ts";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import { Channels, type Info, type Spoken } from "../channel/chat.ts";
-import { type ApiError, reasonOf, refused } from "../errors.ts";
-import { Issues } from "../issue/issue.ts";
-import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
-import { Projects } from "../project/project.ts";
-import { Crons } from "../cron/cron.ts";
-import type { ToolStart } from "../session/facts.ts";
-import { Runtimes } from "../runtime/runtime.ts";
-import { type Roster, Sessions } from "../session/session.ts";
-import { Tasks } from "../task/task.ts";
+import { Channels, type Info, type Spoken } from "@/channel/chat.ts";
+import { type ApiError, reasonOf, refused } from "@/errors.ts";
+import { Issues } from "@/issue/issue.ts";
+import { foundText, Memories, type SearchQuery } from "@/memory/memory.ts";
+import { Projects } from "@/project/project.ts";
+import { Crons } from "@/cron/cron.ts";
+import type { ToolStart } from "@/session/facts.ts";
+import { Runtimes } from "@/runtime/runtime.ts";
+import { type Roster, Sessions } from "@/session/session.ts";
+import { Tasks } from "@/task/task.ts";
 import {
   answers,
   blockLine,

@@ -16,7 +16,7 @@ import {
   type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
-import { reasonOf } from "../../base/api";
+import { reasonOf } from "@/base/api";
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
 /** Text edits wait this long after the last key, and no longer than maxWaitMs while typing goes on. */

@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
 // and the playback's account are moss.ts's; this wires them to the socket and the audio.
 
-import { messageOf } from "../../base/format";
+import { messageOf } from "@/base/format";
 import { mossLinePath } from "@vibevalley/protocol";
 import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackAction, type Queued } from "./moss";
 

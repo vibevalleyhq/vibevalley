@@ -75,6 +75,8 @@ writeFileSync(
         resolveJsonModule: true,
         allowImportingTsExtensions: true,
         noEmit: true,
+        // @/ is src/, as in apps/server/tsconfig.json.
+        paths: { "@/*": ["./src/*"] },
       },
     },
     null,

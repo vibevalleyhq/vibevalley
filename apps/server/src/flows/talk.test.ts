@@ -1,13 +1,13 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { channelOf } from "../channel/state.ts";
-import { Said } from "../testing/said.ts";
+import { channelOf } from "@/channel/state.ts";
+import { Said } from "@/testing/said.ts";
 import { Effect } from "effect";
-import { Agents } from "../agent/agent.ts";
-import { Channels } from "../channel/chat.ts";
-import { Core } from "../core/core.ts";
-import { Issues } from "../issue/issue.ts";
-import { Sessions } from "../session/session.ts";
+import { Agents } from "@/agent/agent.ts";
+import { Channels } from "@/channel/chat.ts";
+import { Core } from "@/core/core.ts";
+import { Issues } from "@/issue/issue.ts";
+import { Sessions } from "@/session/session.ts";
 import { farm, lab, until } from "./farm.ts";
 
 describe("a talk with a helper profile", () => {

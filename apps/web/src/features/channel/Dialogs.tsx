@@ -4,17 +4,17 @@ import { t } from "@vibevalley/i18n";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Channel, Notify } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { useCore } from "../../base/frame";
-import { Segmented } from "../../ui/Segmented";
+import { api, reasonOf } from "@/base/api";
+import { useCore } from "@/base/frame";
+import { Segmented } from "@/ui/Segmented";
 import { createChannelForm } from "./channelForm";
 import { channelName } from "./rules";
-import { autofocus } from "../../base/util";
-import { ready, useProjects } from "../../base/query";
-import { Button } from "../../ui/Button";
-import { Dialog } from "../../ui/Dialog";
-import { Field, Select, TextArea, TextInput } from "../../ui/Field";
-import { useOrchestrators } from "../../base/agents";
+import { autofocus } from "@/base/util";
+import { ready, useProjects } from "@/base/query";
+import { Button } from "@/ui/Button";
+import { Dialog } from "@/ui/Dialog";
+import { Field, Select, TextArea, TextInput } from "@/ui/Field";
+import { useOrchestrators } from "@/base/agents";
 
 function ProjectInput(props: { value: string; onChange: (v: string) => void }) {
   const projects = useProjects();

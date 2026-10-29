@@ -3,9 +3,9 @@
 
 import { Clock, Effect, Schema } from "effect";
 import * as q from "../../db/generated/agent_task.sql.ts";
-import { Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { jsonOrNone } from "../base/json.ts";
+import { Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
 import { type By, finished, type State, type AgentTask } from "@vibevalley/agent/agentTask";
 import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 import { toolFailed } from "@vibevalley/agent/core/errors";

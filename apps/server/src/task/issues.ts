@@ -2,7 +2,7 @@
 
 import type { WorkspaceState, Issue, TaskGraph } from "@vibevalley/protocol";
 import { asksForYou, blockedBy, graphSpent, isSettled, layersOf } from "./graph.ts";
-import { compare, compareText, or } from "../base/text.ts";
+import { compare, compareText, or } from "@/base/text.ts";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { owner, session } from "../base/actor.ts";
+import { owner, session } from "@/base/actor.ts";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
@@ -10,15 +10,15 @@ import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { Agents } from "../agent/agent.ts";
-import { ServerConfig } from "../base/config.ts";
-import { Database, Db } from "../base/db.ts";
-import { Setting } from "../setting/setting.ts";
-import { testConfig } from "../testing/layers.ts";
+import { Agents } from "@/agent/agent.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { Database, Db } from "@/base/db.ts";
+import { Setting } from "@/setting/setting.ts";
+import { testConfig } from "@/testing/layers.ts";
 import { foundText, Memories, make } from "./memory.ts";
 import { localName } from "./recall.ts";
 import { nowledge, nowledgeLabels } from "./nowledge.ts";
-import { until } from "../testing/until.ts";
+import { until } from "@/testing/until.ts";
 
 /** How EverOS names a farm project's scope (everos.ts): ASCII, and never the same as global. */
 const everosProject = (project: string) => "project-" + createHash("sha256").update(project).digest("hex");

@@ -5,12 +5,12 @@ import { t } from "@vibevalley/i18n";
 
 import { sessionId } from "@vibevalley/protocol/schema";
 import { type ActorKind, type Memory, MemoryKindValues, type Outcome } from "@vibevalley/protocol";
-import type { Actor } from "../base/actor.ts";
+import type { Actor } from "@/base/actor.ts";
 import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
-import { Db } from "../base/db.ts";
+import { Db } from "@/base/db.ts";
 import * as q from "../../db/generated/memory.sql.ts";
-import { newId } from "../base/ids.ts";
+import { newId } from "@/base/ids.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
 import { omitUndefined } from "@vibevalley/protocol/rules";

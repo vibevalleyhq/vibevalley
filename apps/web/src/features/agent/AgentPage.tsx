@@ -1,4 +1,4 @@
-import { Tabs } from "../../ui/Tabs";
+import { Tabs } from "@/ui/Tabs";
 import { t } from "@vibevalley/i18n";
 // One profile, made or edited: its
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
@@ -25,31 +25,31 @@ import {
   SpeciesValues,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
-import { api, reasonOf } from "../../base/api";
-import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../ui/cast";
-import { ConfirmButton } from "../../ui/ConfirmButton";
-import { runtimeName } from "../../ui/runtimes";
-import { toast } from "../../ui/toasts";
-import { A } from "../../ui/A";
-import { useRouter, useSearch } from "../../base/router";
-import { aria } from "../../base/util";
-import { useAgentProblems } from "../../base/agents";
-import { ready, useAgents, useRuntimes, useSprites } from "../../base/query";
-import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
-import { Button } from "../../ui/Button";
-import { ChipsInput, KeyValueEditor } from "../../ui/Chips";
-import { AgentFace } from "../../ui/Face";
-import { Select, TextArea, TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { PoseSprite } from "../../ui/PoseSprite";
-import { Segmented } from "../../ui/Segmented";
-import { Toggle } from "../../ui/layout";
-import { MemoryPanel } from "../memory";
-import { useSkills } from "../runtime";
-import { TrajectoryList } from "../session";
+import { api, reasonOf } from "@/base/api";
+import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "@/ui/cast";
+import { ConfirmButton } from "@/ui/ConfirmButton";
+import { runtimeName } from "@/ui/runtimes";
+import { toast } from "@/ui/toasts";
+import { A } from "@/ui/A";
+import { useRouter, useSearch } from "@/base/router";
+import { aria } from "@/base/util";
+import { useAgentProblems } from "@/base/agents";
+import { ready, useAgents, useRuntimes, useSprites } from "@/base/query";
+import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { Button } from "@/ui/Button";
+import { ChipsInput, KeyValueEditor } from "@/ui/Chips";
+import { AgentFace } from "@/ui/Face";
+import { Select, TextArea, TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { PoseSprite } from "@/ui/PoseSprite";
+import { Segmented } from "@/ui/Segmented";
+import { Toggle } from "@/ui/layout";
+import { MemoryPanel } from "@/features/memory";
+import { useSkills } from "@/features/runtime";
+import { TrajectoryList } from "@/features/session";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 import { FromTemplate } from "./FromTemplate";
-import { Hint } from "../../ui/Tip";
+import { Hint } from "@/ui/Tip";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;

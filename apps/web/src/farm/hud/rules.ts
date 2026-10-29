@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import type { ChatMessage, WorkspaceState, Crop, Doing, Issue, Session } from "@vibevalley/protocol";
 
-import { beds, cropLabel, type Bed } from "../world/plots";
+import { beds, cropLabel, type Bed } from "@/farm/world/plots";
 
 /** To five minutes; `tod` 0..1, 0.5 is noon. */
 export function clockText(tod: number) {

@@ -3,8 +3,8 @@ import { t } from "@vibevalley/i18n";
 import { Popover } from "@vibevalley/base-ui";
 import { Show } from "solid-js";
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
-import { Button } from "../../ui/Button";
-import { Segmented } from "../../ui/Segmented";
+import { Button } from "@/ui/Button";
+import { Segmented } from "@/ui/Segmented";
 
 /** 显示: a small panel under its button with how the list groups and how both views order. */
 export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) => void }) {

@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 
 import type { WorkspaceState, InboxItem } from "@vibevalley/protocol";
 import type { TraySummary } from "@vibevalley/protocol/host";
-import { unreadTotal } from "../channel";
+import { unreadTotal } from "@/features/channel";
 
 /** The tray's title (working helpers, calls waiting) and its lines. */
 export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]): TraySummary {

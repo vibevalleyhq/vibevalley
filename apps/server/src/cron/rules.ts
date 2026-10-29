@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 // whether a cron waits for the owner's yes.
 
 import type { Cron, CronRequest } from "@vibevalley/protocol";
-import { actsForOwner, type Actor } from "../base/actor.ts";
+import { actsForOwner, type Actor } from "@/base/actor.ts";
 import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, cronTime } from "./when.ts";
 import { Cron as EffectCron, DateTime } from "effect";
 

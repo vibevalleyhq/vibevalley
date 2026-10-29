@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import { createSignal, For, onSettled } from "solid-js";
-import { keyCap, pressed, shortcutPlaces, shortcuts } from "../base/shortcuts";
+import { keyCap, pressed, shortcutPlaces, shortcuts } from "@/base/shortcuts";
 import { Dialog } from "./Dialog";
 
 /** Whether the focus is in a field, whose keys are its own: ? there is a question mark. */

@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 
-import { ready, useRuntimes, useSprites } from "../base/query";
+import { ready, useRuntimes, useSprites } from "@/base/query";
 import { runtimeName } from "./runtimes";
 
 /** The execution tool named by a profile or session, using the server's catalog label. */

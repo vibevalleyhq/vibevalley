@@ -3,7 +3,7 @@ import { list, t } from "@vibevalley/i18n";
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
-import { messageOf } from "../errors.ts";
+import { messageOf } from "@/errors.ts";
 import { join } from "node:path";
 import {
   type Agent,
@@ -19,9 +19,9 @@ import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings } from "./seed.ts";
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
-import { ServerConfig } from "../base/config.ts";
-import { FileWriter, readOrSetAside } from "../base/files.ts";
-import { type ApiError, missing, refused, lookIn } from "../errors.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { FileWriter, readOrSetAside } from "@/base/files.ts";
+import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
 
 interface Stored {
   readonly agents: readonly Agent[];

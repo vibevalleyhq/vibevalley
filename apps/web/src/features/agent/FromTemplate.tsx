@@ -5,10 +5,10 @@ import { t } from "@vibevalley/i18n";
 import { Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { Agent } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { ready, useAgentTemplates } from "../../base/query";
-import { toast } from "../../ui/toasts";
-import { ConfirmButton } from "../../ui/ConfirmButton";
+import { api, reasonOf } from "@/base/api";
+import { ready, useAgentTemplates } from "@/base/query";
+import { toast } from "@/ui/toasts";
+import { ConfirmButton } from "@/ui/ConfirmButton";
 
 export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => void }) {
   const templates = useAgentTemplates();

@@ -4,8 +4,8 @@ import { SqlClient } from "effect/sql";
 import type { CoreEvent } from "@vibevalley/agent/brain";
 import type { StopReason } from "@vibevalley/ai/messages";
 import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
-import { until } from "../testing/until.ts";
-import { world } from "../testing/world.ts";
+import { until } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
 import { AgentExecution } from "./execution.ts";
 import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside, NotRecorded } from "./session.ts";
 

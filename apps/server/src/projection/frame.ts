@@ -5,12 +5,12 @@ import { t } from "@vibevalley/i18n";
 // words never reach the saved state.
 
 import type { WorkspaceState, GameEffect, StateFrame } from "@vibevalley/protocol";
-import { inbox } from "../notice/inbox.ts";
+import { inbox } from "@/notice/inbox.ts";
 import { phaseWords } from "@vibevalley/protocol/rules";
-import { nextText, whenText } from "../cron/when.ts";
-import { graphsOf } from "../task/issues.ts";
-import { canEditTask, canRemoveTask, graphActions, taskActions } from "../task/graph.ts";
-import { viewOf } from "../game/view.ts";
+import { nextText, whenText } from "@/cron/when.ts";
+import { graphsOf } from "@/task/issues.ts";
+import { canEditTask, canRemoveTask, graphActions, taskActions } from "@/task/graph.ts";
+import { viewOf } from "@/game/view.ts";
 
 /** Every graph action in words, for the page to say any of them. */
 const graphActionText = () => Object.fromEntries(GraphActionValues.map((a) => [a, t(`server.task.graphAction.${a}`)])) as Record<GraphAction, string>;

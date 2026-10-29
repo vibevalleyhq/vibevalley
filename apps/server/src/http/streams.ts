@@ -5,9 +5,9 @@ import { eventsPath, livePath, statePath } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { Effect, Metric, Schedule, type Schema, Stream } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
-import { bounded } from "../core/bounded.ts";
-import { wireJson } from "../base/wire.ts";
-import { Core } from "../core/core.ts";
+import { bounded } from "@/core/bounded.ts";
+import { wireJson } from "@/base/wire.ts";
+import { Core } from "@/core/core.ts";
 
 const heartbeatMs = 20_000;
 

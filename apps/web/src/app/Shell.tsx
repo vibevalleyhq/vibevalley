@@ -6,17 +6,17 @@ import { t } from "@vibevalley/i18n";
 import { For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
-import { useCore, useFrames } from "../base/frame";
-import { OrchestratorFace } from "../ui/Face";
-import { Icon } from "../ui/Icon";
-import { Hint } from "../ui/Tip";
-import { A } from "../ui/A";
-import { useRouter } from "../base/router";
-import { titleBar } from "../ui/TitleBar";
-import { QuickSwitcher, switcher } from "../features/channel";
-import { pressed } from "../base/shortcuts";
-import { waitingOnOwner } from "../features/notice";
-import { ShortcutSheet } from "../ui/ShortcutSheet";
+import { useCore, useFrames } from "@/base/frame";
+import { OrchestratorFace } from "@/ui/Face";
+import { Icon } from "@/ui/Icon";
+import { Hint } from "@/ui/Tip";
+import { A } from "@/ui/A";
+import { useRouter } from "@/base/router";
+import { titleBar } from "@/ui/TitleBar";
+import { QuickSwitcher, switcher } from "@/features/channel";
+import { pressed } from "@/base/shortcuts";
+import { waitingOnOwner } from "@/features/notice";
+import { ShortcutSheet } from "@/ui/ShortcutSheet";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;

@@ -3,7 +3,7 @@
 
 import type { ChatMessage } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Stream } from "effect";
-import { Core } from "../core/core.ts";
+import { Core } from "@/core/core.ts";
 
 export class Said extends Context.Service<
   Said,

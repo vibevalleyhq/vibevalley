@@ -3,8 +3,8 @@ import { t } from "@vibevalley/i18n";
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
 import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
-import { api, newSendKey } from "../base/api";
-import { actionOf, perform } from "../features/issue";
+import { api, newSendKey } from "@/base/api";
+import { actionOf, perform } from "@/features/issue";
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";

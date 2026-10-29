@@ -6,10 +6,10 @@ import { t } from "@vibevalley/i18n";
 
 import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
 
-import { defaultOf } from "../channel/state.ts";
+import { defaultOf } from "@/channel/state.ts";
 import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
-import { graphsOf } from "../task/issues.ts";
-import { cut, oneLine, slice } from "../base/text.ts";
+import { graphsOf } from "@/task/issues.ts";
+import { cut, oneLine, slice } from "@/base/text.ts";
 import { patrolBrief, patrolWho } from "./prompts.ts";
 
 /** channel undefined: the general channel; since undefined: from when the reader first saw it. brief is for the orchestrator, {ago} filled with how long it has waited. */

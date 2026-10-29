@@ -5,11 +5,11 @@ import { expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { Effect, Schema } from "effect";
-import { wireJson } from "../base/wire.ts";
+import { wireJson } from "@/base/wire.ts";
 import type { WorkspaceState } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "./core.ts";
-import { reduce } from "../projection/reduce.ts";
-import { frameOf } from "../projection/frame.ts";
+import { reduce } from "@/projection/reduce.ts";
+import { frameOf } from "@/projection/frame.ts";
 import * as S from "@vibevalley/protocol/schema";
 
 const encodeFrame = wireJson(S.StateFrame);

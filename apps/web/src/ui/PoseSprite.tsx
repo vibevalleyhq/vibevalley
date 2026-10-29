@@ -1,7 +1,7 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { type Cast, castSprite, type Pose, walkFrames } from "./cast";
-import { Keyed } from "../base/util";
-import { ready, useSprites } from "../base/query";
+import { Keyed } from "@/base/util";
+import { ready, useSprites } from "@/base/query";
 
 const walkFps = 7;
 

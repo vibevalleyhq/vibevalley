@@ -5,13 +5,13 @@ import { t } from "@vibevalley/i18n";
 
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { farm, type FarmOverlay, type FarmPanel } from "../store";
-import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../../features/orchestrator";
-import { aria, Keyed } from "../../base/util";
-import { useCore } from "../../base/frame";
-import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../../ui/pixel";
-import { useFarm } from "../state";
-import { useVillage } from "../support";
+import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
+import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
+import { aria, Keyed } from "@/base/util";
+import { useCore } from "@/base/frame";
+import { FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
+import { useFarm } from "@/farm/state";
+import { useVillage } from "@/farm/support";
 import { Achievements } from "./Achievements";
 import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
@@ -19,13 +19,13 @@ import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
 import { TaskBoard } from "./TaskBoard";
 import { tint } from "./bits";
-import { setPet, usePrefs } from "../../base/prefs";
+import { setPet, usePrefs } from "@/base/prefs";
 import { useQueryClient } from "@tanstack/solid-query";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
-import { orchestratorLookOf } from "../../base/agents";
-import { api, reasonOf } from "../../base/api";
-import { ready, useAgents } from "../../base/query";
-import { toast } from "../../ui/toasts";
+import { orchestratorLookOf } from "@/base/agents";
+import { api, reasonOf } from "@/base/api";
+import { ready, useAgents } from "@/base/query";
+import { toast } from "@/ui/toasts";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],

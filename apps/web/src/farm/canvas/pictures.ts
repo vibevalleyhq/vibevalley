@@ -4,8 +4,8 @@
 
 import { GROUND_NORMALS, LOW_NORMALS, normalTexture, pixelsOf, SPRITE_NORMALS, type Normals } from "@vibevalley/engine/pixi";
 import type { Texture } from "pixi.js";
-import type { SpriteAtlas } from "../../ui/pixel/atlas";
-import { loadTextures, texture } from "../world/textures";
+import type { SpriteAtlas } from "@/ui/pixel/atlas";
+import { loadTextures, texture } from "@/farm/world/textures";
 
 export interface Pictures {
   readonly has: (name: string) => boolean;

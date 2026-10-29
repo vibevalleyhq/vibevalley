@@ -22,15 +22,15 @@ import {
 } from "@vibevalley/engine/pixi";
 import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
-import { castPrefix } from "../../ui/cast";
-import { playSound } from "../../ui/pixel/sound";
-import { clock, farmState } from "../store";
-import { orchestratorSprite } from "../../features/orchestrator";
-import { frameVillage } from "../world/framing";
-import { villageHitAt, type VillageHit } from "../world/hits";
-import type { Box, Point } from "../world/level";
-import type { Village } from "../world/load";
-import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "../world/plots";
+import { castPrefix } from "@/ui/cast";
+import { playSound } from "@/ui/pixel/sound";
+import { clock, farmState } from "@/farm/store";
+import { orchestratorSprite } from "@/features/orchestrator";
+import { frameVillage } from "@/farm/world/framing";
+import { villageHitAt, type VillageHit } from "@/farm/world/hits";
+import type { Box, Point } from "@/farm/world/level";
+import type { Village } from "@/farm/world/load";
+import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "@/farm/world/plots";
 import {
   placeOfAction,
   plotCalls,
@@ -44,13 +44,13 @@ import {
   type Goal,
   type Pose,
   type Stroll,
-} from "../world/world";
+} from "@/farm/world/world";
 import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
-import { orchestratorMood } from "../../base/frame";
-import { prefsNow } from "../../base/prefs";
+import { orchestratorMood } from "@/base/frame";
+import { prefsNow } from "@/base/prefs";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Art pixels a second, and frames of the walk cycle a second. */

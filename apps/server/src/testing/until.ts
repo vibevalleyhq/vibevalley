@@ -2,7 +2,7 @@
 
 import type { WorkspaceState } from "@vibevalley/protocol";
 import { Effect, Option, Stream } from "effect";
-import { Core } from "../core/core.ts";
+import { Core } from "@/core/core.ts";
 
 export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
 

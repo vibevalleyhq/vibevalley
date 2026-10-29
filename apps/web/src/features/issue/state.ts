@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./rules";
-import { tookText } from "../../base/format";
+import { tookText } from "@/base/format";
 import type { Tone } from "./cards";
 
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */

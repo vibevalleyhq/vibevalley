@@ -4,8 +4,8 @@
 import { Effect } from "effect";
 import { artifactPrefix as prefix } from "@vibevalley/protocol";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { Artifacts } from "../artifact/artifact.ts";
-import { artifactHeaders } from "../artifact/rules.ts";
+import { Artifacts } from "@/artifact/artifact.ts";
+import { artifactHeaders } from "@/artifact/rules.ts";
 
 const notFound = () => HttpServerResponse.text("404 page not found\n", { status: 404 });
 

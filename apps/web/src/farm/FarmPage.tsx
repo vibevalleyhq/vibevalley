@@ -7,7 +7,7 @@ import { type FarmSoundInput } from "./cues";
 
 import { createEffect, Show } from "solid-js";
 import { farm } from "./store";
-import { FramesContext, useFrames } from "../base/frame";
+import { FramesContext, useFrames } from "@/base/frame";
 import { VillageCanvas } from "./canvas/VillageCanvas";
 import { DebugPanel } from "./debug/DebugPanel";
 import { Hud } from "./hud/Hud";
@@ -16,7 +16,7 @@ import { Panels } from "./panels/Panels";
 import { createFarmFrames, rawFarmFrame, useFarm } from "./state";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
-import { createCall } from "../features/voice";
+import { createCall } from "@/features/voice";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** `project`: whose farm ("" for the sessions without a project). */

@@ -3,26 +3,26 @@ import { t } from "@vibevalley/i18n";
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
 
-import { messageOf } from "../../base/format";
+import { messageOf } from "@/base/format";
 import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
 
 import type { Agent } from "@vibevalley/protocol";
-import { frames } from "../../base/frames";
+import { frames } from "@/base/frames";
 import { startScene, type Scene } from "./scene";
 import { background, cssCursor, holdTimeOfDay, type Hotspots, lightOn, screenOf } from "./screen";
-import { clickBed, openPlace } from "../commands";
-import { playSound } from "../../ui/pixel/sound";
-import { farm, farmState, subscribeFarm } from "../store";
-import { yardPlace } from "../world/places";
-import { beds } from "../world/plots";
-import { spriteUrl } from "../../ui/pixel/atlas";
-import { textureProgress } from "../world/textures";
-import { createExternal } from "../../base/external";
-import { useRouter } from "../../base/router";
-import { ready, useAgents, useQuery } from "../../base/query";
-import { commands, farmProject } from "../state";
-import { farmFrameOf } from "../scope";
-import { useVillage } from "../support";
+import { clickBed, openPlace } from "@/farm/commands";
+import { playSound } from "@/ui/pixel/sound";
+import { farm, farmState, subscribeFarm } from "@/farm/store";
+import { yardPlace } from "@/farm/world/places";
+import { beds } from "@/farm/world/plots";
+import { spriteUrl } from "@/ui/pixel/atlas";
+import { textureProgress } from "@/farm/world/textures";
+import { createExternal } from "@/base/external";
+import { useRouter } from "@/base/router";
+import { ready, useAgents, useQuery } from "@/base/query";
+import { commands, farmProject } from "@/farm/state";
+import { farmFrameOf } from "@/farm/scope";
+import { useVillage } from "@/farm/support";
 
 export function VillageCanvas() {
   let host!: HTMLDivElement;

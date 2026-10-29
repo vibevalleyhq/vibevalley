@@ -4,21 +4,21 @@ import { t } from "@vibevalley/i18n";
 // the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
-import { useRouter } from "../../base/router";
-import { toasts } from "../../ui/pixel/toasts";
+import { useRouter } from "@/base/router";
+import { toasts } from "@/ui/pixel/toasts";
 import { For, Show } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
-import { api } from "../../base/api";
-import { createComposer, draftOf, drafts, threadOwnerOf } from "../../features/channel";
+import { api } from "@/base/api";
+import { createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
 
-import { aria } from "../../base/util";
-import { useCore } from "../../base/frame";
-import { AgentFace } from "../../ui/Face";
-import { DictationButton } from "../../features/voice";
-import { SpriteIcon } from "../../ui/pixel";
+import { aria } from "@/base/util";
+import { useCore } from "@/base/frame";
+import { AgentFace } from "@/ui/Face";
+import { DictationButton } from "@/features/voice";
+import { SpriteIcon } from "@/ui/pixel";
 
-import { useAgent } from "../../base/agents";
-import { setPick, usePrefs } from "../../base/prefs";
+import { useAgent } from "@/base/agents";
+import { setPick, usePrefs } from "@/base/prefs";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {

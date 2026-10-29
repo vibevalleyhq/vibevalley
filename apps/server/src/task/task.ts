@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
-import { scopedPubSub } from "../base/pubsub.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import {
   type Agent,
@@ -26,10 +26,10 @@ import {
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionOf } from "../session/state.ts";
+import { sessionOf } from "@/session/state.ts";
 import { graphActions, graphProblems, isAcceptance, isOpen, taskActions, taskOf } from "./graph.ts";
 import { graphsOf } from "./issues.ts";
-import { clip } from "../base/text.ts";
+import { clip } from "@/base/text.ts";
 import {
   acceptanceChecks,
   acceptancesOf,
@@ -50,21 +50,21 @@ import {
   withTask,
 } from "./rules.ts";
 import { graphChanges, graphEventText, renderedChanges } from "./changes.ts";
-import { actsForOwner, type Actor, session as sessionActor, system } from "../base/actor.ts";
+import { actsForOwner, type Actor, session as sessionActor, system } from "@/base/actor.ts";
 
 import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
-import { Agents } from "../agent/agent.ts";
-import { causeMessage, Db } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { jsonOrNone } from "../base/json.ts";
-import { Core } from "../core/core.ts";
-import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
-import { Issues } from "../issue/issue.ts";
-import { Projects } from "../project/project.ts";
-import { MergeFailure, type ProjectError } from "../project/shapes.ts";
-import { chooseAgent } from "../runtime/rules.ts";
-import { Runtimes } from "../runtime/runtime.ts";
+import { Agents } from "@/agent/agent.ts";
+import { causeMessage, Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
+import { Core } from "@/core/core.ts";
+import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/errors.ts";
+import { Issues } from "@/issue/issue.ts";
+import { Projects } from "@/project/project.ts";
+import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
+import { chooseAgent } from "@/runtime/rules.ts";
+import { Runtimes } from "@/runtime/runtime.ts";
 import {
   acceptancePassedText,
   checkFailedText,
@@ -80,7 +80,7 @@ import {
   startNeedsOwner,
   taskBrief,
 } from "./prompts.ts";
-import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "../session/session.ts";
+import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;

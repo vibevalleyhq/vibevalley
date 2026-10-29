@@ -6,7 +6,7 @@ import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testDatabase } from "../testing/layers.ts";
+import { testDatabase } from "@/testing/layers.ts";
 import { Db, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
