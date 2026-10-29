@@ -36,9 +36,9 @@ interface Row {
   readonly text: string;
   readonly spans: readonly TextSpan[];
   readonly updatedBy: string;
-  readonly problem?: string;
+  readonly problem: string | undefined;
   readonly depth: number;
-  readonly number?: number;
+  readonly number: number | undefined;
   readonly writing: boolean;
   readonly showFace: boolean;
   readonly wanted: boolean;
@@ -132,7 +132,7 @@ export function BlocksView(props: { id: string; onEditor?: (editor: BlockEditor)
 
 const barHeight = (type: string) => (type === "divider" ? 16 : type === "heading" ? 28 : 20);
 
-function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent }) {
+function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefined }) {
   const r = () => props.row;
   const writer = () => (r().updatedBy === ownerId ? t("web.artifact.blocks.owner") : (props.agent?.name ?? r().updatedBy));
   const mark = (): JSX.Element | undefined => {

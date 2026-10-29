@@ -120,7 +120,7 @@ function Search(props: { query: string; onChange: (q: string) => void; placehold
   );
 }
 
-function Sprites(props: { id?: string; tabs: JSX.Element }) {
+function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
   const all = usePictures();
   const router = useRouter();
   const [shelf, setShelf] = createSignal("all");

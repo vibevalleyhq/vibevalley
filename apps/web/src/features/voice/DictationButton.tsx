@@ -53,7 +53,13 @@ export function DictationButton(props: {
 export type DictationState = "unset" | DictationPhase;
 
 /** The button as it looks in each state, the microphone and the server kept out: what DictationButton draws. */
-export function DictationMark(props: { state: DictationState; problem?: string; size?: IconSize; class?: string; onClick: () => void }) {
+export function DictationMark(props: {
+  state: DictationState;
+  problem?: string | undefined;
+  size?: IconSize | undefined;
+  class?: string | undefined;
+  onClick: () => void;
+}) {
   const look = (): [IconName, string] =>
     props.state === "unset"
       ? ["record", t("web.voice.dictation.unset")]

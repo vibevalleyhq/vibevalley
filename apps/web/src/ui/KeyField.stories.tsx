@@ -3,7 +3,7 @@ import { stories, story } from "@vibevalley/stories";
 import { KeyField, KeyMark, SaveBar } from "./KeyField";
 import { SecretInput } from "./layout";
 
-const statusOf = (source: string, hint: string): KeyStatus => (source === "settings" || source === "config" ? { source, hint: hint || undefined } : {});
+const statusOf = (source: string, hint: string): KeyStatus => (source === "settings" || source === "config" ? { source, ...(hint ? { hint } : {}) } : {});
 
 export default stories({
   title: "组件/工作台/KeyField",

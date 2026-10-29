@@ -140,7 +140,7 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
   );
 }
 
-function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: () => void }) {
+function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: (() => void) | undefined }) {
   return (
     <div class="mt-2 flex items-center justify-end gap-2">
       <button type="button" data-testid="form-back" onClick={() => props.onBack()} class="cursor-pointer text-[12px] text-leaf-700 hover:underline">

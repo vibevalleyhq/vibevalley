@@ -3,6 +3,7 @@
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { newIssueTitle } from "./rules";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const pickKey = "vibevalley.board.pick";
 
@@ -33,7 +34,7 @@ export async function writeIssue(text: string, agent: string, project: string): 
   const who = agent || last.agent;
   const where = project || last.project;
   const words = text.trim();
-  const made = await api.issue.create({ title: words || newIssueTitle, project: where || undefined, assignee: who || undefined });
+  const made = await api.issue.create(omitUndefined({ title: words || newIssueTitle, project: where || undefined, assignee: who || undefined }));
   if (!words) return { issue: made, refused: "" };
   try {
     return { issue: await api.issue.refine({ id: made.id, text: words }), refused: "" };

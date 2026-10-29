@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import type { SessionEvent } from "@vibevalley/protocol";
 import { big, tookText } from "../../base/format";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;
@@ -25,7 +26,7 @@ export function shownEvents(log: SessionEvent[]): SessionEvent[] {
   for (const e of log) if (e.type === "tool/result" && e.call !== undefined) results.set(e.call, e);
   return log.flatMap((e) => {
     const result = e.type === "tool/call" ? results.get(e.seq) : undefined;
-    if (result) return [{ ...e, output: result.output, ok: result.ok }];
+    if (result) return [omitUndefined({ ...e, output: result.output, ok: result.ok })];
     if (e.type === "tool/result" || e.type === "run/start" || e.type === "run/end") return [];
     return [e];
   });
@@ -55,12 +56,12 @@ export function roundsOf(steps: SessionEvent[]): Round[] {
   let current: SessionEvent[] = [];
   for (const s of steps) {
     if (s.type === "user/message" && s.under === undefined) {
-      if (asked || current.length) rounds.push({ asked, steps: current });
+      if (asked || current.length) rounds.push(omitUndefined({ asked, steps: current }));
       asked = s;
       current = [];
     } else current.push(s);
   }
-  if (asked || current.length) rounds.push({ asked, steps: current });
+  if (asked || current.length) rounds.push(omitUndefined({ asked, steps: current }));
   return rounds;
 }
 

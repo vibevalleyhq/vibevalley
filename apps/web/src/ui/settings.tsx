@@ -49,7 +49,14 @@ export function SettingsGroup(props: { title?: string; note?: JSX.Element; child
  * One setting: its name and one line on what it does (hint), more on hover (tip), its control on the right. wide puts the
  * control under the words, for a field too wide to sit beside them.
  */
-export function SettingRow(props: { label: string; hint?: string; tip?: string; wide?: boolean; testid?: string; children?: JSX.Element }) {
+export function SettingRow(props: {
+  label: string;
+  hint?: string | undefined;
+  tip?: string | undefined;
+  wide?: boolean;
+  testid?: string | undefined;
+  children?: JSX.Element;
+}) {
   const query = useContext(SettingsSearch);
   const found = () => query() !== "" && matches(query(), [props.label, props.hint, props.tip]);
   return (

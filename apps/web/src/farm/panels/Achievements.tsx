@@ -45,7 +45,7 @@ const tierTitle = (a: Achievement, tier: number) => (tier >= 1 && tier <= a.tier
 
 const reachedAt = (p: Progress, id: string, tier: number) => p.unlocked.find((u) => u.id === id && u.tier === tier)?.at;
 
-type Standings = (a: Achievement) => { tier: number; count: number; next?: number };
+type Standings = (a: Achievement) => { tier: number; count: number; next: number | undefined };
 
 const standingsOf = (list: readonly AchievementStanding[]): Standings => {
   const by = new Map(list.map((s) => [s.id, s]));
@@ -97,7 +97,7 @@ function Bar(props: { value: number; max: number; height?: number; label?: strin
   );
 }
 
-function Heading(props: { text: string; aside?: string }) {
+function Heading(props: { text: string; aside?: string | undefined }) {
   return (
     <p class="mb-1.5 text-[12px] text-bark-600">
       {props.text}

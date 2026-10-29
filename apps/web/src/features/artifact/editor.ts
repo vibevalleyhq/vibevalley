@@ -38,7 +38,7 @@ export const newBlockId = () => crypto.randomUUID();
 /** One block as the editor holds it: the server's last word on it (rev, who wrote it) and the owner's text as it is now. */
 export class EditBlock {
   readonly id: string;
-  parentId?: string;
+  parentId: string | undefined;
   orderKey: string;
   type: BlockType;
   attrs: BlockAttrs;
@@ -49,15 +49,15 @@ export class EditBlock {
   /** The text in its field. */
   text: string;
   /** The ask that last brought another writer's change to this block (display only: it shows as being written). */
-  heardAt?: number;
+  heardAt: number | undefined = undefined;
   /** The text the server has, as far as this client knows: an update is sent only when the owner's differs. */
   sent: TextSpan[];
   /** Set when the server did not take the owner's text. */
-  problem?: string;
+  problem: string | undefined = undefined;
   composing = false;
   focused = false;
   /** Where the caret goes once the field is drawn again: the editor moved the text under it. */
-  caret?: number;
+  caret: number | undefined = undefined;
 
   constructor(b: BlockInput | Block) {
     this.id = b.id;
@@ -84,10 +84,10 @@ interface Pending {
 
 export class BlockEditor {
   artifact?: Artifact;
-  error?: string;
+  error: string | undefined = undefined;
   blocks: EditBlock[] = [];
   /** The block to focus once drawn. */
-  focusId?: string;
+  focusId: string | undefined = undefined;
 
   private readonly byId = new Map<string, EditBlock>();
   private seq = 0;
@@ -96,10 +96,10 @@ export class BlockEditor {
   // Removed here before the server has heard: an answer about one does not bring it back, but its rev still counts for an
   // op queued against it before it went (the text typed into a block just split off, then joined back).
   private readonly gone = new Map<string, EditBlock>();
-  private inflight?: { id: string; ops: BlockOp[]; ids: Set<string> };
+  private inflight: { id: string; ops: BlockOp[]; ids: Set<string> } | undefined = undefined;
   private sending = false;
-  private idle?: ReturnType<typeof setTimeout>;
-  private max?: ReturnType<typeof setTimeout>;
+  private idle: ReturnType<typeof setTimeout> | undefined = undefined;
+  private max: ReturnType<typeof setTimeout> | undefined = undefined;
   private poll?: ReturnType<typeof setTimeout>;
   private disposed = false;
   // Questions made for what others wrote, and the one that last brought another writer's change.

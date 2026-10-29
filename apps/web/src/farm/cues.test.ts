@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 import type { IssueAttention, Session, IssueAct, IssueAction } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { farmCues, type FarmSoundInput } from "./cues";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const buttons = (...names: IssueAct[]): IssueAction[] =>
   names.map((act): IssueAction => {
@@ -81,7 +82,7 @@ describe("farmCues", () => {
   });
 
   test("the call", () => {
-    const at = (phase: "idle" | "connecting" | "live" | "ending", problem?: string) => ({ ...base, call: { phase, problem } });
+    const at = (phase: "idle" | "connecting" | "live" | "ending", problem?: string) => ({ ...base, call: omitUndefined({ phase, problem }) });
     expect(farmCues(at("connecting"), at("live"))).toEqual([{ name: "voiceOn" }]);
     expect(farmCues(at("ending"), at("idle"))).toEqual([{ name: "voiceOff" }]);
     expect(farmCues(at("connecting"), at("idle"))).toEqual([]);

@@ -22,6 +22,6 @@ const atRoot = (): Plugin => ({
 
 export default defineConfig({
   worker: { format: "es" },
-  plugins: lazyPlugins(() => [solid(), tailwindcss(), atRoot()]),
+  plugins: lazyPlugins(() => [solid(), tailwindcss(), atRoot()]) ?? [],
   build: { outDir: "dist-stories", rollupOptions: { input: join(import.meta.dirname, "stories.html") } },
 });

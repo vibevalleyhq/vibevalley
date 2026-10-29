@@ -11,7 +11,7 @@ const tagTones: Record<TagTone, string> = {
   wait: "bg-wheat/25 text-ink",
 };
 
-export function Tag(props: { icon?: IconName; label: string; tone: TagTone }) {
+export function Tag(props: { icon?: IconName | undefined; label: string; tone: TagTone }) {
   return (
     <span class={["inline-flex items-center gap-1 rounded-sm px-1.5 py-px text-xs font-medium", tagTones[props.tone]]}>
       {props.icon && <Icon name={props.icon} size={12} />}

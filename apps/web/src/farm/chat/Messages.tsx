@@ -283,7 +283,15 @@ function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
   );
 }
 
-export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolean; face?: JSX.Element; tag?: string; folded?: boolean; after?: JSX.Element }) {
+export function ChatBubble(props: {
+  m: ChatMessage;
+  mine: boolean;
+  first: boolean;
+  face?: JSX.Element;
+  tag?: string | undefined;
+  folded?: boolean;
+  after?: JSX.Element;
+}) {
   const [editing, setEditing] = createSignal(false);
   return (
     <ChatRow

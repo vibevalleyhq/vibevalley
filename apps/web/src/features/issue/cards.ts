@@ -22,7 +22,7 @@ import {
   taskLine,
 } from "./rules";
 import { ago, tookText } from "../../base/format";
-import { shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
 import { attentionTone } from "./state";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
@@ -51,7 +51,7 @@ export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefine
     else if (issue.graph === undefined && (issue.parent === undefined || issue.sessions.length > 0)) {
       if (issue.sessions.length === 0) cards.push({ kind: "todo", ...base, lane: "todo" });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
-      else cards.push({ kind: "issue", ...base, sessions: row.sessions, tag: issueTag(issue), session: issueSession(core, issue) });
+      else cards.push(omitUndefined({ kind: "issue" as const, ...base, sessions: row.sessions, tag: issueTag(issue), session: issueSession(core, issue) }));
     }
   }
   // A task's lane is its parent issue's status, which the server works out from the task's state.
@@ -97,23 +97,23 @@ export function rowFacts(c: BoardCard): RowFacts {
     case "todo":
     case "orchestrator":
     case "missing":
-      return {
+      return omitUndefined({
         lane: c.lane,
         priority: c.issue.priority,
         createdAt: c.issue.createdAt,
         updatedAt: issueUpdated(c.issue),
         project: c.issue.project,
         agent: c.issue.assignee,
-      };
+      });
     case "issue":
-      return {
+      return omitUndefined({
         lane: c.lane,
         priority: c.issue.priority,
         createdAt: c.issue.createdAt,
         updatedAt: Math.max(issueUpdated(c.issue), ...c.sessions.flatMap((s) => [s.hiredAt, s.lastRun?.at ?? 0, endedAt(s) ?? 0])),
         project: c.issue.project,
         agent: c.issue.assignee,
-      };
+      });
     case "task":
       return {
         lane: c.lane,
@@ -193,15 +193,15 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const said = now0.lastRun?.summary;
       if (tag === "waiting" && said) lines.push(said);
       if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
-      return {
+      return omitUndefined({
         number: numberOf(issue),
         title: shortTitle(issueTitle(issue, graphs)),
         status: issue.status,
-        statusTone: issue.canceled === "lost" ? "berry" : undefined,
+        statusTone: issue.canceled === "lost" ? ("berry" as const) : undefined,
         priority: issue.priority,
         flags,
         detail: lines.join("\n"),
-      };
+      });
     }
     case "orchestrator": {
       const { issue } = c;
@@ -221,14 +221,14 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
         detail: t("web.issue.card.missing", { what: list(c.missing) }),
       };
     case "task":
-      return {
+      return omitUndefined({
         number: c.issue ? numberOf(c.issue) : undefined,
         title: t("web.issue.card.graph", { title: c.graph.title }),
         status: c.issue?.status ?? laneStatus[c.lane],
         flags,
         detail: taskLine(c.graph),
         progress: { done: Math.round(c.graph.settled ?? 0), total: c.graph.tasks.length },
-      };
+      });
   }
 }
 

@@ -115,9 +115,9 @@ function IssueBody(props: {
   session: Session;
   onHarvest: (s: Session) => void;
   onClose: (s: Session) => Promise<void>;
-  onThread?: () => void;
+  onThread?: (() => void) | undefined;
   onNavigate: () => void;
-  onTask?: () => void;
+  onTask?: (() => void) | undefined;
 }) {
   const frames = useFrames();
   const now = useNow();
@@ -464,7 +464,7 @@ function IssueBody(props: {
 }
 
 /** The helper on its crop, what it is and which plot and round. */
-function Aside(props: { session: Session; agent?: Agent }) {
+function Aside(props: { session: Session; agent?: Agent | undefined }) {
   const loaded = useVillage();
   const frames = useFrames();
   const plot = () => (frames.frame ? plotOf(frames.frame.view, props.session) : { crop: "empty" as const });

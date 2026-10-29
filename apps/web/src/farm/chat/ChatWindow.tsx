@@ -401,7 +401,7 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   );
 }
 
-function Item(props: { m: ChatMessage; thread?: Channel; first: boolean; agents: ReadonlyMap<string, Agent>; chatUnread: (t: Channel) => number }) {
+function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: boolean; agents: ReadonlyMap<string, Agent>; chatUnread: (t: Channel) => number }) {
   const face = () => <FaceOf m={props.m} agents={props.agents} />;
   const chip = () => {
     const inThread = props.thread;

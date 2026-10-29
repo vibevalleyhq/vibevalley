@@ -9,7 +9,7 @@ import { ready, useAgents, useSprites } from "../base/query";
 import { RuntimeBadge } from "./RuntimeBadge";
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */
-export function AgentFace(props: { agentId: string; runtime?: string; look?: Look; size?: number; muted?: boolean }) {
+export function AgentFace(props: { agentId: string; runtime?: string | undefined; look?: Look | undefined; size?: number; muted?: boolean | undefined }) {
   const sprites = useSprites();
   const size = () => props.size ?? 24;
   const cut = () => {
@@ -44,7 +44,7 @@ export function AgentFace(props: { agentId: string; runtime?: string; look?: Loo
 
 /** The orchestrator's head (orchestrator-<look>-face; the farmer's until looks are picked). */
 /** An orchestrator's head (the default one when agent is none), in its profile's look unless look is given. */
-export function OrchestratorFace(props: { size?: number; agent?: string; look?: string }) {
+export function OrchestratorFace(props: { size?: number; agent?: string | undefined; look?: string }) {
   const sprites = useSprites();
   const agents = useAgents();
   const size = () => props.size ?? 24;

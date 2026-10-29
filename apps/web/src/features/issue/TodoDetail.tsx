@@ -16,6 +16,7 @@ import { TextArea, TextInput } from "../../ui/Field";
 import { run } from "./hooks";
 import { IssueArtifacts } from "../artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 interface Draft {
   title: string;
@@ -131,7 +132,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const text = word().trim();
     const edit = unsaved();
     return busyWith(async () => {
-      saved(await api.issue.refine({ id, text, edit }));
+      saved(await api.issue.refine(omitUndefined({ id, text, edit })));
       setWord("");
     });
   };

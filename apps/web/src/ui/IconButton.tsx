@@ -9,7 +9,7 @@ export function IconButton(props: {
   label: string;
   onClick: () => void;
   size?: IconSize;
-  tone?: "danger";
+  tone?: "danger" | undefined;
   pressed?: boolean;
   disabled?: boolean;
   testid?: string;

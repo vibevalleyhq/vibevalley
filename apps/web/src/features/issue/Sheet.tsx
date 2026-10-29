@@ -36,7 +36,7 @@ export function Property(props: { label: string; children: JSX.Element }) {
 }
 
 /** A second-level part: folded until asked for, its summary beside the label. */
-export function Fold(props: { label: string; summary?: string; open?: boolean; leading?: JSX.Element; children: JSX.Element }) {
+export function Fold(props: { label: string; summary?: string | undefined; open?: boolean; leading?: JSX.Element; children: JSX.Element }) {
   const [open, setOpen] = createSignal(untrack(() => props.open ?? false));
   return (
     <div class="border-b border-line last:border-b-0">

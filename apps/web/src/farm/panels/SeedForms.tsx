@@ -22,6 +22,7 @@ import { useWorkAgents } from "../../base/agents";
 import { useCore } from "../../base/frame";
 import { issueOf } from "../world/plots";
 import { usePrefs } from "../../base/prefs";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
@@ -98,7 +99,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     const p = project();
     if (!canSow() || !p) return;
     playSound("plant");
-    fire(commands.plant(text(), { station: props.station, agent: agentOf(sower()), project: p }));
+    fire(commands.plant(text(), omitUndefined({ station: props.station, agent: agentOf(sower()), project: p })));
     props.onDone();
   };
   const write = async () => {

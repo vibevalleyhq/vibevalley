@@ -17,6 +17,7 @@ import { createFarmFrames, rawFarmFrame, useFarm } from "./state";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
 import { createCall } from "../features/voice";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** `project`: whose farm ("" for the sessions without a project). */
 export function FarmPage(props: { project: string }) {
@@ -78,13 +79,15 @@ function FarmSounds() {
   const chat = useFarm((s) => s.chatOpen);
   const friends = useFarm((s) => s.friendsOpen);
   const has = (kind: string) => overlays().some((o) => o.kind === kind);
-  farmSounds((): FarmSoundInput => ({
-    tool: tool(),
-    bedFx: bedFx(),
-    open: { panel: has("panel"), selected: has("inspect"), sowing: has("sow"), watering: has("water"), friends: friends(), chat: chat() },
-    effects: raw()?.effects,
-    sessions: raw()?.state.sessions,
-    issues: raw()?.state.issues,
-  }));
+  farmSounds((): FarmSoundInput =>
+    omitUndefined({
+      tool: tool(),
+      bedFx: bedFx(),
+      open: { panel: has("panel"), selected: has("inspect"), sowing: has("sow"), watering: has("water"), friends: friends(), chat: chat() },
+      effects: raw()?.effects,
+      sessions: raw()?.state.sessions,
+      issues: raw()?.state.issues,
+    }),
+  );
   return null;
 }

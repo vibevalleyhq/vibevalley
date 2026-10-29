@@ -15,6 +15,7 @@ import { queries, ready, useProjects, useQuery } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Quiet } from "../../ui/layout";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Notes not tied to a project. */
 const everywhere = "*";
@@ -301,7 +302,7 @@ export function ArchivePanel(props: { agent: string }) {
   const [open, setOpen] = createSignal<{ name: string; text: string }>();
   const listing = useQuery(() => ({
     queryKey: ["archive", props.agent, asked() ?? ""],
-    queryFn: () => api.orchestrator.archive.list({ agent: props.agent, ...(asked() ? { q: asked() } : {}) }),
+    queryFn: () => api.orchestrator.archive.list(omitUndefined({ agent: props.agent, q: asked() || undefined })),
   }));
   const now = useNow();
   const show = async (name: string) => {
@@ -431,7 +432,7 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
   );
 }
 
-export function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string[]; faded?: boolean; warning?: string }) {
+export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | undefined; meta: string[]; faded?: boolean; warning?: string | undefined }) {
   return (
     <div data-testid="memory" data-key={props.memory.id} class={[item, "group flex items-start gap-2 px-3 py-2"]} data-faded={props.faded ? "" : undefined}>
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">

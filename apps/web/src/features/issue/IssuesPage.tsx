@@ -23,6 +23,7 @@ import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { TaskDetail } from "./TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const lookKey = "vibevalley.board.look";
 
@@ -75,7 +76,7 @@ export function IssuesPage(props: { rest: string }) {
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
-    await run(() => api.issue.update({ id: c.id, before }));
+    await run(() => api.issue.update(omitUndefined({ id: c.id, before })));
   };
 
   /** Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last. */

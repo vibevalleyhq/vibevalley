@@ -44,7 +44,7 @@ type Message = Record<string, unknown>;
 export class LiveCaptions {
   static readonly keep = 8;
   readonly turns: Caption[] = [];
-  agentState?: string;
+  agentState: string | undefined = undefined;
   /** Said once per turn. */
   onHeard?: (text: string) => void;
   /** The orchestrator's words of a turn, once the turn is over or talked over: what it got to say. */

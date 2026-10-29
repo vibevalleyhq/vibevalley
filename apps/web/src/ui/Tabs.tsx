@@ -7,7 +7,7 @@ import type { IconName } from "./icons";
 export interface TabItem<T extends string> {
   readonly value: T;
   readonly label: string;
-  readonly icon?: IconName;
+  readonly icon?: IconName | undefined;
   /** The tab is a link: selecting it goes there (the selection then follows the address). */
   readonly href?: string;
 }
@@ -32,7 +32,7 @@ export function Tabs<T extends string>(props: {
   onChange?: (v: T) => void;
   items: readonly TabItem<T>[];
   look?: TabsLook;
-  class?: string;
+  class?: string | undefined;
 }) {
   const look = () => looks[props.look ?? "pills"];
   return (

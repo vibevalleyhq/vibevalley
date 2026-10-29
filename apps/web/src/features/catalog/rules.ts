@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { outfitLabel, speciesLabel } from "../../ui/cast";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Picture {
   readonly name: string;
@@ -22,16 +23,18 @@ export interface Picture {
 export function picturesOf(manifest: Record<string, Record<string, unknown>>): Picture[] {
   const density = (manifest.map?.w as number) / 384;
   const art = (v: unknown) => (typeof v === "number" ? v / density : undefined);
-  return Object.entries(manifest).map(([name, m]) => ({
-    name,
-    w: art(m.w)!,
-    h: art(m.h)!,
-    ax: art(m.ax)!,
-    ay: art(m.ay)!,
-    ...(art(m.hx) !== undefined ? { hx: art(m.hx) } : {}),
-    ...(art(m.hy) !== undefined ? { hy: art(m.hy) } : {}),
-    ...(typeof m.sheet === "string" ? { sheet: m.sheet } : {}),
-  }));
+  return Object.entries(manifest).map(([name, m]) =>
+    omitUndefined({
+      name,
+      w: art(m.w)!,
+      h: art(m.h)!,
+      ax: art(m.ax)!,
+      ay: art(m.ay)!,
+      hx: art(m.hx),
+      hy: art(m.hy),
+      sheet: typeof m.sheet === "string" ? m.sheet : undefined,
+    }),
+  );
 }
 
 const isHelper = (name: string) => SpeciesValues.some((s) => name.startsWith(`${s}-`));

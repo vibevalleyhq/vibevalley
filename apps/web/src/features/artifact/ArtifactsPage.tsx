@@ -383,7 +383,7 @@ function Shown(props: { artifact: Artifact }) {
 }
 
 /** A reply under the message that announced it (or the version shown): what its maker is woken with. */
-function Reply(props: { at: { readonly channel: string; readonly number?: number }; version?: ArtifactVersion }) {
+function Reply(props: { at: { readonly channel: string; readonly number?: number }; version?: ArtifactVersion | undefined }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const send = async () => {

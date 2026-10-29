@@ -59,7 +59,7 @@ const emptyText: Record<Lane, string> = {
 export interface BoardProps {
   cards: BoardCard[];
   loading: boolean;
-  selected?: string;
+  selected?: string | undefined;
   older: boolean;
   ordering: Ordering;
   onOlder: () => void;
@@ -200,7 +200,7 @@ function LaneView(props: {
   );
 }
 
-function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: string) => void; drag: Drag; onPlace?: (moved: BoardCard) => void }) {
+function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: string) => void; drag: Drag; onPlace?: ((moved: BoardCard) => void) | undefined }) {
   const nameOf = useNameOf();
   const graphs = useGraphs();
   const look = () => cardLook(props.card, nameOf(), graphs(), Date.now());

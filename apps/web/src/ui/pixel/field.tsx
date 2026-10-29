@@ -8,7 +8,7 @@ import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
 
 /** `label` with a dotted underline that shows `tip` on hover; the bare label without one. */
-export function PxTip(props: { tip?: string; children: JSX.Element; class?: string }) {
+export function PxTip(props: { tip?: string | undefined; children: JSX.Element; class?: string }) {
   return (
     <Show when={props.tip} fallback={<span class={props.class}>{props.children}</span>}>
       <span title={props.tip} class={cx("cursor-help underline decoration-bark-600 decoration-dotted decoration-2", props.class)}>
@@ -29,7 +29,7 @@ export function PxField(props: {
   hint?: JSX.Element;
   /** What the field is for, shown when the label is hovered instead of a line under the field. */
   tip?: string;
-  error?: string;
+  error?: string | undefined;
   aside?: JSX.Element;
   required?: boolean;
   optional?: boolean;
@@ -197,7 +197,7 @@ export function PxTextArea(props: {
   label?: string;
   autoFocus?: boolean;
   /** What is selected when `value` is replaced from outside (a blank to fill in), as [start, end]; the cursor goes to the end without it. */
-  selection?: readonly [number, number];
+  selection?: readonly [number, number] | undefined;
   id?: string;
   ref?: (el: HTMLTextAreaElement) => void;
   class?: string;

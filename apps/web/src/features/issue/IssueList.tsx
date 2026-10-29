@@ -22,7 +22,7 @@ export type ListAdd = (text: string, where: { project?: string; agent?: string }
 export function IssueList(props: {
   cards: BoardCard[];
   loading: boolean;
-  selected?: string;
+  selected?: string | undefined;
   older: boolean;
   grouping: Grouping;
   ordering: Ordering;

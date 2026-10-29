@@ -242,7 +242,7 @@ export function OrchestratorScreen() {
 }
 
 /** The call as it looks in each phase, the line itself kept out: what OrchestratorScreen draws, and its stories. */
-export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; problem?: string; onKey: () => void }) {
+export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; problem?: string | undefined; onKey: () => void }) {
   const line = () => {
     switch (props.phase) {
       case "connecting":

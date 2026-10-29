@@ -44,7 +44,7 @@ export default defineConfig({
   // A worker is an ES module, so its own dynamic imports split into chunks (ui/code: one per language) instead of being
   // inlined into it.
   worker: { format: "es" },
-  plugins: lazyPlugins(() => [solid(), tailwindcss(), opening()]),
+  plugins: lazyPlugins(() => [solid(), tailwindcss(), opening()]) ?? [],
   server: { proxy: { "/api": { target: "http://127.0.0.1:8787", ws: true } } },
   // The rules' tests, pure, without a DOM (the Solid plugin would give them jsdom); test/ is Playwright's.
   test: { include: ["src/**/*.test.ts"], environment: "node" },

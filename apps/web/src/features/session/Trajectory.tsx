@@ -34,6 +34,7 @@ import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Quiet } from "../../ui/layout";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
@@ -120,7 +121,14 @@ interface RowSpec {
   markable: boolean;
 }
 
-export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; onMarkWrong?: MarkWrong; head?: JSX.Element }) {
+export function Trajectory(props: {
+  steps: SessionEvent[];
+  now: number;
+  asked?: string | undefined;
+  working?: boolean;
+  onMarkWrong?: MarkWrong | undefined;
+  head?: JSX.Element;
+}) {
   const [query, setQuery] = createSignal("");
   const [open, setOpen] = createSignal<ReadonlySet<number>>(new Set());
   const [marked, setMarked] = createSignal<number>();
@@ -162,13 +170,15 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
       for (const step of round.asked ? [round.asked, ...round.steps] : round.steps) {
         const tag = tagOf(step, props.asked, step.seq === firstAsked);
         if (q && !haystack(step, tag).includes(q)) continue;
-        out.push({
-          step,
-          tag,
-          gutter: first ? (round.asked ? t("web.session.trajectory.round", { n: turn }) : t("web.session.trajectory.earlier")) : undefined,
-          when: first ? ago((round.asked ?? round.steps[0]!).time, props.now) : undefined,
-          markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
-        });
+        out.push(
+          omitUndefined({
+            step,
+            tag,
+            gutter: first ? (round.asked ? t("web.session.trajectory.round", { n: turn }) : t("web.session.trajectory.earlier")) : undefined,
+            when: first ? ago((round.asked ?? round.steps[0]!).time, props.now) : undefined,
+            markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
+          }),
+        );
         first = false;
       }
     }
@@ -419,7 +429,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
 }
 
 /** 这一轮做错了 floats over what began the round. */
-function Markable(props: { step: number; send: MarkWrong; file?: string; onMarked: (file: string) => void; children: JSX.Element }) {
+function Markable(props: { step: number; send: MarkWrong; file?: string | undefined; onMarked: (file: string) => void; children: JSX.Element }) {
   const [writing, setWriting] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [want, setWant] = createSignal("");

@@ -39,7 +39,7 @@ function Form(props: {
   onSubmit: () => Promise<void>;
   onCancel: () => void;
   busy: boolean;
-  error?: string;
+  error?: string | undefined;
   ready?: boolean;
   children: JSX.Element;
 }) {

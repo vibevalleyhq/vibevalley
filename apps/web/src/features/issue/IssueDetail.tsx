@@ -44,9 +44,9 @@ import { createSessionEvents } from "../session";
 export function IssueDetail(props: {
   issue: Issue;
   sessions: Session[];
-  session?: Session;
+  session?: Session | undefined;
   onClose: (session: Session, review: boolean) => void;
-  onTask?: () => void;
+  onTask?: (() => void) | undefined;
 }) {
   const graphs = useGraphs();
   const now = useNow();

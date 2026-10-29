@@ -22,6 +22,7 @@ import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
 import { type Answer, graphs, useGraphChanges } from "../../features/task";
 import { useAgent, useWorkAgents } from "../../base/agents";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   splitting: ["#d5dcd7", "#46301d"],
@@ -93,7 +94,7 @@ export function TaskBoard() {
   );
 }
 
-function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }) {
+function NewTask(props: { onCancel?: (() => void) | undefined; onSplit: (id: string) => void }) {
   const core = useCore();
   const frames = useFrames();
   const projectsQuery = useProjects();
@@ -115,7 +116,7 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
   const submit = async () => {
     if (!ok()) return;
     setBusy(true);
-    const answer = await graphs.split({ goal: goal(), project: where(), agent: splitter() === "auto" ? undefined : splitter() });
+    const answer = await graphs.split(omitUndefined({ goal: goal(), project: where(), agent: splitter() === "auto" ? undefined : splitter() }));
     setBusy(false);
     const id = /（(p\d+)）/.exec(answer.text)?.[1];
     if (answer.ok && id) props.onSplit(id);
@@ -339,7 +340,7 @@ const nodeTone: Record<TaskState, { card: string; edge?: string; tag: string; in
   skipped: { card: "#eedcb2", tag: "#e2c995", ink: "#67482d", opacity: 0.6 },
 };
 
-function SmallBtn(props: { label: string; onClick?: () => void; primary?: boolean }) {
+function SmallBtn(props: { label: string; onClick?: (() => void) | undefined; primary?: boolean }) {
   return (
     <button
       type="button"
@@ -585,7 +586,7 @@ const when = (at: number) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
-function TaskLog(props: { graph: TaskGraph; only?: string; onAll: () => void }) {
+function TaskLog(props: { graph: TaskGraph; only?: string | undefined; onAll: () => void }) {
   // Read when shown, and again whenever the graph changes: something happened.
   const events = useQuery(() => ({
     queryKey: ["graph-events", props.graph.id, JSON.stringify(props.graph)],

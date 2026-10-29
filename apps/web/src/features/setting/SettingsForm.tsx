@@ -26,6 +26,7 @@ import { Hint, Tip } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
 import { currentLocale } from "@vibevalley/i18n";
 import { Quiet, SecretInput, Toggle } from "../../ui/layout";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export type SettingsPart = "deepseek" | "memory";
 
@@ -35,7 +36,7 @@ const sourceAddress: Record<MemorySourceKind, string> = { nowledge: "http://127.
 /** One memory source as the form edits it, from what is saved until it is saved again. */
 interface SourceDraft {
   readonly kind: MemorySourceKind;
-  readonly saved?: MemorySource;
+  readonly saved: MemorySource | undefined;
   url: string;
   user: string;
   key: string;
@@ -110,7 +111,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
   };
 
   const submit = async () => {
-    const update: SettingsUpdate = {
+    const update: SettingsUpdate = omitUndefined({
       // A key removed and not typed again goes as "" (the server forgets it).
       deepseekApiKey: deepseek().trim() ? deepseek().trim() : removing() ? "" : undefined,
       memorySources: !sources().some((d) => d.changed)
@@ -127,7 +128,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
               ...(d.user.trim() ? { user: d.user.trim() } : {}),
               ...(d.key.trim() ? { key: d.key.trim() } : d.keyCleared ? { key: "" } : {}),
             })),
-    };
+    });
     setBusy(true);
     setError(undefined);
     try {
