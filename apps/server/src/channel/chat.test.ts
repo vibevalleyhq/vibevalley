@@ -15,7 +15,7 @@ import { Core } from "@/core/core.ts";
 import { newsOf } from "@/session/session.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
 import { layer as projection } from "@/projection/projection.ts";
-import { summaryOf } from "@/session/rules.ts";
+import { summaryOf } from "@/session/report.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { until, waitFor } from "@/testing/until.ts";

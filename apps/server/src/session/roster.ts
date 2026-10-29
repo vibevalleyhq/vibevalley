@@ -1,6 +1,6 @@
 // Finding and changing a session in the core state. Nothing here changes what it is given.
 
-import type { WorkspaceState, PhaseWorking, Session } from "@vibevalley/protocol";
+import type { WorkspaceState, PhaseWorking, Session, Doing } from "@vibevalley/protocol";
 
 export const sessionOf = (state: WorkspaceState, id: string) => state.sessions.find((h) => h.id === id);
 
@@ -25,3 +25,5 @@ export function whileWorking(state: WorkspaceState, id: string, change: (p: Phas
   if (phase?._tag !== "working") return [state, false];
   return withSession(state, id, (h) => ({ ...h, phase: change(phase) }));
 }
+
+export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });

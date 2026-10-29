@@ -9,7 +9,7 @@ import type { Channels } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
 import type { WorkplaceRelease } from "@/project/shapes.ts";
-import { chooseAgent } from "@/runtime/rules.ts";
+import { chooseAgent } from "@/runtime/fit.ts";
 import type { Runtimes } from "@/runtime/runtime.ts";
 import type { Hired, HireOptions, Sessions } from "@/session/session.ts";
 import { isForOrchestrator } from "./status.ts";

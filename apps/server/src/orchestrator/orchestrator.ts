@@ -40,7 +40,9 @@ import { Setting } from "@/setting/setting.ts";
 import { Tasks } from "@/task/task.ts";
 import { Tools } from "@/tool/tool.ts";
 import { channelLine } from "@/tool/prompts.ts";
-import { deepseekModel, intake, orchestratorInboxLines, orchestratorModel, quotaText, situationDelta, type Source } from "./rules.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import { intake, type Source } from "./intake.ts";
+import { orchestratorInboxLines, quotaText, situationDelta } from "./situation.ts";
 
 const keepEvents = 1000;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */

@@ -65,7 +65,8 @@ import { type Hired, type HireOptions, NotRecorded, type SessionNews, Sessions }
 import { type Due, Crons } from "@/cron/cron.ts";
 import { IssueSessions } from "./sessions.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
-import { conflictBrief, parseAnswer } from "@/session/rules.ts";
+import { conflictBrief } from "@/session/takeIn.ts";
+import { parseAnswer } from "@/session/report.ts";
 import * as S from "@vibevalley/protocol/schema";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";

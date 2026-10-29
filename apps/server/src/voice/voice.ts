@@ -24,7 +24,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { orchestratorModel } from "@/orchestrator/rules.ts";
+import { orchestratorModel } from "@/orchestrator/model.ts";
 import { Notices } from "@/notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 import { callbackLog } from "@/base/log.ts";

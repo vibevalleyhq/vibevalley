@@ -7,7 +7,6 @@ import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";
-
 describe("Caller", () => {
   it.effect("keeps what came before its reader, then streams until it ends", () =>
     Effect.gen(function* () {

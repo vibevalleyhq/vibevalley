@@ -1,41 +1,12 @@
-import { t } from "@vibevalley/i18n";
-// The orchestrator's pure rules: where an input came from, how the farm reads to it and what changed
-// in it, what the patrol finds, and how a model answer's tokens are worded.
+// How the farm reads to the orchestrator and what changed in it since its last turn: the situation's lines, the
+// runtimes' quota, the inbox.
 
-import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts";
-import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
+import { lineWords, quotaWords, situationWords } from "./prompts.ts";
+import { ownerId, type RuntimeInfo } from "@vibevalley/protocol";
 import { head } from "@/base/clip.ts";
 import { type InboxMessage } from "@/channel/wake.ts";
 import { messageLine } from "@/channel/prompts.ts";
 import { quotaLow, yuan } from "@/runtime/money.ts";
-
-/** The model the orchestrator answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */
-export const orchestratorModel = "vibevalley-orchestrator";
-export const chatCompletionsPath = "/v1/chat/completions";
-
-/** Who woke the orchestrator: what the input's words are worth. */
-export type Source =
-  /** The owner's words alone: in a channel, on a call, over chat/completions, from a connector. */
-  | "owner"
-  /** A channel or a thread with a helper's words in it. */
-  | "chat"
-  | "issue"
-  | "cron"
-  | "patrol"
-  | "graph";
-
-/** How an input of each source goes in. head: its first words, fixed per source so that the conversation's prefix stays
- * the same, and how its log names the round. now: it joins the run under way (the owner waits on it); else it waits until
- * the run would stop. trigger: what its run is started by, unless the input brings its own. */
-export const intake: Readonly<Record<Source, { readonly head: string; readonly now: boolean; readonly trigger: RunTriggerKind }>> = {
-  owner: { head: sourceHead.owner, now: true, trigger: "comment" },
-  chat: { head: sourceHead.chat, now: false, trigger: "comment" },
-  issue: { head: sourceHead.issue, now: false, trigger: "issue" },
-  cron: { head: sourceHead.cron, now: false, trigger: "cron" },
-  // The patrol's and the task graphs' lines are the farm's own.
-  patrol: { head: sourceHead.patrol, now: false, trigger: "runtime" },
-  graph: { head: sourceHead.graph, now: false, trigger: "runtime" },
-};
 
 export function quotaText(info: RuntimeInfo | undefined): string {
   const budget = info?.settings.dailyBudget ?? 0;
@@ -47,15 +18,6 @@ export function quotaText(info: RuntimeInfo | undefined): string {
     if (budget > 0) today += quotaWords.budget(yuan(budget));
   }
   return quotaWords.line(info?.quota?.text, low, today);
-}
-
-/** The orchestrator answers only on DeepSeek: its profile's model as DeepSeek names it. */
-export function deepseekModel(configured: string, fallback: string): string {
-  if (configured === "") return fallback;
-  const slash = configured.indexOf("/");
-  if (slash < 0) return configured;
-  if (configured.slice(0, slash) === "deepseek") return configured.slice(slash + 1);
-  throw new Error(t("server.orchestrator.onlyDeepseek", { configured }));
 }
 
 interface SituationLine {

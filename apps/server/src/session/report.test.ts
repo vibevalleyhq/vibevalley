@@ -6,25 +6,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "@/runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
 import { MergeFailure } from "@/project/shapes.ts";
-import {
-  checksOf,
-  conflictBrief,
-  conflictOf,
-  jobBreak,
-  noRoom,
-  notTakenIn,
-  parseAnswer,
-  questionsOf,
-  readReport,
-  reportVerdict,
-  sessionName,
-  summaryOf,
-  whoMakesRoom,
-  withRecall,
-} from "./rules.ts";
+import { checksOf, parseAnswer, questionsOf, readReport, reportVerdict, summaryOf } from "./report.ts";
+import { conflictBrief, conflictOf, notTakenIn } from "./takeIn.ts";
+import { jobBreak, withRecall } from "./briefing.ts";
+import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
 import { shellCommand } from "./shell.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
-
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>

@@ -60,7 +60,7 @@ import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/
 import { Issues } from "@/issue/issue.ts";
 import { Projects } from "@/project/project.ts";
 import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
-import { chooseAgent } from "@/runtime/rules.ts";
+import { chooseAgent } from "@/runtime/fit.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
 import {
   acceptancePassedText,

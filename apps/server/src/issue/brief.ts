@@ -2,7 +2,7 @@
 // read back from its report (findings, a pull request's conclusion).
 
 import { t } from "@vibevalley/i18n";
-import { reportVerdict } from "@/session/rules.ts";
+import { reportVerdict } from "@/session/report.ts";
 import type { Deliverable, Issue } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";

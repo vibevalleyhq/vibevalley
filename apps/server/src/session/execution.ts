@@ -1,9 +1,4 @@
 import { t } from "@vibevalley/i18n";
-// The run of an in-process agent (the orchestrator's) and its log. One agent loop
-// (agent_start to agent_end) is one run: it starts when the loop takes its first input and ends with the loop; a loop
-// that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
-// An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
-
 import { Inconsistent } from "@/errors.ts";
 import type { CoreEvent } from "@vibevalley/agent/brain";
 import { messageText } from "@vibevalley/agent/messages";
@@ -14,6 +9,10 @@ import type { ToolStart } from "./facts.ts";
 import type { ToolResult } from "@vibevalley/agent/core/loop";
 import type { Journal } from "./journal.ts";
 import type { NotRecorded, RunStore } from "./session.ts";
+// The run of an in-process agent (the orchestrator's) and its log. One agent loop
+// (agent_start to agent_end) is one run: it starts when the loop takes its first input and ends with the loop; a loop
+// that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
+// An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
 

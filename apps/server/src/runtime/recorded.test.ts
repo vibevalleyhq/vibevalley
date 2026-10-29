@@ -3,7 +3,8 @@ import { sampleAgent } from "@/testing/agents.ts";
 import { factsOf } from "@/agent/seed.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
-import { agentProblems, chooseAgent, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
+import { agentProblems, chooseAgent } from "./fit.ts";
+import { moneyStop, quotaLeft, quotaOf, quotaText } from "./quota.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("runtime");

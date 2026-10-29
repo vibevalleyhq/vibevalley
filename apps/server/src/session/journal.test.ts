@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tempDir } from "@vibevalley/testkit/temp";
-
 import { join } from "node:path";
 import type { SessionEvent } from "@vibevalley/protocol";
 import { afterEach, describe, expect } from "vite-plus/test";
@@ -9,7 +8,6 @@ import { Effect } from "effect";
 import { TestClock } from "effect/testing";
 import { readJournal, Trajectories } from "./journal.ts";
 import { timeHere, wallTime } from "@/base/time.ts";
-
 const open: Trajectories[] = [];
 afterEach(() => {
   for (const t of open.splice(0)) t.close();

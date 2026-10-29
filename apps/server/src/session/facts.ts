@@ -1,17 +1,18 @@
 import { t } from "@vibevalley/i18n";
-// A session's events read as facts and journal steps. Pure: it reads the session as
-// the core state has it and the session's own bookkeeping, and changes nothing.
-
 import { relative } from "node:path";
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
 import type { FactIn } from "@/core/core.ts";
 import type { Session, SessionAction, SessionEventType, Spent, ToolAction, SessionId } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { doingOf, failureText, jobBreak, recalledIn } from "./rules.ts";
+import { doingOf } from "./roster.ts";
+import { failureText } from "./report.ts";
+import { jobBreak, recalledIn } from "./briefing.ts";
 import { clip } from "@/base/clip.ts";
 import type { Rate } from "@/runtime/price.ts";
 import { shellCommand } from "./shell.ts";
+// A session's events read as facts and journal steps. Pure: it reads the session as
+// the core state has it and the session's own bookkeeping, and changes nothing.
 
 /** The bubble over a session's head holds about this much. */
 const labelMax = 40;
