@@ -5,21 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import {
-  type Agent,
-  blockBulleted,
-  blockCode,
-  blockDivider,
-  blockHeading,
-  blockImage,
-  blockIssueRef,
-  blockMemoryItem,
-  blockNumbered,
-  blockQuote,
-  blockTodo,
-  ownerId,
-  type TextSpan,
-} from "@vibevalley/protocol";
+import { type Agent, ownerId, type TextSpan } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { BlockEditor, type EditBlock } from "./editor";
 import { hexColor, swatches } from "../../ui/cast";
@@ -144,20 +130,20 @@ export function BlocksView(props: { id: string; onEditor?: (editor: BlockEditor)
   );
 }
 
-const barHeight = (type: string) => (type === blockDivider ? 16 : type === blockHeading ? 28 : 20);
+const barHeight = (type: string) => (type === "divider" ? 16 : type === "heading" ? 28 : 20);
 
 function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent }) {
   const r = () => props.row;
   const writer = () => (r().updatedBy === ownerId ? t("web.artifact.blocks.owner") : (props.agent?.name ?? r().updatedBy));
   const mark = (): JSX.Element | undefined => {
     switch (r().type) {
-      case blockBulleted:
+      case "bulleted":
         return "•";
-      case blockNumbered:
+      case "numbered":
         return `${r().number ?? 1}.`;
-      case blockMemoryItem:
+      case "memory_item":
         return <span class="text-xs text-muted">{t("web.artifact.blocks.memoryItem")}</span>;
-      case blockTodo:
+      case "todo":
         return (
           <Checkbox
             class="mt-1"
@@ -170,24 +156,15 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent }) {
         return undefined;
     }
   };
-  const box = () =>
-    r().type === blockQuote ? "border-l-[3px] border-line pl-3" : r().type === blockCode ? "rounded-md bg-code-bg px-3 py-2 text-code-ink" : "";
+  const box = () => (r().type === "quote" ? "border-l-[3px] border-line pl-3" : r().type === "code" ? "rounded-md bg-code-bg px-3 py-2 text-code-ink" : "");
   const kind = () =>
-    !knownTypes.has(r().type)
-      ? "unknown"
-      : r().type === blockDivider
-        ? "divider"
-        : r().type === blockImage
-          ? "image"
-          : r().type === blockIssueRef
-            ? "issue"
-            : "text";
+    !knownTypes.has(r().type) ? "unknown" : r().type === "divider" ? "divider" : r().type === "image" ? "image" : r().type === "issue_ref" ? "issue" : "text";
   return (
     <div
       data-block={r().block.id}
       data-type={r().type}
       data-writing={r().writing ? "" : undefined}
-      class={["flex items-start pb-0.5", r().type === blockHeading ? "pt-2.5" : "pt-0.5"]}
+      class={["flex items-start pb-0.5", r().type === "heading" ? "pt-2.5" : "pt-0.5"]}
     >
       <span class="w-[22px] shrink-0 pt-[3px]">
         <Show when={r().showFace}>
@@ -243,18 +220,18 @@ function Placeholder(props: { text: string }) {
 /** A block's whole type: size, line height and weight from one place, so no two font sizes meet on one element. */
 function typeStyle(r: Row) {
   switch (r.type) {
-    case blockHeading:
+    case "heading":
       return (r.attrs.level ?? 1) <= 1
         ? "text-2xl leading-8 font-semibold"
         : r.attrs.level === 2
           ? "text-xl leading-7 font-semibold"
           : "text-lg leading-7 font-semibold";
-    case blockCode:
+    case "code":
       return "font-mono text-sm leading-6";
-    case blockQuote:
+    case "quote":
       return "text-base leading-6 text-muted";
     default:
-      return r.type === blockTodo && r.attrs.checked ? "text-base leading-6 text-muted line-through" : "text-base leading-6";
+      return r.type === "todo" && r.attrs.checked ? "text-base leading-6 text-muted line-through" : "text-base leading-6";
   }
 }
 
@@ -300,7 +277,7 @@ function BlockField(props: { editor: BlockEditor; row: Row }) {
           onClick={() => setEditing(true)}
           class={["min-h-6 cursor-text break-words whitespace-pre-wrap", typeStyle(props.row)]}
         >
-          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? t("web.artifact.blocks.heading") : " "}</span>}>
+          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === "heading" ? t("web.artifact.blocks.heading") : " "}</span>}>
             <Marked spans={props.row.spans} />
           </Show>
         </div>
@@ -358,7 +335,7 @@ function Field(props: { editor: BlockEditor; row: Row; focusNow: boolean; onLeav
       aria-label={t("web.artifact.blocks.block", { id: b().id })}
       rows={1}
       value={props.row.text}
-      placeholder={props.row.type === blockHeading ? t("web.artifact.blocks.heading") : undefined}
+      placeholder={props.row.type === "heading" ? t("web.artifact.blocks.heading") : undefined}
       spellcheck="false"
       onFocus={() => props.editor.focus(b(), true)}
       onBlur={() => {

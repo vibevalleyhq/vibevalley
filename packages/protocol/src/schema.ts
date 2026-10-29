@@ -346,11 +346,13 @@ export const Conflict: Codec<T.Conflict> = Schema.Struct({
 
 export const SessionAction: Codec<T.SessionAction> = Schema.Literals(T.SessionActionValues);
 
-export const Doing: Codec<T.Doing> = Schema.Struct({
+const doingFields = {
   action: SessionAction,
   label: Schema.String,
   actionText: Schema.optionalKey(Schema.String),
-});
+};
+
+export const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
 
 export const PhaseArriving: Codec<T.PhaseArriving> = Schema.Struct({
   _tag: Schema.Literal("arriving"),
@@ -413,12 +415,7 @@ export const SessionGraph: Codec<T.SessionGraph> = Schema.Struct({
   task: Schema.optionalKey(Schema.String),
 });
 
-export const ActionStep: Codec<T.ActionStep> = Schema.Struct({
-  at: Schema.Number,
-  action: SessionAction,
-  label: Schema.String,
-  actionText: Schema.optionalKey(Schema.String),
-});
+export const ActionStep: Codec<T.ActionStep> = Schema.Struct({ at: Schema.Number, ...doingFields });
 
 export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({
   station: Schema.Number,
@@ -2008,10 +2005,9 @@ export const ChooseTitleRequest: Codec<T.ChooseTitleRequest> = Schema.Struct({
   tier: Schema.optionalKey(Schema.Number),
 });
 
-export const RenewRequest: Codec<T.RenewRequest> = Schema.Struct({
-  channel: Schema.String,
-  uid: Schema.String,
-});
+const renewRequestFields = { channel: Schema.String, uid: Schema.String };
+
+export const RenewRequest: Codec<T.RenewRequest> = Schema.Struct(renewRequestFields);
 
 export const DictateRequest: Codec<T.DictateRequest> = Schema.Struct({
   audio: Schema.String,
@@ -2034,11 +2030,7 @@ export const VoiceHeard: Codec<T.VoiceHeard> = Schema.Struct({
   sendKey: Schema.optionalKey(Schema.String),
 });
 
-export const StartRequest: Codec<T.StartRequest> = Schema.Struct({
-  channel: Schema.String,
-  uid: Schema.String,
-  about: Schema.optionalKey(Schema.String),
-});
+export const StartRequest: Codec<T.StartRequest> = Schema.Struct({ ...renewRequestFields, about: Schema.optionalKey(Schema.String) });
 
 export const VerifyRequest: Codec<T.VerifyRequest> = Schema.Struct({
   code: Schema.String,
@@ -2103,11 +2095,13 @@ export const BlockAttrs: Codec<T.BlockAttrs> = Schema.Struct({
   memoryId: Schema.optionalKey(Schema.String),
 });
 
+export const BlockType: Codec<T.BlockType> = Schema.Literals(T.BlockTypeValues);
+
 const blockInputFields = {
   id: Schema.String,
   parentId: Schema.optionalKey(Schema.String),
   orderKey: Schema.String,
-  type: Schema.String,
+  type: BlockType,
   attrs: BlockAttrs,
   text: Schema.mutable(Schema.Array(TextSpan)),
 };
@@ -2154,7 +2148,7 @@ export const BlockOpSetAttrs: Codec<T.BlockOpSetAttrs> = Schema.Struct({
 export const BlockOpSetType: Codec<T.BlockOpSetType> = Schema.Struct({
   op: Schema.Literal("set_type"),
   blockId: Schema.String,
-  type: Schema.String,
+  type: BlockType,
   attrs: BlockAttrs,
 });
 

@@ -2,22 +2,7 @@
 // through an edit, list numbers and the line-start shortcuts. Order keys are the shared rule (keyBetween); the ops' rules
 // stay the server's.
 
-import {
-  blockBulleted,
-  blockCode,
-  blockDivider,
-  blockHeading,
-  blockImage,
-  blockIssueRef,
-  blockMemoryItem,
-  blockNumbered,
-  blockParagraph,
-  blockQuote,
-  blockTodo,
-  type BlockAttrs,
-  type SpanMarks,
-  type TextSpan,
-} from "@vibevalley/protocol";
+import { type BlockAttrs, type BlockType, BlockTypeValues, type SpanMarks, type TextSpan } from "@vibevalley/protocol";
 
 /** The server counts offsets in code points; a string's index is in UTF-16 units. */
 export const codePointOffset = (text: string, utf16: number) => [...text.slice(0, Math.min(Math.max(0, utf16), text.length))].length;
@@ -86,33 +71,24 @@ export function editSpans(old: readonly TextSpan[], text: string): TextSpan[] {
   return normalSpans([...head, { t: typed, marks }, ...tail]);
 }
 
-export const textTypes: ReadonlySet<string> = new Set([
-  blockParagraph,
-  blockHeading,
-  blockBulleted,
-  blockNumbered,
-  blockTodo,
-  blockQuote,
-  blockCode,
-  blockMemoryItem,
-]);
-export const knownTypes: ReadonlySet<string> = new Set([...textTypes, blockDivider, blockImage, blockIssueRef]);
-export const listTypes: ReadonlySet<string> = new Set([blockBulleted, blockNumbered, blockTodo]);
+export const textTypes: ReadonlySet<string> = new Set(["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code", "memory_item"]);
+export const knownTypes: ReadonlySet<string> = new Set(BlockTypeValues);
+export const listTypes: ReadonlySet<string> = new Set(["bulleted", "numbered", "todo"]);
 
 export const hasText = (type: string) => textTypes.has(type);
 
 /** A paragraph that starts with Markdown for another block: its type, its attrs, and how much of the start to drop. */
-export function markdownShortcut(text: string): { type: string; attrs: BlockAttrs; strip: number } | undefined {
+export function markdownShortcut(text: string): { type: BlockType; attrs: BlockAttrs; strip: number } | undefined {
   const heading = /^(#{1,3}) /.exec(text);
-  if (heading) return { type: blockHeading, attrs: { level: heading[1]!.length }, strip: heading[0].length };
+  if (heading) return { type: "heading", attrs: { level: heading[1]!.length }, strip: heading[0].length };
   const todo = /^\[( |x)?\] /.exec(text);
-  if (todo) return { type: blockTodo, attrs: { checked: todo[1] === "x" }, strip: todo[0].length };
+  if (todo) return { type: "todo", attrs: { checked: todo[1] === "x" }, strip: todo[0].length };
   const bullet = /^[-*] /.exec(text);
-  if (bullet) return { type: blockBulleted, attrs: {}, strip: bullet[0].length };
+  if (bullet) return { type: "bulleted", attrs: {}, strip: bullet[0].length };
   const number = /^\d+[.)] /.exec(text);
-  if (number) return { type: blockNumbered, attrs: {}, strip: number[0].length };
-  if (text.startsWith("> ")) return { type: blockQuote, attrs: {}, strip: 2 };
-  if (text.startsWith("```")) return { type: blockCode, attrs: {}, strip: text.startsWith("``` ") ? 4 : 3 };
+  if (number) return { type: "numbered", attrs: {}, strip: number[0].length };
+  if (text.startsWith("> ")) return { type: "quote", attrs: {}, strip: 2 };
+  if (text.startsWith("```")) return { type: "code", attrs: {}, strip: text.startsWith("``` ") ? 4 : 3 };
   return undefined;
 }
 
@@ -123,9 +99,9 @@ export function listNumbers(ordered: readonly { id: string; parentId?: string; t
   const out = new Map<string, number>();
   for (const b of ordered) {
     const before = last.get(b.parentId);
-    const n = b.type === blockNumbered ? (before && before[0] === blockNumbered ? before[1] + 1 : 1) : 0;
+    const n = b.type === "numbered" ? (before && before[0] === "numbered" ? before[1] + 1 : 1) : 0;
     last.set(b.parentId, [b.type, n]);
-    if (b.type === blockNumbered) out.set(b.id, n);
+    if (b.type === "numbered") out.set(b.id, n);
   }
   return out;
 }

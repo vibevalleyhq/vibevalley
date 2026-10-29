@@ -3,7 +3,19 @@ import { list, t } from "@vibevalley/i18n";
 // their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
 // its seq goes up in order. Part of Artifacts (artifact.ts), which owns the artifact's row.
 
-import type { Agent, Block, BlockAttrs, BlockInput, BlockAck, BlockCreate, BlockUpdate, BlockOpResult, TextSpan, BlockSubmit } from "@vibevalley/protocol";
+import type {
+  Agent,
+  Block,
+  BlockAttrs,
+  BlockInput,
+  BlockType,
+  BlockAck,
+  BlockCreate,
+  BlockUpdate,
+  BlockOpResult,
+  TextSpan,
+  BlockSubmit,
+} from "@vibevalley/protocol";
 import { Clock, Effect, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Db } from "../base/db.ts";
@@ -42,7 +54,7 @@ export interface BlocksShape {
   readonly append: (
     id: string,
     actor: string,
-    type: string,
+    type: BlockType,
     attrs: BlockAttrs,
     text: string,
   ) => Effect.Effect<[Block | undefined, BlockOpResult | undefined], ApiError>;
@@ -64,7 +76,8 @@ export interface BlocksShape {
 }
 
 /** The block kinds an agent appends; the editor has more (dividers, images), which an agent does not write. */
-const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
+const appendTypes: readonly BlockType[] = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
+const isAppendType = (type: string): type is BlockType => (appendTypes as readonly string[]).includes(type);
 
 const blockOf = (r: qb.ArtifactBlocksResult): Block =>
   wire({
@@ -72,7 +85,8 @@ const blockOf = (r: qb.ArtifactBlocksResult): Block =>
     artifactId: r.artifact_id,
     ...(r.parent_id !== null ? { parentId: r.parent_id } : {}),
     orderKey: r.order_key,
-    type: r.type,
+    // Written only through BlockOp, whose type the wire decodes as a BlockType.
+    type: r.type as BlockType,
     attrs: attrsOf(r.attrs),
     text: storedSpans(r.spans) ?? [],
     rev: r.rev,
@@ -206,7 +220,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
 
     const one = (ack: BlockAck, id: string): [Block | undefined, BlockOpResult | undefined] => [blockIn(ack, id), ack.results[0]];
 
-    const append = Effect.fn("Blocks.append")(function* (artifact: string, actor: string, type: string, attrs: BlockAttrs, text: string) {
+    const append = Effect.fn("Blocks.append")(function* (artifact: string, actor: string, type: BlockType, attrs: BlockAttrs, text: string) {
       const last = new Page(artifact, actor, 0, yield* blocksOf(artifact)).children("").at(-1)?.orderKey ?? "";
       const b: BlockInput = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
       return one(yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
@@ -222,7 +236,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
 
     const appendBlock = Effect.fn("Blocks.appendBlock")(function* (artifact: string, actor: string, req: BlockCreate) {
       const type = (req.type ?? "").trim() || "paragraph";
-      if (!appendTypes.includes(type)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
+      if (!isAppendType(type)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
       const level = req.level !== undefined && req.level >= 1 && req.level <= 3 ? Math.trunc(req.level) : 2;
       const attrs: BlockAttrs = type === "heading" ? { level } : type === "todo" ? { checked: false } : {};
       const [, r] = yield* append(artifact, actor, type, attrs, req.text);
@@ -285,7 +299,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
     const demoWrite = Effect.fn("Blocks.demoWrite")(function* (artifact: string, writer: string, headings: string[], section: number) {
       for (const text of demoParagraphs(section)) {
-        const b = { id: newId(), type: "paragraph", attrs: {}, text: [] };
+        const b: Omit<BlockInput, "orderKey"> = { id: newId(), type: "paragraph", attrs: {}, text: [] };
         let rev = yield* demoInsert(artifact, writer, b, { headings, section });
         const chars = Array.from(text);
         for (let n = 1; n <= demoPieces; n++) {
@@ -303,7 +317,12 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       function* (artifact: string, writers: string[]) {
         const headings: string[] = [];
         for (const [i, w] of writers.entries()) {
-          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", t(`server.artifact.demo.${i as DemoSection}.heading`)) };
+          const b: Omit<BlockInput, "orderKey"> = {
+            id: newId(),
+            type: "heading",
+            attrs: { level: 2 },
+            text: spansOf("heading", t(`server.artifact.demo.${i as DemoSection}.heading`)),
+          };
           yield* demoInsert(artifact, w, b);
           headings.push(b.id);
           yield* wait(0.5);

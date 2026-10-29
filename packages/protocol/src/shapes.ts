@@ -79,35 +79,26 @@ export const sessionMcpServers = "mcpServers";
 
 export const sessionDisallowedTools = "disallowedTools";
 
-export const blockParagraph = "paragraph";
-
-/** Attrs.Level 1 to 3. */
-export const blockHeading = "heading";
-
-export const blockBulleted = "bulleted";
-
-/** Its number is not stored: the client counts the run of numbered siblings it is in. */
-export const blockNumbered = "numbered";
-
-/** Attrs.Checked. */
-export const blockTodo = "todo";
-
-export const blockQuote = "quote";
-
-/** Attrs.Language; its text has no marks. */
-export const blockCode = "code";
-
-/** No text. */
-export const blockDivider = "divider";
-
-/** Attrs.Src, Width, Height, Alt; no text. */
-export const blockImage = "image";
-
-/** Attrs.IssueID; no text. */
-export const blockIssueRef = "issue_ref";
-
-/** Attrs.MemoryID, and text. */
-export const blockMemoryItem = "memory_item";
+/**
+ * What a block is, which says what its attrs and text hold: heading (Attrs.Level 1 to 3), todo (Attrs.Checked), code
+ * (Attrs.Language; its text has no marks), divider (no text), image (Attrs.Src, Width, Height, Alt; no text), issue_ref
+ * (Attrs.IssueID; no text), memory_item (Attrs.MemoryID, and text). A numbered block's number is not stored: the client
+ * counts the run of numbered siblings it is in.
+ */
+export const BlockTypeValues = [
+  "paragraph",
+  "heading",
+  "bulleted",
+  "numbered",
+  "todo",
+  "quote",
+  "code",
+  "divider",
+  "image",
+  "issue_ref",
+  "memory_item",
+] as const;
+export type BlockType = (typeof BlockTypeValues)[number];
 
 /** The line the server prints on stdout once it listens, with --ready-json (the desktop shell waits for it). */
 export interface ServerReady {
@@ -481,11 +472,8 @@ export interface SessionGraph {
   task?: string;
 }
 
-export interface ActionStep {
+export interface ActionStep extends Doing {
   at: number;
-  action: SessionAction;
-  label: string;
-  actionText?: string;
 }
 
 export interface SessionPlay {
@@ -2470,9 +2458,7 @@ export interface VoiceHeard {
   sendKey?: string;
 }
 
-export interface StartRequest {
-  channel: string;
-  uid: string;
+export interface StartRequest extends RenewRequest {
   /** The call answers a ring: what rang, which the orchestrator says first instead of the greeting. */
   about?: string;
 }
@@ -2546,7 +2532,7 @@ export interface BlockInput {
   id: string;
   parentId?: string;
   orderKey: string;
-  type: string;
+  type: BlockType;
   attrs: BlockAttrs;
   text: TextSpan[];
 }
@@ -2602,7 +2588,7 @@ export interface BlockOpSetAttrs {
 export interface BlockOpSetType {
   op: "set_type";
   blockId: string;
-  type: string;
+  type: BlockType;
   attrs: BlockAttrs;
 }
 
