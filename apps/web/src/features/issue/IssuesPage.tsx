@@ -181,7 +181,12 @@ function Detail(props: {
   onClose: (issue: Issue, session: Session, review: boolean) => void;
 }) {
   const card = createMemo<BoardCard | undefined>(
-    (last) => props.cards().find((c) => c.id === props.id || (c.kind === "issue" && issueIs(c.issue, props.id))) ?? last,
+    // By its id, a session of it, or its number (#12 in a message links to /issues/12).
+    (last) =>
+      props
+        .cards()
+        .find((c) => c.id === props.id || ((c.kind === "issue" || c.kind === "todo") && (issueIs(c.issue, props.id) || String(c.issue.number) === props.id))) ??
+      last,
   );
   const as = <K extends BoardCard["kind"]>(_kind: K) => card() as CardOf<K>;
   /** What a panel is keyed by: the card's kind and the thing it shows, or undefined for another kind. */

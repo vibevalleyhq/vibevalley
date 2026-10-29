@@ -192,5 +192,16 @@
       "voice": "Talk to the manager (changeable in settings)",
       "command": "Commands: a ticket, remember, stop, a direct message"
     }
+  },
+  "rich": {
+    "copy": "Copy",
+    "copied": "Copied",
+    "more": "Show all",
+    "less": "Show less",
+    "lines": "{n} lines",
+    "diagram": "Diagram",
+    "diagramFailed": "This diagram cannot be drawn: {why}",
+    "longMore": "Show all",
+    "longLess": "Show less"
   }
 }

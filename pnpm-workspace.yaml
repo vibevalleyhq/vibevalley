@@ -48,6 +48,7 @@ catalog:
   remark-gfm: "^4.0.1"
   remark-parse: "^11.0.0"
   remark-rehype: "^11.1.2"
+  pele: ^1.12.0
   shiki: ^4.5.0
   solid-js: "2.0.0-rc.16"
   tailwindcss: "^4.3.3"

@@ -1452,6 +1452,17 @@ export const catalogs = {
           command: "命令：记工单、让管家记住、叫停、私聊",
         },
       },
+      rich: {
+        copy: "复制",
+        copied: "复制了",
+        more: "展开",
+        less: "收起",
+        lines: "{n} 行",
+        diagram: "图",
+        diagramFailed: "这张图画不出来：{why}",
+        longMore: "展开全文",
+        longLess: "收起",
+      },
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -5084,6 +5095,17 @@ export const catalogs = {
           command: "Commands: a ticket, remember, stop, a direct message",
         },
       },
+      rich: {
+        copy: "Copy",
+        copied: "Copied",
+        more: "Show all",
+        less: "Show less",
+        lines: "{n} lines",
+        diagram: "Diagram",
+        diagramFailed: "This diagram cannot be drawn: {why}",
+        longMore: "Show all",
+        longLess: "Show less",
+      },
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -8711,6 +8733,15 @@ export interface Messages {
   "web.base.place.settings.label": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;
+  "web.base.rich.copied": undefined;
+  "web.base.rich.copy": undefined;
+  "web.base.rich.diagram": undefined;
+  "web.base.rich.diagramFailed": { readonly why: string | number };
+  "web.base.rich.less": undefined;
+  "web.base.rich.lines": { readonly n: string | number };
+  "web.base.rich.longLess": undefined;
+  "web.base.rich.longMore": undefined;
+  "web.base.rich.more": undefined;
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;

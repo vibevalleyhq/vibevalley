@@ -784,3 +784,79 @@ select,
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
+
+/* Rendered Markdown's parts made by ui/richText.ts. Drawn in the text's own colour, so they read on the workbench's page
+   in either theme and on the pixel skin's paper. */
+.code-block {
+  margin: 0.5rem 0;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.code-block pre {
+  margin: 0 !important;
+  background: transparent !important;
+}
+.code-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0 0.75rem;
+  font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height);
+  opacity: 0.7;
+}
+.code-lang {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+.code-act,
+.code-more {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem;
+  cursor: pointer;
+}
+.code-act:hover,
+.code-more:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.code-more {
+  margin: 0 0.5rem 0.25rem;
+  padding: 0 0.375rem;
+  font-size: var(--text-xs);
+  opacity: 0.75;
+}
+/* Folded: the first lines, fading out (the same mask as fold-fade). */
+.code-block[data-folded] pre {
+  max-height: 18rem;
+  overflow: hidden !important;
+  mask-image: linear-gradient(to bottom, black 70%, transparent);
+}
+.diagram {
+  margin: 0.5rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  /* The page's colour, not transparent: an edge's label sits on its line and masks it. */
+  --pele-bg: var(--color-page);
+  --pele-fg: var(--color-ink);
+  --pele-muted: var(--color-muted);
+  --pele-line: var(--color-muted);
+  --pele-surface: var(--color-side);
+  --pele-accent: var(--color-accent);
+  --pele-font: inherit;
+  --pele-radius: var(--radius-md);
+}
+.diagram-error {
+  font-size: var(--text-xs);
+  color: var(--color-berry);
+}
+li.task {
+  list-style: none;
+  margin-left: -1.25rem;
+}
+li.task > input {
+  margin-right: 0.375rem;
+  accent-color: var(--color-accent);
+  vertical-align: -0.1em;
+}
