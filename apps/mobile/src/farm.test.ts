@@ -12,7 +12,8 @@ vi.mock("expo-secure-store", () => ({ getItemAsync: storage.get, setItemAsync: s
 const requests = new Map<string, ReturnType<typeof Promise.withResolvers<Response>>>();
 const signals = new Map<string, AbortSignal>();
 const link = (farm: string) => ({ url: `http://${farm}`, code: farm });
-const reply = (farm: string) => requests.get(`http://${farm}/api/v1/lan/pair`)!.resolve(Response.json({ key: `key-${farm}`, hostName: farm }));
+const reply = (farm: string) =>
+  requests.get(`http://${farm}/api/v1/lan/pair`)!.resolve(Response.json({ device: `device-${farm}`, key: `key-${farm}`, hostName: farm }));
 const saved = (farm: string) => JSON.stringify({ url: `http://${farm}`, key: `key-${farm}`, hostName: farm });
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
