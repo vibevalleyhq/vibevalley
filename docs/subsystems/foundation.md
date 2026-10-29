@@ -36,7 +36,7 @@
 
 **模块和服务**
 
-- **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`cron`、`issue`、`task`、`tool`、`mcp`、`orchestrator`、`lan`、`voice`、`connector`、`game`。子文件夹只有 `packages/agent`（VibeValley 自己的 agent）。
+- **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词；哪些文件夹、排成哪几层，以 [`modules.ts`](apps/server/src/modules.ts) 为准（`modules.test.ts` 查每个文件夹都在表里）。子文件夹只有 `packages/agent`（VibeValley 自己的 agent）。
 - **一个模块导出一个服务**：`class Issues extends Context.Service<Issues, IssuesShape>()("vibevalley/Issues")`，加上建它的 `make`（`Effect.gen` 里 `yield*` 它用到的服务和 `Settings`）和 `layer`。没有服务拿整个农场。一块业务里分开写的几部分是模块里不导出的函数，`make` 把它们拼成一个服务。
 - **`base` 只放地基**：配置、数据库、id、租约、存文件、日志脱敏、谁在做（`Actor`）。不放业务，不放服务之间传的形状；那些形状放在定义它的模块里，上下两层都用的放在下层。
 - **谁在做是一个 `Actor`**（`base/actor.ts`）：主人、管家（带 `forOwner`：这一轮有没有主人的话）、某个帮工（Session）、农场自己。只有入口造它：HTTP 接口是主人（服务端只听本机，手机是主人放进来的设备）；管家的工具是管家；帮工经 `/mcp` 的工具是那个帮工；定时任务和巡查是农场。改东西的服务操作带着它，自己按 `actsForOwner` 判断要不要主人的话（工单的改和挪、计划的开工和合并、定时任务要不要等主人同意），规矩不写在工具层或入口。记下来的只有它的种类（`ActorKind`：计划的修改记录、定时任务是谁定的、记性是谁记的），表里的取值约束跟着它。
