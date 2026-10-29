@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { ConfirmButton } from "./ConfirmButton";
 
 export default stories({
-  title: "ui/ConfirmButton",
+  title: "组件/工作台/ConfirmButton",
   stories: {
     Delete: story({
       note: "按一下就地问，Escape 或焦点离开就收回。",

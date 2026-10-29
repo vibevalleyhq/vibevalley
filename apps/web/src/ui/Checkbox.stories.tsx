@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Checkbox } from "./Checkbox";
 
 export default stories({
-  title: "ui/Checkbox",
+  title: "组件/工作台/Checkbox",
   stories: {
     Playground: story({
       args: { checked: true, indeterminate: false, disabled: false },

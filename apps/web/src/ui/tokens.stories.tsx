@@ -30,6 +30,16 @@ const colours: [string, string][] = [
   ["code-bg", "bg-code-bg"],
 ];
 
+// The pixel skin's families, darkest last.
+const palette: [string, string[]][] = [
+  ["cream", ["bg-cream-50", "bg-cream-100", "bg-cream-200", "bg-cream-300"]],
+  ["bark", ["bg-bark-400", "bg-bark-500", "bg-bark-600", "bg-bark-800", "bg-bark-900"]],
+  ["leaf", ["bg-leaf-300", "bg-leaf-500", "bg-leaf-600", "bg-leaf-700"]],
+  ["wheat · berry · water", ["bg-hat", "bg-wheat-700", "bg-berry-500", "bg-berry-800", "bg-water-500"]],
+  ["ink", ["bg-ink-100", "bg-ink-300", "bg-ink-500", "bg-ink-700", "bg-ink-900"]],
+  ["lcd · dusk · glow", ["bg-lcd-pale", "bg-lcd-paper", "bg-lcd-light", "bg-dusk-800", "bg-glow"]],
+];
+
 const sizes: [string, string][] = [
   ["text-2xs", "text-2xs"],
   ["text-xs", "text-xs"],
@@ -105,7 +115,7 @@ function Curve(props: { name: string; class: string }) {
 }
 
 export default stories({
-  title: "ui/Tokens",
+  title: "设计体系/令牌",
   stories: {
     Colour: story({
       render: () => (
@@ -115,6 +125,23 @@ export default stories({
               <div class="flex flex-col gap-1">
                 <span class={["h-8 rounded-md border border-line", cls]} />
                 <Name>{name}</Name>
+              </div>
+            )}
+          </For>
+        </div>
+      ),
+    }),
+    "Pixel palette": story({
+      note: "像素皮的颜色不跟主题走。",
+      render: () => (
+        <div data-theme="light" class="flex flex-wrap gap-4 rounded-lg bg-cream-50 p-4">
+          <For each={palette}>
+            {([name, list]) => (
+              <div class="flex flex-col gap-1">
+                <div class="flex border-2 border-bark-500">
+                  <For each={list}>{(cls) => <span class={["size-7", cls]} />}</For>
+                </div>
+                <span class="font-mono text-2xs text-bark-600">{name}</span>
               </div>
             )}
           </For>

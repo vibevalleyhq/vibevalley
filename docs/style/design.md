@@ -236,7 +236,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
 4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
 
-**写一个新界面之前**：先在故事里看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Tabs`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了原子或一种 `tone`，在它旁边的 `X.stories.tsx` 写上（`src/stories.test.ts` 查 `ui/` 的每个零件都有）；加了令牌，加进 `ui/tokens.stories.tsx`。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。
+**写一个新界面之前**：先在故事里看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Tabs`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了原子或一种 `tone`，在它旁边的 `X.stories.tsx` 写上（`src/stories.test.ts` 查 `ui/` 的每个零件都有）；加了令牌，加进 `ui/tokens.stories.tsx`。故事分四层（[客户端](docs/subsystems/app.md)）：设计体系、组件、交互、界面；几个零件一起完成的一件事（确认、保存、空状态）写成「交互」的故事，一个概念的一块界面用编出来的数据写成「界面」的故事。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。
 
 **类名怎么拼**：Solid 的 `class` 直接收数组和对象（`class={["h-7 …", { "bg-selected": on }, props.class]}`），不用 clsx。原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。所以不用 tailwind-merge 去合并互相冲突的类：真有要盖的那天，再加一个按我们的令牌配好的 `cn`。
 

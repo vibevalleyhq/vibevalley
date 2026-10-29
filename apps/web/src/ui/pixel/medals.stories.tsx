@@ -6,7 +6,7 @@ import { EarnedMedal } from "./medals";
 const achievements = ["first_try", "harvests", "night_owl", "steady", "thrifty", "weekend", "full_house", "untangle"];
 
 export default stories({
-  title: "pixel/medals",
+  title: "组件/像素/medals",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

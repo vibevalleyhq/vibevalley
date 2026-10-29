@@ -3,7 +3,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Button } from "./Button";
 import { Dot } from "./Dot";
 import { IconButton } from "./IconButton";
-import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink, Toggle } from "./layout";
+import { Card, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } from "./layout";
 
 const projects = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf" as const },
@@ -12,27 +12,29 @@ const projects = [
 ];
 
 export default stories({
-  title: "ui/layout",
+  title: "组件/工作台/layout",
   stories: {
-    "List and detail": story({
-      fill: true,
-      note: "md 以下列表叠在详情上面。",
-      args: { open: "vibevalley" },
-      controls: { open: { kind: "choice", options: projects.map((p) => p.id) } },
+    "List card": story({
+      note: "列表和详情怎么放在一起，见「交互 / 列表和详情」。",
+      args: { active: "vibevalley" },
+      controls: { active: { kind: "choice", options: projects.map((p) => p.id) } },
       render: (a) => (
-        <Split
-          list={
-            <ListCard title="项目" action={<IconButton icon="add" label="新建项目" onClick={() => undefined} />}>
-              <For each={projects}>
-                {(p) => <ListRow to={`/projects/${p.id}`} item={p.id} active={a.open === p.id} title={p.id} line={p.line} leading={<Dot tone={p.tone} />} />}
-              </For>
-            </ListCard>
-          }
-        >
-          <Card title={a.open} action={<Button>打开目录</Button>}>
+        <div class="w-72">
+          <ListCard title="项目" action={<IconButton icon="add" label="新建项目" onClick={() => undefined} />}>
+            <For each={projects}>
+              {(p) => <ListRow to={`/projects/${p.id}`} item={p.id} active={a.active === p.id} title={p.id} line={p.line} leading={<Dot tone={p.tone} />} />}
+            </For>
+          </ListCard>
+        </div>
+      ),
+    }),
+    Card: story({
+      render: () => (
+        <div class="w-96">
+          <Card title="vibevalley" action={<Button>打开目录</Button>}>
             <Quiet>还没有说明。</Quiet>
           </Card>
-        </Split>
+        </div>
       ),
     }),
     Toggle: story({

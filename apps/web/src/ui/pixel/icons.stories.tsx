@@ -14,7 +14,7 @@ const phases: [string, Phase][] = [
 ];
 
 export default stories({
-  title: "pixel/icons",
+  title: "组件/像素/icons",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

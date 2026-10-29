@@ -15,7 +15,7 @@ const sample = [
 ].join("\n");
 
 export default stories({
-  title: "pixel/PxMarkdown",
+  title: "组件/像素/PxMarkdown",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

@@ -6,7 +6,7 @@ import { icons, type IconName } from "./icons";
 const tones: Tone[] = ["plain", "primary", "quiet", "danger"];
 
 export default stories({
-  title: "ui/Button",
+  title: "组件/工作台/Button",
   stories: {
     Playground: story({
       args: { label: "派活", tone: "primary", icon: "add", disabled: false },

@@ -3,7 +3,7 @@ import { IconButton, IconLink, OutLink } from "./IconButton";
 import { icons, type IconName } from "./icons";
 
 export default stories({
-  title: "ui/IconButton",
+  title: "组件/工作台/IconButton",
   stories: {
     Playground: story({
       args: { icon: "search", label: "搜索", pressed: false, danger: false, disabled: false },

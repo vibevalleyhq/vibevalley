@@ -8,7 +8,7 @@ const runtimes = [
 ];
 
 export default stories({
-  title: "pixel/choice",
+  title: "组件/像素/choice",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

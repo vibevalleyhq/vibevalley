@@ -4,7 +4,7 @@ import { ToastStore } from "./toasts";
 import { ToastViewport } from "./ToastViewport";
 
 export default stories({
-  title: "pixel/ToastViewport",
+  title: "组件/像素/ToastViewport",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

@@ -4,7 +4,7 @@ import { ToastHost } from "./ToastHost";
 import { toast } from "./toasts";
 
 export default stories({
-  title: "ui/ToastHost",
+  title: "组件/工作台/ToastHost",
   stories: {
     Toasts: story({
       fill: true,

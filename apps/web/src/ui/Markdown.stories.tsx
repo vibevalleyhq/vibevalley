@@ -25,7 +25,7 @@ const diagram = ["```mermaid", "flowchart LR", "  主人 --> 管家 --> 帮工",
 const long = ["```ts", ...Array.from({ length: 30 }, (_, i) => `const n${i} = ${i};`), "```"].join("\n");
 
 export default stories({
-  title: "ui/Markdown",
+  title: "组件/工作台/Markdown",
   stories: {
     Message: story({
       note: "代码上色、可复制、长的折起；链接只放安全的；#12 去工单。",

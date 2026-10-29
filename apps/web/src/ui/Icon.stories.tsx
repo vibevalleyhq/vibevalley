@@ -7,7 +7,7 @@ const ladder: IconSize[] = [10, 12, 14, 16, 20, 24, 48];
 const names = Object.keys(icons) as IconName[];
 
 export default stories({
-  title: "ui/Icon",
+  title: "设计体系/图标",
   stories: {
     All: story({
       note: "一个意思一个图（ui/icons.ts）；名字就是 <Icon name> 收的。",

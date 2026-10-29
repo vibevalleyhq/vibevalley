@@ -4,7 +4,7 @@ import { Dialog } from "./Dialog";
 import { Field, TextInput } from "./Field";
 
 export default stories({
-  title: "ui/Dialog",
+  title: "组件/工作台/Dialog",
   stories: {
     Form: story({
       note: "模态的 <dialog> 盖在整页上：一次只开一个主题看。",

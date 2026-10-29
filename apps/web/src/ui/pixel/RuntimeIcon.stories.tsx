@@ -5,7 +5,7 @@ import { RuntimeIcon } from "./RuntimeIcon";
 const runtimes = ["claude", "codex", "pi", "cursor", "opencode", "kimi", "grok", "antigravity", "dsh", "unknown"];
 
 export default stories({
-  title: "pixel/RuntimeIcon",
+  title: "组件/像素/RuntimeIcon",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

@@ -7,7 +7,7 @@ import { PoseSprite } from "./PoseSprite";
 const poses: Pose[] = ["idle", "walk", "think", "work", "cheer", "worry"];
 
 export default stories({
-  title: "ui/PoseSprite",
+  title: "组件/工作台/PoseSprite",
   stories: {
     Poses: story({
       args: { species: "bear", height: 64 },

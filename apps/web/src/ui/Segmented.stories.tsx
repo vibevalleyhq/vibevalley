@@ -4,7 +4,7 @@ import { Segmented } from "./Segmented";
 type View = "list" | "board" | "farm";
 
 export default stories({
-  title: "ui/Segmented",
+  title: "组件/工作台/Segmented",
   stories: {
     Playground: story({
       note: "换选项时底块滑过去。",

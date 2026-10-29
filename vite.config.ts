@@ -28,7 +28,7 @@ export default defineConfig({
       ],
       "web:check": [
         "vp check",
-        "vp run --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
+        "vp run --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/stories --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
         "vp run --filter @vibevalley/web build",
         "vp run --filter @vibevalley/web build:stories",
       ],
@@ -161,8 +161,10 @@ export default defineConfig({
           "**/prompts.ts",
           "**/*.test.ts",
           "**/*.test.tsx",
-          // Stories are made-up samples for the page's parts, shown only in the stories' page (apps/web/stories.html).
+          // Stories are made-up samples for the page's parts, shown only in the stories' page (apps/web/stories.html), and
+          // their levels' names.
           "**/*.stories.tsx",
+          "apps/web/src/storyLevels.ts",
           "apps/server/src/testing/**",
           "apps/server/src/**/testing.ts",
           "packages/*/src/testing.ts",

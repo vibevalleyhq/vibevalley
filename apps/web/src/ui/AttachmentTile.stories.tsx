@@ -12,7 +12,7 @@ const files: Attachment[] = [
 ];
 
 export default stories({
-  title: "ui/AttachmentTile",
+  title: "组件/工作台/AttachmentTile",
   stories: {
     Kinds: story({
       args: { removable: true },
