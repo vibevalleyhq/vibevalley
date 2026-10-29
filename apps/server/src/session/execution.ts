@@ -7,14 +7,18 @@ import { t } from "@vibevalley/i18n";
 import type { CoreEvent } from "@vibevalley/agent/brain";
 import { messageText } from "@vibevalley/agent/messages";
 import type { Outcome, RunTrigger } from "@vibevalley/protocol";
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import { newId } from "../base/ids.ts";
 import type { ToolStart } from "./facts.ts";
 import type { ToolResult } from "@vibevalley/agent/core/loop";
 import type { Journal } from "./journal.ts";
-import type { RunStore } from "./session.ts";
+import type { NotRecorded, RunStore } from "./session.ts";
 
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
+
+/** A failed start asked while another run is still going: it is not recorded as its own run. */
+export class ExecutionBusy extends Data.TaggedError("ExecutionBusy")<{ readonly message: string }> {}
+
 export interface RunInput {
   readonly issue?: string;
   readonly by: RunTrigger | { readonly kind: "" };
@@ -85,12 +89,13 @@ export class AgentExecution {
   }
 
   /** The loop's events, in order; input only for a consumed input's message_start. */
-  observe(e: CoreEvent, input?: RunInput): Effect.Effect<void, Error> {
+  observe(e: CoreEvent, input?: RunInput): Effect.Effect<void, NotRecorded> {
     const self = this;
     return Effect.gen(function* () {
       if (self.closed) return;
       if (input) {
-        if (e.type !== "message_start") return yield* Effect.fail(new Error("run input requires a message start"));
+        // The loop hands a consumed input with the message_start it opened: anything else is a bug in the host.
+        if (e.type !== "message_start") return yield* Effect.die(new Error("run input requires a message start"));
         yield* self.begin(input);
         if (input.heard && input.heard.length > 0) {
           for (const id of input.heard) if (!self.heard.includes(id)) self.heard.push(id);
@@ -135,11 +140,11 @@ export class AgentExecution {
   }
 
   /** A rejected input as its own failed run, without consuming another input's work. */
-  failedStart(input: RunInput, text: string, reason: string): Effect.Effect<string, Error> {
+  failedStart(input: RunInput, text: string, reason: string): Effect.Effect<string, NotRecorded | ExecutionBusy> {
     const self = this;
     return Effect.gen(function* () {
       if (self.closed) return "";
-      if (self.run && !self.ending) return yield* Effect.fail(new Error("another agent execution is still running"));
+      if (self.run && !self.ending) return yield* new ExecutionBusy({ message: "another agent execution is still running" });
       yield* self.begin(input);
       self.journal.asked(text);
       self.outcome = "failed";
@@ -156,7 +161,7 @@ export class AgentExecution {
     this.resuming = input;
   }
 
-  close(): Effect.Effect<void, Error> {
+  close(): Effect.Effect<void, NotRecorded> {
     return Effect.suspend(() => {
       this.closed = true;
       if (this.run && !this.ending) {

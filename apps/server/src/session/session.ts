@@ -47,7 +47,7 @@ import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type
 
 export type { SessionNews };
 import { serverAddress, ServerConfig } from "../base/config.ts";
-import { Db } from "../base/db.ts";
+import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core, type FactIn } from "../core/core.ts";
@@ -119,7 +119,7 @@ export interface HireOptions {
 export interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly issue: Pick<Issue, "id" | "number">;
   /** Links the session to its existing issue before the hired fact or any report can be seen. */
-  readonly hiring?: (s: Session) => Effect.Effect<void, unknown>;
+  readonly hiring?: (s: Session) => Effect.Effect<void, NotRecorded>;
 }
 
 export interface RunFinished {
@@ -233,11 +233,11 @@ export class Sessions extends Context.Service<
 
 /** What execution.ts keeps runs with; a write that fails is an error the run retries. */
 export interface RunStore {
-  readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, Error>;
-  readonly link: (run: string, issue: string) => Effect.Effect<void, Error>;
-  readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, Error>;
-  readonly issues: (run: string) => Effect.Effect<IssueId[], Error>;
-  readonly finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => Effect.Effect<void, Error>;
+  readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, NotRecorded>;
+  readonly link: (run: string, issue: string) => Effect.Effect<void, NotRecorded>;
+  readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, NotRecorded>;
+  readonly issues: (run: string) => Effect.Effect<IssueId[], NotRecorded>;
+  readonly finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => Effect.Effect<void, NotRecorded>;
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: InputConsumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
@@ -258,6 +258,9 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
       return undefined;
   }
 }
+
+/** A write of a session's own records (a run, the issue it works) that did not go through. */
+export class NotRecorded extends Data.TaggedError("NotRecorded")<{ readonly message: string; readonly cause?: unknown }> {}
 
 /** Work that did not go in (see handOver); the session stays. */
 export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
@@ -397,7 +400,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const forkHere = yield* FiberSet.makeRuntime<never>();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((err) => (err instanceof Error ? err : new Error(String(err)))));
+      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
     const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
@@ -509,7 +512,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
     };
     /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
-    const keptRun = (what: string, e: Effect.Effect<unknown, Error>) =>
+    const keptRun = (what: string, e: Effect.Effect<unknown, NotRecorded>) =>
       Effect.catch(Effect.asVoid(e), (err) => Effect.logWarning(`vibevalley: ${what}: ${err.message}`));
 
     /** Called before the input goes out, so the turn it opens finds it. */

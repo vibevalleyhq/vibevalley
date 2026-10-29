@@ -77,7 +77,7 @@ import { merging } from "./merge.ts";
 import { refinement } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
-import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
+import { type Hired, type HireOptions, NotRecorded, type SessionNews, Sessions } from "../session/session.ts";
 import { type Due, Crons } from "../cron/cron.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
@@ -139,7 +139,7 @@ export class Issues extends Context.Service<
     /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
     readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
     /** A session starts on an existing issue: open it and link the session in one write. */
-    readonly ran: (id: string, session: Session) => Effect.Effect<void, Error>;
+    readonly ran: (id: string, session: Session) => Effect.Effect<void, NotRecorded>;
     /** The issues of a task graph as the graph has them now, published as one commit once written. */
     readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
     readonly nextTaskId: () => Effect.Effect<string>;
@@ -443,7 +443,7 @@ export const make = (options: IssueOptions = {}) =>
         )
         .pipe(
           Effect.provideService(SqlClient.SqlClient, sql),
-          Effect.mapError((e) => new Error(causeMessage(e))),
+          Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
         );
       worked.added(session.id, id);
       yield* publish(id);
