@@ -6,7 +6,7 @@ import { SecretInput } from "./layout";
 const statusOf = (source: string, hint: string): KeyStatus => (source === "settings" || source === "config" ? { source, hint: hint || undefined } : {});
 
 export default stories({
-  title: "ui/KeyField",
+  title: "组件/工作台/KeyField",
   stories: {
     Key: story({
       args: { source: "settings", hint: "a1b2", removing: false, small: false },

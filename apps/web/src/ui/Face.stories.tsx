@@ -8,7 +8,7 @@ const lookOf = (species: Species): Look => ({ species, outfit: "farmer", build: 
 const looks = ["farmer", "auntie", "foreman", "gardener", "grandpa", "robot"];
 
 export default stories({
-  title: "ui/Face",
+  title: "组件/工作台/Face",
   stories: {
     Agents: story({
       args: { size: 32, muted: false, runtime: "claude" },

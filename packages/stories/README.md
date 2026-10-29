@@ -15,7 +15,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Button, type Tone } from "./Button";
 
 export default stories({
-  title: "ui/Button", // the first part is the group in the tree
+  title: "组件/工作台/Button", // a path: folders, then the file
   stories: {
     Playground: story({
       args: { label: "派活", tone: "primary", disabled: false },
@@ -41,13 +41,22 @@ export default stories({
 A file may say `themes: ["light"]` and `frame: "<classes>"` for parts with colours of their own (the pixel skin), drawn on
 their own ground in their one theme.
 
+## Titles and the tree
+
+A title is a path: `组件/工作台/Button`. Every part but the last is a folder; the last holds the file's stories, or, for a
+file of one story, is that story. `StoriesApp`'s `order` lists paths to put first at each depth (`["设计体系", "组件",
+"组件/工作台"]`); the rest go by name. The levels and the open story's folders start open, a search opens what it finds,
+and folders opened or closed by hand stay so in this browser (`localStorage`, if it is there). The tree's rules are
+`tree.ts`, tested on their own.
+
 ## The viewer
 
-`StoriesApp({ stories, order, wrap })`. The address holds the view (`?s=<title>:<name>&theme=light|dark|both&w=full|400|720|1280`),
+`StoriesApp({ stories, order, wrap })`. The toolbar is reicon's icons: light, dark, both; full width, phone (400),
+tablet (720), laptop (1280); a copy of the link. The address holds the view (`?s=<title>:<name>&theme=light|dark|both&w=full|400|720|1280`),
 so a link opens the same thing. Each frame carries `data-theme` and contains its layout, so a part fixed to the window
 (a toast) stays in its frame; a modal `<dialog>` still opens over everything. A story that throws shows its error in its
 frame (`data-testid="story-error"`), not a blank page. The viewer's own words are English: it is a tool for whoever
 writes the parts, not shipped to the owner.
 
-Test ids: `stories-tree`, `stories-search`, `story-link` (`data-key`), `story-canvas`, `story-frame` (`data-theme`),
-`story-theme`, `story-width` (`data-value` on each), `story-args`, `story-arg` (`data-name`), `story-reset`, `story-error`.
+Test ids: `stories-tree`, `stories-search`, `story-folder` (`data-key` the path, `aria-expanded`), `story-link` (`data-key`), `story-canvas`, `story-frame` (`data-theme`),
+`story-theme`, `story-width` (`data-value` on each), `story-copy-link`, `story-args`, `story-arg` (`data-name`), `story-reset`, `story-error`.

@@ -1,12 +1,14 @@
-// A router that goes nowhere, so a link in a part does not move the viewer; the farm's lists are known up front: there
-// is no server behind the stories.
+// There is no server: the router goes nowhere, so a link in a part does not move the viewer, and the lists and the state
+// start empty. A story that wants data passes it to the part.
 
 import { render } from "@solidjs/web";
 import { createSignal, Loading } from "solid-js";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { StoriesApp, type Stories } from "@vibevalley/stories";
 import { queries } from "./base/query";
+import { FramesContext } from "./base/frame";
 import { RouterContext, type Router } from "./base/router";
+import { order } from "./storyLevels";
 import "./stories.css";
 
 const found = import.meta.glob<{ default: Stories }>("./**/*.stories.tsx", { eager: true });
@@ -28,12 +30,14 @@ render(
   () => (
     <StoriesApp
       stories={Object.values(found).map((m) => m.default)}
-      order={["ui", "pixel"]}
+      order={order}
       wrap={(story) => (
         <RouterContext value={still()}>
-          <QueryClientProvider client={queries}>
-            <Loading>{story()}</Loading>
-          </QueryClientProvider>
+          <FramesContext value={{ frame: undefined, link: "open", count: 0 }}>
+            <QueryClientProvider client={queries}>
+              <Loading>{story()}</Loading>
+            </QueryClientProvider>
+          </FramesContext>
         </RouterContext>
       )}
     />

@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { PxField, PxTextArea, PxTextInput, PxTip } from "./field";
 
 export default stories({
-  title: "pixel/field",
+  title: "组件/像素/field",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

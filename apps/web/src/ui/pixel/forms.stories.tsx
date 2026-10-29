@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { PxChipsInput } from "./forms";
 
 export default stories({
-  title: "pixel/forms",
+  title: "组件/像素/forms",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

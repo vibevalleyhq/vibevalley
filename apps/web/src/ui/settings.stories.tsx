@@ -4,7 +4,7 @@ import { KeyRow, SettingRow, SettingsGroup, SettingsPage, SettingsSearch } from 
 import { Toggle } from "./layout";
 
 export default stories({
-  title: "ui/settings",
+  title: "交互/设置页",
   stories: {
     Page: story({
       fill: true,

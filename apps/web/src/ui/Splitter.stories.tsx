@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Splitter, usePaneWidth } from "./Splitter";
 
 export default stories({
-  title: "ui/Splitter",
+  title: "组件/工作台/Splitter",
   stories: {
     Pane: story({
       fill: true,

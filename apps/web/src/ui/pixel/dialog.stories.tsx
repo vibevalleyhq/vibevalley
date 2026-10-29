@@ -3,7 +3,7 @@ import { PxButton } from "./button";
 import { FarmDialog, type FarmDialogSize, FarmSection, PxDialog } from "./dialog";
 
 export default stories({
-  title: "pixel/dialog",
+  title: "组件/像素/dialog",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

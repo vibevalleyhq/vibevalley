@@ -4,7 +4,7 @@ import { MoreMenu } from "./MoreMenu";
 const noop = () => undefined;
 
 export default stories({
-  title: "ui/MoreMenu",
+  title: "组件/工作台/MoreMenu",
   stories: {
     "A place's other actions": story({
       render: () => (

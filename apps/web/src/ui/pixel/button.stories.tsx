@@ -5,7 +5,7 @@ import { PxButton, type PxSize, type PxTone } from "./button";
 const tones: PxTone[] = ["plain", "primary", "accent", "danger"];
 
 export default stories({
-  title: "pixel/PxButton",
+  title: "组件/像素/PxButton",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

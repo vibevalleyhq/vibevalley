@@ -85,10 +85,36 @@
   --shiki-token-function: #e2b46a;
 }
 
-/* Named after the theme's own: declared on each themed element, so a part in the other theme than the page around it
-   (the pixel skin, a story's frame) resolves them to its own ink, not to the one it inherited. */
+/* Declared again on each themed element: a custom property that names another is worked out where it is declared, so
+   one declared only on the root would hand its theme down into a part in the other theme (the pixel skin in a dark
+   workbench, a story's dark frame). The palette's names (@theme below) are restated here for the same reason. */
 :root,
 [data-theme] {
+  --color-page: var(--wb-page);
+  --color-side: var(--wb-side);
+  --color-ink: var(--wb-ink);
+  --color-muted: var(--wb-muted);
+  --color-faint: var(--wb-faint);
+  --color-line: var(--wb-line);
+  --color-hover: var(--wb-hover);
+  --color-selected: var(--wb-selected);
+  --color-focus: var(--wb-focus);
+  --color-accent: var(--wb-accent);
+  --color-leaf: var(--wb-leaf);
+  --color-wheat: var(--wb-wheat);
+  --color-berry: var(--wb-berry);
+  --color-water: var(--wb-water);
+  --color-bark: var(--wb-bark);
+  --color-ok-soft: var(--wb-ok-soft);
+  --color-ok-ink: var(--wb-ok-ink);
+  --color-bad-soft: var(--wb-bad-soft);
+  --color-warn-ink: var(--wb-warn-ink);
+  --color-scrim: var(--wb-scrim);
+  --color-rail: var(--wb-rail);
+  --color-on-rail: var(--wb-on-rail);
+  --color-idle: var(--wb-idle);
+  --color-code-bg: var(--wb-code-bg);
+  --color-code-ink: var(--wb-code-ink);
   --shiki-foreground: var(--wb-ink);
   --shiki-background: transparent;
   --shiki-token-parameter: var(--wb-ink);

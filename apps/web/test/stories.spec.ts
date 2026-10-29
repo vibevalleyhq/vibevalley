@@ -41,17 +41,26 @@ const test = base.extend<object, { stories: string }>({
 // Wide enough for two frames of a page-sized part side by side, with the tree and the arguments.
 test.use({ viewport: { width: 1680, height: 1000 } });
 
-test("the viewer lists the stories, opens one from the address and keeps the view in it", async ({ page }) => {
-  await page.goto("/?s=ui%2FButton%3ATones&theme=dark&w=400");
-  await expect(page.getByTestId("story-link").first()).toBeVisible();
-  await expect(page.locator('[data-testid="story-link"][aria-current="page"]')).toHaveAttribute("data-key", "ui/Button:Tones");
+const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
+const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
+
+test("the viewer opens a story from the address, in folders, and keeps the view in it", async ({ page }) => {
+  await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Button:Tones", theme: "dark", w: "400" })}`);
+  await expect(page.locator(key("组件/工作台/Button:Tones"))).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("story-frame")).toHaveCount(1);
   await expect(page.getByTestId("story-frame")).toHaveAttribute("data-theme", "dark");
 
+  await expect(page.locator(folder("设计体系"))).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(folder("组件/工作台"))).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(folder("组件/像素"))).toHaveAttribute("aria-expanded", "false");
+  await page.locator(folder("组件/像素")).click();
+  await expect(page.locator(folder("组件/像素"))).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator('[data-testid="story-link"][data-key^="组件/像素/"]').first()).toBeVisible();
+
   await page.getByTestId("story-theme").locator('[data-value="both"]').click();
   await expect(page.getByTestId("story-frame")).toHaveCount(2);
-  await page.locator('[data-testid="story-link"][data-key="ui/Button:Playground"]').click();
-  await expect(page).toHaveURL(/s=ui%2FButton%3APlayground&theme=both&w=400/);
+  await page.locator(key("组件/工作台/Button:Playground")).click();
+  await expect(page).toHaveURL(new RegExp(`s=${encodeURIComponent("组件/工作台/Button:Playground")}&theme=both&w=400`));
 
   const label = page.locator('[data-testid="story-arg"][data-name="label"] input');
   await label.fill("go");
@@ -59,7 +68,7 @@ test("the viewer lists the stories, opens one from the address and keeps the vie
   await page.getByTestId("story-reset").click();
   await expect(label).not.toHaveValue("go");
 
-  await page.getByTestId("stories-search").fill("ui/button tones");
+  await page.getByTestId("stories-search").fill("工作台 button tones");
   await expect(page.getByTestId("story-link")).toHaveCount(1);
 });
 
@@ -72,6 +81,8 @@ const titles = readdirSync(join(import.meta.dirname, "..", "src"), { recursive: 
 for (const title of titles)
   test(`${title}: each story draws in each of its themes with nothing for axe to find`, async ({ page }) => {
     await page.goto("/");
+    // A search opens every folder it finds something in.
+    await page.getByTestId("stories-search").fill(title);
     const keys = await page.locator(`[data-testid="story-link"][data-key^="${title}:"]`).evaluateAll((links) => links.map((a) => a.getAttribute("data-key")!));
     expect(keys.length, `no stories titled ${title}`).toBeGreaterThan(0);
     const found: string[] = [];

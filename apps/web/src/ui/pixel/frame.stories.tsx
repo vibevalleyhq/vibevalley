@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { PxFrame } from "./frame";
 
 export default stories({
-  title: "pixel/PxFrame",
+  title: "组件/像素/PxFrame",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

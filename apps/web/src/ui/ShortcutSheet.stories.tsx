@@ -3,7 +3,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Kbd, Shortcuts } from "./ShortcutSheet";
 
 export default stories({
-  title: "ui/ShortcutSheet",
+  title: "组件/工作台/ShortcutSheet",
   stories: {
     List: story({
       note: "页面上按 ? 打开的那张单子里的内容。",
