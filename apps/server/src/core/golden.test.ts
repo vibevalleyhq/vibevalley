@@ -7,7 +7,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, test } from "vite-plus/test";
 import { phaseText, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { emptyWorkspaceState } from "./core.ts";
-import { targetOf } from "@/channel/state.ts";
+import { targetOf } from "@/channel/folded.ts";
 import { nextRun, nextText, whenText } from "@/cron/when.ts";
 import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf } from "@/task/graph.ts";
 import { attentionOf } from "@/issue/attention.ts";

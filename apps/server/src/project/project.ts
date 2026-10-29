@@ -31,7 +31,7 @@ import {
   type PullRequestState,
   type Repo,
 } from "@vibevalley/protocol";
-import { slice } from "@/base/text.ts";
+import { slice } from "@/base/clip.ts";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { ServerConfig } from "@/base/config.ts";

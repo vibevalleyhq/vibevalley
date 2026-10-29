@@ -1,4 +1,7 @@
-import { type AudienceInput, channelNameProblem, chatAudience, type InboxMessage, mentionsIn, parseChatTarget, type UnreadRow } from "./rules.ts";
+import { type AudienceInput, chatAudience } from "./audience.ts";
+import { channelNameProblem, parseChatTarget } from "./targets.ts";
+import { type InboxMessage, type UnreadRow } from "./wake.ts";
+import { mentionsIn } from "./mentions.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "@/testing/golden.ts";

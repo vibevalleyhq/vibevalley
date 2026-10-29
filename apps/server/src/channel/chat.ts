@@ -42,25 +42,13 @@ import {
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { keepChannels, targetOf } from "./state.ts";
-import { head } from "@/base/text.ts";
-import {
-  agentWakeCooldownMs,
-  channelNameProblem,
-  chatAudience,
-  type Delivery,
-  heldShown,
-  hopLimit,
-  hopLimitText,
-  type InboxMessage,
-  mentionOf,
-  mentionsIn,
-  parseChatTarget,
-  parseSearch,
-  retryWindowMs,
-  summaryChannels,
-  type UnreadRow,
-} from "./rules.ts";
+import { keepChannels, targetOf } from "./folded.ts";
+import { head } from "@/base/clip.ts";
+import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText } from "./audience.ts";
+import { channelNameProblem, parseChatTarget } from "./targets.ts";
+import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
+import { mentionOf, mentionsIn } from "./mentions.ts";
+import { parseSearch } from "./search.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";

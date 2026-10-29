@@ -13,7 +13,7 @@ import { HttpClient } from "effect/http";
 import { createHash, randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { channelOf, defaultOf } from "@/channel/state.ts";
+import { channelOf, defaultOf } from "@/channel/folded.ts";
 import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";

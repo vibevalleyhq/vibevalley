@@ -4,7 +4,7 @@
 
 import type { Agent, Issue, Session, Task, TaskGraph, GraphState, TaskState } from "@vibevalley/protocol";
 import { traitsOf } from "@/agent/prompts.ts";
-import { slice } from "@/base/text.ts";
+import { slice } from "@/base/clip.ts";
 import { isForOrchestrator } from "@/issue/state.ts";
 import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf } from "./graph.ts";
 import { acceptanceChecks, frozenOf } from "./rules.ts";

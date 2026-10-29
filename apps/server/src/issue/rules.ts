@@ -23,7 +23,7 @@ import type {
 } from "@vibevalley/protocol";
 import { attentionWantsOwner, closedText, plainText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
-import { clip } from "@/base/text.ts";
+import { clip } from "@/base/clip.ts";
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";

@@ -6,7 +6,7 @@ import { orchestrator, owner } from "@/base/actor.ts";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
 import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
 import { inbox } from "@/notice/inbox.ts";
-import { clip } from "@/base/text.ts";
+import { clip } from "@/base/clip.ts";
 import { graphOf, parseSplit, taskIssueID } from "./rules.ts";
 import { taskBrief } from "./prompts.ts";
 import { Effect, type Scope, Stream } from "effect";

@@ -3,7 +3,7 @@ import { isBusy, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "@/session/roster.ts";
 import { statusMoves } from "./moves.ts";
 import { attentionIn } from "./attention.ts";
-import { compare, compareText, or } from "@/base/text.ts";
+import { compare, compareText, or } from "@/base/order.ts";
 
 /** One rule whoever does the work: a session on the farm says where its issue stands; an issue run by no session (an
  * in-process agent's, the orchestrator's) is in progress while its latest run goes on and waits on the owner once it

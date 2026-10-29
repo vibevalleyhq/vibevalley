@@ -9,7 +9,7 @@ import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botivers
 import { failureAdvice } from "@botiverse/oar/observe";
 import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, IssueAnswer, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
-import { clip, slice } from "@/base/text.ts";
+import { clip, slice } from "@/base/clip.ts";
 import { runtimeLabel } from "@/agent/seed.ts";
 import type { MergeFailure } from "@/project/shapes.ts";
 

@@ -9,7 +9,7 @@ import type { FactIn } from "@/core/core.ts";
 import type { Session, SessionAction, SessionEventType, Spent, ToolAction, SessionId } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { doingOf, failureText, jobBreak, recalledIn } from "./rules.ts";
-import { clip } from "@/base/text.ts";
+import { clip } from "@/base/clip.ts";
 import type { Rate } from "@/runtime/price.ts";
 import { shellCommand } from "./shell.ts";
 

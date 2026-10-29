@@ -34,7 +34,7 @@ import {
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { closedText, shortTitle, isOneOf } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
-import { cut } from "@/base/text.ts";
+import { cut } from "@/base/clip.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { attentionIn } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";

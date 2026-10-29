@@ -9,7 +9,7 @@ import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 import { Schema } from "effect";
-import { cut } from "@/base/text.ts";
+import { cut } from "@/base/clip.ts";
 import { FileWriter } from "@/base/files.ts";
 import type { From, ToolStart } from "./facts.ts";
 import type { Time } from "@/base/time.ts";

@@ -4,8 +4,8 @@ import { t } from "@vibevalley/i18n";
 
 import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts";
 import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
-import { head } from "@/base/text.ts";
-import { type InboxMessage } from "@/channel/rules.ts";
+import { head } from "@/base/clip.ts";
+import { type InboxMessage } from "@/channel/wake.ts";
 import { messageLine } from "@/channel/prompts.ts";
 import { quotaLow, yuan } from "@/runtime/money.ts";
 

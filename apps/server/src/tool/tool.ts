@@ -13,7 +13,7 @@ import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOr
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import { openFindings } from "@/issue/state.ts";
 import { isOpen, maxTasks } from "@/task/graph.ts";
-import { head } from "@/base/text.ts";
+import { head } from "@/base/clip.ts";
 import { graphText } from "@/task/prompts.ts";
 import { inboxLines } from "@/channel/prompts.ts";
 import { Clock, Context, Data, Effect, Layer, Schema } from "effect";

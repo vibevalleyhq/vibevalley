@@ -1,6 +1,6 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { channelOf } from "@/channel/state.ts";
+import { channelOf } from "@/channel/folded.ts";
 import { Said } from "@/testing/said.ts";
 import { Effect } from "effect";
 import { Agents } from "@/agent/agent.ts";

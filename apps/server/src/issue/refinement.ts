@@ -7,7 +7,7 @@ import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
 import type { Agents } from "@/agent/agent.ts";
-import { cut } from "@/base/text.ts";
+import { cut } from "@/base/clip.ts";
 import type { Channels } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn } from "@/errors.ts";

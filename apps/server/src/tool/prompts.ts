@@ -19,7 +19,7 @@ import {
 import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "@/agent/seed.ts";
 import { nextText, whenText } from "@/cron/when.ts";
-import { head } from "@/base/text.ts";
+import { head } from "@/base/clip.ts";
 import { yuan } from "@/runtime/money.ts";
 import type { Handlers } from "@vibevalley/protocol/api";
 
