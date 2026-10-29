@@ -40,7 +40,7 @@ import {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream, Metric } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -258,6 +258,9 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
       return undefined;
   }
 }
+
+/** The executions open now (a helper's runtime session, the orchestrator's), as a gauge. */
+const running = Metric.gauge("vibevalley.sessions.running", { description: "Executions open now" });
 
 /** A write of a session's own records (a run, the issue it works) that did not go through. */
 export class NotRecorded extends Data.TaggedError("NotRecorded")<{ readonly message: string; readonly cause?: unknown }> {}
@@ -716,7 +719,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         Effect.tap(() =>
           Effect.sync(() => {
             if (allocations.get(allocation.owner.id) === allocation) allocations.delete(allocation.owner.id);
-          }),
+          }).pipe(Effect.andThen(Metric.update(running, allocations.size))),
         ),
       );
 
@@ -766,6 +769,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const subagents = createSubagents({ runtimes: { get: (rid) => (rid === base.id ? mine : undefined) }, maxRunning, maxDepth: 1, cwd: root, logDir });
       const allocation: Allocation = { owner, subagents, resources, attached: false };
       allocations.set(id, allocation);
+      yield* Metric.update(running, allocations.size);
       const opening = Effect.gen(function* () {
         const task = text && agent.personaMode === "prompt" ? text + jobBreak + input : input;
         const spawned = yield* Effect.promise(() =>

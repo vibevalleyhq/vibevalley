@@ -1,8 +1,9 @@
 // The API over HTTP: every endpoint in @vibevalley/protocol/api is a POST at its op's path, routed to its handler. An input
 // that does not decode is a 400 with why (an empty body is {}); no answer is a 204; a refusal is its tagged JSON at its status.
 
+import { messageOf } from "../errors.ts";
 import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
-import { Cause, Effect, Schema } from "effect";
+import { Cause, Effect, Schema, Metric } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { wireOf } from "../base/wire.ts";
 
@@ -10,6 +11,9 @@ import { wireOf } from "../base/wire.ts";
 const isApiError = Schema.is(ApiError);
 
 const badRequest = (why: string) => HttpServerResponse.text(why + "\n", { status: 400 });
+
+/** Each call of an endpoint, by its op and the status it answered. */
+const requests = Metric.counter("vibevalley.http.requests", { description: "Calls of an endpoint, by op and status", incremental: true });
 
 function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unknown, ApiError>) {
   return Effect.gen(function* () {
@@ -21,7 +25,7 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
       try {
         json = JSON.parse(text === "" ? "{}" : text);
       } catch (e) {
-        return badRequest((e as Error).message);
+        return badRequest(messageOf(e));
       }
       const decoded = Schema.decodeUnknownExit(endpoint.input)(json);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
@@ -42,11 +46,10 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
         return HttpServerResponse.schemaJson(ApiError)(failure, {
           status: errorStatus[failure._tag],
         });
-      return Effect.as(
-        Effect.logError(`${endpoint.op}: ${Cause.pretty(cause)}`),
-        HttpServerResponse.text(String(failure instanceof Error ? failure.message : failure) + "\n", { status: 500 }),
-      );
+      return Effect.as(Effect.logError("an endpoint failed", cause), HttpServerResponse.text(messageOf(failure) + "\n", { status: 500 }));
     }),
+    Effect.tap((response) => Metric.update(requests.pipe(Metric.withAttributes({ op: endpoint.op, status: String(response.status) })), 1)),
+    Effect.annotateLogs({ op: endpoint.op }),
   );
 }
 
