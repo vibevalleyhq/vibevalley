@@ -1,15 +1,11 @@
 {
   "place": {
     "label": "Artifacts",
-    "hint": "Pages helpers and the orchestrator hand in: designs, reports, comparisons, by version"
+    "hint": "What you, the helpers and the orchestrator leave to be read: pages written together and web pages handed in"
   },
   "card": {
     "version": "Version {version}",
     "open": "Open \"{title}\""
-  },
-  "kind": {
-    "html": "Page",
-    "markdown": "Notes"
   },
   "page": {
     "by": "Made by {name}",
@@ -17,19 +13,53 @@
     "versions": "Versions",
     "open": "Open in a new tab",
     "delete": "Delete",
-    "deleteAsk": "Delete this artifact and every version? Its cards stay in the conversation.",
+    "deleteAsk": "Delete this artifact? Its cards stay in the conversation.",
     "deleted": "Deleted \"{title}\"",
     "gone": "This artifact was deleted, or there is no such artifact.",
-    "frame": "\"{title}\" version {version}"
+    "frame": "\"{title}\" version {version}",
+    "list": "All artifacts",
+    "newTitle": "New artifact title",
+    "new": "New",
+    "none": "No artifacts yet: give one a title to start it, or have a helper hand one in.",
+    "all": "All artifacts",
+    "forIssue": "For #{number}"
   },
   "talk": {
     "atMessage": "In the conversation",
-    "reply": "Reply to this version",
+    "reply": "Reply",
     "replyHint": "For the helper who made it: what to change",
     "send": "Reply",
-    "sent": "Replied to version {version}"
+    "sent": "Replied",
+    "replyVersion": "Reply to this version",
+    "sentVersion": "Replied to version {version}"
   },
   "issue": {
     "title": "Artifacts"
+  },
+  "blocks": {
+    "memoryItem": "Memory",
+    "saving": "Saving…",
+    "saved": "All saved",
+    "blocks": "{n, plural, one {# block} other {# blocks}}",
+    "helpersWriting": "helpers writing",
+    "demo": "Demo: several helpers writing at once",
+    "append": "Write a paragraph at the end",
+    "owner": "Owner",
+    "done": "Done",
+    "notDone": "Not done",
+    "writing": "{who} is writing",
+    "wrote": "{who} wrote it",
+    "issue": "Ticket {id}",
+    "unknown": "This block is a \"{type}\", which this version cannot draw yet: it can be read, not changed",
+    "block": "Block {id}",
+    "heading": "Heading",
+    "notSaved": "Not saved: {why}",
+    "changed": "Someone else just changed this block",
+    "conflict": "{why}: what you wrote was not saved and stays in the revision",
+    "image": "Image: {alt} {src}"
+  },
+  "body": {
+    "blocks": "Written together",
+    "html": "Web page"
   }
 }

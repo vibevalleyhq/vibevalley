@@ -8,10 +8,6 @@
       "label": "Tickets",
       "hint": "Every ticket from written to closed"
     },
-    "docs": {
-      "label": "Docs",
-      "hint": "Documents you and the helpers write together"
-    },
     "agents": {
       "label": "Profiles",
       "hint": "Profiles: managers and helpers"

@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
-import { blockHeading, blockNumbered, blockParagraph, type DocSpan } from "@vibevalley/protocol";
+import { blockHeading, blockNumbered, blockParagraph, type TextSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "./blocks";
 
-const span = (t: string, bold = false): DocSpan => ({ t, marks: bold ? { bold: true } : {} });
+const span = (t: string, bold = false): TextSpan => ({ t, marks: bold ? { bold: true } : {} });
 
 test("keys between, as the server makes them", () => {
   expect(keyBetween("", "")).toBe("V");

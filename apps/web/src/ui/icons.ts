@@ -75,7 +75,7 @@ export const icons = {
   // Places.
   chat: ChatRound,
   issues: Checklist,
-  docs: Document,
+  artifacts: Document,
   agents: Users,
   runtimes: Cpu,
   projects: Folder2,

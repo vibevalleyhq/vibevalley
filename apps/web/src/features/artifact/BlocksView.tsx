@@ -1,12 +1,10 @@
 import { t } from "@vibevalley/i18n";
-import { Empty } from "../../ui/Empty";
-// 文档: the documents on the left, the one open on the right, written block by block with the
-// helpers. A block shows its marks until it is clicked into; then it is a plain field (marks are kept through the edit),
-// and Enter splits it, Backspace at its start joins it to the one before, Up and Down at its ends move between blocks.
+// A blocks artifact, written block by block with the helpers. A block shows its marks until it is clicked into; then it is
+// a plain field (marks are kept through the edit), and Enter splits it, Backspace at its start joins it to the one before,
+// Up and Down at its ends move between blocks.
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQueryClient } from "@tanstack/solid-query";
 import {
   type Agent,
   blockBulleted,
@@ -19,23 +17,19 @@ import {
   blockNumbered,
   blockQuote,
   blockTodo,
-  type DocSpan,
-  docOwner,
+  ownerId,
+  type TextSpan,
 } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../base/api";
-import { DocEditor, type EditBlock } from "./editor";
+import { api } from "../../base/api";
+import { BlockEditor, type EditBlock } from "./editor";
 import { hexColor, swatches } from "../../ui/cast";
 import { knownTypes } from "./blocks";
-import { useRouter } from "../../base/router";
-import { aria, Keyed } from "../../base/util";
+import { aria } from "../../base/util";
 import { createExternal } from "../../base/external";
-import { ready, useAgents, useQuery } from "../../base/query";
+import { ready, useAgents } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
-import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
-
-const docPath = (id?: string) => (id === undefined ? "/docs" : `/docs/${encodeURIComponent(id)}`);
 
 /** The owner's lines on the attribution bar. */
 const ownerColor = "#c8a46e";
@@ -43,106 +37,11 @@ const ownerColor = "#c8a46e";
 /** Who wrote a block last, as the bar beside it shows: the owner's colour, or the helper's (its look's trim, else a colour
  * picked from its id, the same every time). */
 function authorColor(updatedBy: string, agent: Agent | undefined) {
-  if (updatedBy === docOwner) return ownerColor;
+  if (updatedBy === ownerId) return ownerColor;
   if (agent?.look.trim) return hexColor(agent.look.trim);
   let h = 0;
   for (let i = 0; i < updatedBy.length; i++) h = (h * 31 + updatedBy.charCodeAt(i)) & 0x7fffffff;
   return hexColor(swatches.trim[h % swatches.trim.length]!);
-}
-
-/** `rest` is the path after /docs/. */
-export function DocsPage(props: { rest: string }) {
-  const router = useRouter();
-  const client = useQueryClient();
-  const [title, setTitle] = createSignal("");
-  const [problem, setProblem] = createSignal<string>();
-  const docs = useQuery(() => ({ queryKey: ["docs"], queryFn: () => api.doc.list() }));
-  const list = () => ready(docs, []);
-  const id = () => props.rest || undefined;
-  const open = () => (id() && decodeURIComponent(id()!)) || list()[0]?.id;
-  const create = async () => {
-    try {
-      const made = await api.doc.create({ title: title() });
-      setTitle("");
-      setProblem(undefined);
-      await client.invalidateQueries({ queryKey: ["docs"] });
-      router.navigate(docPath(made.doc.id));
-    } catch (e) {
-      setProblem(reasonOf(e));
-    }
-  };
-  return (
-    <div class="flex h-full min-h-0 flex-col gap-3 p-3 lg:flex-row">
-      <nav
-        aria-label={t("web.doc.docs.list")}
-        class={[id() ? "hidden lg:flex" : "flex", "shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-65 lg:overflow-y-auto"]}
-      >
-        <h2 class="px-2 pt-1.5 text-base font-semibold">{t("web.doc.docs.title")}</h2>
-        <form
-          class="flex gap-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void create();
-          }}
-        >
-          <TextInput
-            data-testid="new-doc-title"
-            aria-label={t("web.doc.docs.newTitle")}
-            placeholder={t("web.doc.docs.newTitle")}
-            value={title()}
-            onInput={(e) => setTitle(e.currentTarget.value)}
-          />
-          <Button type="submit" tone="primary" icon="add" data-testid="new-doc">
-            {t("web.doc.docs.new")}
-          </Button>
-        </form>
-        <Show when={problem() || docs.error}>
-          <p class="px-2 text-xs text-berry">{problem() ?? reasonOf(docs.error)}</p>
-        </Show>
-        <Show when={docs.isSuccess && list().length === 0}>
-          <p class="px-2 text-xs text-muted lg:hidden">{t("web.doc.docs.none")}</p>
-        </Show>
-        <ul class="flex flex-col gap-0.5">
-          <For each={list()}>
-            {(d) => (
-              <li>
-                <button
-                  type="button"
-                  aria-current={d.id === open() ? "page" : undefined}
-                  onClick={() => router.navigate(docPath(d.id))}
-                  class={[
-                    "w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left text-sm font-medium",
-                    d.id === open() ? "bg-selected" : "hover:bg-hover",
-                  ]}
-                >
-                  {d.title}
-                </button>
-              </li>
-            )}
-          </For>
-        </ul>
-      </nav>
-      <div class={[id() ? "flex" : "hidden lg:flex", "min-h-0 min-w-0 flex-1 flex-col gap-2"]}>
-        <Show when={id()}>
-          <div class="lg:hidden">
-            <Button icon="back" onClick={() => router.navigate(docPath())}>
-              {t("web.doc.docs.all")}
-            </Button>
-          </div>
-        </Show>
-        <Show
-          when={open()}
-          fallback={
-            <Show when={docs.isSuccess}>
-              <Empty icon="docs">{t("web.doc.docs.none")}</Empty>
-            </Show>
-          }
-        >
-          {(o) => <Keyed key={o()}>{() => <DocView id={o()} />}</Keyed>}
-        </Show>
-      </div>
-    </div>
-  );
 }
 
 /** A block as one drawing of the editor shows it; `block` is the editor's own, for its actions. */
@@ -151,7 +50,7 @@ interface Row {
   readonly type: string;
   readonly attrs: EditBlock["attrs"];
   readonly text: string;
-  readonly spans: readonly DocSpan[];
+  readonly spans: readonly TextSpan[];
   readonly updatedBy: string;
   readonly problem?: string;
   readonly depth: number;
@@ -161,9 +60,9 @@ interface Row {
   readonly wanted: boolean;
 }
 
-function DocView(props: { id: string }) {
-  // Keyed by the id: one editor for the page's life.
-  const editor = new DocEditor(
+/** Keyed by the id by its caller: one editor for the page's life. */
+export function BlocksView(props: { id: string }) {
+  const editor = new BlockEditor(
     api,
     untrack(() => props.id),
   );
@@ -192,7 +91,7 @@ function DocView(props: { id: string }) {
         depth: editor.depthOf(b),
         number: numbers.get(b.id),
         writing,
-        showFace: writing || (b.updatedBy !== docOwner && b.updatedBy !== lastAuthor),
+        showFace: writing || (b.updatedBy !== ownerId && b.updatedBy !== lastAuthor),
         wanted: editor.focusId === b.id,
       };
       lastAuthor = b.updatedBy;
@@ -204,43 +103,41 @@ function DocView(props: { id: string }) {
     return (
       editor.error ??
       (editor.busy
-        ? t("web.doc.docs.saving")
+        ? t("web.artifact.blocks.saving")
         : [
-            t("web.doc.docs.saved"),
-            t("web.doc.docs.blocks", { n: editor.blocks.length }),
-            ...(editor.othersWriting ? [t("web.doc.docs.helpersWriting")] : []),
+            t("web.artifact.blocks.saved"),
+            t("web.artifact.blocks.blocks", { n: editor.blocks.length }),
+            ...(editor.othersWriting ? [t("web.artifact.blocks.helpersWriting")] : []),
           ].join(" · "))
     );
   };
-  const doc = () => (version(), editor.doc);
   return (
     <article
-      aria-label={doc()?.title ?? t("web.doc.docs.doc")}
-      data-testid="doc"
-      data-key={doc()?.id}
+      aria-label={(version(), editor.artifact?.title) ?? ""}
+      data-testid="artifact-blocks"
+      data-key={props.id}
       data-state={(version(), editor.error ? "error" : editor.busy ? "saving" : "saved")}
       data-blocks={(version(), editor.blocks.length)}
       data-writing={(version(), editor.othersWriting) ? "" : undefined}
-      class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2"
+      class="flex min-h-0 flex-1 flex-col"
     >
-      <div class="flex items-start gap-2 pb-1 pl-[35px]">
-        <h1 class="min-w-0 flex-1 text-2xl font-semibold">{doc()?.title ?? ""}</h1>
-        <Button icon="play" data-testid="doc-demo" onClick={() => void editor.demo()}>
-          {t("web.doc.docs.demo")}
+      <div class="flex items-center gap-2 pb-2 pl-[35px]">
+        <p role="status" class={["min-w-0 flex-1 truncate text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
+          {status()}
+        </p>
+        <Button tone="quiet" icon="play" data-testid="artifact-demo" onClick={() => void editor.demo()}>
+          {t("web.artifact.blocks.demo")}
         </Button>
       </div>
-      <p role="status" class={["pb-3 pl-[35px] text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
-        {status()}
-      </p>
-      <div class="min-h-0 flex-1 overflow-y-auto">
+      <div class="min-h-0 flex-1 overflow-y-auto pr-3">
         <For each={rows()} keyed={(r) => r.block.id}>
           {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} />}
         </For>
         {/* Below the last block: a click starts a new paragraph. */}
         <button
           type="button"
-          data-testid="doc-append"
-          aria-label={t("web.doc.docs.append")}
+          data-testid="artifact-append"
+          aria-label={t("web.artifact.blocks.append")}
           class="block h-16 w-full cursor-text"
           onClick={() => editor.append()}
         />
@@ -251,9 +148,9 @@ function DocView(props: { id: string }) {
 
 const barHeight = (type: string) => (type === blockDivider ? 16 : type === blockHeading ? 28 : 20);
 
-function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
+function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent }) {
   const r = () => props.row;
-  const writer = () => (r().updatedBy === docOwner ? t("web.doc.docs.owner") : (props.agent?.name ?? r().updatedBy));
+  const writer = () => (r().updatedBy === ownerId ? t("web.artifact.blocks.owner") : (props.agent?.name ?? r().updatedBy));
   const mark = (): JSX.Element | undefined => {
     switch (r().type) {
       case blockBulleted:
@@ -261,14 +158,14 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
       case blockNumbered:
         return `${r().number ?? 1}.`;
       case blockMemoryItem:
-        return <span class="text-xs text-muted">{t("web.doc.docs.memoryItem")}</span>;
+        return <span class="text-xs text-muted">{t("web.artifact.blocks.memoryItem")}</span>;
       case blockTodo:
         return (
           <button
             type="button"
             role="checkbox"
             aria-checked={aria(r().attrs.checked ?? false)}
-            aria-label={r().attrs.checked ? t("web.doc.docs.done") : t("web.doc.docs.notDone")}
+            aria-label={r().attrs.checked ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
             onClick={() => props.editor.toggle(r().block)}
             class={[
               "mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-xs border-[1.5px]",
@@ -308,8 +205,8 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
         </Show>
       </span>
       <span
-        title={r().writing ? t("web.doc.docs.writing", { who: writer() }) : t("web.doc.docs.wrote", { who: writer() })}
-        aria-label={r().writing ? t("web.doc.docs.writing", { who: writer() }) : undefined}
+        title={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : t("web.artifact.blocks.wrote", { who: writer() })}
+        aria-label={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : undefined}
         class={["mt-0.5 mr-2.5 shrink-0 rounded-sm", r().writing ? "w-1 animate-pulse" : "w-[3px]"]}
         style={{ height: `${barHeight(r().type)}px`, background: authorColor(r().updatedBy, props.agent) }}
       />
@@ -323,10 +220,10 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
               <Placeholder
                 text={
                   kind() === "image"
-                    ? t("web.doc.docs.image", { alt: r().attrs.alt ?? "", src: r().attrs.src ?? "" }).trim()
+                    ? t("web.artifact.blocks.image", { alt: r().attrs.alt ?? "", src: r().attrs.src ?? "" }).trim()
                     : kind() === "issue"
-                      ? t("web.doc.docs.issue", { id: r().attrs.issueId ?? "" })
-                      : t("web.doc.docs.unknown", { type: r().type })
+                      ? t("web.artifact.blocks.issue", { id: r().attrs.issueId ?? "" })
+                      : t("web.artifact.blocks.unknown", { type: r().type })
                 }
               />
             </Show>
@@ -366,7 +263,7 @@ function typeStyle(r: Row) {
   }
 }
 
-function Marked(props: { spans: readonly DocSpan[] }) {
+function Marked(props: { spans: readonly TextSpan[] }) {
   return (
     <For each={props.spans}>
       {(s) => {
@@ -392,7 +289,7 @@ function Marked(props: { spans: readonly DocSpan[] }) {
 }
 
 /** A block's text: the marks drawn until it is clicked into, then a plain field of its own. */
-function BlockField(props: { editor: DocEditor; row: Row }) {
+function BlockField(props: { editor: BlockEditor; row: Row }) {
   const [editing, setEditing] = createSignal(false);
   // focused is the editor's live flag, read again when editing changes: the editor sets it without a new version.
   const shown = () => editing() || props.row.wanted || props.row.block.focused;
@@ -403,12 +300,12 @@ function BlockField(props: { editor: DocEditor; row: Row }) {
         <div
           role="textbox"
           tabindex={0}
-          aria-label={t("web.doc.docs.block", { id: props.row.block.id })}
+          aria-label={t("web.artifact.blocks.block", { id: props.row.block.id })}
           onFocus={() => setEditing(true)}
           onClick={() => setEditing(true)}
           class={["min-h-6 cursor-text text-base leading-6 break-words whitespace-pre-wrap", typeStyle(props.row)]}
         >
-          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? t("web.doc.docs.heading") : " "}</span>}>
+          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? t("web.artifact.blocks.heading") : " "}</span>}>
             <Marked spans={props.row.spans} />
           </Show>
         </div>
@@ -419,7 +316,7 @@ function BlockField(props: { editor: DocEditor; row: Row }) {
   );
 }
 
-function Field(props: { editor: DocEditor; row: Row; focusNow: boolean; onLeave: () => void }) {
+function Field(props: { editor: BlockEditor; row: Row; focusNow: boolean; onLeave: () => void }) {
   let el!: HTMLTextAreaElement;
   const b = () => props.row.block;
   // Clicked into: the field takes the focus once it is on the page.
@@ -463,10 +360,10 @@ function Field(props: { editor: DocEditor; row: Row; focusNow: boolean; onLeave:
   return (
     <textarea
       ref={(t) => (el = t)}
-      aria-label={t("web.doc.docs.block", { id: b().id })}
+      aria-label={t("web.artifact.blocks.block", { id: b().id })}
       rows={1}
       value={props.row.text}
-      placeholder={props.row.type === blockHeading ? t("web.doc.docs.heading") : undefined}
+      placeholder={props.row.type === blockHeading ? t("web.artifact.blocks.heading") : undefined}
       spellcheck="false"
       onFocus={() => props.editor.focus(b(), true)}
       onBlur={() => {

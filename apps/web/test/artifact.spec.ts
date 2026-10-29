@@ -49,24 +49,27 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   const { violations } = await new AxeBuilder({ page }).exclude('[data-testid="artifact-frame"]').withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(violations.map((v) => v.id)).toEqual([]);
 
-  // Deleted: its page says so, its cards stay.
+  // Deleted: back to 产出, its cards stay.
   await page.getByTestId("artifact-delete").click();
   await page.getByTestId("artifact-delete-sure").click();
-  await expect(page).toHaveURL(/\/chat/);
+  await expect(page).toHaveURL(/\/artifacts$/);
   await expect(api.artifact.get({ id: made.id })).rejects.toBeTruthy();
 });
 
-test("Markdown is drawn by the page, without the HTML it carries", async ({ page, api }) => {
+test("Markdown handed in is read into blocks to write on, without running the HTML it carries", async ({ page, api }) => {
   const made = await api.artifact.create({
     title: "notes",
     kind: "markdown",
     content: '# heading\n\n<script>window.ran = 1</script><img src=x onerror="window.ran = 2">\n\n- one\n- two',
   });
+  expect(made.body).toBe("blocks");
   await page.goto(`/artifacts/${made.id}`);
-  const shown = page.getByTestId("artifact-text");
-  await expect(shown.locator("h1")).toBeVisible();
-  await expect(shown.locator("li")).toHaveCount(2);
+  const shown = page.getByTestId("artifact-blocks");
+  await expect(shown.locator('[data-type="heading"]')).toBeVisible();
+  await expect(shown.locator('[data-type="bulleted"]')).toHaveCount(2);
   await expect(shown.locator("script, img")).toHaveCount(0);
+  // Every artifact is listed on 产出, whichever way it came.
+  await expect(page.locator(`[data-testid="artifact-row"][data-key="${made.id}"]`)).toHaveAttribute("aria-current", "page");
   expect(await page.evaluate(() => (window as unknown as { ran?: number }).ran)).toBeUndefined();
 });
 

@@ -1,10 +1,10 @@
-// Markdown is how a document is traded with agents and MEMORY.md, not how it is stored.
+// Markdown is how a artifact is traded with agents and MEMORY.md, not how it is stored.
 // What a block is that Markdown has no word for goes in an HTML comment (<!-- issue:ID -->, <!-- memory:ID -->), an
 // image's size in its title ("640x480"). Nesting is two spaces of indent per level. What the export writes, the import
 // reads back to the same blocks.
 
 import { issueId } from "@vibevalley/protocol/schema";
-import type { Block, BlockAttrs, DocMarks, DocSpan } from "@vibevalley/protocol";
+import type { Block, BlockAttrs, SpanMarks, TextSpan } from "@vibevalley/protocol";
 import { ordered, textFor } from "./ops.ts";
 import { normal, plain, unmarked } from "./text.ts";
 
@@ -13,12 +13,12 @@ export interface MdBlock {
   readonly depth: number;
   readonly type: string;
   readonly attrs: BlockAttrs;
-  readonly text: DocSpan[];
+  readonly text: TextSpan[];
 }
 
 const isList = (t: string) => t === "bulleted" || t === "numbered" || t === "todo";
 
-/** The live blocks, in document order. */
+/** The live blocks, in artifact order. */
 export function markdownOf(blocks: readonly Block[]): string {
   const depth = new Map<string, number>();
   let out = "";
@@ -86,7 +86,7 @@ const escape = (t: string) => Array.from(t, (c) => (specials.includes(c) ? "\\" 
 /** An ASCII letter or digit. */
 const wordy = (c: string | undefined) => c !== undefined && /^[A-Za-z0-9]$/.test(c);
 
-function inlineOf(spans: readonly DocSpan[]): string {
+function inlineOf(spans: readonly TextSpan[]): string {
   const all = normal(spans);
   return all
     .map((s, i) => {
@@ -200,8 +200,8 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
 /** Markdown's inline marks: **bold**, _italic_ or *italic*, `code`, ~~strike~~, [text](url), and \ before any character to take it as it is. */
 export const inlineSpans = (s: string) => normal(inline(Array.from(s), {}));
 
-function inline(s: readonly string[], m: DocMarks): DocSpan[] {
-  const out: DocSpan[] = [];
+function inline(s: readonly string[], m: SpanMarks): TextSpan[] {
+  const out: TextSpan[] = [];
   let buf = "";
   const flush = () => {
     if (buf !== "") out.push({ t: buf, marks: m });

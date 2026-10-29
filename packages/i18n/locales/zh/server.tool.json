@@ -33,9 +33,8 @@
     "search_archive": "翻旧账",
     "memory_search": "翻记性",
     "memory_create": "替帮工记",
-    "doc_get": "读文档",
-    "doc_block_create": "往文档里加一块",
-    "doc_block_update": "改文档的一块"
+    "artifact_block_create": "往产出里加一块",
+    "artifact_block_update": "改产出的一块"
   },
   "about": "{label}：{about}"
 }

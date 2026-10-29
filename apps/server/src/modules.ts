@@ -12,7 +12,7 @@ export const modules: readonly Module[] = [
   { name: "Platform", parts: ["base", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
-  { name: "Collaboration", parts: ["channel", "doc", "artifact"] },
+  { name: "Collaboration", parts: ["channel", "artifact"] },
   { name: "Agent Sessions", parts: ["session"] },
   { name: "Issues", parts: ["issue", "task", "cron"] },
   { name: "Notifications", parts: ["notice"] },

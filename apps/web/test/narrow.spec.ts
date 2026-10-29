@@ -5,7 +5,7 @@ import { expect, test } from "./fixtures";
 const places = [
   "/chat",
   "/issues",
-  "/docs",
+  "/artifacts",
   "/agents",
   "/agents/templates",
   "/runtimes",

@@ -1,18 +1,22 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
-async function newDoc(page: Page, title: string) {
-  await page.goto("/docs");
-  await page.getByTestId("new-doc-title").fill(title);
-  await page.getByTestId("new-doc").click();
-  return page.locator('[data-testid="doc"]', { has: page.getByRole("heading", { name: title }) });
+/** A new blocks artifact, started on 产出 with a title; its blocks once it is open. */
+async function newBlocks(page: Page, title: string) {
+  await page.goto("/artifacts");
+  await page.getByTestId("new-artifact-title").fill(title);
+  await page.getByTestId("new-artifact").click();
+  // Its own, by its title: /artifacts first opens the newest one there was, another test's on a shared server.
+  const shown = page.locator('[data-testid="artifact"]', { has: page.getByRole("heading", { name: title }) });
+  await expect(shown).toHaveAttribute("data-body", "blocks");
+  return shown.getByTestId("artifact-blocks");
 }
 
-test("a document is made and written block by block, and what is written is kept", async ({ page }) => {
+test("a blocks artifact is started on the page and written block by block, and what is written is kept", async ({ page }) => {
   const title = `weekly ${Date.now() % 100000}`;
-  const doc = await newDoc(page, title);
+  const doc = await newBlocks(page, title);
   await expect(doc).toBeVisible();
-  await doc.getByTestId("doc-append").click();
+  await doc.getByTestId("artifact-append").click();
   // Markdown's shortcuts: "# " makes a heading, "- " a bulleted line.
   await page.keyboard.type("# This week");
   await page.keyboard.type(" done");
@@ -31,8 +35,8 @@ test("a document is made and written block by block, and what is written is kept
 
 test("Backspace at a block's start joins it to the one before", async ({ page, api }) => {
   const title = `join ${Date.now() % 100000}`;
-  const doc = await newDoc(page, title);
-  await doc.getByTestId("doc-append").click();
+  const doc = await newBlocks(page, title);
+  await doc.getByTestId("artifact-append").click();
   await page.keyboard.type("first");
   await page.keyboard.press("Enter");
   await page.keyboard.type("second");
@@ -41,6 +45,6 @@ test("Backspace at a block's start joins it to the one before", async ({ page, a
   await page.keyboard.press("Tab");
   await expect(doc).toHaveAttribute("data-blocks", "1", { timeout: 10_000 });
   await expect(doc).toHaveAttribute("data-state", "saved");
-  const id = (await api.doc.list()).find((d) => d.title === title)!.id;
-  expect((await api.doc.get({ id })).blocks.filter((b) => !b.deleted).map((b) => b.text.map((s) => s.t).join(""))).toEqual(["firstsecond"]);
+  const id = (await api.artifact.list({})).find((a) => a.title === title)!.id;
+  expect((await api.artifact.blocks.get({ id })).blocks.filter((b) => !b.deleted).map((b) => b.text.map((s) => s.t).join(""))).toEqual(["firstsecond"]);
 });

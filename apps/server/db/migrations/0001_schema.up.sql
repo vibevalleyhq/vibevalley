@@ -348,61 +348,25 @@ CREATE TABLE agent_task (
   primary key (graph, id)
 );
 CREATE INDEX agent_task_by_keeper on agent_task (keeper, finished_at);
--- Documents (doc/doc.go): blocks in a flat list, nested by parent_id and ordered by (order_key, id); every change is an op,
--- and a batch of ops is one doc_change with the doc's next seq.
-CREATE TABLE doc (
-  id         text primary key,
-  title      text not null,
-  seq        integer not null default 0,
-  created_at double precision not null,
-  updated_at double precision not null
-);
-CREATE TABLE doc_block (
-  id         text primary key,
-  doc_id     text not null references doc (id) on delete cascade,
-  parent_id  text,
-  order_key  text not null,
-  type       text not null,
-  attrs      text not null default '{}', -- JSON: protocol.BlockAttrs
-  spans      text not null default '[]', -- JSON: []protocol.Span
-  rev        integer not null,
-  deleted    boolean not null default false,
-  updated_by text not null,
-  updated_at double precision not null
-);
-CREATE INDEX doc_block_by_doc on doc_block (doc_id, order_key, id);
--- A block's text at each rev (kind normal), and a submitted text that was not taken (kind conflict, at the rev it lost to).
-CREATE TABLE doc_block_revision (
-  id         text primary key,
-  block_id   text not null references doc_block (id) on delete cascade,
-  rev        integer not null,
-  spans      text not null,
-  actor      text not null,
-  kind       text not null check (kind in ('normal', 'conflict')),
-  created_at double precision not null
-);
-CREATE INDEX doc_block_revision_by_block on doc_block_revision (block_id, rev);
-CREATE TABLE doc_change (
-  doc_id     text not null references doc (id) on delete cascade,
-  seq        integer not null,
-  batch_id   text not null unique,
-  actor      text not null,
-  block_ids  text not null, -- JSON: the blocks the batch changed
-  results    text not null, -- JSON: []protocol.DocOpResult, answered again when the batch comes again
-  created_at double precision not null,
-  primary key (doc_id, seq)
-);
+-- Artifacts (artifact/artifact.ts). A blocks one's blocks are a flat list, nested by parent_id and ordered by
+-- (order_key, id); every change is an op, and a batch of ops is one artifact_change with the artifact's next seq.
 CREATE TABLE artifact (
   id          text primary key,
   title       text not null,
-  kind        text not null check (kind in ('html', 'markdown')),
-  -- The channel or thread it was announced in; the issue it was made for, if any.
-  channel_id  text not null references channel (id),
+  -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version).
+  body        text not null check (body in ('blocks', 'html')),
+  -- The channel or thread it was announced in, none for one the owner started on the page; the issue it was made for, if any.
+  channel_id  text references channel (id),
+  -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).
+  message_id  text references channel_message (id) on delete set null,
   issue       text,
   -- Its maker, a profile's id or the owner's, and the name it went by then.
   by_id       text not null,
   by_name     text not null,
+  -- html: the latest version; blocks: 0.
   version     integer not null,
+  -- blocks: the batches taken (artifact_change); html: 0.
+  seq         integer not null default 0,
   created_at  double precision not null,
   updated_at  double precision not null
 );
@@ -423,6 +387,41 @@ CREATE TABLE artifact_version (
   primary key (artifact_id, version)
 );
 CREATE INDEX artifact_version_by_sha on artifact_version (sha);
+CREATE TABLE artifact_block (
+  id          text primary key,
+  artifact_id text not null references artifact (id) on delete cascade,
+  parent_id   text,
+  order_key   text not null,
+  type        text not null,
+  attrs       text not null default '{}', -- JSON: protocol.BlockAttrs
+  spans       text not null default '[]', -- JSON: []protocol.TextSpan
+  rev         integer not null,
+  deleted     boolean not null default false,
+  updated_by  text not null,
+  updated_at  double precision not null
+);
+CREATE INDEX artifact_block_by_artifact on artifact_block (artifact_id, order_key, id);
+-- A block's text at each rev (kind normal), and a submitted text that was not taken (kind conflict, at the rev it lost to).
+CREATE TABLE artifact_block_revision (
+  id         text primary key,
+  block_id   text not null references artifact_block (id) on delete cascade,
+  rev        integer not null,
+  spans      text not null,
+  actor      text not null,
+  kind       text not null check (kind in ('normal', 'conflict')),
+  created_at double precision not null
+);
+CREATE INDEX artifact_block_revision_by_block on artifact_block_revision (block_id, rev);
+CREATE TABLE artifact_change (
+  artifact_id text not null references artifact (id) on delete cascade,
+  seq         integer not null,
+  batch_id    text not null unique,
+  actor       text not null,
+  block_ids   text not null, -- JSON: the blocks the batch changed
+  results     text not null, -- JSON: []protocol.BlockOpResult, answered again when the batch comes again
+  created_at  double precision not null,
+  primary key (artifact_id, seq)
+);
 
 -- A thread hangs under a message, which is made after its channel.
 ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);

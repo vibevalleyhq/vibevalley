@@ -29,7 +29,6 @@ import { effectTool } from "@vibevalley/agent/core/tool";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
-import { Docs } from "../doc/doc.ts";
 import { type ApiError, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
@@ -138,7 +137,6 @@ export const make = Effect.gen(function* () {
   const agents = yield* Agents;
   const projects = yield* Projects;
   const memory = yield* Memories;
-  const docs = yield* Docs;
   const run = yield* Sessions;
   const runtimes = yield* Runtimes;
   const chat = yield* Channels;
@@ -472,7 +470,9 @@ export const make = Effect.gen(function* () {
         yield* callerOf(who);
         return yield* artifactSaid(
           Effect.flatMap(artifacts.get(p.id.trim()), (a) =>
-            Effect.map(artifacts.content(a.id, p.version), (c) => answers.artifact.content(a.title, c.version, c.content)),
+            a.body === "blocks"
+              ? Effect.map(artifacts.blocks(a.id), (snap) => [answers.block.header(a.title, snap.blocks.length), ...snap.blocks.map(blockLine)].join("\n"))
+              : Effect.map(artifacts.content(a.id, p.version), (c) => answers.artifact.content(a.title, c.version, c.content)),
           ),
         );
       }),
@@ -935,47 +935,36 @@ export const make = Effect.gen(function* () {
           }),
         );
 
-  // Documents: a session reads one, appends blocks and rewrites a block's text against the rev it read, through the same
-  // op pipeline the owner's editor uses, written as its profile (its session id when it has none).
+  // A blocks artifact: a session appends blocks and rewrites a block's text against the rev it read (artifact_content_get),
+  // through the same op pipeline the owner's editor uses, written as its profile (its session id when it has none).
   const writer = (c: Caller) => c.agent || c.session;
-
-  const docGet = (who: Who) =>
-    sessionSchemaTool(
-      "doc.get",
-      sessionDescriptions["doc.get"],
-      Effect.fn("Tools.docGet")(function* (p: Session<"doc.get">) {
-        yield* callerOf(who);
-        const snap = yield* docs.get(p.id.trim());
-        return [answers.doc.header(snap.doc.title, snap.blocks.length), ...snap.blocks.map(blockLine)].join("\n");
-      }),
-    );
 
   const blockCreate = (who: Who) =>
     sessionSchemaTool(
-      "doc.block.create",
-      sessionDescriptions["doc.block.create"],
-      Effect.fn("Tools.blockCreate")(function* (p: Session<"doc.block.create">) {
+      "artifact.block.create",
+      sessionDescriptions["artifact.block.create"],
+      Effect.fn("Tools.blockCreate")(function* (p: Session<"artifact.block.create">) {
         const c = yield* callerOf(who);
         const { id, ...block } = p;
-        const r = yield* docs.appendBlock(id.trim(), writer(c), block);
+        const r = yield* artifacts.appendBlock(id.trim(), writer(c), block);
         if (r.status !== "applied") return yield* refuse(r.reason ?? "");
-        return answers.doc.appended(r.blockId, r.rev ?? 0);
+        return answers.block.appended(r.blockId, r.rev ?? 0);
       }),
     );
 
   const blockUpdate = (who: Who) =>
     sessionSchemaTool(
-      "doc.block.update",
-      sessionDescriptions["doc.block.update"],
-      Effect.fn("Tools.blockUpdate")(function* (p: Session<"doc.block.update">) {
+      "artifact.block.update",
+      sessionDescriptions["artifact.block.update"],
+      Effect.fn("Tools.blockUpdate")(function* (p: Session<"artifact.block.update">) {
         const c = yield* callerOf(who);
         const { id, ...block } = p;
-        const r = yield* docs.updateBlock(id.trim(), writer(c), block);
-        if (r.status === "applied") return answers.doc.updated(r.blockId, r.rev);
+        const r = yield* artifacts.updateBlock(id.trim(), writer(c), block);
+        if (r.status === "applied") return answers.block.updated(r.blockId, r.rev);
         if (r.status === "conflict") {
-          const now = yield* Effect.orElseSucceed(docs.get(id.trim()), () => undefined);
+          const now = yield* Effect.orElseSucceed(artifacts.blocks(id.trim()), () => undefined);
           const x = now?.blocks.find((b) => b.id === r.blockId);
-          return answers.doc.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
+          return answers.block.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
         }
         return yield* refuse(r.reason ?? "");
       }),
@@ -1023,7 +1012,6 @@ export const make = Effect.gen(function* () {
       sessionList,
       memorySearch(who, false),
       memoryCreate(who, false),
-      docGet(who),
       blockCreate(who),
       blockUpdate(who),
       issueSplit(who),

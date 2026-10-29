@@ -135,7 +135,61 @@ export const catalogs = {
       made: "做了「{title}」",
       versioned: "「{title}」出了第 {version} 版",
       withNote: "{said}：{note}",
-      preview: { remove: "删掉「{title}」和它的 {n} 版", cards: "对话里的卡片还在，点开说已经删掉了" },
+      preview: { remove: "删掉「{title}」和它的 {n} 版", cards: "对话里的卡片还在，点开说已经删掉了", removeBlocks: "删掉「{title}」和它的 {n} 块" },
+      untitled: "没起名的产出",
+      noBatch: "这批改动没有 batchId",
+      demoNotInserted: "演示的块没插进去：{status}",
+      noWriter: "没有能写的帮工：先在档案里打开一个",
+      demoRunning: "演示正在写，写完再点",
+      notApplied: "这一块没写进去",
+      op: {
+        deleted: "这一块已经删掉了",
+        noAttr: "没有属性 {name}",
+        noBlock: "没有块 {id}",
+        noId: "新块没有 id",
+        taken: "块 {id} 已经有了",
+        unknownType: "不认识的块类型 {type}",
+        badKey: "不是有效的顺序键：{key}",
+        missing: "没有这一块",
+        unknownOp: "不认识的改动 {op}",
+        noText: "这一块没有字",
+        noRev: "没有第 {rev} 版",
+        changed: "这一块刚被别人改过",
+        underSelf: "不能挪到自己下面",
+        splitAtEnd: "这一块刚被别人改过，从末尾拆开了",
+        splitOutside: "拆分位置 {at} 不在字里（{length} 个字）",
+        intoSelf: "不能并进自己",
+      },
+      demo: {
+        "0": {
+          heading: "背景 · 演示",
+          paragraphs: {
+            "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
+            "1": "现在产出按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
+            "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
+          },
+        },
+        "1": {
+          heading: "做法 · 演示",
+          paragraphs: {
+            "0": "（演示）每个帮工先在自己那一节的末尾插一个空段落，然后每隔一秒左右把这一段整段换新，看起来就是一段话在慢慢长长。",
+            "1": "所有改动都走和主人一样的 op 管线：插入是 insert_block，长字是 update_text，带着上一版的版本号，服务端按顺序一批一批收下。",
+            "2": "如果主人在帮工正写着的那一段里改了字，帮工那一下就会冲突、写不进去；它不抢这一段，接着去写下一段。",
+          },
+        },
+        "2": {
+          heading: "下一步 · 演示",
+          paragraphs: {
+            "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
+            "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
+            "2": "演示到这里就结束了。这篇产出留着也行，删掉也行，它不会影响任何工单和记性。",
+          },
+        },
+      },
+      badBlockType: "块的类型只能是 {types}",
+      otherArtifact: "这批改动（{batch}）是另一个产出的",
+      notBlocks: "「{title}」是一整页网页，不按块改：交新的一版",
+      notHtml: "「{title}」是一起写的，不交新的一版：一块一块改（artifact_block_create、artifact_block_update）",
     },
     "server.base": {
       noFile: "{path}: 没有这个文件",
@@ -341,61 +395,6 @@ export const catalogs = {
       noProject: "#{channel} 没有默认项目：直接派给帮工的定时任务要写 project",
       remove: "删掉定时任务「{name}」：以后不再到点开工，它开过的工单留着",
       removeWhen: "删掉定时任务「{name}」（{when}）：以后不再到点开工，它开过的工单留着",
-    },
-    "server.doc": {
-      doc: "文档 {id}",
-      untitled: "没起名的文档",
-      otherDoc: "这批改动（{batch}）是另一篇文档的",
-      noBatch: "这批改动没有 batchId",
-      demoNotInserted: "演示的块没插进去：{status}",
-      noWriter: "没有能写的帮工：先在档案里打开一个",
-      demoRunning: "演示正在写，写完再点",
-      notApplied: "这一块没写进去",
-      op: {
-        deleted: "这一块已经删掉了",
-        noAttr: "没有属性 {name}",
-        noBlock: "没有块 {id}",
-        noId: "新块没有 id",
-        taken: "块 {id} 已经有了",
-        unknownType: "不认识的块类型 {type}",
-        badKey: "不是有效的顺序键：{key}",
-        missing: "没有这一块",
-        unknownOp: "不认识的改动 {op}",
-        noText: "这一块没有字",
-        noRev: "没有第 {rev} 版",
-        changed: "这一块刚被别人改过",
-        underSelf: "不能挪到自己下面",
-        splitAtEnd: "这一块刚被别人改过，从末尾拆开了",
-        splitOutside: "拆分位置 {at} 不在字里（{length} 个字）",
-        intoSelf: "不能并进自己",
-      },
-      demo: {
-        "0": {
-          heading: "背景 · 演示",
-          paragraphs: {
-            "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
-            "1": "现在文档按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
-            "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
-          },
-        },
-        "1": {
-          heading: "做法 · 演示",
-          paragraphs: {
-            "0": "（演示）每个帮工先在自己那一节的末尾插一个空段落，然后每隔一秒左右把这一段整段换新，看起来就是一段话在慢慢长长。",
-            "1": "所有改动都走和主人一样的 op 管线：插入是 insert_block，长字是 update_text，带着上一版的版本号，服务端按顺序一批一批收下。",
-            "2": "如果主人在帮工正写着的那一段里改了字，帮工那一下就会冲突、写不进去；它不抢这一段，接着去写下一段。",
-          },
-        },
-        "2": {
-          heading: "下一步 · 演示",
-          paragraphs: {
-            "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
-            "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
-            "2": "演示到这里就结束了。这篇文档留着也行，删掉也行，它不会影响任何工单和记性。",
-          },
-        },
-      },
-      badBlockType: "块的类型只能是 {types}",
     },
     "server.game": {
       badge: { ripe: "可收获", bugs: "有虫", retrying: "重试中", rest: "歇着", weeding: "除草中 {n}" },
@@ -1049,9 +1048,8 @@ export const catalogs = {
         search_archive: "翻旧账",
         memory_search: "翻记性",
         memory_create: "替帮工记",
-        doc_get: "读文档",
-        doc_block_create: "往文档里加一块",
-        doc_block_update: "改文档的一块",
+        artifact_block_create: "往产出里加一块",
+        artifact_block_update: "改产出的一块",
       },
       about: "{label}：{about}",
     },
@@ -1336,28 +1334,63 @@ export const catalogs = {
       noEffortModel: "{model}没有推理强度可选。",
     },
     "web.artifact": {
-      place: { label: "产出", hint: "帮工和管家交出来的一页：设计、报告、对比，按版本看" },
+      place: { label: "产出", hint: "你和帮工、管家留下要看的东西：一起写的文档、交上来的网页，都在这里" },
       card: { version: "第 {version} 版", open: "打开「{title}」" },
-      kind: { html: "网页", markdown: "说明" },
       page: {
         by: "{name} 做的",
         updated: "{when}更新",
         versions: "版本",
         open: "在新标签页打开",
         delete: "删掉",
-        deleteAsk: "删掉这个产出和它的每一版？对话里的卡片还在。",
+        deleteAsk: "删掉这个产出？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
         gone: "这个产出已经删掉了，或者没有这个产出。",
         frame: "「{title}」第 {version} 版",
+        list: "全部产出",
+        newTitle: "新产出的标题",
+        new: "新建",
+        none: "还没有产出：写个标题新建一篇，或者让帮工交一份上来。",
+        all: "全部产出",
+        forIssue: "为 #{number} 做的",
       },
-      talk: { atMessage: "在对话里", reply: "回复这一版", replyHint: "写给做它的帮工：哪里要改", send: "回复", sent: "回复了第 {version} 版" },
+      talk: {
+        atMessage: "在对话里",
+        reply: "回复",
+        replyHint: "写给做它的帮工：哪里要改",
+        send: "回复",
+        sent: "回复了",
+        replyVersion: "回复这一版",
+        sentVersion: "回复了第 {version} 版",
+      },
       issue: { title: "产出" },
+      blocks: {
+        memoryItem: "记性",
+        saving: "在存……",
+        saved: "都存好了",
+        blocks: "{n} 块",
+        helpersWriting: "帮工在写",
+        demo: "演示：几个帮工一起写",
+        append: "在末尾写一段",
+        owner: "主人",
+        done: "做完了",
+        notDone: "没做完",
+        writing: "{who} 在写",
+        wrote: "{who} 写的",
+        issue: "工单 {id}",
+        unknown: "这一块是「{type}」，这个版本的客户端还画不了，只能看不能改",
+        block: "块 {id}",
+        heading: "标题",
+        notSaved: "没存上：{why}",
+        changed: "这一块刚被别人改过",
+        conflict: "{why}：你写的没存上，留在修订里了",
+        image: "图片：{alt} {src}",
+      },
+      body: { blocks: "一起写的", html: "网页" },
     },
     "web.base": {
       place: {
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
-        docs: { label: "文档", hint: "主人和帮工一起写的文档" },
         agents: { label: "档案", hint: "档案：管家和帮工" },
         runtimes: { label: "农具", hint: "机器上的编码 agent" },
         projects: { label: "项目", hint: "每个项目一座岛" },
@@ -1814,37 +1847,6 @@ export const catalogs = {
         ok: "确定",
         cannotScan: "扫不了？在手机上打开这个链接：",
         newCode: "换一个码",
-      },
-    },
-    "web.doc": {
-      docs: {
-        memoryItem: "记性",
-        list: "文档列表",
-        title: "文档",
-        newTitle: "新文档的标题",
-        new: "新文档",
-        none: "还没有文档。写个标题，点「新文档」。",
-        all: "全部文档",
-        saving: "在存……",
-        saved: "都存好了",
-        blocks: "{n} 块",
-        helpersWriting: "帮工在写",
-        doc: "文档",
-        demo: "演示：几个帮工一起写",
-        append: "在末尾写一段",
-        owner: "主人",
-        done: "做完了",
-        notDone: "没做完",
-        writing: "{who} 在写",
-        wrote: "{who} 写的",
-        issue: "工单 {id}",
-        unknown: "这一块是「{type}」，这个版本的客户端还画不了，只能看不能改",
-        block: "块 {id}",
-        heading: "标题",
-        notSaved: "没存上：{why}",
-        changed: "这一块刚被别人改过",
-        conflict: "{why}：你写的没存上，留在修订里了",
-        image: "图片：{alt} {src}",
       },
     },
     "web.farm": {
@@ -3693,7 +3695,65 @@ export const catalogs = {
       made: 'Made "{title}"',
       versioned: '"{title}" is at version {version}',
       withNote: "{said}: {note}",
-      preview: { remove: 'Delete "{title}" and its {n} versions', cards: "Its cards stay in the conversation and say it was deleted when opened" },
+      preview: {
+        remove: 'Delete "{title}" and its {n} versions',
+        cards: "Its cards stay in the conversation and say it was deleted when opened",
+        removeBlocks: "Delete “{title}” and its {n} blocks",
+      },
+      untitled: "Untitled",
+      noBatch: "This batch of changes has no batchId",
+      demoNotInserted: "The demo's block was not inserted: {status}",
+      noWriter: "No helper can write: turn one on in the profiles first",
+      demoRunning: "The demo is writing: try again when it is done",
+      notApplied: "The block was not written",
+      op: {
+        deleted: "This block was deleted",
+        noAttr: "There is no attribute {name}",
+        noBlock: "There is no block {id}",
+        noId: "The new block has no id",
+        taken: "Block {id} already exists",
+        unknownType: "Unknown block type {type}",
+        badKey: "Not a valid order key: {key}",
+        missing: "There is no such block",
+        unknownOp: "Unknown change {op}",
+        noText: "This block has no text",
+        noRev: "There is no version {rev}",
+        changed: "Someone else just changed this block",
+        underSelf: "A block cannot move under itself",
+        splitAtEnd: "Someone else just changed this block, so it was split at its end",
+        splitOutside: "The split position {at} is outside the text ({length} characters)",
+        intoSelf: "A block cannot merge into itself",
+      },
+      demo: {
+        "0": {
+          heading: "Background · demo",
+          paragraphs: {
+            "0": "(Demo) A script wrote this section; no helper really thought of it. We have several helpers here, and an article used to be written by one of them from start to end while the others waited.",
+            "1": "Now a artifact is stored in blocks, each with its own version. Each helper writes its own section without fighting over a block, and the bar on the left shows at a glance who wrote which.",
+            "2": "This demo lets you see it for yourself: three helpers write at once, the words grow paragraph by paragraph, and in the end they make one whole article.",
+          },
+        },
+        "1": {
+          heading: "How · demo",
+          paragraphs: {
+            "0": "(Demo) Each helper first inserts an empty paragraph at the end of its section, then replaces that paragraph about once a second, so it looks like a paragraph slowly growing.",
+            "1": "Every change goes through the same op pipeline as yours: inserting is insert_block, growing is update_text with the last version's number, and the server takes them in order, batch by batch.",
+            "2": "If you change the words in a paragraph a helper is writing, the helper's next write conflicts and does not go in; it leaves that paragraph to you and goes on to the next.",
+          },
+        },
+        "2": {
+          heading: "Next · demo",
+          paragraphs: {
+            "0": "(Demo) Once broadcasting is done, the page will no longer ask the server every second: when a helper writes, you see it at once.",
+            "1": "Later, a helper that wants to change another section's words will not change them directly but leave a suggestion for you to approve; a finished section is marked in the outline as done and waiting for you.",
+            "2": "That is the end of the demo. Keep this artifact or delete it: it touches no ticket and no memory.",
+          },
+        },
+      },
+      badBlockType: "A block's type can only be {types}",
+      otherArtifact: "This batch of changes ({batch}) belongs to another artifact",
+      notBlocks: "“{title}” is a whole web page, not changed block by block: hand in a new version",
+      notHtml: "“{title}” is written together and takes no new version: change it block by block (artifact_block_create, artifact_block_update)",
     },
     "server.base": {
       noFile: "{path}: no such file",
@@ -3899,61 +3959,6 @@ export const catalogs = {
       noProject: "#{channel} has no default project: a scheduled task sent straight to a helper needs a project",
       remove: 'Delete the scheduled task "{name}": it no longer starts work when due; the tickets it opened stay',
       removeWhen: 'Delete the scheduled task "{name}" ({when}): it no longer starts work when due; the tickets it opened stay',
-    },
-    "server.doc": {
-      doc: "document {id}",
-      untitled: "Untitled document",
-      otherDoc: "This batch of changes ({batch}) belongs to another document",
-      noBatch: "This batch of changes has no batchId",
-      demoNotInserted: "The demo's block was not inserted: {status}",
-      noWriter: "No helper can write: turn one on in the profiles first",
-      demoRunning: "The demo is writing: try again when it is done",
-      notApplied: "The block was not written",
-      op: {
-        deleted: "This block was deleted",
-        noAttr: "There is no attribute {name}",
-        noBlock: "There is no block {id}",
-        noId: "The new block has no id",
-        taken: "Block {id} already exists",
-        unknownType: "Unknown block type {type}",
-        badKey: "Not a valid order key: {key}",
-        missing: "There is no such block",
-        unknownOp: "Unknown change {op}",
-        noText: "This block has no text",
-        noRev: "There is no version {rev}",
-        changed: "Someone else just changed this block",
-        underSelf: "A block cannot move under itself",
-        splitAtEnd: "Someone else just changed this block, so it was split at its end",
-        splitOutside: "The split position {at} is outside the text ({length} characters)",
-        intoSelf: "A block cannot merge into itself",
-      },
-      demo: {
-        "0": {
-          heading: "Background · demo",
-          paragraphs: {
-            "0": "(Demo) A script wrote this section; no helper really thought of it. We have several helpers here, and an article used to be written by one of them from start to end while the others waited.",
-            "1": "Now a document is stored in blocks, each with its own version. Each helper writes its own section without fighting over a block, and the bar on the left shows at a glance who wrote which.",
-            "2": "This demo lets you see it for yourself: three helpers write at once, the words grow paragraph by paragraph, and in the end they make one whole article.",
-          },
-        },
-        "1": {
-          heading: "How · demo",
-          paragraphs: {
-            "0": "(Demo) Each helper first inserts an empty paragraph at the end of its section, then replaces that paragraph about once a second, so it looks like a paragraph slowly growing.",
-            "1": "Every change goes through the same op pipeline as yours: inserting is insert_block, growing is update_text with the last version's number, and the server takes them in order, batch by batch.",
-            "2": "If you change the words in a paragraph a helper is writing, the helper's next write conflicts and does not go in; it leaves that paragraph to you and goes on to the next.",
-          },
-        },
-        "2": {
-          heading: "Next · demo",
-          paragraphs: {
-            "0": "(Demo) Once broadcasting is done, the page will no longer ask the server every second: when a helper writes, you see it at once.",
-            "1": "Later, a helper that wants to change another section's words will not change them directly but leave a suggestion for you to approve; a finished section is marked in the outline as done and waiting for you.",
-            "2": "That is the end of the demo. Keep this document or delete it: it touches no ticket and no memory.",
-          },
-        },
-      },
-      badBlockType: "A block's type can only be {types}",
     },
     "server.game": {
       badge: { ripe: "Ripe", bugs: "Bugs", retrying: "Retrying", rest: "Resting", weeding: "Weeding {n}" },
@@ -4653,9 +4658,8 @@ export const catalogs = {
         search_archive: "Search old talks",
         memory_search: "Search the memory",
         memory_create: "Remember for a helper",
-        doc_get: "Read a doc",
-        doc_block_create: "Add to a doc",
-        doc_block_update: "Change a doc's block",
+        artifact_block_create: "Add to an artifact",
+        artifact_block_update: "Change an artifact's block",
       },
       about: "{label}: {about}",
     },
@@ -4952,34 +4956,63 @@ export const catalogs = {
       noEffortModel: "{model} has no effort levels.",
     },
     "web.artifact": {
-      place: { label: "Artifacts", hint: "Pages helpers and the orchestrator hand in: designs, reports, comparisons, by version" },
+      place: { label: "Artifacts", hint: "What you, the helpers and the orchestrator leave to be read: pages written together and web pages handed in" },
       card: { version: "Version {version}", open: 'Open "{title}"' },
-      kind: { html: "Page", markdown: "Notes" },
       page: {
         by: "Made by {name}",
         updated: "Updated {when}",
         versions: "Versions",
         open: "Open in a new tab",
         delete: "Delete",
-        deleteAsk: "Delete this artifact and every version? Its cards stay in the conversation.",
+        deleteAsk: "Delete this artifact? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
         gone: "This artifact was deleted, or there is no such artifact.",
         frame: '"{title}" version {version}',
+        list: "All artifacts",
+        newTitle: "New artifact title",
+        new: "New",
+        none: "No artifacts yet: give one a title to start it, or have a helper hand one in.",
+        all: "All artifacts",
+        forIssue: "For #{number}",
       },
       talk: {
         atMessage: "In the conversation",
-        reply: "Reply to this version",
+        reply: "Reply",
         replyHint: "For the helper who made it: what to change",
         send: "Reply",
-        sent: "Replied to version {version}",
+        sent: "Replied",
+        replyVersion: "Reply to this version",
+        sentVersion: "Replied to version {version}",
       },
       issue: { title: "Artifacts" },
+      blocks: {
+        memoryItem: "Memory",
+        saving: "Saving…",
+        saved: "All saved",
+        blocks: "{n, plural, one {# block} other {# blocks}}",
+        helpersWriting: "helpers writing",
+        demo: "Demo: several helpers writing at once",
+        append: "Write a paragraph at the end",
+        owner: "Owner",
+        done: "Done",
+        notDone: "Not done",
+        writing: "{who} is writing",
+        wrote: "{who} wrote it",
+        issue: "Ticket {id}",
+        unknown: 'This block is a "{type}", which this version cannot draw yet: it can be read, not changed',
+        block: "Block {id}",
+        heading: "Heading",
+        notSaved: "Not saved: {why}",
+        changed: "Someone else just changed this block",
+        conflict: "{why}: what you wrote was not saved and stays in the revision",
+        image: "Image: {alt} {src}",
+      },
+      body: { blocks: "Written together", html: "Web page" },
     },
     "web.base": {
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
-        docs: { label: "Docs", hint: "Documents you and the helpers write together" },
         agents: { label: "Profiles", hint: "Profiles: managers and helpers" },
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
         projects: { label: "Projects", hint: "An island for each project" },
@@ -5471,37 +5504,6 @@ export const catalogs = {
         ok: "OK",
         cannotScan: "Cannot scan? Open this link on the phone: ",
         newCode: "Another code",
-      },
-    },
-    "web.doc": {
-      docs: {
-        memoryItem: "Memory",
-        list: "Documents",
-        title: "Documents",
-        newTitle: "The new document's title",
-        new: "New document",
-        none: "No documents yet. Write a title and press New document.",
-        all: "All documents",
-        saving: "Saving…",
-        saved: "All saved",
-        blocks: "{n, plural, one {# block} other {# blocks}}",
-        helpersWriting: "helpers writing",
-        doc: "Document",
-        demo: "Demo: several helpers writing at once",
-        append: "Write a paragraph at the end",
-        owner: "Owner",
-        done: "Done",
-        notDone: "Not done",
-        writing: "{who} is writing",
-        wrote: "{who} wrote it",
-        issue: "Ticket {id}",
-        unknown: 'This block is a "{type}", which this version cannot draw yet: it can be read, not changed',
-        block: "Block {id}",
-        heading: "Heading",
-        notSaved: "Not saved: {why}",
-        changed: "Someone else just changed this block",
-        conflict: "{why}: what you wrote was not saved and stays in the revision",
-        image: "Image: {alt} {src}",
       },
     },
     "web.farm": {
@@ -7398,18 +7400,57 @@ export interface Messages {
   "server.agent.template.unreadable": { readonly file: string | number; readonly why: string | number };
   "server.agent.unequip": { readonly holders: string | number };
   "server.archiveRef": { readonly name: string | number };
+  "server.artifact.badBlockType": { readonly types: string | number };
   "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
+  "server.artifact.demo.0.heading": undefined;
+  "server.artifact.demo.0.paragraphs.0": undefined;
+  "server.artifact.demo.0.paragraphs.1": undefined;
+  "server.artifact.demo.0.paragraphs.2": undefined;
+  "server.artifact.demo.1.heading": undefined;
+  "server.artifact.demo.1.paragraphs.0": undefined;
+  "server.artifact.demo.1.paragraphs.1": undefined;
+  "server.artifact.demo.1.paragraphs.2": undefined;
+  "server.artifact.demo.2.heading": undefined;
+  "server.artifact.demo.2.paragraphs.0": undefined;
+  "server.artifact.demo.2.paragraphs.1": undefined;
+  "server.artifact.demo.2.paragraphs.2": undefined;
+  "server.artifact.demoNotInserted": { readonly status: string | number };
+  "server.artifact.demoRunning": undefined;
   "server.artifact.empty": undefined;
   "server.artifact.longTitle": { readonly max: string | number };
   "server.artifact.made": { readonly title: string | number };
   "server.artifact.missing": { readonly id: string | number };
+  "server.artifact.noBatch": undefined;
   "server.artifact.noFile": { readonly title: string | number; readonly version: string | number };
   "server.artifact.noTitle": undefined;
   "server.artifact.noVersion": { readonly latest: string | number; readonly title: string | number; readonly version: string | number };
+  "server.artifact.noWriter": undefined;
+  "server.artifact.notApplied": undefined;
+  "server.artifact.notBlocks": { readonly title: string | number };
+  "server.artifact.notHtml": { readonly title: string | number };
   "server.artifact.notKept": { readonly why: string | number };
+  "server.artifact.op.badKey": { readonly key: string | number };
+  "server.artifact.op.changed": undefined;
+  "server.artifact.op.deleted": undefined;
+  "server.artifact.op.intoSelf": undefined;
+  "server.artifact.op.missing": undefined;
+  "server.artifact.op.noAttr": { readonly name: string | number };
+  "server.artifact.op.noBlock": { readonly id: string | number };
+  "server.artifact.op.noId": undefined;
+  "server.artifact.op.noRev": { readonly rev: string | number };
+  "server.artifact.op.noText": undefined;
+  "server.artifact.op.splitAtEnd": undefined;
+  "server.artifact.op.splitOutside": { readonly at: string | number; readonly length: string | number };
+  "server.artifact.op.taken": { readonly id: string | number };
+  "server.artifact.op.underSelf": undefined;
+  "server.artifact.op.unknownOp": { readonly op: string | number };
+  "server.artifact.op.unknownType": { readonly type: string | number };
+  "server.artifact.otherArtifact": { readonly batch: string | number };
   "server.artifact.preview.cards": undefined;
   "server.artifact.preview.remove": { readonly n: string | number; readonly title: string | number };
+  "server.artifact.preview.removeBlocks": { readonly n: string | number; readonly title: string | number };
   "server.artifact.tooBig": { readonly mb: string | number };
+  "server.artifact.untitled": undefined;
   "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
   "server.artifact.withNote": { readonly note: string | number; readonly said: string | number };
   "server.base.homeTaken": { readonly home: string | number };
@@ -7619,43 +7660,6 @@ export interface Messages {
   "server.cron.when.weekdays": { readonly time: string | number };
   "server.cron.when.weekend": { readonly time: string | number };
   "server.cron.when.weekly": { readonly days: string | number; readonly time: string | number };
-  "server.doc.badBlockType": { readonly types: string | number };
-  "server.doc.demo.0.heading": undefined;
-  "server.doc.demo.0.paragraphs.0": undefined;
-  "server.doc.demo.0.paragraphs.1": undefined;
-  "server.doc.demo.0.paragraphs.2": undefined;
-  "server.doc.demo.1.heading": undefined;
-  "server.doc.demo.1.paragraphs.0": undefined;
-  "server.doc.demo.1.paragraphs.1": undefined;
-  "server.doc.demo.1.paragraphs.2": undefined;
-  "server.doc.demo.2.heading": undefined;
-  "server.doc.demo.2.paragraphs.0": undefined;
-  "server.doc.demo.2.paragraphs.1": undefined;
-  "server.doc.demo.2.paragraphs.2": undefined;
-  "server.doc.demoNotInserted": { readonly status: string | number };
-  "server.doc.demoRunning": undefined;
-  "server.doc.doc": { readonly id: string | number };
-  "server.doc.noBatch": undefined;
-  "server.doc.noWriter": undefined;
-  "server.doc.notApplied": undefined;
-  "server.doc.op.badKey": { readonly key: string | number };
-  "server.doc.op.changed": undefined;
-  "server.doc.op.deleted": undefined;
-  "server.doc.op.intoSelf": undefined;
-  "server.doc.op.missing": undefined;
-  "server.doc.op.noAttr": { readonly name: string | number };
-  "server.doc.op.noBlock": { readonly id: string | number };
-  "server.doc.op.noId": undefined;
-  "server.doc.op.noRev": { readonly rev: string | number };
-  "server.doc.op.noText": undefined;
-  "server.doc.op.splitAtEnd": undefined;
-  "server.doc.op.splitOutside": { readonly at: string | number; readonly length: string | number };
-  "server.doc.op.taken": { readonly id: string | number };
-  "server.doc.op.underSelf": undefined;
-  "server.doc.op.unknownOp": { readonly op: string | number };
-  "server.doc.op.unknownType": { readonly type: string | number };
-  "server.doc.otherDoc": { readonly batch: string | number };
-  "server.doc.untitled": undefined;
   "server.game.badge.bugs": undefined;
   "server.game.badge.rest": undefined;
   "server.game.badge.retrying": undefined;
@@ -8302,6 +8306,8 @@ export interface Messages {
   "server.task.taskState.waiting": undefined;
   "server.task.taskState.working": undefined;
   "server.tool.about": { readonly about: string | number; readonly label: string | number };
+  "server.tool.labels.artifact_block_create": undefined;
+  "server.tool.labels.artifact_block_update": undefined;
   "server.tool.labels.channel_create": undefined;
   "server.tool.labels.channel_list": undefined;
   "server.tool.labels.channel_message_list": undefined;
@@ -8311,9 +8317,6 @@ export interface Messages {
   "server.tool.labels.cron_create": undefined;
   "server.tool.labels.cron_delete": undefined;
   "server.tool.labels.cron_list": undefined;
-  "server.tool.labels.doc_block_create": undefined;
-  "server.tool.labels.doc_block_update": undefined;
-  "server.tool.labels.doc_get": undefined;
   "server.tool.labels.graph_act": undefined;
   "server.tool.labels.graph_get": undefined;
   "server.tool.labels.graph_list": undefined;
@@ -8624,17 +8627,43 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
+  "web.artifact.blocks.append": undefined;
+  "web.artifact.blocks.block": { readonly id: string | number };
+  "web.artifact.blocks.blocks": { readonly n: number };
+  "web.artifact.blocks.changed": undefined;
+  "web.artifact.blocks.conflict": { readonly why: string | number };
+  "web.artifact.blocks.demo": undefined;
+  "web.artifact.blocks.done": undefined;
+  "web.artifact.blocks.heading": undefined;
+  "web.artifact.blocks.helpersWriting": undefined;
+  "web.artifact.blocks.image": { readonly alt: string | number; readonly src: string | number };
+  "web.artifact.blocks.issue": { readonly id: string | number };
+  "web.artifact.blocks.memoryItem": undefined;
+  "web.artifact.blocks.notDone": undefined;
+  "web.artifact.blocks.notSaved": { readonly why: string | number };
+  "web.artifact.blocks.owner": undefined;
+  "web.artifact.blocks.saved": undefined;
+  "web.artifact.blocks.saving": undefined;
+  "web.artifact.blocks.unknown": { readonly type: string | number };
+  "web.artifact.blocks.writing": { readonly who: string | number };
+  "web.artifact.blocks.wrote": { readonly who: string | number };
+  "web.artifact.body.blocks": undefined;
+  "web.artifact.body.html": undefined;
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
   "web.artifact.issue.title": undefined;
-  "web.artifact.kind.html": undefined;
-  "web.artifact.kind.markdown": undefined;
+  "web.artifact.page.all": undefined;
   "web.artifact.page.by": { readonly name: string | number };
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": undefined;
   "web.artifact.page.deleted": { readonly title: string | number };
+  "web.artifact.page.forIssue": { readonly number: string | number };
   "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
   "web.artifact.page.gone": undefined;
+  "web.artifact.page.list": undefined;
+  "web.artifact.page.new": undefined;
+  "web.artifact.page.newTitle": undefined;
+  "web.artifact.page.none": undefined;
   "web.artifact.page.open": undefined;
   "web.artifact.page.updated": { readonly when: string | number };
   "web.artifact.page.versions": undefined;
@@ -8643,8 +8672,10 @@ export interface Messages {
   "web.artifact.talk.atMessage": undefined;
   "web.artifact.talk.reply": undefined;
   "web.artifact.talk.replyHint": undefined;
+  "web.artifact.talk.replyVersion": undefined;
   "web.artifact.talk.send": undefined;
-  "web.artifact.talk.sent": { readonly version: string | number };
+  "web.artifact.talk.sent": undefined;
+  "web.artifact.talk.sentVersion": { readonly version: string | number };
   "web.base.big": { readonly n: string | number };
   "web.base.cast.outfit.farmer": undefined;
   "web.base.cast.outfit.gardener": undefined;
@@ -8713,8 +8744,6 @@ export interface Messages {
   "web.base.place.catalog.label": undefined;
   "web.base.place.chat.hint": undefined;
   "web.base.place.chat.label": undefined;
-  "web.base.place.docs.hint": undefined;
-  "web.base.place.docs.label": undefined;
   "web.base.place.issues.hint": undefined;
   "web.base.place.issues.label": undefined;
   "web.base.place.projects.hint": undefined;
@@ -9157,33 +9186,6 @@ export interface Messages {
   "web.connector.connectors.state.waiting": undefined;
   "web.connector.connectors.weixinIntro": undefined;
   "web.connector.connectors.whichChannel": undefined;
-  "web.doc.docs.all": undefined;
-  "web.doc.docs.append": undefined;
-  "web.doc.docs.block": { readonly id: string | number };
-  "web.doc.docs.blocks": { readonly n: number };
-  "web.doc.docs.changed": undefined;
-  "web.doc.docs.conflict": { readonly why: string | number };
-  "web.doc.docs.demo": undefined;
-  "web.doc.docs.doc": undefined;
-  "web.doc.docs.done": undefined;
-  "web.doc.docs.heading": undefined;
-  "web.doc.docs.helpersWriting": undefined;
-  "web.doc.docs.image": { readonly alt: string | number; readonly src: string | number };
-  "web.doc.docs.issue": { readonly id: string | number };
-  "web.doc.docs.list": undefined;
-  "web.doc.docs.memoryItem": undefined;
-  "web.doc.docs.new": undefined;
-  "web.doc.docs.newTitle": undefined;
-  "web.doc.docs.none": undefined;
-  "web.doc.docs.notDone": undefined;
-  "web.doc.docs.notSaved": { readonly why: string | number };
-  "web.doc.docs.owner": undefined;
-  "web.doc.docs.saved": undefined;
-  "web.doc.docs.saving": undefined;
-  "web.doc.docs.title": undefined;
-  "web.doc.docs.unknown": { readonly type: string | number };
-  "web.doc.docs.writing": { readonly who: string | number };
-  "web.doc.docs.wrote": { readonly who: string | number };
   "web.farm.achievements.category.craft": undefined;
   "web.farm.achievements.category.harvest": undefined;
   "web.farm.achievements.category.secret": undefined;

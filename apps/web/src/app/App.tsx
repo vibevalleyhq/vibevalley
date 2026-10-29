@@ -8,8 +8,7 @@ import { FarmPage } from "../farm/FarmPage";
 import { TreePage } from "../tree/TreePage";
 import { AgentsRoute } from "../features/agent";
 import { CatalogPage } from "../features/catalog";
-import { ArtifactPage } from "../features/artifact";
-import { DocsPage } from "../features/doc";
+import { ArtifactsPage } from "../features/artifact";
 import { IssuesPage } from "../features/issue";
 import { OrchestratorPage } from "../features/orchestrator";
 import { PairPage } from "../features/lan";
@@ -43,9 +42,8 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   agents: (rest) => <AgentsRoute rest={rest()} />,
   runtimes: (rest) => <RuntimesPage rest={rest()} />,
   projects: (rest) => <ProjectsPage rest={rest()} />,
-  docs: (rest) => <DocsPage rest={rest()} />,
   catalog: (rest) => <CatalogPage rest={rest()} />,
-  artifacts: (rest) => <ArtifactPage id={rest()} />,
+  artifacts: (rest) => <ArtifactsPage rest={rest()} />,
 };
 
 /**

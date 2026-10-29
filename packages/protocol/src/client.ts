@@ -251,20 +251,40 @@ export class VibeValleyApi {
   };
 
   readonly artifact = {
-    /** The artifacts announced in a channel or made for an issue, newest first; every one the farm has when neither is given. */
+    /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
     list: (a: T.ArtifactListRequest): Promise<T.Artifact[]> => this.call("/api/v1/artifact/list", a) as Promise<T.Artifact[]>,
     get: (a: { id: string }): Promise<T.Artifact> => this.call("/api/v1/artifact/get", a) as Promise<T.Artifact>,
-    /** Makes one, and its maker says so where it is announced, with its card. */
+    /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest): Promise<T.Artifact> => this.call("/api/v1/artifact/create", a) as Promise<T.Artifact>,
     delete: (a: { id: string }): Promise<void> => this.call("/api/v1/artifact/delete", a) as Promise<void>,
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/artifact/previewDelete", a) as Promise<T.Preview>,
+    /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
+    submit: (a: { id: string } & T.BlockSubmit): Promise<T.BlockAck> => this.call("/api/v1/artifact/submit", a) as Promise<T.BlockAck>,
+    /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
+     * one already running is refused. */
+    demo: (a: { id: string }): Promise<void> => this.call("/api/v1/artifact/demo", a) as Promise<void>,
     content: {
-      /** A version's words, as made: what an agent reads to make the next one. */
+      /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
+       * to make the next one. */
       get: (a: T.ArtifactReadRequest): Promise<T.ArtifactContent> => this.call("/api/v1/artifact/content/get", a) as Promise<T.ArtifactContent>,
     },
     version: {
-      /** A new version over the latest; the old ones stay. Announced like the first. */
+      /** An html one's new version over the latest; the old ones stay. Announced like the first. A blocks one is changed
+       * block by block instead. */
       create: (a: T.ArtifactVersionRequest): Promise<T.Artifact> => this.call("/api/v1/artifact/version/create", a) as Promise<T.Artifact>,
+    },
+    blocks: {
+      /** A blocks artifact and every live block (no tombstones), in order. */
+      get: (a: { id: string }): Promise<T.BlockSnapshot> => this.call("/api/v1/artifact/blocks/get", a) as Promise<T.BlockSnapshot>,
+    },
+    block: {
+      /** One block appended, as one batch of one op. */
+      create: (a: { id: string } & T.BlockCreate): Promise<T.BlockOpResult> => this.call("/api/v1/artifact/block/create", a) as Promise<T.BlockOpResult>,
+      update: (a: { id: string } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call("/api/v1/artifact/block/update", a) as Promise<T.BlockOpResult>,
+    },
+    markdown: {
+      /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
+      get: (a: { id: string }): Promise<T.ArtifactMarkdown> => this.call("/api/v1/artifact/markdown/get", a) as Promise<T.ArtifactMarkdown>,
     },
   };
 
@@ -389,29 +409,6 @@ export class VibeValleyApi {
     },
     me: {
       get: (): Promise<T.LanDevice> => this.call("/api/v1/lan/me/get", undefined) as Promise<T.LanDevice>,
-    },
-  };
-
-  readonly doc = {
-    /** The documents, the newest change first; their blocks are in doc.get. */
-    list: (): Promise<T.Document[]> => this.call("/api/v1/doc/list", undefined) as Promise<T.Document[]>,
-    create: (a: T.DocRequest): Promise<T.DocSnapshot> => this.call("/api/v1/doc/create", a) as Promise<T.DocSnapshot>,
-    /** A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored. */
-    import: (a: T.DocImport): Promise<T.DocSnapshot> => this.call("/api/v1/doc/import", a) as Promise<T.DocSnapshot>,
-    /** The document and every live block (no tombstones), in order. */
-    get: (a: { id: string }): Promise<T.DocSnapshot> => this.call("/api/v1/doc/get", a) as Promise<T.DocSnapshot>,
-    /** A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time. */
-    submit: (a: { id: string } & T.DocSubmit): Promise<T.DocAck> => this.call("/api/v1/doc/submit", a) as Promise<T.DocAck>,
-    /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
-     * one already running is refused. */
-    demo: (a: { id: string }): Promise<void> => this.call("/api/v1/doc/demo", a) as Promise<void>,
-    block: {
-      /** One block appended, as one batch of one op. */
-      create: (a: { id: string } & T.DocBlockCreate): Promise<T.DocOpResult> => this.call("/api/v1/doc/block/create", a) as Promise<T.DocOpResult>,
-      update: (a: { id: string } & T.DocBlockUpdate): Promise<T.DocOpResult> => this.call("/api/v1/doc/block/update", a) as Promise<T.DocOpResult>,
-    },
-    markdown: {
-      get: (a: { id: string }): Promise<T.DocMarkdown> => this.call("/api/v1/doc/markdown/get", a) as Promise<T.DocMarkdown>,
     },
   };
 
