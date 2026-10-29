@@ -76,7 +76,7 @@
 
 **叫停**（`orchestrator.stop`，`vibevalley orchestrator stop`；管家在 `thinking` 或 `speaking` 时输入框旁边有停止键）：停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在频道，派出去的帮工照常干活；交给管家的工单那一轮记成 `interrupted`，日志记「主人叫停了」。管家闲着时什么也不做。
 
-**关闭**：`AgentHost.close` 先拒绝新输入并取消启动，等 start、Build、deliver 的串行链结束，再关 Brain、events 和 execution；关闭中的输入只结束 caller，不记新的 failed run，迟到文本不交给已关闭的 Brain。关大脑就是关它的作用域（`openBrain` 的 `close`）；它和 `AgentHost.close` 都 memoize 同一份清理 Promise，重复调用不提前返回。
+**关闭**：`AgentHost.close` 先拒绝新输入，等手里的那条输入（start、Build、交给大脑，一把 `Semaphore`）做完，再关大脑的作用域、等事件跟完，最后关 execution；关闭中的输入只结束 caller，不记新的 failed run，迟到文本不交给已关闭的 Brain。大脑在自己的纤程上发事件、等听的人，所以事件先进一条 `Queue`，由宿主的一条纤程按序跟；队列在大脑自己的收尾之后才结束，收尾时发的「一轮结束」也跟得到。重复 `close` 都等同一次关闭（一个 `Deferred`）。
 
 **重启后接着做**：开机时 `sessionUnfinished` 看每个管家的对话文件是不是停在半路（规则见 [VibeValley 自己的 agent](docs/subsystems/brain.md#接着做被打断的一轮)）。没做完、有钥匙，就在后台起大脑、`resume(30 分钟)`：
 
@@ -97,7 +97,7 @@
 - **频道（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进频道，带 `sendKey` 的重发不再交给管家（[频道](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时任务经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（完成，交付 `none`）（[工单](docs/subsystems/issue.md)）。`issue_list`、`issue_create`、`issue_update`、`issue_status_update`、`issue_review`、`issue_diff_get` 是工单服务的方法（`list`、`add`、`start`、`draft`、`edit`、`setStatus`……）。
 - **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给现状和工具找帮工。挑档案归 `Runtimes.choose`。
-- **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完）。`brief` 可带 `AbortSignal`，只结束这次等回答的 listener，不取消大家共享的 run；提交失败会拒绝这次 `brief`，不会变成未处理的 rejection。
+- **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完）。`brief` 是一个 Effect：打断它只结束这次等回答（通话结束时语音就这样做），不取消大家共享的 run；提交失败时这次 `brief` 失败。
 - **定时任务（`cron`）**：管家的 `cron_create` 工具经 `Cron.Add(req, orchestrator, owner)`；`wakeSoon` 读定时任务决定空闲时压不压。
 - **计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_act`、`graph_task_update`、`graph_task_delete`、`graph_task_act` 调它。
 - **记性（`memory`）**：`agentHome` 定每个管家的家目录；管家页的记性（`memory.*`，`agent` 是管家的档案 id）和旧账接口（`orchestrator.archive.*`，带 `agent`）读写它的 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`packages/agent/src/memory.ts`）。
@@ -139,6 +139,6 @@
 - 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter @vibevalley/server evals`，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)）。重放时农场的工具只回答样例录下的同一个调用（同一个工具、同样的参数），每个一次，别的调用都回「评测里没有这个工具的结果」（`evals.ts` 的 `stubbed`）：录下的是做错的那一轮，它对一个模型这次没再做的调用的回答（比如没让开工的开工）会让模型以为自己做了。
 - `tool/tool.test.ts`：管家和帮工每个工具生成的参数逐字节对照 `testdata/parameters.json`；钱的说法；轨迹里工具的名字和说法。
 - 大脑、循环和模型请求的测试见 [VibeValley 自己的 agent](docs/subsystems/brain.md#怎么验证)。
-- `session/host.test.ts`：每个回答整条说一次，Caller 边长边拿到字，状态在拿到输入后带上它的去处；Caller 的监听器随 push、end、abort 清理；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 共享清理结果。
+- `session/host.test.ts`：每个回答整条说一次，Caller 边长边拿到字，状态在拿到输入后带上它的去处；Caller 留着读者来之前的字、失败时把原因交给读者；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 等同一次关闭。
 - `agent/agent.test.ts`：管家是内置的档案。
 - 页面：`apps/web/test/orchestrator.spec.ts`（记性、轨迹、「这一轮做错了」、旧账、声音）；`farm-chat.spec.ts`（管家回答田头的话）。

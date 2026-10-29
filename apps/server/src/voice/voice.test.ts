@@ -169,7 +169,7 @@ describe("a call's agent", () => {
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture, brief?: (line: string, signal?: AbortSignal) => Promise<string>) => {
+const farm = (capture: Capture, brief?: (line: string) => Effect.Effect<string, unknown>) => {
   const config = {
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
@@ -475,11 +475,11 @@ describe("voice", () => {
   it.live("a rejected brief is contained and a later update can be told", () => {
     const capture = new Capture();
     let asks = 0;
-    const brief = async () => {
-      asks++;
-      if (asks === 1) throw new Error("brief failed");
-      return "第二件说完了";
-    };
+    const brief = () =>
+      Effect.suspend(() => {
+        asks++;
+        return asks === 1 ? Effect.fail("brief failed") : Effect.succeed("第二件说完了");
+      });
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const core = yield* Core;
@@ -514,19 +514,11 @@ describe("voice", () => {
     const capture = new Capture();
     let asked = 0;
     let cancelled = false;
-    const brief = async (_line: string, signal?: AbortSignal) => {
-      if (!signal) throw new Error("missing abort signal");
-      asked++;
-      await new Promise<void>((resolve) => {
-        const done = () => {
-          cancelled = true;
-          resolve();
-        };
-        if (signal.aborted) done();
-        else signal.addEventListener("abort", done, { once: true });
-      });
-      return "不该念出来";
-    };
+    const brief = () =>
+      Effect.suspend(() => {
+        asked++;
+        return Effect.as(Effect.never, "不该念出来");
+      }).pipe(Effect.onInterrupt(() => Effect.sync(() => (cancelled = true))));
     return Effect.gen(function* () {
       const scope = yield* Scope.make();
       yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
@@ -592,7 +584,7 @@ describe("voice", () => {
       // oxlint-disable-next-line vibevalley/no-test-sleep
       yield* Effect.sleep(80);
       expect(speaks()).toBe(1);
-    }).pipe(Effect.scoped, Effect.provide(farm(capture, async () => "这一句要分很多段念。".repeat(40))));
+    }).pipe(Effect.scoped, Effect.provide(farm(capture, () => Effect.succeed("这一句要分很多段念。".repeat(40)))));
   });
 
   it("asks the orchestrator for one answer of everything that waited", () => {

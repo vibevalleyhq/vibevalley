@@ -292,16 +292,9 @@ export default defineConfig({
       },
       {
         // Not moved into Effect yet; the list only shrinks (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上").
-        // The orchestrator's host and its inputs, the call's line and the local network's proxy wait and queue by hand;
-        // the command line's chats and time.ts's Promise clock go with them.
-        files: [
-          "apps/server/src/session/host.ts",
-          "apps/server/src/orchestrator/orchestrator.ts",
-          "apps/server/src/voice/voice.ts",
-          "apps/server/src/lan/lan.ts",
-          "apps/server/src/cli/chat.ts",
-          "apps/server/src/base/time.ts",
-        ],
+        // The call's line and the local network's proxy wait and queue by hand; the command line's chats and time.ts's
+        // Promise clock go with them.
+        files: ["apps/server/src/voice/voice.ts", "apps/server/src/lan/lan.ts", "apps/server/src/cli/chat.ts", "apps/server/src/base/time.ts"],
         rules: { "vibevalley/promise-boundary": "off" },
       },
       {

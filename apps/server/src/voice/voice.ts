@@ -29,6 +29,14 @@ import { callbackLog } from "@/base/log.ts";
 import { afterRealTime, timeHere, wallTime } from "@/base/time.ts";
 import type { Time } from "@/base/time.ts";
 
+/** Succeeds once the signal aborts. */
+const aborted = (signal: AbortSignal) =>
+  Effect.callback<void>((resume) => {
+    if (signal.aborted) return resume(Effect.void);
+    const done = () => resume(Effect.void);
+    signal.addEventListener("abort", done, { once: true });
+    return Effect.sync(() => signal.removeEventListener("abort", done));
+  });
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 
 /** A page renews tokens before they run out. */
@@ -602,10 +610,12 @@ export const make = (options: VoiceOptions = {}) =>
         const texts = waiting.splice(0);
         const ring = rang;
         rang = undefined;
-        const said = yield* Effect.tryPromise({
-          try: (signal) => orchestrator.brief(onCallLine(texts, ring), AbortSignal.any([signal, call.life.signal])),
-          catch: callStepFailed,
-        }).pipe(Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.succeed(undefined) : Effect.fail(e))));
+        // The call ending ends the wait for the brief (not the orchestrator's run).
+        const said = yield* orchestrator.brief(onCallLine(texts, ring)).pipe(
+          Effect.mapError(callStepFailed),
+          Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
+          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.succeed(undefined) : Effect.fail(e))),
+        );
         if (said === undefined || stopped || call.ending || calls.get(on) !== call) break;
         if (said) {
           tries = 0;
