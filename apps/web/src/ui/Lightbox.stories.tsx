@@ -9,7 +9,7 @@ const pictures: Picture[] = [
 ];
 
 export default stories({
-  title: "ui/Lightbox",
+  title: "组件/工作台/Lightbox",
   stories: {
     Pictures: story({
       note: "← → 换一张，Escape 或点图外面关上。模态，盖在整页上。",

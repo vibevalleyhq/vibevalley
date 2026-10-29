@@ -4,7 +4,7 @@ import { Tabs, type TabsLook } from "./Tabs";
 type Tab = "chat" | "jobs" | "crons" | "files";
 
 export default stories({
-  title: "ui/Tabs",
+  title: "组件/工作台/Tabs",
   stories: {
     Playground: story({
       note: "pills 用在窗格里，line 用在页面的头下面。",

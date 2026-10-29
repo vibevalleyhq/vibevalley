@@ -1,51 +1,35 @@
 // Drawn with the host's token classes (bg-page, border-line…): the host's Tailwind scans this folder. Each frame contains
 // its layout, so a part fixed to the window (a toast) stays in its frame; a modal <dialog> still opens over everything.
 
-import { createMemo, createSignal, createStore, Errored, For, Show } from "solid-js";
+import { createMemo, createSignal, createStore, Errored, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import type { Args, Control, Stories, Story } from "./format";
+import { AngleRight, Check, Folder, Laptop, Layout, Link, Maximize, Mobile, Moon, Restart, Search, Sun, Tablet, type IconFunction } from "reicon";
+import type { Args, Control, Stories } from "./format";
+import { type Entry, entries, isOpen, type Node, search, treeOf } from "./tree";
 
 export type Theme = "light" | "dark" | "both";
 export const widths = ["full", "400", "720", "1280"] as const;
 export type Width = (typeof widths)[number];
 
-export interface Entry {
-  /** "ui/Button:Tones": the address of one story. */
-  readonly key: string;
-  readonly title: string;
-  readonly name: string;
-  readonly story: Story;
-  readonly themes: readonly ("light" | "dark")[];
-  readonly frame: string | undefined;
-}
+const themeLook: Record<Theme, { icon: IconFunction; label: string }> = {
+  light: { icon: Sun, label: "Light" },
+  dark: { icon: Moon, label: "Dark" },
+  both: { icon: Layout, label: "Light and dark side by side" },
+};
 
-/** Every story, by group (`order` first, the rest after), then title, then as written. Two files with one title is a
- * mistake, said once. */
-export function entries(modules: readonly Stories[], order: readonly string[] = []): Entry[] {
-  const seen = new Set<string>();
-  const rank = (title: string) => {
-    const i = order.indexOf(title.split("/")[0]!);
-    return i === -1 ? order.length : i;
-  };
-  return [...modules]
-    .sort((a, b) => rank(a.title) - rank(b.title) || a.title.localeCompare(b.title))
-    .flatMap((m) => {
-      if (seen.has(m.title)) throw new Error(`two stories files are titled ${m.title}`);
-      seen.add(m.title);
-      return Object.entries(m.stories).map(([name, story]) => ({
-        key: `${m.title}:${name}`,
-        title: m.title,
-        name,
-        story,
-        themes: m.themes ?? ["light", "dark"],
-        frame: m.frame,
-      }));
-    });
-}
+const widthLook: Record<Width, { icon: IconFunction; label: string }> = {
+  full: { icon: Maximize, label: "Full width" },
+  "400": { icon: Mobile, label: "Phone, 400 px" },
+  "720": { icon: Tablet, label: "Tablet, 720 px" },
+  "1280": { icon: Laptop, label: "Laptop, 1280 px" },
+};
 
-export function search(list: readonly Entry[], q: string): Entry[] {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  return list.filter((e) => words.every((w) => e.key.toLowerCase().includes(w)));
+function Glyph(props: { icon: IconFunction; size?: number; class?: string }) {
+  return (
+    <span aria-hidden="true" class={["inline-flex shrink-0", props.class]}>
+      {props.icon({ size: props.size ?? 14 })}
+    </span>
+  );
 }
 
 interface View {
@@ -71,9 +55,26 @@ const writeView = (v: View) => {
   history.replaceState(null, "", `${location.pathname}?${q}`);
 };
 
+// Which folders were opened or closed by hand: a convenience of this browser, gone without storage.
+const toggledKey = "stories.toggled";
+const readToggled = () => {
+  try {
+    return new Map<string, boolean>(JSON.parse(localStorage.getItem(toggledKey) ?? "[]") as [string, boolean][]);
+  } catch {
+    return new Map<string, boolean>();
+  }
+};
+const writeToggled = (m: ReadonlyMap<string, boolean>) => {
+  try {
+    localStorage.setItem(toggledKey, JSON.stringify([...m]));
+  } catch {
+    // Not kept: the tree opens as it does by default next time.
+  }
+};
+
 export function StoriesApp(props: {
   stories: readonly Stories[];
-  /** The groups (a title's first part) to list first, in this order. */
+  /** Paths to list first, in this order, at each depth ("设计体系", "组件", "组件/工作台"). */
   order?: readonly string[];
   /** What every story is drawn inside: the host's contexts (a router, a query cache). */
   wrap?: (story: () => JSX.Element) => JSX.Element;
@@ -87,57 +88,99 @@ export function StoriesApp(props: {
   };
   const [q, setQ] = createSignal("");
   const shown = createMemo(() => search(list, q()));
+  const tree = createMemo(() => treeOf(shown()));
   const open = createMemo(() => list.find((e) => e.key === view().key));
+  const [toggled, setToggled] = createSignal<ReadonlyMap<string, boolean>>(readToggled());
+  const folderOpen = (path: string, depth: number) => q().trim() !== "" || isOpen(path, depth, open()?.title, toggled());
+  const toggle = (path: string, depth: number) => {
+    const next = new Map(toggled()).set(path, !folderOpen(path, depth));
+    setToggled(next);
+    writeToggled(next);
+  };
+
+  const Tree = (p: { nodes: readonly Node[] }) => (
+    <ul>
+      <For each={p.nodes}>
+        {(n) => (
+          <li>
+            <Switch>
+              <Match when={n.kind === "folder" && n}>
+                {(f) => (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="story-folder"
+                      data-key={f().path}
+                      aria-expanded={folderOpen(f().path, f().depth) ? "true" : "false"}
+                      onClick={() => toggle(f().path, f().depth)}
+                      style={{ "padding-left": `${f().depth * 12 + 4}px` }}
+                      class={[
+                        "group flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left hover:bg-hover",
+                        f().depth === 0 ? "mt-2 text-xs font-semibold" : "text-muted hover:text-ink",
+                      ]}
+                    >
+                      <Glyph icon={AngleRight} size={12} class="text-faint transition-transform group-aria-expanded:rotate-90" />
+                      <Show when={f().depth > 0}>
+                        <Glyph icon={Folder} size={14} class="text-faint" />
+                      </Show>
+                      <span class="truncate">{f().name}</span>
+                    </button>
+                    <Show when={folderOpen(f().path, f().depth)}>
+                      <Tree nodes={f().children} />
+                    </Show>
+                  </>
+                )}
+              </Match>
+              <Match when={n.kind === "story" && n}>
+                {(s) => (
+                  <a
+                    href={`?s=${encodeURIComponent(s().entry.key)}`}
+                    data-testid="story-link"
+                    data-key={s().entry.key}
+                    aria-current={view().key === s().entry.key ? "page" : undefined}
+                    onClick={(ev) => {
+                      if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+                      ev.preventDefault();
+                      move({ key: s().entry.key });
+                    }}
+                    style={{ "padding-left": `${s().depth * 12 + 20}px` }}
+                    class="block truncate rounded-md py-1 pr-2 hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium"
+                  >
+                    {s().name}
+                  </a>
+                )}
+              </Match>
+            </Switch>
+          </li>
+        )}
+      </For>
+    </ul>
+  );
 
   return (
     <div class="flex h-dvh min-h-0 bg-page text-sm text-ink">
-      <nav data-testid="stories-tree" aria-label="Stories" class="flex w-64 shrink-0 flex-col border-r border-line bg-side">
+      <nav data-testid="stories-tree" aria-label="Stories" class="flex w-72 shrink-0 flex-col border-r border-line bg-side">
         <div class="p-2">
-          <input
-            type="search"
-            data-testid="stories-search"
-            aria-label="Search stories"
-            placeholder="Search"
-            value={q()}
-            onInput={(e) => setQ(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              const first = shown()[0];
-              if (e.key === "Enter" && first) move({ key: first.key });
-            }}
-            class="h-8 w-full rounded-md border border-line bg-page px-2 text-sm outline-none focus:border-focus"
-          />
+          <label class="flex h-8 items-center gap-2 rounded-md border border-line bg-page px-2 text-muted focus-within:border-focus">
+            <Glyph icon={Search} />
+            <input
+              type="search"
+              data-testid="stories-search"
+              aria-label="Search stories"
+              placeholder="Search"
+              value={q()}
+              onInput={(e) => setQ(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                const first = shown()[0];
+                if (e.key === "Enter" && first) move({ key: first.key });
+              }}
+              class="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+            />
+          </label>
         </div>
-        <ul class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-          <For each={groups(shown())}>
-            {(g) => (
-              <li class="mt-2">
-                <div class="px-2 py-1 font-mono text-2xs text-muted">{g.title}</div>
-                <ul>
-                  <For each={g.entries}>
-                    {(e) => (
-                      <li>
-                        <a
-                          href={`?s=${encodeURIComponent(e.key)}`}
-                          data-testid="story-link"
-                          data-key={e.key}
-                          aria-current={view().key === e.key ? "page" : undefined}
-                          onClick={(ev) => {
-                            if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
-                            ev.preventDefault();
-                            move({ key: e.key });
-                          }}
-                          class="block truncate rounded-md px-2 py-1 hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium"
-                        >
-                          {e.name}
-                        </a>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-              </li>
-            )}
-          </For>
-        </ul>
+        <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+          <Tree nodes={tree()} />
+        </div>
         <div class="border-t border-line px-3 py-2 text-2xs text-muted">{`${list.length} stories`}</div>
       </nav>
 
@@ -155,16 +198,6 @@ export function StoriesApp(props: {
       </Show>
     </div>
   );
-}
-
-function groups(list: readonly Entry[]) {
-  const out: { title: string; entries: Entry[] }[] = [];
-  for (const e of list) {
-    const last = out.at(-1);
-    if (last?.title === e.title) last.entries.push(e);
-    else out.push({ title: e.title, entries: [e] });
-  }
-  return out;
 }
 
 const frameWidth = (w: Width) => (w === "full" ? undefined : `${w}px`);
@@ -201,13 +234,14 @@ function Opened(props: {
         <header class="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2">
           <div class="flex min-w-0 flex-1 flex-col">
             <h1 data-testid="story-name" class="truncate text-sm font-semibold">
-              <span class="font-normal text-muted">{`${props.entry.title} / `}</span>
+              <span class="font-normal text-muted">{`${props.entry.title.split("/").join(" / ")} / `}</span>
               {props.entry.name}
             </h1>
             <Show when={story.note}>{(note) => <p class="text-xs text-muted">{note()}</p>}</Show>
           </div>
-          <Pick label="Theme" testid="story-theme" value={props.theme} options={["light", "dark", "both"]} onChange={props.onTheme} />
-          <Pick label="Width" testid="story-width" value={props.width} options={widths} onChange={props.onWidth} />
+          <Pick label="Theme" testid="story-theme" value={props.theme} options={["light", "dark", "both"]} looks={themeLook} onChange={props.onTheme} />
+          <Pick label="Width" testid="story-width" value={props.width} options={widths} looks={widthLook} onChange={props.onWidth} />
+          <CopyLink />
         </header>
         <div
           data-testid="story-canvas"
@@ -228,7 +262,10 @@ function Opened(props: {
                   story.fill ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
                 ]}
               >
-                <span class="absolute top-2 left-3 rounded-xs bg-page px-1 font-mono text-2xs text-muted">{theme}</span>
+                <span class="absolute top-2 left-3 flex items-center gap-1 rounded-xs bg-page px-1 font-mono text-2xs text-muted">
+                  <Glyph icon={themeLook[theme].icon} size={12} />
+                  {theme}
+                </span>
                 <Errored
                   fallback={(err, reset) => (
                     <div data-testid="story-error" role="alert" class="flex flex-col gap-2 text-berry">
@@ -254,10 +291,12 @@ function Opened(props: {
             <button
               type="button"
               data-testid="story-reset"
-              class="rounded-md px-2 py-0.5 text-xs text-muted hover:bg-hover"
+              aria-label="Reset the arguments"
+              title="Reset the arguments"
+              class="flex size-6 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
               onClick={() => set({ ...story.args })}
             >
-              Reset
+              <Glyph icon={Restart} size={14} />
             </button>
           </div>
           <For each={names}>
@@ -269,7 +308,14 @@ function Opened(props: {
   );
 }
 
-function Pick<T extends string>(props: { label: string; testid: string; value: T; options: readonly T[]; onChange: (v: T) => void }) {
+function Pick<T extends string>(props: {
+  label: string;
+  testid: string;
+  value: T;
+  options: readonly T[];
+  looks: Record<T, { icon: IconFunction; label: string }>;
+  onChange: (v: T) => void;
+}) {
   return (
     <div role="radiogroup" aria-label={props.label} data-testid={props.testid} class="flex rounded-md border border-line p-0.5">
       <For each={props.options}>
@@ -278,15 +324,39 @@ function Pick<T extends string>(props: { label: string; testid: string; value: T
             type="button"
             role="radio"
             aria-checked={props.value === o ? "true" : "false"}
+            aria-label={props.looks[o].label}
+            title={props.looks[o].label}
             data-value={String(o)}
             onClick={() => props.onChange(o)}
-            class="rounded-sm px-2 py-0.5 text-xs text-muted hover:text-ink aria-checked:bg-selected aria-checked:font-medium aria-checked:text-ink"
+            class="flex size-7 items-center justify-center rounded-sm text-muted hover:text-ink aria-checked:bg-selected aria-checked:text-ink"
           >
-            {o}
+            <Glyph icon={props.looks[o].icon} size={16} />
           </button>
         )}
       </For>
     </div>
+  );
+}
+
+/** The address holds the view: copying it shares this story, theme and width. */
+function CopyLink() {
+  const [copied, setCopied] = createSignal(false);
+  return (
+    <button
+      type="button"
+      data-testid="story-copy-link"
+      aria-label="Copy link to this view"
+      title={copied() ? "Copied" : "Copy link to this view"}
+      onClick={() =>
+        void navigator.clipboard?.writeText(location.href).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        })
+      }
+      class="flex size-8 items-center justify-center rounded-md border border-line text-muted hover:text-ink"
+    >
+      <Glyph icon={copied() ? Check : Link} size={16} />
+    </button>
   );
 }
 

@@ -5,7 +5,7 @@ import { Dot, type DotTone } from "./Dot";
 const tones: DotTone[] = ["leaf", "wheat", "berry", "water", "idle", "faint", "muted"];
 
 export default stories({
-  title: "ui/Dot",
+  title: "组件/工作台/Dot",
   stories: {
     Tones: story({
       args: { ring: false, size: 8 },

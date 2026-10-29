@@ -9,7 +9,7 @@ const runtimes = [
 ];
 
 export default stories({
-  title: "ui/Field",
+  title: "组件/工作台/Field",
   stories: {
     Text: story({
       args: { label: "项目名", hint: "工作目录下的文件夹名", placeholder: "vibevalley", disabled: false },

@@ -3,7 +3,7 @@ import { Tag, type TagTone } from "./Tag";
 import { icons, type IconName } from "./icons";
 
 export default stories({
-  title: "ui/Tag",
+  title: "组件/工作台/Tag",
   stories: {
     Playground: story({
       args: { label: "完成", tone: "ok", icon: "check" },

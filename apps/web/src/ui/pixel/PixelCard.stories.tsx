@@ -6,7 +6,7 @@ import { CardColors, badgeColors } from "./card";
 import { AnimalFace, PixelCard } from "./PixelCard";
 
 export default stories({
-  title: "pixel/PixelCard",
+  title: "组件/像素/PixelCard",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

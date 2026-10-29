@@ -5,7 +5,7 @@ import { RuntimeBadge } from "./RuntimeBadge";
 const runtimes = ["claude", "codex", "pi", "cursor", "opencode", "kimi", "grok", "antigravity", "dsh", "unknown"];
 
 export default stories({
-  title: "ui/RuntimeBadge",
+  title: "组件/工作台/RuntimeBadge",
   stories: {
     Runtimes: story({
       note: "叠在头像右下角；没有 logo 的是扳手。",

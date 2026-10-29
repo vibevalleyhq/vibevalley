@@ -52,7 +52,9 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   `src/style.css` (lint: `vibevalley/no-hex-color`, `vibevalley/design-tokens`); which one to pick, the atoms' looks and
   the checklist before handing a page in are in docs/style/design.md. The pixel skins and faces are drawn and keep theirs.
 - **Stories.** Every part in `src/ui` (and `src/ui/pixel`) has an `X.stories.tsx` beside it (`src/stories.test.ts`;
-  the few without say why there): its states with made-up data, in both themes, at a few widths. `vp run --filter
+  the few without say why there): its states with made-up data, in both themes, at a few widths. A title's first part
+  is its level (`src/storyLevels.ts`): 设计体系, 组件, 交互 (parts working together, in `src/stories/`), 界面 (a
+  feature's view from made-up data, beside it in the feature). `vp run --filter
   @vibevalley/web stories` serves them; `build:stories` (in `web:check`) builds them to `dist-stories/`, never into
   `dist/`; `test/stories.spec.ts` opens each in its themes with axe. A part that reads the page's data to draw itself is
   split so its drawing takes arguments (`Shortcuts` in `ShortcutSheet.tsx`). The format and the viewer are

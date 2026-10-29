@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { CrossMark, TickMark } from "./glyphs";
 
 export default stories({
-  title: "pixel/glyphs",
+  title: "组件/像素/glyphs",
   themes: ["light"],
   frame: "bg-cream-50 font-pixel text-[12px] text-bark-900",
   stories: {

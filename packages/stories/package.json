@@ -7,9 +7,11 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
+    "reicon": "catalog:",
     "solid-js": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

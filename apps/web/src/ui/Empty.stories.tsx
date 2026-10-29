@@ -3,7 +3,7 @@ import { Button } from "./Button";
 import { Empty } from "./Empty";
 
 export default stories({
-  title: "ui/Empty",
+  title: "组件/工作台/Empty",
   stories: {
     "With a next step": story({
       fill: true,

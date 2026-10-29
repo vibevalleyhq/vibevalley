@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 import { Qr } from "./Qr";
 
 export default stories({
-  title: "ui/Qr",
+  title: "组件/工作台/Qr",
   stories: {
     Pairing: story({
       note: "黑白，带留白：深色主题里也是白底。",

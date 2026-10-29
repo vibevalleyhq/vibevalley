@@ -3,7 +3,7 @@ import { Button } from "./Button";
 import { Hint, Tip } from "./Tip";
 
 export default stories({
-  title: "ui/Tip",
+  title: "组件/工作台/Tip",
   stories: {
     Hover: story({
       note: "悬停或聚焦才出来；提示说明它，不给它起名字。",

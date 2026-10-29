@@ -3,7 +3,7 @@ import { stories, story } from "@vibevalley/stories";
 import { ChipsInput, KeyValueEditor } from "./Chips";
 
 export default stories({
-  title: "ui/Chips",
+  title: "组件/工作台/Chips",
   stories: {
     Words: story({
       note: "回车或逗号加一个，空着按退格删最后一个。",
