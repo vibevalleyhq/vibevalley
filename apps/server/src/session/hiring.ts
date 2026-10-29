@@ -31,5 +31,7 @@ export function sessionName(sessions: readonly Session[], agentId: string, agent
  * or when every one is at work. */
 export function whoMakesRoom(sessions: readonly Session[], max: number): Session | undefined {
   if (sessions.length < max) return undefined;
-  return sessions.filter((s) => !isBusy(s)).sort((a, b) => a.hiredAt - b.hiredAt)[0];
+  // Idle since its last run ended, or since it came when it has not run.
+  const idleSince = (s: Session) => s.lastRun?.at ?? s.hiredAt;
+  return sessions.filter((s) => !isBusy(s)).sort((a, b) => idleSince(a) - idleSince(b))[0];
 }
