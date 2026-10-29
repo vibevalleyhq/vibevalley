@@ -8,7 +8,8 @@ import { onSettled } from "solid-js";
 import { reducedMotion } from "@/ui/pixel";
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
 import type { MemoryItem, MemoryKind, MemoryTree } from "./mock";
-import { constellation, flashFor, hash01, kept, type Star, starsOf, tiesOf, type TreeFilter } from "./rules";
+import { constellation, hash01, type Star, starsOf, tiesOf } from "./sky";
+import { flashFor, kept, type TreeFilter } from "./memories";
 
 export interface SceneHover {
   readonly item: MemoryItem;

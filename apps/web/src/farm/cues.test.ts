@@ -3,7 +3,6 @@ import type { IssueAttention, Session, IssueAct, IssueAction } from "@vibevalley
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { farmCues, type FarmSoundInput } from "./cues";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
 const buttons = (...names: IssueAct[]): IssueAction[] =>
   names.map((act): IssueAction => {
     switch (act) {

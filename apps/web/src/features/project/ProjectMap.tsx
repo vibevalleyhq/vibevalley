@@ -12,8 +12,8 @@ import { api, newSendKey, reasonOf } from "@/base/api";
 import { badgeColors, CardColors } from "@/ui/pixel/card";
 import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
 import { castOf, castSprite, cropSprite } from "@/ui/cast";
+import { growthOf, since } from "./calendar";
 import {
-  growthOf,
   homeless,
   type Island,
   islandLook,
@@ -26,9 +26,8 @@ import {
   openOf,
   plotsIn,
   sessionInPlot,
-  since,
   spotText,
-} from "./rules";
+} from "./islands";
 import { toast } from "@/ui/toasts";
 import { writeIssue } from "@/features/issue";
 import { useRouter } from "@/base/router";

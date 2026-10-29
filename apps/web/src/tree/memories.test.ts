@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { mockTree } from "./mock";
-import { allOf, constellation, counts, kept, starsOf, tiesOf } from "./rules";
-
+import { allOf, counts, kept } from "./memories";
+import { constellation, starsOf, tiesOf } from "./sky";
 const now = Date.parse("2026-10-22T12:00:00+08:00");
 
 test("a memory for every project is kept under any project; a helper filter keeps only its own", () => {

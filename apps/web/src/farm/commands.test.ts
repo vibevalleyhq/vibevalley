@@ -5,7 +5,6 @@ import { farm, resetFarm } from "./store";
 import { beds } from "./world/plots";
 import type { Tool } from "./tools";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-
 afterEach(resetFarm);
 
 const buttons = (...names: IssueAct[]): IssueAction[] =>

@@ -9,7 +9,7 @@ import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "sol
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
-import { doingOf } from "@/farm/hud/rules";
+import { doingOf } from "@/farm/hud/readout";
 import { farm } from "@/farm/store";
 import { stationOfSession } from "@/farm/world/plots";
 import { lineCounts } from "@/features/issue";
@@ -18,7 +18,7 @@ import { useCore, useFrames } from "@/base/frame";
 import { ready, useProjects, useQuery } from "@/base/query";
 import { AgentFace } from "@/ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
 import { type Answer, graphs, useGraphChanges } from "@/features/task";
 import { useAgent, useWorkAgents } from "@/base/agents";

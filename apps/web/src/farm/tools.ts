@@ -1,9 +1,8 @@
 import { t } from "@vibevalley/i18n";
-// The tools the owner holds over the plots, and what a click with one means. aimTool is the
-// rule: the screen shows it while pointing and follows it on a click.
-
 import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
 import { type Bed, isRipe } from "./world/plots";
+// The tools the owner holds over the plots, and what a click with one means. aimTool is the
+// rule: the screen shows it while pointing and follows it on a click.
 
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
 

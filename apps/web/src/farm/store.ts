@@ -9,7 +9,6 @@ import type { Point } from "./world/level";
 import type { FarmPanel } from "./world/places";
 import type { Rect } from "./world/framing";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
 export type { FarmPanel } from "./world/places";
 
 /**

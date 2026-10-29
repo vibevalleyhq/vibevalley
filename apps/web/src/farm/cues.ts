@@ -1,7 +1,6 @@
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 import { playSound, type SoundName } from "@/ui/pixel/sound";
 import type { BedFxKind } from "./tools";
-
 const BED_SOUND = { water: "water", spray: "spray", harvest: "harvest", shovel: "shovel", note: "nope" } as const satisfies Record<BedFxKind, SoundName>;
 
 export type CallPhase = "idle" | "connecting" | "live" | "ending";

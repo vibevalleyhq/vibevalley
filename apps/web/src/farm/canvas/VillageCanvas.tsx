@@ -20,7 +20,8 @@ import { textureProgress } from "@/farm/world/textures";
 import { createExternal } from "@/base/external";
 import { useRouter } from "@/base/router";
 import { ready, useAgents, useQuery } from "@/base/query";
-import { commands, farmProject } from "@/farm/state";
+import { commands } from "@/farm/frames";
+import { farmProject } from "@/farm/ui";
 import { farmFrameOf } from "@/farm/scope";
 import { useVillage } from "@/farm/support";
 

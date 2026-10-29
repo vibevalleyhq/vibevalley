@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
-import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./rules";
+import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 import { farmState } from "@/farm/store";
 import { aimTool } from "@/farm/tools";
 import { yardPlaces } from "@/farm/world/places";
@@ -15,7 +15,7 @@ import { plotH } from "@/farm/world/world";
 import { useFrames } from "@/base/frame";
 import { useFollowed, defaultOf } from "@/features/channel";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { useVillage } from "@/farm/support";
 
 /** Rows of art pixels above the plot's bottom where its rail is. */

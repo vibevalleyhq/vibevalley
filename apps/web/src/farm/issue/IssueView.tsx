@@ -37,7 +37,8 @@ import { ready } from "@/base/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
 import { farmActWords } from "@/farm/labels";
 import { tint } from "@/farm/panels/bits";
-import { commands, useFarm } from "@/farm/state";
+import { commands } from "@/farm/frames";
+import { useFarm } from "@/farm/ui";
 import { useVillage } from "@/farm/support";
 import { useAgent } from "@/base/agents";
 

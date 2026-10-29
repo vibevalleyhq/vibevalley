@@ -1,23 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { Issue, LanguageCount, Phase, ProjectSummary, Session } from "@vibevalley/protocol";
-import {
-  calendarOf,
-  githubRepository,
-  growthOf,
-  type Island,
-  islandScale,
-  islandsOf,
-  islandText,
-  homeless,
-  languageShares,
-  mapPose,
-  mapTally,
-  number,
-  plotsIn,
-  since,
-  streaksOf,
-} from "./rules";
-
+import { calendarOf, growthOf, since, streaksOf } from "./calendar";
+import { githubRepository, number } from "./projects";
+import { type Island, islandScale, islandsOf, islandText, homeless, mapPose, mapTally, plotsIn } from "./islands";
+import { languageShares } from "./languages";
 const lang = (name: string, code: number, comments = 0, files = 1): LanguageCount => ({ name, files, code, comments, blanks: 0 });
 
 describe("languages", () => {

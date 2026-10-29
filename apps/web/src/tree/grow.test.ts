@@ -1,7 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { growthOf, growTree } from "./grow";
 import { mockTree } from "./mock";
-
 const now = Date.parse("2026-10-22T12:00:00+08:00");
 const items = mockTree(now).items;
 

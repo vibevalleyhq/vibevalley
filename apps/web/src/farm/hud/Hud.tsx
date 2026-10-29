@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { clockText, thousands } from "./rules";
+import { clockText, thousands } from "./readout";
 import { playSound } from "@/ui/pixel/sound";
 import { farm } from "@/farm/store";
 import { tools } from "@/farm/tools";
@@ -20,7 +20,7 @@ import { CardColors, PixelCard, SpriteIcon } from "@/ui/pixel";
 import { Phone } from "@/farm/phone/Phone";
 import { HudCard } from "./HudCard";
 import { PhoneButton } from "@/farm/phone/PhoneButton";
-import { timeOfDay, useFarm } from "@/farm/state";
+import { timeOfDay, useFarm } from "@/farm/ui";
 import { Friends } from "./Friends";
 import { FxLayer } from "./FxLayer";
 import { Overlay } from "./Overlay";

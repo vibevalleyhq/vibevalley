@@ -38,7 +38,7 @@ import { orchestratorMood, useCore } from "@/base/frame";
 import { ready, useAgents } from "@/base/query";
 import { OrchestratorFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";

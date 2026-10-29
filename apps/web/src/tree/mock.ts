@@ -4,7 +4,6 @@
 
 import { currentLocale } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
 export type MemoryKind = "leaf" | "fruit" | "seed";
 
 /** A fruit's three parts: an EverOS agent case, or the issue and its last report for a local `issue` memory. */

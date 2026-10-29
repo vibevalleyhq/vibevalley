@@ -6,7 +6,7 @@ import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untra
 import type { JSX } from "@solidjs/web";
 
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "@/ui/pixel/sound";
-import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./rules";
+import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./shelves";
 import { numberText } from "@/base/format";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
