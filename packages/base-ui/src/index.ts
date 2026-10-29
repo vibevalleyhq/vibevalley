@@ -16,3 +16,4 @@ export { Accordion } from "./accordion";
 export { Toolbar } from "./toolbar";
 export { ContextMenu } from "./context-menu";
 export { PreviewCard, type PreviewCardOpenChangeReason } from "./preview-card";
+export { Combobox, type ComboboxOpenChangeReason } from "./combobox";
