@@ -1,7 +1,7 @@
 // The seeds (seeds.json, template_catalog.json): the achievements, the runtimes' presets and settings, and the issue
 // templates, in the farm's language (a profile's templates are folders, template.ts). The .en files say the same as the Chinese but for their words (seed.test.ts).
 
-import type { AchievementDef, RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
+import type { AchievementCategory, RuntimeFacts, RuntimePreset, RuntimeSettings, TemplateKind } from "@vibevalley/protocol";
 import { currentLocale } from "@vibevalley/i18n";
 import seedsZh from "./seeds.json";
 import seedsEn from "./seeds.en.json";
@@ -10,6 +10,18 @@ import catalogEn from "./template_catalog.en.json";
 
 const seeds = () => (currentLocale() === "en" ? seedsEn : seedsZh);
 const catalog = () => (currentLocale() === "en" ? catalogEn : catalogZh);
+
+/** An achievement as seeds.json defines it; the game says it in the owner's words (game/view.ts). */
+export interface AchievementDef {
+  id: string;
+  category: AchievementCategory;
+  title: string;
+  tierTitles?: string[];
+  detail: string;
+  tiers: number[];
+  coins: number[];
+  unit?: string;
+}
 
 /** In the order the page shows them. */
 export const achievements = () => seeds().achievements as AchievementDef[];

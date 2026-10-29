@@ -17,7 +17,6 @@ import {
   type FactLeft,
   type FactReport,
   defaultOrchestrator,
-  firstChannelName,
   ownerId,
   type ActorKind,
   type MessageKind,
@@ -86,6 +85,9 @@ import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
+
+/** The channel a new farm opens with. */
+const firstChannelName = "general";
 
 const reportMax = 1500;
 const searchMax = 50;

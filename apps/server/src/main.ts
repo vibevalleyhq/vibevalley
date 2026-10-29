@@ -9,6 +9,7 @@
 
 import { parseArgs } from "node:util";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import type { ServerReady } from "@vibevalley/protocol";
 import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Otlp, OtlpSerialization } from "effect/observability";
@@ -59,7 +60,7 @@ const main = Effect.gen(function* () {
       Effect.gen(function* () {
         yield* Effect.log(`vibevalley: listening on http://${address}`);
         withdraw = announce(config.home, `http://${address}`);
-        if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid }) + "\n");
+        if (flags["ready-json"]) process.stdout.write(JSON.stringify({ url: `http://${address}`, pid: process.pid } satisfies ServerReady) + "\n");
       }),
     { runtime },
   );

@@ -1,4 +1,4 @@
-import { artifactMax } from "@vibevalley/protocol";
+import { artifactMax } from "./rules.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { artifactHeaders, artifactProblem, htmlPolicy } from "./rules.ts";
 

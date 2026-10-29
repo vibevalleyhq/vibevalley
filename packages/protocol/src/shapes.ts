@@ -22,8 +22,6 @@ export const ownerId = "owner";
 export const everyone = "everyone";
 
 /** The first channel, made default when the farm has none; then a name like any other, stored and in its address. */
-export const firstChannelName = "general";
-
 /** Sessions working at once; also the beds on the farm. */
 export const maxRunning = 6;
 
@@ -111,6 +109,7 @@ export const blockIssueRef = "issue_ref";
 /** Attrs.MemoryID, and text. */
 export const blockMemoryItem = "memory_item";
 
+/** The line the server prints on stdout once it listens, with --ready-json (the desktop shell waits for it). */
 export interface ServerReady {
   url: string;
   pid: number;
@@ -152,17 +151,6 @@ export interface RecallPreview {
 
 export const AchievementCategoryValues = ["starter", "harvest", "craft", "thrift", "team", "secret"] as const;
 export type AchievementCategory = (typeof AchievementCategoryValues)[number];
-
-export interface AchievementDef {
-  id: string;
-  category: AchievementCategory;
-  title: string;
-  tierTitles?: string[];
-  detail: string;
-  tiers: number[];
-  coins: number[];
-  unit?: string;
-}
 
 export interface Achievement {
   id: string;
@@ -301,9 +289,6 @@ export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 /** What a maker hands in: a whole HTML page, or Markdown, which is read into blocks. */
 export const ArtifactKindValues = ["html", "markdown"] as const;
 export type ArtifactKind = (typeof ArtifactKindValues)[number];
-
-export const artifactMax = 5 * 1024 * 1024;
-export const artifactTitleMax = 80;
 
 /** A version's content, a GET like an attachment's: an <iframe src> can only GET. */
 export const artifactPrefix = "/api/v1/artifact/";
@@ -1308,11 +1293,6 @@ export interface GraphSplitRequest {
   agent?: string;
 }
 
-export interface Dispatched {
-  session?: SessionId;
-  queued?: string;
-}
-
 export interface IssueHistory {
   issue: Issue;
   sessions: Session[];
@@ -2132,14 +2112,6 @@ export interface SettingsUpdateVoice {
   silenceMs?: number;
   interruptMs?: number;
   idleSeconds?: number;
-}
-
-export interface Roots {
-  fact: Fact;
-  event: SideEvent;
-  frame: StateFrame;
-  ledger: LedgerEntry;
-  taskEvent: GraphEvent;
 }
 
 /** Told apart by `type`. */

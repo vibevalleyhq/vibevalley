@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { artifactMax, ownerId } from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
+import { artifactMax } from "./rules.ts";
 import { Effect } from "effect";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";

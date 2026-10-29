@@ -1,20 +1,12 @@
 import { maybe, t } from "@vibevalley/i18n";
+import { artifactMax } from "../artifact/rules.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 // The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
-import {
-  type Agent,
-  artifactMax,
-  DeliverableValues,
-  type Issue,
-  IssueStatusValues,
-  defaultOrchestrator,
-  type CronWhen,
-  type TaskEdit,
-} from "@vibevalley/protocol";
+import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";

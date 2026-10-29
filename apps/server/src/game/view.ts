@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 
 import type {
   Achievement,
-  AchievementDef,
   AchievementStanding,
   AchievementTier,
   Badge,
@@ -22,7 +21,7 @@ import type {
 } from "@vibevalley/protocol";
 import { needOf } from "@vibevalley/protocol/rules";
 import { playOf } from "./play.ts";
-import { achievements } from "../agent/seed.ts";
+import { type AchievementDef, achievements } from "../agent/seed.ts";
 import { sessionOf } from "../session/state.ts";
 import { openFindings } from "../issue/state.ts";
 

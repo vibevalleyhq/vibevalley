@@ -14,11 +14,6 @@ export const SessionId: Codec<T.SessionId> = Schema.String.pipe(Schema.brand("Se
 export const issueId = Brand.nominal<T.IssueId>();
 export const sessionId = Brand.nominal<T.SessionId>();
 
-export const ServerReady: Codec<T.ServerReady> = Schema.Struct({
-  url: Schema.String,
-  pid: Schema.Number,
-});
-
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,
   version: Schema.optionalKey(Schema.String),
@@ -142,17 +137,6 @@ export const RecallPreview: Codec<T.RecallPreview> = Schema.Struct({
 });
 
 export const AchievementCategory: Codec<T.AchievementCategory> = Schema.Literals(T.AchievementCategoryValues);
-
-export const AchievementDef: Codec<T.AchievementDef> = Schema.Struct({
-  id: Schema.String,
-  category: AchievementCategory,
-  title: Schema.String,
-  tierTitles: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  detail: Schema.String,
-  tiers: Schema.mutable(Schema.Array(Schema.Number)),
-  coins: Schema.mutable(Schema.Array(Schema.Number)),
-  unit: Schema.optionalKey(Schema.String),
-});
 
 export const AchievementTier: Codec<T.AchievementTier> = Schema.Struct({
   need: Schema.Number,
@@ -1452,11 +1436,6 @@ export const GraphSplitRequest: Codec<T.GraphSplitRequest> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
 });
 
-export const Dispatched: Codec<T.Dispatched> = Schema.Struct({
-  session: Schema.optionalKey(SessionId),
-  queued: Schema.optionalKey(Schema.String),
-});
-
 export const IssueHistory: Codec<T.IssueHistory> = Schema.Struct({
   issue: Issue,
   sessions: Schema.mutable(Schema.Array(Session)),
@@ -1969,14 +1948,6 @@ export const SideEvent: Codec<T.SideEvent> = Schema.Union([
   SideEventNotice,
   SideEventRuntime,
 ]);
-
-export const Roots: Codec<T.Roots> = Schema.Struct({
-  fact: Fact,
-  event: SideEvent,
-  frame: StateFrame,
-  ledger: LedgerEntry,
-  taskEvent: GraphEvent,
-});
 
 export const CronUpdate: Codec<T.CronUpdate> = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),

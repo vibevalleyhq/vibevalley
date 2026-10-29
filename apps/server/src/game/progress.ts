@@ -4,7 +4,6 @@
 
 import {
   type Achievement,
-  type AchievementDef,
   type WorkspaceState,
   everyone,
   type Fact,
@@ -18,7 +17,7 @@ import {
   type SessionId,
 } from "@vibevalley/protocol";
 import { sessionOf, sessionOnIssue } from "../session/state.ts";
-import { achievements } from "../agent/seed.ts";
+import { type AchievementDef, achievements } from "../agent/seed.ts";
 import { layersOf } from "../task/graph.ts";
 import { achievementInWords, levelForCommits } from "./view.ts";
 import { graphOf } from "../task/rules.ts";
