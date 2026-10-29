@@ -356,6 +356,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      '@vibevalley/health':
+        specifier: workspace:*
+        version: link:packages/health
       effect:
         specifier: 'catalog:'
         version: 4.0.5
@@ -707,6 +710,19 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+
+  packages/health:
+    dependencies:
+      vite:
+        specifier: 'catalog:'
+        version: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)'
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
+      vite-plus:
+        specifier: 'catalog:'
+        version: 1.4.0(@types/node@26.6.5)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@2.4.0))(playwright@1.64.1)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
 
   packages/i18n:
     devDependencies:

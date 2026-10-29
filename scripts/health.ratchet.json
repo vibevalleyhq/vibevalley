@@ -1,0 +1,217 @@
+{
+  "apps/desktop": {
+    "nonNull": 1,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "apps/mobile": {
+    "nonNull": 1,
+    "doubleCast": 1,
+    "lintOff": 0
+  },
+  "apps/server": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "apps/web": {
+    "nonNull": 3,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "packages/agent": {
+    "nonNull": 21,
+    "doubleCast": 2,
+    "lintOff": 0
+  },
+  "packages/ai": {
+    "nonNull": 13,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "packages/base-ui": {
+    "nonNull": 8,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "packages/engine": {
+    "nonNull": 40,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "packages/i18n": {
+    "nonNull": 5,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "packages/protocol": {
+    "nonNull": 10,
+    "doubleCast": 3,
+    "lintOff": 0
+  },
+  "packages/stories": {
+    "nonNull": 5,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "packages/testkit": {
+    "nonNull": 5,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "server: Agent Sessions": {
+    "nonNull": 18,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "server: Agents": {
+    "nonNull": 40,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "server: Collaboration": {
+    "nonNull": 48,
+    "doubleCast": 1,
+    "lintOff": 0
+  },
+  "server: Gamification": {
+    "nonNull": 4,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "server: Gateway": {
+    "nonNull": 22,
+    "doubleCast": 1,
+    "lintOff": 1
+  },
+  "server: Issues": {
+    "nonNull": 48,
+    "doubleCast": 2,
+    "lintOff": 0
+  },
+  "server: Notifications": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "server: Orchestrator": {
+    "nonNull": 11,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "server: Platform": {
+    "nonNull": 6,
+    "doubleCast": 1,
+    "lintOff": 1
+  },
+  "server: Source Control": {
+    "nonNull": 35,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: app": {
+    "nonNull": 10,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: base": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: farm": {
+    "nonNull": 78,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/agent": {
+    "nonNull": 4,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/artifact": {
+    "nonNull": 10,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/catalog": {
+    "nonNull": 18,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/channel": {
+    "nonNull": 13,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/connector": {
+    "nonNull": 2,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/issue": {
+    "nonNull": 24,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/lan": {
+    "nonNull": 1,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/memory": {
+    "nonNull": 6,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/notice": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/orchestrator": {
+    "nonNull": 1,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/project": {
+    "nonNull": 23,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/runtime": {
+    "nonNull": 4,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/session": {
+    "nonNull": 23,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/setting": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/task": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: features/voice": {
+    "nonNull": 9,
+    "doubleCast": 0,
+    "lintOff": 1
+  },
+  "web: tree": {
+    "nonNull": 27,
+    "doubleCast": 0,
+    "lintOff": 0
+  },
+  "web: ui": {
+    "nonNull": 16,
+    "doubleCast": 5,
+    "lintOff": 0
+  }
+}

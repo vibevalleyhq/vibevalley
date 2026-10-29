@@ -13,10 +13,13 @@
     "package:mac": "vp run --filter @vibevalley/desktop package",
     "capabilities": "vpx scripts/capabilities.ts",
     "api:client": "vpx scripts/api-client.ts",
-    "i18n:gen": "vpx scripts/i18n.ts gen"
+    "i18n:gen": "vpx scripts/i18n.ts gen",
+    "health": "vpx packages/health/src/cli.ts --config scripts/health.config.ts",
+    "health:write": "vpx packages/health/src/cli.ts --config scripts/health.config.ts --write"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@vibevalley/health": "workspace:*",
     "effect": "catalog:",
     "eslint-plugin-solid": "catalog:",
     "typescript": "catalog:",

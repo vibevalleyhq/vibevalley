@@ -9,6 +9,7 @@
 | 「让容易的写法就是对的写法」的四层手段，和新规矩先问能不能写成代码或检查 | 具体的规矩条文（根目录 [AGENTS.md](AGENTS.md#规矩)） |
 | 文档的分层、子系统和 Note 的分工 | 每层放什么的规矩本身（[docs/AGENTS.md](docs/AGENTS.md)）；Note 的位置、类别和格式（[.agents/notes/README.md](.agents/notes/README.md)） |
 | `docs:verify` 的四个检查：Note、skill、链接和路径、旧名字 | 服务端和页面的检查：黄金数据、`schema.test.ts`、`server:check`、`web:check`（[地基](docs/subsystems/foundation.md)、[客户端](docs/subsystems/app.md)） |
+| 体检：热点和类型逃生口的棘轮（`packages/health`），读数为什么不当门槛 | 拦问题的检查本身（lint、测试、`docs:verify`） |
 | 项目自己的 skill 和验证 skill 的格式 | 每个验证 skill 的步骤（[.agents/skills](.agents/skills/README.md)） |
 | 写作规范为什么是现在这样 | 写作规范本身（[style/writing.md](docs/style/writing.md)）、代码怎么写（[style/code.md](docs/style/code.md)） |
 | 素材的生图和切图流水线 | 客户端怎么读图、密度、像素村（[农场的皮](docs/subsystems/farm.md)）；操作步骤（[development.md](docs/development.md#素材音效和官网)） |
@@ -17,6 +18,7 @@
 ## 在哪
 
 - **`scripts/`**（`vpx` 直接跑 `.ts`，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `vp run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统、`comment-review.ts`（让模型照 `docs/style/code.md` 审注释，只报不改）。
+- **体检** `packages/health`：读 git 和源码，出热点和类型逃生口的报告（[README](packages/health/README.md)）；这个仓库算哪些文件、怎么分区、哪些文件本来就热写在 `scripts/health.config.ts`，逃生口的棘轮是 `scripts/health.ratchet.json`。`vp run health` 出报告，`vp run health:verify` 在 CI 的 check 里。
 - **`.agents/`**：`notes/` 是 Agent Notes，`CATALOG.md` 是生成的清单；`skills/` 是项目自己的 skill，`.claude/skills` 是指向它的符号链接。
 - **`docs/`**：分层见 [docs/AGENTS.md](docs/AGENTS.md)；`docs/style/` 是 `writing.md` 和 `code.md`。
 - **`design/`**：`pixel/gen.sh`（codex 生图）、`pixel/process.py`（切图，写 `apps/web/public/pixel/` 和 `sprites.json`）、`pixel/prompts/`（提示词）、`pixel/icons/`（Hugeicons 的 SVG 和排参考图的 `ref.py`）；`assets/` 只留最早一套手绘界面的 `gen.sh`、提示词和原图；`art.sh` 把单独仓库 vibevalley-art 里的原图链接进来；`names.md` 是给档案和人物起名的梗。
@@ -73,9 +75,11 @@
 - **原图留着，但放在单独的仓库。** 生图不是确定的，原图删了就回不来；原图和效果图有四百多 MB，不该让每次克隆都带上。`design/art.sh` 链接回 `design/`，脚本照常读写。
 - **叫 VibeValley（码农场物语）。** 原名 heybro 在 GitHub 上撞了一个同样做 AI agent 的项目，也说不出它是什么。VibeValley 一个词连着 vibe coding、《星露谷物语》的田园感和硅谷；码农场物语是「码农」「农场」的双关，「物语」呼应《牧场物语》。放弃了 vibefarm（域名、游戏、GitHub 名都被占）、viberfarm（VIBER 是注册商标，读音也撞）、只改仓库名（GitHub 和应用两个名字，传不起来）、只改名字不改数据里的 id（看不见的地方永远叫旧名，新代码要记住例外），也放弃了兼容旧名字：每个读环境变量或目录的地方都得记着旧名，而当时没有外部用户，改一次最便宜。
 - **没价值的注释：分隔线交给 lint，其余交给模型审新加的。** 量过 main 上的 4663 条注释：能用模式认准的只有分隔线和给一段代码起的标题（40 处，全中）；换个说法复述名字、文件开头的概述、测试里一步步讲，按词比对只对一半，只比声明的名字又只抓到一处，要读懂注释和它旁边的代码。所以分隔线是 `vibevalley/no-comment-divider`；其余由 `scripts/comment-review.ts` 把新加的注释连同附近的代码、`docs/style/code.md` 的「注释」一节交给 DeepSeek 判，[vv-comments](.agents/skills/vv-comments/SKILL.md) 写怎么对着代码核实。只审新加的：花的和改动一样大，旧的由主人点名一块用 `--all` 清。只报不改：删错一条说为什么的注释，比留一条废话代价大。在 `apps/server/src/issue` 上校准过（174 条）：第一轮判 70 条不留，6 条判错（一致性的约定、元组的先后、把「问题」和「检查」弄混）、5 条改写丢了要紧的；第二轮又在第一轮留下的里报出 13 条该删的。所以只报不改，清一块跑两轮。提 PR 前在本机跑、不进 CI：模型的回答每次不一样，不该挡合并。放弃了全写成 lint（认不准，`error` 误报、`warn` 没人看）和每次审整个仓库（3850 条、近两百次请求）。
+- **体检只指方向，只有逃生口是门槛。** 「文件不超过多少行」这类门槛一设，agent 学会的是把大文件机械地切开凑数；热点（改动次数乘行数）只排出先看哪里，`shapes.ts`、`schema.ts` 这类本来就热的写明理由放在一边。类型逃生口（`x!`、`as unknown as`、关掉 lint 的注释）做成按区的棘轮：数清楚、意思明确，多一个就该有理由；少了也失败，要求把棘轮降下来，否则省下的余量会被下一个改动悄悄用掉。读数和这个仓库自己的过去比，不和行业的数比。体检做成单独的包、配置留在仓库：它不认识 VibeValley，以后能给主人的项目用。
 
 ## 还没做的
 
+- 体检的后几项：代码存活率（新写的行 14 天后还剩多少）、跨模块一起改的文件、测试超出预算的趋势，和每项读数能不能预测问题的回测：[体检](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)。
 - 用 VibeValley 开发 VibeValley：干活的农场和正在改的代码分开、合并前跑检查、渠道各用各的工作目录：[提案](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)。
 
 ## 怎么验证
@@ -84,4 +88,5 @@
 - 在文档里写一个不存在的反引号路径或 `../` 链接，`vpx scripts/doc-links.ts` 报错；删掉一份验收分册的「证据」一节、或入口的表漏了一份，`vpx scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`vpx scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
 - `vp test run scripts/verify-server.test.ts`：`only a machine receipt from the owned process announces readiness`、`sandbox owns isolation, readiness, validation failure and cleanup`。
 - `vp test run scripts/comment-review.test.ts`：只挑新加的注释、连着的 `//` 合成一条、跳过工具的指令、模型漏答或答错格式时报错而不当成 `keep`。
+- `vp run health:verify`：本包的测试（改名跟到今天的名字、机械的改动不计、三种逃生口在 `.ts` 和 `.tsx` 里、棘轮的多和少）；在任何一个算进去的文件里加一个 `x!`，`--check` 报出那一区和多了几个。
 - 素材没有自动检查：重跑 `process.py` 后看 `git diff apps/web/public/pixel/`，图鉴页能看全部贴图。

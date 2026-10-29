@@ -32,6 +32,7 @@ packages/ai/               模型：DeepSeek 的请求和流、消息形状、�
 packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具，其余是 Brain（对话、压缩、技能、记性、帮手、自己的任务）；
                            不认识农场，lint 查方向（ai ← agent ← apps/server）
 packages/testkit/          测试共用的：黄金数据、在真实时间上等条件、测试金字塔（只在 devDependencies）
+packages/health/           仓库的体检：热点（改动次数乘行数）和类型逃生口的棘轮；这个仓库的配置在 scripts/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面
 site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 apps/web/public 的
 design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
@@ -67,6 +68,7 @@ vp run package:mac                                              # macOS 应用�
 vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
 vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键
+vp run health                                                   # 看先改哪里：热点和类型逃生口；vp run health:verify 对棘轮（逃生口变少了跑 vp run health:write 降下来）
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
 vp run docs:verify                                              # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接、旧名字
 vp run site:check && vp run site:build                          # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
