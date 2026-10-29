@@ -1,7 +1,7 @@
 // A tool's parameters, from its Schema to the JSON Schema the model is shown, and a model's arguments back to what the
 // Schema reads, as pi-ai's validateToolArguments makes them (testdata/arguments.jsonl.gz).
 
-import { Schema } from "effect";
+import { Schema, Predicate } from "effect";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
@@ -85,7 +85,7 @@ function matches(value: unknown, type: string): boolean {
     case "array":
       return Array.isArray(value);
     case "object":
-      return typeof value === "object" && value !== null && !Array.isArray(value);
+      return Predicate.isObject(value);
     default:
       return false;
   }

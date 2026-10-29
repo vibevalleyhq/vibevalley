@@ -498,7 +498,7 @@ export const make = (options: RuntimeOptions = {}) =>
       update: (id, s) =>
         known(id)
           ? Effect.andThen(
-              store.saveSettings(id, s).pipe(Effect.mapError((e) => (e._tag === "Refused" ? refused(t("server.runtime.notSaved", { id, why: e.reason })) : e))),
+              store.saveSettings(id, s).pipe(Effect.catchTag("Refused", (e) => Effect.fail(refused(t("server.runtime.notSaved", { id, why: e.reason }))))),
               refresh(id),
             )
           : Effect.succeed(undefined),

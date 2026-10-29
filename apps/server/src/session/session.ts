@@ -52,6 +52,7 @@ import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core, type FactIn } from "../core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { Memories } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
 import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "../project/shapes.ts";
@@ -271,8 +272,7 @@ export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
 }> {}
 
 /** A failure's words, whatever it is. */
-const reasonText = (e: unknown): string =>
-  e instanceof Error ? e.message : typeof e === "object" && e !== null && "_tag" in e ? reasonOf(e as ApiError) : String(e);
+const reasonText = (e: unknown): string => (e instanceof Error ? e.message : Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : String(e));
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));

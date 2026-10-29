@@ -3,7 +3,7 @@
 // through. requiredOrder is the order the required fields are listed in, and a struct that refuses fields it does not
 // know (parseOptions) says so in the JSON Schema too (additionalProperties false).
 
-import { Schema } from "effect";
+import { Schema, Predicate } from "effect";
 import type { Handlers } from "@vibevalley/protocol/api";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { params } from "./prompts.ts";
@@ -299,9 +299,7 @@ const written = (node: unknown): unknown => {
   for (const key of Object.keys(o).sort()) {
     const value = o[key];
     out[key] =
-      key === "properties" && typeof value === "object" && value !== null
-        ? Object.fromEntries(Object.entries(value).map(([name, p]) => [name, written(p)]))
-        : written(value);
+      key === "properties" && Predicate.isObject(value) ? Object.fromEntries(Object.entries(value).map(([name, p]) => [name, written(p)])) : written(value);
   }
   return out;
 };

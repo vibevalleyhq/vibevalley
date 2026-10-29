@@ -1,6 +1,7 @@
 // A chat/completions stream read into an assistant message, as pi-ai 1.3.0's openai-completions reads DeepSeek's
 // (testdata/deepseek.jsonl.gz holds what pi-ai made of each stream), with pi-ai's events on the way.
 
+import { Predicate } from "effect";
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -359,7 +360,7 @@ export function toolCallArguments(json: string): { arguments: Readonly<Record<st
 function streamingArguments(partial: string, last: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   try {
     const parsed = parseWithRepair(partial);
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : last;
+    return Predicate.isObject(parsed) ? parsed : last;
   } catch {
     return last;
   }
