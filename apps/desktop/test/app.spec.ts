@@ -12,7 +12,8 @@ import type { Notice } from "@vibevalley/protocol/host";
 // The server and the agents it runs read keys from the environment: a test must never reach a real model, voice service or
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
 // own logins (~/.pi, ~/.claude, …) stay out of reach.
-const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_/;
+// GIT_CONFIG_* go together: GIT_CONFIG_COUNT without its GIT_CONFIG_KEY_n stops every git command.
+const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/;
 /** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
  * starts with, as a farm whose agent.starters names them. */
 const starters = () =>
