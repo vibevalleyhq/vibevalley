@@ -15,7 +15,7 @@ const farm = Effect.gen(function* () {
 });
 
 describe("an artifact's content", () => {
-  it.live("is read back by GET at its version's path, sandboxed as HTML or plain as Markdown, and nothing else is", () =>
+  it.live("is read back by GET at an html version's path, sandboxed, and nothing else is: a blocks one is not a file", () =>
     Effect.gen(function* () {
       const { address, artifacts } = yield* farm;
       const owner = { from: ownerId, by: ownerId };
@@ -32,12 +32,9 @@ describe("an artifact's content", () => {
       expect(yield* Effect.promise(() => first.text())).toBe("<p>第一版</p>");
       expect(yield* Effect.promise(async () => (await fetch(`http://${address}${artifactPath(html.id, 2)}`)).text())).toBe("<p>第二版</p>");
       const md = yield* artifacts.create(owner, { title: "说明", kind: "markdown", content: "# 题\n\n<script>no</script>" });
-      const text = yield* get(artifactPath(md.id, 1));
-      expect([text.headers.get("content-type"), text.headers.get("content-security-policy")]).toEqual([
-        "text/plain; charset=utf-8",
-        "sandbox; default-src 'none'",
-      ]);
       for (const path of [
+        artifactPath(md.id, 0),
+        artifactPath(md.id, 1),
         artifactPath(html.id, 3),
         artifactPath(html.id, 0),
         artifactPath("0".repeat(36), 1),

@@ -45,7 +45,7 @@
 21. **首页**（`apps/web/src/farm/title/`）：背景按打开时的钟点选清晨、白天、黄昏或夜晚，上面叠着会动的云、炊烟、植物和萤火虫，管家和选好的宠物画在场景里。左边是「开始游戏」「继续游戏」「设置」；有农场可回时才能继续，没填 DeepSeek 钥匙时点开始在菜单下提示，点设置才进设置页。什么时候出现和回去见[客户端](docs/subsystems/app.md#怎么走)，固定钟点的方法见[开发](docs/development.md#调试台)。
 22. **管家页**（`/orchestrator` 是默认管家的，`/orchestrator/<档案 id>` 是别的）：管家的专门页，不用捏帮工页；头上有「改它的档案」。页签（「声音」只有默认管家有）：「记性」能替它记和忘，带不进系统提示预算的内容变淡；「轨迹」占满内容区，在一轮收到的话上能标「这一轮做错了」；「旧账」能搜压缩时存下的旧对话；「声音」管打电话时的人设、开场白和音色。规则分别见[管家](docs/subsystems/orchestrator.md)和[语音](docs/subsystems/voice.md)。
 
-**工作台**（`apps/web/src/app/Shell.tsx`）：干活和配置的地方，农场是看和玩的地方。最左一条木色的栏：管家头像（回农场）、聊天、工单、文档（`/docs`，[文档](docs/subsystems/doc.md)）、项目、帮工、农具、图鉴；最下面是设置和回农场。农具里每台农机画成一件农机，钉着那家 agent 的 logo（来自 LobeHub Icons）。
+**工作台**（`apps/web/src/app/Shell.tsx`）：干活和配置的地方，农场是看和玩的地方。最左一条木色的栏：管家头像（回农场）、聊天、工单、产出（`/artifacts`，[产出](docs/subsystems/artifact.md)）、项目、帮工、农具、图鉴；最下面是设置和回农场。农具里每台农机画成一件农机，钉着那家 agent 的 logo（来自 LobeHub Icons）。
 
 ## 轨迹
 

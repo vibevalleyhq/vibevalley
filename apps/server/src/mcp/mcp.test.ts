@@ -1,13 +1,12 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, Session } from "@vibevalley/protocol";
+import { type Agent, ownerId, type Session } from "@vibevalley/protocol";
 import { Said } from "../testing/said.ts";
 import { starter } from "../testing/layers.ts";
 import { Effect } from "effect";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { Docs } from "../doc/doc.ts";
 import { Artifacts } from "../artifact/artifact.ts";
 import { Sessions } from "../session/session.ts";
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
@@ -87,6 +86,8 @@ describe("mcp", () => {
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).sort()).toEqual([
+        "artifact_block_create",
+        "artifact_block_update",
         "artifact_content_get",
         "artifact_create",
         "artifact_get",
@@ -95,9 +96,6 @@ describe("mcp", () => {
         "channel_message_list",
         "channel_message_send",
         "channel_unread_list",
-        "doc_block_create",
-        "doc_block_update",
-        "doc_get",
         "issue_split",
         "memory_create",
         "memory_search",
@@ -210,37 +208,37 @@ describe("mcp", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 
-  // A helper writes a document through its tools: the same ops as the owner's editor, written as its profile; a stale
-  // rewrite over the owner's change is not taken and says what the block has now.
-  it.live("lets a helper write a document", () =>
+  // A helper writes a blocks artifact through its tools: the same ops as the owner's editor, written as its profile; a
+  // stale rewrite over the owner's change is not taken and says what the block has now.
+  it.live("lets a helper write in a blocks artifact", () =>
     Effect.gen(function* () {
       const core = yield* Core;
       const mcp = yield* Mcp;
-      const docs = yield* Docs;
+      const artifacts = yield* Artifacts;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab" });
-      const d = yield* docs.create("周报");
+      const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报" });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
-      const added = yield* tool("doc_block_create", { id: d.doc.id, text: "这周做完了**第一步**" });
+      const added = yield* tool("artifact_block_create", { id: d.id, text: "这周做完了**第一步**" });
       const block = /加了一块〔(\S+)〕，第 (\d+) 版/.exec(added)![1]!;
-      expect(yield* tool("doc_block_create", { id: d.doc.id, text: "下周", type: "heading", level: 1 })).toContain("加了一块");
-      expect(yield* tool("doc_block_create", { id: d.doc.id, text: "x", type: "table" })).toContain("没成：块的类型只能是");
-      const read = yield* tool("doc_get", { id: d.doc.id });
+      expect(yield* tool("artifact_block_create", { id: d.id, text: "下周", type: "heading", level: 1 })).toContain("加了一块");
+      expect(yield* tool("artifact_block_create", { id: d.id, text: "x", type: "table" })).toContain("没成：块的类型只能是");
+      const read = yield* tool("artifact_content_get", { id: d.id });
       expect(read).toContain("《周报》，2 块");
       expect(read).toContain("〔" + block + " · 第 1 版 · paragraph〕这周做完了第一步");
-      expect(yield* tool("doc_block_update", { id: d.doc.id, block, baseRev: 1, text: "这周做完了第一步和第二步" })).toContain("现在是第 2 版");
+      expect(yield* tool("artifact_block_update", { id: d.id, block, baseRev: 1, text: "这周做完了第一步和第二步" })).toContain("现在是第 2 版");
       // The owner changes it in the editor; the helper's next rewrite was made against rev 2.
-      yield* docs.submit(d.doc.id, "owner", {
+      yield* artifacts.submit(d.id, "owner", {
         batchId: "owner",
         ops: [{ op: "update_text", blockId: block, baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
       });
-      const stale = yield* tool("doc_block_update", { id: d.doc.id, block, baseRev: 2, text: "帮工又改" });
+      const stale = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 2, text: "帮工又改" });
       expect(stale).toContain("没改：这一块刚被别人改过，现在是第 3 版");
       expect(stale).toContain("主人改过的");
-      const snap = yield* docs.get(d.doc.id);
+      const snap = yield* artifacts.blocks(d.id);
       expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["主人改过的", "owner", "lab"]);
-      expect(yield* docs.markdown(d.doc.id)).toBe("主人改过的\n\n# 下周\n");
-      expect(yield* tool("doc_get", { id: "nope" })).toContain("没成");
+      expect(yield* artifacts.markdown(d.id)).toBe("主人改过的\n\n# 下周\n");
+      expect(yield* tool("artifact_content_get", { id: "nope" })).toContain("没成");
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 });

@@ -16,7 +16,7 @@ for (const theme of ["light", "dark"] as const)
       "/chat",
       "/issues",
       `/issues/${issue.id}`,
-      "/docs",
+      "/artifacts",
       "/agents",
       `/agents/${agent.id}`,
       "/agents/templates",

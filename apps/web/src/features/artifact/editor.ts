@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-// The document being edited: blocks in order, the owner's edits as ops
+// The blocks artifact being edited: blocks in order, the owner's edits as ops
 // waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
 
@@ -11,11 +11,11 @@ import {
   blockParagraph,
   blockTodo,
   blockQuote,
-  type DocOp,
-  docOwner,
-  type DocSnapshot,
-  type DocSpan,
-  type Document,
+  type BlockOp,
+  ownerId,
+  type BlockSnapshot,
+  type TextSpan,
+  type Artifact,
   type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
@@ -26,7 +26,7 @@ import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes
 export const idleWait = 500;
 export const maxWait = 2000;
 
-/** How often an open document asks for what others (helpers) wrote while nothing of the owner's waits: every pollFast
+/** How often an open blocks artifact asks for what others (helpers) wrote while nothing of the owner's waits: every pollFast
  * while another writer was heard in the last busyPolls asks (or the demo was just started), else pollEvery. */
 export const pollEvery = 4000;
 export const pollFast = 1000;
@@ -45,7 +45,7 @@ export class EditBlock {
   orderKey: string;
   type: string;
   attrs: BlockAttrs;
-  spans: DocSpan[];
+  spans: TextSpan[];
   /** Zero is local: edits of a new block wait behind its insertion until the server supplies a revision. */
   rev: number;
   updatedBy: string;
@@ -54,7 +54,7 @@ export class EditBlock {
   /** The ask that last brought another writer's change to this block (display only: it shows as being written). */
   heardAt?: number;
   /** The text the server has, as far as this client knows: an update is sent only when the owner's differs. */
-  sent: DocSpan[];
+  sent: TextSpan[];
   /** Set when the server did not take the owner's text. */
   problem?: string;
   composing = false;
@@ -71,7 +71,7 @@ export class EditBlock {
     this.spans = b.text;
     this.sent = b.text;
     this.rev = "rev" in b ? b.rev : 0;
-    this.updatedBy = "updatedBy" in b ? b.updatedBy : docOwner;
+    this.updatedBy = "updatedBy" in b ? b.updatedBy : ownerId;
     this.text = plainOf(b.text);
   }
 }
@@ -80,13 +80,13 @@ interface Pending {
   /** The blocks it changes: their text is not replaced by the server's until it has gone. */
   readonly ids: ReadonlySet<string>;
   /** Made when the batch goes: an op written against a rev takes the rev the client knows then. */
-  readonly build: () => DocOp;
+  readonly build: () => BlockOp;
   /** The block whose rev the op is written against. */
   readonly base?: string;
 }
 
-export class DocEditor {
-  doc?: Document;
+export class BlockEditor {
+  artifact?: Artifact;
   error?: string;
   blocks: EditBlock[] = [];
   /** The block to focus once drawn. */
@@ -99,7 +99,7 @@ export class DocEditor {
   // Removed here before the server has heard: an answer about one does not bring it back, but its rev still counts for an
   // op queued against it before it went (the text typed into a block just split off, then joined back).
   private readonly gone = new Map<string, EditBlock>();
-  private inflight?: { id: string; ops: DocOp[]; ids: Set<string> };
+  private inflight?: { id: string; ops: BlockOp[]; ids: Set<string> };
   private sending = false;
   private idle?: ReturnType<typeof setTimeout>;
   private max?: ReturnType<typeof setTimeout>;
@@ -116,7 +116,7 @@ export class DocEditor {
 
   constructor(
     private readonly api: VibeValleyApi,
-    readonly docId: string,
+    readonly artifactId: string,
   ) {}
 
   subscribe = (f: () => void) => {
@@ -134,19 +134,19 @@ export class DocEditor {
     return this.sending || this.queue.length > 0 || this.dirty.size > 0;
   }
 
-  /** Someone other than the owner changed the document lately (or the demo was just started). */
+  /** Someone other than the owner changed the artifact lately (or the demo was just started). */
   get othersWriting() {
     return this.heardAt !== undefined && this.polls - this.heardAt < busyPolls;
   }
 
   /** A helper is writing it now: its change came in one of the last writingPolls questions. */
   writing(b: EditBlock) {
-    return b.updatedBy !== docOwner && b.heardAt !== undefined && this.polls - b.heardAt < writingPolls;
+    return b.updatedBy !== ownerId && b.heardAt !== undefined && this.polls - b.heardAt < writingPolls;
   }
 
   async load() {
     try {
-      this.take(await this.api.doc.get({ id: this.docId }), true);
+      this.take(await this.api.artifact.block.list({ id: this.artifactId }), true);
       this.error = undefined;
     } catch (e) {
       this.error = reasonOf(e);
@@ -166,9 +166,9 @@ export class DocEditor {
     // Drawn as being written before this ask: it may have stopped since.
     let redraw = this.othersWriting || this.blocks.some((b) => this.writing(b));
     try {
-      const snap = await this.api.doc.get({ id: this.docId });
+      const snap = await this.api.artifact.block.list({ id: this.artifactId });
       this.polls++;
-      if ((snap.doc.seq !== this.seq || this.held.size > 0) && !this.busy) {
+      if ((snap.artifact.seq !== this.seq || this.held.size > 0) && !this.busy) {
         this.take(snap, true, true);
         redraw = true;
       }
@@ -181,7 +181,7 @@ export class DocEditor {
   /** Starts the scripted demo: helpers write their sections at once; asks come every pollFast from now. */
   async demo() {
     try {
-      await this.api.doc.demo({ id: this.docId });
+      await this.api.artifact.demo({ id: this.artifactId });
       this.error = undefined;
       this.heardAt = this.polls;
       this.cron();
@@ -191,9 +191,9 @@ export class DocEditor {
     this.changed();
   }
 
-  private take(snap: DocSnapshot, replace: boolean, heard = false) {
-    this.doc = snap.doc;
-    this.seq = snap.doc.seq;
+  private take(snap: BlockSnapshot, replace: boolean, heard = false) {
+    this.artifact = snap.artifact;
+    this.seq = snap.artifact.seq;
     this.held.clear();
     const seen = new Set<string>();
     for (const b of snap.blocks) {
@@ -219,7 +219,7 @@ export class DocEditor {
       this.byId.delete(b.id);
       return;
     }
-    const news = heard && b.updatedBy !== docOwner && (!mine || mine.rev !== b.rev);
+    const news = heard && b.updatedBy !== ownerId && (!mine || mine.rev !== b.rev);
     if (news) this.heardAt = this.polls;
     if (!mine) {
       const added = new EditBlock(b);
@@ -500,7 +500,7 @@ export class DocEditor {
           if (this.queue.length === 0) break;
           // A batch ends before an op written against a block an earlier op in it changes: that op needs the rev the
           // server gives back.
-          const ops: DocOp[] = [];
+          const ops: BlockOp[] = [];
           const ids = new Set<string>();
           while (this.queue.length > 0 && !(ops.length > 0 && this.queue[0]!.base !== undefined && ids.has(this.queue[0]!.base))) {
             const next = this.queue.shift()!;
@@ -511,10 +511,10 @@ export class DocEditor {
         }
         let ack;
         try {
-          ack = await this.api.doc.submit({ id: this.docId, batchId: batch.id, lastSeq: this.seq, ops: batch.ops });
+          ack = await this.api.artifact.submit({ id: this.artifactId, batchId: batch.id, lastSeq: this.seq, ops: batch.ops });
         } catch (e) {
           // Kept with its batch id, so sending it again cannot take it twice.
-          this.error = t("web.doc.docs.notSaved", { why: reasonOf(e) });
+          this.error = t("web.artifact.blocks.notSaved", { why: reasonOf(e) });
           this.changed();
           break;
         }
@@ -526,9 +526,9 @@ export class DocEditor {
           if (!b) continue;
           b.problem =
             r.status === "conflict"
-              ? t("web.doc.docs.conflict", { why: r.reason ?? t("web.doc.docs.changed") })
+              ? t("web.artifact.blocks.conflict", { why: r.reason ?? t("web.artifact.blocks.changed") })
               : r.status === "rejected"
-                ? t("web.doc.docs.notSaved", { why: r.reason ?? "" })
+                ? t("web.artifact.blocks.notSaved", { why: r.reason ?? "" })
                 : undefined;
           if (r.status === "conflict") b.sent = [];
         }

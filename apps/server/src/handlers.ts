@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 // Each handler only forwards to the service that owns the rule.
 
-import { defaultOrchestrator, docOwner, type IssueUpdate, ownerId } from "@vibevalley/protocol";
+import { defaultOrchestrator, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
 import { missing, lookIn, reasonOf, refused } from "./errors.ts";
@@ -11,7 +11,6 @@ import { Settings } from "./base/config.ts";
 import { Core } from "./core/core.ts";
 import { Artifacts } from "./artifact/artifact.ts";
 import { Channels } from "./channel/chat.ts";
-import { Docs } from "./doc/doc.ts";
 import { Issues } from "./issue/issue.ts";
 import { Memories } from "./memory/memory.ts";
 import { Runtimes } from "./runtime/runtime.ts";
@@ -34,7 +33,6 @@ export const handlers = Effect.gen(function* () {
   const agents = yield* Agents;
   const projects = yield* Projects;
   const memory = yield* Memories;
-  const docs = yield* Docs;
   const runtimes = yield* Runtimes;
   const sessions = yield* Sessions;
   const channels = yield* Channels;
@@ -187,8 +185,15 @@ export const handlers = Effect.gen(function* () {
         artifacts.create({ from: ownerId, by: ownerId }, { ...req, ...(issue ? { issue } : {}) }),
       ),
     "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),
+    "artifact.update": ({ id, title }) => artifacts.rename(id, title),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
+    "artifact.block.list": ({ id }) => artifacts.blocks(id),
+    "artifact.submit": ({ id, ...body }) => artifacts.submit(id, ownerId, body),
+    "artifact.block.create": ({ id, ...body }) => artifacts.appendBlock(id, ownerId, body),
+    "artifact.block.update": ({ id, ...body }) => artifacts.updateBlock(id, ownerId, body),
+    "artifact.markdown.get": ({ id }) => Effect.map(artifacts.markdown(id), (markdown) => ({ markdown })),
+    "artifact.demo": ({ id }) => artifacts.demo(id, agents.agents()),
     "cron.create": (body) => crons.add(body, owner),
     "cron.list": () => Effect.sync(crons.list),
     "cron.update": ({ id, ...body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(crons.setEnabled(id, body.enabled))),
@@ -227,15 +232,6 @@ export const handlers = Effect.gen(function* () {
     "graph.event.list": ({ id }) => tasks.events(id),
     "graph.list": () => Effect.sync(tasks.graphs),
     "graph.get": ({ id }) => tasks.graph(id),
-    "doc.list": () => docs.list(),
-    "doc.create": (body) => docs.create(body.title),
-    "doc.import": (body) => docs.importMarkdown(body.title, body.markdown, docOwner),
-    "doc.get": ({ id }) => docs.get(id),
-    "doc.submit": ({ id, ...body }) => docs.submit(id, docOwner, body),
-    "doc.block.create": ({ id, ...body }) => docs.appendBlock(id, docOwner, body),
-    "doc.block.update": ({ id, ...body }) => docs.updateBlock(id, docOwner, body),
-    "doc.markdown.get": ({ id }) => Effect.map(docs.markdown(id), (markdown) => ({ markdown })),
-    "doc.demo": ({ id }) => docs.demo(id, agents.agents()),
   };
   return done;
 });

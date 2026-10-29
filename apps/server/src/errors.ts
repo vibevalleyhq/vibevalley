@@ -13,7 +13,6 @@ type LookIn =
   | "session"
   | "project"
   | "runtime"
-  | "doc"
   | "agent"
   | "skill"
   | "template"
@@ -43,7 +42,6 @@ export const lookIn = {
   session: listed("session", commandOf("session.list")),
   project: listed("project", commandOf("project.list")),
   runtime: listed("runtime", commandOf("runtime.list")),
-  doc: listed("doc", commandOf("doc.list")),
   agent: listed("agent", commandOf("agent.list")),
   skill: listed("skill", commandOf("skill.list")),
   template: listed("template", commandOf("agent.template.list")),

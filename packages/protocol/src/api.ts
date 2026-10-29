@@ -180,17 +180,33 @@ export interface Handlers<R = never> {
   /** The thread under a message, made if it has none: its id. */
   readonly "channel.thread.create": (a: { readonly id: string }) => Effect.Effect<string, ApiError, R>;
   readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
-  /** The artifacts announced in a channel or made for an issue, newest first; every one the farm has when neither is given. */
+  /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
   readonly "artifact.list": (a: T.ArtifactListRequest) => Effect.Effect<T.Artifact[], ApiError, R>;
   readonly "artifact.get": (a: { readonly id: string }) => Effect.Effect<T.Artifact, ApiError, R>;
-  /** A version's words, as made: what an agent reads to make the next one. */
+  /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
+   * to make the next one. */
   readonly "artifact.content.get": (a: T.ArtifactReadRequest) => Effect.Effect<T.ArtifactContent, ApiError, R>;
-  /** Makes one, and its maker says so where it is announced, with its card. */
+  /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
   readonly "artifact.create": (a: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError, R>;
-  /** A new version over the latest; the old ones stay. Announced like the first. */
+  /** An html one's new version over the latest; the old ones stay. Announced like the first. A blocks one is changed
+   * block by block instead. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  /** Its title, as the owner renames it. */
+  readonly "artifact.update": (a: { readonly id: string; readonly title: string }) => Effect.Effect<T.Artifact, ApiError, R>;
   readonly "artifact.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "artifact.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  /** A blocks artifact and every live block (no tombstones), in order. */
+  readonly "artifact.block.list": (a: { readonly id: string }) => Effect.Effect<T.BlockSnapshot, ApiError, R>;
+  /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
+  readonly "artifact.submit": (a: { readonly id: string } & T.BlockSubmit) => Effect.Effect<T.BlockAck, ApiError, R>;
+  /** One block appended, as one batch of one op. */
+  readonly "artifact.block.create": (a: { readonly id: string } & T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError, R>;
+  readonly "artifact.block.update": (a: { readonly id: string } & T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError, R>;
+  /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
+  readonly "artifact.markdown.get": (a: { readonly id: string }) => Effect.Effect<T.ArtifactMarkdown, ApiError, R>;
+  /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
+   * one already running is refused. */
+  readonly "artifact.demo": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
   readonly "channel.archive.toggle": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** A channel nothing points at any more, with its threads and messages. */
@@ -296,22 +312,6 @@ export interface Handlers<R = never> {
   readonly "lan.device.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "lan.pair": (a: T.LanPairRequest) => Effect.Effect<T.LanPaired, ApiError, R>;
   readonly "lan.me.get": () => Effect.Effect<T.LanDevice, ApiError, R>;
-  /** The documents, the newest change first; their blocks are in doc.get. */
-  readonly "doc.list": () => Effect.Effect<T.Document[], ApiError, R>;
-  readonly "doc.create": (a: T.DocRequest) => Effect.Effect<T.DocSnapshot, ApiError, R>;
-  /** A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored. */
-  readonly "doc.import": (a: T.DocImport) => Effect.Effect<T.DocSnapshot, ApiError, R>;
-  /** The document and every live block (no tombstones), in order. */
-  readonly "doc.get": (a: { readonly id: string }) => Effect.Effect<T.DocSnapshot, ApiError, R>;
-  /** A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time. */
-  readonly "doc.submit": (a: { readonly id: string } & T.DocSubmit) => Effect.Effect<T.DocAck, ApiError, R>;
-  /** One block appended, as one batch of one op. */
-  readonly "doc.block.create": (a: { readonly id: string } & T.DocBlockCreate) => Effect.Effect<T.DocOpResult, ApiError, R>;
-  readonly "doc.block.update": (a: { readonly id: string } & T.DocBlockUpdate) => Effect.Effect<T.DocOpResult, ApiError, R>;
-  readonly "doc.markdown.get": (a: { readonly id: string }) => Effect.Effect<T.DocMarkdown, ApiError, R>;
-  /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
-   * one already running is refused. */
-  readonly "doc.demo": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
 }
 
 export interface Endpoint {
@@ -830,6 +830,13 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote", "orchestrator", "session"],
   },
   {
+    op: "artifact.update",
+    about: ["id"],
+    input: input({ id: Schema.String, title: Schema.String }),
+    result: S.Artifact,
+    can: ["owner", "remote"],
+  },
+  {
     op: "artifact.delete",
     about: ["id"],
     input: artifactDeleteInput,
@@ -843,6 +850,48 @@ export const endpoints: readonly Endpoint[] = [
     input: artifactDeleteInput,
     result: S.Preview,
     can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.block.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.BlockSnapshot,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.submit",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.BlockSubmit),
+    result: S.BlockAck,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.block.create",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.BlockCreate),
+    result: S.BlockOpResult,
+    can: ["owner", "remote", "session"],
+  },
+  {
+    op: "artifact.block.update",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.BlockUpdate),
+    result: S.BlockOpResult,
+    can: ["owner", "remote", "session"],
+  },
+  {
+    op: "artifact.markdown.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.ArtifactMarkdown,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.demo",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: undefined,
+    can: ["owner"],
   },
   {
     op: "graph.diff.get",
@@ -1311,68 +1360,5 @@ export const endpoints: readonly Endpoint[] = [
     input: undefined,
     result: S.LanDevice,
     can: ["owner", "remote"],
-  },
-  {
-    op: "doc.list",
-    about: [],
-    input: undefined,
-    result: Schema.mutable(Schema.Array(S.Document)),
-    can: ["owner", "remote"],
-  },
-  {
-    op: "doc.create",
-    about: [],
-    input: S.DocRequest,
-    result: S.DocSnapshot,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "doc.import",
-    about: [],
-    input: S.DocImport,
-    result: S.DocSnapshot,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "doc.get",
-    about: ["id"],
-    input: input({ id: Schema.String }),
-    result: S.DocSnapshot,
-    can: ["owner", "remote", "session"],
-  },
-  {
-    op: "doc.submit",
-    about: ["id"],
-    input: input({ id: Schema.String }, S.DocSubmit),
-    result: S.DocAck,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "doc.block.create",
-    about: ["id"],
-    input: input({ id: Schema.String }, S.DocBlockCreate),
-    result: S.DocOpResult,
-    can: ["owner", "remote", "session"],
-  },
-  {
-    op: "doc.block.update",
-    about: ["id"],
-    input: input({ id: Schema.String }, S.DocBlockUpdate),
-    result: S.DocOpResult,
-    can: ["owner", "remote", "session"],
-  },
-  {
-    op: "doc.markdown.get",
-    about: ["id"],
-    input: input({ id: Schema.String }),
-    result: S.DocMarkdown,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "doc.demo",
-    about: ["id"],
-    input: input({ id: Schema.String }),
-    result: undefined,
-    can: ["owner"],
   },
 ];

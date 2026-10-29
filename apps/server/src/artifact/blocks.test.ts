@@ -1,22 +1,66 @@
 import { t } from "@vibevalley/i18n";
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, DocOp } from "@vibevalley/protocol";
+import type { Agent, BlockOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { Database, DbLayer } from "../base/db.ts";
 import { Settings, type Config } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { waitFor, whenTrue } from "../testing/until.ts";
-import { make } from "./doc.ts";
+import { newId } from "../base/ids.ts";
+import { Db } from "../base/db.ts";
+import { missing } from "../errors.ts";
+import * as qa from "../../db/generated/artifact.sql.ts";
+import { type BlocksOptions, makeBlocks } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";
 import { plain } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
 const on = (config: Config = testConfig()) => DbLayer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(Settings, config)));
 
+/** The blocks of artifacts made straight in the table: the rest of Artifacts (channels, cards) is artifact.test.ts's. */
+const make = (options: BlocksOptions = {}) =>
+  Effect.gen(function* () {
+    const { run: db, one } = yield* Db;
+    const row = (id: string) => Effect.flatMap(one(qa.artifact({ id })), (r) => (r ? Effect.succeed(r) : Effect.fail(missing(id, []))));
+    const blocks = yield* makeBlocks(row, options);
+    const get = (id: string) =>
+      Effect.gen(function* () {
+        const list = yield* blocks.blocks(id);
+        const r = yield* row(id);
+        return { artifact: { id: r.id, title: r.title, seq: r.seq }, blocks: list };
+      });
+    const create = (title: string) =>
+      Effect.gen(function* () {
+        const id = newId();
+        yield* db(
+          qa.addArtifact({
+            id,
+            title: title.trim() || t("server.artifact.untitled"),
+            body: "blocks",
+            channel_id: null,
+            issue: null,
+            by_id: "owner",
+            by_name: "主人",
+            version: 0,
+            created_at: 0,
+          }),
+        );
+        return yield* get(id);
+      });
+    const list = () => db(qa.artifacts({ limit_n: 100n }));
+    const importMarkdown = (title: string, markdown: string, actor: string) =>
+      Effect.gen(function* () {
+        const made = yield* create(title);
+        yield* blocks.fill(made.artifact.id, markdown, actor);
+        return yield* get(made.artifact.id);
+      });
+    return { ...blocks, get, create, list, importMarkdown };
+  });
+
 type Service = Effect.Success<ReturnType<typeof make>>;
 
-const submit = (s: Service, doc: string, batchId: string, ...ops: DocOp[]) => s.submit(doc, "owner", { batchId, ops });
+const submit = (s: Service, doc: string, batchId: string, ...ops: BlockOp[]) => s.submit(doc, "owner", { batchId, ops });
 
 const texts = (blocks: { text: { t: string }[] }[]) => blocks.map((b) => plain(b.text as never)).join("|");
 
@@ -24,7 +68,7 @@ const helpers = (...list: [string, boolean][]) => list.map(([id, enabled]) => ({
 
 const finished = (s: Service) => Effect.promise(() => whenTrue(() => !s.demoRunning(), "the demo finished", 10_000));
 
-describe("doc", () => {
+describe("a blocks artifact", () => {
   it.live("what one person writes is there after the server starts again", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
@@ -32,19 +76,19 @@ describe("doc", () => {
         Effect.gen(function* () {
           const s = yield* make();
           const d = yield* s.create("周报");
-          yield* submit(s, d.doc.id, "b1", { op: "insert_block", block: para("a", "V", "你好世界") });
-          yield* submit(s, d.doc.id, "b2", { op: "split_block", blockId: "a", baseRev: 1, offset: 2, newBlock: para("b", "W", "") });
-          yield* submit(s, d.doc.id, "b3", { op: "update_text", blockId: "b", baseRev: 1, text: [bold("世界🌾")] });
-          return d.doc.id;
+          yield* submit(s, d.artifact.id, "b1", { op: "insert_block", block: para("a", "V", "你好世界") });
+          yield* submit(s, d.artifact.id, "b2", { op: "split_block", blockId: "a", baseRev: 1, offset: 2, newBlock: para("b", "W", "") });
+          yield* submit(s, d.artifact.id, "b3", { op: "update_text", blockId: "b", baseRev: 1, text: [bold("世界🌾")] });
+          return d.artifact.id;
         }),
       ).pipe(Effect.provide(on(config)));
       yield* Effect.scoped(
         Effect.gen(function* () {
           const s = yield* make();
           const snap = yield* s.get(id);
-          expect([texts(snap.blocks), snap.doc.seq, snap.doc.title]).toEqual(["你好|世界🌾", 3, "周报"]);
+          expect([texts(snap.blocks), snap.artifact.seq, snap.artifact.title]).toEqual(["你好|世界🌾", 3, "周报"]);
           const b = snap.blocks[1]!;
-          expect([b.rev, b.text[0]!.marks.bold, b.updatedBy, b.docId]).toEqual([2, true, "owner", id]);
+          expect([b.rev, b.text[0]!.marks.bold, b.updatedBy, b.artifactId]).toEqual([2, true, "owner", id]);
           expect((yield* s.list()).map((d) => d.id)).toEqual([id]);
         }),
       ).pipe(Effect.provide(on(config)));
@@ -56,16 +100,16 @@ describe("doc", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const d = yield* s.create("");
-        const first = yield* submit(s, d.doc.id, "same", { op: "insert_block", block: para("a", "V", "一") });
-        const second = yield* submit(s, d.doc.id, "same", { op: "insert_block", block: para("a", "V", "一") });
+        const first = yield* submit(s, d.artifact.id, "same", { op: "insert_block", block: para("a", "V", "一") });
+        const second = yield* submit(s, d.artifact.id, "same", { op: "insert_block", block: para("a", "V", "一") });
         expect([first.seq, second.seq, second.results[0]!.status, second.blocks.length]).toEqual([1, 1, "applied", 1]);
-        const snap = yield* s.get(d.doc.id);
-        expect([snap.doc.seq, snap.blocks.length, snap.doc.title]).toEqual([1, 1, "没起名的文档"]);
+        const snap = yield* s.get(d.artifact.id);
+        expect([snap.artifact.seq, snap.blocks.length, snap.artifact.title]).toEqual([1, 1, t("server.artifact.untitled")]);
         const other = yield* s.create("另一篇");
-        expect((yield* Effect.flip(submit(s, other.doc.id, "same")))._tag).toBe("Refused");
+        expect((yield* Effect.flip(submit(s, other.artifact.id, "same")))._tag).toBe("Refused");
         expect((yield* Effect.flip(submit(s, "nope", "x")))._tag).toBe("Missing");
         // A block id is the doc's that has it.
-        expect((yield* submit(s, other.doc.id, "dup", { op: "insert_block", block: para("a", "V", "撞了") })).results[0]!.status).toBe("rejected");
+        expect((yield* submit(s, other.artifact.id, "dup", { op: "insert_block", block: para("a", "V", "撞了") })).results[0]!.status).toBe("rejected");
       }),
     ).pipe(Effect.provide(on())),
   );
@@ -75,15 +119,15 @@ describe("doc", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const sql = yield* SqlClient.SqlClient;
-        const id = (yield* s.create("t")).doc.id;
+        const id = (yield* s.create("t")).artifact.id;
         yield* submit(s, id, "1", { op: "insert_block", block: para("a", "V", "原来") });
         const [, r] = yield* s.updateText(id, "lab", "a", 1, "帮工改的");
         expect([r!.status, r!.rev]).toEqual(["applied", 2]);
         const ack = yield* submit(s, id, "3", { op: "update_text", blockId: "a", baseRev: 1, text: [span("我改的")] });
-        expect([ack.results[0]!.status, plain(ack.results[0]!.yours!), ack.results[0]!.rev, ack.seq]).toEqual(["conflict", "我改的", 2, 3]);
+        expect([ack.results[0]!.status, plain(ack.results[0]!.yours ?? []), ack.results[0]!.rev, ack.seq]).toEqual(["conflict", "我改的", 2, 3]);
         const snap = yield* s.get(id);
         expect([texts(snap.blocks), snap.blocks[0]!.updatedBy]).toEqual(["帮工改的", "lab"]);
-        const kinds = yield* sql<{ kind: string }>`select kind from doc_block_revision where block_id = 'a' and spans like '%我改的%'`;
+        const kinds = yield* sql<{ kind: string }>`select kind from artifact_block_revision where block_id = 'a' and spans like '%我改的%'`;
         expect(kinds.map((k) => k.kind)).toEqual(["conflict"]);
         // A checkbox ticked since does not make my text stale.
         yield* submit(s, id, "4", { op: "set_attrs", blockId: "a", attrs: { checked: true } });
@@ -96,7 +140,7 @@ describe("doc", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
-        const id = (yield* s.create("待办")).doc.id;
+        const id = (yield* s.create("待办")).artifact.id;
         yield* submit(s, id, "insert", { op: "insert_block", block: { ...para("a", "V", "原文"), type: "todo", attrs: { checked: false } } });
         const ack = yield* submit(
           s,
@@ -117,13 +161,13 @@ describe("doc", () => {
         const s = yield* make();
         const sql = yield* SqlClient.SqlClient;
         const snap = yield* s.importMarkdown("导入", sample, "lab");
-        expect([snap.doc.seq, snap.blocks.length, snap.blocks[0]!.updatedBy]).toEqual([1, 17, "lab"]);
-        expect(yield* s.markdown(snap.doc.id)).toBe(sample);
-        const [b, r] = yield* s.append(snap.doc.id, "lab", "paragraph", {}, "帮工写的 **一段**");
+        expect([snap.artifact.seq, snap.blocks.length, snap.blocks[0]!.updatedBy]).toEqual([1, 17, "lab"]);
+        expect(yield* s.markdown(snap.artifact.id)).toBe(sample);
+        const [b, r] = yield* s.append(snap.artifact.id, "lab", "paragraph", {}, "帮工写的 **一段**");
         expect([r!.status, b!.rev, b!.text.length]).toEqual(["applied", 1, 2]);
-        expect(yield* s.markdown(snap.doc.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/);
+        expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/);
         expect((yield* Effect.flip(s.get("nope")))._tag).toBe("Missing");
-        expect((yield* sql<{ n: number }>`select count(*)::int as n from doc_change`)[0]!.n).toBe(2);
+        expect((yield* sql<{ n: number }>`select count(*)::int as n from artifact_change`)[0]!.n).toBe(2);
       }),
     ).pipe(Effect.provide(on())),
   );
@@ -134,7 +178,7 @@ describe("doc", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make({ tickMs: 1 });
-        const id = (yield* s.create("演示")).doc.id;
+        const id = (yield* s.create("演示")).artifact.id;
         yield* submit(s, id, "mine", { op: "insert_block", block: para("first", "V", "主人先写的") });
         const all = helpers(["off", false], ["backend", true], ["tester", true], ["frontend", true], ["docs", true]);
         yield* s.demo(id, all);
@@ -151,7 +195,7 @@ describe("doc", () => {
             continue;
           }
           expect(b.updatedBy).toBe(writers[section]);
-          expect(([0, 1, 2] as const).map((p) => t(`server.doc.demo.${section as 0 | 1 | 2}.paragraphs.${p}`))).toContain(plain(b.text));
+          expect(([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section as 0 | 1 | 2}.paragraphs.${p}`))).toContain(plain(b.text));
           expect(b.rev).toBe(demoPieces + 1);
         }
         expect([section, snap.blocks.length]).toEqual([2, 1 + 3 * 4]);
@@ -168,7 +212,7 @@ describe("doc", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make({ tickMs: 20 });
-        const id = (yield* s.create("演示")).doc.id;
+        const id = (yield* s.create("演示")).artifact.id;
         yield* s.demo(id, helpers(["backend", true]));
         // The owner takes the second block over once the demo has written it twice: asked again until it holds.
         const tryTaking = Effect.gen(function* () {

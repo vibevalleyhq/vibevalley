@@ -1,11 +1,11 @@
 import { t } from "@vibevalley/i18n";
 // What an artifact may be, and the headers its content is served with (docs/subsystems/artifact.md).
 
-import { type ArtifactKind, ArtifactKindValues, artifactMax, artifactTitleMax } from "@vibevalley/protocol";
+import { ArtifactKindValues, artifactMax, artifactTitleMax } from "@vibevalley/protocol";
 
-/** Why a title, a kind or a version's size is refused, in the owner's words; "" when they are right. Absent ones are not
- * judged: a new version has no title or kind of its own. */
-export function artifactProblem(a: { readonly title?: string; readonly kind?: string; readonly size: number }): string {
+/** Why a title, a kind or a hand-in's size is refused, in the owner's words; "" when they are right. Absent ones are not
+ * judged: a new version has no title or kind of its own, and an empty blocks artifact the owner starts has no content. */
+export function artifactProblem(a: { readonly title?: string; readonly kind?: string; readonly size?: number }): string {
   if (a.title !== undefined) {
     const n = [...a.title.trim()].length;
     if (n === 0) return t("server.artifact.noTitle");
@@ -13,6 +13,7 @@ export function artifactProblem(a: { readonly title?: string; readonly kind?: st
   }
   if (a.kind !== undefined && !(ArtifactKindValues as readonly string[]).includes(a.kind))
     return t("server.artifact.badKind", { kind: a.kind, kinds: ArtifactKindValues.join(", ") });
+  if (a.size === undefined) return "";
   if (a.size === 0) return t("server.artifact.empty");
   if (a.size > artifactMax) return t("server.artifact.tooBig", { mb: artifactMax / 1024 / 1024 });
   return "";
@@ -38,17 +39,11 @@ export const htmlPolicy = [
   "base-uri 'none'",
 ].join("; ");
 
-/** A version's content never changes once made: cached for good. Markdown goes as text, drawn by the page itself. */
-export const artifactHeaders = (kind: ArtifactKind): Record<string, string> => {
-  const always = {
-    "cache-control": "private, max-age=31536000, immutable",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
-  };
-  switch (kind) {
-    case "html":
-      return { ...always, "content-type": "text/html; charset=utf-8", "content-security-policy": htmlPolicy };
-    case "markdown":
-      return { ...always, "content-type": "text/plain; charset=utf-8", "content-security-policy": "sandbox; default-src 'none'" };
-  }
+/** An html artifact's version never changes once made: cached for good. A blocks one is not served as a file. */
+export const artifactHeaders: Record<string, string> = {
+  "cache-control": "private, max-age=31536000, immutable",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "content-type": "text/html; charset=utf-8",
+  "content-security-policy": htmlPolicy,
 };

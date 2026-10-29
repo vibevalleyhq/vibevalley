@@ -13,14 +13,5 @@ export const useArtifact = (id: () => string) =>
 export const useArtifacts = (q: () => ArtifactListRequest) =>
   useQuery(() => ({ queryKey: ["artifacts", "list", q()], queryFn: () => api.artifact.list(q()), refetchInterval: fresh }));
 
-/** A version's words, for Markdown, which the page draws itself; a version never changes. */
-export const useArtifactText = (id: () => string, version: () => number, enabled: () => boolean) =>
-  useQuery(() => ({
-    queryKey: ["artifacts", "text", id(), version()],
-    queryFn: () => api.artifact.content.get({ id: id(), version: version() }),
-    enabled: enabled(),
-    staleTime: Infinity,
-  }));
-
 /** Where an artifact is looked at; a version other than the latest is in the query string. */
 export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version ? `?v=${version}` : ""}`;

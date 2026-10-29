@@ -171,14 +171,13 @@ const planId = "计划 id";
 const projectFolder = "项目文件夹名";
 const agentProfile = "帮工档案的名字或 id";
 const searchText = "要找什么，几个词或一句话；不填就列出最新的";
-const docId = "文档的 id";
 const channelRef = "频道：#clock-in 这样的名字，或它的 id";
 
 /** The orchestrator's and the session's tool parameter descriptions (tool/schemas.ts). */
 export const params = {
   artifact: {
     title: "标题：主人在卡片上看到的那一行，最多 80 个字",
-    kind: "html 是一整页（样式、脚本都写在这一个文件里，图片用 data: 或 https 地址，能用 https 上的图表库，但连不了网也调不了农场的接口）；markdown 是一段说明，用工作台自己的样子画",
+    kind: "html 是一整页（样式、脚本都写在这一个文件里，图片用 data: 或 https 地址，能用 https 上的图表库，但连不了网也调不了农场的接口），一版一版换；markdown 读成一块一块的，主人和你都能接着改（artifact_block_create、artifact_block_update）",
     content: "这一版的全文；和 file 二选一",
     file: "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
     note: "这一版改了什么，一句话；第一版可以写这是什么",
@@ -193,7 +192,6 @@ export const params = {
   projectFolder,
   agentProfile,
   searchText,
-  docId,
   channelRef,
 
   issueReview: {
@@ -280,12 +278,12 @@ export const params = {
     confirm: "确实要发到频道的顶层，而不是刚读的那个串",
     replyTo: "回复同一处的哪一条：它的消息号（msg=）",
   },
-  docBlockCreate: {
+  blockCreate: {
     level: "标题的级别 1–3，只给 heading 用；默认 2",
     text: "这一块的字；可以用 **粗**、_斜_、行内代码、~~删~~ 和链接；代码块照原样存",
     type: "块的类型：paragraph（默认）、heading、bulleted、numbered、todo、quote、code",
   },
-  docBlockUpdate: {
+  blockUpdate: {
     baseRev: "你读到或写下这一块时它是第几版",
     block: "块的 id",
     text: "这一块完整的新字，不是增量",
@@ -308,7 +306,7 @@ export const params = {
 /** Who the orchestrator is, as a tool answer names it. */
 export const ownerAgentWord = "管家";
 
-/** A document's block in one line: its id, revision, type and text (doc_get, doc_block_update's conflict). */
+/** A blocks artifact's block in one line: its id, revision, type and text (artifact_content_get, artifact_block_update's conflict). */
 export const blockLine = (b: Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
 
 /** Where a memory applies, for the tools' answers. */
@@ -358,10 +356,12 @@ export const descriptions = {
     "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
   "artifact.list": "列出产出：在一个频道里说过的，或为一张工单做的；都不填列出最近的。每行是 id、标题、种类、第几版、谁做的、最新这版改了什么。",
   "artifact.get": "看一个产出：每一版是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
-  "artifact.content.get": "读一个产出某一版的全文，照主人的评论改下一版前先读。",
+  "artifact.content.get":
+    "读一个产出：网页读某一版的全文，照主人的评论改下一版前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "artifact.create":
     "做一个产出：要交给主人看的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，主人在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
-  "artifact.version.create": "给一个产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。",
+  "artifact.version.create":
+    "给一个网页（html）产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。一起写的产出不出新版，一块一块改它。",
 } satisfies Partial<Record<Op, string>>;
 
 /** A session's tools' descriptions; channel_message_list is the orchestrator's. */
@@ -375,16 +375,19 @@ export const sessionDescriptions = {
     "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。不填 project 只找这个项目的和所有项目都用的；project 写空字符串也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
   "memory.create":
     "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 project 记这个项目的；project 写空字符串记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
-  "doc.get": "读一篇文档：每一块的 id、第几版、类型和字。改一块之前先读，doc_block_update 要用这里的 id 和版本。",
-  "doc.block.create": "在文档末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 doc_block_update。",
-  "doc.block.update":
+  "artifact.block.create":
+    "在一个一起写的产出末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
+  "artifact.block.update":
     "把一块的字整段换成新的。baseRev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
-  "artifact.list": "列出产出：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、种类、第几版、谁做的、最新这版改了什么。",
+  "artifact.list":
+    "列出产出：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几版、谁做的、最新这版改了什么。",
   "artifact.get": "看一个产出：每一版是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
-  "artifact.content.get": "读一个产出某一版的全文，照主人的评论改下一版前先读。",
+  "artifact.content.get":
+    "读一个产出：网页读某一版的全文，照主人的评论改下一版前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "artifact.create":
     "做一个产出：要交给主人看、代码改动说不清的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，主人在工作台里点开看、回复卡片评论，评论会叫醒你。",
-  "artifact.version.create": "给一个产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。",
+  "artifact.version.create":
+    "给一个网页（html）产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。一起写的产出不出新版，一块一块改它。",
   "issue.split": (maxTasks: number) =>
     `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
 };
@@ -393,16 +396,22 @@ export const sessionDescriptions = {
 export const answers = {
   failed: (why: string) => "没成：" + why,
   artifact: {
-    made: (a: Artifact) => `做好了「${a.title}」第 ${a.version} 版（id=${a.id}），已经在对话里带着卡片说了，主人在工作台点开看；主人回复那张卡片就是评论`,
+    made: (a: Artifact) =>
+      a.body === "html"
+        ? `做好了「${a.title}」第 ${a.version} 版（id=${a.id}），已经在对话里带着卡片说了，主人在工作台点开看；主人回复那张卡片就是评论`
+        : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；主人回复那张卡片就是评论`,
     versioned: (a: Artifact) => `「${a.title}」出了第 ${a.version} 版（id=${a.id}），已经在第一版说过的地方带着卡片说了`,
     none: "还没有产出",
     line: (a: Artifact) => {
       const note = a.versions.at(-1)?.note;
-      return `- 〔${a.id}〕「${a.title}」${a.kind} · 第 ${a.version} 版 · ${a.byName}${note ? " · " + note : ""}`;
+      const what = a.body === "html" ? `网页 · 第 ${a.version} 版` : "一起写的";
+      return `- 〔${a.id}〕「${a.title}」${what} · ${a.byName}${note ? " · " + note : ""}`;
     },
     detail: (a: Artifact) =>
       [
-        `「${a.title}」（id=${a.id}）${a.kind}，${a.byName} 做的，最新是第 ${a.version} 版：`,
+        a.body === "html"
+          ? `「${a.title}」（id=${a.id}）网页，${a.byName} 做的，最新是第 ${a.version} 版：`
+          : `「${a.title}」（id=${a.id}）一起写的，${a.byName} 起的头；用 artifact_content_get 读它的每一块`,
         ...a.versions.map(
           (v) =>
             `- 第 ${v.version} 版 · ${v.byName}${v.note ? " · " + v.note : ""}${v.number !== undefined ? ` · 卡片是 msg=${v.number}，主人的评论是对它的回复` : ""}`,
@@ -544,9 +553,9 @@ export const answers = {
     rememberedFor: (id: string, where: string, memId: string) => "替 " + id + " 记下了（" + where + "）〔" + memId + "〕",
     remembered: (where: string, memId: string) => "记下了（" + where + "）〔" + memId + "〕",
   },
-  doc: {
+  block: {
     header: (title: string, count: number) => "《" + title + "》，" + count + " 块：",
-    appended: (id: string, rev: number) => `加了一块〔${id}〕，第 ${rev} 版。接着改它用 doc_block_update，block 填 ${id}，baseRev 填 ${rev}。`,
+    appended: (id: string, rev: number) => `加了一块〔${id}〕，第 ${rev} 版。接着改它用 artifact_block_update，block 填 ${id}，baseRev 填 ${rev}。`,
     updated: (id: string, rev: number | undefined) => `改好了〔${id}〕，现在是第 ${rev} 版。`,
     notUpdated: (reason: string | undefined, rev: number | undefined, currentLine: string) =>
       `没改：${reason}，现在是第 ${rev} 版。${currentLine ? "\n现在的字：" + currentLine : ""}`,
