@@ -4,6 +4,8 @@
 // A name that resolves anew between that check and the request (DNS rebinding) is the gap left; nothing is sent with the
 // request but the address, and only a page's head is read back.
 
+import { Effect, Option, Stream } from "effect";
+import { FetchHttpClient, HttpClient } from "effect/http";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { Embed } from "@vibevalley/protocol";
@@ -106,8 +108,10 @@ export function embedOf(url: string, html: string): Embed | undefined {
   };
 }
 
-/** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. */
-export async function readEmbed(link: string, get: typeof fetch = fetch, resolve: Resolve = resolveAll): Promise<Embed | undefined> {
+/** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. Redirects are followed
+ * here, not by the client, so each hop's address is checked before it is asked. */
+export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resolve: Resolve = resolveAll) {
+  const client = yield* HttpClient.HttpClient;
   let url: URL;
   try {
     url = new URL(link);
@@ -115,34 +119,38 @@ export async function readEmbed(link: string, get: typeof fetch = fetch, resolve
     return undefined;
   }
   for (let hop = 0; hop <= redirectsMax; hop++) {
-    if (!(await reachable(url, resolve))) return undefined;
-    const res = await get(url, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(timeoutMs),
-      headers: { accept: "text/html", "user-agent": "VibeValley link preview" },
-    }).catch(() => undefined);
-    if (!res) return undefined;
+    const at = url;
+    if (!(yield* Effect.promise(() => reachable(at, resolve)))) return undefined;
+    const answered = yield* client.get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } }).pipe(
+      Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
+      Effect.timeoutOption(timeoutMs),
+      Effect.catch(() => Effect.succeedNone),
+    );
+    if (Option.isNone(answered)) return undefined;
+    const res = answered.value;
     if (res.status >= 300 && res.status < 400) {
-      const next = res.headers.get("location");
+      const next = res.headers["location"];
       if (!next) return undefined;
-      url = new URL(next, url);
+      url = new URL(next, at);
       continue;
     }
-    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) return undefined;
-    if (!res.body) return undefined;
+    if (res.status < 200 || res.status >= 300 || !(res.headers["content-type"] ?? "").includes("text/html")) return undefined;
+    // Only the head is wanted: reading stops at bodyMax, and the rest is never fetched.
     const chunks: Uint8Array[] = [];
     let size = 0;
-    try {
-      // Only the head is wanted: reading stops at bodyMax, and the rest is never fetched.
-      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-        chunks.push(chunk);
-        size += chunk.length;
-        if (size >= bodyMax) break;
-      }
-    } catch {
-      if (chunks.length === 0) return undefined;
-    }
+    const read = yield* res.stream.pipe(
+      Stream.takeWhile(() => size < bodyMax),
+      Stream.runForEach((chunk) =>
+        Effect.sync(() => {
+          chunks.push(chunk);
+          size += chunk.length;
+        }),
+      ),
+      Effect.timeoutOption(timeoutMs),
+      Effect.result,
+    );
+    if (read._tag === "Failure" && chunks.length === 0) return undefined;
     return embedOf(link, new TextDecoder().decode(Buffer.concat(chunks).subarray(0, bodyMax)));
   }
   return undefined;
-}
+});

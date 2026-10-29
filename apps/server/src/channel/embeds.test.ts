@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
+import { Effect } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { embedOf, linksIn, privateAddress, reachable, readEmbed } from "./embeds.ts";
 
 const page = (html: string, headers: Record<string, string> = { "content-type": "text/html; charset=utf-8" }, status = 200) =>
   new Response(html, { status, headers });
+
+/** readEmbed on the farm's fetch client, with fetch itself the test's. */
+const read = (link: string, get: typeof fetch, resolve: (host: string) => Promise<string[]>) =>
+  Effect.runPromise(readEmbed(link, resolve).pipe(Effect.provide(FetchHttpClient.layer), Effect.provideService(FetchHttpClient.Fetch, get)));
 
 describe("a link's preview", () => {
   it("is read from the links in some words, three at most", () => {
@@ -48,9 +54,9 @@ describe("a link's preview", () => {
       if (u === "https://pdf.example/") return page("%PDF", { "content-type": "application/pdf" });
       return page("<title>Fine</title>");
     }) as typeof fetch;
-    expect(await readEmbed("https://out.example/", get, resolve)).toBeUndefined();
+    expect(await read("https://out.example/", get, resolve)).toBeUndefined();
     expect(asked).toEqual(["https://out.example/"]);
-    expect(await readEmbed("https://pdf.example/", get, resolve)).toBeUndefined();
-    expect(await readEmbed("https://fine.example/", get, resolve)).toEqual({ url: "https://fine.example/", title: "Fine" });
+    expect(await read("https://pdf.example/", get, resolve)).toBeUndefined();
+    expect(await read("https://fine.example/", get, resolve)).toEqual({ url: "https://fine.example/", title: "Fine" });
   });
 });

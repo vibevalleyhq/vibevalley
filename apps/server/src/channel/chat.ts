@@ -6,6 +6,7 @@ import { list, t } from "@vibevalley/i18n";
 // a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
 // than lost. Everything that changes the chat runs one at a time.
 
+import { HttpClient } from "effect/http";
 import { scopedPubSub } from "../base/pubsub.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import {
@@ -486,6 +487,7 @@ export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const core = yield* Core;
+  const http = yield* HttpClient.HttpClient;
   const agents = yield* Agents;
   let helpers: Helpers | undefined;
   const { run: db, one, inTx } = yield* Db;
@@ -954,9 +956,15 @@ export const make = Effect.gen(function* () {
     if (links.length === 0) return;
     void forkHere(
       Effect.gen(function* () {
-        const found = (yield* Effect.promise(() => Promise.all(links.map((l) => readEmbed(l).catch(() => undefined))))).filter(
-          (e): e is Embed => e !== undefined,
-        );
+        const found = (yield* Effect.forEach(
+          links,
+          (l) =>
+            readEmbed(l).pipe(
+              Effect.provideService(HttpClient.HttpClient, http),
+              Effect.catchCause((cause) => Effect.as(Effect.logWarning("a link preview was not read", cause), undefined)),
+            ),
+          { concurrency: "unbounded" },
+        )).filter((e): e is Embed => e !== undefined);
         yield* locked(
           Effect.gen(function* () {
             const now = yield* one(qm.messageByID({ id: row.id }));

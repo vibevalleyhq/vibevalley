@@ -16,7 +16,7 @@ import { newsOf } from "../session/session.ts";
 import { sessionOnIssue } from "../session/state.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
-import { testConfig } from "../testing/layers.ts";
+import { testConfig, offline } from "../testing/layers.ts";
 import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { until, waitFor } from "../testing/until.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
@@ -131,6 +131,7 @@ const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) 
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(ServerConfig, c)),
+    Layer.provideMerge(offline),
   );
 };
 

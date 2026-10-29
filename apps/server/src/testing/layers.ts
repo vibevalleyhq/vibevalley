@@ -4,7 +4,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
-import { Layer } from "effect";
+import { Effect, Layer } from "effect";
+import { HttpClient } from "effect/http";
 import { withCast } from "../agent/agent.ts";
 import { builtInDir, builtInIds, profileOf, readTemplate } from "../agent/template.ts";
 import { defaults, ServerConfig } from "../base/config.ts";
@@ -39,3 +40,9 @@ export function testConfig(change: Partial<ServerConfig["Service"]> = {}): Serve
 export const testSettings = (change: Partial<ServerConfig["Service"]> = {}) => Layer.succeed(ServerConfig, testConfig(change));
 
 export const testDatabase = (change: Partial<ServerConfig["Service"]> = {}) => Database.pipe(Layer.provide(testSettings(change)));
+
+/** An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. */
+export const offline = Layer.succeed(
+  HttpClient.HttpClient,
+  HttpClient.make((request) => Effect.die(new Error(`no network in tests: ${request.method} ${request.url}`))),
+);
