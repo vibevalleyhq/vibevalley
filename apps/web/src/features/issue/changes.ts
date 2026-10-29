@@ -1,5 +1,3 @@
-// An issue's changes to look at before completing: lines added and removed, each file's kind, a patch's marks.
-
 import { t } from "@vibevalley/i18n";
 import type { Changes } from "@vibevalley/protocol";
 
@@ -9,7 +7,6 @@ export const lineCounts = (c: Changes): [number, number] => [
   c.files.reduce((n, f) => n + Math.max(0, Math.round(f.removed)), 0),
 ];
 
-/** The one line over an issue's changes. */
 export function changesLine(c: Changes) {
   const [added, removed] = lineCounts(c);
   const counts = { branch: c.branch ?? "", base: c.base, commits: c.commits.length, added, removed };
@@ -18,10 +15,9 @@ export function changesLine(c: Changes) {
     : t("web.issue.issue.changes", counts);
 }
 
-/** Nothing to merge: completing only lets the helper go. */
+/** Completing then only lets the helper go: there is nothing to merge. */
 export const nothingChanged = (c: Changes) => c.commits.length === 0 && c.uncommitted.length === 0;
 
-/** What a git status letter is, as a mark and a word; an unknown one is itself. */
 export function changeKind(status: string) {
   switch (status) {
     case "A":
@@ -40,7 +36,7 @@ export type PatchMark = "added" | "removed" | "hunk" | "plain";
 export const patchMarkOf = (line: string): PatchMark =>
   line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@@") ? "hunk" : "plain";
 
-/** A patch from its first hunk: the header above it says nothing the file row does not. */
+/** The header above the first hunk says nothing the file row does not. */
 export function patchLines(text: string) {
   const lines = text.split("\n");
   return lines.slice(

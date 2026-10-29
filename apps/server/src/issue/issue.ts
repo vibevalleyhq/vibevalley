@@ -626,7 +626,7 @@ export const make = (options: IssueOptions = {}) =>
         Effect.gen(function* () {
           if (isForOrchestrator(item, store.isOrchestrator)) return yield* toOrchestrator(item, channel.id, by, s);
           const newest = item.sessions.at(-1);
-          // An open issue no session has worked yet (its doer changed to a helper) starts one, as a new one does.
+          // Its doer changed to a helper: open, but no session has worked it, so one starts.
           if (!found || item.status === "backlog" || item.status === "todo" || (!isClosed(item.status) && newest === undefined))
             return yield* Effect.asVoid(start(item.id, channel.id, by));
           if (isClosed(item.status) || newest === undefined) return yield* Effect.asVoid(reopen(item.id, text, channel.id, by));

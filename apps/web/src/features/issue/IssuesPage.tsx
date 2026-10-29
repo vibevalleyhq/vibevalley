@@ -200,7 +200,7 @@ function Detail(props: {
         .find((c) => c.id === props.id || ((c.kind === "issue" || c.kind === "todo") && (issueIs(c.issue, props.id) || String(c.issue.number) === props.id))) ??
       last,
   );
-  /** The card, as the kind its panel is keyed by (shows): only read inside that panel. */
+  /** Only read inside that kind's panel: it throws once the card is another kind. */
   const cardOf = <const K extends BoardCard["kind"]>(kind: K) => {
     const c = card();
     const of = c && variant(c, "kind", kind);

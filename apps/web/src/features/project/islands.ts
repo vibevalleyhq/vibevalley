@@ -1,5 +1,5 @@
-// Every project as an island on the map, its plots its helpers' worktrees. The room on an island is roomLeft, the rule
-// the server refuses a start by: an open plot is one more that may start now, a shut one waits for the farm to free up.
+// The room on an island is roomLeft, the rule the server refuses a start by: an open plot may start now, a shut one
+// waits for the farm to free up.
 
 import { t } from "@vibevalley/i18n";
 import { type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
@@ -22,7 +22,6 @@ export const openOf = (i: Island) => i.spots.filter((s) => s.kind === "open").le
 
 const isFull = (i: Island) => i.working >= i.maxSessions;
 
-/** The project's todos waiting for room, first queued first: the sacks at its gate. */
 const queuedIn = (issues: readonly Issue[], project: string) =>
   issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).sort((a, b) => a.queuedAt! - b.queuedAt!);
 
@@ -71,7 +70,7 @@ export const mapTally = (islands: readonly Island[]) => ({
   queued: islands.reduce((n, i) => n + i.queued.length, 0),
 });
 
-/** The farm's plot size (village/world plotW, plotH) and how the yard's rows are spaced. */
+/** As plotW and plotH in village/world: change them there and here together. */
 const plotW = 34;
 
 const plotH = 26;
@@ -89,8 +88,7 @@ export interface Rect {
   readonly height: number;
 }
 
-/** Rows of three at most from the back, as even as they go (four is two and two), each row and the whole block centred:
- * each plot's foot. */
+/** Each returned point is a plot's foot. */
 export function plotsIn(yard: Rect, n: number): { x: number; y: number }[] {
   if (n <= 0) return [];
   const rows = Math.ceil(n / 3);
@@ -140,7 +138,6 @@ export const islandText = (i: Island) =>
     ...(i.queued.length > 0 ? [t("web.project.project.queued", { n: i.queued.length })] : []),
   ].join(" · ");
 
-/** Twice as big two to a row, smaller to fit two, one to a row on a narrow page. */
 export function islandScale(width: number, cell: number, gap: number) {
   for (const s of [2, 1.5]) if (2 * cell * s + gap <= width) return s;
   const one = width / cell;
@@ -149,7 +146,6 @@ export function islandScale(width: number, cell: number, gap: number) {
 
 export const islandLooks = ["island-meadow", "island-orchard", "island-pond", "island-pines", "island-windmill", "island-lavender"];
 
-/** The same one every time, from its name. */
 export function islandLook(project: string) {
   let h = 0;
   for (const c of project) h = (h * 31 + c.codePointAt(0)!) & 0x7fffffff;

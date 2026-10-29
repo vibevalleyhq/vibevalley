@@ -1,5 +1,3 @@
-// How an issue goes into its row: text that may be absent as null, JSON or null, and the next graph id.
-
 const int64Max = 9223372036854775807n;
 
 export function nextTaskId(ids: readonly string[]): string {

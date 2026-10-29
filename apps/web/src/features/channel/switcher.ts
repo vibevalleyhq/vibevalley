@@ -1,5 +1,3 @@
-// The quick switcher's targets for what the owner typed: channels, threads, issues, helpers.
-
 import { t } from "@vibevalley/i18n";
 
 import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/protocol";
@@ -7,7 +5,6 @@ import { channelLabel, channelName, topOf } from "./places";
 import { threadTitle } from "./threads";
 import { unreadIn, unreadUnder } from "./unread";
 
-/** A place Ctrl+K goes to: a channel, a direct channel, a thread, or a profile not yet talked with alone. */
 export interface SwitchTarget {
   readonly kind: "channel" | "direct" | "thread" | "profile";
   /** The channel's id; a profile's id for one with no direct channel yet. */

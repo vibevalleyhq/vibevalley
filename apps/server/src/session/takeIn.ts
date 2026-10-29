@@ -1,11 +1,8 @@
-// Taking a session's work in: a conflict in its words, and what a take-in that did not go through means.
-
 import { list, t } from "@vibevalley/i18n";
 
 import type { Conflict } from "@vibevalley/protocol";
 
 import type { MergeFailure } from "@/project/shapes.ts";
-/** What a session is told when merging its base in would conflict. */
 export const conflictBrief = (base: string, files: readonly string[]) => t("server.session.conflictBrief", { base, files: list(files) });
 
 /** The conflict a preview of the session's branch shows; none when it goes in clean. */

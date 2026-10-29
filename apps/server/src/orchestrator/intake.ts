@@ -1,5 +1,3 @@
-// Where an input to the orchestrator came from, and what a turn of each kind is headed and triggered by.
-
 import { sourceHead } from "./prompts.ts";
 import { type RunTriggerKind } from "@vibevalley/protocol";
 
@@ -22,7 +20,6 @@ export const intake: Readonly<Record<Source, { readonly head: string; readonly n
   chat: { head: sourceHead.chat, now: false, trigger: "comment" },
   issue: { head: sourceHead.issue, now: false, trigger: "issue" },
   cron: { head: sourceHead.cron, now: false, trigger: "cron" },
-  // The patrol's and the task graphs' lines are the farm's own.
   patrol: { head: sourceHead.patrol, now: false, trigger: "runtime" },
   graph: { head: sourceHead.graph, now: false, trigger: "runtime" },
 };

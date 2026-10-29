@@ -180,7 +180,6 @@ export const changeOf = (e: GraphEvent) => ({
   ...(e.task !== undefined ? { task: e.task } : {}),
   kind: e.kind,
   ...(e.session !== undefined ? { session: e.session } : {}),
-  // A change is sparse: what the event has nothing of is left out.
   ...(e.detail ? { detail: e.detail } : {}),
   ...(e.changes.length > 0 ? { changes: e.changes } : {}),
   ...(e.commits.length > 0 ? { commits: e.commits } : {}),

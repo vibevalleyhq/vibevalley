@@ -8,10 +8,9 @@ import { cut } from "@/base/clip.ts";
 import { FileWriter } from "@/base/files.ts";
 import type { From, ToolStart } from "./facts.ts";
 import type { Time } from "@/base/time.ts";
-// A session's log of events: kept in memory as it grows, pushed to
-// the pages a little after each change, and written to events/<id>.json. A step that grows (text still streaming in, a
-// tool that has not returned) is pushed again under the same number. What is written is never rewritten: later steps
-// only follow it, and the step still being written (the draft) is on disk only once it is sealed.
+// A session's log, written to events/<id>.json: what is written is never rewritten, later steps only follow it, and the step
+// still being written (the draft) is on disk only once it is sealed. A step that grows (text still streaming in, a tool that
+// has not returned) is pushed again under the same number.
 
 const keepEvents = 240;
 const textMax = 6000;

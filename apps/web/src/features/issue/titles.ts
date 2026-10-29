@@ -1,5 +1,3 @@
-// What an issue is called: its title (a task graph's step with the graph's name), a graph's line, a new one's.
-
 import { t } from "@vibevalley/i18n";
 
 import type { Issue, TaskGraph } from "@vibevalley/protocol";
@@ -30,5 +28,4 @@ export function taskLine(g: TaskGraph) {
   }
 }
 
-/** The title an issue made by the plus has until the owner says what it is for. */
 export const newIssueTitle = t("web.issue.boardLabels.newIssue");

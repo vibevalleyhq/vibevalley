@@ -149,7 +149,7 @@ export function refinement(d: RefinementDeps) {
   return { draft, handedBack, clearRefinement };
 }
 
-/** As its session hands it back; a list may come as one string. */
+/** A list may come as one string. */
 export interface IssueRefinement {
   readonly title: string;
   readonly why: string;

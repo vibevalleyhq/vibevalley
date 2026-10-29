@@ -1,14 +1,10 @@
-// A search as the owner types it: words, and from:, in:, has:, before:, after: filters.
-
 import { chatNamed } from "./mentions.ts";
 export type SearchHas = "file" | "image" | "link";
 
-/** What a search asks for: its words, and the filters written among them. */
 export interface SearchQuery {
   readonly words: string;
   /** A participant's id, or a name to match. */
   readonly from?: string;
-  /** A channel's name. */
   readonly in?: string;
   readonly has: readonly SearchHas[];
   /** Before the day it names (that day left out), and from the day it names on: epoch ms, at the server's midnight. */
@@ -20,8 +16,7 @@ const filterPattern = /(?:^|\s)(from|in|has|before|after):(\S+)/giu;
 
 const dayPattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
 
-/** The filters written in a search (from:, in:, has:, before:, after:) and the words around them; one that does not
- * read stays among the words. */
+/** A filter that does not read stays among the words. */
 export function parseSearch(text: string): SearchQuery {
   let from: string | undefined;
   let inName: string | undefined;

@@ -1,5 +1,3 @@
-// The frames as they come, for the farm: the whole farm's or one project's, and the commands on them.
-
 import { type Accessor, createMemo } from "solid-js";
 import type { StateFrame } from "@vibevalley/protocol";
 import { type Frames, frames } from "@/base/frames";

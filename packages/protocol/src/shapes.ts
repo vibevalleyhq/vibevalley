@@ -516,7 +516,7 @@ export interface Session {
   refining: boolean;
 }
 
-/** A session as the frame tells it (StateFrame): what it is doing, in the owner's words. reduce never sees these. */
+/** reduce never sees these: the words are the frame's (projection/frame.ts). */
 export interface SessionView extends Omit<Session, "phase" | "play"> {
   phase: PhaseView;
   play?: SessionPlayView;
@@ -637,7 +637,6 @@ export interface Cron {
   pending: boolean;
 }
 
-/** A cron as the frame tells it: when it runs and when it runs next, in words. */
 export interface CronView extends Cron {
   whenText: string;
   nextText: string;
@@ -682,7 +681,6 @@ export interface WorkspaceState {
   connectors: ConnectorStatus[];
 }
 
-/** The core state as the frame tells it: the words for people beside the facts (projection/frame.ts). */
 export interface WorkspaceView extends Omit<WorkspaceState, "sessions" | "crons"> {
   sessions: SessionView[];
   crons: CronView[];

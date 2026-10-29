@@ -70,8 +70,6 @@ export function useClickAway(open: Accessor<boolean>, close: () => void) {
   };
 }
 
-/** The member of a union whose key holds tag, or undefined: a Match or Show over one member of a union, with that member's
- * fields in its children. */
 export function variant<T, K extends keyof T, const V extends T[K]>(value: T, key: K, tag: V): Extract<T, Record<K, V>> | undefined {
   const is = (v: T): v is Extract<T, Record<K, V>> => v[key] === tag;
   return is(value) ? value : undefined;

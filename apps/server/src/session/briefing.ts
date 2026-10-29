@@ -1,6 +1,3 @@
-// What a session is told: its profile's instructions and skills, its MCP servers in oar's shape, and what it recalls
-// ahead of its job.
-
 import { recallHead, recallIntro } from "./prompts.ts";
 import type { McpServer } from "@botiverse/oar";
 

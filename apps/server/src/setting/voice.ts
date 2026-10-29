@@ -1,5 +1,3 @@
-// The voice's settings: what may be saved, and how only what differs from its defaults is kept.
-
 import { currentLocale, t } from "@vibevalley/i18n";
 import { voiceOrchestratorPersona } from "./prompts.ts";
 import {
@@ -52,7 +50,6 @@ export function voiceSettingsOver(defaults: VoiceSettings, overrides: SettingsUp
   return out;
 }
 
-/** Only what differs. */
 export function voiceOverrides(defaults: VoiceSettings, settings: VoiceSettings): SettingsUpdateVoice {
   const out: Record<string, unknown> = {};
   for (const key of voiceKeys) if (!same(settings[key], defaults[key])) out[key] = settings[key];
@@ -63,7 +60,7 @@ export const defaultVoice = (): VoiceSettings => ({
   area: "US",
   language: currentLocale() === "zh" ? "zh-CN" : "en-US",
   asr: { vendor: "ares" },
-  // The farm's own orchestrator answers: the call is its mouth, answering as it does in the chat (voice/voice.ts, the line).
+  // As the chat's voice/voice.ts: the farm's own orchestrator answers, so change the two together.
   answer: { vendor: "orchestrator" },
   tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
   persona: voiceOrchestratorPersona(),

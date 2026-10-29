@@ -1,5 +1,3 @@
-// The farm page's own state (farm/store.ts) as the Solid farm reads it, and the time of day.
-
 import { type Accessor, createContext, createMemo, useContext } from "solid-js";
 
 import { clock, type FarmUi, farmState, subscribeFarm } from "./store";
@@ -9,7 +7,6 @@ export const FarmUiContext = createContext<Accessor<FarmUi>>();
 /** One subscription to the farm's store for the page; useFarm reads slices of it. */
 export const createFarmUi = () => createExternal(subscribeFarm, farmState);
 
-/** A slice of the farm's state; it notifies only when the slice changes. */
 export function useFarm<T>(select: (s: FarmUi) => T): Accessor<T> {
   const ui = useContext(FarmUiContext);
   return createMemo(() => select(ui()));

@@ -1,5 +1,3 @@
-// The board's lanes: which lane a status is in, what a drag between lanes asks for, how many closed are shown.
-
 import { t } from "@vibevalley/i18n";
 
 import type { IssueStatus } from "@vibevalley/protocol";

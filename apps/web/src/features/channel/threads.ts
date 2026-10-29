@@ -1,5 +1,3 @@
-// Whose a thread is and what it is called: an issue's thread, a session's job thread, a talk.
-
 import { t } from "@vibevalley/i18n";
 
 import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/protocol";
@@ -18,14 +16,13 @@ export function jobThreadOf(chat: Chat | undefined, session: Session) {
   return findLast(chat?.channels, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
 }
 
-/** Whom a thread's words are for now: the session working its issue, or a talk thread's own session. */
 export function threadOwnerOf<S extends Session>(thread: Channel, sessions: readonly S[]): S | undefined {
   switch (thread.subjectKind) {
     case "issue":
       return findLast(sessions, (h) => h.issue === thread.subjectId);
     case "talk":
       return sessions.find((h) => h.id === thread.subjectId);
-    // A task's thread, or one not about anything: no one's words.
+    // Only issues and talks have an owner.
     case "graph":
     default:
       return undefined;
@@ -37,7 +34,7 @@ const head = (text: string) => {
   return flat.length > 24 ? flat.slice(0, 24) : flat;
 };
 
-/** An issue's thread is named by the issue, so the name holds after its sessions leave; the others by the server's title. */
+/** Named by the issue, so the name holds after its sessions leave. */
 export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Session[] = []) {
   switch (thread.subjectKind) {
     case "issue": {
@@ -46,7 +43,6 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
     }
     case "graph":
       return t("web.channel.names.planThread", { id: thread.subjectId ?? "" });
-    // A talk thread, or one not about anything.
     case "talk":
     default: {
       if (thread.subjectKind === "talk" && thread.subjectId) {

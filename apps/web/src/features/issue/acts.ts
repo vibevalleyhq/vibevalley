@@ -135,7 +135,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   };
 }
 
-/** Runs a call; a refusal is said in a toast and the result is undefined. The board is read again after either. */
+/** undefined when refused: the refusal is said in a toast. The board is read again after either. */
 export async function run<T>(act: () => Promise<T>): Promise<T | undefined> {
   try {
     return await act();

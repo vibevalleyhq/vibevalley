@@ -19,7 +19,6 @@ export function FxLayer() {
   const loaded = useVillage();
   const [banner, setBanner] = createSignal<{ id: number; level: number }>();
 
-  // An achievement's toast by its id: its medal and how far it reached.
   const earned = new Map<number, GameEffectAchievement>();
   const show = (f: GameEffect) => {
     if (f.kind === "levelUp") setBanner({ id: Date.now(), level: Math.round(f.level) });

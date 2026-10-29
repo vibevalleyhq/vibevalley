@@ -1,5 +1,4 @@
-// How a run's end reads: its outcome, its summary and verdict, the answer it gave, the owner's questions and its word
-// on each criterion. Lengths are UTF-16 units.
+// Lengths are UTF-16 units.
 
 import { maybe, t } from "@vibevalley/i18n";
 import { Predicate } from "effect";

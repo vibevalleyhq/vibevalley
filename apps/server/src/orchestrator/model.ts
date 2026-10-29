@@ -1,8 +1,6 @@
-// Which model the orchestrator speaks through: its own name on the chat endpoint, and DeepSeek's model as configured.
-
 import { t } from "@vibevalley/i18n";
 
-/** The model the orchestrator answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */
+/** The model id it answers as, on the voice line and on chatCompletionsPath alike. */
 export const orchestratorModel = "vibevalley-orchestrator";
 
 export const chatCompletionsPath = "/v1/chat/completions";

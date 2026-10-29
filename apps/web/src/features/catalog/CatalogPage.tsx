@@ -63,7 +63,6 @@ const shelfTabs = [
 ] as const;
 
 /** `rest` is the path after /catalog/. */
-/** Where a picture's head is, when it has one. */
 const headOf = (p: { readonly hx?: number | undefined; readonly hy?: number | undefined }) =>
   p.hx !== undefined && p.hy !== undefined ? { x: p.hx, y: p.hy } : undefined;
 

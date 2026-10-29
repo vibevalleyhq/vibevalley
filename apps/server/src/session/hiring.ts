@@ -1,5 +1,3 @@
-// Hiring a helper: whether there is room for one more, what it is called, and who goes home to make room.
-
 import { t } from "@vibevalley/i18n";
 
 import type { Session } from "@vibevalley/protocol";

@@ -1,6 +1,3 @@
-// The chat's places as the server sent them: channels in the sidebar's order and groups, their threads and direct
-// talks, their names and their addresses on the page. Nothing here folds facts.
-
 import { type Chat, type Channel } from "@vibevalley/protocol";
 export const isTop = (c: Channel) => c.type !== "thread";
 
@@ -17,11 +14,9 @@ const bySidebar = (a: Channel, b: Channel) => {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 };
 
-/** The channels in the sidebar: not archived. */
 export const topsOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "channel" && c.archived === undefined) ?? []).sort(bySidebar);
 
-/** The archived channels, newest archived first. */
 export const archivedOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).sort((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
 
@@ -45,7 +40,6 @@ export const threadsIn = (chat: Chat | undefined, channel: Channel, archived = f
     (a, b) => (b.last?.at ?? b.at) - (a.last?.at ?? a.at),
   );
 
-/** The number a message address points at, from the page's path. */
 export function pointedAt(path: string): number | undefined {
   const m = /[?&]m=(\d+)/.exec(path);
   return m ? Number(m[1]) : undefined;
@@ -68,7 +62,6 @@ export const channelLabel = (c: Channel | undefined) => (c?.type === "direct" ? 
 
 export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" : `/chat/${c.id}`);
 
-/** Where a message is: its channel's address and its number, which the list scrolls to and lights up. */
 export const messagePath = (c: Channel | undefined, number: number) => `${chatPath(c)}?m=${number}`;
 
 /** Where a thread's parent message is: its channel's, or the general's for a thread without one. */

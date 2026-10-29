@@ -1,6 +1,3 @@
-// The patrol (巡查), no model: each inbox item waits out its kind's grace (a question may be answered in a minute), is
-// reported once, and again only after reportAgainMs if it still stands.
-
 import { patrolAgo } from "./prompts.ts";
 import { type InboxKind, type WorkspaceState } from "@vibevalley/protocol";
 import { inboxEntries } from "./inbox.ts";

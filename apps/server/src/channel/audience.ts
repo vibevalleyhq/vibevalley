@@ -1,10 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
-// Who hears a message, and who of them is held back (chatAudience), from what that needs, kept in memory beside the
-// chat's model (model.ts): who follows each thread,
-// how many times agents have woken agents in each channel since the owner last spoke there, and when each
-// participant was last woken by an agent. The chat tells it each follow and delivery as it writes them, and reloads it
-// with the model when a transaction fails.
+// Kept in memory beside the chat's model (model.ts): the chat tells it each follow and delivery as it writes them, and
+// reloads it with the model when a transaction fails.
 
 const agentLike = (kind: string) => kind === "session" || kind === "orchestrator";
 
@@ -83,7 +80,6 @@ export interface AudienceInput {
   readonly fromKind: ActorKind;
   readonly kind: MessageKind;
   readonly mentions: readonly string[];
-  /** Only its type and a direct channel's peer are read. */
   readonly channel: Pick<Channel, "type" | "peer">;
   /** The place's orchestrator, by its profile id: the one the owner's words there go to when they name no one else. */
   readonly orchestrator: string;

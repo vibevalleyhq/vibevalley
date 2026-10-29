@@ -1,5 +1,3 @@
-// A run of an issue's in words: what started it and how it went.
-
 import { t } from "@vibevalley/i18n";
 
 import type { Run, RunTrigger } from "@vibevalley/protocol";
@@ -20,7 +18,6 @@ function runTriggerText(trigger: RunTrigger) {
   }
 }
 
-/** One line for a run: what started it, how it went, how long, what it cost, what it heard while it ran. */
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),

@@ -1,5 +1,3 @@
-// The project list: its order, a GitHub address as the owner pastes it, and numbers as the cards show them.
-
 import { type ProjectSummary } from "@vibevalley/protocol";
 
 /** Only repository home URLs, never credentials, arbitrary git transports or command-line options. */

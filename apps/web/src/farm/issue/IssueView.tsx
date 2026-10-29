@@ -1,8 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
-// A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
-// workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
-// how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
-// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/status.ts.
+// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
 
 import { OutfitValues, SpeciesValues, type SessionView } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
@@ -47,7 +44,6 @@ const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
 
 /** The plot's issue while the store says so (the inspect layer). */
-/** A word's label when it is one of values; the word itself otherwise. */
 const labelOf = <K extends string>(labels: Record<K, string>, values: readonly K[], word: string) => (isOneOf(values, word) ? labels[word] : word);
 
 export function IssueView() {

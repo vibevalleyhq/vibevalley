@@ -1,9 +1,3 @@
-// The schema's own rules: one baseline (db/migrations/0001_schema.up.sql) that is changed in place, never a second
-// migration; every table named <module> or <module>_<concept>, singular, the module the src folder that owns it; every
-// index named after its table; a closed set of words an enum type named <table>_<column>, so the generated code reads it
-// as a union of the words and the database refuses any other; and each table's SQL in db/queries/<table>.sql, one file a
-// table.
-
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";

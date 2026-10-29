@@ -1,9 +1,6 @@
-// Who a message names: @ids, @names, and the chat's own words for those who are not helpers, outside code.
-
 import { maybe } from "@vibevalley/i18n";
 import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
-// The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English. The
-// orchestrator's names are the place's orchestrator, filled in where the place is known.
+// The chat's names for who is not a helper; defaultOrchestrator is filled in where the place is known.
 export const chatNamed: Readonly<Record<string, string>> = {
   管家: defaultOrchestrator,
   主人: ownerId,
@@ -13,7 +10,6 @@ export const chatNamed: Readonly<Record<string, string>> = {
   everyone,
 };
 
-/** How a mention of who is not a helper is written, in the owner's words. */
 export const mentionOf = (id: string): string | undefined => maybe(`server.channel.mention.${id}`);
 
 const chatFence = /```[\s\S]*?```/g;

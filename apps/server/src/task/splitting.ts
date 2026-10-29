@@ -1,6 +1,3 @@
-// Reading a task graph from a splitter's answer: its JSON block, held to the shape of a step, and what is wrong with it
-// in the owner's words.
-
 import { t } from "@vibevalley/i18n";
 import { Result, Schema, SchemaIssue } from "effect";
 import { messageOf } from "@/errors.ts";
