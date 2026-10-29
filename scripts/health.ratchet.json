@@ -85,8 +85,8 @@
     "lintOff": 0
   },
   "server: Gateway": {
-    "nonNull": 21,
-    "doubleCast": 1,
+    "nonNull": 20,
+    "doubleCast": 0,
     "lintOff": 1
   },
   "server: Issues": {
