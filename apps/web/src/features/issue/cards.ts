@@ -1,29 +1,16 @@
 import { matches } from "@/base/search";
 import { list, t } from "@vibevalley/i18n";
-// The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
-// lanes does (cardMove, laneOrder).
-
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph, SessionView, WorkspaceView } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./display";
-import {
-  endedAt,
-  issueSession,
-  issueTag,
-  type IssueTag,
-  isForOrchestrator,
-  issueTitle,
-  type Lane,
-  laneOf,
-  laneStatus,
-  moveOf,
-  type Move,
-  tagText,
-  tagOpen,
-  taskLine,
-} from "./rules";
+import { endedAt, issueSession, isForOrchestrator } from "./issue";
+import { issueTag, type IssueTag, tagText, tagOpen } from "./tags";
+import { issueTitle, taskLine } from "./titles";
+import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
 import { ago, tookText } from "@/base/format";
 import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
-import { attentionTone } from "./state";
+import { attentionTone } from "./overview";
+// The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
+// lanes does (cardMove, laneOrder).
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";

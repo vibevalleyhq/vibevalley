@@ -1,13 +1,15 @@
 import { t } from "@vibevalley/i18n";
+import { createSignal } from "solid-js";
+import { type Issue, type IssueAct, type IssueAction } from "@vibevalley/protocol";
+import { api, newSendKey, reasonOf } from "@/base/api";
+import { toast } from "@/ui/toasts";
+
+import { reloadIssues } from "./queries";
 // The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx)
 // and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.attention.acts, perform); this
 // says which take words from the box, which open the box first, which open a dialog, what a reopen tells, and keeps the
 // box, its words and the busy flag. A page only says how it runs a button its own way (the farm's commands with their
 // effects) and how it shows a failure.
-
-import { createSignal } from "solid-js";
-import type { Issue, IssueAct, IssueAction } from "@vibevalley/protocol";
-import { api, newSendKey } from "@/base/api";
 
 /** Words said again with the same sendKey are said once. */
 export function perform(issue: Issue, a: IssueAction, words = "", sendKey = newSendKey()): Promise<unknown> {
@@ -131,4 +133,16 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     /** 打回 with its box open is the red one. */
     rejecting: (a: IssueAct) => a === "reject" && box() === "reject",
   };
+}
+
+/** Runs a call; a refusal is said in a toast and the result is undefined. The board is read again after either. */
+export async function run<T>(act: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await act();
+  } catch (e) {
+    toast(reasonOf(e), "bad");
+    return undefined;
+  } finally {
+    void reloadIssues();
+  }
 }

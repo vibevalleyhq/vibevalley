@@ -1,8 +1,7 @@
 import { t } from "@vibevalley/i18n";
-// The issue board's look: how its list is grouped and ordered.
-
 import type { Priority } from "@vibevalley/protocol";
-import { type Lane, lanes } from "./rules";
+import { type Lane, lanes } from "./lanes";
+// The issue board's look: how its list is grouped and ordered.
 
 export type BoardView = "board" | "list";
 export const boardViews: BoardView[] = ["board", "list"];

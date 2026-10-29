@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Tone } from "./cards";
-import { type Stage, stageLabel, stages } from "./rules";
+import { type Stage, stageLabel, stages } from "./stages";
 import { aria } from "@/base/util";
 import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";

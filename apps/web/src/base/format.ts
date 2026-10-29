@@ -1,5 +1,6 @@
 import { currentLocale, t } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
+
 // Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
 
 export function ago(at: number, now: number) {
@@ -48,3 +49,12 @@ export const spentText = (spent: Spent) =>
 
 /** What a thrown or rejected value says: an Error's message, anything else as text. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
+export function spanText(ms: number) {
+  const m = Math.floor(Math.max(0, ms) / 60_000);
+  if (m < 1) return t("web.base.time.round.underMinute");
+  if (m < 60) return t("web.base.time.round.minutes", { m });
+  if (m < 60 * 24) return t("web.base.time.round.hours", { h: Math.floor(m / 60) });
+  return t("web.base.time.round.days", { d: Math.floor(m / 60 / 24) });
+}

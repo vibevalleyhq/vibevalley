@@ -4,7 +4,7 @@ import { createSignal, For, Show } from "solid-js";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
 import { reasonOf } from "@/base/api";
 import type { Tone } from "./cards";
-import { taskLine } from "./rules";
+import { taskLine } from "./titles";
 import { wallClockText } from "@/base/format";
 import { ready } from "@/base/query";
 import { Button } from "@/ui/Button";
@@ -12,7 +12,7 @@ import { Dialog } from "@/ui/Dialog";
 import { Icon } from "@/ui/Icon";
 import { Markdown } from "@/ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { useNameOf } from "./hooks";
+import { useNameOf } from "./queries";
 import { Fold, IssueSheet, More, Note, Property } from "./Sheet";
 import { type Answer, graphs, useGraphChanges } from "@/features/task";
 

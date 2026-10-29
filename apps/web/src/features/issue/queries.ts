@@ -1,9 +1,9 @@
 import { createEffect, createMemo, deep } from "solid-js";
-
-import type { Issue, IssueHistory } from "@vibevalley/protocol";
+import { type Issue, type IssueHistory, defaultOrchestrator, type TaskGraph } from "@vibevalley/protocol";
 import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { queries, ready, useQuery } from "@/base/query";
+import { useCore, useFrames } from "@/base/frame";
+import { queries, ready, useQuery, useAgents } from "@/base/query";
+import { t } from "@vibevalley/i18n";
 
 /** Every issue with its real sessions (issue.history), read again whenever the frame's issues change. */
 export function useIssueHistory(older: () => boolean) {
@@ -49,3 +49,21 @@ export const useIssueRuns = (id: () => string, version: () => string) =>
     queryFn: () => api.issue.run.list({ id: id() }),
     placeholderData: <T>(prev: T) => prev,
   }));
+
+const noGraphs: TaskGraph[] = [];
+
+export function useGraphs(): () => TaskGraph[] {
+  const frames = useFrames();
+  return () => frames.frame?.graphs ?? noGraphs;
+}
+
+/** A profile's name by its id; the default orchestrator with no name is 管家, a profile gone is its id. */
+export function useNameOf(): () => (id: string) => string {
+  const agents = useAgents();
+  return createMemo(() => {
+    const all = ready(agents, []);
+    return (id: string) => all.find((a) => a.id === id)?.name || (id === defaultOrchestrator ? t("web.issue.orchestrator") : id);
+  });
+}
+
+export const reloadIssues = () => queries.invalidateQueries({ queryKey: ["issues"] });

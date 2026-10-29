@@ -1,16 +1,16 @@
-import { t } from "@vibevalley/i18n";
 // What an issue's page says, top to bottom, for the owner: what it is, where it stands, what is asked of the owner, how far
-// it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
-// owner may do) is the server's Issue.attention; this only words it.
+// it is against its criteria. Where it stands (and what the owner may do) is the server's Issue.attention; this only words it.
 
-import type { Changes, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
+import type { Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
-import { endedAt, issueInTask, issueTitle } from "./rules";
-import { tookText } from "@/base/format";
+import { endedAt, issueInTask } from "./issue";
+import { issueTitle } from "./titles";
+import { tookText, spanText } from "@/base/format";
 import type { Tone } from "./cards";
-
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 export const attentionTone: Record<Attention, Tone> = {
   draft: "faint",
   queued: "faint",
@@ -22,15 +22,6 @@ export const attentionTone: Record<Attention, Tone> = {
   canceled: "faint",
 };
 
-/** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
-export function spanText(ms: number) {
-  const m = Math.floor(Math.max(0, ms) / 60_000);
-  if (m < 1) return t("web.base.time.round.underMinute");
-  if (m < 60) return t("web.base.time.round.minutes", { m });
-  if (m < 60 * 24) return t("web.base.time.round.hours", { h: Math.floor(m / 60) });
-  return t("web.base.time.round.days", { d: Math.floor(m / 60 / 24) });
-}
-
 /** The block that asks the owner for the one thing: its head and what it says under it. */
 export interface OwnerQuestion {
   head: string;
@@ -38,7 +29,8 @@ export interface OwnerQuestion {
   tone: Tone;
 }
 
-const nothing: DoingView = { action: "none", label: "", actionText: "" };
+export const nothing: DoingView = { action: "none", label: "", actionText: "" };
+
 const doingOf = (s: SessionView): DoingView => (s.phase._tag === "working" ? s.phase.doing : nothing);
 
 /** One of the criteria as far as it got: the helper's word on it, if it gave one. */
@@ -183,53 +175,5 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
 
 export type IssueState = ReturnType<typeof issueState>;
 
-/** A binary file counts -1: not counted. */
-export const lineCounts = (c: Changes): [number, number] => [
-  c.files.reduce((n, f) => n + Math.max(0, Math.round(f.added)), 0),
-  c.files.reduce((n, f) => n + Math.max(0, Math.round(f.removed)), 0),
-];
-
-/** The one line over an issue's changes. */
-export function changesLine(c: Changes) {
-  const [added, removed] = lineCounts(c);
-  const counts = { branch: c.branch ?? "", base: c.base, commits: c.commits.length, added, removed };
-  return c.uncommitted.length
-    ? t("web.issue.issue.changesUncommitted", { ...counts, uncommitted: c.uncommitted.length })
-    : t("web.issue.issue.changes", counts);
-}
-
 /** The empty 干活过程 says why. */
 export const noStepsText = (head: Session) => (endedAt(head) === undefined ? t("web.issue.issue.noSteps") : t("web.issue.issue.stepsGone"));
-
-/** Nothing to merge: completing only lets the helper go. */
-export const nothingChanged = (c: Changes) => c.commits.length === 0 && c.uncommitted.length === 0;
-
-/** What a git status letter is, as a mark and a word; an unknown one is itself. */
-export function changeKind(status: string) {
-  switch (status) {
-    case "A":
-      return { mark: t("web.issue.issue.change.A.mark"), label: t("web.issue.issue.change.A.label") };
-    case "M":
-      return { mark: t("web.issue.issue.change.M.mark"), label: t("web.issue.issue.change.M.label") };
-    case "D":
-      return { mark: t("web.issue.issue.change.D.mark"), label: t("web.issue.issue.change.D.label") };
-    default:
-      return { mark: status, label: status };
-  }
-}
-
-export type PatchMark = "added" | "removed" | "hunk" | "plain";
-
-export const patchMarkOf = (line: string): PatchMark =>
-  line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@@") ? "hunk" : "plain";
-
-/** A patch from its first hunk: the header above it says nothing the file row does not. */
-export function patchLines(text: string) {
-  const lines = text.split("\n");
-  return lines.slice(
-    Math.max(
-      0,
-      lines.findIndex((l) => l.startsWith("@@")),
-    ),
-  );
-}

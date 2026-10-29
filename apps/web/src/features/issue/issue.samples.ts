@@ -1,7 +1,6 @@
 // For the stories only; the product never imports it.
 
 import type { Changes, Issue, IssueAction, IssueAttention, IssueId, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
-
 export const now = Date.now();
 export const min = 60_000;
 
