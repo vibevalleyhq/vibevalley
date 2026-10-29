@@ -8,13 +8,13 @@ import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
 import { Tip } from "../../ui/Tip";
 
-type Result = { readonly ok: true } | { readonly ok: false; readonly why: string };
+export type MossCheckResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 
-const said = (r: Result) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
+const said = (r: MossCheckResult) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
 
 export function MossCheck(props: { typed: () => string }) {
   const [busy, setBusy] = createSignal(false);
-  const [result, setResult] = createSignal<Result>();
+  const [result, setResult] = createSignal<MossCheckResult>();
   const check = async () => {
     setBusy(true);
     setResult(undefined);
@@ -28,18 +28,23 @@ export function MossCheck(props: { typed: () => string }) {
       setBusy(false);
     }
   };
+  return <MossCheckView busy={busy()} result={result()} onCheck={() => void check()} />;
+}
+
+/** The check as it looks: nothing yet, asking, or the answer as a mark with its reason on hover. */
+export function MossCheckView(props: { busy: boolean; result?: MossCheckResult; onCheck: () => void }) {
   return (
     <div class="flex items-center gap-1.5">
-      <IconButton icon="plug" label={t("web.voice.voice.moss.check")} disabled={busy()} onClick={() => void check()} />
+      <IconButton icon="plug" label={t("web.voice.voice.moss.check")} disabled={props.busy} onClick={() => props.onCheck()} />
       <Switch>
-        <Match when={busy()}>
+        <Match when={props.busy}>
           <Tip text={t("web.voice.voice.moss.checking")}>
             <span role="status" aria-label={t("web.voice.voice.moss.checking")}>
               <Icon name="wait" size={14} />
             </span>
           </Tip>
         </Match>
-        <Match when={result()}>
+        <Match when={props.result}>
           {(r) => (
             <Tip text={said(r())}>
               <span role="status" aria-label={said(r())}>

@@ -5,3 +5,6 @@ export { VoiceCall, voiceCall } from "./call";
 export { liveCaptions } from "./captions";
 export type { SpokenLine } from "./captions";
 export { createCall } from "./createCall";
+export type { CallPhase } from "./call";
+export { DictationMark, type DictationState } from "./DictationButton";
+export { MossLineView, type MossLineState } from "./MossPlayground";

@@ -13,7 +13,7 @@ import { aria } from "../../base/util";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { SpriteIcon } from "../../ui/pixel";
 import { phoneState } from "../support";
-import { createCall, voiceCall } from "../../features/voice";
+import { type CallPhase, createCall, voiceCall } from "../../features/voice";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { useAgent } from "../../base/agents";
@@ -25,6 +25,8 @@ const cream = "#f7e8c4";
 const bark = "#2f1f13";
 const answerGreen = "#5a8234";
 const declineRed = "#c84a3a";
+// Words in red on the screen: the decline key's red is too light to read on its green.
+const failedInk = "#8f2a1e";
 
 /** Cells on a grid, scaled whole into `size` and centred. */
 export function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; size: [number, number]; origin?: [number, number] }) {
@@ -226,36 +228,46 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
   );
 }
 
-/** The orchestrator's line: on the web it cannot be dialed yet, so it sends you to 田头. */
 /** The farm's one call, the chat's call button's too: calling, on it, or why it did not get through. */
 export function OrchestratorScreen() {
   const call = createCall();
-  const phase = () => call().phase;
+  return (
+    <OrchestratorLine
+      phase={call().phase}
+      agentHere={call().agentHere}
+      problem={call().problem}
+      onKey={() => void (call().phase === "live" || call().phase === "connecting" ? voiceCall.end() : voiceCall.start())}
+    />
+  );
+}
+
+/** The call as it looks in each phase, the line itself kept out: what OrchestratorScreen draws, and its stories. */
+export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; problem?: string; onKey: () => void }) {
   const line = () => {
-    switch (phase()) {
+    switch (props.phase) {
       case "connecting":
         return t("web.farm.phone.phase.connecting");
       case "live":
-        return call().agentHere ? t("web.farm.phone.phase.live") : t("web.farm.phone.phase.coming");
+        return props.agentHere ? t("web.farm.phone.phase.live") : t("web.farm.phone.phase.coming");
       case "ending":
         return t("web.farm.phone.phase.ending");
       case "idle":
-        return call().problem ? t("web.farm.phone.phase.failed", { why: call().problem ?? "" }) : t("web.farm.phone.phase.idle");
+        return props.problem ? t("web.farm.phone.phase.failed", { why: props.problem }) : t("web.farm.phone.phase.idle");
     }
   };
-  const on = () => phase() === "live" || phase() === "connecting";
+  const on = () => props.phase === "live" || props.phase === "connecting";
   return (
     <div
       data-testid="orchestrator-line"
-      data-state={phase()}
-      data-problem={call().problem ? "" : undefined}
+      data-state={props.phase}
+      data-problem={props.problem ? "" : undefined}
       class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center"
     >
-      <BigFace shake={phase() === "connecting"}>
+      <BigFace shake={props.phase === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
       <p class="mt-2 text-[24px] leading-none">{t("web.farm.phone.manager")}</p>
-      <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: phase() === "idle" && call().problem ? declineRed : undefined }}>
+      <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: props.phase === "idle" && props.problem ? failedInk : undefined }}>
         {line()}
       </p>
       <div class="mt-auto mb-5">
@@ -263,7 +275,7 @@ export function OrchestratorScreen() {
           answer={!on()}
           testid="line-key"
           label={on() ? t("web.farm.phone.hangUp") : t("web.farm.phone.callOrchestrator")}
-          onClick={() => void (on() ? voiceCall.end() : voiceCall.start())}
+          onClick={() => props.onKey()}
         />
       </div>
     </div>
