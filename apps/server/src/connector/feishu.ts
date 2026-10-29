@@ -6,6 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { wallTime } from "../base/time.ts";
+import { type Adapter, message } from "./adapter.ts";
 
 export type Domain = "feishu" | "lark";
 
@@ -229,4 +230,44 @@ export function text(m: Message): string {
   } catch {
     return "";
   }
+}
+
+export function feishuAdapter(api: FeishuApi): Adapter {
+  const appOf = (s: Record<string, string>) => ({
+    appId: s.appId ?? "",
+    appSecret: s.appSecret ?? "",
+    domain: s.domain === "lark" ? ("lark" as const) : ("feishu" as const),
+  });
+  return {
+    id: "feishu",
+    login: async (signal, _input, progress) => {
+      const linked = await api.login(signal, (url) => progress({ state: "waiting", qr: url }));
+      return {
+        secrets: {
+          appId: linked.app.appId,
+          appSecret: linked.app.appSecret,
+          domain: linked.app.domain,
+        },
+        owner: linked.owner,
+      };
+    },
+    // Returning to the SDK acknowledges only a durable inbox write; the orchestrator's work runs elsewhere.
+    receive: async (signal, secrets, io) => {
+      try {
+        await api.listen(signal, appOf(secrets), (m) =>
+          m.chatType === "p2p" ? io.accept([{ id: m.messageId, from: m.from, text: text(m), quoted: m.parentId }], "") : Promise.resolve(),
+        );
+        return undefined;
+      } catch (e) {
+        return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
+      }
+    },
+    send: async (signal, secrets, to, text) => {
+      try {
+        return await api.sendText(signal, appOf(secrets), to, text);
+      } catch (e) {
+        return { kind: "failed", reason: message(e) };
+      }
+    },
+  };
 }
