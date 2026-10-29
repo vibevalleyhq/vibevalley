@@ -8,7 +8,7 @@
 - 改了宿主接口 `packages/protocol/src/host.ts`（桥的形状）、页面找宿主的 `apps/web/src/base/host.ts`（`currentHost`），或页面里调宿主的地方。
 - 改了 `apps/server/src/lan`（配对、cookie、放行页面）。
 
-不用它：只改了 `apps/mobile/src/rules.ts` 的纯函数、`bun test` 已经覆盖的。
+不用它：只改了 `apps/mobile/src/rules.ts` 的纯函数、`vp run --filter @vibevalley/mobile test` 已经覆盖的。
 
 ## 准备
 
