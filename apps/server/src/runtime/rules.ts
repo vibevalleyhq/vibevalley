@@ -4,6 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 // opens, so a profile that would be refused is shown so before it is sent.
 
 import type { AccountUsage, Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
+import { sessionAppendSystemPrompt, sessionDisallowedTools, sessionEffort, sessionEnv, sessionMcpServers, sessionSystemPrompt } from "@vibevalley/protocol";
 import { factsOf, runtimeLabel } from "../agent/seed.ts";
 import { yuan } from "./money.ts";
 
@@ -86,12 +87,12 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
   // The probed facts; seeds.json's for a runtime not probed.
   const facts = runtime?.facts?.refused ? runtime.facts : factsOf(agent.runtime);
   const refused = facts.refused ?? {};
-  const promptOption = agent.personaMode === "append" ? "appendSystemPrompt" : agent.personaMode === "replace" ? "systemPrompt" : "";
+  const promptOption = agent.personaMode === "append" ? sessionAppendSystemPrompt : agent.personaMode === "replace" ? sessionSystemPrompt : "";
   if (!blank(agent.persona) && promptOption && refused[promptOption]) add("persona", "error", t("server.runtime.persona", { refused: refused[promptOption] }));
-  if (options.effort && refused.effort) add("effort", "error", refused.effort);
-  if (Object.keys(options.env).length > 0 && refused.env) add("env", "error", refused.env);
-  if ((agent.mcpServers ?? []).length > 0 && refused.mcpServers) add("mcpServers", "error", refused.mcpServers);
-  if ((agent.disallowedTools ?? []).length > 0 && refused.disallowedTools) add("disallowedTools", "error", refused.disallowedTools);
+  if (options.effort && refused[sessionEffort]) add("effort", "error", refused[sessionEffort]);
+  if (Object.keys(options.env).length > 0 && refused[sessionEnv]) add("env", "error", refused[sessionEnv]);
+  if ((agent.mcpServers ?? []).length > 0 && refused[sessionMcpServers]) add("mcpServers", "error", refused[sessionMcpServers]);
+  if ((agent.disallowedTools ?? []).length > 0 && refused[sessionDisallowedTools]) add("disallowedTools", "error", refused[sessionDisallowedTools]);
   if (runtime && options.missingModel) add("model", "warn", t("server.runtime.noModel", { runtime: runtime.id, model: options.missingModel }));
   if (runtime && models && options.effort) {
     const model = models.find((m) => (options.model ? m.id === options.model : m.isDefault));

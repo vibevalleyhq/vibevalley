@@ -6,11 +6,8 @@ import { t } from "@vibevalley/i18n";
 import {
   type Block,
   type BlockAttrs,
+  type BlockType,
   type BlockInput,
-  blockCode,
-  blockParagraph,
-  blockTodo,
-  blockQuote,
   type BlockOp,
   ownerId,
   type BlockSnapshot,
@@ -43,7 +40,7 @@ export class EditBlock {
   readonly id: string;
   parentId?: string;
   orderKey: string;
-  type: string;
+  type: BlockType;
   attrs: BlockAttrs;
   spans: TextSpan[];
   /** Zero is local: edits of a new block wait behind its insertion until the server supplies a revision. */
@@ -301,7 +298,7 @@ export class BlockEditor {
       this.changed();
       return;
     }
-    if (b.type !== blockCode && text.includes("\n")) {
+    if (b.type !== "code" && text.includes("\n")) {
       const at = text.indexOf("\n");
       const joined = text.slice(0, at) + text.slice(at + 1);
       b.spans = editSpans(b.spans, joined);
@@ -312,7 +309,7 @@ export class BlockEditor {
       if (added && added.text.includes("\n")) this.edited(added, added.text, 0);
       return;
     }
-    if (b.type === blockParagraph && !markdownShortcut(before)) {
+    if (b.type === "paragraph" && !markdownShortcut(before)) {
       const shortcut = markdownShortcut(text);
       if (shortcut) {
         const rest = text.slice(shortcut.strip);
@@ -339,19 +336,19 @@ export class BlockEditor {
   /** Enter at `at` (UTF-16) in b: an empty list item leaves the list; otherwise the text after `at` becomes a new block. */
   enter(b: EditBlock, at: number): EditBlock | undefined {
     if (listTypes.has(b.type) && b.text === "") {
-      this.setType(b, blockParagraph, {});
+      this.setType(b, "paragraph", {});
       return undefined;
     }
     this.textOp(b);
     const [left, right] = splitSpans(b.spans, at);
     const next = this.nextSibling(b);
-    const keepType = listTypes.has(b.type) || b.type === blockQuote;
+    const keepType = listTypes.has(b.type) || b.type === "quote";
     const nb: BlockInput = {
       id: newBlockId(),
       ...(b.parentId !== undefined ? { parentId: b.parentId } : {}),
       orderKey: keyBetween(b.orderKey, next?.orderKey ?? ""),
-      type: keepType ? b.type : blockParagraph,
-      attrs: b.type === blockTodo ? { checked: false } : {},
+      type: keepType ? b.type : "paragraph",
+      attrs: b.type === "todo" ? { checked: false } : {},
       text: [],
     };
     const offset = codePointOffset(plainOf(b.spans), at);
@@ -380,7 +377,7 @@ export class BlockEditor {
 
   /** Backspace at the start of b: a block that is not a paragraph becomes one; a paragraph joins the block before it. */
   backspaceAtStart(b: EditBlock) {
-    if (b.type !== blockParagraph && hasText(b.type)) return this.setType(b, blockParagraph, {});
+    if (b.type !== "paragraph" && hasText(b.type)) return this.setType(b, "paragraph", {});
     const i = this.blocks.indexOf(b);
     if (i <= 0) return;
     const prev = this.blocks[i - 1]!;
@@ -425,7 +422,7 @@ export class BlockEditor {
     const nb: BlockInput = {
       id: newBlockId(),
       orderKey: keyBetween(last?.orderKey ?? "", ""),
-      type: blockParagraph,
+      type: "paragraph",
       attrs: {},
       text: [],
     };
@@ -455,7 +452,7 @@ export class BlockEditor {
     return i >= 0 && i + 1 < siblings.length ? siblings[i + 1] : undefined;
   }
 
-  private setType(b: EditBlock, type: string, attrs: BlockAttrs) {
+  private setType(b: EditBlock, type: BlockType, attrs: BlockAttrs) {
     this.textOp(b);
     b.type = type;
     b.attrs = attrs;

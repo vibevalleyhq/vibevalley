@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import type { ServerReady } from "@vibevalley/protocol";
 // The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
 // when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
 // It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists, PGlite's wasm and the
@@ -89,7 +90,7 @@ export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0
       log.write(line + "\n");
       if (ready) return;
       try {
-        const { url } = JSON.parse(line) as { url?: unknown };
+        const { url } = JSON.parse(line) as Partial<ServerReady>;
         if (typeof url !== "string") return;
         ready = true;
         clearTimeout(timer);

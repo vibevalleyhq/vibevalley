@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { Block, BlockAttrs, BlockOp, BlockOpStatus, TextSpan } from "@vibevalley/protocol";
+import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { ordered, Page } from "./ops.ts";
@@ -100,7 +100,7 @@ describe("ops", () => {
       blocks: [para("a", "V", "一")],
       ops: [
         { op: "insert_block", block: para("a", "W", "重名") },
-        { op: "insert_block", block: block({ id: "x", orderKey: "W", type: "table" }) },
+        { op: "insert_block", block: block({ id: "x", orderKey: "W", type: "table" as BlockType }) },
         { op: "insert_block", block: para("y", "W0", "坏键") },
       ],
       status: ["rejected", "rejected", "rejected"],
@@ -200,7 +200,7 @@ describe("ops", () => {
         { op: "set_attrs", blockId: "a", attrs: { checked: true } },
         { op: "set_attrs", blockId: "a", attrs: {}, unset: ["nope"] },
         { op: "set_type", blockId: "a", type: "code", attrs: { language: "go" } },
-        { op: "set_type", blockId: "a", type: "table", attrs: {} },
+        { op: "set_type", blockId: "a", type: "table" as BlockType, attrs: {} },
       ],
       status: ["applied", "rejected", "applied", "rejected"],
       want: "a=字",
@@ -255,8 +255,8 @@ describe("ops", () => {
       expect(
         new Page("d", "owner", 1, []).apply({
           op,
-          block: block({ id: "", orderKey: "", type: "" }),
-          newBlock: block({ id: "", orderKey: "", type: "" }),
+          block: block({ id: "", orderKey: "", type: "" as BlockType }),
+          newBlock: block({ id: "", orderKey: "", type: "" as BlockType }),
         } as never).reason ?? "",
       ).not.toMatch(/^不认识的改动/);
   });

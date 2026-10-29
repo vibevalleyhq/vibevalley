@@ -4,14 +4,14 @@
 // reads back to the same blocks.
 
 import { issueId } from "@vibevalley/protocol/schema";
-import type { Block, BlockAttrs, SpanMarks, TextSpan } from "@vibevalley/protocol";
+import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
 import { ordered, textFor } from "./ops.ts";
 import { normal, plain, unmarked } from "./text.ts";
 
 /** A block as Markdown says it: its place is its depth under the block before it. */
 export interface MdBlock {
   readonly depth: number;
-  readonly type: string;
+  readonly type: BlockType;
   readonly attrs: BlockAttrs;
   readonly text: TextSpan[];
 }
@@ -71,6 +71,8 @@ function blockLine(b: Block, number: number): string {
       return "<!-- issue:" + (b.attrs.issueId ?? "") + " -->";
     case "memory_item":
       return "<!-- memory:" + (b.attrs.memoryId ?? "") + " --> " + text;
+    case "paragraph":
+      break;
   }
   // A paragraph: a line that would read as another block's start is escaped.
   return text
@@ -120,7 +122,7 @@ const indentOf = (s: string) => /^ */.exec(s)![0].length;
 
 /** One line (its indent taken off) read as the start of a block; the text is still Markdown. */
 interface LineKind {
-  type: string;
+  type: BlockType;
   attrs: BlockAttrs;
   rest: string;
 }
