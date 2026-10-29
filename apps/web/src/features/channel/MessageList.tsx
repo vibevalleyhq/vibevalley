@@ -358,7 +358,14 @@ function Dispatch(props: { m: ChatMessage }) {
   );
 }
 
-function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel; inChannel?: boolean; where?: string | undefined; onJump?: () => void }) {
+export function MessageRow(props: {
+  m: ChatMessage;
+  continues: boolean;
+  thread?: Channel;
+  inChannel?: boolean;
+  where?: string | undefined;
+  onJump?: () => void;
+}) {
   const core = useCore();
   const editing = () => editingId() === props.m.id;
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);

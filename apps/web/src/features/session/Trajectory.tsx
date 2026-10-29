@@ -44,15 +44,26 @@ const laneNames: Record<Lane, string> = {
   tool: t("web.session.trajectory.lane.tool"),
 };
 
-const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "#2f1f131a" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
+// Usage is not a step of the work: the page's own hover ground, with the theme's ink, in either theme.
+const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "var(--wb-hover)" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
 
-/** A dark fill takes light words. */
-function inkOn(fill: string) {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fill);
-  if (!m) return "#2f1f13";
+const lightInk = "#fffaf0";
+const darkInk = "#2f1f13";
+
+const luminance = (hex: string) => {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex);
+  if (!m) return 1;
   const [r, g, b] = m.slice(1).map((h) => parseInt(h, 16) / 255) as [number, number, number];
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) < 0.25 ? "#fffaf0" : "#2f1f13";
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+
+/** The words on a fill: whichever ink stands out more from it (WCAG's ratio), so a mid-tone fill gets the readable one. */
+function inkOn(fill: string) {
+  if (!/^#[0-9a-f]{6}$/i.test(fill)) return "var(--wb-ink)";
+  const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  const l = luminance(fill);
+  return ratio(l, luminance(lightInk)) >= ratio(l, luminance(darkInk)) ? lightInk : darkInk;
 }
 
 const haystack = (step: SessionEvent, tag: string) => [tag, step.text, step.tool ?? "", step.input ?? "", step.output ?? ""].join("\n").toLowerCase();
@@ -258,7 +269,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
         <span class={[gutterW, "shrink-0 truncate pt-0.5 pl-2 text-xs text-muted"]}>{props.spec.gutter}</span>
         <span
           class={["mt-px shrink-0 truncate rounded px-1 py-px text-center text-xs font-medium", sub() ? "ml-2.5 w-[78px]" : tagW]}
-          style={{ background: sub() ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
+          style={{ background: sub() && fill().startsWith("#") ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
         >
           {props.spec.tag}
         </span>

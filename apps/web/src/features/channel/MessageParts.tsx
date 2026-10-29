@@ -194,7 +194,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
                 <span class="truncate text-xs text-muted">{e().site}</span>
               </Show>
               <Show when={e().title}>
-                <span class="line-clamp-2 text-sm font-semibold text-accent">{e().title}</span>
+                <span class="line-clamp-2 text-sm font-semibold text-ok-ink">{e().title}</span>
               </Show>
               <Show when={e().description}>
                 <span class="line-clamp-3 text-xs">{e().description}</span>

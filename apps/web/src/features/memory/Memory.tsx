@@ -431,11 +431,11 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
   );
 }
 
-function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string[]; faded?: boolean; warning?: string }) {
+export function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string[]; faded?: boolean; warning?: string }) {
   return (
-    <div data-testid="memory" data-key={props.memory.id} class={[item, "group flex items-start gap-2 px-3 py-2", { "opacity-60": !!props.faded }]}>
+    <div data-testid="memory" data-key={props.memory.id} class={[item, "group flex items-start gap-2 px-3 py-2"]} data-faded={props.faded ? "" : undefined}>
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span class="text-sm">{props.memory.text}</span>
+        <span class={["text-sm", { "text-muted": !!props.faded }]}>{props.memory.text}</span>
         <span class="flex flex-wrap gap-x-2 text-xs text-muted">
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>

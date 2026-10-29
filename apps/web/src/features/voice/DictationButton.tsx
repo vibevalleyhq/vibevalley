@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
 
 import { onSettled } from "solid-js";
-import { dictation, insertDictated } from "./dictation";
+import { dictation, type DictationPhase, insertDictated } from "./dictation";
 import { createExternal } from "../../base/external";
 import { ready, useSettings } from "../../base/query";
 import { Icon, type IconSize } from "../../ui/Icon";
@@ -25,22 +25,12 @@ export function DictationButton(props: {
   // Unknown until the settings are read; the server says what is missing then.
   const settings = useSettings();
   const off = () => ready(settings, undefined)?.dictationReady === false;
-  const look = (): [IconName, string] =>
-    off()
-      ? ["record", t("web.voice.dictation.unset")]
-      : phase() === "recording"
-        ? ["stop", t("web.voice.dictation.recording")]
-        : phase() === "transcribing"
-          ? ["wait", t("web.voice.dictation.transcribing")]
-          : ["record", problem() ? t("web.voice.dictation.failed", { why: problem() ?? "" }) : t("web.voice.dictation.start")];
   return (
-    <button
-      type="button"
-      data-testid="dictate"
-      data-state={off() ? "unset" : phase()}
-      aria-label={phase() === "recording" ? t("web.voice.dictation.stop") : t("web.voice.dictation.label")}
-      title={look()[1]}
-      disabled={off() || phase() === "transcribing"}
+    <DictationMark
+      state={off() ? "unset" : phase()}
+      problem={problem() ?? undefined}
+      size={props.size}
+      class={props.class}
       onClick={() =>
         // oxlint-disable-next-line solid/reactivity -- like an event handler, it reads the field as it is when the words come.
         void dictation.toggle(me, (words) => {
@@ -56,9 +46,34 @@ export function DictationButton(props: {
           });
         })
       }
+    />
+  );
+}
+
+export type DictationState = "unset" | DictationPhase;
+
+/** The button as it looks in each state, the microphone and the server kept out: what DictationButton draws. */
+export function DictationMark(props: { state: DictationState; problem?: string; size?: IconSize; class?: string; onClick: () => void }) {
+  const look = (): [IconName, string] =>
+    props.state === "unset"
+      ? ["record", t("web.voice.dictation.unset")]
+      : props.state === "recording"
+        ? ["stop", t("web.voice.dictation.recording")]
+        : props.state === "transcribing"
+          ? ["wait", t("web.voice.dictation.transcribing")]
+          : ["record", props.problem ? t("web.voice.dictation.failed", { why: props.problem }) : t("web.voice.dictation.start")];
+  return (
+    <button
+      type="button"
+      data-testid="dictate"
+      data-state={props.state}
+      aria-label={props.state === "recording" ? t("web.voice.dictation.stop") : t("web.voice.dictation.label")}
+      title={look()[1]}
+      disabled={props.state === "unset" || props.state === "transcribing"}
+      onClick={() => props.onClick()}
       class={[
         "inline-flex shrink-0 cursor-pointer items-center justify-center p-1 disabled:cursor-default disabled:opacity-50",
-        { "animate-pulse": phase() === "recording" },
+        { "animate-pulse": props.state === "recording" },
         props.class,
       ]}
     >

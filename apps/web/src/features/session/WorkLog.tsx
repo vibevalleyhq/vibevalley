@@ -157,7 +157,7 @@ function TimeBar(props: { round: Round; end: number }) {
 }
 
 function When(props: { at: number; now: number }) {
-  return <span class="shrink-0 text-xs text-faint">{ago(props.at, props.now)}</span>;
+  return <span class="shrink-0 text-xs text-muted">{ago(props.at, props.now)}</span>;
 }
 
 function Folded(props: { text: string; lines: number; markdown?: boolean }) {
@@ -184,7 +184,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
 /** tint: the box's ground, a palette class (bg-wheat/14…), so it follows the theme. */
 function Box(props: { tint?: string; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
-    <div class={["rounded-md px-3 py-2", props.tint, { "border border-line": !!props.edge, "opacity-80": !!props.faint }]}>
+    <div class={["rounded-md px-3 py-2", props.tint, { "border border-line": !!props.edge, italic: !!props.faint }]}>
       <div class="mb-1 flex items-center">
         <span class="text-xs font-semibold text-muted">{props.label}</span>
         <span class="flex-1" />
