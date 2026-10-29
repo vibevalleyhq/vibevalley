@@ -12,7 +12,9 @@ interface Ctx {
   readonly max: () => number;
   readonly share: () => number;
   readonly text: () => string;
-  readonly attrs: () => Record<string, string | undefined>;
+  readonly indeterminate: () => boolean;
+  readonly progressing: () => boolean;
+  readonly complete: () => boolean;
   readonly labelId: string;
   readonly setLabelled: (on: boolean) => void;
 }
@@ -37,15 +39,11 @@ const makeRoot = (role: "progressbar" | "meter") =>
     const max = () => props.max ?? 100;
     const share = () => (props.value === null ? 0 : Math.min(1, Math.max(0, (props.value - min()) / (max() - min() || 1))));
     const text = () => props.getValueText?.(props.value, share()) ?? (props.value === null ? "" : `${Math.round(share() * 100)}%`);
-    const attrs = () =>
-      role === "progressbar"
-        ? {
-            "data-indeterminate": flag(props.value === null),
-            "data-progressing": flag(props.value !== null && share() < 1),
-            "data-complete": flag(props.value !== null && share() >= 1),
-          }
-        : {};
-    const ctx: Ctx = { value: () => props.value, min, max, share, text, attrs, labelId: createUniqueId(), setLabelled };
+    // Only a progress bar says how far along it is; a meter is a level, not a task.
+    const indeterminate = () => role === "progressbar" && props.value === null;
+    const progressing = () => role === "progressbar" && props.value !== null && share() < 1;
+    const complete = () => role === "progressbar" && props.value !== null && share() >= 1;
+    const ctx: Ctx = { value: () => props.value, min, max, share, text, indeterminate, progressing, complete, labelId: createUniqueId(), setLabelled };
     return (
       <Context value={ctx}>
         <div
@@ -56,7 +54,9 @@ const makeRoot = (role: "progressbar" | "meter") =>
           aria-valuenow={props.value ?? undefined}
           aria-valuetext={text() || undefined}
           aria-labelledby={labelled() ? ctx.labelId : props["aria-labelledby"]}
-          {...attrs()}
+          data-indeterminate={flag(indeterminate())}
+          data-progressing={flag(progressing())}
+          data-complete={flag(complete())}
         >
           {props.children}
         </div>
@@ -66,7 +66,7 @@ const makeRoot = (role: "progressbar" | "meter") =>
 
 function Track(props: DivProps) {
   const c = use();
-  return <div {...props} {...c.attrs()} />;
+  return <div {...props} data-indeterminate={flag(c.indeterminate())} data-progressing={flag(c.progressing())} data-complete={flag(c.complete())} />;
 }
 
 function Indicator(props: DivProps & { orientation?: "horizontal" | "vertical" | undefined }) {
@@ -76,7 +76,9 @@ function Indicator(props: DivProps & { orientation?: "horizontal" | "vertical" |
     <Show when={c.value() !== null}>
       <div
         {...rest}
-        {...c.attrs()}
+        data-indeterminate={flag(c.indeterminate())}
+        data-progressing={flag(c.progressing())}
+        data-complete={flag(c.complete())}
         style={{
           ...(typeof props.style === "object" ? props.style : {}),
           [props.orientation === "vertical" ? "height" : "width"]: `${c.share() * 100}%`,
@@ -91,7 +93,7 @@ function Value(props: Omit<SpanProps, "children"> & { children?: ((text: string,
   const c = use();
   const rest = omit(props, "children");
   return (
-    <span aria-hidden="true" {...rest} {...c.attrs()}>
+    <span aria-hidden="true" {...rest} data-indeterminate={flag(c.indeterminate())} data-progressing={flag(c.progressing())} data-complete={flag(c.complete())}>
       {props.children ? props.children(c.text(), c.value()) : c.text()}
     </span>
   );
@@ -103,7 +105,9 @@ function Label(props: SpanProps) {
     c.setLabelled(true);
     return () => c.setLabelled(false);
   });
-  return <span {...props} id={c.labelId} {...c.attrs()} />;
+  return (
+    <span {...props} id={c.labelId} data-indeterminate={flag(c.indeterminate())} data-progressing={flag(c.progressing())} data-complete={flag(c.complete())} />
+  );
 }
 
 export const Progress = { Root: makeRoot("progressbar"), Track, Indicator, Value, Label };

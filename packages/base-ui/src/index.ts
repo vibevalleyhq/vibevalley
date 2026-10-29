@@ -12,3 +12,5 @@ export { Meter, Progress } from "./range";
 export { Radio, RadioGroup } from "./radio";
 export { Separator } from "./separator";
 export { Slider } from "./slider";
+export { Accordion } from "./accordion";
+export { Toolbar } from "./toolbar";

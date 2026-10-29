@@ -6,12 +6,6 @@ import { type ButtonProps, call, createControllable, flag, type SpanProps } from
 
 const Context = createContext<{ readonly checked: () => boolean; readonly disabled: () => boolean }>();
 
-const checkedAttrs = (checked: boolean, disabled: boolean) => ({
-  "data-checked": flag(checked),
-  "data-unchecked": flag(!checked),
-  "data-disabled": flag(disabled),
-});
-
 export interface SwitchRootProps extends Omit<ButtonProps, "onChange"> {
   checked?: boolean | undefined;
   defaultChecked?: boolean | undefined;
@@ -36,7 +30,9 @@ function Root(props: SwitchRootProps) {
         {...rest}
         aria-checked={checked() ? "true" : "false"}
         aria-readonly={props.readOnly ? "true" : undefined}
-        {...checkedAttrs(checked(), disabled())}
+        data-checked={flag(checked())}
+        data-unchecked={flag(!checked())}
+        data-disabled={flag(disabled())}
         onClick={(e) => {
           call(props.onClick, e);
           if (!e.defaultPrevented && !props.readOnly) setChecked(!checked());
@@ -51,7 +47,7 @@ function Root(props: SwitchRootProps) {
 function Thumb(props: SpanProps) {
   const c = useContext(Context);
   if (!c) throw new Error("Switch.Thumb belongs inside Switch.Root");
-  return <span aria-hidden="true" {...props} {...checkedAttrs(c.checked(), c.disabled())} />;
+  return <span aria-hidden="true" {...props} data-checked={flag(c.checked())} data-unchecked={flag(!c.checked())} data-disabled={flag(c.disabled())} />;
 }
 
 export const Switch = { Root, Thumb };
