@@ -30,7 +30,7 @@
 - 帮工和管家的工具照接口名来：`artifact_list`、`artifact_get`、`artifact_content_get`、`artifact_create`、`artifact_version_create`；帮工另有 `artifact_block_create`、`artifact_block_update`（`apps/server/src/tool/tool.ts`）。
 - 频道：`Channels.announce` 以作者的身份说那句带卡片的话，`Channels.placeOf` 把「在哪说」认成频道。
 - 页面 `apps/web/src/features/artifact`：
-  - `ArtifactsPage.tsx` 是「产出」页：左边是全部产出（新建、按改动的先后），右边打开的那篇，上面是标题、种类、谁做的、为哪张工单、删；网页的旁边是每一版，交上来的旁边是回到对话里那条消息和回复的框；窄屏只放一边。
+  - `ArtifactsPage.tsx` 是「产出」页：左边是全部产出（按标题找、新建、按改动的先后），右边打开的那篇。上面是标题（就地改名，回车或离开就存，Esc 放回）、种类、网页正在看第几版、谁做的、为哪张工单，右上角的 ⋯ 是新标签页打开（网页）、复制链接、演示（一起写的）、删掉（在原处再问一遍）；网页的旁边是每一版，交上来的旁边是回到对话里那条消息和回复的框（⌘ 回车发）；窄屏只放一边。「新建」马上建一篇没起名的，选中标题等你打字。
   - `BlocksView.tsx` 是一起写的那种：块的画法、按键；`editor.ts` 的 `BlockEditor` 管本地的块、待发的 op、防抖和问别人写的；`blocks.ts` 只有码点偏移、编辑时保留 marks、编号和行首的 Markdown，不在别处重写规则。
   - `ArtifactCard.tsx` 是消息里的卡片，`IssueArtifacts.tsx` 是工单详情里的「产出」；田头窗口的卡片点开去工作台看。
 
@@ -58,7 +58,7 @@
 
 **交一篇**：帮工调 `artifact_create`（`content` 或 `file`，`kind` 是 `html` 或 `markdown`）→ 校验 → 在它的工单串里以它的名义说「做了「标题」」带卡片 → 记下产出和那条消息 → 网页存内容、记第一版；Markdown 读成块，作为一批 `insert_block` 提交，写的人是它的档案。管家的默认在它正在回的频道，主人经接口交的默认在默认频道。
 
-**主人新建**：产出页写个标题点「新建」→ 一篇空的、一起写的产出，不在哪里说 → 打开它接着写。
+**主人新建**：产出页点「新建」→ 一篇没起名的、空的、一起写的产出，不在哪里说 → 打开它，标题选中等着改，下面一行「从这里开始写」。改名是 `artifact.update`。
 
 **网页出新的一版**：`artifact_version_create` → 在第一版说过的地方再说一句带卡片的话 → 记下这一版。
 

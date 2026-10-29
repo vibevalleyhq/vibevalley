@@ -270,6 +270,14 @@ function Shown(props: { artifact: Artifact }) {
           </div>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <Tag label={bodyLabel[props.artifact.body]} tone="wait" />
+            <Show when={html() ? version() : undefined}>
+              {(v) => (
+                <>
+                  <span data-testid="artifact-shown-version">{t("web.artifact.card.version", { version: v().version })}</span>
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
+            </Show>
             <span>{t("web.artifact.page.by", { name: props.artifact.byName })}</span>
             <span aria-hidden="true">·</span>
             <span>{t("web.artifact.page.updated", { when: ago(props.artifact.updated, now()) })}</span>

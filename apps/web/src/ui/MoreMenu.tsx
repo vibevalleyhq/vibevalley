@@ -1,5 +1,5 @@
 import { Menu } from "@vibevalley/base-ui";
-import { For, Show } from "solid-js";
+import { type ComponentProps, For, Show } from "solid-js";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
@@ -13,12 +13,26 @@ export interface MoreItem {
   readonly onSelect: () => void;
 }
 
-/** ⋯: the actions a place has that are not its main one, in base-ui's Menu, drawn like every workbench menu. */
-export function MoreMenu(props: { label: string; items: readonly MoreItem[]; testid?: string; side?: "top" | "bottom" }) {
+/** ⋯: the actions a place has that are not its main one, in base-ui's Menu, drawn like every workbench menu. open and
+ * onOpenChange when the place shows something while it is open (a toolbar that stays); render makes the trigger part of
+ * a toolbar (Toolbar.Button). */
+export function MoreMenu(props: {
+  label: string;
+  items: readonly MoreItem[];
+  testid?: string;
+  /** The trigger's data-key, where its testid names a kind of button (a message's tools). */
+  dataKey?: string;
+  side?: "top" | "bottom";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  render?: ComponentProps<typeof Menu.Trigger>["render"];
+}) {
   return (
-    <Menu.Root>
+    <Menu.Root open={props.open} onOpenChange={(open) => props.onOpenChange?.(open)}>
       <Menu.Trigger
+        render={props.render}
         data-testid={props.testid}
+        data-key={props.dataKey}
         aria-label={props.label}
         title={props.label}
         class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-120 hover:bg-selected hover:text-ink data-popup-open:bg-selected data-popup-open:text-ink"
