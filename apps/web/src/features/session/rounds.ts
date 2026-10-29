@@ -140,13 +140,13 @@ export function spanColor(step: SessionEvent) {
     case "llm/usage":
       return "#efb84e";
     case "run/error":
-      return "#c84a3a";
+      return "#b8402f";
     case "run/start":
     case "run/end":
     case "tool/result":
       return "#e2c995";
     case "tool/call":
-      if (step.ok === false) return "#c84a3a";
+      if (step.ok === false) return "#b8402f";
       switch (step.action ?? "other") {
         case "read_file":
         case "search":
