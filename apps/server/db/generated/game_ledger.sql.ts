@@ -12,7 +12,7 @@ export type LedgerEntriesParams = typeof LedgerEntriesParams.Type
 
 export const LedgerEntriesResult = Schema.Struct({
   ["kind"]: Schema.String,
-  ["at"]: Schema.Finite,
+  ["at"]: Schema.Number,
   ["payload"]: Schema.String,
 })
 export type LedgerEntriesResult = typeof LedgerEntriesResult.Type
@@ -32,7 +32,7 @@ export const ledgerEntries = Effect.fn("LedgerEntries")(function* () {
 export const AddLedgerEntryParams = Schema.Struct({
   ["id"]: Schema.String,
   ["kind"]: Schema.String,
-  ["at"]: Schema.Finite,
+  ["at"]: Schema.Number,
   ["payload"]: Schema.String,
 })
 export type AddLedgerEntryParams = typeof AddLedgerEntryParams.Type

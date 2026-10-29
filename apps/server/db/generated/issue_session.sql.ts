@@ -7,7 +7,7 @@ import { SqlClient, SqlSchema } from "effect/sql"
 export const AddSessionParams = Schema.Struct({
   ["session"]: Schema.String,
   ["issue"]: Schema.String,
-  ["started_at"]: Schema.Finite,
+  ["started_at"]: Schema.Number,
 })
 export type AddSessionParams = typeof AddSessionParams.Type
 

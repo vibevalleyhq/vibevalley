@@ -24,15 +24,15 @@ export const ListIssuesResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["task"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
-  ["queued_at"]: Schema.NullOr(Schema.Finite),
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["queued_at"]: Schema.NullOr(Schema.Number),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
@@ -74,15 +74,15 @@ export const GetIssueResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["task"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
-  ["queued_at"]: Schema.NullOr(Schema.Finite),
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["queued_at"]: Schema.NullOr(Schema.Number),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
@@ -124,15 +124,15 @@ export const IssueByNumberResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["task"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
-  ["queued_at"]: Schema.NullOr(Schema.Finite),
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["queued_at"]: Schema.NullOr(Schema.Number),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
@@ -161,7 +161,7 @@ export const AddIssueParams = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
   ["priority"]: Schema.String,
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
   ["cron"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
@@ -223,7 +223,7 @@ export const refineIssue = Effect.fn("RefineIssue")(function* (params: RefineIss
 })
 
 export const ReviewIssueParams = Schema.Struct({
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
@@ -308,7 +308,7 @@ export const placeIssue = Effect.fn("PlaceIssue")(function* (params: PlaceIssueP
 })
 
 export const QueueIssueParams = Schema.Struct({
-  ["at"]: Schema.Finite,
+  ["at"]: Schema.Number,
   ["id"]: Schema.String,
 })
 export type QueueIssueParams = typeof QueueIssueParams.Type
@@ -341,7 +341,7 @@ export const unqueueIssue = Effect.fn("UnqueueIssue")(function* (params: Unqueue
 })
 
 export const CompleteIssueParams = Schema.Struct({
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
@@ -359,7 +359,7 @@ export const completeIssue = Effect.fn("CompleteIssue")(function* (params: Compl
 })
 
 export const CancelIssueParams = Schema.Struct({
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
@@ -377,7 +377,7 @@ export const cancelIssue = Effect.fn("CancelIssue")(function* (params: CancelIss
 })
 
 export const CompleteOpenIssueParams = Schema.Struct({
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
@@ -395,7 +395,7 @@ export const completeOpenIssue = Effect.fn("CompleteOpenIssue")(function* (param
 })
 
 export const CancelOpenIssueParams = Schema.Struct({
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
@@ -432,15 +432,15 @@ export const KeptIssuesResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["task"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
-  ["queued_at"]: Schema.NullOr(Schema.Finite),
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["queued_at"]: Schema.NullOr(Schema.Number),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
@@ -482,15 +482,15 @@ export const FamilyResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["task"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
-  ["queued_at"]: Schema.NullOr(Schema.Finite),
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["queued_at"]: Schema.NullOr(Schema.Number),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
@@ -520,8 +520,8 @@ export const PutIssueParams = Schema.Struct({
   ["assignee"]: Schema.NullOr(Schema.String),
   ["priority"]: Schema.String,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Finite,
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["parent"]: Schema.NullOr(Schema.String),
@@ -585,15 +585,15 @@ export const LatestOfCronResult = Schema.Struct({
   ["graph"]: Schema.NullOr(Schema.String),
   ["task"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
-  ["queued_at"]: Schema.NullOr(Schema.Finite),
-  ["closed_at"]: Schema.NullOr(Schema.Finite),
+  ["created_at"]: Schema.Number,
+  ["queued_at"]: Schema.NullOr(Schema.Number),
+  ["closed_at"]: Schema.NullOr(Schema.Number),
   ["delivered"]: Schema.NullOr(Schema.String),
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["deliver"]: Schema.String,
   ["talk"]: Schema.NullOr(Schema.String),
-  ["reviewed_at"]: Schema.NullOr(Schema.Finite),
+  ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),

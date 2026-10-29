@@ -9,7 +9,7 @@ export const AddOutboxParams = Schema.Struct({
   ["connector"]: Schema.String,
   ["message_id"]: Schema.String,
   ["body"]: Schema.String,
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
 })
 export type AddOutboxParams = typeof AddOutboxParams.Type
 
@@ -72,7 +72,7 @@ export const countPendingOutbox = Effect.fn("CountPendingOutbox")(function* (par
 })
 
 export const OutboxSentParams = Schema.Struct({
-  ["sent_at"]: Schema.NullOr(Schema.Finite),
+  ["sent_at"]: Schema.NullOr(Schema.Number),
   ["ext_id"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })

@@ -14,8 +14,8 @@ export const LanDevicesResult = Schema.Struct({
   ["id"]: Schema.String,
   ["name"]: Schema.String,
   ["key_hash"]: Schema.String,
-  ["paired_at"]: Schema.Finite,
-  ["last_seen"]: Schema.NullOr(Schema.Finite),
+  ["paired_at"]: Schema.Number,
+  ["last_seen"]: Schema.NullOr(Schema.Number),
 })
 export type LanDevicesResult = typeof LanDevicesResult.Type
 
@@ -35,7 +35,7 @@ export const AddLanDeviceParams = Schema.Struct({
   ["id"]: Schema.String,
   ["name"]: Schema.String,
   ["key_hash"]: Schema.String,
-  ["paired_at"]: Schema.Finite,
+  ["paired_at"]: Schema.Number,
 })
 export type AddLanDeviceParams = typeof AddLanDeviceParams.Type
 
@@ -67,7 +67,7 @@ export const removeLanDevice = Effect.fn("RemoveLanDevice")(function* (params: R
 })
 
 export const SeenLanDeviceParams = Schema.Struct({
-  ["last_seen"]: Schema.NullOr(Schema.Finite),
+  ["last_seen"]: Schema.NullOr(Schema.Number),
   ["id"]: Schema.String,
 })
 export type SeenLanDeviceParams = typeof SeenLanDeviceParams.Type

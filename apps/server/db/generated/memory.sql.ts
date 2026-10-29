@@ -17,9 +17,9 @@ export const MemoriesOfResult = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
   ["author"]: Schema.String,
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
   ["recalled"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["recalled_at"]: Schema.NullOr(Schema.Finite),
+  ["recalled_at"]: Schema.NullOr(Schema.Number),
 })
 export type MemoriesOfResult = typeof MemoriesOfResult.Type
 
@@ -44,7 +44,7 @@ export const AddNoteParams = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
   ["author"]: Schema.String,
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
 })
 export type AddNoteParams = typeof AddNoteParams.Type
 
@@ -60,7 +60,7 @@ export const addNote = Effect.fn("AddNote")(function* (params: AddNoteParams) {
 })
 
 export const RecalledParams = Schema.Struct({
-  ["recalled_at"]: Schema.NullOr(Schema.Finite),
+  ["recalled_at"]: Schema.NullOr(Schema.Number),
   ["id"]: Schema.String,
 })
 export type RecalledParams = typeof RecalledParams.Type
@@ -84,7 +84,7 @@ export const KeepJobParams = Schema.Struct({
   ["terms_of"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
 })
 export type KeepJobParams = typeof KeepJobParams.Type
 
@@ -168,7 +168,7 @@ export type MatchMemoriesParams = typeof MatchMemoriesParams.Type
 
 export const MatchMemoriesResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["score"]: Schema.NullOr(Schema.Finite),
+  ["score"]: Schema.NullOr(Schema.Number),
 })
 export type MatchMemoriesResult = typeof MatchMemoriesResult.Type
 

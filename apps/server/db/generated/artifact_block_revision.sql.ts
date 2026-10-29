@@ -11,7 +11,7 @@ export const AddArtifactBlockRevisionParams = Schema.Struct({
   ["spans"]: Schema.String,
   ["actor"]: Schema.String,
   ["kind"]: Schema.String,
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
 })
 export type AddArtifactBlockRevisionParams = typeof AddArtifactBlockRevisionParams.Type
 

@@ -7,7 +7,7 @@ import { SqlClient, SqlSchema } from "effect/sql"
 export const AcceptInboundParams = Schema.Struct({
   ["connector"]: Schema.String,
   ["ext_id"]: Schema.String,
-  ["created_at"]: Schema.Finite,
+  ["created_at"]: Schema.Number,
   ["payload"]: Schema.String,
 })
 export type AcceptInboundParams = typeof AcceptInboundParams.Type
