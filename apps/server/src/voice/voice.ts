@@ -9,14 +9,16 @@ import { noticeLine, onCallLine } from "./prompts.ts";
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
-import { createServer, type Server } from "node:http";
+import { createServer } from "node:http";
+import { NodeHttpServer } from "@effect/platform-node";
+import { HttpEffect } from "effect/http";
 import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
 import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
 import type { Socket } from "effect/socket";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream, Data } from "effect";
+import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Schema, type Scope, Semaphore, Stream } from "effect";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
@@ -26,8 +28,7 @@ import { orchestratorModel } from "@/orchestrator/rules.ts";
 import { Notices } from "@/notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 import { callbackLog } from "@/base/log.ts";
-import { afterRealTime, timeHere, wallTime } from "@/base/time.ts";
-import type { Time } from "@/base/time.ts";
+import { afterRealTime } from "@/base/time.ts";
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
@@ -179,23 +180,31 @@ const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraA
 /** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
  * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
 export const retrying =
-  (fetcher: typeof fetch, time: Time): typeof fetch =>
-  async (input, init) => {
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetcher(input, init);
-      if (attempt >= 2 || !([408, 429].includes(res.status) || res.status >= 500)) return res;
-      const after = Number(res.headers.get("Retry-After"));
-      await time.sleep(after > 0 ? Math.min(after * 1000, 60_000) : 1000 * 2 ** attempt, init?.signal ?? undefined);
-    }
-  };
+  (fetcher: typeof fetch, run: Run): typeof fetch =>
+  (input, init) =>
+    run(
+      Effect.gen(function* () {
+        for (let attempt = 0; ; attempt++) {
+          // A failed fetch goes back to the SDK as it is: it rejects the SDK's call, as the fetch itself would.
+          const res = yield* Effect.promise(() => fetcher(input, init));
+          if (attempt >= 2 || !([408, 429].includes(res.status) || res.status >= 500)) return res;
+          const after = Number(res.headers.get("Retry-After"));
+          yield* Effect.sleep(after > 0 ? Math.min(after * 1000, 60_000) : 1000 * 2 ** attempt);
+        }
+      }),
+      init?.signal ? { signal: init.signal } : undefined,
+    );
 
-export const clientOf = (c: AgoraCredentials, area: Area, time: Time, fetcher: typeof fetch = fetch) =>
+/** Runs an Effect for the Promise side (the Agora SDK's fetch) on the service's fibers, so its sleeps are on its Clock. */
+export type Run = <A>(effect: Effect.Effect<A, unknown>, options?: { readonly signal: AbortSignal }) => Promise<A>;
+
+export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
     area: areaOf(area) as never,
     appId: c.appId,
     appCertificate: c.appCertificate,
     maxRetries: 0,
-    fetch: retrying(fetcher, time),
+    fetch: retrying(fetcher, run),
   });
 
 /** Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: the client has no RTM. */
@@ -329,7 +338,7 @@ export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
   /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
-  readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
+  readonly tunnel?: (port: number) => Effect.Effect<Tunnel, unknown>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
   /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
@@ -338,57 +347,68 @@ export interface VoiceOptions {
 
 const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 
-function cloudflared(port: number): Promise<{ url: string; close: () => void }> {
-  return new Promise((resolve, reject) => {
+/** A tunnel's public address and how to close it. */
+export interface Tunnel {
+  readonly url: string;
+  readonly close: () => void;
+}
+
+/** Why the voice line cannot be had now; the message is the owner's. */
+class LineFailed extends Data.TaggedError("LineFailed")<{ readonly message: string }> {}
+
+const cloudflared = (port: number) =>
+  Effect.callback<Tunnel, LineFailed>((resume) => {
     let child: ChildProcess;
     try {
       child = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      return reject(e);
+      return resume(Effect.fail(new LineFailed({ message: messageOf(e) })));
     }
     const close = () => child.kill();
+    let settled = false;
+    const settle = (e: Effect.Effect<Tunnel, LineFailed>) => {
+      if (settled) return;
+      settled = true;
+      cancel();
+      resume(e);
+    };
+    const failWith = (message: string) => settle(Effect.fail(new LineFailed({ message })));
     // A real process: its deadline is real time.
     const cancel = afterRealTime(30_000, () => {
       close();
-      reject(new Error(t("server.voice.tunnel.timedOut")));
+      failWith(t("server.voice.tunnel.timedOut"));
     });
     // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
     const read = (b: Buffer) => {
       const url = quickTunnel.exec(b.toString())?.[0];
-      if (url) {
-        cancel();
-        resolve({ url, close });
-      }
+      if (url) settle(Effect.succeed({ url, close }));
     };
     child.stdout?.on("data", read);
     child.stderr?.on("data", read);
-    child.on("error", (e) => {
+    child.on("error", (e) => failWith((e as NodeJS.ErrnoException).code === "ENOENT" ? t("server.voice.tunnel.missing") : e.message));
+    child.on("exit", () => failWith(t("server.voice.tunnel.exited")));
+    // Given up on before it said its address: the process goes too.
+    return Effect.sync(() => {
+      if (settled) return;
+      settled = true;
       cancel();
-      reject((e as NodeJS.ErrnoException).code === "ENOENT" ? new Error(t("server.voice.tunnel.missing")) : e);
-    });
-    child.on("exit", () => {
-      cancel();
-      reject(new Error(t("server.voice.tunnel.exited")));
+      close();
     });
   });
-}
 
-/** The line refusing a keyless request counts as an answer. Asked over the real network, on real time. */
-async function tunnelAnswers(url: string): Promise<boolean> {
-  for (const deadline = wallTime.now() + lineReadyMs; wallTime.now() < deadline;) {
-    try {
-      const res = await fetch(url + "/llm/ready/chat/completions", {
-        method: "POST",
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (res.status === 401) return true;
-    } catch {
-      // Not yet.
+/** The line refusing a keyless request counts as an answer. Asked over the real network. */
+const tunnelAnswers = (url: string) =>
+  Effect.gen(function* () {
+    const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
+    while ((yield* Clock.currentTimeMillis) < deadline) {
+      const res = yield* Effect.tryPromise((signal) =>
+        fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) }),
+      ).pipe(Effect.option);
+      if (res._tag === "Some" && res.value.status === 401) return true;
+      yield* Effect.sleep(2_000);
     }
-    await wallTime.sleep(2_000);
-  }
-  return false;
-}
+    return false;
+  });
 
 export const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
@@ -401,7 +421,9 @@ export const make = (options: VoiceOptions = {}) =>
     const orchestrator = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
-    const time = yield* timeHere;
+    // Fibers started from callbacks belong to this service: they end with it, and sleep on its Clock.
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const runHere: Run = yield* FiberSet.makeRuntimePromise<never>();
     const now = () => clock.currentTimeMillisUnsafe();
 
     const grants = new Map<string, Grant>();
@@ -422,10 +444,10 @@ export const make = (options: VoiceOptions = {}) =>
 
     // The voice line: local only, like the farm; the tunnel is the one way in from outside.
     const keys = new Map<string, string>();
-    let line: Server | undefined;
+    let line = false;
     let linePort = config.voice.line.port;
     let lineProblem = "";
-    let tunnel: { url: string; close: () => void } | undefined;
+    let tunnel: Tunnel | undefined;
     /** What cancels closing the tunnel, lineLingerMs after the last call. */
     let closing: (() => void) | undefined;
     const answer = chatCompletions({
@@ -435,6 +457,15 @@ export const make = (options: VoiceOptions = {}) =>
       now: () => clock.currentTimeMillisUnsafe(),
     });
     const route = /^\/llm\/([\w-]+)\/chat\/completions$/;
+    // A call's own key on its own path; anything else is not there or not let in.
+    const lineHandler = (request: Request): Promise<Response> => {
+      const m = route.exec(new URL(request.url).pathname);
+      if (request.method !== "POST" || !m) return Promise.resolve(new Response(null, { status: 404 }));
+      const key = keys.get(m[1]!);
+      if (!key || request.headers.get("authorization") !== "Bearer " + key)
+        return Promise.resolve(Response.json({ error: { message: "unauthorized" } }, { status: 401 }));
+      return answer(request).catch(() => new Response(null, { status: 502 }));
+    };
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         stopped = true;
@@ -445,117 +476,78 @@ export const make = (options: VoiceOptions = {}) =>
         closing?.();
         tunnel?.close();
         tunnel = undefined;
-        line?.closeAllConnections();
-        line?.close();
       }),
     );
-    yield* Effect.promise(
-      () =>
-        new Promise<void>((resolve) => {
-          const s = createServer((req, res) => {
-            const go = async () => {
-              const m = route.exec(new URL(req.url ?? "/", "http://line").pathname);
-              if (req.method !== "POST" || !m) {
-                res.writeHead(404);
-                return void res.end();
-              }
-              const key = keys.get(m[1]!);
-              if (!key || req.headers.authorization !== "Bearer " + key) {
-                res.writeHead(401, { "content-type": "application/json" });
-                return void res.end(`{"error":{"message":"unauthorized"}}`);
-              }
-              const ended = new AbortController();
-              res.on("close", () => ended.abort());
-              const body = await new Promise<Buffer>((r) => {
-                const parts: Buffer[] = [];
-                req.on("data", (p: Buffer) => parts.push(p));
-                req.on("end", () => r(Buffer.concat(parts)));
-              });
-              const got = await answer(new Request("http://line" + req.url, { method: "POST", body, signal: ended.signal }));
-              res.writeHead(got.status, Object.fromEntries(got.headers));
-              if (!got.body) return void res.end();
-              try {
-                for await (const chunk of got.body as unknown as AsyncIterable<Uint8Array>) res.write(chunk);
-              } finally {
-                res.end();
-              }
-            };
-            go().catch(() => {
-              if (!res.headersSent) res.writeHead(502);
-              res.end();
-            });
-          });
-          s.once("error", (e) => {
-            lineProblem = t("server.voice.lineDown", { why: e.message });
-            logs.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
-            resolve();
-          });
-          s.listen(linePort, "127.0.0.1", () => {
-            if (stopped) {
-              s.closeAllConnections();
-              s.close();
-              resolve();
-              return;
-            }
-            line = s;
-            const a = s.address();
-            if (a && typeof a === "object") linePort = a.port;
-            resolve();
-          });
-        }),
-    );
+    const server = createServer();
+    const listened = yield* Effect.result(NodeHttpServer.make(() => server, { host: "127.0.0.1", port: linePort }));
+    if (listened._tag === "Failure") {
+      lineProblem = t("server.voice.lineDown", { why: messageOf(listened.failure.cause) });
+      yield* Effect.logError(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}: ${messageOf(listened.failure.cause)}`);
+    } else {
+      const http = listened.success;
+      if (http.address._tag !== "UnixPathAddress") linePort = http.address.port;
+      yield* http.serve(HttpEffect.fromWebHandler(lineHandler));
+      // Its close waits for every socket: an answer still streaming is cut first.
+      yield* Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections()));
+      line = true;
+    }
 
     const openTunnel =
       options.tunnel ??
-      (async (port: number) => {
-        const item = await cloudflared(port);
-        if (!(await tunnelAnswers(item.url))) logs.info(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`);
-        return item;
-      });
+      ((port: number) =>
+        Effect.tap(cloudflared(port), (item) =>
+          Effect.flatMap(tunnelAnswers(item.url), (answers) =>
+            answers ? Effect.void : Effect.logInfo(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`),
+          ),
+        ));
     // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
-    let opening: Promise<string> | undefined;
-    const base = async () => {
-      if (config.voice.line.url) return config.voice.line.url.replace(/\/+$/, "");
+    const opening = yield* Semaphore.make(1);
+    const lineClosed = () => new LineFailed({ message: t("server.voice.lineClosed") });
+    const base = Effect.suspend(() => {
+      if (config.voice.line.url) return Effect.succeed(config.voice.line.url.replace(/\/+$/, ""));
       closing?.();
       closing = undefined;
-      if (!tunnel) {
-        opening ??= openTunnel(linePort)
-          .then((item) => {
-            if (stopped) {
-              item.close();
-              throw new Error(t("server.voice.lineClosed"));
-            }
-            tunnel = item;
-            return item.url;
-          })
-          .finally(() => {
-            opening = undefined;
-          });
-        return opening;
-      }
-      return tunnel.url;
-    };
-    const openLine = async (): Promise<CallLine> => {
-      if (stopped) throw new Error(t("server.voice.lineClosed"));
-      if (lineProblem) throw new Error(lineProblem);
-      if (!line) throw new Error(t("server.voice.lineNotOpen"));
-      const url = await base();
-      if (stopped) throw new Error(t("server.voice.lineClosed"));
+      return opening.withPermits(1)(
+        Effect.gen(function* () {
+          if (tunnel) return tunnel.url;
+          const item = yield* openTunnel(linePort).pipe(Effect.mapError((e) => (e instanceof LineFailed ? e : new LineFailed({ message: messageOf(e) }))));
+          if (stopped) {
+            item.close();
+            return yield* lineClosed();
+          }
+          tunnel = item;
+          return item.url;
+        }),
+      );
+    });
+    const openLine = Effect.gen(function* () {
+      if (stopped) return yield* lineClosed();
+      if (lineProblem) return yield* new LineFailed({ message: lineProblem });
+      if (!line) return yield* new LineFailed({ message: t("server.voice.lineNotOpen") });
+      const url = yield* base;
+      if (stopped) return yield* lineClosed();
       const id = randomBytes(8).toString("hex");
       const key = randomBytes(24).toString("base64url");
       keys.set(id, key);
-      return { id, key, url: url + "/llm/" + id + "/chat/completions" };
-    };
+      return { id, key, url: url + "/llm/" + id + "/chat/completions" } satisfies CallLine;
+    });
     const closeLine = (id: string) => {
       keys.delete(id);
       if (keys.size > 0 || !tunnel) return;
       closing?.();
-      closing = time.after(lineLingerMs, () => {
-        closing = undefined;
-        if (keys.size > 0 || !tunnel) return;
-        tunnel.close();
-        tunnel = undefined;
-      });
+      const lingering = forkHere(
+        Effect.sleep(lineLingerMs).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              closing = undefined;
+              if (keys.size > 0 || !tunnel) return;
+              tunnel.close();
+              tunnel = undefined;
+            }),
+          ),
+        ),
+      );
+      closing = () => lingering.interruptUnsafe();
     };
 
     const callOf = (agentId: string) => {
@@ -598,7 +590,6 @@ export const make = (options: VoiceOptions = {}) =>
     // repeating an input the orchestrator may already have taken.
     const gatherMs = options.gatherMs ?? 3000;
     const waiting: string[] = [];
-    const forkHere = yield* FiberSet.makeRuntime<never>();
     let rang: string | undefined;
     let telling = false;
     const drain = Effect.gen(function* () {
@@ -701,18 +692,17 @@ export const make = (options: VoiceOptions = {}) =>
         g.starting = true;
         let release = () => {};
         let callLine: CallLine | undefined;
-        let openingLine: Promise<CallLine> | undefined;
+        let openingLine: Fiber.Fiber<CallLine, LineFailed> | undefined;
         let client: AgoraClient | undefined;
         let starting: Promise<string> | undefined;
         let committed = false;
         const started = Effect.gen(function* () {
           const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
           if (voice.answer.vendor === "orchestrator") {
-            openingLine = openLine();
-            callLine = yield* Effect.tryPromise({
-              try: () => openingLine!,
-              catch: (e) => unavailable(t("server.voice.lineFailed", { why: messageOf(e) })),
-            });
+            // Opened on the service's fibers: a start given up on still closes a line that opens late.
+            const opening = forkHere(openLine);
+            openingLine = opening;
+            callLine = yield* Fiber.join(opening).pipe(Effect.mapError((e) => unavailable(t("server.voice.lineFailed", { why: e.message }))));
             const opened = callLine;
             let once = false;
             release = () => {
@@ -725,7 +715,7 @@ export const make = (options: VoiceOptions = {}) =>
           const forCall = about ? { ...voice, greeting: "" } : voice;
           const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
           if ("_tag" in vendors) return yield* Effect.fail(vendors);
-          const agora = clientOf(g.credentials, voice.area, time, options.fetch);
+          const agora = clientOf(g.credentials, voice.area, runHere, options.fetch);
           client = agora;
           const session = agentFor(agora, forCall, vendors).createSession({
             channel,
@@ -765,23 +755,23 @@ export const make = (options: VoiceOptions = {}) =>
               if (committed) return;
               release();
               if (grants.get(key) === g) grants.delete(key);
-              if (openingLine && !callLine)
-                void openingLine.then(
-                  (opened) => closeLine(opened.id),
-                  () => undefined,
-                );
+              const opening = openingLine;
+              if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => closeLine(opened.id))));
               const pending = starting;
               const agora = client;
+              // An agent that joins after its start was given up on is stopped; one that never joined has nothing to stop.
               if (pending && agora)
-                void pending.then(
-                  async (id) => {
-                    try {
-                      await agora.stopAgent(id);
-                    } catch (e) {
-                      logs.warn("vibevalley: voice: the late agent could not be stopped: " + messageOf(e));
-                    }
-                  },
-                  () => undefined,
+                forkHere(
+                  Effect.tryPromise(() => pending).pipe(
+                    Effect.option,
+                    Effect.flatMap((joined) =>
+                      joined._tag === "None"
+                        ? Effect.void
+                        : Effect.tryPromise(() => agora.stopAgent(joined.value)).pipe(
+                            Effect.catch((e) => Effect.logWarning("vibevalley: voice: the late agent could not be stopped: " + messageOf(e.cause))),
+                          ),
+                    ),
+                  ),
                 );
             }),
           ),
@@ -798,7 +788,7 @@ export const make = (options: VoiceOptions = {}) =>
           call.ending = true;
           call.life.abort();
           client = call.client;
-        } else client = clientOf(yield* creds(), settings.voice().area, time, options.fetch);
+        } else client = clientOf(yield* creds(), settings.voice().area, runHere, options.fetch);
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
           catch: callStepFailed,
