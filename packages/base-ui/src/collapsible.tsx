@@ -2,7 +2,7 @@
 // and which panel it controls; the panel is unmounted while closed unless keepMounted, then only hidden.
 
 import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, type DivProps, flag, openAttrs } from "./internal/state";
+import { type ButtonProps, call, createControllable, type DivProps, flag } from "./internal/state";
 
 interface Ctx {
   readonly open: () => boolean;
@@ -31,7 +31,7 @@ function Root(props: CollapsibleRootProps) {
   const ctx: Ctx = { open, setOpen, disabled: () => Boolean(props.disabled), panelId: createUniqueId() };
   return (
     <Context value={ctx}>
-      <div {...rest} {...openAttrs(open())} data-disabled={flag(ctx.disabled())}>
+      <div {...rest} data-open={flag(open())} data-closed={flag(!open())} data-disabled={flag(ctx.disabled())}>
         {props.children}
       </div>
     </Context>
@@ -68,7 +68,7 @@ function Panel(props: CollapsiblePanelProps) {
   const rest = omit(props, "keepMounted");
   return (
     <Show when={c.open() || props.keepMounted}>
-      <div id={c.panelId} {...rest} hidden={!c.open()} {...openAttrs(c.open())} />
+      <div id={c.panelId} {...rest} hidden={!c.open()} data-open={flag(c.open())} data-closed={flag(!c.open())} />
     </Show>
   );
 }

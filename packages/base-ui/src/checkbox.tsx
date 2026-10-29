@@ -12,13 +12,6 @@ interface Ctx {
 
 const Context = createContext<Ctx>();
 
-const attrs = (c: Ctx) => ({
-  "data-checked": flag(c.checked() && !c.indeterminate()),
-  "data-unchecked": flag(!c.checked() && !c.indeterminate()),
-  "data-indeterminate": flag(c.indeterminate()),
-  "data-disabled": flag(c.disabled()),
-});
-
 export interface CheckboxRootProps extends Omit<ButtonProps, "onChange"> {
   checked?: boolean | undefined;
   defaultChecked?: boolean | undefined;
@@ -42,7 +35,10 @@ function Root(props: CheckboxRootProps) {
         role="checkbox"
         {...rest}
         aria-checked={c.indeterminate() ? "mixed" : checked() ? "true" : "false"}
-        {...attrs(c)}
+        data-checked={flag(c.checked() && !c.indeterminate())}
+        data-unchecked={flag(!c.checked() && !c.indeterminate())}
+        data-indeterminate={flag(c.indeterminate())}
+        data-disabled={flag(c.disabled())}
         onClick={(e) => {
           call(props.onClick, e);
           if (!e.defaultPrevented) setChecked(c.indeterminate() ? true : !checked());
@@ -60,7 +56,14 @@ function Indicator(props: SpanProps & { keepMounted?: boolean | undefined }) {
   const rest = omit(props, "keepMounted");
   return (
     <Show when={c.checked() || c.indeterminate() || props.keepMounted}>
-      <span aria-hidden="true" {...rest} {...attrs(c)} />
+      <span
+        aria-hidden="true"
+        {...rest}
+        data-checked={flag(c.checked() && !c.indeterminate())}
+        data-unchecked={flag(!c.checked() && !c.indeterminate())}
+        data-indeterminate={flag(c.indeterminate())}
+        data-disabled={flag(c.disabled())}
+      />
     </Show>
   );
 }

@@ -6,7 +6,7 @@ import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, omit, onCleanup, useContext } from "solid-js";
 import { createDismiss } from "./internal/dismiss";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
-import { buttonType, call, type DivProps, flag, openAttrs, type Render, refs } from "./internal/state";
+import { buttonType, call, type DivProps, flag, type Render, refs } from "./internal/state";
 
 export type TooltipOpenChangeReason = "hover" | "focus" | "press" | "escape" | "outside";
 
@@ -112,7 +112,7 @@ function Trigger(props: TooltipTriggerProps) {
 
 function Popup(props: DivProps) {
   const c = use();
-  return <div {...props} role="tooltip" id={c.popupId} {...openAttrs(c.open())} />;
+  return <div {...props} role="tooltip" id={c.popupId} data-open={flag(c.open())} data-closed={flag(!c.open())} />;
 }
 
 export const Tooltip = {

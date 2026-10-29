@@ -8,37 +8,46 @@ import { createContext, createSignal, createUniqueId, omit, useContext } from "s
 import { createDismiss } from "./internal/dismiss";
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
 import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, buttonType, call, type DivProps, flag, openAttrs, refs, type Renderable } from "./internal/state";
+import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type Renderable } from "./internal/state";
 
 export type MenuOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 
 const item = "[role=menuitem]";
 
-interface Ctx extends Floating<MenuOpenChangeReason> {
+export interface MenuCtx extends Floating<MenuOpenChangeReason> {
   /** Where the focus goes once the menu is placed. */
   readonly start: () => "first" | "last" | "menu";
   readonly setStart: (start: "first" | "last" | "menu") => void;
+  /** The id that names the menu: its trigger's, when the trigger is a button that says something. */
+  readonly labelledBy: () => string | undefined;
 }
 
-const Context = createContext<Ctx>();
-const use = () => useContext(Context);
+export const MenuContext = createContext<MenuCtx>();
+const use = () => useContext(MenuContext);
 
 export type MenuRootProps = FloatingRootProps<MenuOpenChangeReason>;
 
-function Root(props: MenuRootProps) {
+/** A menu's state; `returnTo` is where the focus goes back when it closes other than by an outside press. */
+export function createMenu(props: MenuRootProps, o: { returnTo: () => HTMLElement | undefined; labelledBy: (triggerId: string) => string | undefined }) {
   const f = createFloating<MenuOpenChangeReason>(props, "trigger");
   const [start, setStart] = createSignal<"first" | "last" | "menu">("menu");
-  const ctx: Ctx = {
+  const ctx: MenuCtx = {
     ...f,
     setOpen: (open, why) => {
       f.setOpen(open, why);
-      if (!open && why !== "outside") f.trigger()?.focus();
+      if (!open && why !== "outside") o.returnTo()?.focus();
     },
     start,
     setStart,
+    labelledBy: () => o.labelledBy(f.triggerId),
   };
   createDismiss({ open: f.open, elements: () => [f.trigger(), f.positioner()], dismiss: (why) => ctx.setOpen(false, why) });
-  return <Context value={ctx}>{props.children}</Context>;
+  return ctx;
+}
+
+function Root(props: MenuRootProps) {
+  const ctx: MenuCtx = createMenu(props, { returnTo: () => ctx.trigger(), labelledBy: (id) => id });
+  return <MenuContext value={ctx}>{props.children}</MenuContext>;
 }
 
 function Trigger(props: ButtonProps & Renderable) {
@@ -90,9 +99,10 @@ function Popup(props: DivProps) {
       {...rest}
       ref={refs(props.ref, setEl)}
       id={c.popupId}
-      aria-labelledby={c.triggerId}
+      aria-labelledby={c.labelledBy()}
       aria-orientation="vertical"
-      {...openAttrs(c.open())}
+      data-open={flag(c.open())}
+      data-closed={flag(!c.open())}
       onKeyDown={(e) => {
         call(props.onKeyDown, e);
         const menu = el();

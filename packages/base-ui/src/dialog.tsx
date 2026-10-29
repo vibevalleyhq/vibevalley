@@ -4,7 +4,7 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
-import { type ButtonProps, buttonType, call, createControllable, flag, openAttrs, refs, type Renderable } from "./internal/state";
+import { type ButtonProps, buttonType, call, createControllable, flag, refs, type Renderable } from "./internal/state";
 
 export type DialogCloseReason = "escape" | "outside" | "close" | "trigger";
 
@@ -98,7 +98,8 @@ function Popup(props: DialogPopupProps) {
       aria-modal="true"
       aria-labelledby={c.hasTitle() ? c.titleId : undefined}
       aria-describedby={c.hasDescription() ? c.descriptionId : undefined}
-      {...openAttrs(c.open())}
+      data-open={flag(c.open())}
+      data-closed={flag(!c.open())}
       onCancel={(e) => {
         call(props.onCancel, e);
         e.preventDefault();

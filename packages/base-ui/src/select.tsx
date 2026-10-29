@@ -8,18 +8,7 @@ import { createContext, createSignal, omit, Show, useContext } from "solid-js";
 import { createDismiss } from "./internal/dismiss";
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
 import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
-import {
-  type ButtonProps,
-  buttonType,
-  call,
-  createControllable,
-  type DivProps,
-  flag,
-  openAttrs,
-  refs,
-  type SpanProps,
-  type Renderable,
-} from "./internal/state";
+import { type ButtonProps, buttonType, call, createControllable, type DivProps, flag, refs, type SpanProps, type Renderable } from "./internal/state";
 
 export type SelectOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 
@@ -156,7 +145,8 @@ function Popup(props: DivProps) {
       ref={refs(props.ref, setEl)}
       id={c.popupId}
       aria-labelledby={c.triggerId}
-      {...openAttrs(c.open())}
+      data-open={flag(c.open())}
+      data-closed={flag(!c.open())}
       onKeyDown={(e) => {
         call(props.onKeyDown, e);
         const list = el();

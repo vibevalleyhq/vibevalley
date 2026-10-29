@@ -5,7 +5,7 @@ import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, onSettled, useContext } from "solid-js";
 import { createDismiss } from "./internal/dismiss";
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner, tabbable } from "./internal/floating";
-import { type ButtonProps, buttonType, call, type DivProps, flag, openAttrs, refs, type Renderable } from "./internal/state";
+import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type Renderable } from "./internal/state";
 
 export type PopoverOpenChangeReason = "trigger" | "escape" | "outside" | "close";
 
@@ -75,7 +75,8 @@ function Popup(props: DivProps) {
       id={c.popupId}
       aria-labelledby={c.titleId()}
       aria-describedby={c.descriptionId()}
-      {...openAttrs(c.open())}
+      data-open={flag(c.open())}
+      data-closed={flag(!c.open())}
     />
   );
 }

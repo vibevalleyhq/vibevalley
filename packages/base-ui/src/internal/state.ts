@@ -26,9 +26,6 @@ export function createControllable<T>(o: { value: () => T | undefined; initial: 
 /** A state as a data attribute: present (empty) when on, absent when off. */
 export const flag = (on: boolean | undefined): "" | undefined => (on ? "" : undefined);
 
-/** Open or closed as Base UI writes it: data-open or data-closed. */
-export const openAttrs = (open: boolean) => ({ "data-open": flag(open), "data-closed": flag(!open) });
-
 /** Calls a handler given as a JSX prop: a function, or Solid's [handler, data] pair. */
 export function call<E extends Event>(handler: unknown, event: E) {
   if (typeof handler === "function") (handler as (e: E) => void)(event);
