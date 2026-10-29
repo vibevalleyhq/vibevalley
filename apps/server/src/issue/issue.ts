@@ -757,8 +757,9 @@ export const make = (options: IssueOptions = {}) =>
         }
         case "interrupted":
           return resumeWords();
+        // Quiet, or not stuck: the server has no words of its own for the round.
         case "quiet":
-        case undefined:
+        default:
           return yield* Effect.fail(refused(t("server.issue.roundNeedsWords")));
       }
     });

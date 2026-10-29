@@ -19,7 +19,7 @@ import type {
   Progress,
   Session,
 } from "@vibevalley/protocol";
-import { needOf } from "@vibevalley/protocol/rules";
+import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { playOf } from "./play.ts";
 import { type AchievementDef, achievements } from "../agent/seed.ts";
 import { sessionOf } from "../session/state.ts";
@@ -183,7 +183,7 @@ export function viewOf(state: WorkspaceState): FarmView {
 
 export function achievementInWords(a: AchievementDef): Achievement {
   const tiers: AchievementTier[] = a.tiers.map((need, i) => ({ need, title: tierTitle(a, i + 1), coins: a.coins[i] ?? 0, reached: reachedText(a, i + 1) }));
-  return { id: a.id, category: a.category, title: a.title, detail: a.detail, unit: a.unit, wearable: a.category !== "starter", tiers };
+  return omitUndefined({ id: a.id, category: a.category, title: a.title, detail: a.detail, unit: a.unit, wearable: a.category !== "starter", tiers });
 }
 
 function tierTitle(a: AchievementDef, tier: number): string {
@@ -204,7 +204,7 @@ function achievementEffect(id: string, tier: number): GameEffectAchievement {
     if (a.id !== id) continue;
     const words = achievementInWords(a);
     e.detail = a.detail;
-    e.oneOff = a.tiers.length === 1 ? true : undefined;
+    if (a.tiers.length === 1) e.oneOff = true;
     const item = tier >= 1 && tier <= words.tiers.length ? words.tiers[tier - 1] : undefined;
     if (item) Object.assign(e, { title: item.title, reached: item.reached, coins: item.coins });
   }
@@ -218,7 +218,8 @@ function standingsOf(p: Progress | undefined): AchievementStanding[] {
       s.count = p.counts?.[a.id] ?? 0;
       for (const u of p.unlocked ?? []) if (u.id === a.id && u.tier > s.tier) s.tier = u.tier;
     }
-    if (s.tier < a.tiers.length) s.next = a.tiers[s.tier];
+    const next = a.tiers[s.tier];
+    if (next !== undefined) s.next = next;
     return s;
   });
 }

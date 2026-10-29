@@ -413,11 +413,10 @@ export class VibeValleyApi {
   };
 
   private async call(path: string, input: unknown): Promise<unknown> {
-    const res = await this.fetcher(this.base + path, {
-      method: "POST",
-      headers: input === undefined ? undefined : { "content-type": "application/json" },
-      body: input === undefined ? undefined : JSON.stringify(input),
-    });
+    const res = await this.fetcher(
+      this.base + path,
+      input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) },
+    );
     const text = await res.text();
     if (!res.ok) {
       let decoded: unknown;

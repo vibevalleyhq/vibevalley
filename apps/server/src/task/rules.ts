@@ -1,3 +1,4 @@
+import { omitUndefined } from "@vibevalley/protocol/rules";
 import { t } from "@vibevalley/i18n";
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
@@ -233,16 +234,16 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
   const project = graph.project;
   const out = [
     keep(
-      {
+      omitUndefined({
         id: issueId(graph.id),
         title: graph.title,
         description: graph.goal,
         project,
         // A helper's issue split under it keeps who it was given to.
         assignee: was.get(issueId(graph.id))?.assignee,
-        deliver: "change",
-        graph: { state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note },
-      },
+        deliver: "change" as const,
+        graph: omitUndefined({ state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note }),
+      }),
       graphClosed(graph.state),
     ),
   ];
@@ -250,17 +251,17 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
     const blocked = (n.needs ?? []).map((need) => taskIssueID(graph.id, need));
     out.push(
       keep(
-        {
+        omitUndefined({
           id: taskIssueID(graph.id, n.id),
           title: n.title,
           description: n.brief,
           project,
-          deliver: "change",
+          deliver: "change" as const,
           assignee: n.agent,
           rank: i > 0 ? i : undefined,
           parent: issueId(graph.id),
           blockedBy: blocked.length > 0 ? blocked : undefined,
-          task: {
+          task: omitUndefined({
             key: n.id,
             state: n.state,
             check: n.check,
@@ -273,8 +274,8 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
             spent: n.spent,
             tries: n.tries,
             failures: n.failures,
-          },
-        },
+          }),
+        }),
         taskClosed(graph.state, n),
       ),
     );

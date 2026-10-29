@@ -43,7 +43,12 @@ export interface Revision {
 }
 
 /** A result as the wire has it: rev 0, no reason and no texts are left out. */
-export function result(status: BlockOpStatus, blockId: string, rev = 0, more: { yours?: TextSpan[]; reason?: string } = {}): BlockOpResult {
+export function result(
+  status: BlockOpStatus,
+  blockId: string,
+  rev = 0,
+  more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {},
+): BlockOpResult {
   return { status, blockId, ...(rev ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
 }
 

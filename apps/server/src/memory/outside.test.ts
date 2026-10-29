@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
@@ -116,8 +117,8 @@ class FakeNowledge {
       createServer(
         (req, res) =>
           void (async () => {
-            const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-            await this.server().connect(transport);
+            const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
+            await this.server().connect(asTransport(transport));
             await transport.handleRequest(req, res, req.method === "POST" ? await bodyOf(req) : undefined);
           })(),
       ),

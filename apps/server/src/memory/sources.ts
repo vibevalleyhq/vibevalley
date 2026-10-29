@@ -11,6 +11,7 @@ import type { MemorySourceConfig } from "../setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
 import { termsOf } from "./terms.ts";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
 export interface RecalledLine {
@@ -408,11 +409,11 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
             (groups) =>
               g.all.map((one, i) => {
                 const page = groups[i]?.[0];
-                return {
+                return omitUndefined({
                   source: one.name,
                   found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
                   coverage: page ? page.coverage : t("server.memory.coverage.failed"),
-                };
+                });
               }),
           );
         }),

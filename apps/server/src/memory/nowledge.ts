@@ -6,6 +6,7 @@ import { recallWords } from "./prompts.ts";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { Memory } from "@vibevalley/protocol";
 import { Clock, Effect, Option, Schema } from "effect";
 import { redact } from "../base/redact.ts";
@@ -94,11 +95,11 @@ export function nowledge(c: MemorySourceConfig): Source {
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart.
   const open = () =>
     (client ??= (async () => {
-      const wire = new StreamableHTTPClientTransport(new URL(c.url), { requestInit: c.key ? { headers: { Authorization: `Bearer ${c.key}` } } : undefined });
+      const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
       transport = wire;
       const one = new Client({ name: app, version: "1" });
       try {
-        await one.connect(wire, { timeout: prefetchTimeoutMs, signal: connecting.signal });
+        await one.connect(asTransport(wire), { timeout: prefetchTimeoutMs, signal: connecting.signal });
         connecting.signal.throwIfAborted();
       } catch (e) {
         await one.close().catch(() => {});

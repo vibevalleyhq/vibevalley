@@ -133,7 +133,8 @@ describe("settings", () => {
         const s = yield* Setting;
         expect(s.status().memorySources).toEqual([]);
         expect((yield* s.save({ memorySources: [nowledge] })).memorySources[0]!.key).toEqual({ source: "settings", hint: "…9876" });
-        yield* s.save({ memorySources: [{ ...nowledge, key: undefined, write: false }] });
+        const { key: _key, ...keyless } = nowledge;
+        yield* s.save({ memorySources: [{ ...keyless, write: false }] });
         expect(s.memorySources()).toEqual([{ kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, key: "nmem-secret-9876" }]);
         yield* s.save({ deepseekApiKey: "sk-other-key-0000" });
         expect(s.memorySources()).toHaveLength(1);

@@ -298,6 +298,7 @@ describe("sessions", () => {
         place: { project: "demo", cwd: "/nowhere" },
         access: Semaphore.makeUnsafe(1),
         journal: s.trajectories.openLog("w1"),
+        sess: undefined,
         oarSessionId: "",
         lastText: "",
         tracking: {},
