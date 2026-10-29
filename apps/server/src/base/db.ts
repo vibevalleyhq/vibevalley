@@ -120,8 +120,8 @@ export function causeMessage(e: unknown): string {
 
 /**
  * The farm's database as the services use it: a generated query (db/generated) run against it. The database is in this
- * process, so a query that fails is a bug or a full disk: run makes it a defect; attempt keeps the failure for the few
- * callers that log it and go on, or tell it as a refusal.
+ * process, so a query that fails is a bug or a full disk: run makes it a defect; attempt keeps the failure for the
+ * callers that log it and go on, or tell it as a refusal (db.test.ts names them and why).
  */
 export class Db extends Context.Service<
   Db,
