@@ -39,12 +39,8 @@
 
 - 2026-10-26 [把模块层往下压：项目检查成端口，重启留在内存，项目的决定成规则](.agents/notes/proposed/testing/2026-10-26-press-the-module-layer-down.md)
 
-## rejected（2 篇）
+## rejected（1 篇）
 
 ### feature
 
 - 2026-10-10 [帮工的权限请求变成地里的杂草](.agents/notes/rejected/feature/2026-10-10-permission-requests-as-weeds.md) — 帮工不做权限确认是常驻规矩：靠本机、工作目录和「连接到本机」划边界，逐条批准会让帮工停在命令上等人，和无人值守冲突；「除草」留着位置
-
-### architecture
-
-- 2026-10-11 [游戏层往哪走：全用 TS，在 Pixi 上自己写引擎；Rust 等真要原生宿主时再进来](.agents/notes/rejected/architecture/2026-10-11-game-engine-direction.md) — 客户端换成了 Flutter，像素村用 Flame 画，没有走 TS 加 Pixi 自己写引擎；对 Rust、Bevy 和 Agora 绑定的评估仍然有用

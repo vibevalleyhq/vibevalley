@@ -1,13 +1,11 @@
 # site
 
-官网 vibevalley.dev：一页静态网页，中文在 `/`，英文在 `/en/`。用 [Astro](https://astro.build) 生成，样式是 [Tailwind](https://tailwindcss.com)，会动的部分是 React island，动画用 [Motion](https://motion.dev)，Bun 管依赖。
+官网 vibevalley.dev：一页静态网页，中文在 `/`，英文在 `/en/`。用 [Astro](https://astro.build) 生成，样式是 [Tailwind](https://tailwindcss.com)，会动的部分是 React island，动画用 [Motion](https://motion.dev)。`site/` 自成一个 pnpm workspace（自己的 Astro、Vite 和 catalog，[地基](docs/subsystems/foundation.md)），根目录的命令先装它的依赖再跑。
 
 ```bash
-cd site
-bun install
-bun run check     # 准备素材，再 astro check
-bun run build     # 准备素材，再生成到 dist/
-bun run deploy    # 构建，再发到 Cloudflare
+vp run site:check     # 准备素材，再 astro check
+vp run site:build     # 准备素材，再生成到 dist/
+vp run site:deploy    # 构建，再发到 Cloudflare
 ```
 
 不开 `astro dev`：改完跑 `check` 和 `build`，用静态服务器打开 `dist/` 看。
@@ -46,4 +44,4 @@ bun run deploy    # 构建，再发到 Cloudflare
 
 ## 发布
 
-一个只有静态文件的 Cloudflare Worker（`wrangler.jsonc`），自定义域名写在配置里。先用握着这个域名的账号 `bunx wrangler login`，再 `bun run deploy`。
+一个只有静态文件的 Cloudflare Worker（`wrangler.jsonc`），自定义域名写在配置里。先用握着这个域名的账号 `pnpm dlx wrangler@4 login`，再 `vp run site:deploy`。

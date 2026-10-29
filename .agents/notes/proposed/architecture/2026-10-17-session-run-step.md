@@ -62,7 +62,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 - 协议里没有 `Trajectory`、`TrajectoryHead`；家目录里没有 `*.head.json`；`session` 表有活的和走了的 Session。
 - 每个 `SessionEvent` 落在一个 Run 里（搬来的旧事件可以没有）；`session.event.list <id> --run <n>` 只返回那一轮的。
 - `mcp/mcp.ts` 里没有 `farm_*`；帮工被 @ 时，投递的 prompt 里有那几条上文；一轮的交代里 @ 到的人收到投递。
-- `bun run server:check`、`bun run capabilities`、`bun run web:check`、`bun run docs:verify` 通过；旧家目录打开后头文件搬进了表。
+- `vp run server:check`、`vp run capabilities`、`vp run web:check`、`vp run docs:verify` 通过；旧家目录打开后头文件搬进了表。
 
 ## Risks
 
