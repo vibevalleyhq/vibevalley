@@ -16,12 +16,15 @@ test("a quick add shows the new issue in todo without a reload", async ({ page, 
   await expect.poll(async () => (await api.issue.list({})).some((i) => i.title === title)).toBe(true);
   const made = (await api.issue.list({})).find((i) => i.title === title)!;
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
-  // With no helper and no project the server refuses the draft, after asking the runtimes (a few seconds); the issue opens.
+  // With no helper and no project the server refuses the draft, after asking the runtimes (a few seconds); the board stays.
   await expect(page.getByTestId("toast").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page).toHaveURL(/\/issues$/);
+  await expect(card(lane(page, "todo"), made.id)).toBeVisible();
+  // Its own page, and Escape back to the board.
+  await card(lane(page, "todo"), made.id).click();
   await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`));
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/issues$/);
-  await expect(card(lane(page, "todo"), made.id)).toBeVisible();
 });
 
 test("the list view and its grouping are kept across a reload", async ({ page, api }) => {
@@ -48,6 +51,9 @@ test("an issue opens at its own address and its edits are saved", async ({ page,
   await card(lane(page, "todo"), made.id).click();
   await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`));
   const detail = page.getByTestId("issue");
+  // A new draft starts from one sentence to draft from; the description is written by asking for it.
+  await expect(detail.getByTestId("issue-description")).toHaveCount(0);
+  await detail.getByTestId("issue-write-own").click();
   await detail.getByTestId("issue-title").fill("after the title changes");
   await detail.getByTestId("issue-description").fill("The login page remembers the last user name.");
   await detail.getByTestId("issue-priority").selectOption("high");
@@ -95,4 +101,28 @@ test("the search keeps only the cards it matches, and clearing it brings them ba
   await expect(card(todo, banana.id)).toHaveCount(0);
   await page.getByTestId("filter-clear").click();
   await expect(card(todo, banana.id)).toBeVisible();
+});
+
+test("a card shows only what differs from its lane, an empty lane is a place to drop, and a filter narrows the board", async ({ page, api }) => {
+  const plain = await issue(api, "a plain draft");
+  const urgent = await issue(api, "an urgent draft");
+  await api.issue.update({ id: urgent.id, priority: "urgent" });
+  const kept = await api.project.create({ name: "kept" });
+  const inKept = await api.issue.create({ title: "one in kept", project: kept.name });
+  await page.goto("/issues");
+  const todo = lane(page, "todo");
+  // A draft in 待办 with no helper and no priority: nothing to mark but its being a draft.
+  await expect(card(todo, plain.id).getByTestId("card-marks").locator("svg")).toHaveCount(0);
+  await expect(card(todo, urgent.id).getByTestId("card-marks").locator("svg").first()).toBeVisible();
+  await expect(lane(page, "working").getByTestId("lane-empty")).toBeVisible();
+  const working = await lane(page, "working").boundingBox();
+  expect(working!.height).toBeLessThan(200);
+
+  await page.getByTestId("filter-project").click();
+  await page.locator('[role="option"][data-key="kept"]').click();
+  await expect(page.getByTestId("filter-project")).toHaveAttribute("data-value", "kept");
+  await expect(card(todo, inKept.id)).toBeVisible();
+  await expect(card(todo, plain.id)).toHaveCount(0);
+  await page.getByTestId("filter-clear").click();
+  await expect(card(todo, plain.id)).toBeVisible();
 });

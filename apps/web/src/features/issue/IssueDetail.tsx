@@ -305,7 +305,7 @@ export function IssueDetail(props: {
   const side = (
     <>
       <Show when={sideActs().length > 0}>
-        <div class="mb-3 flex flex-col gap-2">
+        <div class="mb-3 flex flex-wrap gap-2">
           <For each={sideActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
         </div>
       </Show>
