@@ -45,10 +45,10 @@ describe("hotspots", () => {
 });
 
 describe("escapes", () => {
-  test("non-null assertions, casts through unknown and lint-off comments, in .ts and .tsx", () => {
-    const ts = `const a = b!.c!;\nconst d = e as unknown as F;\nconst g = h as F;\n// oxlint-disable-next-line no-x\n/* eslint-disable y */\nconst s = "x!";`;
-    expect(escapesIn("a.ts", ts)).toEqual({ nonNull: 2, doubleCast: 1, lintOff: 2 });
-    expect(escapesIn("a.tsx", "const v = <b>{q!}</b>;")).toEqual({ nonNull: 1, doubleCast: 0, lintOff: 0 });
+  test("non-null assertions, casts, casts through unknown and lint-off comments, in .ts and .tsx", () => {
+    const ts = `const a = b!.c!;\nconst d = e as unknown as F;\nconst g = h as F;\nconst k = [1] as const;\nconst u = v as unknown;\n// oxlint-disable-next-line no-x\n/* eslint-disable y */\nconst s = "x!";`;
+    expect(escapesIn("a.ts", ts)).toEqual({ nonNull: 2, doubleCast: 1, cast: 1, lintOff: 2 });
+    expect(escapesIn("a.tsx", "const v = <b>{q!}</b>;")).toEqual({ nonNull: 1, doubleCast: 0, cast: 0, lintOff: 0 });
   });
 
   test("summed by area, counted files only", () => {
@@ -59,11 +59,14 @@ describe("escapes", () => {
       { path: "a/one.test.ts", text: "w!;" },
     ];
     const health = { counted: (p: string) => !p.endsWith(".test.ts"), areaOf: (p: string) => p.split("/")[0]! };
-    expect(escapesByArea(sources, health)).toEqual({ a: { nonNull: 2, doubleCast: 0, lintOff: 0 }, b: { nonNull: 0, doubleCast: 1, lintOff: 0 } });
+    expect(escapesByArea(sources, health)).toEqual({
+      a: { nonNull: 2, doubleCast: 0, cast: 0, lintOff: 0 },
+      b: { nonNull: 0, doubleCast: 1, cast: 0, lintOff: 0 },
+    });
   });
 
   test("the ratchet: up, down, a new area and a gone one all drift; equal counts do not", () => {
-    const e = (nonNull: number) => ({ nonNull, doubleCast: 0, lintOff: 0 });
+    const e = (nonNull: number) => ({ nonNull, doubleCast: 0, cast: 0, lintOff: 0 });
     expect(drift({ a: e(2), b: e(1), gone: e(3) }, { a: e(3), b: e(1), fresh: e(1) })).toEqual([
       { area: "a", kind: "nonNull", kept: 2, now: 3 },
       { area: "fresh", kind: "nonNull", kept: 0, now: 1 },

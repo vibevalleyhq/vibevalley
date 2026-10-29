@@ -1,4 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
+import { variant } from "@/base/util";
 import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Issue, Session } from "@vibevalley/protocol";
@@ -6,19 +7,21 @@ import { api, reasonOf } from "@/base/api";
 import { writeIssue } from "./write";
 import { type BoardLook, boardViews, defaultLook, lookFromList, lookToList, viewLabel } from "./display";
 import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
-import { issueIs, type Lane } from "./rules";
+import { issueIs } from "./issue";
+import { type Lane } from "./lanes";
 import { toast } from "@/ui/toasts";
 import { useRouter } from "@/base/router";
 import { Select } from "@/ui/Field";
 import { useCore } from "@/base/frame";
 import { useOrchestrators } from "@/base/agents";
-import { useIssueHistory } from "./data";
+import { useIssueHistory } from "./queries";
 import { Icon } from "@/ui/Icon";
 import { Segmented } from "@/ui/Segmented";
 import { IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
-import { run, useGraphs, useNameOf } from "./hooks";
+import { run } from "./acts";
+import { useGraphs, useNameOf } from "./queries";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { TaskDetail } from "./TaskDetail";
@@ -176,8 +179,6 @@ export function IssuesPage(props: { rest: string }) {
   );
 }
 
-type CardOf<K extends BoardCard["kind"]> = Extract<BoardCard, { kind: K }>;
-
 /**
  * The open card. It is the last one found by the id, so it stays while the board is read again and while the overlay
  * closes: its panels' queries may still be settling then, and a read through a narrowed accessor would halt the page.
@@ -199,7 +200,13 @@ function Detail(props: {
         .find((c) => c.id === props.id || ((c.kind === "issue" || c.kind === "todo") && (issueIs(c.issue, props.id) || String(c.issue.number) === props.id))) ??
       last,
   );
-  const as = <K extends BoardCard["kind"]>(_kind: K) => card() as CardOf<K>;
+  /** The card, as the kind its panel is keyed by (shows): only read inside that panel. */
+  const cardOf = <const K extends BoardCard["kind"]>(kind: K) => {
+    const c = card();
+    const of = c && variant(c, "kind", kind);
+    if (!of) throw new Error(`the card is no longer a ${kind}`);
+    return of;
+  };
   /** What a panel is keyed by: the card's kind and the thing it shows, or undefined for another kind. */
   const shows = (kind: BoardCard["kind"]) => {
     const c = card();
@@ -224,32 +231,32 @@ function Detail(props: {
         </div>
       </Match>
       <Match when={shows("todo")} keyed>
-        {() => <TodoDetail item={as("todo").issue} onDone={props.open} />}
+        {() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}
       </Match>
       <Match when={shows("issue")} keyed>
         {() => (
           <IssueDetail
-            issue={as("issue").issue}
-            sessions={as("issue").sessions}
-            session={as("issue").session}
-            onClose={(session, review) => props.onClose(as("issue").issue, session, review)}
-            onTask={as("issue").issue.parent ? () => props.open(`task:${as("issue").issue.parent}`) : undefined}
+            issue={cardOf("issue").issue}
+            sessions={cardOf("issue").sessions}
+            session={cardOf("issue").session}
+            onClose={(session, review) => props.onClose(cardOf("issue").issue, session, review)}
+            onTask={cardOf("issue").issue.parent ? () => props.open(`task:${cardOf("issue").issue.parent}`) : undefined}
           />
         )}
       </Match>
       <Match when={shows("orchestrator")} keyed>
-        {() => <OrchestratorIssueDetail issue={as("orchestrator").issue} />}
+        {() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}
       </Match>
       <Match when={shows("missing")} keyed>
         {() => (
           <div>
-            <h1 class="text-xl font-semibold">{as("missing").issue.title}</h1>
-            <p class="mt-3 text-sm">{t("web.issue.page.missing", { what: list(as("missing").missing) })}</p>
+            <h1 class="text-xl font-semibold">{cardOf("missing").issue.title}</h1>
+            <p class="mt-3 text-sm">{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
           </div>
         )}
       </Match>
       <Match when={shows("task")} keyed>
-        {() => <TaskDetail graph={as("task").graph} stepIssues={steps(as("task").graph.id)} onOpen={props.open} />}
+        {() => <TaskDetail graph={cardOf("task").graph} stepIssues={steps(cardOf("task").graph.id)} onOpen={props.open} />}
       </Match>
     </Switch>
   );

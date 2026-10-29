@@ -8,7 +8,8 @@ let abort: AbortController | undefined;
 
 // One live stream while anyone listens; it reconnects a second after it drops and closes with the last listener.
 function connect(signal: AbortSignal) {
-  readStream<LiveEvent>(
+  readStream(
+    "",
     livePath,
     (e) => listeners.forEach((l) => l(e)),
     signal,

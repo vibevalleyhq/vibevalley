@@ -8,7 +8,6 @@ import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 import { AgentExecution } from "./execution.ts";
 import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside, NotRecorded } from "./session.ts";
-
 const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
 const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
   type: "message_end",

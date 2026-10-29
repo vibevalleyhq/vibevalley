@@ -8,7 +8,7 @@
 |---|---|
 | 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/orchestrator.md)；档案的默认项目在帮工的档案上） |
-| 开了 worktree 时，一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.ts` 的 `noRoom`，上限从这里取） |
+| 开了 worktree 时，一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/hiring.ts` 的 `noRoom`，上限从这里取） |
 | 改动：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 完成的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
 | 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 计划的分支和每一件的检查什么时候跑（[计划](docs/subsystems/task.md)） |
 | GitHub 检测：`gh` 装没装、登没登录，每个项目能不能提 PR | `github.pr_projects` 里放哪些项目（主人的配置） |
@@ -21,7 +21,7 @@
 - 配置（`ServerConfig`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
 - 接口：`project.list`、`project.validate`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
-- 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/features/project/rules.ts`。
+- 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/features/project/islands.ts`。
 
 ## 模型和不变量
 
@@ -118,4 +118,4 @@
 - `project/github.test.ts`：`gh` 在不在、登没登录（不记它打的字）；地址；权限在刷新时取、摘要不问 `gh`；登出或卸了丢掉权限；私有仓库用登录的 `gh` 克隆；PR 要项目打开、有权限；先检查再推送、已经开着的 PR 找回来；PR 的正文写检查跑没跑；新工单能快进时从 origin 的 main 开始；commit 每个仓库连同它的 worktree 只数一次。
 - `project/stack.test.ts`：每种标记文件、锁文件选包管理器。
 - `src/flows/pull_request.test.ts`：提 PR 的项目完成时推送、开 PR、主分支不动，第二轮只推送；重启以后 PR 合了或关了，工单关上，帮工、worktree 和分支清掉。
-- 页面：`apps/web/test/projects.spec.ts`（开一块新地、出现在地图上、打开地契；GitHub 地址先给名字）；`apps/web/src/features/project/rules.test.ts`（空位、锁住的地、排队只算排上队的）。
+- 页面：`apps/web/test/projects.spec.ts`（开一块新地、出现在地图上、打开地契；GitHub 地址先给名字）；`apps/web/src/features/project/projects.test.ts`（空位、锁住的地、排队只算排上队的）。

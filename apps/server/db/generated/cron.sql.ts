@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_cron_set_by_b6fe14629be3 } from "./types.js"
+
 export const CronsParams = Schema.Struct({
 
 })
@@ -22,7 +24,7 @@ export const CronsResult = Schema.Struct({
   ["enabled"]: Schema.Boolean,
   ["created_at"]: Schema.Number,
   ["last_run"]: Schema.NullOr(Schema.Number),
-  ["set_by"]: Schema.String,
+  ["set_by"]: Pg_public_cron_set_by_b6fe14629be3,
   ["pending"]: Schema.Boolean,
 })
 export type CronsResult = typeof CronsResult.Type
@@ -49,7 +51,7 @@ export const AddCronParams = Schema.Struct({
   ["spec"]: Schema.String,
   ["tz"]: Schema.String,
   ["pending"]: Schema.Boolean,
-  ["set_by"]: Schema.String,
+  ["set_by"]: Pg_public_cron_set_by_b6fe14629be3,
   ["created_at"]: Schema.Number,
 })
 export type AddCronParams = typeof AddCronParams.Type

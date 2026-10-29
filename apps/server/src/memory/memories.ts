@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // stops a run: it is logged, and the run goes on without it.
 
 import { sessionId } from "@vibevalley/protocol/schema";
-import { type ActorKind, type Memory, MemoryKindValues, type Outcome } from "@vibevalley/protocol";
+import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
 import type { Actor } from "@/base/actor.ts";
 import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
@@ -60,22 +60,19 @@ export const makeMemories = Effect.gen(function* () {
   const list = (agent: string) =>
     db(
       Effect.map(q.memoriesOf({ agent }), (rows) =>
-        rows
-          // A row of a kind this code does not know is left out.
-          .filter((r) => (MemoryKindValues as readonly string[]).includes(r.kind))
-          .map((r): Memory => ({
-            id: r.id,
-            agent,
-            kind: r.kind as Memory["kind"],
-            text: r.body,
-            author: r.author as ActorKind,
-            at: r.created_at,
-            recalled: r.recalled,
-            fading: false,
-            ...(r.project !== null ? { project: r.project } : {}),
-            ...(r.session !== null ? { session: sessionId(r.session) } : {}),
-            ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
-          })),
+        rows.map((r): Memory => ({
+          id: r.id,
+          agent,
+          kind: r.kind,
+          text: r.body,
+          author: r.author,
+          at: r.created_at,
+          recalled: r.recalled,
+          fading: false,
+          ...(r.project !== null ? { project: r.project } : {}),
+          ...(r.session !== null ? { session: sessionId(r.session) } : {}),
+          ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
+        })),
       ),
     );
 

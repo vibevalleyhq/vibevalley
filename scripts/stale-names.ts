@@ -143,7 +143,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Ask|Asks|openAsks|asksOf|setIssueAsks|SetIssueAsks|OwnerAsk|badgeAsks)\b|\.asks\b/,
     says: "Question, questions, openQuestions, questionsOf; the inbox kind ask and the verb ask stay",
     // The marker a helper writing English may put before a question (要问主人：).
-    except: /^apps\/server\/src\/session\/rules\.ts$/,
+    except: /^apps\/server\/src\/session\/report\.ts$/,
   },
   {
     name: "the read model under the core name",

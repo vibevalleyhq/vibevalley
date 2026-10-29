@@ -3,7 +3,7 @@
 // fixtures.ts); the plot's test serves a frame with a helper in place of the state stream.
 
 import type { Page } from "@playwright/test";
-import type { Agent, Issue, Session, StateFrame } from "@vibevalley/protocol";
+import type { Agent, Issue, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { buttons, composerOn, defaultChannel, expect, gate, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -150,14 +150,14 @@ test("a dispatch note stays inside its column", async ({ page, api }) => {
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
   return new Promise<StateFrame>((resolve, reject) => {
-    readStream<StateFrame>(url + statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
+    readStream(url, statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
   });
 }
 
 test("a click on a helper's plot opens its issue: its state, the acts and the folds", async ({ page, server, api }) => {
   const made = await api.issue.create({ title: "finish remember-me" });
   const frame = await firstFrame(server.url);
-  const session: Session = {
+  const session: SessionView = {
     id: sessionId("w1"),
     name: "fox",
     agent: "fox",
@@ -167,6 +167,7 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
     runs: 1,
     phase: { _tag: "done" },
     refining: false,
+    phaseText: "",
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },

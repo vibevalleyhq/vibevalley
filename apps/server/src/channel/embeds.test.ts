@@ -2,7 +2,6 @@ import { describe, expect, it } from "vite-plus/test";
 import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { embedOf, linksIn, privateAddress, type Resolve, reachable, readEmbed } from "./embeds.ts";
-
 const page = (html: string, headers: Record<string, string> = { "content-type": "text/html; charset=utf-8" }, status = 200) =>
   new Response(html, { status, headers });
 

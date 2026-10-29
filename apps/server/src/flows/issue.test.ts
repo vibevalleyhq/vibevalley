@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { openFindings } from "@/issue/state.ts";
+import { openFindings } from "@/issue/status.ts";
 import { Said } from "@/testing/said.ts";
 import { viewOf } from "@/game/view.ts";
 import { Effect } from "effect";
@@ -170,11 +170,11 @@ describe("an issue", () => {
       expect((yield* sessions.get(got.session!))!.brief).toBe("写打卡并提交");
       const started = yield* issues.get(issue.id);
       expect([started.sessions, started.status]).toEqual([[got.session], "in_review"]);
-      yield* until(() => inState(issue.id)?.sessions?.length === 1 && inState(issue.id)?.status === "in_review", "the core state follows its run");
+      yield* until(() => inState(issue.id)?.sessions.length === 1 && inState(issue.id)?.status === "in_review", "the core state follows its run");
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
       refusedWith(yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, owner)));
 
-      const unsent = (all: Issue[]) => all.filter((i) => (i.sessions ?? []).length === 0).map((i) => i.title);
+      const unsent = (all: Issue[]) => all.filter((i) => i.sessions.length === 0).map((i) => i.title);
       const a = yield* issues.add({ title: "一" });
       const b = yield* issues.add({ title: "二", priority: "urgent" });
       const c = yield* issues.add({ title: "三" });

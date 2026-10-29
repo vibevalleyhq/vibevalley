@@ -6,17 +6,17 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
 import { actionOf, perform } from "./acts";
-import { issueTitle } from "./rules";
-import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./state";
+import { issueTitle } from "./titles";
+import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
 import { ago } from "@/base/format";
 import { aria, autofocus } from "@/base/util";
 import { ready } from "@/base/query";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea } from "@/ui/Field";
-import { run } from "./hooks";
+import { run } from "./acts";
 import { Note } from "./Sheet";
-import { useIssueChanges } from "./data";
+import { useIssueChanges } from "./queries";
 import { useCore } from "@/base/frame";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */

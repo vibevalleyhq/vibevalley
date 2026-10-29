@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice } from "@/setting/rules.ts";
+import { defaultVoice } from "@/setting/voice.ts";
 import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { Setting } from "@/setting/setting.ts";

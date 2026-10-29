@@ -21,10 +21,10 @@ import { toast } from "@/ui/toasts";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
 import { bodyIcon, bodyLabel } from "./ArtifactCard";
-import { artifactHref, useArtifact, useArtifacts } from "./data";
+import { artifactHref, useArtifact, useArtifacts } from "./queries";
 
 /** What a page in the frame may do: run its scripts and open links in a tab of their own. Never allow-same-origin: it
- * would be the farm's own page. The server's header says the same (artifact/rules.ts). */
+ * would be the farm's own page. The server's header says the same (artifact/policy.ts). */
 const sandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 
 const messageHref = (at: { readonly channel: string; readonly number?: number }) =>

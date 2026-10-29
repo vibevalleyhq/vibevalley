@@ -1,6 +1,8 @@
 // The schema's own rules: one baseline (db/migrations/0001_schema.up.sql) that is changed in place, never a second
 // migration; every table named <module> or <module>_<concept>, singular, the module the src folder that owns it; every
-// index named after its table; and each table's SQL in db/queries/<table>.sql, one file a table.
+// index named after its table; a closed set of words an enum type named <table>_<column>, so the generated code reads it
+// as a union of the words and the database refuses any other; and each table's SQL in db/queries/<table>.sql, one file a
+// table.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +16,7 @@ const indexes = [...schema.matchAll(/create (?:unique )?index (?:if not exists )
   name: m[1]!.toLowerCase(),
   table: m[2]!.toLowerCase(),
 }));
+const enums = new Set([...schema.matchAll(/create type (\w+) as enum/gi)].map((m) => m[1]!.toLowerCase()));
 const modules = readdirSync(src).filter((d) => statSync(join(src, d)).isDirectory());
 
 /** A plural ends in s; these words end in s and are singular. */
@@ -32,6 +35,19 @@ describe("the schema", () => {
       for (const word of t.split("_"))
         expect({ table: t, plural: word.endsWith("s") && !singularInS.has(word) ? word : undefined }).toEqual({ table: t, plural: undefined });
     }
+  });
+
+  it("keeps a closed set of words in an enum type named after its table and column", () => {
+    expect([...schema.matchAll(/^\s+\w+\s+text\b.*check \(\w+ in \(/gim)].map((m) => m[0].trim())).toEqual([]);
+    let table = "";
+    const named: string[] = [];
+    for (const line of schema.split("\n")) {
+      table = /^create table (\w+)/i.exec(line)?.[1]?.toLowerCase() ?? table;
+      const column = /^\s+(\w+)\s+(\w+)/.exec(line);
+      if (column && enums.has(column[2]!.toLowerCase()) && column[2]!.toLowerCase() !== `${table}_${column[1]!.toLowerCase()}`)
+        named.push(`${table}.${column[1]}`);
+    }
+    expect(named).toEqual([]);
   });
 
   it("names every index after its table", () => {

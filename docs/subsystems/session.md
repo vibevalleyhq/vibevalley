@@ -16,8 +16,8 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
-- `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentProblems`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
+- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的），`takeIn.ts`（收活：冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
+- `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`fit.ts` 的 `agentProblems`、`quota.ts` 的 `moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
 - 接口：`session.list`、`session.get`、`session.event.list`、`session.stop`、`issue.run.list`、`issue.history.list`、`runtime.*`、`agent.validate`（[capabilities.md](docs/reference/capabilities.md)）。
@@ -72,7 +72,7 @@
 
 开一轮和发布它在同一把锁（`admission`）里，几个同时来的派活不会占到同一个空位。每个 Session 另有一把现场锁：带话、交接和离场互斥，合并和验收不占全局的准入锁，其他帮工仍能接话和叫停。带话先拿现场锁再拿准入锁，准入锁内不等已有 Session 的现场锁。地里满 6 个又来新活时，工单经 `Sessions.makeRoom` 请最早派出去的闲置帮工收工。
 
-**派不出去**（`runtime/rules.ts` 的 `agentProblems`，派活前查、`agent.validate` 给页面）：档案停用、农机没装或停用、农机不接受档案的选项（人设方式、思考强度、环境变量、MCP、禁用工具）或模型没有这一档思考强度；以及钱的一条（`moneyStop`）：套餐的任一窗口用到 100%（写明几点重置）、余额用完、今天花到每日预算。正在干的会干完。
+**派不出去**（`runtime/fit.ts` 的 `agentProblems`，派活前查、`agent.validate` 给页面）：档案停用、农机没装或停用、农机不接受档案的选项（人设方式、思考强度、环境变量、MCP、禁用工具）或模型没有这一档思考强度；以及钱的一条（`moneyStop`）：套餐的任一窗口用到 100%（写明几点重置）、余额用完、今天花到每日预算。正在干的会干完。
 
 **额度和花费**（`runtime`）：
 
@@ -114,7 +114,7 @@
 
 **叫停**（`session.stop`）：打断这一轮，Session 留在地里，带句话开下一轮。
 
-**离开**（合并时 `handOver`、收工 `dismiss`）：先关 oar 会话；合并时在干或有待开始的一轮就拒绝；`handOver` 只管让帮工歇下、交出现场（worktree 和它最后说的话）、按给的关法离开，怎么合（本地合、提 PR、结束 PR、合进计划分支）由调它的人给，执行不知道 PR 和计划；调用方的检查在这次交接内运行，直到检查和合并结束都不接新一轮，检查失败后的带话在交接结束以后做；合的那一步失败，Session 和分支都留着：冲突施加 `conflict`，失败照种类说成 `NotTakenIn`（`rules.ts` 的 `notTakenIn`：帮工要带回去修的话、给主人的话、农场的通知、计划记的一行）；冲突由谁解决由调用方说（`settle`：工单交给主人决定，计划直接让帮工修），带话的路也由调用方定。
+**离开**（合并时 `handOver`、收工 `dismiss`）：先关 oar 会话；合并时在干或有待开始的一轮就拒绝；`handOver` 只管让帮工歇下、交出现场（worktree 和它最后说的话）、按给的关法离开，怎么合（本地合、提 PR、结束 PR、合进计划分支）由调它的人给，执行不知道 PR 和计划；调用方的检查在这次交接内运行，直到检查和合并结束都不接新一轮，检查失败后的带话在交接结束以后做；合的那一步失败，Session 和分支都留着：冲突施加 `conflict`，失败照种类说成 `NotTakenIn`（`takeIn.ts` 的 `notTakenIn`：帮工要带回去修的话、给主人的话、农场的通知、计划记的一行）；冲突由谁解决由调用方说（`settle`：工单交给主人决定，计划直接让帮工修），带话的路也由调用方定。
 
 `dismiss` 的 `discard` 把停止写入后的工作区重置，再离场清理，起草的调用方不自己排停机和重置的顺序。农机关闭失败时整次动作拒绝，现场、句柄和监听都保留，不重置、不合并、不离场；这次关闭的失败也保留，重复调用不会把农机内部的重复关闭当作成功。重置失败时提醒主人，照常离场，清理仍保留未合的改动。
 
@@ -167,10 +167,10 @@
 
 ## 怎么验证
 
-- `session/rules.test.ts`（纯函数，不开会话）：一轮从活开始、花费从上一次的累计算、没动静以一句话结束而不是用量、重试和模型失败和进程退出说人话、子 agent 的步骤说是谁的、摘要是结论、做完和失败的一轮怎么读、给主人的问题、工作区的上限、Session 的编号、挑档案。
+- `session/report.test.ts`（纯函数，不开会话）：一轮从活开始、花费从上一次的累计算、没动静以一句话结束而不是用量、重试和模型失败和进程退出说人话、子 agent 的步骤说是谁的、摘要是结论、做完和失败的一轮怎么读、给主人的问题、工作区的上限、Session 的编号、挑档案。
 - `session/journal.test.ts`：日志存下、放开以后从盘上读回、接着原来的写；子 agent 的步骤挂在它的调用下面；长出来的一步只推一次、写下；同一步的内容版本递增、落盘后保留；只追加。
 - `session/session.test.ts`（oar 的 `scriptedRuntime` 扮演帮工、真的 git 仓库）：派出去、干一轮、汇报、带一句话、合并；要了的一轮在开始干之前占着位置。
 - `src/flows/work.test.ts`（照字眼干活的帮工、真的 git 仓库）：派出去、干活、汇报、回家；被拒的原因；合并后清掉 worktree、记进账本；重启后歇着回来、叫得醒；每一步都在轨迹里；失败说原因；没动静被标出来（开工就不出声也算）；合并前看改动；冲突的分支留到解决；项目和农机的上限；两个同时派到新项目；开口、结束、令牌随它走；每次 run 记着为什么开、重启打断的记成 `interrupted`；到场时工单已经在；走了的是一行。`flows/reach.test.ts`：帮工的 `/mcp` 跟着服务端实际的地址。
 - `session/execution.test.ts`：管家的一个 loop 是一次 run、关联它消费的全部工单，失败和叫停怎么说；终结没写成的 run 在下一次开始前先终结。
-- `runtime/runtime.test.ts`：接受的探测拥有它读用量的那个安装、慢的不覆盖新的；适配器的拒绝挡住档案；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；昨天的花费不挡今天；存不上的设置被拒；`resolve` 管默认、覆盖和模型的退回；价目分开算缓存、按人民币；dsh 和 pi 的价格和余额。`runtime/rules.test.ts`：黄金数据和额度的说法。`runtime/dsh.test.ts`：DeepSeek Harness 的模型和思考强度。
+- `runtime/runtime.test.ts`：接受的探测拥有它读用量的那个安装、慢的不覆盖新的；适配器的拒绝挡住档案；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；昨天的花费不挡今天；存不上的设置被拒；`resolve` 管默认、覆盖和模型的退回；价目分开算缓存、按人民币；dsh 和 pi 的价格和余额。`runtime/recorded.test.ts`：黄金数据和额度的说法。`runtime/dsh.test.ts`：DeepSeek Harness 的模型和思考强度。
 - 页面：`apps/web/src/features/session/rounds.test.ts`（日志怎么按 run 分段、瀑布图）。

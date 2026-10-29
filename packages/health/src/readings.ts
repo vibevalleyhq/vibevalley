@@ -94,11 +94,13 @@ export interface Escapes {
   readonly nonNull: number;
   /** x as unknown as T: the type checker is told a value is another type. */
   readonly doubleCast: number;
+  /** x as T: the type checker takes a value as T unchecked (as const, as unknown and double casts aside). */
+  readonly cast: number;
   /** A comment that turns a lint rule off. */
   readonly lintOff: number;
 }
 
-export const escapeKinds = ["nonNull", "doubleCast", "lintOff"] as const satisfies readonly (keyof Escapes)[];
+export const escapeKinds = ["nonNull", "doubleCast", "cast", "lintOff"] as const satisfies readonly (keyof Escapes)[];
 
 type Node = { readonly type?: unknown; readonly [key: string]: unknown };
 
@@ -106,6 +108,7 @@ export function escapesIn(path: string, text: string): Escapes {
   const parsed = parseSync(path, text, { lang: path.endsWith(".tsx") ? "tsx" : "ts" });
   let nonNull = 0;
   let doubleCast = 0;
+  let cast = 0;
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) return value.forEach(visit);
     if (typeof value !== "object" || value === null) return;
@@ -113,13 +116,16 @@ export function escapesIn(path: string, text: string): Escapes {
     if (node.type === "TSNonNullExpression") nonNull++;
     if (node.type === "TSAsExpression") {
       const inner = node.expression as Node;
+      const to = node.typeAnnotation as Node;
+      const toConst = to.type === "TSTypeReference" && (to.typeName as Node).name === "const";
       if (inner.type === "TSAsExpression" && (inner.typeAnnotation as Node).type === "TSUnknownKeyword") doubleCast++;
+      else if (!toConst && to.type !== "TSUnknownKeyword") cast++;
     }
     for (const key in node) if (key !== "parent") visit(node[key]);
   };
   visit(parsed.program);
   const lintOff = parsed.comments.filter((c) => /^\s*(?:oxlint|eslint)-disable/.test(c.value)).length;
-  return { nonNull, doubleCast, lintOff };
+  return { nonNull, doubleCast, cast, lintOff };
 }
 
 /** The escapes of the counted sources, summed by area, areas in order. */
@@ -128,7 +134,7 @@ export function escapesByArea(sources: readonly Source[], health: Pick<Health, "
   for (const s of sources) {
     if (!health.counted(s.path)) continue;
     const e = escapesIn(s.path, s.text);
-    const area = (out[health.areaOf(s.path)] ??= { nonNull: 0, doubleCast: 0, lintOff: 0 });
+    const area = (out[health.areaOf(s.path)] ??= { nonNull: 0, doubleCast: 0, cast: 0, lintOff: 0 });
     for (const k of escapeKinds) area[k] += e[k];
   }
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));

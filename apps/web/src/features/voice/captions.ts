@@ -1,3 +1,4 @@
+import { recordOf } from "@/base/util";
 // The live captions of a call, from the conversational AI agent's messages on the RTC data
 // stream (the server starts it with data_channel 'datastream'). A message comes in chunks, `id|part|parts|base64`,
 // 1-based; put together and decoded, it is JSON with an `object`:
@@ -128,8 +129,7 @@ export class LiveCaptions {
     if (parts.length !== 4) {
       // Not chunked: a plain JSON message.
       try {
-        const decoded: unknown = JSON.parse(packet);
-        return decoded && typeof decoded === "object" && !Array.isArray(decoded) ? (decoded as Message) : undefined;
+        return recordOf(JSON.parse(packet));
       } catch {
         return undefined;
       }
@@ -146,8 +146,7 @@ export class LiveCaptions {
     try {
       const joined = Array.from({ length: n }, (_, k) => got.get(k + 1) ?? "").join("");
       const bytes = Uint8Array.from(atob(joined), (c) => c.charCodeAt(0));
-      const decoded: unknown = JSON.parse(new TextDecoder().decode(bytes));
-      return decoded && typeof decoded === "object" && !Array.isArray(decoded) ? (decoded as Message) : undefined;
+      return recordOf(JSON.parse(new TextDecoder().decode(bytes)));
     } catch {
       return undefined;
     }

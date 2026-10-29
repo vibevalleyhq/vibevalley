@@ -160,7 +160,7 @@ describe("memory", () => {
       const preview = yield* m.recallOf("lab", "clock", "");
       expect(preview.lines).toEqual(["- （这个项目）clock 的测试用 pnpm test", "- （所有项目）提交前跑 lint"]);
       expect(preview.limit).toBe(recallChars);
-      for (const x of yield* m.list("lab")) expect([x.recalled, x.fading ?? false]).toEqual([0, false]);
+      for (const x of yield* m.list("lab")) expect([x.recalled, x.fading]).toEqual([0, false]);
       expect((yield* m.recallOf("lab", "", "")).lines).toEqual([]);
       for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, project: "", by: owner });
       expect((yield* m.list("lab")).filter((x) => x.fading)).toHaveLength(2);

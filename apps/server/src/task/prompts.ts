@@ -4,11 +4,9 @@
 
 import type { Agent, Issue, Session, Task, TaskGraph, GraphState, TaskState } from "@vibevalley/protocol";
 import { traitsOf } from "@/agent/prompts.ts";
-import { slice } from "@/base/text.ts";
-import { isForOrchestrator } from "@/issue/state.ts";
-import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf } from "./graph.ts";
-import { acceptanceChecks, frozenOf } from "./rules.ts";
-
+import { slice } from "@/base/clip.ts";
+import { isForOrchestrator } from "@/issue/status.ts";
+import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf, acceptanceChecks, frozenOf } from "./graph.ts";
 /** A graph's and a step's state as the model reads them (only in Chinese: prompts are). */
 const graphStateText: Record<GraphState, string> = {
   splitting: "在拆",

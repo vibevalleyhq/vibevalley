@@ -1,7 +1,6 @@
 // For the stories only; the product never imports it.
 
-import type { Changes, Issue, IssueAction, IssueAttention, IssueId, IssueStatus, Phase, Priority, Session, SessionId } from "@vibevalley/protocol";
-
+import type { Changes, Issue, IssueAction, IssueAttention, IssueId, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
 export const now = Date.now();
 export const min = 60_000;
 
@@ -34,7 +33,7 @@ export const sampleIssue = (number: number, title: string, status: IssueStatus, 
   ...more,
 });
 
-export const sampleSession = (id: string, agent: string, phase: Phase, more: Partial<Session> = {}): Session => ({
+export const sampleSession = (id: string, agent: string, phase: PhaseView, more: Partial<SessionView> = {}): SessionView => ({
   id: id as SessionId,
   name: agent,
   agent,
@@ -44,13 +43,14 @@ export const sampleSession = (id: string, agent: string, phase: Phase, more: Par
   runs: 2,
   phase,
   refining: false,
+  phaseText: "",
   ...more,
 });
 
-export const working = (since: number, quietSince?: number): Phase => ({
+export const working = (since: number, quietSince?: number): PhaseView => ({
   _tag: "working",
   since,
-  doing: { action: "edit_file", label: "改 session.ts" },
+  doing: { action: "edit_file", label: "改 session.ts", actionText: "改文件" },
   ...(quietSince === undefined ? {} : { quietSince }),
 });
 

@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
-import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook, OrchestratorLookValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "@/base/api";
 import { useRouter } from "@/base/router";
@@ -170,7 +170,10 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
           <RadioGroup
             aria-label={t("web.agent.orchestrator.look")}
             value={draft().look.orchestrator ?? "farmer"}
-            onValueChange={(v) => setLook(v as OrchestratorLook)}
+            onValueChange={(v) => {
+              const look = OrchestratorLookValues.find((l) => l === v);
+              if (look) setLook(look);
+            }}
             class="grid grid-cols-3 gap-2 sm:grid-cols-6"
           >
             <For each={orchestratorLooks}>

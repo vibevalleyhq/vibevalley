@@ -13,7 +13,7 @@ import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage
 import { api, reasonOf } from "@/base/api";
 import { toast } from "@/ui/toasts";
 import { aria, autofocus } from "@/base/util";
-import { farmClock, readsLong } from "./text";
+import { farmClock, readsLong } from "./labels";
 import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
 import { useCore } from "@/base/frame";
 import { PxMarkdown, SpriteIcon } from "@/ui/pixel";

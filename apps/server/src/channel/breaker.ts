@@ -2,8 +2,7 @@
 // again (the audience leaves it out, kick does not hand it messages) until someone speaks to it by name or it leaves.
 // Speaking again only clears the count: a tripped breaker stays tripped until it is reset.
 
-import { wakeBreaker } from "./rules.ts";
-
+import { wakeBreaker } from "./audience.ts";
 export class WakeBreaker {
   private readonly failures = new Map<string, number>();
   private readonly open = new Set<string>();

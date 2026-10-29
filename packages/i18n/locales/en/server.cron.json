@@ -53,6 +53,5 @@
   "noChannel": "There is no channel {name}",
   "noProfile": "There is no profile called {name}",
   "noProject": "#{channel} has no default project: a scheduled task sent straight to a helper needs a project",
-  "remove": "Delete the scheduled task \"{name}\": it no longer starts work when due; the tickets it opened stay",
   "removeWhen": "Delete the scheduled task \"{name}\" ({when}): it no longer starts work when due; the tickets it opened stay"
 }

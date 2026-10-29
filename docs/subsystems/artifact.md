@@ -21,8 +21,8 @@
 - 服务端 `apps/server/src/artifact`（服务 `Artifacts`），归 Collaboration，排在 `channel` 后面：
   - `artifact.ts`：产出本身、网页的每一版（内容按 sha256 存在 `$VIBEVALLEY_HOME/artifacts/<sha256>`）、交上来时说的那句话。
   - `blocks.ts`：一起写的那种的块，存取和提交（`Artifacts` 的一部分，不是单独的服务）。
-  - `ops.ts`：op 的规则（纯函数，在内存里的一组块上按顺序施加）；`text.ts` 按码点切和接文字；`markdown.ts` 读写 Markdown；`demo.ts` 是演示的节奏。
-  - `rules.ts`：标题、种类、大小的校验，网页内容的响应头。
+  - `ops.ts`：op 的规则（纯函数，在内存里的一组块上按顺序施加）；`spans.ts` 按码点切和接文字；`markdown.ts` 读写 Markdown；`demo.ts` 是演示的节奏。
+  - `policy.ts`：标题、种类、大小的校验，网页内容的响应头。
   - 顺序键在 `packages/protocol/src/rules/order.ts`（`keyBetween`），服务端和页面用同一份。
 - 表：`artifact`（一篇一行：正文的种类、在哪说的、第一次说它的那条消息、为哪张工单、谁做的、网页的最新版本、块的 `seq`）、`artifact_version`（网页的每一版）、`artifact_block`（每一块，含墓碑）、`artifact_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`artifact_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
 - 形状在 `packages/protocol/src/shapes.ts`：`Artifact`、`ArtifactCard`、`ArtifactVersion`；块那一套 `BlockInput`（作者给的新块）、`Block`、`BlockAttrs`、`TextSpan`、`SpanMarks`，op 是封闭的联合 `BlockOp`（按 `op` 区分），`BlockSubmit`、`BlockAck`、`BlockOpResult`、`BlockSnapshot`。块的类型是封闭的 `BlockType`（成员表 `BlockTypeValues`），接口解码时拒掉别的取值，服务端和页面都写带类型的字面量。
@@ -52,7 +52,7 @@
 - **rev**：每个改到这一块的 op 让它加 1；新块从 1 开始。每一版的字存进 `artifact_block_revision`。
 - **seq**：一起写的产出每收下一批加 1；同一批重发（同一个 `batchId`）不加，回答第一次的结果。
 - **墓碑**：删除块只置 `deleted`，子块一起；`artifact.block.list` 不返回墓碑。
-- **偏移按 Unicode 码点数**，不按 UTF-16。仓库里给人看的字数（`apps/server/src/base/text.ts`）按 UTF-16 码元，两套单位只在这里分开：`split_block` 的 `offset` 是码点，页面把光标的 UTF-16 位置换成码点再发（`codePointOffset`）。
+- **偏移按 Unicode 码点数**，不按 UTF-16。仓库里给人看的字数（`apps/server/src/base/clip.ts`）按 UTF-16 码元，两套单位只在这里分开：`split_block` 的 `offset` 是码点，页面把光标的 UTF-16 位置换成码点再发（`codePointOffset`）。
 
 ## 怎么走
 
@@ -141,7 +141,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/artifact/rules.test.ts`：校验和响应头（沙箱不带 `allow-same-origin`，`connect-src 'none'`）。
+- `apps/server/src/artifact/policy.test.ts`：校验和响应头（沙箱不带 `allow-same-origin`，`connect-src 'none'`）。
 - `artifact/artifact.test.ts`：卡片说在哪、网页新的一版留着旧的、按工单和频道列、拒绝的几种、删掉以后内容文件的去留；交上来的 Markdown 读成块、不出新版；主人新建的是空的、不在哪里说。
 - `artifact/blocks.rules.test.ts`：拆分时留着 marks、接起来时合并一样的 marks；两键之间的键在两者之间；同键按 id 排；改过的块带着 rev 和写的人；协议里每种 op 都有分支；代码块没有 marks；Markdown → 块 → Markdown、块 → Markdown → 块不丢东西。
 - `artifact/blocks.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；同一批勾选后改字不误判冲突；读写 Markdown；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。

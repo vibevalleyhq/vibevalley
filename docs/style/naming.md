@@ -31,7 +31,7 @@
 
 名字说性质，说的是写的人怎么实现、怎么测，读的人要找的却是哪件事；性质变了，名字也跟着错。位置本身就是约定、而且有检查守着的，可以用：`prompts.ts`（对模型说的话，lint 在这里放行中文）、`index.ts`（一个 feature 对外的入口，`page-layers` 查）、`packages/protocol/src/rules`（两边都跑的，`contract.test.ts` 查）、`testing/` 和 `testing.ts`（测试用的，金字塔认它们）。
 
-**起不出名字就先拆。** 一个文件或函数只能用「和」连起来说，或只能用上表左边的词概括，说明它管了不止一件事：拆成几份，每份再起名。仓库里还有十九个 `rules.ts` 和一批 `state.ts`、`data.ts`，多是这样来的：改到其中一个时，把动到的部分搬到概念的文件里，不往里加新的。
+**起不出名字就先拆。** 一个文件或函数只能用「和」连起来说，或只能用上表左边的词概括，说明它管了不止一件事：拆成几份，每份再起名。左边这些名字 `scripts/file-names.test.ts` 拦下，`apps/`、`packages/` 里一个也没有。
 
 ## 查询和命令
 
@@ -86,7 +86,7 @@
 
 | 词 | 指的是 | 也被用来指 |
 |---|---|---|
-| rules | 测试金字塔的规则层 | 业务的纯函数（`rules.ts`，照「起不出名字就先拆」逐个拆）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
+| rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
 
 已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`project.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、项目的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 

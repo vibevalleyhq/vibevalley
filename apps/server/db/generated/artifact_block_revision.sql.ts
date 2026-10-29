@@ -4,13 +4,15 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_artifact_block_revision_kind_d4f813831ef1 } from "./types.js"
+
 export const AddArtifactBlockRevisionParams = Schema.Struct({
   ["id"]: Schema.String,
   ["block_id"]: Schema.String,
   ["rev"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["spans"]: Schema.String,
   ["actor"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_artifact_block_revision_kind_d4f813831ef1,
   ["created_at"]: Schema.Number,
 })
 export type AddArtifactBlockRevisionParams = typeof AddArtifactBlockRevisionParams.Type

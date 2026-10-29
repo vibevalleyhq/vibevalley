@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
+import { variant, aria, createSettled, Keyed } from "@/base/util";
 import { saveSettings } from "@/base/settings";
 
 import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
@@ -44,7 +45,6 @@ import {
   withPart,
 } from "./choices";
 import { A } from "@/ui/A";
-import { aria, createSettled, Keyed } from "@/base/util";
 import { ready, useQuery, useSettings } from "@/base/query";
 import { Button } from "@/ui/Button";
 import { Select, TextArea, TextInput } from "@/ui/Field";
@@ -83,10 +83,10 @@ export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
 
 /** What the server says is wrong with the draft, asked a moment after it last changed. */
 function useProblem(update: () => SettingsUpdate) {
-  const asked = createSettled(() => JSON.stringify(update()));
+  const asked = createSettled(update);
   const check = useQuery(() => ({
-    queryKey: ["settings-check", asked()],
-    queryFn: () => api.setting.validate(JSON.parse(asked()) as SettingsUpdate),
+    queryKey: ["settings-check", JSON.stringify(asked())],
+    queryFn: () => api.setting.validate(asked()),
     placeholderData: keepPreviousData,
   }));
   return () => ready(check, undefined)?.problem;
@@ -288,10 +288,10 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       label={t("web.voice.voice.language")}
                       value={draft().language}
                       options={LanguageValues.map((l) => ({ value: l, label: t("shared.join.aside", { text: languageLabel[l], aside: l }) }))}
-                      onChange={(l) => l && set({ ...draft(), language: l as VoiceSettings["language"] })}
+                      onChange={(l) => set({ ...draft(), language: l })}
                     />
                   </Labeled>
-                  <Show when={asr().vendor === "deepgram" ? (asr() as Extract<VoiceSettings["asr"], { vendor: "deepgram" }>) : undefined}>
+                  <Show when={variant(asr(), "vendor", "deepgram")}>
                     {(a) => (
                       <Labeled label={t("web.voice.voice.deepgramModel")}>
                         <Segmented
@@ -304,7 +304,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       </Labeled>
                     )}
                   </Show>
-                  <Show when={asr().vendor === "microsoft" ? (asr() as Extract<VoiceSettings["asr"], { vendor: "microsoft" }>) : undefined}>
+                  <Show when={variant(asr(), "vendor", "microsoft")}>
                     {(a) => (
                       <>
                         <Labeled label={t("web.voice.voice.azureArea")} hint={t("web.voice.voice.azureAreaHint")}>
@@ -334,7 +334,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
                   />
                 </Labeled>
-                <Show when={answer().vendor === "agora" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "agora" }>) : undefined}>
+                <Show when={variant(answer(), "vendor", "agora")}>
                   {(a) => (
                     <Labeled label={t("web.voice.voice.model")}>
                       <Segmented
@@ -347,7 +347,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     </Labeled>
                   )}
                 </Show>
-                <Show when={answer().vendor === "deepseek" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "deepseek" }>) : undefined}>
+                <Show when={variant(answer(), "vendor", "deepseek")}>
                   {(a) => (
                     <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.deepseekModel")}>
                       <TextInput
@@ -359,7 +359,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     </Labeled>
                   )}
                 </Show>
-                <Show when={answer().vendor === "openai" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "openai" }>) : undefined}>
+                <Show when={variant(answer(), "vendor", "openai")}>
                   {(a) => (
                     <Cols>
                       <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.llmAddress")}>
@@ -505,7 +505,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 onChange={(v) => set({ ...draft(), tts: v === tts().vendor ? tts() : ttsStart[v] })}
               />
             </Labeled>
-            <Show when={tts().vendor === "minimax" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "minimax" }>) : undefined}>
+            <Show when={variant(tts(), "vendor", "minimax")}>
               {(narrowed) => (
                 <Labeled label={t("web.voice.voice.persona.ttsModel")}>
                   <Segmented
@@ -518,7 +518,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 </Labeled>
               )}
             </Show>
-            <Show when={tts().vendor === "openai" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "openai" }>) : undefined}>
+            <Show when={variant(tts(), "vendor", "openai")}>
               {(narrowed) => (
                 <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.openaiVoice")}>
                   <Segmented
@@ -531,7 +531,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 </Labeled>
               )}
             </Show>
-            <Show when={tts().vendor === "microsoft" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "microsoft" }>) : undefined}>
+            <Show when={variant(tts(), "vendor", "microsoft")}>
               {(narrowed) => (
                 <>
                   <Labeled label={t("web.voice.voice.azureArea")}>
@@ -559,7 +559,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               )}
             </Show>
           </Cols>
-          <Show when={tts().vendor === "minimax" ? (tts() as Extract<VoiceSettings["tts"], { vendor: "minimax" }>) : undefined}>
+          <Show when={variant(tts(), "vendor", "minimax")}>
             {(narrowed) => (
               <>
                 <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.minimaxVoice")}>

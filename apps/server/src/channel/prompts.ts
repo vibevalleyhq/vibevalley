@@ -1,8 +1,7 @@
 // What a helper is told of the chat when it is woken for messages or busy with unread ones: said to the model, in
 // Chinese whatever the owner's locale.
 
-import { summaryChannels, type UnreadRow, wakeMessages, type InboxMessage } from "./rules.ts";
-
+import { summaryChannels, type UnreadRow, wakeMessages, type InboxMessage } from "./wake.ts";
 /** Line breaks are marked, so no message can pass for a header. */
 export function messageLine(m: InboxMessage): string {
   const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;

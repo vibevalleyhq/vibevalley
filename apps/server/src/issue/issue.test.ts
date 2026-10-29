@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { freshTask } from "@/task/rules.ts";
+import { freshTask } from "@/task/editing.ts";
 import { graphView } from "@/task/graph.ts";
 import { owner } from "@/base/actor.ts";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
-import { starter } from "@/testing/layers.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
 import { Cause, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
@@ -16,12 +16,10 @@ import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
 import { Crons } from "@/cron/cron.ts";
 import { Sessions } from "@/session/session.ts";
-import { testConfig } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 import { Issues } from "./issue.ts";
 import { until } from "@/testing/until.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-
 const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())) });

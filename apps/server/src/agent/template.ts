@@ -111,8 +111,9 @@ export function readTemplate(dir: string, source: AgentTemplateSource): AgentTem
 }
 
 /** The ids of the built-in templates, in the order they are listed and installed. */
-export const builtInIds = (): string[] =>
-  Schema.decodeSync(Schema.fromJsonString(Schema.Array(Schema.String)))(readFileSync(join(builtInDir, "index.json"), "utf8")) as string[];
+export const builtInIds = (): string[] => [
+  ...Schema.decodeSync(Schema.fromJsonString(Schema.Array(Schema.String)))(readFileSync(join(builtInDir, "index.json"), "utf8")),
+];
 
 /** Every built-in template; one that does not read is a broken build (templates.test.ts keeps them readable). */
 export const builtInTemplates = (): AgentTemplate[] => builtInIds().map((id) => readTemplate(join(builtInDir, id), "builtIn"));

@@ -3,7 +3,7 @@ import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } f
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { ordered, Page } from "./ops.ts";
-import { normal, plain, runeLen, sameText, splitAt } from "./text.ts";
+import { normal, plain, runeLen, sameText, splitAt } from "./spans.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
 const block = (b: Partial<Block> & Pick<Block, "id" | "orderKey" | "type">): Block => ({

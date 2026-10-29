@@ -11,7 +11,7 @@ import { missedOf, phoneCalls } from "./calls";
 import { ChatWindow } from "@/farm/chat/ChatWindow";
 import { useCore } from "@/base/frame";
 import { unreadTotal } from "@/features/channel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { voiceCall } from "@/features/voice";
 import { lcd } from "./lcd";
 import type { PadButton } from "./pad";

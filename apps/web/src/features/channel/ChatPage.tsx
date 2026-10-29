@@ -5,7 +5,7 @@ import { Splitter, usePaneWidth } from "@/ui/Splitter";
 import type { IconName } from "@/ui/icons";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type SessionView } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
 import {
   archivedOf,
@@ -20,16 +20,12 @@ import {
   topsOf,
   chatPath,
   channelOf,
-  jobThreadOf,
-  phaseDot,
-  phaseText,
-  threadOwnerOf,
-  threadTitle,
-  unreadIn,
-  unreadUnder,
   defaultOf,
-  workbenchClock,
-} from "./rules";
+} from "./places";
+import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
+import { phaseDot, phaseText } from "./presence";
+import { unreadIn, unreadUnder } from "./unread";
+import { workbenchClock } from "./feed";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { useRouter } from "@/base/router";
 import { orchestratorMood, useCore } from "@/base/frame";
@@ -543,7 +539,7 @@ function ChannelRow(props: {
   );
 }
 
-function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) => void }) {
+function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channel) => void }) {
   const core = useCore();
   const now = useNow();
   const thread = () => jobThreadOf(core()?.chat, props.h);

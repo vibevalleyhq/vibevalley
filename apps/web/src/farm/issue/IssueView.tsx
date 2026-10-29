@@ -2,8 +2,10 @@ import { list, t } from "@vibevalley/i18n";
 // A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
 // workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
-// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
+// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/status.ts.
 
+import { OutfitValues, SpeciesValues, type SessionView } from "@vibevalley/protocol";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -35,7 +37,8 @@ import { ready } from "@/base/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
 import { farmActWords } from "@/farm/labels";
 import { tint } from "@/farm/panels/bits";
-import { commands, useFarm } from "@/farm/state";
+import { commands } from "@/farm/frames";
+import { useFarm } from "@/farm/ui";
 import { useVillage } from "@/farm/support";
 import { useAgent } from "@/base/agents";
 
@@ -44,6 +47,9 @@ const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
 
 /** The plot's issue while the store says so (the inspect layer). */
+/** A word's label when it is one of values; the word itself otherwise. */
+const labelOf = <K extends string>(labels: Record<K, string>, values: readonly K[], word: string) => (isOneOf(values, word) ? labels[word] : word);
+
 export function IssueView() {
   const inspect = useFarm((s) => overlayOf(s, "inspect")?.sessionId);
   const core = useCore();
@@ -62,7 +68,7 @@ export function IssueView() {
   );
 }
 
-function PlotDetail(props: { session: Session; onDone: () => void }) {
+function PlotDetail(props: { session: SessionView; onDone: () => void }) {
   const core = useCore();
   const router = useRouter();
   const history = useIssueHistory(() => true);
@@ -112,7 +118,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
 function IssueBody(props: {
   issue: Issue;
   sessions: Session[];
-  session: Session;
+  session: SessionView;
   onHarvest: (s: Session) => void;
   onClose: (s: Session) => Promise<void>;
   onThread?: (() => void) | undefined;
@@ -491,7 +497,7 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
       </div>
       <p class="mt-2 text-[13px]">{cropLabel[plot().crop]}</p>
       <p class={["text-center", xs]}>
-        {(speciesLabel as Record<string, string>)[kind()[0] ?? ""] ?? kind()[0]} · {(outfitLabel as Record<string, string>)[kind()[1] ?? ""] ?? kind()[1]}
+        {labelOf(speciesLabel, SpeciesValues, kind()[0] ?? "")} · {labelOf(outfitLabel, OutfitValues, kind()[1] ?? "")}
       </p>
       <p class={xs}>{t("web.farm.plot.where", { plot: stationOfSession(props.session) + 1, round: Math.round(props.session.runs) })}</p>
     </div>

@@ -2,7 +2,8 @@
 // thumb carries the same state for styling.
 
 import { createContext, omit, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, flag, type SpanProps } from "./internal/state";
+import { type ButtonProps, call, flag, type SpanProps } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 const Context = createContext<{ readonly checked: () => boolean; readonly disabled: () => boolean }>();
 

@@ -1,22 +1,23 @@
 import { t } from "@vibevalley/i18n";
-
 import { draftMatch, refinementBrief } from "./prompts.ts";
 import type { Agent, Question, Issue } from "@vibevalley/protocol";
-import { Effect, Semaphore } from "effect";
+import { Effect, Semaphore, Predicate } from "effect";
 import type { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/issue.sql.ts";
-import * as qs from "../../db/generated/issue_session.sql.ts";
 import type { Agents } from "@/agent/agent.ts";
-import { cut } from "@/base/text.ts";
+import { cut, clip } from "@/base/clip.ts";
 import type { Channels } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
-import { type ApiError, refused, lookIn } from "@/errors.ts";
+import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
 import type { WorkplaceRelease } from "@/project/shapes.ts";
-import { chooseAgent } from "@/runtime/rules.ts";
+import { chooseAgent } from "@/runtime/fit.ts";
 import type { Runtimes } from "@/runtime/runtime.ts";
 import type { Hired, HireOptions, Sessions } from "@/session/session.ts";
-import { isForOrchestrator } from "./state.ts";
-import { refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitBrief } from "./rules.ts";
+import { isForOrchestrator } from "./status.ts";
+import { jsonOrNull, nullText } from "./stored.ts";
+import { splitBrief } from "./brief.ts";
+
+import * as q from "../../db/generated/issue.sql.ts";
+import * as qs from "../../db/generated/issue_session.sql.ts";
 
 export interface RefinementDeps {
   readonly core: Core["Service"];
@@ -146,4 +147,78 @@ export function refinement(d: RefinementDeps) {
   });
 
   return { draft, handedBack, clearRefinement };
+}
+
+/** As its session hands it back; a list may come as one string. */
+export interface IssueRefinement {
+  readonly title: string;
+  readonly why: string;
+  readonly todo: string[];
+  readonly criteria: string[];
+  readonly notDoing: string[];
+  readonly files: string[];
+}
+
+export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
+
+export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
+
+function linesOf(v: unknown, field: string): string[] {
+  if (v === undefined || v === null) return [];
+  if (typeof v === "string") return [v];
+  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
+  throw new Error(t("server.issue.refinement.lines", { field }));
+}
+
+function textOf(v: unknown, field: string): string {
+  if (v === undefined || v === null) return "";
+  if (typeof v === "string") return v;
+  throw new Error(t("server.issue.refinement.text", { field }));
+}
+
+const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+
+/** The last block that reads as a draft with a title; problem says why none did. */
+export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
+  const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
+  if (blocks.length === 0) return { problem: t("server.issue.refinement.noBlock") };
+  let problem = "";
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    let d: IssueRefinement;
+    try {
+      const raw: unknown = JSON.parse(blocks[i]!);
+      if (!Predicate.isObject(raw)) throw new Error(t("server.issue.refinement.notObject"));
+      d = {
+        title: textOf(raw.title, "title"),
+        why: textOf(raw.why, "why"),
+        todo: linesOf(raw.todo, "todo"),
+        criteria: linesOf(raw.criteria, "criteria"),
+        notDoing: linesOf(raw.notDoing, "notDoing"),
+        files: linesOf(raw.files, "files"),
+      };
+    } catch (e) {
+      problem = t("server.issue.refinement.unreadable", { why: messageOf(e) });
+      continue;
+    }
+    const title = clip(d.title, 80);
+    if (!title) {
+      problem = t("server.issue.refinement.noTitle");
+      continue;
+    }
+    return { draft: { ...d, title }, problem: "" };
+  }
+  return { problem };
+}
+
+export function refinementDescription(d: IssueRefinement): string {
+  const parts: string[] = [];
+  const why = d.why.trim();
+  if (why) parts.push(t("server.issue.refinement.why") + "\n" + why);
+  for (const [head, lines] of [
+    [t("server.issue.refinement.todo"), kept(d.todo)],
+    [t("server.issue.refinement.notDoing"), kept(d.notDoing)],
+    [t("server.issue.refinement.files"), kept(d.files)],
+  ] as const)
+    if (lines.length > 0) parts.push(head + "\n- " + lines.join("\n- "));
+  return parts.join("\n\n");
 }

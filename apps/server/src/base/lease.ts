@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // has no flock, so a lock whose process is gone is stale and is taken over. server.json says where that server listens,
 // so the command line finds it on whatever port it got (the desktop app asks for a free one).
 
+import { errnoOf } from "@/errors.ts";
 import { Schema } from "effect";
 import { jsonOrNone } from "./json.ts";
 import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
@@ -14,7 +15,7 @@ const alive = (pid: number) => {
     process.kill(pid, 0);
     return true;
   } catch (e) {
-    return (e as NodeJS.ErrnoException).code === "EPERM";
+    return errnoOf(e) === "EPERM";
   }
 };
 
@@ -42,7 +43,7 @@ export function leaseHome(home: string): () => void {
         }
       };
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+      if (errnoOf(e) !== "EEXIST") throw e;
       const pid = Number(readFileSync(path, "utf8"));
       if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken(t("server.base.homeTaken", { home }));
       unlinkSync(path);

@@ -10,7 +10,7 @@ import { playSound } from "@/ui/pixel/sound";
 import { farm } from "@/farm/store";
 import { aria } from "@/base/util";
 import { PixelCard } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { phoneState } from "@/farm/support";
 import { useCore } from "@/base/frame";
 import { unreadTotal } from "@/features/channel";

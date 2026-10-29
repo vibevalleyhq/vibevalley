@@ -6,7 +6,7 @@ import { Agents } from "@/agent/agent.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
 import { Setting } from "@/setting/setting.ts";
-import type { MemorySourceConfig } from "@/setting/rules.ts";
+import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { whenTrue } from "@/testing/until.ts";
 import { owner as ownerActor } from "@/base/actor.ts";

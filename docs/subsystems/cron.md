@@ -14,7 +14,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/cron`（`Crons`）：`cron.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`rules.ts` 是只有它用的纯函数：`dueCrons`、`isMissed`、`afterRun`、`needsOK`。
+- 服务端 `apps/server/src/cron`（`Crons`）：`cron.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`due.ts` 是只有它用的纯函数：`dueCrons`、`isMissed`、`afterRun`、`needsOK`、`cronProblem`。
 - 几处都用的规则在 `apps/server/src/cron/when.ts`：`nextRun`、`cronProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
 - 表：`cron`（一个定时任务一行，时间写法存成 JSON 的 `spec`）；工单表的 `cron` 列指着它的定时任务。
 - 接口：`cron.create`、`cron.list`、`cron.update`、`cron.delete`（[capabilities.md](docs/reference/capabilities.md)）；`cron.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `cron_create`、`cron_list`、`cron_delete` 在 `tool/tool.ts`。

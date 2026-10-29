@@ -9,7 +9,7 @@ import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "sol
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
-import { doingOf } from "@/farm/hud/rules";
+import { doingOf } from "@/farm/hud/readout";
 import { farm } from "@/farm/store";
 import { stationOfSession } from "@/farm/world/plots";
 import { lineCounts } from "@/features/issue";
@@ -18,7 +18,7 @@ import { useCore, useFrames } from "@/base/frame";
 import { ready, useProjects, useQuery } from "@/base/query";
 import { AgentFace } from "@/ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
 import { type Answer, graphs, useGraphChanges } from "@/features/task";
 import { useAgent, useWorkAgents } from "@/base/agents";
@@ -38,7 +38,7 @@ const isOpen = (g: TaskGraph) => g.state !== "done" && g.state !== "abandoned";
 const taskOf = (g: TaskGraph, id: string) => g.tasks.find((n) => n.id === id);
 const actionText = (g: TaskGraph, a: GraphAction) => g.actionText[a] ?? "";
 
-const StateTag = (props: { g: TaskGraph }) => <FarmTag text={props.g.stateTag ?? ""} fill={stateTone[props.g.state][0]} ink={stateTone[props.g.state][1]} />;
+const StateTag = (props: { g: TaskGraph }) => <FarmTag text={props.g.stateTag} fill={stateTone[props.g.state][0]} ink={stateTone[props.g.state][1]} />;
 
 export function TaskBoard() {
   const frames = useFrames();
@@ -447,7 +447,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
             <FarmTag text={t("web.farm.plot.review")} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
-        <FarmTag text={props.node.stateText ?? ""} fill={tone().tag} ink={tone().ink} />
+        <FarmTag text={props.node.stateText} fill={tone().tag} ink={tone().ink} />
       </div>
       <p class="mt-1 line-clamp-4 text-[12px] text-bark-800" title={props.node.brief}>
         {props.node.brief}
@@ -475,7 +475,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
         {(s) => (
           <p class="mt-1.5 bg-cream-50/70 px-1.5 py-1 text-[12px] text-bark-800">
             {doing() && doing()!.action !== "none"
-              ? t("web.farm.graph.onPlotDoing", { name: s().name, plot: stationOfSession(s()) + 1, doing: doing()!.actionText ?? "" })
+              ? t("web.farm.graph.onPlotDoing", { name: s().name, plot: stationOfSession(s()) + 1, doing: doing()!.actionText })
               : t("web.farm.graph.onPlot", { name: s().name, plot: stationOfSession(s()) + 1 })}
           </p>
         )}

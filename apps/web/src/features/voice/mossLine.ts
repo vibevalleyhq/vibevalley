@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
 // and the playback's account are moss.ts's; this wires them to the socket and the audio.
 
+import { recordOf } from "@/base/util";
 import { messageOf } from "@/base/format";
 import { mossLinePath } from "@vibevalley/protocol";
 import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackAction, type Queued } from "./moss";
@@ -167,16 +168,18 @@ export class MossLine {
   }
 
   private event(data: string, setup: MossSetup) {
-    let m: { action?: string; data?: Record<string, unknown> };
+    let m: Record<string, unknown> | undefined;
     try {
-      m = JSON.parse(data) as typeof m;
+      m = recordOf(JSON.parse(data));
     } catch {
       return;
     }
-    if (!noisy.has(m.action ?? "")) this.log(false, data);
-    const d = m.data ?? {};
+    if (!m) return;
+    const action = str(m.action);
+    if (!noisy.has(action)) this.log(false, data);
+    const d = recordOf(m.data) ?? {};
     const text = str(d.text);
-    switch (m.action) {
+    switch (action) {
       case "session_attached": {
         const persona = setup.persona.trim();
         this.send({ action: "session.update", session: { ...(persona ? { persona: { prompt: persona } } : {}), instructions: setup.instructions.trim() } });
@@ -188,11 +191,11 @@ export class MossLine {
         break;
       case "input.transcript.updated":
       case "input.transcript.done":
-        this.words("owner", str(d.turn), text, m.action.endsWith("done"));
+        this.words("owner", str(d.turn), text, action.endsWith("done"));
         break;
       case "output.transcript.updated":
       case "output.transcript.done":
-        this.words("moss", str(d.turn_id), text, m.action.endsWith("done"));
+        this.words("moss", str(d.turn_id), text, action.endsWith("done"));
         break;
       case "response.audio.context":
         this.piece = { chunk: str(d.chunk_id), run: str(d.run_id), turn: str(d.turn_id) };

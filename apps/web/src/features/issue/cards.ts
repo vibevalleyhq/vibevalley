@@ -1,29 +1,16 @@
 import { matches } from "@/base/search";
 import { list, t } from "@vibevalley/i18n";
-// The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
-// lanes does (cardMove, laneOrder).
-
-import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
+import type { Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph, SessionView, WorkspaceView } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./display";
-import {
-  endedAt,
-  issueSession,
-  issueTag,
-  type IssueTag,
-  isForOrchestrator,
-  issueTitle,
-  type Lane,
-  laneOf,
-  laneStatus,
-  moveOf,
-  type Move,
-  tagText,
-  tagOpen,
-  taskLine,
-} from "./rules";
+import { endedAt, issueSession, isForOrchestrator } from "./issue";
+import { issueTag, type IssueTag, tagText, tagOpen } from "./tags";
+import { issueTitle, taskLine } from "./titles";
+import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
 import { ago, tookText } from "@/base/format";
 import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
-import { attentionTone } from "./state";
+import { attentionTone } from "./overview";
+// The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
+// lanes does (cardMove, laneOrder).
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
@@ -31,7 +18,7 @@ export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
 export type BoardCard =
   | { kind: "todo"; id: string; lane: Lane; issue: Issue }
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
-  | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: Session }
+  | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: SessionView }
   | { kind: "missing"; id: string; lane: Lane; issue: Issue; missing: string[] }
   /** An issue for the orchestrator: open while the orchestrator works on it, closed once it has answered; never dragged. */
   | { kind: "orchestrator"; id: string; lane: Lane; issue: Issue }
@@ -42,7 +29,7 @@ export const cardProject = (c: BoardCard) => (c.kind === "task" ? c.graph.projec
 export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : c.issue.assignee);
 
 /** A task is its own card; a step of one is on the board once a helper has worked it. */
-export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefined, graphs: TaskGraph[], orchestrators: ReadonlySet<string>): BoardCard[] {
+export function buildCards(rows: IssueHistory[], core: WorkspaceView | undefined, graphs: TaskGraph[], orchestrators: ReadonlySet<string>): BoardCard[] {
   const cards: BoardCard[] = [];
   for (const row of rows) {
     const issue = row.issue;

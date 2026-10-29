@@ -23,7 +23,8 @@ import { Sessions } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 import { Orchestrator } from "./orchestrator.ts";
-import { deepseekModel, intake, orchestratorModel } from "./rules.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import { intake } from "./intake.ts";
 import { gate, untilGot as until, whenTrue, within } from "@/testing/until.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
@@ -521,7 +522,7 @@ describe("the orchestrator", () => {
       yield* orchestrator.say("每天九点跑一遍测试", {}, undefined, "");
       const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's cron on");
       expect(on[0]).toMatchObject({ by: "orchestrator" });
-      expect(on[0]!.pending ?? false).toBe(false);
+      expect(on[0]!.pending).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

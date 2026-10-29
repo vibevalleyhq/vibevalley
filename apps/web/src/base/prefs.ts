@@ -2,6 +2,8 @@
 // profile's), and how the workbench looks and where the page opens. A phone and a desktop may want them apart, so they are
 // kept in localStorage, not settings.json; without storage they last until the page closes.
 
+import { recordOf } from "@/base/util";
+import { isOneOf } from "@vibevalley/protocol/rules";
 import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 import type { Accessor } from "solid-js";
 import { createExternal } from "./external";
@@ -29,7 +31,7 @@ const key = "vibevalley.prefs";
 
 const fallback: Prefs = { pick: "auto", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} };
 
-const oneOf = <T>(values: readonly T[], v: unknown, d: T): T => (values.includes(v as T) ? (v as T) : d);
+const oneOf = <T>(values: readonly T[], v: unknown, d: T): T => (isOneOf(values, v) ? v : d);
 
 const widthsOf = (v: unknown): Record<string, number> =>
   typeof v === "object" && v !== null
@@ -38,7 +40,7 @@ const widthsOf = (v: unknown): Record<string, number> =>
 
 function load(): Prefs {
   try {
-    const raw = JSON.parse(localStorage.getItem(key) ?? "{}") as Partial<Record<keyof Prefs, unknown>>;
+    const raw = recordOf(JSON.parse(localStorage.getItem(key) ?? "{}")) ?? {};
     const text = (v: unknown, d: string) => (typeof v === "string" && v !== "" ? v : d);
     return {
       pick: text(raw.pick, fallback.pick),

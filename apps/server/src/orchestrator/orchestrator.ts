@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 // The orchestrator (管家): the owner's agent that takes the work in, hands it to helpers, follows it and tells the owner.
-// Every input comes in through take, with its source; the intake table (rules.ts) says, per source, its first words,
+// Every input comes in through take, with its source; the intake table (intake.ts) says, per source, its first words,
 // whether it joins the run under way and what its run is triggered by. Each input carries the time, the farm (whole, or
 // what changed since the model last saw it), what memory gained, the channels' news and the line, and a route: where its
 // answer goes. Running the agent (starting it, queuing inputs, streaming words, recording runs, going on after a restart)
@@ -40,7 +40,9 @@ import { Setting } from "@/setting/setting.ts";
 import { Tasks } from "@/task/task.ts";
 import { Tools } from "@/tool/tool.ts";
 import { channelLine } from "@/tool/prompts.ts";
-import { deepseekModel, intake, orchestratorInboxLines, orchestratorModel, quotaText, situationDelta, type Source } from "./rules.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import { intake, type Source } from "./intake.ts";
+import { orchestratorInboxLines, quotaText, situationDelta } from "./situation.ts";
 
 const keepEvents = 1000;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */
@@ -362,7 +364,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         let line = lineWords.issue(w.issue.title, w.issue.description, again, channel.name);
         const s = w.cron;
         if (s) {
-          const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";
+          const missed = w.by.missed ? lineWords.missed : "";
           line = lineWords.cron(s.name, missed, s.text, channel.name, s.id);
         }
         // The issue's assignee is the orchestrator it is for; a cron that names none is its channel's orchestrator's.

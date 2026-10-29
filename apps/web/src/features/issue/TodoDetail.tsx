@@ -4,7 +4,8 @@ import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { api } from "@/base/api";
 import { rememberPick } from "./write";
-import { isRefined, newIssueTitle } from "./rules";
+import { isRefined } from "./issue";
+import { newIssueTitle } from "./titles";
 import { ago, wallClockText } from "@/base/format";
 import { toast } from "@/ui/toasts";
 import { autofocus } from "@/base/util";
@@ -13,7 +14,7 @@ import { ready, queries, useProjects } from "@/base/query";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea, TextInput } from "@/ui/Field";
-import { run } from "./hooks";
+import { run } from "./acts";
 import { IssueArtifacts } from "@/features/artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 import { omitUndefined } from "@vibevalley/protocol/rules";
@@ -318,7 +319,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.todo.priority")}
           testid="issue-priority"
           value={d().priority}
-          onChange={(v) => edit({ priority: v as Priority })}
+          onChange={(v) => edit({ priority: v })}
           options={PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) }))}
         />
       </Property>
@@ -327,7 +328,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.detail.deliver")}
           testid="issue-deliver"
           value={d().deliver}
-          onChange={(v) => edit({ deliver: v as Deliverable })}
+          onChange={(v) => edit({ deliver: v })}
           options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
         />
       </Property>

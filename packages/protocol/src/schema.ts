@@ -349,10 +349,11 @@ export const SessionAction: Codec<T.SessionAction> = Schema.Literals(T.SessionAc
 const doingFields = {
   action: SessionAction,
   label: Schema.String,
-  actionText: Schema.optionalKey(Schema.String),
 };
 
 export const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
+
+export const DoingView: Codec<T.DoingView> = Schema.Struct({ ...doingFields, actionText: Schema.String });
 
 export const PhaseArriving: Codec<T.PhaseArriving> = Schema.TaggedStruct("arriving", {});
 
@@ -361,12 +362,15 @@ export const Retry: Codec<T.Retry> = Schema.Struct({
   of: Schema.optionalKey(Schema.Finite),
 });
 
-export const PhaseWorking: Codec<T.PhaseWorking> = Schema.TaggedStruct("working", {
+const workingFields = {
   since: Schema.Finite,
-  doing: Doing,
   quietSince: Schema.optionalKey(Schema.Finite),
   retry: Schema.optionalKey(Retry),
-});
+};
+
+export const PhaseWorking: Codec<T.PhaseWorking> = Schema.TaggedStruct("working", { ...workingFields, doing: Doing });
+
+export const PhaseWorkingView: Codec<T.PhaseWorkingView> = Schema.TaggedStruct("working", { ...workingFields, doing: DoingView });
 
 export const PhaseDone: Codec<T.PhaseDone> = Schema.TaggedStruct("done", {});
 
@@ -384,6 +388,8 @@ export const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
 });
 
 export const Phase: Codec<T.Phase> = Schema.Union([PhaseArriving, PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
+
+export const PhaseView: Codec<T.PhaseView> = Schema.Union([PhaseArriving, PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
 export const IssueAnswer: Codec<T.IssueAnswer> = Schema.Struct({
   conclusion: Schema.String,
@@ -407,17 +413,22 @@ export const SessionGraph: Codec<T.SessionGraph> = Schema.Struct({
 
 export const ActionStep: Codec<T.ActionStep> = Schema.Struct({ at: Schema.Finite, ...doingFields });
 
-export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({
+export const ActionStepView: Codec<T.ActionStepView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
+
+const playFields = {
   station: Schema.Finite,
-  history: Schema.mutable(Schema.Array(ActionStep)),
   toolsThisRun: Schema.Finite,
   counts: Schema.Record(Schema.String, Schema.Finite),
   files: Schema.mutable(Schema.Array(Schema.String)),
   commands: Schema.mutable(Schema.Array(Schema.String)),
   runStartedAt: Schema.optionalKey(Schema.Finite),
-});
+};
 
-export const Session: Codec<T.Session> = Schema.Struct({
+export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(ActionStep)) });
+
+export const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(ActionStepView)) });
+
+const sessionFields = {
   id: SessionId,
   name: Schema.String,
   agent: Schema.String,
@@ -429,15 +440,21 @@ export const Session: Codec<T.Session> = Schema.Struct({
   conflict: Schema.optionalKey(Conflict),
   hiredAt: Schema.Finite,
   runs: Schema.Finite,
-  phase: Phase,
   lastRun: Schema.optionalKey(LastRun),
   spent: Schema.optionalKey(Spent),
   graph: Schema.optionalKey(SessionGraph),
   channel: Schema.optionalKey(Schema.String),
-  play: Schema.optionalKey(SessionPlay),
   issue: Schema.optionalKey(IssueId),
   refining: Schema.Boolean,
-  phaseText: Schema.optionalKey(Schema.String),
+};
+
+export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase, play: Schema.optionalKey(SessionPlay) });
+
+export const SessionView: Codec<T.SessionView> = Schema.Struct({
+  ...sessionFields,
+  phase: PhaseView,
+  play: Schema.optionalKey(SessionPlayView),
+  phaseText: Schema.String,
 });
 
 export const Repo: Codec<T.Repo> = Schema.Struct({
@@ -474,7 +491,7 @@ export const Task: Codec<T.Task> = Schema.Struct({
   tries: Schema.Finite,
   failures: Schema.optionalKey(Schema.Finite),
   blockedBy: Schema.mutable(Schema.Array(Schema.String)),
-  stateText: Schema.optionalKey(Schema.String),
+  stateText: Schema.String,
   actions: Schema.mutable(Schema.Array(TaskAction)),
   actionText: Schema.Record(Schema.String, Schema.String),
   canEdit: Schema.Boolean,
@@ -490,7 +507,7 @@ export const TaskGraph: Codec<T.TaskGraph> = Schema.Struct({
   project: Schema.String,
   branch: Schema.optionalKey(Schema.String),
   state: GraphState,
-  stateTag: Schema.optionalKey(Schema.String),
+  stateTag: Schema.String,
   actionText: Schema.Record(Schema.String, Schema.String),
   actions: Schema.mutable(Schema.Array(GraphAction)),
   tasks: Schema.mutable(Schema.Array(Task)),
@@ -565,7 +582,7 @@ export const CronWhenExpr: Codec<T.CronWhenExpr> = Schema.Struct({
 
 export const CronWhen: Codec<T.CronWhen> = Schema.Union([CronWhenOnce, CronWhenEvery, CronWhenDaily, CronWhenWeekly, CronWhenExpr]);
 
-export const Cron: Codec<T.Cron> = Schema.Struct({
+const cronFields = {
   id: Schema.String,
   name: Schema.String,
   text: Schema.String,
@@ -579,9 +596,11 @@ export const Cron: Codec<T.Cron> = Schema.Struct({
   lastRun: Schema.optionalKey(Schema.Finite),
   by: ActorKind,
   pending: Schema.Boolean,
-  whenText: Schema.optionalKey(Schema.String),
-  nextText: Schema.optionalKey(Schema.String),
-});
+};
+
+export const Cron: Codec<T.Cron> = Schema.Struct(cronFields);
+
+export const CronView: Codec<T.CronView> = Schema.Struct({ ...cronFields, whenText: Schema.String, nextText: Schema.String });
 
 export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
   message: ChatMessage,
@@ -755,17 +774,27 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
   error: Schema.String,
 });
 
-export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
+const workspaceFields = {
   call: CallState,
   callReason: Schema.String,
   orchestrators: Schema.Record(Schema.String, OrchestratorNow),
-  sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
   progress: Schema.optionalKey(Progress),
-  crons: Schema.mutable(Schema.Array(Cron)),
   issues: Schema.mutable(Schema.Array(Issue)),
   connectors: Schema.mutable(Schema.Array(ConnectorStatus)),
+};
+
+export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
+  ...workspaceFields,
+  sessions: Schema.mutable(Schema.Array(Session)),
+  crons: Schema.mutable(Schema.Array(Cron)),
+});
+
+export const WorkspaceView: Codec<T.WorkspaceView> = Schema.Struct({
+  ...workspaceFields,
+  sessions: Schema.mutable(Schema.Array(SessionView)),
+  crons: Schema.mutable(Schema.Array(CronView)),
 });
 
 export const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.SessionEventTypeValues);
@@ -1005,7 +1034,7 @@ export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Stru
 export const GameEffect: Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
 
 export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
-  state: WorkspaceState,
+  state: WorkspaceView,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
   graphs: Schema.mutable(Schema.Array(TaskGraph)),
   view: FarmView,

@@ -10,7 +10,8 @@ import { autofocus } from "@/base/util";
 import { Dialog } from "@/ui/Dialog";
 import { toast } from "@/ui/toasts";
 import { Count } from "./bits";
-import { channelOf, chatPath, type SwitchTarget, switchTargets } from "./rules";
+import { channelOf, chatPath } from "./places";
+import { type SwitchTarget, switchTargets } from "./switcher";
 
 const [shown, setShown] = createSignal(false);
 

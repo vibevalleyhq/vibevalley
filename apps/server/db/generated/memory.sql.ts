@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_memory_author_ee4fd907c562, Pg_public_memory_kind_667ae7b26db7 } from "./types.js"
+
 export const MemoriesOfParams = Schema.Struct({
   ["agent"]: Schema.NullOr(Schema.String),
 })
@@ -12,11 +14,11 @@ export type MemoriesOfParams = typeof MemoriesOfParams.Type
 
 export const MemoriesOfResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_memory_kind_667ae7b26db7,
   ["body"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
-  ["author"]: Schema.String,
+  ["author"]: Pg_public_memory_author_ee4fd907c562,
   ["created_at"]: Schema.Number,
   ["recalled"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["recalled_at"]: Schema.NullOr(Schema.Number),
@@ -43,7 +45,7 @@ export const AddNoteParams = Schema.Struct({
   ["terms_of"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
-  ["author"]: Schema.String,
+  ["author"]: Pg_public_memory_author_ee4fd907c562,
   ["created_at"]: Schema.Number,
 })
 export type AddNoteParams = typeof AddNoteParams.Type

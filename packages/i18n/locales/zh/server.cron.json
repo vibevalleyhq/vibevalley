@@ -53,6 +53,5 @@
   "noChannel": "没有 {name} 这个频道",
   "noProfile": "没有叫 {name} 的档案",
   "noProject": "#{channel} 没有默认项目：直接派给帮工的定时任务要写 project",
-  "remove": "删掉定时任务「{name}」：以后不再到点开工，它开过的工单留着",
   "removeWhen": "删掉定时任务「{name}」（{when}）：以后不再到点开工，它开过的工单留着"
 }

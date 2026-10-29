@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_agent_task_executor_d4aa134baf72, Pg_public_agent_task_state_dc4a73f708be } from "./types.js"
+
 export const OpenAgentTasksParams = Schema.Struct({
   ["keeper"]: Schema.String,
 })
@@ -18,8 +20,8 @@ export const OpenAgentTasksResult = Schema.Struct({
   ["title"]: Schema.String,
   ["brief"]: Schema.String,
   ["after"]: Schema.String,
-  ["executor"]: Schema.String,
-  ["state"]: Schema.String,
+  ["executor"]: Pg_public_agent_task_executor_d4aa134baf72,
+  ["state"]: Pg_public_agent_task_state_dc4a73f708be,
   ["result"]: Schema.String,
   ["tries"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["updated_at"]: Schema.Number,
@@ -63,8 +65,8 @@ export const AddAgentTaskParams = Schema.Struct({
   ["title"]: Schema.String,
   ["brief"]: Schema.String,
   ["after"]: Schema.String,
-  ["executor"]: Schema.String,
-  ["state"]: Schema.String,
+  ["executor"]: Pg_public_agent_task_executor_d4aa134baf72,
+  ["state"]: Pg_public_agent_task_state_dc4a73f708be,
   ["result"]: Schema.String,
   ["tries"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["updated_at"]: Schema.Number,

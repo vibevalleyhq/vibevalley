@@ -1,5 +1,5 @@
-// The pyramid's boundaries (pyramid.ts): the whole farm of the flows is built only in src/flows, and every module's
-// rules stay in the process, so a rule test is one in fact and not only in name.
+// The pyramid's boundaries (pyramid.ts): the whole farm of the flows is built only in src/flows, and each module's
+// recorded cases (recorded.test.ts, its golden data) are replayed against rules that stay in the process.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
@@ -34,13 +34,13 @@ describe("the test pyramid", () => {
     expect(crossing).toEqual([]);
   });
 
-  it("keeps every module's rules and their tests in the process", () => {
-    const leaving = all
-      .filter((f) => /\/rules(\.test)?\.ts$/.test(f))
-      .flatMap((f) => {
-        const chain = reach(f);
-        return chain ? [chain.join(" → ")] : [];
-      });
+  it("replays each module's recorded cases in the process", () => {
+    const recorded = all.filter((f) => f.endsWith("/recorded.test.ts"));
+    expect(recorded.length).toBeGreaterThan(0);
+    const leaving = recorded.flatMap((f) => {
+      const chain = reach(f);
+      return chain ? [chain.join(" → ")] : [];
+    });
     expect(leaving).toEqual([]);
   });
 

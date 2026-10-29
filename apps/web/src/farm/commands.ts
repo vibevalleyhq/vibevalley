@@ -1,7 +1,4 @@
 import { t } from "@vibevalley/i18n";
-// What the owner does to the farm: each calls the server, then plays the bed's effect.
-// A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
-
 import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
 import { api, newSendKey } from "@/base/api";
 import { actionOf, perform } from "@/features/issue";
@@ -10,6 +7,8 @@ import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type Tool
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 import { webRoutes, type YardPlace } from "./world/places";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+// What the owner does to the farm: each calls the server, then plays the bed's effect.
+// A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
 /** A refusal is the server's to tell (a notice). */
 export const fire = (command: Promise<unknown>) => void command.catch(() => {});

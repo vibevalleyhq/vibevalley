@@ -1,11 +1,13 @@
 import { t } from "@vibevalley/i18n";
+import { createSignal } from "solid-js";
+import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
+import { reasonOf } from "@/base/api";
+import { recordOf } from "@/base/util";
+import { Option, Schema } from "effect";
 // What the owner is writing in each channel: the words, the message it answers and the files uploaded for it. Kept on
 // this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
 
-import { createSignal } from "solid-js";
-import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
-
-import { reasonOf } from "@/base/api";
+import * as S from "@vibevalley/protocol/schema";
 
 export interface Draft {
   readonly text?: string;
@@ -16,24 +18,25 @@ export interface Draft {
 const none: Draft = { files: [] };
 const key = "vibevalley.chat.drafts";
 
+// Kept on this device by an older page, so read as anything: what does not fit is left out.
+const replyOf = Schema.decodeUnknownOption(S.ChatMessage);
+const filesOf = Schema.decodeUnknownOption(Schema.Array(S.Attachment));
+
 function load(): Record<string, Draft> {
   try {
-    const raw = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, Partial<Draft>>;
+    const raw = recordOf(JSON.parse(localStorage.getItem(key) ?? "{}")) ?? {};
     return Object.fromEntries(
-      Object.entries(raw).flatMap(([channel, d]) =>
-        d && typeof d === "object"
-          ? [
-              [
-                channel,
-                {
-                  ...(typeof d.text === "string" ? { text: d.text } : {}),
-                  ...(d.reply ? { reply: d.reply } : {}),
-                  files: Array.isArray(d.files) ? d.files : [],
-                },
-              ],
-            ]
-          : [],
-      ),
+      Object.entries(raw).flatMap(([channel, v]) => {
+        const d = recordOf(v);
+        if (!d) return [];
+        const reply = Option.getOrUndefined(replyOf(d.reply));
+        const draft: Draft = {
+          ...(typeof d.text === "string" ? { text: d.text } : {}),
+          ...(reply ? { reply } : {}),
+          files: Option.getOrElse(filesOf(d.files), () => []),
+        };
+        return [[channel, draft]];
+      }),
     );
   } catch {
     return {};

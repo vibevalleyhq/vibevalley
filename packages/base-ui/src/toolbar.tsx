@@ -5,7 +5,7 @@ import { createContext, createSignal, omit, useContext } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Orientation } from "./internal/composite";
 import { itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/state";
+import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
 
 interface Ctx {
   readonly orientation: () => Orientation;

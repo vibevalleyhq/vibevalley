@@ -4,10 +4,12 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_channel_mention_resolved_fd5340e01451 } from "./types.js"
+
 export const InsertMentionParams = Schema.Struct({
   ["message_id"]: Schema.String,
   ["target_id"]: Schema.String,
-  ["resolved"]: Schema.String,
+  ["resolved"]: Pg_public_channel_mention_resolved_fd5340e01451,
 })
 export type InsertMentionParams = typeof InsertMentionParams.Type
 

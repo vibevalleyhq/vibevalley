@@ -3,7 +3,7 @@ import { t } from "@vibevalley/i18n";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Tone } from "./cards";
-import { type Stage, stageLabel, stages } from "./rules";
+import { type Stage, stageLabel, stages } from "./stages";
 import { aria } from "@/base/util";
 import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
@@ -119,12 +119,12 @@ export function Stages(props: { at: Stage }) {
 }
 
 /** A small menu-like pick in the side column. */
-export function Pick(props: {
+export function Pick<V extends string>(props: {
   label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  onChange: (v: string) => void;
+  value: V;
+  options: readonly { value: V; label: string }[];
+  placeholder?: "" extends V ? string : never;
+  onChange: (v: V) => void;
   disabled?: boolean;
   testid?: string;
 }) {

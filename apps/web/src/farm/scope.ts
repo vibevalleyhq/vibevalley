@@ -3,7 +3,6 @@
 
 import type { StateFrame } from "@vibevalley/protocol";
 import { farmOf } from "@vibevalley/protocol/rules";
-
 const made = new WeakMap<StateFrame, { project: string; frame: StateFrame }>();
 
 /** The same frame and project give back the same object, so a reader comparing frames sees no change. */

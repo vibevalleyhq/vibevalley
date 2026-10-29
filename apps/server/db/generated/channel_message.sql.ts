@@ -4,11 +4,13 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_channel_message_kind_c6d35b7b1ae3, Pg_public_channel_participant_kind_4fff83732556, Pg_public_channel_type_653a6aa2de49 } from "./types.js"
+
 export const InsertMessageParams = Schema.Struct({
   ["id"]: Schema.String,
   ["channel"]: Schema.String,
   ["sender"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -64,7 +66,7 @@ export const MessageByIDResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -76,7 +78,7 @@ export const MessageByIDResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessageByIDResult = typeof MessageByIDResult.Type
@@ -105,7 +107,7 @@ export const MessageBySendKeyResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -117,7 +119,7 @@ export const MessageBySendKeyResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessageBySendKeyResult = typeof MessageBySendKeyResult.Type
@@ -145,7 +147,7 @@ export const OwnerMentionsResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -157,9 +159,9 @@ export const OwnerMentionsResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
-  ["channel_type"]: Schema.String,
+  ["channel_type"]: Pg_public_channel_type_653a6aa2de49,
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["top_id"]: Schema.NullOr(Schema.String),
   ["channel_name"]: Schema.NullOr(Schema.String),
@@ -191,7 +193,7 @@ export const MessagesBeforeResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -203,7 +205,7 @@ export const MessagesBeforeResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessagesBeforeResult = typeof MessagesBeforeResult.Type
@@ -233,7 +235,7 @@ export const MessagesAfterResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -245,7 +247,7 @@ export const MessagesAfterResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessagesAfterResult = typeof MessagesAfterResult.Type
@@ -273,7 +275,7 @@ export const RecentReportsResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -285,7 +287,7 @@ export const RecentReportsResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type RecentReportsResult = typeof RecentReportsResult.Type
@@ -314,7 +316,7 @@ export const ReportsAfterResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -326,7 +328,7 @@ export const ReportsAfterResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type ReportsAfterResult = typeof ReportsAfterResult.Type
@@ -523,7 +525,7 @@ export const MessageByNumberResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -535,7 +537,7 @@ export const MessageByNumberResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessageByNumberResult = typeof MessageByNumberResult.Type
@@ -589,7 +591,7 @@ export const MessagesChangedAfterResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -601,7 +603,7 @@ export const MessagesChangedAfterResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessagesChangedAfterResult = typeof MessagesChangedAfterResult.Type
@@ -702,7 +704,7 @@ export const PinnedInResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -714,7 +716,7 @@ export const PinnedInResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type PinnedInResult = typeof PinnedInResult.Type
@@ -750,7 +752,7 @@ export const SearchMessagesResult = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
@@ -762,9 +764,9 @@ export const SearchMessagesResult = Schema.Struct({
   ["pinned_at"]: Schema.NullOr(Schema.Number),
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["sender_agent"]: Schema.NullOr(Schema.String),
-  ["channel_type"]: Schema.String,
+  ["channel_type"]: Pg_public_channel_type_653a6aa2de49,
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["top_id"]: Schema.NullOr(Schema.String),
   ["channel_name"]: Schema.NullOr(Schema.String),

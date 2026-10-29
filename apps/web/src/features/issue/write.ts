@@ -2,9 +2,8 @@
 
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { api } from "@/base/api";
-import { newIssueTitle } from "./rules";
+import { newIssueTitle } from "./titles";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
 const pickKey = "vibevalley.board.pick";
 
 /** The helper and project last picked on this machine, for the next quick add. */

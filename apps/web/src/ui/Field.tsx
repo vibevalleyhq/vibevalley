@@ -32,13 +32,14 @@ export function Field(props: { label: string; hint?: string | undefined; childre
 /**
  * One of a list, under a button that shows the chosen label (base-ui's Select, so the list looks and moves like the
  * workbench's menus on every system). value "" is the placeholder, and choosing it is choosing none. quiet is the side
- * column's: no box until the pointer is over it.
+ * column's: no box until the pointer is over it. onChange is given one of the options' values, typed as they are, or the
+ * placeholder's "" (a placeholder needs a value type that holds "").
  */
-export function Select(props: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string; disabled?: boolean | undefined }[];
-  placeholder?: string | undefined;
+export function Select<V extends string>(props: {
+  value: V;
+  onChange: (v: V) => void;
+  options: readonly { value: V; label: string; disabled?: boolean | undefined }[];
+  placeholder?: ("" extends V ? string : never) | undefined;
   label: string;
   /** Placement only: width, margins. */
   class?: string;
@@ -50,9 +51,10 @@ export function Select(props: {
   size?: "control" | "field";
   disabled?: boolean | undefined;
 }) {
-  const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder }] : []), ...props.options];
+  const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false }] : []), ...props.options];
+  const offered = (v: string): v is V => all().some((o) => o.value === v);
   return (
-    <Base.Root value={props.value} onValueChange={(v) => props.onChange(v)} items={all()} disabled={props.disabled}>
+    <Base.Root value={props.value} onValueChange={(v) => offered(v) && props.onChange(v)} items={all()} disabled={props.disabled}>
       <Base.Trigger
         data-testid={props.testid}
         data-value={props.value}

@@ -8,7 +8,7 @@ import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { Segmented } from "@/ui/Segmented";
 import { createChannelForm } from "./channelForm";
-import { channelName } from "./rules";
+import { channelName } from "./places";
 import { autofocus } from "@/base/util";
 import { ready, useProjects } from "@/base/query";
 import { Button } from "@/ui/Button";

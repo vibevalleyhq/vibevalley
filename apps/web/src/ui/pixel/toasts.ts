@@ -19,7 +19,6 @@ export interface ToastData {
   readonly description?: string;
   /** Milliseconds; 0 or less stays until closed. */
   readonly timeout: number;
-  readonly data?: unknown;
 }
 
 export interface ToastInput {
@@ -27,7 +26,6 @@ export interface ToastInput {
   title: string;
   description?: string;
   timeout?: number;
-  data?: unknown;
 }
 
 export class ToastStore {
@@ -54,8 +52,8 @@ export class ToastStore {
 
   readonly snapshot = () => this.list;
 
-  add({ type = "info", title, description, timeout = 5000, data }: ToastInput): number {
-    const t: ToastData = omitUndefined({ id: ++this.next, type, title, description, timeout, data });
+  add({ type = "info", title, description, timeout = 5000 }: ToastInput): number {
+    const t: ToastData = omitUndefined({ id: ++this.next, type, title, description, timeout });
     this.list = [t, ...this.list];
     this.left.set(t.id, timeout);
     if (!this.paused) this.start(t.id);

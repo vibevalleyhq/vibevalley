@@ -4,12 +4,14 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_channel_delivery_held_by_26c61b671014, Pg_public_channel_delivery_reason_9967d32533cc, Pg_public_channel_delivery_state_14b6f78d22d9, Pg_public_channel_message_kind_c6d35b7b1ae3, Pg_public_channel_participant_kind_4fff83732556, Pg_public_channel_subject_kind_387f28ce6303, Pg_public_channel_type_653a6aa2de49 } from "./types.js"
+
 export const InsertDeliveryParams = Schema.Struct({
   ["recipient_id"]: Schema.String,
   ["message_id"]: Schema.String,
-  ["reason"]: Schema.String,
+  ["reason"]: Pg_public_channel_delivery_reason_9967d32533cc,
   ["wakes"]: Schema.Boolean,
-  ["held_by"]: Schema.NullOr(Schema.String),
+  ["held_by"]: Schema.NullOr(Pg_public_channel_delivery_held_by_26c61b671014),
   ["created_at"]: Schema.Number,
 })
 export type InsertDeliveryParams = typeof InsertDeliveryParams.Type
@@ -256,24 +258,24 @@ export const AllOpenDeliveriesResult = Schema.Struct({
   ["recipient_id"]: Schema.String,
   ["message_id"]: Schema.String,
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["reason"]: Schema.String,
+  ["reason"]: Pg_public_channel_delivery_reason_9967d32533cc,
   ["wakes"]: Schema.Boolean,
-  ["held_by"]: Schema.NullOr(Schema.String),
-  ["state"]: Schema.String,
+  ["held_by"]: Schema.NullOr(Pg_public_channel_delivery_held_by_26c61b671014),
+  ["state"]: Pg_public_channel_delivery_state_14b6f78d22d9,
   ["launch"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.String,
   ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["created_at"]: Schema.Number,
   ["name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
-  ["channel_type"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
+  ["channel_type"]: Pg_public_channel_type_653a6aa2de49,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
+  ["subject_kind"]: Schema.NullOr(Pg_public_channel_subject_kind_387f28ce6303),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["channel_name"]: Schema.NullOr(Schema.String),
 })

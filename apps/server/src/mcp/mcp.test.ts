@@ -71,7 +71,7 @@ describe("mcp", () => {
       id: "pi",
       turn: async (turn) => {
         for (const s of turn.options.mcpServers ?? [])
-          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers?.authorization ?? "").replace(/^Bearer /, ""));
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /, ""));
         turn.say("做完了");
       },
     });
@@ -122,7 +122,7 @@ describe("mcp", () => {
       id: "pi",
       turn: async (turn) => {
         for (const s of turn.options.mcpServers ?? [])
-          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers?.authorization ?? "").replace(/^Bearer /, ""));
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /, ""));
         turn.say("做完了");
       },
     });

@@ -64,6 +64,9 @@ export const reasonOf = (e: ApiError): string =>
 /** What a thrown or rejected value says: an Error's message, anything else as text. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/** A failed system call's code (ENOENT, EPERM…), or undefined for anything else. */
+export const errnoOf = (e: unknown): string | undefined => (e instanceof Error && "code" in e && typeof e.code === "string" ? e.code : undefined);
+
 /** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is
  * held to. Died with, so it is a bug to fix, found by this name. */
 export class Inconsistent extends Data.TaggedError("Inconsistent")<{ readonly message: string }> {}

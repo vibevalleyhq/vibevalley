@@ -6,7 +6,6 @@ import type { IconName } from "@/ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import {
-  type Deliverable,
   DeliverableValues,
   type Question,
   type Issue,
@@ -16,11 +15,14 @@ import {
   type Milestone,
   type Session,
   type SessionEvent,
+  type SessionView,
 } from "@vibevalley/protocol";
 import { api } from "@/base/api";
 import { createIssueActs, perform } from "./acts";
-import { issueTag, runText, tagOpen, tagText } from "./rules";
-import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "./state";
+import { issueTag, tagOpen, tagText } from "./tags";
+import { runText } from "./runs";
+import { changesLine } from "./changes";
+import { type CriterionRow, issueState, noStepsText, attentionTone } from "./overview";
 import { closedText } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "@/base/format";
 import { toast } from "@/ui/toasts";
@@ -31,10 +33,11 @@ import { TextArea } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { Markdown } from "@/ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { run, useGraphs } from "./hooks";
+import { run } from "./acts";
+import { useGraphs } from "./queries";
 import { IssueArtifacts } from "@/features/artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
+import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { useAgent } from "@/base/agents";
 import { createSessionEvents } from "@/features/session";
 
@@ -44,7 +47,7 @@ import { createSessionEvents } from "@/features/session";
 export function IssueDetail(props: {
   issue: Issue;
   sessions: Session[];
-  session?: Session | undefined;
+  session?: SessionView | undefined;
   onClose: (session: Session, review: boolean) => void;
   onTask?: (() => void) | undefined;
 }) {
@@ -336,7 +339,7 @@ export function IssueDetail(props: {
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, deliver: v as Deliverable }));
+              void act(() => api.issue.update({ id, deliver: v }));
             }}
             options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
           />

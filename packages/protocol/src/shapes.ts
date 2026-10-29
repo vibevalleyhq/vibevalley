@@ -452,7 +452,11 @@ export type SessionAction = (typeof SessionActionValues)[number];
 export interface Doing {
   action: SessionAction;
   label: string;
-  actionText?: string;
+}
+
+/** A Doing as the frame tells it: its action in the owner's words. */
+export interface DoingView extends Doing {
+  actionText: string;
 }
 
 /** Told apart by `_tag`. */
@@ -474,6 +478,10 @@ export interface SessionGraph {
 
 export interface ActionStep extends Doing {
   at: number;
+}
+
+export interface ActionStepView extends ActionStep {
+  actionText: string;
 }
 
 export interface SessionPlay {
@@ -506,7 +514,23 @@ export interface Session {
   play?: SessionPlay;
   issue?: IssueId;
   refining: boolean;
-  phaseText?: string;
+}
+
+/** A session as the frame tells it (StateFrame): what it is doing, in the owner's words. reduce never sees these. */
+export interface SessionView extends Omit<Session, "phase" | "play"> {
+  phase: PhaseView;
+  play?: SessionPlayView;
+  phaseText: string;
+}
+
+export type PhaseView = Exclude<Phase, PhaseWorking> | PhaseWorkingView;
+
+export interface PhaseWorkingView extends Omit<PhaseWorking, "doing"> {
+  doing: DoingView;
+}
+
+export interface SessionPlayView extends Omit<SessionPlay, "history"> {
+  history: ActionStepView[];
 }
 
 export interface CommitCount {
@@ -538,7 +562,7 @@ export interface Task {
   tries: number;
   failures?: number;
   blockedBy: string[];
-  stateText?: string;
+  stateText: string;
   actions: TaskAction[];
   actionText: Record<string, string>;
   canEdit: boolean;
@@ -552,7 +576,7 @@ export interface TaskGraph {
   project: string;
   branch?: string;
   state: GraphState;
-  stateTag?: string;
+  stateTag: string;
   actionText: Record<string, string>;
   actions: GraphAction[];
   tasks: Task[];
@@ -611,8 +635,12 @@ export interface Cron {
   lastRun?: number;
   by: ActorKind;
   pending: boolean;
-  whenText?: string;
-  nextText?: string;
+}
+
+/** A cron as the frame tells it: when it runs and when it runs next, in words. */
+export interface CronView extends Cron {
+  whenText: string;
+  nextText: string;
 }
 
 export interface OwnerMention {
@@ -652,6 +680,12 @@ export interface WorkspaceState {
   issues: Issue[];
   /** Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json. */
   connectors: ConnectorStatus[];
+}
+
+/** The core state as the frame tells it: the words for people beside the facts (projection/frame.ts). */
+export interface WorkspaceView extends Omit<WorkspaceState, "sessions" | "crons"> {
+  sessions: SessionView[];
+  crons: CronView[];
 }
 
 export const SessionEventTypeValues = [
@@ -828,7 +862,7 @@ export interface FarmView {
 export type GameEffect = GameEffectReward | GameEffectPenalty | GameEffectLevelUp | GameEffectAchievement;
 
 export interface StateFrame {
-  state: WorkspaceState;
+  state: WorkspaceView;
   inbox: InboxItem[];
   graphs: TaskGraph[];
   view: FarmView;

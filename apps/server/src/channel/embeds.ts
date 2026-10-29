@@ -9,7 +9,6 @@ import { FetchHttpClient, HttpClient } from "effect/http";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { Embed } from "@vibevalley/protocol";
-
 /** At most this many links of a message get a preview. */
 export const embedMax = 3;
 const timeoutMs = 3000;

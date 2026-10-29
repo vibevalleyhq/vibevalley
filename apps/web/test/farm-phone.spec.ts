@@ -4,7 +4,7 @@
 // the page reconnects a second later to the next.
 
 import type { Page } from "@playwright/test";
-import type { InboxItem, Session, StateFrame } from "@vibevalley/protocol";
+import type { InboxItem, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -49,16 +49,14 @@ test("the phone opens over its button, a game takes the pad, and Esc puts it awa
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
   return new Promise<StateFrame>((resolve, reject) => {
-    readStream<StateFrame>(url + statePath, (f) => (resolve(f), abort.signal.aborted || abort.abort()), abort.signal).catch(
-      (e) => abort.signal.aborted || reject(e),
-    );
+    readStream(url, statePath, (f) => (resolve(f), abort.signal.aborted || abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
   });
 }
 
 test("a new call rings the phone open; answering goes to the helper's plot and logs the call", async ({ page, server, api }) => {
   const made = await api.issue.create({ title: "finish remember-me on the login page" });
   const frame = await firstFrame(server.url);
-  const session: Session = {
+  const session: SessionView = {
     id: sessionId("w1"),
     name: "fox",
     agent: "fox",
@@ -68,6 +66,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     runs: 1,
     phase: { _tag: "done" },
     refining: false,
+    phaseText: "",
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },

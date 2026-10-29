@@ -3,7 +3,7 @@
 // so the helpers come from a frame the test serves in place of the state stream: the real server's first frame with
 // sessions added.
 
-import type { Session, StateFrame } from "@vibevalley/protocol";
+import type { StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
@@ -16,11 +16,11 @@ test.beforeEach(async ({ page }) => {
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
   return new Promise<StateFrame>((resolve, reject) => {
-    readStream<StateFrame>(url + statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
+    readStream(url, statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
   });
 }
 
-const helper = (id: string, station: number, phase: Session["phase"], crop: string): { session: Session; crop: string } => ({
+const helper = (id: string, station: number, phase: SessionView["phase"], crop: string): { session: SessionView; crop: string } => ({
   session: {
     id: sessionId(id),
     name: `帮工${id}`,
@@ -31,6 +31,7 @@ const helper = (id: string, station: number, phase: Session["phase"], crop: stri
     runs: 1,
     phase,
     refining: false,
+    phaseText: "",
     issue: issueId(`issue-${id}`),
     play: { station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   },
@@ -39,7 +40,7 @@ const helper = (id: string, station: number, phase: Session["phase"], crop: stri
 
 /** The real frame with four helpers: one hands-on at its plot, one reading at the library, one ripe, one withered. */
 function withHelpers(frame: StateFrame): StateFrame {
-  const doing = (action: string) => ({ _tag: "working", since: 0, doing: { action, label: action } }) as Session["phase"];
+  const doing = (action: string) => ({ _tag: "working", since: 0, doing: { action, label: action } }) as SessionView["phase"];
   const helpers = [
     helper("a", 0, doing("edit_file"), "leafy"),
     helper("b", 1, doing("read_file"), "sprout"),

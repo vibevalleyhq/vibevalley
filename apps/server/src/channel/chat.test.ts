@@ -2,10 +2,10 @@ import { describe, expect, it } from "@effect/vitest";
 import { readFileSync } from "node:fs";
 import { type ChatMessage, type Channel, defaultOrchestrator, type Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { channelOf, defaultOf } from "./state.ts";
+import { channelOf, defaultOf } from "./folded.ts";
 import { Said, said } from "@/testing/said.ts";
-import { head } from "@/base/text.ts";
-import { wakeBreaker } from "./rules.ts";
+import { head } from "@/base/clip.ts";
+import { wakeBreaker } from "./audience.ts";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { ServerConfig } from "@/base/config.ts";
@@ -13,14 +13,14 @@ import { Database, Db } from "@/base/db.ts";
 import { Agents } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
 import { newsOf } from "@/session/session.ts";
-import { sessionOnIssue } from "@/session/state.ts";
+import { sessionOnIssue } from "@/session/roster.ts";
 import { layer as projection } from "@/projection/projection.ts";
-import { summaryOf } from "@/session/rules.ts";
+import { summaryOf } from "@/session/report.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { until, waitFor } from "@/testing/until.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
+import * as qm from "../../db/generated/channel_message.sql.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
  * off), 「必败」 fails. */
@@ -151,7 +151,7 @@ const farm = Effect.gen(function* () {
         wakes: boolean;
         held_by: string;
         state: string;
-      }>`select message_id, reason, wakes, coalesce(held_by, '') as held_by, state from channel_delivery where recipient_id = ${recipient} order by message_id`,
+      }>`select message_id, reason, wakes, coalesce(held_by::text, '') as held_by, state from channel_delivery where recipient_id = ${recipient} order by message_id`,
     );
   const deliveryOf = async (recipient: string, message: string) => (await deliveries(recipient)).find((d) => d.message_id === message);
   return { core, chat, sql, messagesOf, channel, deliveries, deliveryOf };
@@ -506,7 +506,7 @@ describe("the chat", () => {
         const { message: sq } = yield* f.chat.say("大家早", f.chat.defaultChannel(), "");
         const talk = yield* f.chat.speak("w10", "早", { target: `#general:${sq.number}`, anyway: true });
         expect([talk.kind, talk.target]).toEqual(["sent", `#general:${sq.number}`]);
-        const under = f.core.state().chat?.channels?.find((c) => c.root === sq.id);
+        const under = f.core.state().chat?.channels.find((c) => c.root === sq.id);
         expect(under?.subjectKind).toBe("talk");
       }),
     ),

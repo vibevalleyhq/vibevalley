@@ -24,7 +24,8 @@ import { Core } from "@/core/core.ts";
 import { type ApiError, refused } from "@/errors.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, price, type Rate } from "./price.ts";
-import { agentProblems, type Candidate, chooseAgent, moneyStop, quotaOf, sessionOptions } from "./rules.ts";
+import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
+import { moneyStop, quotaOf } from "./quota.ts";
 import { callbackLog } from "@/base/log.ts";
 import { timeHere, withinRealTime } from "@/base/time.ts";
 

@@ -13,7 +13,7 @@ import { HttpClient } from "effect/http";
 import { createHash, randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { channelOf, defaultOf } from "@/channel/state.ts";
+import { channelOf, defaultOf } from "@/channel/folded.ts";
 import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
@@ -28,7 +28,7 @@ import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { type Adapter, AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
-import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
+import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type WeixinApi, WeixinClient, weixinAdapter } from "./weixin.ts";
 import { Notices } from "@/notice/notice.ts";
 
@@ -502,8 +502,8 @@ export const make = (options: ConnectorOptions = {}) =>
             if (g !== current) return;
             yield* stopGeneration;
             let failure = result instanceof AppFailed ? result.message : undefined;
-            if (failure === undefined && !closing) {
-              const linked = result as Linked;
+            if (!(result instanceof AppFailed) && !closing) {
+              const linked = result;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
               const at = yield* Clock.currentTimeMillis;
               const connectedNow = yield* Effect.result(

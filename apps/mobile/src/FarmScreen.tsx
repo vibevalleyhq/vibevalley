@@ -8,7 +8,7 @@ import { WebView, type WebViewMessageEvent, type WebViewProps } from "react-nati
 import { type FromNative, fromNativeKey, type ToNative } from "@vibevalley/protocol/host";
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
-import { isPairPage, keyScript } from "./rules";
+import { isPairPage, keyScript } from "./pairing";
 import { colors } from "./style";
 
 // The package types its props as WebViewProps & P with P = undefined, which is never: the props it takes, as they are.

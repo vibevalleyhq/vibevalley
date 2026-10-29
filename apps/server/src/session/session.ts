@@ -1,16 +1,5 @@
 import { t } from "@vibevalley/i18n";
-// The sessions: each helper on the farm is an oar session in its project's worktree, run by
-// oar's subagents, and its events are read into facts (facts.ts) and its log (journal.ts). Every session is a row from the
-// moment it is sent; ended, its row says when and how its issue took it, and its runs are session_run.
-//
-// oar runs sessions without permission prompts or a sandbox: the only fence is where a session starts, inside the work
-// root in its own worktree. Each farm session owns its subagents; what only it takes (the farm's MCP server, its prompt,
-// its refused tools) goes in through a copy of its runtime, so the shared registry is never changed. A run starts when
-// the runtime opens a turn and ends with that turn's report; what started it is known only to whoever sent the input, so
-// the sender leaves its trigger on the hand first and the turn takes the oldest. Admission serializes room and opening
-// turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
-
-import { messageOf } from "@/errors.ts";
+import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -38,7 +27,6 @@ import {
   type IssueId,
   type SessionId,
 } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import {
   Cause,
@@ -63,14 +51,11 @@ import {
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
-
-export type { SessionNews };
 import { serverAddress, ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { Core, type FactIn } from "@/core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { Memories } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
@@ -79,28 +64,29 @@ import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { type Journal, Trajectories } from "./journal.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
-import {
-  conflictOf,
-  instructions,
-  jobBreak,
-  noRoom,
-  notTakenIn,
-  readReport,
-  recallBlock,
-  sameConflict,
-  type SessionLimits,
-  sessionName,
-  type Settle,
-  summaryOf,
-  toOarMcp,
-  whoMakesRoom,
-  withRecall,
-} from "./rules.ts";
-import { sessionOnIssue } from "./state.ts";
+import { conflictOf, notTakenIn, sameConflict, type Settle } from "./takeIn.ts";
+import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
+import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
+import { readReport, summaryOf } from "./report.ts";
+import { sessionOnIssue } from "./roster.ts";
+import { timeHere } from "@/base/time.ts";
+// The sessions: each helper on the farm is an oar session in its project's worktree, run by
+// oar's subagents, and its events are read into facts (facts.ts) and its log (journal.ts). Every session is a row from the
+// moment it is sent; ended, its row says when and how its issue took it, and its runs are session_run.
+//
+// oar runs sessions without permission prompts or a sandbox: the only fence is where a session starts, inside the work
+// root in its own worktree. Each farm session owns its subagents; what only it takes (the farm's MCP server, its prompt,
+// its refused tools) goes in through a copy of its runtime, so the shared registry is never changed. A run starts when
+// the runtime opens a turn and ends with that turn's report; what started it is known only to whoever sent the input, so
+// the sender leaves its trigger on the hand first and the turn takes the oldest. Admission serializes room and opening
+// turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
+
+import * as S from "@vibevalley/protocol/schema";
+
+export type { SessionNews };
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";
-import { timeHere } from "@/base/time.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -319,7 +305,7 @@ export function runOf(r: qr.RunsOfSessionResult): Run {
   };
   if (r.issue !== null) run.issue = issueId(r.issue);
   if (r.ended_at !== null) run.endedAt = r.ended_at;
-  if (r.outcome !== null) run.outcome = r.outcome as Outcome;
+  if (r.outcome !== null) run.outcome = r.outcome;
   const spent = spentOf(r.spent);
   if (spent) run.spent = spent;
   return run;
@@ -338,7 +324,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
     brief: r.brief,
     hiredAt: r.hired_at,
     runs: runs.length,
-    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: (r.closed ?? "dismissed") as SessionClose },
+    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
     refining: false,
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
@@ -359,7 +345,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
   }
   if (tokens > 0 || priced) s.spent = { tokens, ...(priced ? { cny } : {}) };
   const last = runs.at(-1);
-  if (last?.outcome) s.lastRun = { outcome: last.outcome as Outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
+  if (last?.outcome) s.lastRun = { outcome: last.outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
   return s;
 }
 

@@ -9,7 +9,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { FarmConnection } from "./src/farm";
 import { FarmScreen } from "./src/FarmScreen";
 import { PairScreen } from "./src/PairScreen";
-import { deviceName } from "./src/rules";
+import { deviceName } from "./src/pairing";
 import { followDevice } from "./src/locale";
 
 followDevice();

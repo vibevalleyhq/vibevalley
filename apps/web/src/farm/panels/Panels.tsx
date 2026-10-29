@@ -10,7 +10,7 @@ import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/fea
 import { aria, Keyed } from "@/base/util";
 import { useCore } from "@/base/frame";
 import { FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { useVillage } from "@/farm/support";
 import { Achievements } from "./Achievements";
 import { FarmLog } from "./FarmLog";

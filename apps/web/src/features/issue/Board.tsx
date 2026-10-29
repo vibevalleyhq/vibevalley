@@ -5,11 +5,11 @@ import type { JSX } from "@solidjs/web";
 import { maxRunning } from "@vibevalley/protocol";
 import type { Ordering } from "./display";
 import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
-import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./rules";
+import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
 import { autofocus } from "@/base/util";
 import { Hint } from "@/ui/Tip";
 import { Segmented } from "@/ui/Segmented";
-import { useGraphs, useNameOf } from "./hooks";
+import { useGraphs, useNameOf } from "./queries";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */

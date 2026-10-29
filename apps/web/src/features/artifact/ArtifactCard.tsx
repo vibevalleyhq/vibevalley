@@ -4,7 +4,7 @@ import { Show } from "solid-js";
 import { A } from "@/ui/A";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
-import { artifactHref } from "./data";
+import { artifactHref } from "./queries";
 
 export const bodyLabel: Record<ArtifactBody, string> = { blocks: t("web.artifact.body.blocks"), html: t("web.artifact.body.html") };
 export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web" };

@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // applies a batch's ops in order and writes back what changed. A stale update (baseRev behind) is taken only when the
 // block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
 
+import { messageOf } from "@/errors.ts";
 import type {
   Block,
   BlockInput,
@@ -16,8 +17,8 @@ import type {
   BlockOpUpdateText,
   TextSpan,
 } from "@vibevalley/protocol";
-import { keyBetween, validKey } from "@vibevalley/protocol/rules";
-import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./text.ts";
+import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
+import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./spans.ts";
 
 const withText: Readonly<Record<string, boolean>> = {
   paragraph: true,
@@ -74,7 +75,7 @@ export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly st
   const out: Record<string, unknown> = { ...attrs };
   for (const name of attrNames) if (patch[name] !== undefined) out[name] = patch[name];
   for (const name of unset) {
-    if (!(attrNames as readonly string[]).includes(name)) throw new Error(t("server.artifact.op.noAttr", { name }));
+    if (!isOneOf(attrNames, name)) throw new Error(t("server.artifact.op.noAttr", { name }));
     delete out[name];
   }
   return out;
@@ -150,7 +151,7 @@ export class Page {
     try {
       parent = this.liveParent(b.parentId ?? "");
     } catch (e) {
-      return (e as Error).message;
+      return messageOf(e);
     }
     return {
       id: b.id,
@@ -191,7 +192,7 @@ export class Page {
         try {
           b.attrs = patched(b.attrs, op.attrs, op.unset);
         } catch (e) {
-          return rejected(b.id, (e as Error).message);
+          return rejected(b.id, messageOf(e));
         }
         this.touch(b);
         return applied(b);
@@ -225,7 +226,7 @@ export class Page {
           if (parent === undefined) delete b.parentId;
           else b.parentId = parent;
         } catch (e) {
-          return rejected(b.id, (e as Error).message);
+          return rejected(b.id, messageOf(e));
         }
         this.setDeleted(b, false);
         return applied(b);
@@ -278,7 +279,7 @@ export class Page {
     try {
       parent = this.liveParent(o.parentId ?? "");
     } catch (e) {
-      return rejected(b.id, (e as Error).message);
+      return rejected(b.id, messageOf(e));
     }
     for (let at = parent ?? ""; at !== ""; at = parentOf(this.find(at)!)) if (at === b.id) return rejected(b.id, t("server.artifact.op.underSelf"));
     if (parent === undefined) delete b.parentId;
@@ -331,7 +332,7 @@ export class Page {
       try {
         key = keyBetween(last, "");
       } catch (e) {
-        return rejected(c.id, (e as Error).message);
+        return rejected(c.id, messageOf(e));
       }
       c.parentId = target.id;
       c.orderKey = key;

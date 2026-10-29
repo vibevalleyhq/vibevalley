@@ -5,7 +5,8 @@
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
 import type { Orientation } from "./internal/composite";
-import { call, createControllable, type DivProps, flag, refs, type SpanProps } from "./internal/state";
+import { call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 interface Ctx {
   readonly value: () => number;

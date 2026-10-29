@@ -1,11 +1,4 @@
 import { list, t } from "@vibevalley/i18n";
-// The chat: the channels, the default one among them, the owner's direct channel with the orchestrator, and a thread
-// under any message of a channel; every
-// session's work is talked about in its issue's thread. Every message is written to the database first, in one
-// transaction with who it goes to; only then does it become a fact. A delivery goes pending → announced → handed → seen;
-// a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
-// than lost. Everything that changes the chat runs one at a time.
-
 import { HttpClient } from "effect/http";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
@@ -40,27 +33,14 @@ import {
   type Notify,
 } from "@vibevalley/protocol";
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { keepChannels, targetOf } from "./state.ts";
-import { head } from "@/base/text.ts";
-import {
-  agentWakeCooldownMs,
-  channelNameProblem,
-  chatAudience,
-  type Delivery,
-  heldShown,
-  hopLimit,
-  hopLimitText,
-  type InboxMessage,
-  mentionOf,
-  mentionsIn,
-  parseChatTarget,
-  parseSearch,
-  retryWindowMs,
-  summaryChannels,
-  type UnreadRow,
-} from "./rules.ts";
+import { keepChannels, targetOf } from "./folded.ts";
+import { head } from "@/base/clip.ts";
+import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
+import { channelNameProblem, parseChatTarget } from "./targets.ts";
+import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
+import { mentionOf, mentionsIn } from "./mentions.ts";
+import { parseSearch } from "./search.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -74,10 +54,17 @@ import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
-import { Audience } from "./audience.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
+// The chat: the channels, the default one among them, the owner's direct channel with the orchestrator, and a thread
+// under any message of a channel; every
+// session's work is talked about in its issue's thread. Every message is written to the database first, in one
+// transaction with who it goes to; only then does it become a fact. A delivery goes pending → announced → handed → seen;
+// a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
+// than lost. Everything that changes the chat runs one at a time.
+
+import * as S from "@vibevalley/protocol/schema";
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
@@ -494,7 +481,7 @@ export const make = Effect.gen(function* () {
   const model = new ChatModel();
   const reach = new Audience();
   const open = new Deliveries();
-  const follow = (channel: string, participant: string, reason: string, from: number) =>
+  const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
     Effect.andThen(
       db(qf.follow({ channel_id: channel, participant_id: participant, reason, from_number: from })),
       Effect.sync(() => reach.followed(channel, participant)),
@@ -552,7 +539,7 @@ export const make = Effect.gen(function* () {
   const seat = Effect.fnUntraced(function* (id: string) {
     const name = agents.agent(id)?.name.trim() || t("server.channel.name.orchestrator");
     if (model.participant(id)?.name === name && model.participant(id)?.kind === "orchestrator") return;
-    const joined = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
+    const joined: qp.UpsertParticipantParams = { id, kind: "orchestrator", name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis };
     yield* db(qp.upsertParticipant(joined));
     model.joined(joined);
   });
@@ -1003,20 +990,16 @@ export const make = Effect.gen(function* () {
     ...inboxMore(r, filesAt),
   });
 
-  const groupRows = (rows: readonly DeliveryRow[]) => {
-    const out: { target: string; unread: number; mentionsYou: boolean; latest?: string }[] = [];
+  const groupRows = (rows: readonly DeliveryRow[]): UnreadRow[] => {
+    // A Map keeps the order targets were first met in.
+    const out = new Map<string, UnreadRow>();
     for (const r of rows) {
       const target = deliveryTarget(r);
-      let row = out.find((u) => u.target === target);
-      if (!row) {
-        row = { target, unread: 0, mentionsYou: false };
-        out.push(row);
-      }
-      row.unread++;
-      row.mentionsYou ||= r.reason === "mention" || r.reason === "everyone";
-      row.latest = r.name;
+      const was = out.get(target);
+      const mentions = r.reason === "mention" || r.reason === "everyone";
+      out.set(target, { target, unread: (was?.unread ?? 0) + 1, mentionsYou: (was?.mentionsYou ?? false) || mentions, latest: r.name });
     }
-    return out as UnreadRow[];
+    return [...out.values()];
   };
 
   const inboxRows = Effect.fn("Channels.inboxRows")(function* (who: string) {
@@ -1152,7 +1135,14 @@ export const make = Effect.gen(function* () {
     );
 
   const openJob = Effect.fn("Channels.openJob")(function* (h: Session) {
-    const joined = { id: h.id, kind: "session", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: yield* Clock.currentTimeMillis };
+    const joined: qp.UpsertParticipantParams = {
+      id: h.id,
+      kind: "session",
+      name: h.name,
+      agent_id: h.agent,
+      runtime: h.runtime,
+      joined_at: yield* Clock.currentTimeMillis,
+    };
     yield* db(qp.upsertParticipant(joined));
     model.joined(joined);
     const job = jobOf(h);
@@ -1907,7 +1897,14 @@ export const make = Effect.gen(function* () {
           const peer = mine ? agent.id : profileId(agent.id);
           if (mine) yield* seat(agent.id);
           else {
-            const joined = { id: peer, kind: "profile", name: agent.name, agent_id: agent.id, runtime: null, joined_at: yield* Clock.currentTimeMillis };
+            const joined: qp.UpsertParticipantParams = {
+              id: peer,
+              kind: "profile",
+              name: agent.name,
+              agent_id: agent.id,
+              runtime: null,
+              joined_at: yield* Clock.currentTimeMillis,
+            };
             yield* db(qp.upsertParticipant(joined));
             model.joined(joined);
           }

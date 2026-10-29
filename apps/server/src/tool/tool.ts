@@ -2,7 +2,7 @@ import { maybe, t } from "@vibevalley/i18n";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { messageOf } from "@/errors.ts";
-import { artifactMax } from "@/artifact/rules.ts";
+import { artifactMax } from "@/artifact/policy.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 // The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
@@ -11,9 +11,9 @@ import { resolve, sep } from "node:path";
 
 import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
-import { openFindings } from "@/issue/state.ts";
+import { openFindings } from "@/issue/status.ts";
 import { isOpen, maxTasks } from "@/task/graph.ts";
-import { head } from "@/base/text.ts";
+import { head } from "@/base/clip.ts";
 import { graphText } from "@/task/prompts.ts";
 import { inboxLines } from "@/channel/prompts.ts";
 import { Clock, Context, Data, Effect, Layer, Schema } from "effect";

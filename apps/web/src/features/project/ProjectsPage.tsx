@@ -6,22 +6,10 @@ import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "sol
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
-import {
-  calendarOf,
-  type CalendarDay,
-  dateText,
-  dayText,
-  githubRepository,
-  growthOf,
-  islandLook,
-  langIcon,
-  languageShares,
-  number,
-  percent,
-  since,
-  sortProjects,
-  streaksOf,
-} from "./rules";
+import { calendarOf, type CalendarDay, dateText, dayText, growthOf, since, streaksOf } from "./calendar";
+import { githubRepository, number, percent, sortProjects } from "./projects";
+import { islandLook } from "./islands";
+import { langIcon, languageShares } from "./languages";
 import { toast } from "@/ui/toasts";
 import { useRouter } from "@/base/router";
 import { autofocus, useNow } from "@/base/util";

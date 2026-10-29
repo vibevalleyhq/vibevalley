@@ -1,9 +1,11 @@
 import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, Show } from "solid-js";
-import type { Channel, Cron } from "@vibevalley/protocol";
+import type { Channel, CronView } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
-import { chatPath, jobThreadOf, phaseText } from "./rules";
+import { chatPath } from "./places";
+import { jobThreadOf } from "./threads";
+import { phaseText } from "./presence";
 import { toast } from "@/ui/toasts";
 import { aria, useNow } from "@/base/util";
 import { useRouter } from "@/base/router";
@@ -86,7 +88,7 @@ export function Crons(props: { channel: Channel }) {
   );
 }
 
-export function CronCard(props: { s: Cron }) {
+export function CronCard(props: { s: CronView }) {
   const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
   const setEnabled = (enabled: boolean) => act(api.cron.update({ id: props.s.id, enabled }));
@@ -103,8 +105,8 @@ export function CronCard(props: { s: Cron }) {
   });
   const meta = () =>
     [
-      props.s.whenText ?? "",
-      props.s.pending ? (props.s.nextText ?? "") : t("web.channel.crons.next", { next: props.s.nextText ?? "" }),
+      props.s.whenText,
+      props.s.pending ? props.s.nextText : t("web.channel.crons.next", { next: props.s.nextText }),
       ...(props.s.agent ? [t("web.channel.crons.direct", { agent: props.s.agent })] : []),
       ...(props.s.by === "orchestrator" ? [t("web.channel.crons.byOrchestrator")] : []),
     ].join(" · ");

@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_artifact_block_type_ca97145941a5 } from "./types.js"
+
 export const ArtifactBlocksParams = Schema.Struct({
   ["artifact_id"]: Schema.String,
 })
@@ -15,7 +17,7 @@ export const ArtifactBlocksResult = Schema.Struct({
   ["artifact_id"]: Schema.String,
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["order_key"]: Schema.String,
-  ["type"]: Schema.String,
+  ["type"]: Pg_public_artifact_block_type_ca97145941a5,
   ["attrs"]: Schema.String,
   ["spans"]: Schema.String,
   ["rev"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
@@ -65,7 +67,7 @@ export const PutArtifactBlockParams = Schema.Struct({
   ["artifact_id"]: Schema.String,
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["order_key"]: Schema.String,
-  ["type"]: Schema.String,
+  ["type"]: Pg_public_artifact_block_type_ca97145941a5,
   ["attrs"]: Schema.String,
   ["spans"]: Schema.String,
   ["rev"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),

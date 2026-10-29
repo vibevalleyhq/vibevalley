@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { messageOf } from "@/errors.ts";
+import { messageOf, errnoOf } from "@/errors.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -24,7 +24,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { orchestratorModel } from "@/orchestrator/rules.ts";
+import { orchestratorModel } from "@/orchestrator/model.ts";
 import { Notices } from "@/notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 import { callbackLog } from "@/base/log.ts";
@@ -175,7 +175,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
   }
 }
 
-const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area];
+const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
 
 /** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
  * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
@@ -200,7 +200,7 @@ export type Run = <A>(effect: Effect.Effect<A, unknown>, options?: { readonly si
 
 export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
-    area: areaOf(area) as never,
+    area: areaOf(area),
     appId: c.appId,
     appCertificate: c.appCertificate,
     maxRetries: 0,
@@ -221,7 +221,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
         },
         end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
       },
-    } as never,
+    },
     // RTM carries transcripts and the agent's state; a client without RTM asks for the RTC data stream, which carries
     // the transcripts (chunked); RTM is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
     advancedFeatures: { enable_rtm: false, enable_tools: true },
@@ -230,7 +230,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
       data_channel: "datastream",
       enable_error_message: true,
       enable_metrics: true,
-    } as never,
+    },
   })
     .withStt(vendors.stt)
     .withLlm(vendors.llm)
@@ -385,7 +385,7 @@ const cloudflared = (port: number) =>
     };
     child.stdout?.on("data", read);
     child.stderr?.on("data", read);
-    child.on("error", (e) => failWith((e as NodeJS.ErrnoException).code === "ENOENT" ? t("server.voice.tunnel.missing") : e.message));
+    child.on("error", (e) => failWith(errnoOf(e) === "ENOENT" ? t("server.voice.tunnel.missing") : e.message));
     child.on("exit", () => failWith(t("server.voice.tunnel.exited")));
     // Given up on before it said its address: the process goes too.
     return Effect.sync(() => {

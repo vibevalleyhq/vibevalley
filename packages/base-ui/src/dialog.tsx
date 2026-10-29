@@ -4,7 +4,8 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
-import { type ButtonProps, buttonType, call, createControllable, flag, refs, type Renderable } from "./internal/state";
+import { type ButtonProps, buttonType, call, flag, refs, type Renderable } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 export type DialogCloseReason = "escape" | "outside" | "close" | "trigger";
 

@@ -1,11 +1,11 @@
 // An html artifact's version, a GET since an <iframe src> can only GET. Its headers keep an HTML page from ever running as one of
-// the farm's (artifact/rules.ts); a version never changes once made, so it is cached for good.
+// the farm's (artifact/policy.ts); a version never changes once made, so it is cached for good.
 
 import { Effect } from "effect";
 import { artifactPrefix as prefix } from "@vibevalley/protocol";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Artifacts } from "@/artifact/artifact.ts";
-import { artifactHeaders } from "@/artifact/rules.ts";
+import { artifactHeaders } from "@/artifact/policy.ts";
 
 const notFound = () => HttpServerResponse.text("404 page not found\n", { status: 404 });
 

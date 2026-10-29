@@ -4,6 +4,8 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_issue_canceled_7f990c847aae, Pg_public_issue_deliver_dea8d59ad1da, Pg_public_issue_delivered_5565b9f35912, Pg_public_issue_priority_7a8aa16ed3e5 } from "./types.js"
+
 export const ListIssuesParams = Schema.Struct({
 
 })
@@ -17,7 +19,7 @@ export const ListIssuesResult = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
@@ -27,10 +29,10 @@ export const ListIssuesResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["pull_request"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
@@ -67,7 +69,7 @@ export const GetIssueResult = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
@@ -77,10 +79,10 @@ export const GetIssueResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["pull_request"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
@@ -117,7 +119,7 @@ export const IssueByNumberResult = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
@@ -127,10 +129,10 @@ export const IssueByNumberResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["pull_request"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
@@ -160,10 +162,10 @@ export const AddIssueParams = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["created_at"]: Schema.Number,
   ["cron"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
 })
 export type AddIssueParams = typeof AddIssueParams.Type
@@ -184,9 +186,9 @@ export const EditIssueParams = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["criteria"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["id"]: Schema.String,
 })
 export type EditIssueParams = typeof EditIssueParams.Type
@@ -342,7 +344,7 @@ export const unqueueIssue = Effect.fn("UnqueueIssue")(function* (params: Unqueue
 
 export const CompleteIssueParams = Schema.Struct({
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
   ["id"]: Schema.String,
 })
 export type CompleteIssueParams = typeof CompleteIssueParams.Type
@@ -360,7 +362,7 @@ export const completeIssue = Effect.fn("CompleteIssue")(function* (params: Compl
 
 export const CancelIssueParams = Schema.Struct({
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["id"]: Schema.String,
 })
 export type CancelIssueParams = typeof CancelIssueParams.Type
@@ -378,7 +380,7 @@ export const cancelIssue = Effect.fn("CancelIssue")(function* (params: CancelIss
 
 export const CompleteOpenIssueParams = Schema.Struct({
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
   ["id"]: Schema.String,
 })
 export type CompleteOpenIssueParams = typeof CompleteOpenIssueParams.Type
@@ -396,7 +398,7 @@ export const completeOpenIssue = Effect.fn("CompleteOpenIssue")(function* (param
 
 export const CancelOpenIssueParams = Schema.Struct({
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["id"]: Schema.String,
 })
 export type CancelOpenIssueParams = typeof CancelOpenIssueParams.Type
@@ -425,7 +427,7 @@ export const KeptIssuesResult = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
@@ -435,10 +437,10 @@ export const KeptIssuesResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["pull_request"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
@@ -475,7 +477,7 @@ export const FamilyResult = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
@@ -485,10 +487,10 @@ export const FamilyResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["pull_request"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
@@ -518,12 +520,12 @@ export const PutIssueParams = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["created_at"]: Schema.Number,
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
@@ -578,7 +580,7 @@ export const LatestOfCronResult = Schema.Struct({
   ["description"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["assignee"]: Schema.NullOr(Schema.String),
-  ["priority"]: Schema.String,
+  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
@@ -588,10 +590,10 @@ export const LatestOfCronResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
   ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Schema.String),
-  ["canceled"]: Schema.NullOr(Schema.String),
+  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
+  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
   ["pull_request"]: Schema.NullOr(Schema.String),
-  ["deliver"]: Schema.String,
+  ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
   ["talk"]: Schema.NullOr(Schema.String),
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),

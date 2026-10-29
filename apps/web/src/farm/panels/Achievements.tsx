@@ -8,13 +8,13 @@ import { createSignal, For, Show } from "solid-js";
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
 import { api } from "@/base/api";
 import { fire } from "@/farm/commands";
-import { thousands } from "@/farm/hud/rules";
+import { thousands } from "@/farm/hud/readout";
 import { beds } from "@/farm/world/plots";
 import { aria, useClickAway } from "@/base/util";
 import { useCore, useFrames } from "@/base/frame";
 import { ready, useQuery } from "@/base/query";
 import { numberText, SpriteIcon } from "@/ui/pixel";
-import { commands } from "@/farm/state";
+import { commands } from "@/farm/frames";
 import { tint, Tinted } from "./bits";
 
 const walls: AchievementCategory[] = ["harvest", "craft", "thrift", "team"];

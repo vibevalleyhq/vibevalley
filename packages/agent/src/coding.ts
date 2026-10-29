@@ -1,6 +1,7 @@
 // Tools to read and change a work directory and run commands in it. No sandbox: a host gives these only to agents that
 // are meant to change things (not the orchestrator).
 
+import { errnoOf, messageOf } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
 import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -19,11 +20,11 @@ export interface CodingOptions {
 }
 
 const why = (e: unknown) => {
-  const err = e as NodeJS.ErrnoException;
-  if (err.code === "ENOENT") return "no such file or directory";
-  if (err.code === "EISDIR") return "is a directory";
-  if (err.code === "EACCES") return "permission denied";
-  return err instanceof Error ? err.message : String(e);
+  const code = errnoOf(e);
+  if (code === "ENOENT") return "no such file or directory";
+  if (code === "EISDIR") return "is a directory";
+  if (code === "EACCES") return "permission denied";
+  return messageOf(e);
 };
 
 export function withEnv(env: Record<string, string | null> = {}): NodeJS.ProcessEnv {
@@ -89,7 +90,7 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
       done();
       reject(
         Object.assign(new Error(words.cannotRun(e.message)), {
-          code: (e as NodeJS.ErrnoException).code,
+          code: errnoOf(e),
         }),
       );
     });
@@ -243,7 +244,7 @@ export function codingTools(o: CodingOptions): Tool[] {
       try {
         ran = await runCommand(argv, cwd, 30_000, runEnv, tc.signal);
       } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new Error(words.noRipgrep, { cause: e });
+        if (errnoOf(e) === "ENOENT") throw new Error(words.noRipgrep, { cause: e });
         throw e;
       }
       if (ran.code === 1 || ran.output.trim() === "") return words.noMatches;

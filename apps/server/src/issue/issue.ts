@@ -10,7 +10,6 @@ import {
   type Finding,
   type IssueRun,
   type IssueAnswer,
-  type Deliverable,
   type Outcome,
   type Issue,
   type Delivery,
@@ -25,7 +24,6 @@ import {
   type IssueUpdate,
   type Preview,
   ownerId,
-  type Priority,
   type ProjectTemplates,
   type RunTrigger,
   type Cron,
@@ -34,35 +32,23 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { closedText, shortTitle } from "@vibevalley/protocol/rules";
-import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
-import { cut } from "@/base/text.ts";
+import { closedText, shortTitle, isOneOf, isBusy } from "@vibevalley/protocol/rules";
+import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues, isClosed } from "./status.ts";
+import { cut } from "@/base/clip.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { attentionIn } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { graphIssues } from "@/task/rules.ts";
-import { dueText } from "@/cron/rules.ts";
-import {
-  answerCureWords,
-  cureWords,
-  filledKinds,
-  findingsOf,
-  isClosed,
-  issueBrief,
-  kept,
-  milestonesOf,
-  nextTaskId,
-  openQuestions,
-  resumeWords,
-  sentTitles,
-  splitBrief,
-  pickIssues,
-} from "./rules.ts";
+import { graphIssues } from "@/task/issues.ts";
+import { dueText } from "@/cron/due.ts";
+import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
+import { filledKinds, sentTitles } from "./templates.ts";
+import { kept, openQuestions, refinement } from "./refinement.ts";
+import { milestonesOf } from "./timeline.ts";
+import { nextTaskId, jsonOrNull, nullText } from "./stored.ts";
+import { pickIssues } from "./filter.ts";
 import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { isBusy } from "@vibevalley/protocol/rules";
 import { inboxLines } from "@/channel/prompts.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
-import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
 import { ServerConfig } from "@/base/config.ts";
@@ -74,17 +60,17 @@ import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { issueBranch, Projects } from "@/project/project.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
 import { merging } from "./merge.ts";
-import { refinement } from "./refinement.ts";
-import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "@/session/journal.ts";
 import { type Hired, type HireOptions, NotRecorded, type SessionNews, Sessions } from "@/session/session.ts";
 import { type Due, Crons } from "@/cron/cron.ts";
+import { IssueSessions } from "./sessions.ts";
+import { actsForOwner, type Actor } from "@/base/actor.ts";
+import { conflictBrief } from "@/session/takeIn.ts";
+import { parseAnswer } from "@/session/report.ts";
+import * as S from "@vibevalley/protocol/schema";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
-import { IssueSessions } from "./sessions.ts";
-import { actsForOwner, type Actor } from "@/base/actor.ts";
-import { conflictBrief, parseAnswer } from "@/session/rules.ts";
 
 export interface OrchestratorWork {
   readonly issue: Issue;
@@ -265,13 +251,13 @@ export const make = (options: IssueOptions = {}) =>
         description: row.description,
         ...(row.project !== null ? { project: row.project } : {}),
         ...(row.assignee !== null ? { assignee: row.assignee } : {}),
-        priority: row.priority as Priority,
+        priority: row.priority,
         createdAt: row.created_at,
         ...(row.queued_at !== null ? { queuedAt: row.queued_at } : {}),
         sessions: (runs ?? []).map((s) => sessionId(s)),
         ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
-        ...(row.delivered !== null ? { delivered: row.delivered as Delivery } : {}),
-        ...(row.canceled !== null ? { canceled: row.canceled as IssueCanceled } : {}),
+        ...(row.delivered !== null ? { delivered: row.delivered } : {}),
+        ...(row.canceled !== null ? { canceled: row.canceled } : {}),
         ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
         blockedBy: blockedBy ?? [],
         ...(graph ? { graph } : {}),
@@ -280,7 +266,7 @@ export const make = (options: IssueOptions = {}) =>
         status: "backlog",
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
-        deliver: row.deliver as Deliverable,
+        deliver: row.deliver,
         ...(row.talk !== null ? { talk: row.talk } : {}),
         ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: column.findings(row.findings) ?? [],
@@ -719,7 +705,7 @@ export const make = (options: IssueOptions = {}) =>
     /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
      * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
     const settledMove = Effect.fn("Issues.settledMove")(function* (issue: Issue, to: IssueStatus, text: string, opt: StatusOptions) {
-      if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused(t("server.issue.noStatus", { to })));
+      if (!isOneOf(IssueStatusValues, to)) return yield* Effect.fail(refused(t("server.issue.noStatus", { to })));
       const taker = opt.assignee ? yield* takerOf(issue, to, opt.assignee) : undefined;
       const [move, why] = statusMove(issue, to);
       const said = text.trim();
@@ -1054,7 +1040,7 @@ export const make = (options: IssueOptions = {}) =>
         if (cleared.kept) return yield* Effect.fail(refused(t("server.issue.cannotDelete", { n: item.number, why: cleared.reason })));
         yield* db(q.removeIssue({ id }));
         yield* reloadSessions;
-        yield* core.apply({ type: "issueGone", id } as never);
+        yield* core.apply({ type: "issueGone", id: issueId(id) });
       }),
       queue: (id, queued) => queueRow(id, queued, chat.defaultChannel()),
       start: (id, channel) => start(id, channel),
@@ -1254,7 +1240,10 @@ export const make = (options: IssueOptions = {}) =>
         if (gone.length > 0) yield* reloadSessions;
         // Published in one core.apply, once the transaction has succeeded.
         const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (item) => get(item.id).pipe(Effect.orDie));
-        yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
+        yield* core.apply(
+          ...gone.map((id) => ({ type: "issueGone" as const, id: issueId(id) })),
+          ...updated.map((issue) => ({ type: "issue" as const, issue })),
+        );
       }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),

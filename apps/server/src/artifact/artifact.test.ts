@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { ownerId } from "@vibevalley/protocol";
-import { artifactMax } from "./rules.ts";
+import { artifactMax } from "./policy.ts";
 import { Effect } from "effect";
 import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";

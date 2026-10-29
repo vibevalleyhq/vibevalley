@@ -1,18 +1,17 @@
 import { t } from "@vibevalley/i18n";
-// A session's log of events: kept in memory as it grows, pushed to
-// the pages a little after each change, and written to events/<id>.json. A step that grows (text still streaming in, a
-// tool that has not returned) is pushed again under the same number. What is written is never rewritten: later steps
-// only follow it, and the step still being written (the draft) is on disk only once it is sealed.
-
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 import { Schema } from "effect";
-import { cut } from "@/base/text.ts";
+import { cut } from "@/base/clip.ts";
 import { FileWriter } from "@/base/files.ts";
 import type { From, ToolStart } from "./facts.ts";
 import type { Time } from "@/base/time.ts";
+// A session's log of events: kept in memory as it grows, pushed to
+// the pages a little after each change, and written to events/<id>.json. A step that grows (text still streaming in, a
+// tool that has not returned) is pushed again under the same number. What is written is never rewritten: later steps
+// only follow it, and the step still being written (the draft) is on disk only once it is sealed.
 
 const keepEvents = 240;
 const textMax = 6000;

@@ -5,7 +5,7 @@ import { Clock, Effect } from "effect";
 import { HttpEffect, HttpRouter } from "effect/http";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { chatCompletionsPath } from "@/orchestrator/rules.ts";
+import { chatCompletionsPath } from "@/orchestrator/model.ts";
 import { Mcp } from "@/mcp/mcp.ts";
 import { callbackLog } from "@/base/log.ts";
 

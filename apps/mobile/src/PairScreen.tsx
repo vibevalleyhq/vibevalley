@@ -6,7 +6,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { FarmConnection, Pairing } from "./farm";
-import { parsePairLink } from "./rules";
+import { parsePairLink } from "./pairing";
 import { colors } from "./style";
 
 export function PairScreen({ connection, choice }: { connection: FarmConnection; choice: Pairing }) {

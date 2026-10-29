@@ -7,7 +7,7 @@ import { Agents } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Memories } from "@/memory/memory.ts";
-import { jobBreak } from "@/session/rules.ts";
+import { jobBreak } from "@/session/briefing.ts";
 import { recallHead } from "@/session/prompts.ts";
 import { Sessions } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";

@@ -4,9 +4,11 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
+import { Pg_public_channel_participant_kind_4fff83732556 } from "./types.js"
+
 export const UpsertParticipantParams = Schema.Struct({
   ["id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["name"]: Schema.String,
   ["agent_id"]: Schema.NullOr(Schema.String),
   ["runtime"]: Schema.NullOr(Schema.String),
@@ -50,7 +52,7 @@ export type ParticipantsParams = typeof ParticipantsParams.Type
 
 export const ParticipantsResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["kind"]: Schema.String,
+  ["kind"]: Pg_public_channel_participant_kind_4fff83732556,
   ["name"]: Schema.String,
   ["agent_id"]: Schema.NullOr(Schema.String),
   ["runtime"]: Schema.NullOr(Schema.String),

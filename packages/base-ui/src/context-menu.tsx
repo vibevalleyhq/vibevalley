@@ -3,7 +3,7 @@
 
 import { createContext, createSignal, omit, useContext } from "solid-js";
 import { makePortal, makePositioner } from "./internal/floating";
-import { call, type DivProps, flag, refs } from "./internal/state";
+import { call, type DivProps, flag, refs } from "./internal/element";
 import { createMenu, Menu, MenuContext, type MenuRootProps } from "./menu";
 
 const use = () => useContext(MenuContext);

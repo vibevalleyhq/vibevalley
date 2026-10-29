@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 // the phone large.
 
 import { messageOf } from "@/base/format";
-import { farmChannelLabel } from "./text";
+import { farmChannelLabel } from "./labels";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "@/base/api";
@@ -38,7 +38,7 @@ import { orchestratorMood, useCore } from "@/base/frame";
 import { ready, useAgents } from "@/base/query";
 import { OrchestratorFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/state";
+import { useFarm } from "@/farm/ui";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";

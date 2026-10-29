@@ -1,57 +1,46 @@
 import { list, t } from "@vibevalley/i18n";
-// Task graphs: a job split into steps, each worked by its own session on a branch of the graph's,
-// merged back into the graph's branch when it is verified, and the whole graph merged into the main branch once every
-// step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
-// Everything here runs one at a time.
-
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { commandOf } from "@vibevalley/protocol/api";
-import {
-  type Agent,
-  type Changes,
-  type GraphAction,
-  ActorKindValues,
-  type ActorKind,
-  type GraphEvent,
-  type GraphEventKind,
-  type Preview,
-  GraphEventKindValues,
-  type Session,
-  type SessionGraph,
-  type Task,
-  type TaskAction,
-  type TaskEdit,
-  type TaskGraph,
+import type {
+  Agent,
+  Changes,
+  GraphAction,
+  ActorKind,
+  GraphEvent,
+  Preview,
+  Session,
+  SessionGraph,
+  Task,
+  TaskAction,
+  TaskEdit,
+  TaskGraph,
 } from "@vibevalley/protocol";
-import { type Wire } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
+import type { Wire } from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionOf } from "@/session/state.ts";
-import { graphActions, graphProblems, graphView, isAcceptance, isOpen, taskActions, taskOf } from "./graph.ts";
-import { graphsOf } from "./issues.ts";
-import { clip } from "@/base/text.ts";
+import { sessionOf } from "@/session/roster.ts";
 import {
+  graphActions,
+  graphProblems,
+  graphView,
+  isAcceptance,
+  isOpen,
+  taskActions,
+  taskOf,
   acceptanceChecks,
   acceptancesOf,
   allSettled,
   autoRetries,
-  changeOf,
   defaultParallel,
-  type EditResult,
-  editTask,
-  freshTask,
   frozenTouched,
-  graphOf,
-  parseSplit,
-  removeTask,
   startable,
-  type StepDraft,
-  taskIssueID,
   withTask,
-} from "./rules.ts";
-import { graphChanges, graphEventText, renderedChanges } from "./changes.ts";
+} from "./graph.ts";
+import { graphsOf, graphOf, taskIssueID } from "./issues.ts";
+import { clip } from "@/base/clip.ts";
+import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
+import { type EditResult, editTask, freshTask, removeTask, type StepDraft } from "./editing.ts";
+import { parseSplit } from "./splitting.ts";
 import { actsForOwner, type Actor, session as sessionActor, system } from "@/base/actor.ts";
-
 import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
@@ -63,7 +52,7 @@ import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/
 import { Issues } from "@/issue/issue.ts";
 import { Projects } from "@/project/project.ts";
 import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
-import { chooseAgent } from "@/runtime/rules.ts";
+import { chooseAgent } from "@/runtime/fit.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
 import {
   acceptancePassedText,
@@ -81,6 +70,13 @@ import {
   taskBrief,
 } from "./prompts.ts";
 import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
+// Task graphs: a job split into steps, each worked by its own session on a branch of the graph's,
+// merged back into the graph's branch when it is verified, and the whole graph merged into the main branch once every
+// step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
+// Everything here runs one at a time.
+
+import * as S from "@vibevalley/protocol/schema";
+
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
@@ -726,15 +722,13 @@ export const make = (options: TaskOptions = {}) =>
         const graph = get(id);
         const titleOf = (node: string) => (graph ? (taskOf(graph, node)?.title ?? node) : node);
         return rows.flatMap((row): GraphEvent[] => {
-          // A row this code no longer knows how to read is left out.
-          if (!(GraphEventKindValues as readonly string[]).includes(row.kind) || !(ActorKindValues as readonly string[]).includes(row.actor)) return [];
           const p: EventPayload = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
           const e: GraphEvent = {
             id: row.id,
             graph: row.graph_id,
             ...(row.task_id ? { task: row.task_id } : {}),
-            kind: row.kind as GraphEventKind,
-            actor: row.actor as ActorKind,
+            kind: row.kind,
+            actor: row.actor,
             ...(p.session ? { session: p.session } : {}),
             detail: p.detail ?? "",
             changes: p.changes ?? [],

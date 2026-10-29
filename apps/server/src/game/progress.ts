@@ -16,11 +16,11 @@ import {
   type Unlock,
   type SessionId,
 } from "@vibevalley/protocol";
-import { sessionOf, sessionOnIssue } from "@/session/state.ts";
+import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
 import { layersOf } from "@/task/graph.ts";
 import { achievementInWords, levelForCommits } from "./view.ts";
-import { graphOf } from "@/task/rules.ts";
+import { graphOf } from "@/task/issues.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
 export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
@@ -44,11 +44,11 @@ const taskCoins = (merged: number) => 30 + 10 * merged;
 const cheapCNY = 0.05;
 
 export interface Seen {
-  readonly told: string[];
-  readonly failed: string[];
-  readonly conflicted: string[];
-  readonly reviewed: string[];
-  readonly runtimes: string[];
+  readonly told: readonly string[];
+  readonly failed: readonly string[];
+  readonly conflicted: readonly string[];
+  readonly reviewed: readonly string[];
+  readonly runtimes: readonly string[];
 }
 
 export interface Folded {
@@ -60,7 +60,7 @@ export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak:
 
 export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 
-const added = (list: readonly string[], item: string) => (list.includes(item) ? (list as string[]) : [...list, item]);
+const added = (list: readonly string[], item: string): readonly string[] => (list.includes(item) ? list : [...list, item]);
 const bump = (counts: Record<string, number>, id: string, by: number) => ({ ...counts, [id]: (counts[id] ?? 0) + by });
 const atLeast = (counts: Record<string, number>, id: string, value: number) => ((counts[id] ?? 0) >= value ? counts : { ...counts, [id]: value });
 

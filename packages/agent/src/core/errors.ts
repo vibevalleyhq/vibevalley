@@ -3,6 +3,9 @@ import { Data } from "effect";
 /** What a thrown or rejected value says: an Error's message, anything else as text. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/** A failed system call's code (ENOENT, EPERM…), or undefined for anything else. */
+export const errnoOf = (e: unknown): string | undefined => (e instanceof Error && "code" in e && typeof e.code === "string" ? e.code : undefined);
+
 /** A tool that did not do what it was asked: its message is the failed result the model reads. */
 export class ToolFailed extends Data.TaggedError("ToolFailed")<{ readonly message: string; readonly cause?: unknown }> {}
 

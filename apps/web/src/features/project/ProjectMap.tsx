@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
 // plot its issue, an empty plot a seed for the project.
 
+import { variant, autofocus } from "@/base/util";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
@@ -11,8 +12,8 @@ import { api, newSendKey, reasonOf } from "@/base/api";
 import { badgeColors, CardColors } from "@/ui/pixel/card";
 import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
 import { castOf, castSprite, cropSprite } from "@/ui/cast";
+import { growthOf, since } from "./calendar";
 import {
-  growthOf,
   homeless,
   type Island,
   islandLook,
@@ -25,13 +26,11 @@ import {
   openOf,
   plotsIn,
   sessionInPlot,
-  since,
   spotText,
-} from "./rules";
+} from "./islands";
 import { toast } from "@/ui/toasts";
 import { writeIssue } from "@/features/issue";
 import { useRouter } from "@/base/router";
-import { autofocus } from "@/base/util";
 import { useCore, useFrames } from "@/base/frame";
 import { defaultOf } from "@/features/channel";
 import { ready, useAgents, useProjects } from "@/base/query";
@@ -302,7 +301,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
             const tip = () => spotText(spot(), Date.now());
             return (
               <Switch>
-                <Match when={spot().kind === "taken" ? (spot() as Extract<Island["spots"][number], { kind: "taken" }>) : undefined}>
+                <Match when={variant(spot(), "kind", "taken")}>
                   {(taken) => {
                     const h = () => taken().session;
                     const cast = () => castOf(agents().get(h().agent)?.look, h().agent);

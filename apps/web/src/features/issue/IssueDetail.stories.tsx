@@ -1,4 +1,4 @@
-import type { Changes, Issue, Session } from "@vibevalley/protocol";
+import type { Changes, Issue, SessionView } from "@vibevalley/protocol";
 import { stories, story, type Story } from "@vibevalley/stories";
 import { answer } from "@/base/storyApi";
 import { ToastHost } from "@/ui/ToastHost";
@@ -13,12 +13,12 @@ const criteria = ["过期的会话回到登录页", "登录页说「登录过期
 interface Page {
   readonly note: string;
   readonly issue: Issue;
-  readonly sessions?: Session[];
-  readonly session?: Session;
+  readonly sessions?: SessionView[];
+  readonly session?: SessionView;
   readonly changes?: Changes;
 }
 
-const resting = (more: Partial<Session> = {}) =>
+const resting = (more: Partial<SessionView> = {}) =>
   sampleSession("w1", "老周", { _tag: "resting" }, { project: "vibevalley", branch: "issue-18-login", runs: 3, ...more });
 
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });

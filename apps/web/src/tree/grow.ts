@@ -4,8 +4,7 @@
 // the scene's pixels.
 
 import type { MemoryItem } from "./mock";
-import { hash01 } from "./rules";
-
+import { hash01 } from "./sky";
 interface Gene {
   readonly parent: number;
   readonly depth: number;
