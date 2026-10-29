@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 
 import { Lightbox } from "../../ui/Lightbox";
 import { fileKind, sizeText } from "../../ui/AttachmentTile";
-import { createSignal, For, Show, untrack } from "solid-js";
+import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { useRouter } from "../../base/router";
@@ -51,11 +51,42 @@ export function ReplyQuote(props: { channel: string; number: number }) {
   );
 }
 
+/** Past this height a message's words start folded: a helper's long report should not push the conversation away. */
+const foldPx = 360;
+
 export function MessageBody(props: { m: ChatMessage }) {
+  let box: HTMLDivElement | undefined;
+  const [long, setLong] = createSignal(false);
+  const [open, setOpen] = createSignal(false);
+  onSettled(() => {
+    if (!box) return;
+    const watch = new ResizeObserver(() => setLong(box!.scrollHeight > foldPx + 40));
+    watch.observe(box);
+    return () => watch.disconnect();
+  });
   return (
     <Show when={props.m.deleted === undefined} fallback={<p class="text-sm text-muted italic">{t("web.channel.messages.deleted")}</p>}>
       <Show when={props.m.text}>
-        <Markdown text={props.m.text} mentions />
+        <div
+          ref={(el) => (box = el)}
+          data-testid="message-body"
+          data-folded={long() && !open() ? "" : undefined}
+          class={{ "fold-fade overflow-hidden": long() && !open() }}
+          style={long() && !open() ? { "max-height": `${foldPx}px` } : undefined}
+        >
+          <Markdown text={props.m.text} mentions />
+        </div>
+        <Show when={long()}>
+          <button
+            type="button"
+            data-testid="message-more"
+            aria-expanded={open() ? "true" : "false"}
+            onClick={() => setOpen(!open())}
+            class="mt-0.5 cursor-pointer rounded-sm px-1 text-xs text-muted hover:bg-hover hover:text-ink"
+          >
+            {open() ? t("web.base.rich.longLess") : t("web.base.rich.longMore")}
+          </button>
+        </Show>
       </Show>
       <Show when={props.m.edited !== undefined}>
         <span class="text-xs text-faint">{t("web.channel.messages.edited")}</span>

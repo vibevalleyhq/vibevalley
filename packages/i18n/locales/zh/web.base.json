@@ -192,5 +192,16 @@
       "voice": "跟管家说话（在设置里能换）",
       "command": "命令：记工单、让管家记住、叫停、私聊"
     }
+  },
+  "rich": {
+    "copy": "复制",
+    "copied": "复制了",
+    "more": "展开",
+    "less": "收起",
+    "lines": "{n} 行",
+    "diagram": "图",
+    "diagramFailed": "这张图画不出来：{why}",
+    "longMore": "展开全文",
+    "longLess": "收起"
   }
 }

@@ -1,9 +1,11 @@
-import { createMemo } from "solid-js";
+import { createMemo, onCleanup } from "solid-js";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
-import { unified } from "unified";
+import { type Plugin, unified } from "unified";
+import { richen } from "../richText";
+import { remarkIssueRefs } from "../richRules";
 import { mentionHref, withMentions } from "./markdown";
 import { cx, pxText } from "./style";
 
@@ -24,11 +26,17 @@ const reading = cx(
 );
 
 // Raw HTML in the text is dropped (remark-rehype's default).
-const md = unified().use(remarkParse).use(remarkGfm).use(remarkRehype);
+const md = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkIssueRefs as unknown as Plugin)
+  .use(remarkRehype);
 
 /** The tree as DOM: a mention link becomes its tag, a link opens through `open` or a new tab, a rule becomes the dashed line. */
 function render(text: string, open: ((url: string) => void) | undefined): Node[] {
   const root = toDom(md.runSync(md.parse(text)), { fragment: true }) as DocumentFragment;
+  // Made safe, its code and diagrams drawn, before the links below are given their pixel look.
+  onCleanup(richen(root, { pixel: true }));
   for (const a of [...root.querySelectorAll("a")]) {
     if (a.getAttribute("href") === mentionHref) {
       const tag = document.createElement("span");
