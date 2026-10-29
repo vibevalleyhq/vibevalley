@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+import { Empty } from "../../ui/Empty";
 // 文档: the documents on the left, the one open on the right, written block by block with the
 // helpers. A block shows its marks until it is clicked into; then it is a plain field (marks are kept through the edit),
 // and Enter splits it, Backspace at its start joins it to the one before, Up and Down at its ends move between blocks.
@@ -99,7 +100,7 @@ export function DocsPage(props: { rest: string }) {
           <p class="px-2 text-xs text-berry">{problem() ?? reasonOf(docs.error)}</p>
         </Show>
         <Show when={docs.isSuccess && list().length === 0}>
-          <p class="px-2 text-xs text-muted">{t("web.doc.docs.none")}</p>
+          <p class="px-2 text-xs text-muted lg:hidden">{t("web.doc.docs.none")}</p>
         </Show>
         <ul class="flex flex-col gap-0.5">
           <For each={list()}>
@@ -129,7 +130,16 @@ export function DocsPage(props: { rest: string }) {
             </Button>
           </div>
         </Show>
-        <Show when={open()}>{(o) => <Keyed key={o()}>{() => <DocView id={o()} />}</Keyed>}</Show>
+        <Show
+          when={open()}
+          fallback={
+            <Show when={docs.isSuccess}>
+              <Empty icon="docs">{t("web.doc.docs.none")}</Empty>
+            </Show>
+          }
+        >
+          {(o) => <Keyed key={o()}>{() => <DocView id={o()} />}</Keyed>}
+        </Show>
       </div>
     </div>
   );

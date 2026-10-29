@@ -10,7 +10,8 @@ import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
-import { Empty, HelperFace, PhaseGlyph } from "./bits";
+import { HelperFace, PhaseGlyph } from "./bits";
+import { Empty } from "../../ui/Empty";
 
 const card = "rounded-lg border border-line bg-page p-3";
 
@@ -21,7 +22,14 @@ export function Jobs(props: { channel: Channel }) {
   const now = useNow();
   const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : !!props.channel.default));
   return (
-    <Show when={sessions().length > 0} fallback={<Empty icon="issues">{t("web.channel.jobs.empty")}</Empty>}>
+    <Show
+      when={sessions().length > 0}
+      fallback={
+        <Empty testid="tab-empty" icon="issues">
+          {t("web.channel.jobs.empty")}
+        </Empty>
+      }
+    >
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={sessions()}>
           {(h) => {
@@ -63,7 +71,14 @@ export function Crons(props: { channel: Channel }) {
   const core = useCore();
   const crons = () => (core()?.crons ?? []).filter((s) => s.channel === props.channel.id);
   return (
-    <Show when={crons().length > 0} fallback={<Empty icon="clock">{t("web.channel.crons.empty")}</Empty>}>
+    <Show
+      when={crons().length > 0}
+      fallback={
+        <Empty testid="tab-empty" icon="clock">
+          {t("web.channel.crons.empty")}
+        </Empty>
+      }
+    >
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={crons()}>{(s) => <CronCard s={s} />}</For>
       </div>

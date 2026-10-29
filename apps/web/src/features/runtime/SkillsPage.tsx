@@ -19,7 +19,8 @@ import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
-import { Card, Quiet } from "../../ui/layout";
+import { Card } from "../../ui/layout";
+import { Empty } from "../../ui/Empty";
 
 const installedPrefix = "installed:";
 export const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);
@@ -27,6 +28,7 @@ export const skillPath = (id?: string) => (id === undefined ? "/settings/skills"
 export const useSkills = () => useQuery(() => ({ queryKey: ["skills"], queryFn: () => api.skill.list() }));
 
 export function SkillsPage(props: { id?: string }) {
+  const router = useRouter();
   const [query, setQuery] = createSignal("");
   const skills = useSkills();
   const runtimes = useRuntimes();
@@ -97,7 +99,20 @@ export function SkillsPage(props: { id?: string }) {
         </ul>
       </nav>
       <div class="min-w-0 flex-1 lg:overflow-y-auto">
-        <Switch fallback={<Quiet>{t("web.runtime.library.noSkills")}</Quiet>}>
+        <Switch
+          fallback={
+            <Empty
+              icon="skill"
+              action={
+                <Button icon="add" onClick={() => router.navigate(skillPath("new"))}>
+                  {t("web.runtime.library.newSkill")}
+                </Button>
+              }
+            >
+              {t("web.runtime.library.noSkills")}
+            </Empty>
+          }
+        >
           <Match when={creating()}>
             <Keyed key="new">{() => <SkillEditor />}</Keyed>
           </Match>

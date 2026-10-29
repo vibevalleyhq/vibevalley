@@ -88,7 +88,7 @@
     "noMatch": "Nothing matches.",
     "own": "VibeValley's own · {count}",
     "newSkill": "New skill",
-    "noSkills": "No skills yet.",
+    "noSkills": "No skills yet: write one of VibeValley's own, or install some on a runtime and come back.",
     "installedNote": "A skill installed on the machines: helpers using these machines load it when needed, no need to tick it in a profile. To change it, edit its file.",
     "where": "Machines that have it",
     "inUse": "{n} agents use it; deleting it takes it off them.",
