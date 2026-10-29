@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
+import { type Adapter, message } from "./adapter.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
@@ -368,3 +369,74 @@ export function text(m: Message): string {
 }
 
 export const quoted = (m: Message) => (m.item_list ?? []).find((i) => i.ref_msg?.svr_id)?.ref_msg?.svr_id ?? "";
+
+const weixinPollMs = 35_000;
+
+export function weixinAdapter(api: WeixinApi): Adapter {
+  const accountOf = (s: Record<string, string>) => ({
+    baseUrl: s.baseUrl || baseUrl,
+    token: s.token ?? "",
+  });
+  return {
+    id: "weixin",
+    login: async (signal, _input, progress, verifyCode) => {
+      const linked = await api.login(signal, (state, url) => progress({ state, qr: url }), verifyCode);
+      return {
+        secrets: {
+          token: linked.account.token,
+          botId: linked.botId,
+          baseUrl: linked.account.baseUrl,
+        },
+        owner: linked.owner,
+      };
+    },
+    receive: async (signal, secrets, io) => {
+      const account = accountOf(secrets);
+      let buf = io.cursor;
+      let timeout = weixinPollMs;
+      while (!signal.aborted) {
+        let updates;
+        try {
+          updates = decodeUpdates(await api.getUpdates(signal, account, buf, timeout));
+        } catch (e) {
+          return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
+        }
+        if (signal.aborted) return undefined;
+        const code = failed(updates.ret, updates.errcode);
+        if (code !== undefined) {
+          if (code === staleToken) return { kind: "stale", reason: t("server.connector.staleLogin") };
+          return { kind: "failed", reason: "getupdates: " + (updates.errmsg || String(code)) };
+        }
+        if (updates.longpolling_timeout_ms && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
+        // Its own messages echo back; groups are not for the farm.
+        const messages = (updates.msgs ?? [])
+          .filter((m) => m.message_type !== 2 && !m.group_id && m.from_user_id)
+          .map((m) => ({
+            id: m.message_id ?? "",
+            from: m.from_user_id!,
+            text: text(m),
+            reply: m.context_token ?? "",
+            quoted: quoted(m),
+          }));
+        try {
+          await io.accept(messages, updates.get_updates_buf ?? "");
+        } catch (e) {
+          return { kind: "failed", reason: message(e) };
+        }
+        if (updates.get_updates_buf) buf = updates.get_updates_buf;
+      }
+      return undefined;
+    },
+    send: async (signal, secrets, to, text, reply) => {
+      try {
+        return await api.sendText(signal, accountOf(secrets), to, text, reply);
+      } catch (e) {
+        const code = e instanceof WeixinError ? e.code : 0;
+        return {
+          kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed",
+          reason: message(e),
+        };
+      }
+    },
+  };
+}

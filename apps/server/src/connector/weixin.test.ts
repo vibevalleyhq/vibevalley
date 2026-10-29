@@ -1,7 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { weixinAdapter } from "./connector.ts";
-import { decodeUpdates, type WeixinApi, WeixinClient, WeixinError } from "./weixin.ts";
+import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient, WeixinError } from "./weixin.ts";
 
 const servers: Server[] = [];
 afterEach(() => {

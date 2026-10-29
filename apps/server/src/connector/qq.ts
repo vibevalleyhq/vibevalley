@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
+import { type Adapter, message } from "./adapter.ts";
 
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
@@ -242,4 +243,41 @@ export class QQClient implements QQApi {
     if (!body?.id || (body.code !== undefined && body.code !== 0)) throw new SendError(t("server.connector.qq.noId", { why: body?.message ?? "" }));
     return body.id;
   }
+}
+
+export function qqAdapter(api: QQApi): Adapter {
+  const appOf = (s: Record<string, string>) => ({ appId: s.appId ?? "", secret: s.secret ?? "" });
+  return {
+    id: "qq",
+    login: async (signal, input) => {
+      const appId = (input.appId ?? "").trim();
+      const secret = (input.secret ?? "").trim();
+      if (!appId || !secret) throw new Error(t("server.connector.qqKeys"));
+      await api.check(signal, { appId, secret });
+      return { secrets: { appId, secret }, owner: "" };
+    },
+    receive: async (signal, secrets, io) => {
+      try {
+        await api.listen(signal, appOf(secrets), (m) => {
+          const parts = [m.content.trim(), m.attachments > 0 ? t("server.connector.media.attachment") : ""].filter(Boolean);
+          return io.accept([{ id: m.id, from: m.from, text: parts.join("\n"), reply: m.id }], "");
+        });
+        return undefined;
+      } catch (e) {
+        return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
+      }
+    },
+    send: async (signal, secrets, to, text, reply) => {
+      try {
+        return await api.sendText(signal, appOf(secrets), to, text, reply);
+      } catch (e) {
+        // A refused passive reply (too late, too many) waits for the owner's next message; a bad login is stale.
+        const status = e instanceof SendError ? e.status : 0;
+        return {
+          kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed",
+          reason: message(e),
+        };
+      }
+    },
+  };
 }

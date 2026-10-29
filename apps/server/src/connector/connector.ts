@@ -10,7 +10,7 @@ import { t } from "@vibevalley/i18n";
 // owner next says something, several as one digest.
 
 import { randomInt } from "node:crypto";
-import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
+import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf } from "../channel/state.ts";
 import { Cause, Clock, Context, Data, Deferred, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schema, Semaphore, Stream } from "effect";
@@ -24,36 +24,15 @@ import { reasonOf } from "../errors.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
-import { type QQApi, QQClient, SendError } from "./qq.ts";
+import { type Failure, type Inbound, type Linked, message, type Progress, type Adapter } from "./adapter.ts";
+import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
+import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
-import {
-  baseUrl,
-  decodeUpdates,
-  failed as weixinFailed,
-  quoted,
-  restricted,
-  staleToken,
-  text as weixinText,
-  type WeixinApi,
-  WeixinClient,
-  WeixinError,
-} from "./weixin.ts";
+import { type WeixinApi, WeixinClient, weixinAdapter } from "./weixin.ts";
 import { Notices } from "../notice/notice.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
-const weixinPollMs = 35_000;
-
-export interface Inbound {
-  /** Each is taken once. */
-  readonly id: string;
-  readonly from: string;
-  readonly text: string;
-  /** WeChat's context token, QQ's message id. */
-  readonly reply?: string;
-  readonly quoted?: string;
-}
 
 const InboundSchema: Schema.Codec<Inbound> = Schema.Struct({
   id: Schema.String,
@@ -62,182 +41,6 @@ const InboundSchema: Schema.Codec<Inbound> = Schema.Struct({
   reply: Schema.optionalKey(Schema.String),
   quoted: Schema.optionalKey(Schema.String),
 });
-
-export interface Failure {
-  readonly kind: "restricted" | "stale" | "failed";
-  readonly reason: string;
-}
-
-interface Linked {
-  readonly secrets: Record<string, string>;
-  readonly owner: string;
-}
-
-interface Progress {
-  readonly state: ConnectorState;
-  readonly qr?: string;
-}
-
-interface Receiving {
-  readonly cursor: string;
-  readonly accept: (messages: readonly Inbound[], cursor: string) => Promise<void>;
-}
-
-export interface Adapter {
-  readonly id: ConnectorID;
-  login(signal: AbortSignal, input: ConnectorLogin, progress: (p: Progress) => void, verifyCode: () => string): Promise<Linked>;
-  /** Until it fails (a failure) or signal aborts (undefined). */
-  receive(signal: AbortSignal, secrets: Record<string, string>, io: Receiving): Promise<Failure | undefined>;
-  send(signal: AbortSignal, secrets: Record<string, string>, to: string, text: string, reply: string): Promise<string | Failure>;
-}
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-export function weixinAdapter(api: WeixinApi): Adapter {
-  const accountOf = (s: Record<string, string>) => ({
-    baseUrl: s.baseUrl || baseUrl,
-    token: s.token ?? "",
-  });
-  return {
-    id: "weixin",
-    login: async (signal, _input, progress, verifyCode) => {
-      const linked = await api.login(signal, (state, url) => progress({ state, qr: url }), verifyCode);
-      return {
-        secrets: {
-          token: linked.account.token,
-          botId: linked.botId,
-          baseUrl: linked.account.baseUrl,
-        },
-        owner: linked.owner,
-      };
-    },
-    receive: async (signal, secrets, io) => {
-      const account = accountOf(secrets);
-      let buf = io.cursor;
-      let timeout = weixinPollMs;
-      while (!signal.aborted) {
-        let updates;
-        try {
-          updates = decodeUpdates(await api.getUpdates(signal, account, buf, timeout));
-        } catch (e) {
-          return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
-        }
-        if (signal.aborted) return undefined;
-        const code = weixinFailed(updates.ret, updates.errcode);
-        if (code !== undefined) {
-          if (code === staleToken) return { kind: "stale", reason: t("server.connector.staleLogin") };
-          return { kind: "failed", reason: "getupdates: " + (updates.errmsg || String(code)) };
-        }
-        if (updates.longpolling_timeout_ms && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
-        // Its own messages echo back; groups are not for the farm.
-        const messages = (updates.msgs ?? [])
-          .filter((m) => m.message_type !== 2 && !m.group_id && m.from_user_id)
-          .map((m) => ({
-            id: m.message_id ?? "",
-            from: m.from_user_id!,
-            text: weixinText(m),
-            reply: m.context_token ?? "",
-            quoted: quoted(m),
-          }));
-        try {
-          await io.accept(messages, updates.get_updates_buf ?? "");
-        } catch (e) {
-          return { kind: "failed", reason: message(e) };
-        }
-        if (updates.get_updates_buf) buf = updates.get_updates_buf;
-      }
-      return undefined;
-    },
-    send: async (signal, secrets, to, text, reply) => {
-      try {
-        return await api.sendText(signal, accountOf(secrets), to, text, reply);
-      } catch (e) {
-        const code = e instanceof WeixinError ? e.code : 0;
-        return {
-          kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed",
-          reason: message(e),
-        };
-      }
-    },
-  };
-}
-
-export function feishuAdapter(api: FeishuApi): Adapter {
-  const appOf = (s: Record<string, string>) => ({
-    appId: s.appId ?? "",
-    appSecret: s.appSecret ?? "",
-    domain: s.domain === "lark" ? ("lark" as const) : ("feishu" as const),
-  });
-  return {
-    id: "feishu",
-    login: async (signal, _input, progress) => {
-      const linked = await api.login(signal, (url) => progress({ state: "waiting", qr: url }));
-      return {
-        secrets: {
-          appId: linked.app.appId,
-          appSecret: linked.app.appSecret,
-          domain: linked.app.domain,
-        },
-        owner: linked.owner,
-      };
-    },
-    // Returning to the SDK acknowledges only a durable inbox write; the orchestrator's work runs elsewhere.
-    receive: async (signal, secrets, io) => {
-      try {
-        await api.listen(signal, appOf(secrets), (m) =>
-          m.chatType === "p2p" ? io.accept([{ id: m.messageId, from: m.from, text: feishuText(m), quoted: m.parentId }], "") : Promise.resolve(),
-        );
-        return undefined;
-      } catch (e) {
-        return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
-      }
-    },
-    send: async (signal, secrets, to, text) => {
-      try {
-        return await api.sendText(signal, appOf(secrets), to, text);
-      } catch (e) {
-        return { kind: "failed", reason: message(e) };
-      }
-    },
-  };
-}
-
-export function qqAdapter(api: QQApi): Adapter {
-  const appOf = (s: Record<string, string>) => ({ appId: s.appId ?? "", secret: s.secret ?? "" });
-  return {
-    id: "qq",
-    login: async (signal, input) => {
-      const appId = (input.appId ?? "").trim();
-      const secret = (input.secret ?? "").trim();
-      if (!appId || !secret) throw new Error(t("server.connector.qqKeys"));
-      await api.check(signal, { appId, secret });
-      return { secrets: { appId, secret }, owner: "" };
-    },
-    receive: async (signal, secrets, io) => {
-      try {
-        await api.listen(signal, appOf(secrets), (m) => {
-          const parts = [m.content.trim(), m.attachments > 0 ? t("server.connector.media.attachment") : ""].filter(Boolean);
-          return io.accept([{ id: m.id, from: m.from, text: parts.join("\n"), reply: m.id }], "");
-        });
-        return undefined;
-      } catch (e) {
-        return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
-      }
-    },
-    send: async (signal, secrets, to, text, reply) => {
-      try {
-        return await api.sendText(signal, appOf(secrets), to, text, reply);
-      } catch (e) {
-        // A refused passive reply (too late, too many) waits for the owner's next message; a bad login is stale.
-        const status = e instanceof SendError ? e.status : 0;
-        return {
-          kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed",
-          reason: message(e),
-        };
-      }
-    },
-  };
-}
 
 interface Account {
   secrets: Record<string, string>;
