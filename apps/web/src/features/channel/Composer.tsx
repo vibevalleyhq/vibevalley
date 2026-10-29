@@ -80,13 +80,15 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
         const mine = [...followed.get(id).messages].reverse().find((m) => m.from === ownerId && m.kind === "chat" && m.deleted === undefined);
         if (mine) {
           e.preventDefault();
-          return setEditingId(mine.id);
+          setEditingId(mine.id);
+          return;
         }
       }
       if (e.key === "Escape" && draft().reply) {
         e.preventDefault();
         e.stopPropagation();
-        return drafts.reply(id, undefined);
+        drafts.reply(id, undefined);
+        return;
       }
     }
     box.onKey(e);

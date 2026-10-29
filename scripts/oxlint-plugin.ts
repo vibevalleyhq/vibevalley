@@ -270,6 +270,7 @@ const pageLayersRule = defineRule({
       const b = pageLayers.indexOf(to.layer);
       if (b > a || (b === a && from.layer !== "features")) return "layer";
       if (to.layer === "features" && target !== to.unit && target !== `${to.unit}/index`) return "index";
+      return undefined;
     };
     return {
       ImportDeclaration(node) {

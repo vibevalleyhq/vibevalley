@@ -103,7 +103,10 @@ export function BugSnakeGame() {
     const now = game.get();
     if (!now || now.over !== null) return void (button === "a" && start());
     if (!playing()) return void (button === "a" && setPlaying(true));
-    if (button === "b") return setPlaying(false);
+    if (button === "b") {
+      setPlaying(false);
+      return;
+    }
     if (button !== "a") setG(steerBugSnake(now, button));
   });
 

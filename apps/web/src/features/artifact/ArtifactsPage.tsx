@@ -173,7 +173,10 @@ function Title(props: { artifact: Artifact }) {
   let field!: HTMLInputElement;
   const save = async () => {
     const title = text().trim();
-    if (!title || title === props.artifact.title) return setText(props.artifact.title);
+    if (!title || title === props.artifact.title) {
+      setText(props.artifact.title);
+      return;
+    }
     try {
       await api.artifact.update({ id: props.artifact.id, title });
       void queries.invalidateQueries({ queryKey: ["artifacts"] });
