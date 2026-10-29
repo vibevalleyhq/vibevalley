@@ -35,7 +35,10 @@ export default stories({
           setProblem("");
           setTimeout(() => {
             setBusy(false);
-            if (a.fails) return setProblem("名字已经有人用了");
+            if (a.fails) {
+              setProblem("名字已经有人用了");
+              return;
+            }
             setBase({ ...draft(), key: "", removing: false });
             setDraft({ ...draft(), key: "", removing: false });
             toast("存好了");

@@ -118,7 +118,8 @@ export function DinoGame(props: { big?: boolean }) {
     if (!now || now.over) return void (down && jumpKey && start());
     if (jumpKey && down) {
       if (now.lift === 0) playSound("tap");
-      return setD(jump(now));
+      setD(jump(now));
+      return;
     }
     if (button === "down" || button === "b") setD(duck(now, down));
   });

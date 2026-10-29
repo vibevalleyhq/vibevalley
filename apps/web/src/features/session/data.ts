@@ -21,7 +21,7 @@ export function createSessionEvents(id: Accessor<string>, enabled: Accessor<bool
     () => (enabled() ? id() : undefined),
     (session) => {
       setSteps([]);
-      if (session !== undefined) return logs.subscribe(session, setSteps);
+      return session !== undefined ? logs.subscribe(session, setSteps) : undefined;
     },
   );
   return steps;

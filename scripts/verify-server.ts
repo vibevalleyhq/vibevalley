@@ -51,6 +51,7 @@ export function readyAddress(line: string, pid: number): string | undefined {
   } catch {
     /* Other stdout is still logged, but is not a readiness receipt. */
   }
+  return undefined;
 }
 
 // The validation command owns assertions and fixtures; this owner isolates and releases its server and child process groups.
