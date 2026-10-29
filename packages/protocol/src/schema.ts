@@ -20,7 +20,7 @@ export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   loggedIn: Schema.Boolean,
   account: Schema.optionalKey(Schema.String),
   reason: Schema.optionalKey(Schema.String),
-  checkedAt: Schema.Number,
+  checkedAt: Schema.Finite,
 });
 
 export const Validation: Codec<T.Validation> = Schema.Struct({
@@ -28,7 +28,7 @@ export const Validation: Codec<T.Validation> = Schema.Struct({
 });
 
 export const RuntimeQuota: Codec<T.RuntimeQuota> = Schema.Struct({
-  left: Schema.optionalKey(Schema.Number),
+  left: Schema.optionalKey(Schema.Finite),
   text: Schema.String,
 });
 
@@ -79,7 +79,7 @@ export const Look: Codec<T.Look> = Schema.Struct({
   eye: Schema.String,
 });
 
-export const AgentFrom: Codec<T.AgentFrom> = Schema.Struct({ template: Schema.String, version: Schema.Number });
+export const AgentFrom: Codec<T.AgentFrom> = Schema.Struct({ template: Schema.String, version: Schema.Finite });
 
 export const Agent: Codec<T.Agent> = Schema.Struct({
   id: Schema.String,
@@ -105,7 +105,7 @@ export const Agent: Codec<T.Agent> = Schema.Struct({
 
 export const AgentTemplate: Codec<T.AgentTemplate> = Schema.Struct({
   id: Schema.String,
-  version: Schema.Number,
+  version: Schema.Finite,
   role: Schema.Literals(T.AgentRoleValues),
   name: Schema.String,
   duty: Schema.String,
@@ -132,16 +132,16 @@ export const AgentValidation: Codec<T.AgentValidation> = Schema.Struct({
 
 export const RecallPreview: Codec<T.RecallPreview> = Schema.Struct({
   lines: Schema.mutable(Schema.Array(Schema.String)),
-  chars: Schema.Number,
-  limit: Schema.Number,
+  chars: Schema.Finite,
+  limit: Schema.Finite,
 });
 
 export const AchievementCategory: Codec<T.AchievementCategory> = Schema.Literals(T.AchievementCategoryValues);
 
 export const AchievementTier: Codec<T.AchievementTier> = Schema.Struct({
-  need: Schema.Number,
+  need: Schema.Finite,
   title: Schema.String,
-  coins: Schema.Number,
+  coins: Schema.Finite,
   reached: Schema.String,
 });
 
@@ -157,9 +157,9 @@ export const Achievement: Codec<T.Achievement> = Schema.Struct({
 
 export const AchievementStanding: Codec<T.AchievementStanding> = Schema.Struct({
   id: Schema.String,
-  tier: Schema.Number,
-  count: Schema.Number,
-  next: Schema.optionalKey(Schema.Number),
+  tier: Schema.Finite,
+  count: Schema.Finite,
+  next: Schema.optionalKey(Schema.Finite),
 });
 
 export const RuntimePreset: Codec<T.RuntimePreset> = Schema.Struct({
@@ -185,7 +185,7 @@ export const OrchestratorState: Codec<T.OrchestratorState> = Schema.Literals(T.O
 export const OrchestratorNow: Codec<T.OrchestratorNow> = Schema.Struct({
   state: OrchestratorState,
   channel: Schema.optionalKey(Schema.String),
-  since: Schema.optionalKey(Schema.Number),
+  since: Schema.optionalKey(Schema.Finite),
 });
 
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
@@ -211,7 +211,7 @@ export const Embed: Codec<T.Embed> = Schema.Struct({
 
 export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
 
-export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Number });
+export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Finite });
 
 export const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBodyValues);
 
@@ -221,19 +221,19 @@ export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   body: ArtifactBody,
-  version: Schema.Number,
+  version: Schema.Finite,
   note: Schema.optionalKey(Schema.String),
 });
 
 export const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
-  version: Schema.Number,
-  size: Schema.Number,
+  version: Schema.Finite,
+  size: Schema.Finite,
   note: Schema.optionalKey(Schema.String),
   by: Schema.String,
   byName: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
   channel: Schema.String,
-  number: Schema.optionalKey(Schema.Number),
+  number: Schema.optionalKey(Schema.Finite),
 });
 
 export const Artifact: Codec<T.Artifact> = Schema.Struct({
@@ -241,15 +241,15 @@ export const Artifact: Codec<T.Artifact> = Schema.Struct({
   title: Schema.String,
   body: ArtifactBody,
   channel: Schema.optionalKey(Schema.String),
-  said: Schema.optionalKey(Schema.Struct({ channel: Schema.String, number: Schema.Number })),
+  said: Schema.optionalKey(Schema.Struct({ channel: Schema.String, number: Schema.Finite })),
   issue: Schema.optionalKey(Schema.String),
   by: Schema.String,
   byName: Schema.String,
-  version: Schema.Number,
-  seq: Schema.Number,
+  version: Schema.Finite,
+  seq: Schema.Finite,
   versions: Schema.mutable(Schema.Array(ArtifactVersion)),
-  at: Schema.Number,
-  updated: Schema.Number,
+  at: Schema.Finite,
+  updated: Schema.Finite,
 });
 
 export const ArtifactRequest: Codec<T.ArtifactRequest> = Schema.Struct({
@@ -274,14 +274,14 @@ export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
 
 export const ArtifactReadRequest: Codec<T.ArtifactReadRequest> = Schema.Struct({
   id: Schema.String,
-  version: Schema.optionalKey(Schema.Number),
+  version: Schema.optionalKey(Schema.Finite),
 });
 
-export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Number, content: Schema.String });
+export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Finite, content: Schema.String });
 
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: Schema.String,
-  number: Schema.Number,
+  number: Schema.Finite,
   channel: Schema.String,
   from: Schema.String,
   fromKind: ActorKind,
@@ -296,12 +296,12 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   spent: Schema.optionalKey(Spent),
   spoken: Schema.optionalKey(Schema.Boolean),
   sendKey: Schema.optionalKey(Schema.String),
-  at: Schema.Number,
-  revision: Schema.Number,
-  replyTo: Schema.optionalKey(Schema.Number),
-  edited: Schema.optionalKey(Schema.Number),
-  deleted: Schema.optionalKey(Schema.Number),
-  pinned: Schema.optionalKey(Schema.Number),
+  at: Schema.Finite,
+  revision: Schema.Finite,
+  replyTo: Schema.optionalKey(Schema.Finite),
+  edited: Schema.optionalKey(Schema.Finite),
+  deleted: Schema.optionalKey(Schema.Finite),
+  pinned: Schema.optionalKey(Schema.Finite),
   reactions: Schema.optionalKey(Schema.mutable(Schema.Array(Reaction))),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Attachment))),
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(Embed))),
@@ -320,23 +320,23 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   orchestrator: Schema.optionalKey(Schema.String),
   parent: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
-  position: Schema.optionalKey(Schema.Number),
-  archived: Schema.optionalKey(Schema.Number),
+  position: Schema.optionalKey(Schema.Finite),
+  archived: Schema.optionalKey(Schema.Finite),
   notify: Schema.optionalKey(Notify),
   root: Schema.optionalKey(Schema.String),
-  rootNumber: Schema.optionalKey(Schema.Number),
+  rootNumber: Schema.optionalKey(Schema.Finite),
   name: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   subjectKind: Schema.optionalKey(SubjectKind),
   subjectId: Schema.optionalKey(Schema.String),
-  lastNumber: Schema.optionalKey(Schema.Number),
-  replies: Schema.Number,
-  read: Schema.optionalKey(Schema.Number),
-  unread: Schema.optionalKey(Schema.Number),
+  lastNumber: Schema.optionalKey(Schema.Finite),
+  replies: Schema.Finite,
+  read: Schema.optionalKey(Schema.Finite),
+  unread: Schema.optionalKey(Schema.Finite),
   title: Schema.optionalKey(Schema.String),
-  last: Schema.optionalKey(Schema.Struct({ from: Schema.String, name: Schema.String, text: Schema.String, at: Schema.Number })),
-  at: Schema.Number,
+  last: Schema.optionalKey(Schema.Struct({ from: Schema.String, name: Schema.String, text: Schema.String, at: Schema.Finite })),
+  at: Schema.Finite,
 });
 
 export const Conflict: Codec<T.Conflict> = Schema.Struct({
@@ -359,15 +359,15 @@ export const PhaseArriving: Codec<T.PhaseArriving> = Schema.Struct({
 });
 
 export const Retry: Codec<T.Retry> = Schema.Struct({
-  attempt: Schema.Number,
-  of: Schema.optionalKey(Schema.Number),
+  attempt: Schema.Finite,
+  of: Schema.optionalKey(Schema.Finite),
 });
 
 export const PhaseWorking: Codec<T.PhaseWorking> = Schema.Struct({
   _tag: Schema.Literal("working"),
-  since: Schema.Number,
+  since: Schema.Finite,
   doing: Doing,
-  quietSince: Schema.optionalKey(Schema.Number),
+  quietSince: Schema.optionalKey(Schema.Finite),
   retry: Schema.optionalKey(Retry),
 });
 
@@ -389,7 +389,7 @@ export const IssueCanceled: Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanc
 
 export const PhaseClosed: Codec<T.PhaseClosed> = Schema.Struct({
   _tag: Schema.Literal("closed"),
-  at: Schema.Number,
+  at: Schema.Finite,
   closed: SessionClose,
 });
 
@@ -405,7 +405,7 @@ export const IssueAnswer: Codec<T.IssueAnswer> = Schema.Struct({
 export const LastRun: Codec<T.LastRun> = Schema.Struct({
   outcome: Outcome,
   summary: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
   spent: Schema.optionalKey(Spent),
   answer: Schema.optionalKey(IssueAnswer),
 });
@@ -415,16 +415,16 @@ export const SessionGraph: Codec<T.SessionGraph> = Schema.Struct({
   task: Schema.optionalKey(Schema.String),
 });
 
-export const ActionStep: Codec<T.ActionStep> = Schema.Struct({ at: Schema.Number, ...doingFields });
+export const ActionStep: Codec<T.ActionStep> = Schema.Struct({ at: Schema.Finite, ...doingFields });
 
 export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({
-  station: Schema.Number,
+  station: Schema.Finite,
   history: Schema.mutable(Schema.Array(ActionStep)),
-  toolsThisRun: Schema.Number,
-  counts: Schema.Record(Schema.String, Schema.Number),
+  toolsThisRun: Schema.Finite,
+  counts: Schema.Record(Schema.String, Schema.Finite),
   files: Schema.mutable(Schema.Array(Schema.String)),
   commands: Schema.mutable(Schema.Array(Schema.String)),
-  runStartedAt: Schema.optionalKey(Schema.Number),
+  runStartedAt: Schema.optionalKey(Schema.Finite),
 });
 
 export const Session: Codec<T.Session> = Schema.Struct({
@@ -437,8 +437,8 @@ export const Session: Codec<T.Session> = Schema.Struct({
   branch: Schema.optionalKey(Schema.String),
   worktree: Schema.optionalKey(Schema.String),
   conflict: Schema.optionalKey(Conflict),
-  hiredAt: Schema.Number,
-  runs: Schema.Number,
+  hiredAt: Schema.Finite,
+  runs: Schema.Finite,
   phase: Phase,
   lastRun: Schema.optionalKey(LastRun),
   spent: Schema.optionalKey(Spent),
@@ -452,11 +452,11 @@ export const Session: Codec<T.Session> = Schema.Struct({
 
 export const Repo: Codec<T.Repo> = Schema.Struct({
   path: Schema.String,
-  commits: Schema.Number,
+  commits: Schema.Finite,
 });
 
 export const CommitCount: Codec<T.CommitCount> = Schema.Struct({
-  total: Schema.Number,
+  total: Schema.Finite,
   repos: Schema.mutable(Schema.Array(Repo)),
 });
 
@@ -481,8 +481,8 @@ export const Task: Codec<T.Task> = Schema.Struct({
   conclusion: Schema.optionalKey(Schema.String),
   commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   spent: Schema.optionalKey(Spent),
-  tries: Schema.Number,
-  failures: Schema.optionalKey(Schema.Number),
+  tries: Schema.Finite,
+  failures: Schema.optionalKey(Schema.Finite),
   blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   stateText: Schema.optionalKey(Schema.String),
   actions: Schema.optionalKey(Schema.mutable(Schema.Array(TaskAction))),
@@ -504,57 +504,57 @@ export const TaskGraph: Codec<T.TaskGraph> = Schema.Struct({
   actionText: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   actions: Schema.optionalKey(Schema.mutable(Schema.Array(GraphAction))),
   tasks: Schema.mutable(Schema.Array(Task)),
-  parallel: Schema.Number,
+  parallel: Schema.Finite,
   note: Schema.optionalKey(Schema.String),
-  createdAt: Schema.Number,
+  createdAt: Schema.Finite,
   layers: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.mutable(Schema.Array(Schema.String))))),
   asksForYou: Schema.optionalKey(Schema.Boolean),
   spent: Schema.optionalKey(Spent),
-  settled: Schema.optionalKey(Schema.Number),
+  settled: Schema.optionalKey(Schema.Finite),
 });
 
 export const Unlock: Codec<T.Unlock> = Schema.Struct({
   id: Schema.String,
-  tier: Schema.Number,
-  at: Schema.Number,
+  tier: Schema.Finite,
+  at: Schema.Finite,
 });
 
 export const AgentTally: Codec<T.AgentTally> = Schema.Struct({
-  hired: Schema.Number,
-  harvested: Schema.Number,
-  failed: Schema.Number,
+  hired: Schema.Finite,
+  harvested: Schema.Finite,
+  failed: Schema.Finite,
 });
 
 export const ProgressTitle: Codec<T.ProgressTitle> = Schema.Struct({
   id: Schema.String,
-  tier: Schema.Number,
+  tier: Schema.Finite,
 });
 
 export const Progress: Codec<T.Progress> = Schema.Struct({
-  coins: Schema.Number,
-  streak: Schema.Number,
-  bestStreak: Schema.Number,
-  counts: Schema.Record(Schema.String, Schema.Number),
+  coins: Schema.Finite,
+  streak: Schema.Finite,
+  bestStreak: Schema.Finite,
+  counts: Schema.Record(Schema.String, Schema.Finite),
   unlocked: Schema.mutable(Schema.Array(Unlock)),
   title: Schema.optionalKey(ProgressTitle),
   agents: Schema.optionalKey(Schema.Record(Schema.String, AgentTally)),
-  multiplier: Schema.optionalKey(Schema.Number),
+  multiplier: Schema.optionalKey(Schema.Finite),
 });
 
 export const ProgressNews: Codec<T.ProgressNews> = Schema.Struct({
-  coins: Schema.optionalKey(Schema.Number),
+  coins: Schema.optionalKey(Schema.Finite),
   session: Schema.optionalKey(SessionId),
   unlocked: Schema.optionalKey(Schema.mutable(Schema.Array(Unlock))),
 });
 
 export const CronWhenOnce: Codec<T.CronWhenOnce> = Schema.Struct({
   kind: Schema.Literal("once"),
-  at: Schema.Number,
+  at: Schema.Finite,
 });
 
 export const CronWhenEvery: Codec<T.CronWhenEvery> = Schema.Struct({
   kind: Schema.Literal("every"),
-  minutes: Schema.Number,
+  minutes: Schema.Finite,
 });
 
 export const CronWhenDaily: Codec<T.CronWhenDaily> = Schema.Struct({
@@ -585,8 +585,8 @@ export const Cron: Codec<T.Cron> = Schema.Struct({
   when: CronWhen,
   tz: Schema.String,
   enabled: Schema.Boolean,
-  created: Schema.Number,
-  lastRun: Schema.optionalKey(Schema.Number),
+  created: Schema.Finite,
+  lastRun: Schema.optionalKey(Schema.Finite),
   by: ActorKind,
   pending: Schema.optionalKey(Schema.Boolean),
   whenText: Schema.optionalKey(Schema.String),
@@ -614,7 +614,7 @@ export const Priority: Codec<T.Priority> = Schema.Literals(T.PriorityValues);
 export const IssueGraph: Codec<T.IssueGraph> = Schema.Struct({
   state: GraphState,
   branch: Schema.optionalKey(Schema.String),
-  parallel: Schema.Number,
+  parallel: Schema.Finite,
   note: Schema.optionalKey(Schema.String),
 });
 
@@ -629,8 +629,8 @@ export const IssueTask: Codec<T.IssueTask> = Schema.Struct({
   conclusion: Schema.optionalKey(Schema.String),
   commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   spent: Schema.optionalKey(Spent),
-  tries: Schema.Number,
-  failures: Schema.optionalKey(Schema.Number),
+  tries: Schema.Finite,
+  failures: Schema.optionalKey(Schema.Finite),
 });
 
 export const IssueStatus: Codec<T.IssueStatus> = Schema.Literals(T.IssueStatusValues);
@@ -639,14 +639,14 @@ export const PullRequestState: Codec<T.PullRequestState> = Schema.Literals(T.Pul
 
 export const PullRequest: Codec<T.PullRequest> = Schema.Struct({
   url: Schema.String,
-  number: Schema.Number,
+  number: Schema.Finite,
   state: PullRequestState,
 });
 
 export const Finding: Codec<T.Finding> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
   resolved: Schema.optionalKey(Schema.Boolean),
 });
 
@@ -663,7 +663,7 @@ export const Question: Codec<T.Question> = Schema.Struct({
 export const CheckResult: Codec<T.CheckResult> = Schema.Literals(T.CheckResultValues);
 
 export const CriterionCheck: Codec<T.CriterionCheck> = Schema.Struct({
-  criterion: Schema.Number,
+  criterion: Schema.Finite,
   result: CheckResult,
   proof: Schema.optionalKey(Schema.String),
 });
@@ -682,7 +682,7 @@ export const IssueAction: Codec<T.IssueAction> = Schema.Union([
 
 export const IssueAttention: Codec<T.IssueAttention> = Schema.Struct({
   state: Attention,
-  since: Schema.optionalKey(Schema.Number),
+  since: Schema.optionalKey(Schema.Finite),
   stuck: Schema.optionalKey(StuckReason),
   lead: Schema.optionalKey(IssueAct),
   acts: Schema.mutable(Schema.Array(IssueAction)),
@@ -691,7 +691,7 @@ export const IssueAttention: Codec<T.IssueAttention> = Schema.Struct({
 export const MilestoneKind: Codec<T.MilestoneKind> = Schema.Literals(T.MilestoneKindValues);
 
 export const Milestone: Codec<T.Milestone> = Schema.Struct({
-  at: Schema.Number,
+  at: Schema.Finite,
   kind: MilestoneKind,
   who: Schema.optionalKey(Schema.String),
   text: Schema.String,
@@ -707,8 +707,8 @@ export const Preview: Codec<T.Preview> = Schema.Struct({
 });
 
 export const IssueRun: Codec<T.IssueRun> = Schema.Struct({
-  startedAt: Schema.Number,
-  endedAt: Schema.optionalKey(Schema.Number),
+  startedAt: Schema.Finite,
+  endedAt: Schema.optionalKey(Schema.Finite),
   outcome: Schema.optionalKey(Outcome),
 });
 
@@ -716,17 +716,17 @@ export const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableVa
 
 export const Issue: Codec<T.Issue> = Schema.Struct({
   id: IssueId,
-  number: Schema.Number,
+  number: Schema.Finite,
   title: Schema.String,
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Priority,
-  rank: Schema.optionalKey(Schema.Number),
-  createdAt: Schema.Number,
-  queuedAt: Schema.optionalKey(Schema.Number),
+  rank: Schema.optionalKey(Schema.Finite),
+  createdAt: Schema.Finite,
+  queuedAt: Schema.optionalKey(Schema.Finite),
   sessions: Schema.mutable(Schema.Array(SessionId)),
-  closedAt: Schema.optionalKey(Schema.Number),
+  closedAt: Schema.optionalKey(Schema.Finite),
   delivered: Schema.optionalKey(Delivery),
   canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(IssueId),
@@ -739,7 +739,7 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   pullRequest: Schema.optionalKey(PullRequest),
   deliver: Deliverable,
   talk: Schema.optionalKey(Schema.String),
-  reviewedAt: Schema.optionalKey(Schema.Number),
+  reviewedAt: Schema.optionalKey(Schema.Finite),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
@@ -761,10 +761,10 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
   pairCode: Schema.optionalKey(Schema.String),
   channel: Schema.optionalKey(Schema.String),
   owner: Schema.optionalKey(Schema.String),
-  since: Schema.optionalKey(Schema.Number),
-  lastInbound: Schema.optionalKey(Schema.Number),
-  pausedUntil: Schema.optionalKey(Schema.Number),
-  pending: Schema.Number,
+  since: Schema.optionalKey(Schema.Finite),
+  lastInbound: Schema.optionalKey(Schema.Finite),
+  pausedUntil: Schema.optionalKey(Schema.Finite),
+  pending: Schema.Finite,
   error: Schema.optionalKey(Schema.String),
 });
 
@@ -786,19 +786,19 @@ export const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.Ses
 export const ToolAction: Codec<T.ToolAction> = Schema.Literals(T.ToolActionValues);
 
 export const EventTokens: Codec<T.EventTokens> = Schema.Struct({
-  input: Schema.Number,
-  cacheRead: Schema.Number,
-  output: Schema.Number,
+  input: Schema.Finite,
+  cacheRead: Schema.Finite,
+  output: Schema.Finite,
 });
 
 export const SessionEvent: Codec<T.SessionEvent> = Schema.Struct({
-  seq: Schema.Number,
-  revision: Schema.Number,
-  time: Schema.Number,
+  seq: Schema.Finite,
+  revision: Schema.Finite,
+  time: Schema.Finite,
   type: SessionEventType,
   run: Schema.optionalKey(Schema.String),
-  call: Schema.optionalKey(Schema.Number),
-  under: Schema.optionalKey(Schema.Number),
+  call: Schema.optionalKey(Schema.Finite),
+  under: Schema.optionalKey(Schema.Finite),
   text: Schema.String,
   action: Schema.optionalKey(ToolAction),
   actionText: Schema.optionalKey(Schema.String),
@@ -844,13 +844,13 @@ export const ModelEntry: Codec<T.ModelEntry> = Schema.Struct({
 
 export const UsageWindow: Codec<T.UsageWindow> = Schema.Struct({
   label: Schema.String,
-  usedPercent: Schema.Number,
-  resetsAt: Schema.NullOr(Schema.Number),
+  usedPercent: Schema.Finite,
+  resetsAt: Schema.NullOr(Schema.Finite),
 });
 
 export const Balance: Codec<T.Balance> = Schema.Struct({
   currency: Schema.String,
-  amount: Schema.Number,
+  amount: Schema.Finite,
 });
 
 export const AccountUsageOk: Codec<T.AccountUsageOk> = Schema.Struct({
@@ -890,8 +890,8 @@ export const RuntimeSettings: Codec<T.RuntimeSettings> = Schema.Struct({
   defaultModel: Schema.String,
   defaultEffort: Schema.String,
   env: Schema.Record(Schema.String, Schema.String),
-  dailyBudget: Schema.optionalKey(Schema.Number),
-  maxWorking: Schema.optionalKey(Schema.Number),
+  dailyBudget: Schema.optionalKey(Schema.Finite),
+  maxWorking: Schema.optionalKey(Schema.Finite),
 });
 
 export const RuntimeInfo: Codec<T.RuntimeInfo> = Schema.Struct({
@@ -905,16 +905,16 @@ export const RuntimeInfo: Codec<T.RuntimeInfo> = Schema.Struct({
   mcpServers: Schema.NullOr(Schema.mutable(Schema.Array(InventoryEntry))),
   tools: Schema.NullOr(Schema.mutable(Schema.Array(InventoryEntry))),
   settings: RuntimeSettings,
-  spentToday: Schema.optionalKey(Schema.Number),
+  spentToday: Schema.optionalKey(Schema.Finite),
   quota: Schema.optionalKey(RuntimeQuota),
   stop: Schema.optionalKey(Schema.String),
-  checkedAt: Schema.Number,
+  checkedAt: Schema.Finite,
 });
 
 export const FarmLevel: Codec<T.FarmLevel> = Schema.Struct({
-  level: Schema.Number,
-  xp: Schema.Number,
-  need: Schema.Number,
+  level: Schema.Finite,
+  xp: Schema.Finite,
+  need: Schema.Finite,
 });
 
 export const InboxKind: Codec<T.InboxKind> = Schema.Literals(T.InboxKindValues);
@@ -962,7 +962,7 @@ export const InboxItem: Codec<T.InboxItem> = Schema.Struct({
   from: InboxFrom,
   who: Schema.String,
   text: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
   target: InboxTarget,
   words: InboxWords,
 });
@@ -990,8 +990,8 @@ export const FarmView: Codec<T.FarmView> = Schema.Struct({
 export const GameEffectReward: Codec<T.GameEffectReward> = Schema.Struct({
   kind: Schema.Literal("reward"),
   sessionId: Schema.optionalKey(SessionId),
-  coins: Schema.Number,
-  streak: Schema.Number,
+  coins: Schema.Finite,
+  streak: Schema.Finite,
 });
 
 export const GameEffectPenalty: Codec<T.GameEffectPenalty> = Schema.Struct({
@@ -1001,17 +1001,17 @@ export const GameEffectPenalty: Codec<T.GameEffectPenalty> = Schema.Struct({
 
 export const GameEffectLevelUp: Codec<T.GameEffectLevelUp> = Schema.Struct({
   kind: Schema.Literal("levelUp"),
-  level: Schema.Number,
+  level: Schema.Finite,
 });
 
 export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Struct({
   kind: Schema.Literal("achievement"),
   achievement: Schema.String,
-  tier: Schema.Number,
+  tier: Schema.Finite,
   title: Schema.String,
   reached: Schema.String,
   detail: Schema.String,
-  coins: Schema.Number,
+  coins: Schema.Finite,
   oneOff: Schema.optionalKey(Schema.Boolean),
 });
 
@@ -1143,7 +1143,7 @@ export const GraphEvent: Codec<T.GraphEvent> = Schema.Struct({
   detail: Schema.optionalKey(Schema.String),
   changes: Schema.optionalKey(Schema.mutable(Schema.Array(TaskFieldChange))),
   commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  at: Schema.Number,
+  at: Schema.Finite,
   text: Schema.optionalKey(Schema.String),
   actorText: Schema.optionalKey(Schema.String),
 });
@@ -1151,8 +1151,8 @@ export const GraphEvent: Codec<T.GraphEvent> = Schema.Struct({
 export const LanDevice: Codec<T.LanDevice> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  pairedAt: Schema.Number,
-  lastSeen: Schema.optionalKey(Schema.Number),
+  pairedAt: Schema.Finite,
+  lastSeen: Schema.optionalKey(Schema.Finite),
 });
 
 export const LanPaired: Codec<T.LanPaired> = Schema.Struct({
@@ -1169,7 +1169,7 @@ export const LanPairRequest: Codec<T.LanPairRequest> = Schema.Struct({
 export const LanPairing: Codec<T.LanPairing> = Schema.Struct({
   code: Schema.String,
   link: Schema.String,
-  expiresAt: Schema.Number,
+  expiresAt: Schema.Finite,
   asking: Schema.optionalKey(Schema.String),
 });
 
@@ -1201,35 +1201,35 @@ export const AgoraGrant: Codec<T.AgoraGrant> = Schema.Struct({
 
 export const DayCount: Codec<T.DayCount> = Schema.Struct({
   day: Schema.String,
-  commits: Schema.Number,
+  commits: Schema.Finite,
 });
 
 export const Author: Codec<T.Author> = Schema.Struct({
   name: Schema.String,
-  commits: Schema.Number,
+  commits: Schema.Finite,
 });
 
 export const ProjectActivity: Codec<T.ProjectActivity> = Schema.Struct({
   project: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
   days: Schema.mutable(Schema.Array(DayCount)),
   authors: Schema.mutable(Schema.Array(Author)),
-  total: Schema.Number,
-  first: Schema.optionalKey(Schema.Number),
-  last: Schema.optionalKey(Schema.Number),
+  total: Schema.Finite,
+  first: Schema.optionalKey(Schema.Finite),
+  last: Schema.optionalKey(Schema.Finite),
 });
 
 export const LanguageCount: Codec<T.LanguageCount> = Schema.Struct({
   name: Schema.String,
-  files: Schema.Number,
-  code: Schema.Number,
-  comments: Schema.Number,
-  blanks: Schema.Number,
+  files: Schema.Finite,
+  code: Schema.Finite,
+  comments: Schema.Finite,
+  blanks: Schema.Finite,
 });
 
 export const ProjectLanguages: Codec<T.ProjectLanguages> = Schema.Struct({
   project: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
   languages: Schema.mutable(Schema.Array(LanguageCount)),
 });
 
@@ -1242,8 +1242,8 @@ export const ProjectStack: Codec<T.ProjectStack> = Schema.Struct({
 });
 
 export const TemplateBlank: Codec<T.TemplateBlank> = Schema.Struct({
-  start: Schema.Number,
-  end: Schema.Number,
+  start: Schema.Finite,
+  end: Schema.Finite,
 });
 
 export const IssueTemplate: Codec<T.IssueTemplate> = Schema.Struct({
@@ -1288,8 +1288,8 @@ export const ProjectSummary: Codec<T.ProjectSummary> = Schema.Struct({
   name: Schema.String,
   path: Schema.String,
   git: Schema.Boolean,
-  last: Schema.optionalKey(Schema.Number),
-  maxSessions: Schema.Number,
+  last: Schema.optionalKey(Schema.Finite),
+  maxSessions: Schema.Finite,
   pullRequest: PullRequestCapability,
 });
 
@@ -1307,7 +1307,7 @@ export const Skill: Codec<T.Skill> = Schema.Struct({
 
 export const OrchestratorEvalRequest: Codec<T.OrchestratorEvalRequest> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
-  on: Schema.Number,
+  on: Schema.Finite,
   want: Schema.String,
 });
 
@@ -1318,13 +1318,13 @@ export const OrchestratorEval: Codec<T.OrchestratorEval> = Schema.Struct({
 
 export const ArchiveFile: Codec<T.ArchiveFile> = Schema.Struct({
   name: Schema.String,
-  at: Schema.Number,
-  chars: Schema.Number,
+  at: Schema.Finite,
+  chars: Schema.Finite,
 });
 
 export const ArchiveHit: Codec<T.ArchiveHit> = Schema.Struct({
   file: Schema.String,
-  line: Schema.Number,
+  line: Schema.Finite,
   text: Schema.String,
 });
 
@@ -1344,9 +1344,9 @@ const memoryFields = {
   author: Schema.optionalKey(ActorKind),
   project: Schema.optionalKey(Schema.String),
   session: Schema.optionalKey(SessionId),
-  at: Schema.Number,
-  recalled: Schema.Number,
-  recalledAt: Schema.optionalKey(Schema.Number),
+  at: Schema.Finite,
+  recalled: Schema.Finite,
+  recalledAt: Schema.optionalKey(Schema.Finite),
   fading: Schema.optionalKey(Schema.Boolean),
   source: Schema.optionalKey(Schema.String),
 };
@@ -1364,7 +1364,7 @@ export const MemoryScope: Codec<T.MemoryScope> = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("unknown") }),
 ]);
 
-export const MemoryFound: Codec<T.MemoryFound> = Schema.Struct({ ...memoryFields, source: Schema.String, score: Schema.Number, scope: MemoryScope });
+export const MemoryFound: Codec<T.MemoryFound> = Schema.Struct({ ...memoryFields, source: Schema.String, score: Schema.Finite, scope: MemoryScope });
 
 export const MemorySearch: Codec<T.MemorySearch> = Schema.Struct({
   found: Schema.mutable(Schema.Array(MemoryFound)),
@@ -1385,20 +1385,20 @@ export const MemoryList: Codec<T.MemoryList> = Schema.Struct({
   memories: Schema.mutable(Schema.Array(Memory)),
   sources: Schema.mutable(Schema.Array(MemorySourceInfo)),
   file: Schema.optionalKey(Schema.String),
-  carried: Schema.optionalKey(Schema.Number),
+  carried: Schema.optionalKey(Schema.Finite),
 });
 
 export const Commit: Codec<T.Commit> = Schema.Struct({
   hash: Schema.String,
   subject: Schema.String,
-  at: Schema.Number,
+  at: Schema.Finite,
 });
 
 export const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
   path: Schema.String,
   status: Schema.String,
-  added: Schema.Number,
-  removed: Schema.Number,
+  added: Schema.Finite,
+  removed: Schema.Finite,
   patch: Schema.optionalKey(Schema.String),
 });
 
@@ -1415,7 +1415,7 @@ export const Changes: Codec<T.Changes> = Schema.Struct({
   files: Schema.mutable(Schema.Array(ChangedFile)),
   uncommitted: Schema.mutable(Schema.Array(UncommittedItem)),
   conflicts: Schema.mutable(Schema.Array(Schema.String)),
-  behind: Schema.Number,
+  behind: Schema.Finite,
 });
 
 export const TaskEdit: Codec<T.TaskEdit> = Schema.Struct({
@@ -1468,8 +1468,8 @@ export const Run: Codec<T.Run> = Schema.Struct({
   issue: Schema.optionalKey(IssueId),
   triggeredBy: RunTrigger,
   heard: Schema.mutable(Schema.Array(Schema.String)),
-  startedAt: Schema.Number,
-  endedAt: Schema.optionalKey(Schema.Number),
+  startedAt: Schema.Finite,
+  endedAt: Schema.optionalKey(Schema.Finite),
   outcome: Schema.optionalKey(Outcome),
   summary: Schema.optionalKey(Schema.String),
   spent: Schema.optionalKey(Spent),
@@ -1483,9 +1483,9 @@ export const CommentRequest: Codec<T.CommentRequest> = Schema.Struct({
 export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
-  replyTo: Schema.optionalKey(Schema.Number),
+  replyTo: Schema.optionalKey(Schema.Finite),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  station: Schema.optionalKey(Schema.Number),
+  station: Schema.optionalKey(Schema.Finite),
   agent: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),
@@ -1606,9 +1606,9 @@ export const VoiceSettings: Codec<T.VoiceSettings> = Schema.Struct({
   persona: Schema.String,
   greeting: Schema.String,
   failureMessage: Schema.String,
-  silenceMs: Schema.Number,
-  interruptMs: Schema.Number,
-  idleSeconds: Schema.Number,
+  silenceMs: Schema.Finite,
+  interruptMs: Schema.Finite,
+  idleSeconds: Schema.Finite,
 });
 
 export const DictationVia: Codec<T.DictationVia> = Schema.Literals(T.DictationViaValues);
@@ -1674,9 +1674,9 @@ export const SettingsUpdateVoice: Codec<T.SettingsUpdateVoice> = Schema.Struct({
   persona: Schema.optionalKey(Schema.String),
   greeting: Schema.optionalKey(Schema.String),
   failureMessage: Schema.optionalKey(Schema.String),
-  silenceMs: Schema.optionalKey(Schema.Number),
-  interruptMs: Schema.optionalKey(Schema.Number),
-  idleSeconds: Schema.optionalKey(Schema.Number),
+  silenceMs: Schema.optionalKey(Schema.Finite),
+  interruptMs: Schema.optionalKey(Schema.Finite),
+  idleSeconds: Schema.optionalKey(Schema.Finite),
 });
 
 export const SettingsUpdate: Codec<T.SettingsUpdate> = Schema.Struct({
@@ -1703,14 +1703,14 @@ export const Health: Codec<T.Health> = Schema.Struct({
 
 export const FactCall: Codec<T.FactCall> = Schema.Struct({
   type: Schema.Literal("call"),
-  at: Schema.Number,
+  at: Schema.Finite,
   state: CallState,
   reason: Schema.optionalKey(Schema.String),
 });
 
 export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
   type: Schema.Literal("orchestrator"),
-  at: Schema.Number,
+  at: Schema.Finite,
   agent: Schema.String,
   state: OrchestratorState,
   channel: Schema.optionalKey(Schema.String),
@@ -1718,7 +1718,7 @@ export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
 
 export const FactMessage: Codec<T.FactMessage> = Schema.Struct({
   type: Schema.Literal("message"),
-  at: Schema.Number,
+  at: Schema.Finite,
   message: ChatMessage,
   thread: Schema.optionalKey(Schema.String),
   answers: Schema.optionalKey(SessionId),
@@ -1726,39 +1726,39 @@ export const FactMessage: Codec<T.FactMessage> = Schema.Struct({
 
 export const FactChannel: Codec<T.FactChannel> = Schema.Struct({
   type: Schema.Literal("channel"),
-  at: Schema.Number,
+  at: Schema.Finite,
   channel: Channel,
 });
 
 export const FactOwnerMentions: Codec<T.FactOwnerMentions> = Schema.Struct({
   type: Schema.Literal("ownerMentions"),
-  at: Schema.Number,
+  at: Schema.Finite,
   mentions: Schema.mutable(Schema.Array(OwnerMention)),
 });
 
 export const FactHired: Codec<T.FactHired> = Schema.Struct({
   type: Schema.Literal("hired"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Session,
 });
 
 export const FactStation: Codec<T.FactStation> = Schema.Struct({
   type: Schema.Literal("station"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
-  station: Schema.Number,
+  station: Schema.Finite,
 });
 
 export const FactRun: Codec<T.FactRun> = Schema.Struct({
   type: Schema.Literal("run"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
   brief: Schema.optionalKey(Schema.String),
 });
 
 export const FactDoing: Codec<T.FactDoing> = Schema.Struct({
   type: Schema.Literal("doing"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
   action: SessionAction,
   label: Schema.String,
@@ -1766,34 +1766,34 @@ export const FactDoing: Codec<T.FactDoing> = Schema.Struct({
 
 export const FactQuiet: Codec<T.FactQuiet> = Schema.Struct({
   type: Schema.Literal("quiet"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
-  since: Schema.Number,
+  since: Schema.Finite,
 });
 
 export const FactRetry: Codec<T.FactRetry> = Schema.Struct({
   type: Schema.Literal("retry"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
-  attempt: Schema.Number,
-  of: Schema.optionalKey(Schema.Number),
+  attempt: Schema.Finite,
+  of: Schema.optionalKey(Schema.Finite),
 });
 
 export const FactSpent: Codec<T.FactSpent> = Schema.Struct({
   type: Schema.Literal("spent"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
   spent: Spent,
 });
 
 export const FactReport: Codec<T.FactReport> = Schema.Struct({
   type: Schema.Literal("report"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
   run: Schema.optionalKey(Schema.String),
   outcome: Outcome,
   summary: Schema.String,
-  runs: Schema.Number,
+  runs: Schema.Finite,
   spent: Schema.optionalKey(Spent),
   questions: Schema.optionalKey(Schema.mutable(Schema.Array(Question))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
@@ -1802,65 +1802,65 @@ export const FactReport: Codec<T.FactReport> = Schema.Struct({
 
 export const FactConflict: Codec<T.FactConflict> = Schema.Struct({
   type: Schema.Literal("conflict"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
   conflict: Schema.optionalKey(Conflict),
 });
 
 export const FactLeft: Codec<T.FactLeft> = Schema.Struct({
   type: Schema.Literal("left"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: SessionId,
   closed: Schema.optionalKey(SessionClose),
-  merged: Schema.optionalKey(Schema.Number),
+  merged: Schema.optionalKey(Schema.Finite),
 });
 
 export const FactCommits: Codec<T.FactCommits> = Schema.Struct({
   type: Schema.Literal("commits"),
-  at: Schema.Number,
+  at: Schema.Finite,
   commits: CommitCount,
 });
 
 export const FactIssue: Codec<T.FactIssue> = Schema.Struct({
   type: Schema.Literal("issue"),
-  at: Schema.Number,
+  at: Schema.Finite,
   issue: Issue,
 });
 
 export const FactChannelGone: Codec<T.FactChannelGone> = Schema.Struct({
   type: Schema.Literal("channelGone"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: Schema.String,
 });
 
 export const FactIssueGone: Codec<T.FactIssueGone> = Schema.Struct({
   type: Schema.Literal("issueGone"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: IssueId,
 });
 
 export const FactProgress: Codec<T.FactProgress> = Schema.Struct({
   type: Schema.Literal("progress"),
-  at: Schema.Number,
+  at: Schema.Finite,
   progress: Progress,
   news: Schema.optionalKey(ProgressNews),
 });
 
 export const FactCron: Codec<T.FactCron> = Schema.Struct({
   type: Schema.Literal("cron"),
-  at: Schema.Number,
+  at: Schema.Finite,
   cron: Cron,
 });
 
 export const FactCronGone: Codec<T.FactCronGone> = Schema.Struct({
   type: Schema.Literal("cronGone"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: Schema.String,
 });
 
 export const FactConnector: Codec<T.FactConnector> = Schema.Struct({
   type: Schema.Literal("connector"),
-  at: Schema.Number,
+  at: Schema.Finite,
   status: ConnectorStatus,
 });
 
@@ -1892,27 +1892,27 @@ export const Fact: Codec<T.Fact> = Schema.Union([
 
 export const SideEventSnapshot: Codec<T.SideEventSnapshot> = Schema.Struct({
   type: Schema.Literal("snapshot"),
-  at: Schema.Number,
+  at: Schema.Finite,
   state: WorkspaceState,
 });
 
 export const SideEventSessionEvent: Codec<T.SideEventSessionEvent> = Schema.Struct({
   type: Schema.Literal("event"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: Schema.String,
   activity: SessionEvent,
 });
 
 export const SideEventNotice: Codec<T.SideEventNotice> = Schema.Struct({
   type: Schema.Literal("notice"),
-  at: Schema.Number,
+  at: Schema.Finite,
   level: NoticeLevel,
   text: Schema.String,
 });
 
 export const SideEventRuntime: Codec<T.SideEventRuntime> = Schema.Struct({
   type: Schema.Literal("runtime"),
-  at: Schema.Number,
+  at: Schema.Finite,
   info: RuntimeInfo,
 });
 
@@ -1960,7 +1960,7 @@ export const IssueFilter: Codec<T.IssueFilter> = Schema.Struct({
   status: Schema.optionalKey(IssueStatus),
   text: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  limit: Schema.optionalKey(Schema.Number),
+  limit: Schema.optionalKey(Schema.Finite),
   closed: Schema.optionalKey(Schema.Boolean),
   wantsOwner: Schema.optionalKey(Schema.Boolean),
 });
@@ -1997,12 +1997,12 @@ export const TaskActRequest: Codec<T.TaskActRequest> = Schema.Struct({
 });
 
 export const ChatReadRequest: Codec<T.ChatReadRequest> = Schema.Struct({
-  number: Schema.Number,
+  number: Schema.Finite,
 });
 
 export const ChooseTitleRequest: Codec<T.ChooseTitleRequest> = Schema.Struct({
   achievement: Schema.optionalKey(Schema.String),
-  tier: Schema.optionalKey(Schema.Number),
+  tier: Schema.optionalKey(Schema.Finite),
 });
 
 const renewRequestFields = { channel: Schema.String, uid: Schema.String };
@@ -2050,21 +2050,21 @@ export const AnswerPairingRequest: Codec<T.AnswerPairingRequest> = Schema.Struct
 
 export const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
   type: Schema.Literal("event"),
-  at: Schema.Number,
+  at: Schema.Finite,
   id: Schema.String,
   activity: SessionEvent,
 });
 
 export const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
   type: Schema.Literal("notice"),
-  at: Schema.Number,
+  at: Schema.Finite,
   level: NoticeLevel,
   text: Schema.String,
 });
 
 export const LiveEventRuntime: Codec<T.LiveEventRuntime> = Schema.Struct({
   type: Schema.Literal("runtime"),
-  at: Schema.Number,
+  at: Schema.Finite,
   info: RuntimeInfo,
 });
 
@@ -2084,12 +2084,12 @@ export const TextSpan: Codec<T.TextSpan> = Schema.Struct({
 });
 
 export const BlockAttrs: Codec<T.BlockAttrs> = Schema.Struct({
-  level: Schema.optionalKey(Schema.Number),
+  level: Schema.optionalKey(Schema.Finite),
   checked: Schema.optionalKey(Schema.Boolean),
   language: Schema.optionalKey(Schema.String),
   src: Schema.optionalKey(Schema.String),
-  width: Schema.optionalKey(Schema.Number),
-  height: Schema.optionalKey(Schema.Number),
+  width: Schema.optionalKey(Schema.Finite),
+  height: Schema.optionalKey(Schema.Finite),
   alt: Schema.optionalKey(Schema.String),
   issueId: Schema.optionalKey(IssueId),
   memoryId: Schema.optionalKey(Schema.String),
@@ -2111,10 +2111,10 @@ export const BlockInput: Codec<T.BlockInput> = Schema.Struct(blockInputFields);
 export const Block: Codec<T.Block> = Schema.Struct({
   ...blockInputFields,
   artifactId: Schema.String,
-  rev: Schema.Number,
+  rev: Schema.Finite,
   deleted: Schema.optionalKey(Schema.Boolean),
   updatedBy: Schema.String,
-  updated: Schema.Number,
+  updated: Schema.Finite,
 });
 
 export const BlockSnapshot: Codec<T.BlockSnapshot> = Schema.Struct({
@@ -2134,7 +2134,7 @@ export const BlockOpInsertBlock: Codec<T.BlockOpInsertBlock> = Schema.Struct({
 export const BlockOpUpdateText: Codec<T.BlockOpUpdateText> = Schema.Struct({
   op: Schema.Literal("update_text"),
   blockId: Schema.String,
-  baseRev: Schema.Number,
+  baseRev: Schema.Finite,
   text: Schema.mutable(Schema.Array(TextSpan)),
 });
 
@@ -2172,8 +2172,8 @@ export const BlockOpRestoreBlock: Codec<T.BlockOpRestoreBlock> = Schema.Struct({
 export const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
   op: Schema.Literal("split_block"),
   blockId: Schema.String,
-  baseRev: Schema.Number,
-  offset: Schema.Number,
+  baseRev: Schema.Finite,
+  offset: Schema.Finite,
   newBlock: BlockInput,
 });
 
@@ -2197,7 +2197,7 @@ export const BlockOp: Codec<T.BlockOp> = Schema.Union([
 
 export const BlockSubmit: Codec<T.BlockSubmit> = Schema.Struct({
   batchId: Schema.String,
-  lastSeq: Schema.Number,
+  lastSeq: Schema.Finite,
   ops: Schema.mutable(Schema.Array(BlockOp)),
 });
 
@@ -2205,20 +2205,20 @@ export const BlockOpStatus: Codec<T.BlockOpStatus> = Schema.Literals(T.BlockOpSt
 
 export const BlockCreate: Codec<T.BlockCreate> = Schema.Struct({
   type: Schema.optionalKey(Schema.String),
-  level: Schema.optionalKey(Schema.Number),
+  level: Schema.optionalKey(Schema.Finite),
   text: Schema.String,
 });
 
 export const BlockUpdate: Codec<T.BlockUpdate> = Schema.Struct({
   block: Schema.String,
-  baseRev: Schema.Number,
+  baseRev: Schema.Finite,
   text: Schema.String,
 });
 
 export const BlockOpResult: Codec<T.BlockOpResult> = Schema.Struct({
   status: BlockOpStatus,
   blockId: Schema.String,
-  rev: Schema.optionalKey(Schema.Number),
+  rev: Schema.optionalKey(Schema.Finite),
   text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
   yours: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
   reason: Schema.optionalKey(Schema.String),
@@ -2226,7 +2226,7 @@ export const BlockOpResult: Codec<T.BlockOpResult> = Schema.Struct({
 
 export const BlockAck: Codec<T.BlockAck> = Schema.Struct({
   batchId: Schema.String,
-  seq: Schema.Number,
+  seq: Schema.Finite,
   results: Schema.mutable(Schema.Array(BlockOpResult)),
   blocks: Schema.mutable(Schema.Array(Block)),
 });
@@ -2247,7 +2247,7 @@ export const MessageSearch: Codec<T.MessageSearch> = Schema.Struct({ text: Schem
 
 export const ChannelUnread: Codec<T.ChannelUnread> = Schema.Struct({
   channel: Schema.String,
-  unread: Schema.Number,
+  unread: Schema.Finite,
   mentionsYou: Schema.Boolean,
   latest: Schema.optionalKey(Schema.String),
 });

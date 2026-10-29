@@ -4,7 +4,7 @@
 // agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
-import { AgentClosed, asError, toolFailed } from "./core/errors.ts";
+import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/errors.ts";
 import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
 import { join } from "node:path";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
@@ -195,13 +195,13 @@ export class Brain {
   private knownMemory: string[] = [];
 
   /** Connects to its MCP servers first: one that cannot be reached is left out (mcpStatus). */
-  static make(options: BrainOptions): Effect.Effect<Brain, Error, Scope.Scope> {
+  static make(options: BrainOptions): Effect.Effect<Brain, AgentFailed, Scope.Scope> {
     return Effect.gen(function* () {
-      const mcp = yield* Effect.acquireRelease(Effect.tryPromise({ try: (signal) => connectAll(options.mcpServers ?? [], signal), catch: asError }), (m) =>
+      const mcp = yield* Effect.acquireRelease(Effect.tryPromise({ try: (signal) => connectAll(options.mcpServers ?? [], signal), catch: agentFailed }), (m) =>
         Effect.promise(() => m.close()),
       );
       const clock = yield* Clock.Clock;
-      const brain = yield* Effect.try({ try: () => new Brain(options, mcp, () => clock.currentTimeMillisUnsafe()), catch: asError });
+      const brain = yield* Effect.try({ try: () => new Brain(options, mcp, () => clock.currentTimeMillisUnsafe()), catch: agentFailed });
       yield* brain.open();
       return brain;
     });
@@ -322,7 +322,7 @@ export class Brain {
   }
 
   private tick(): Effect.Effect<void> {
-    return Effect.try({ try: () => this.reminders?.tick() ?? [], catch: asError }).pipe(
+    return Effect.try({ try: () => this.reminders?.tick() ?? [], catch: agentFailed }).pipe(
       Effect.flatMap((due) => Effect.forEach(due, (text) => this.later(customMessage("reminder", text, this.now())), { discard: true })),
       Effect.catch((e) => Effect.logError("agent: cannot claim due reminders:", e)),
     );
@@ -460,7 +460,7 @@ export class Brain {
   }
 
   private save(message: BrainMessage): Effect.Effect<void> {
-    return Effect.try({ try: () => this.session?.append(message), catch: asError }).pipe(
+    return Effect.try({ try: () => this.session?.append(message), catch: agentFailed }).pipe(
       Effect.catch((err) => Effect.logError(`agent ${this.options.name}: cannot save the conversation:`, err)),
     );
   }

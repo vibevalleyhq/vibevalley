@@ -21,7 +21,7 @@ export const ArtifactBlocksResult = Schema.Struct({
   ["rev"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["deleted"]: Schema.Boolean,
   ["updated_by"]: Schema.String,
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
 })
 export type ArtifactBlocksResult = typeof ArtifactBlocksResult.Type
 
@@ -71,7 +71,7 @@ export const PutArtifactBlockParams = Schema.Struct({
   ["rev"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["deleted"]: Schema.Boolean,
   ["updated_by"]: Schema.String,
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
 })
 export type PutArtifactBlockParams = typeof PutArtifactBlockParams.Type
 

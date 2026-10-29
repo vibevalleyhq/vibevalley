@@ -20,8 +20,8 @@ export const CronsResult = Schema.Struct({
   ["spec"]: Schema.String,
   ["tz"]: Schema.String,
   ["enabled"]: Schema.Boolean,
-  ["created_at"]: Schema.Number,
-  ["last_run"]: Schema.NullOr(Schema.Number),
+  ["created_at"]: Schema.Finite,
+  ["last_run"]: Schema.NullOr(Schema.Finite),
   ["set_by"]: Schema.String,
   ["pending"]: Schema.Boolean,
 })
@@ -50,7 +50,7 @@ export const AddCronParams = Schema.Struct({
   ["tz"]: Schema.String,
   ["pending"]: Schema.Boolean,
   ["set_by"]: Schema.String,
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type AddCronParams = typeof AddCronParams.Type
 
@@ -66,7 +66,7 @@ export const addCron = Effect.fn("AddCron")(function* (params: AddCronParams) {
 })
 
 export const CronRanParams = Schema.Struct({
-  ["last_run"]: Schema.NullOr(Schema.Number),
+  ["last_run"]: Schema.NullOr(Schema.Finite),
   ["enabled"]: Schema.Boolean,
   ["id"]: Schema.String,
 })

@@ -51,9 +51,9 @@ const modelPair = jsonOrNone(Schema.Tuple([Schema.String, Schema.String]));
 /** A JSON-RPC answer on dsh's stdout. */
 const rpcAnswer = jsonOrNone(
   Schema.Struct({
-    id: Schema.optionalKey(Schema.Number),
+    id: Schema.optionalKey(Schema.Finite),
     result: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-    error: Schema.optionalKey(Schema.Struct({ code: Schema.optionalKey(Schema.Number), message: Schema.optionalKey(Schema.String) })),
+    error: Schema.optionalKey(Schema.Struct({ code: Schema.optionalKey(Schema.Finite), message: Schema.optionalKey(Schema.String) })),
   }),
 );
 

@@ -13,7 +13,7 @@ export const KeepSessionParams = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
-  ["hired_at"]: Schema.Number,
+  ["hired_at"]: Schema.Finite,
 })
 export type KeepSessionParams = typeof KeepSessionParams.Type
 
@@ -29,7 +29,7 @@ export const keepSession = Effect.fn("KeepSession")(function* (params: KeepSessi
 })
 
 export const EndSessionParams = Schema.Struct({
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["closed"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
@@ -61,8 +61,8 @@ export const SessionByIDResult = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
-  ["hired_at"]: Schema.Number,
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["hired_at"]: Schema.Finite,
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["closed"]: Schema.NullOr(Schema.String),
   ["place"]: Schema.NullOr(Schema.String),
   ["oar_session"]: Schema.NullOr(Schema.String),
@@ -98,8 +98,8 @@ export const EndedSessionsResult = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
-  ["hired_at"]: Schema.Number,
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["hired_at"]: Schema.Finite,
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["closed"]: Schema.NullOr(Schema.String),
   ["place"]: Schema.NullOr(Schema.String),
   ["oar_session"]: Schema.NullOr(Schema.String),
@@ -121,7 +121,7 @@ export const endedSessions = Effect.fn("EndedSessions")(function* (params: Ended
 })
 
 export const SessionsEndedBeforeParams = Schema.Struct({
-  ["before"]: Schema.NullOr(Schema.Number),
+  ["before"]: Schema.NullOr(Schema.Finite),
 })
 export type SessionsEndedBeforeParams = typeof SessionsEndedBeforeParams.Type
 

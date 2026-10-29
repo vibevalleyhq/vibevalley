@@ -33,7 +33,7 @@ export const CreateChannelParams = Schema.Struct({
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
   ["project"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type CreateChannelParams = typeof CreateChannelParams.Type
 
@@ -51,7 +51,7 @@ export const createChannel = Effect.fn("CreateChannel")(function* (params: Creat
 export const CreateDirectParams = Schema.Struct({
   ["id"]: Schema.String,
   ["peer_id"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type CreateDirectParams = typeof CreateDirectParams.Type
 
@@ -123,7 +123,7 @@ export const CreateThreadParams = Schema.Struct({
   ["subject_kind"]: Schema.NullOr(Schema.String),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type CreateThreadParams = typeof CreateThreadParams.Type
 
@@ -154,7 +154,7 @@ export const AllChannelsResult = Schema.Struct({
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["last_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["reply_count"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
   ["project"]: Schema.NullOr(Schema.String),
@@ -163,7 +163,7 @@ export const AllChannelsResult = Schema.Struct({
   ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["category"]: Schema.NullOr(Schema.String),
   ["position"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["archived_at"]: Schema.NullOr(Schema.Number),
+  ["archived_at"]: Schema.NullOr(Schema.Finite),
   ["notify"]: Schema.String,
   ["orchestrator"]: Schema.NullOr(Schema.String),
 })
@@ -197,7 +197,7 @@ export const RecentChannelsResult = Schema.Struct({
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["last_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["reply_count"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
   ["project"]: Schema.NullOr(Schema.String),
@@ -206,7 +206,7 @@ export const RecentChannelsResult = Schema.Struct({
   ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["category"]: Schema.NullOr(Schema.String),
   ["position"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["archived_at"]: Schema.NullOr(Schema.Number),
+  ["archived_at"]: Schema.NullOr(Schema.Finite),
   ["notify"]: Schema.String,
   ["orchestrator"]: Schema.NullOr(Schema.String),
 })
@@ -349,7 +349,7 @@ export const placeChannel = Effect.fn("PlaceChannel")(function* (params: PlaceCh
 })
 
 export const SetArchivedParams = Schema.Struct({
-  ["archived_at"]: Schema.NullOr(Schema.Number),
+  ["archived_at"]: Schema.NullOr(Schema.Finite),
   ["id"]: Schema.String,
 })
 export type SetArchivedParams = typeof SetArchivedParams.Type

@@ -182,6 +182,9 @@ catalogs:
     '@effect/sql-pglite':
       specifier: 4.0.5
       version: 4.0.5
+    '@effect/tsgo':
+      specifier: 0.63.0
+      version: 0.63.0
     '@effect/vitest':
       specifier: 4.0.5
       version: 4.0.5
@@ -353,6 +356,9 @@ importers:
 
   .:
     devDependencies:
+      '@effect/tsgo':
+        specifier: 'catalog:'
+        version: 0.63.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -1385,6 +1391,45 @@ packages:
     resolution: {integrity: sha512-1kwizzeOqX3l/+YSTG+LWZq07xuKY+jYOziOEumqOCLGjfxr3S5m61jWrAGDFejQLK1zUQtBYNe6FpcFSynzaQ==}
     peerDependencies:
       effect: ^4.0.5
+
+  '@effect/tsgo-darwin-arm64@0.63.0':
+    resolution: {integrity: sha512-KBvYatuEol71+i+BERWuDRU9XE+4sTK78N83Ko6VNF5gy6yXiujj/bgtWs2P3cDGXsevAV6L+HtpuAWjAQKC6Q==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@effect/tsgo-darwin-x64@0.63.0':
+    resolution: {integrity: sha512-Qxp51/OFaHx5D+z5f1FtRKAiUH5rkMzaqjv/4ppUGNS0ppdqlcQ5rwQqbY6CiZOxqUlcnmKRirtWpmuxUgHP7w==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@effect/tsgo-linux-arm64@0.63.0':
+    resolution: {integrity: sha512-uwnM3kSwaHDKPeU1WSMxijdZaM1NxpDREgJtyyIx2qdqB6HnRYhEZB8RrhWvYYPw1QDKaWHd+byzq5p49+o7+Q==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@effect/tsgo-linux-arm@0.63.0':
+    resolution: {integrity: sha512-tVwlTyAqmDVPvDrr0oogCnlRVs96X19Ny9OD/XJ/6QQSp/1hIjXAvKjo9HAyncF2sAUQyVdF1E7Q7X3wFXvSnQ==}
+    cpu: [arm]
+    os: [linux]
+
+  '@effect/tsgo-linux-x64@0.63.0':
+    resolution: {integrity: sha512-fM3pJIhAZEX8LMbd/pN9iYNxkdVEkx68vMtILYGT4qazwxWelvouD/5fNV0SHDmY13Mv04NJ/550vTLC2hU8VA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@effect/tsgo-win32-arm64@0.63.0':
+    resolution: {integrity: sha512-LTS0CrEqZmQO0AJAIfFaETjIN/3d/Nda1Mi5zl90y/9BKZr4yyFfClCkz+DMl6/P/+TOuEQ5Wi8LvRiEdwWT4g==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@effect/tsgo-win32-x64@0.63.0':
+    resolution: {integrity: sha512-28s5YrwL26/7EUnUOu81IOJGJZLkPf2lPkiSIsd4EnFhimeBqP279bhAoDAEwLW1gv45GKM/49JKduXmdLyT1g==}
+    cpu: [x64]
+    os: [win32]
+
+  '@effect/tsgo@0.63.0':
+    resolution: {integrity: sha512-bRbvVj+YLE/nBmcBWGAwsul3mjEYlqqOmWMxvwSVKq/oNnJEuZYgi2OFDeUf7q49E2g3w+oMHMWyN2QayZ77RQ==}
+    hasBin: true
 
   '@effect/vitest@4.0.5':
     resolution: {integrity: sha512-q64paZ/i4V2NiRhTyqCmT2KiDbFjlxc2EZrZca8GGt+Nf8844946HyJM5bPk/q+YeRkFSxIrlCs+J+LSfky/wA==}
@@ -7618,6 +7663,37 @@ snapshots:
     dependencies:
       '@electric-sql/pglite': 0.5.11
       effect: 4.0.5
+
+  '@effect/tsgo-darwin-arm64@0.63.0':
+    optional: true
+
+  '@effect/tsgo-darwin-x64@0.63.0':
+    optional: true
+
+  '@effect/tsgo-linux-arm64@0.63.0':
+    optional: true
+
+  '@effect/tsgo-linux-arm@0.63.0':
+    optional: true
+
+  '@effect/tsgo-linux-x64@0.63.0':
+    optional: true
+
+  '@effect/tsgo-win32-arm64@0.63.0':
+    optional: true
+
+  '@effect/tsgo-win32-x64@0.63.0':
+    optional: true
+
+  '@effect/tsgo@0.63.0':
+    optionalDependencies:
+      '@effect/tsgo-darwin-arm64': 0.63.0
+      '@effect/tsgo-darwin-x64': 0.63.0
+      '@effect/tsgo-linux-arm': 0.63.0
+      '@effect/tsgo-linux-arm64': 0.63.0
+      '@effect/tsgo-linux-x64': 0.63.0
+      '@effect/tsgo-win32-arm64': 0.63.0
+      '@effect/tsgo-win32-x64': 0.63.0
 
   '@effect/vitest@4.0.5(effect@4.0.5)(vitest@5.0.5)':
     dependencies:

@@ -8,7 +8,7 @@ export const SetReadCursorParams = Schema.Struct({
   ["participant_id"]: Schema.String,
   ["channel_id"]: Schema.String,
   ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
 })
 export type SetReadCursorParams = typeof SetReadCursorParams.Type
 
@@ -90,7 +90,7 @@ export const deleteCursorsIn = Effect.fn("DeleteCursorsIn")(function* (params: D
 export const MarkUnreadParams = Schema.Struct({
   ["channel_id"]: Schema.String,
   ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
 })
 export type MarkUnreadParams = typeof MarkUnreadParams.Type
 

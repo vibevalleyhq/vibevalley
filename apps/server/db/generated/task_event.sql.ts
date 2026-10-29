@@ -11,7 +11,7 @@ export const AddGraphEventParams = Schema.Struct({
   ["kind"]: Schema.String,
   ["actor"]: Schema.String,
   ["payload"]: Schema.String,
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type AddGraphEventParams = typeof AddGraphEventParams.Type
 
@@ -40,7 +40,7 @@ export const GraphEventsResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["actor"]: Schema.String,
   ["payload"]: Schema.String,
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type GraphEventsResult = typeof GraphEventsResult.Type
 

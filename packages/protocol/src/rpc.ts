@@ -10,7 +10,7 @@ export const rpcPath = "/api/v1/rpc";
 
 export class Subscriptions extends RpcGroup.make(
   /** What changed in a channel after the revision after, then each change from now on, each the message as it now is. */
-  Rpc.make("channel.follow", { payload: { id: Schema.String, after: Schema.Number }, success: S.ChannelEvent, error: ApiError, stream: true }),
+  Rpc.make("channel.follow", { payload: { id: Schema.String, after: Schema.Finite }, success: S.ChannelEvent, error: ApiError, stream: true }),
   /** The turn reports in any channel after the one with this id (by message id, which sorts by time), or the newest
    * when absent, then each report from now on. */
   Rpc.make("channel.reports", { payload: { after: Schema.optionalKey(Schema.String) }, success: S.ChannelEvent, error: ApiError, stream: true }),

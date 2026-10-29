@@ -17,10 +17,10 @@ export const ConnectorAccountResult = Schema.Struct({
   ["pair_code"]: Schema.NullOr(Schema.String),
   ["cursor"]: Schema.String,
   ["reply_context"]: Schema.NullOr(Schema.String),
-  ["reply_at"]: Schema.NullOr(Schema.Number),
-  ["last_inbound"]: Schema.NullOr(Schema.Number),
-  ["paused_until"]: Schema.NullOr(Schema.Number),
-  ["connected_at"]: Schema.Number,
+  ["reply_at"]: Schema.NullOr(Schema.Finite),
+  ["last_inbound"]: Schema.NullOr(Schema.Finite),
+  ["paused_until"]: Schema.NullOr(Schema.Finite),
+  ["connected_at"]: Schema.Finite,
   ["channel_id"]: Schema.NullOr(Schema.String),
 })
 export type ConnectorAccountResult = typeof ConnectorAccountResult.Type
@@ -42,7 +42,7 @@ export const ConnectAccountParams = Schema.Struct({
   ["secrets"]: Schema.String,
   ["owner_id"]: Schema.NullOr(Schema.String),
   ["pair_code"]: Schema.NullOr(Schema.String),
-  ["connected_at"]: Schema.Number,
+  ["connected_at"]: Schema.Finite,
 })
 export type ConnectAccountParams = typeof ConnectAccountParams.Type
 
@@ -74,7 +74,7 @@ export const disconnectAccount = Effect.fn("DisconnectAccount")(function* (param
 })
 
 export const PauseAccountParams = Schema.Struct({
-  ["paused_until"]: Schema.NullOr(Schema.Number),
+  ["paused_until"]: Schema.NullOr(Schema.Finite),
   ["connector"]: Schema.String,
 })
 export type PauseAccountParams = typeof PauseAccountParams.Type
@@ -126,7 +126,7 @@ export const accountCursor = Effect.fn("AccountCursor")(function* (params: Accou
 
 export const AccountReplyParams = Schema.Struct({
   ["reply_context"]: Schema.NullOr(Schema.String),
-  ["at"]: Schema.NullOr(Schema.Number),
+  ["at"]: Schema.NullOr(Schema.Finite),
   ["connector"]: Schema.String,
 })
 export type AccountReplyParams = typeof AccountReplyParams.Type

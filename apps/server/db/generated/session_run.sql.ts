@@ -9,7 +9,7 @@ export const StartRunParams = Schema.Struct({
   ["session"]: Schema.String,
   ["issue"]: Schema.NullOr(Schema.String),
   ["triggered_by"]: Schema.String,
-  ["started_at"]: Schema.Number,
+  ["started_at"]: Schema.Finite,
 })
 export type StartRunParams = typeof StartRunParams.Type
 
@@ -42,7 +42,7 @@ export const heardInRun = Effect.fn("HeardInRun")(function* (params: HeardInRunP
 })
 
 export const EndRunParams = Schema.Struct({
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["outcome"]: Schema.NullOr(Schema.String),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
@@ -73,8 +73,8 @@ export const OpenRunsResult = Schema.Struct({
   ["issue"]: Schema.NullOr(Schema.String),
   ["triggered_by"]: Schema.String,
   ["heard"]: Schema.NullOr(Schema.String),
-  ["started_at"]: Schema.Number,
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["started_at"]: Schema.Finite,
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["outcome"]: Schema.NullOr(Schema.String),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
@@ -105,8 +105,8 @@ export const RunsOfIssueResult = Schema.Struct({
   ["issue"]: Schema.NullOr(Schema.String),
   ["triggered_by"]: Schema.String,
   ["heard"]: Schema.NullOr(Schema.String),
-  ["started_at"]: Schema.Number,
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["started_at"]: Schema.Finite,
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["outcome"]: Schema.NullOr(Schema.String),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
@@ -137,8 +137,8 @@ export const RunsOfSessionResult = Schema.Struct({
   ["issue"]: Schema.NullOr(Schema.String),
   ["triggered_by"]: Schema.String,
   ["heard"]: Schema.NullOr(Schema.String),
-  ["started_at"]: Schema.Number,
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["started_at"]: Schema.Finite,
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["outcome"]: Schema.NullOr(Schema.String),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
@@ -169,8 +169,8 @@ export const RunsOfEndedSessionsResult = Schema.Struct({
   ["issue"]: Schema.NullOr(Schema.String),
   ["triggered_by"]: Schema.String,
   ["heard"]: Schema.NullOr(Schema.String),
-  ["started_at"]: Schema.Number,
-  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["started_at"]: Schema.Finite,
+  ["ended_at"]: Schema.NullOr(Schema.Finite),
   ["outcome"]: Schema.NullOr(Schema.String),
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),

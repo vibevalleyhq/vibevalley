@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // once; a page sees only where each comes from and its last characters; keys are never logged. The locale is the
 // process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
+import { messageOf } from "../errors.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
@@ -190,11 +191,10 @@ export const make = Effect.gen(function* () {
     if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = compact(next) as Stored;
-    try {
-      disk.write(() => JSON.stringify(kept, null, 2) + "\n");
-    } catch (e) {
-      return yield* new SettingRefused({ message: t("server.setting.notSaved", { file, why: (e as Error).message }) });
-    }
+    yield* Effect.try({
+      try: () => disk.write(() => JSON.stringify(kept, null, 2) + "\n"),
+      catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }) }),
+    });
     stored = kept;
     setLocale(kept.locale ?? "zh");
     return status();

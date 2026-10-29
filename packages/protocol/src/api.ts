@@ -662,7 +662,7 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "channel.message.list",
     about: ["id"],
-    input: input({ id: Schema.String, before: Schema.optionalKey(Schema.Number), limit: Schema.optionalKey(Schema.Number) }),
+    input: input({ id: Schema.String, before: Schema.optionalKey(Schema.Finite), limit: Schema.optionalKey(Schema.Finite) }),
     result: Schema.mutable(Schema.Array(S.ChatMessage)),
     can: ["owner", "remote", "orchestrator", "session"],
   },

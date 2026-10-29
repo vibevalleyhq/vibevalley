@@ -91,7 +91,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     const answer = Effect.gen(function* () {
       const res = yield* http.execute(request);
       const text = (yield* res.text).slice(0, 4 << 20);
-      if (res.status < 200 || res.status >= 300) return yield* Effect.fail(new SourceError({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` }));
+      if (res.status < 200 || res.status >= 300) return yield* new SourceError({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` });
       return text;
     }).pipe(Effect.catchTag("HttpClientError", (e) => Effect.fail(sourceError(e))));
     return closing ? answer : life.alive(answer);
@@ -118,7 +118,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     };
     const text = yield* post("search", body);
     const found = yield* Effect.mapError(
-      Schema.decodeUnknownEffect(FoundBodySchema)(text),
+      Schema.decodeEffect(FoundBodySchema)(text),
       () => new SourceError({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
     );
     const ownership = (hit: { app_id?: string; project_id?: string }): MemoryScope =>

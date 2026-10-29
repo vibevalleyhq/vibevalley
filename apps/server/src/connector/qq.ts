@@ -14,14 +14,14 @@ const intents = 1 << 25;
 // A refused AppID or secret answers without a token, with QQ's reason in message: that reason is what the owner sees.
 const TokenResponse = Schema.Struct({
   access_token: Schema.optionalKey(Schema.String),
-  expires_in: Schema.optionalKey(Schema.Union([Schema.Number, Schema.String])),
+  expires_in: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.String])),
   message: Schema.optionalKey(Schema.String),
 });
 const GatewayResponse = Schema.Struct({ url: Schema.String });
 const GatewayEvent = Schema.Struct({
-  op: Schema.Number,
+  op: Schema.Finite,
   // Frames that are not dispatches may carry s and t as null.
-  s: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  s: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
   t: Schema.optionalKey(Schema.NullOr(Schema.String)),
   d: Schema.optionalKey(Schema.Unknown),
 });

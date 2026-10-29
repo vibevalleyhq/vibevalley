@@ -214,7 +214,7 @@ export function readMcpConfig(path: string): McpServer[] {
   if (data.trim() === "") throw new Error(mcpConfig.notJson(path));
   let config: { mcpServers?: Record<string, McpEntry> };
   try {
-    config = Schema.decodeUnknownSync(McpConfigSchema)(data);
+    config = Schema.decodeSync(McpConfigSchema)(data);
   } catch (e) {
     throw new Error(mcpConfig.badShape(path, String(e)), { cause: e });
   }

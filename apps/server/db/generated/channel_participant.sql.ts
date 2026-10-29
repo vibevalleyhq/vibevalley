@@ -10,7 +10,7 @@ export const UpsertParticipantParams = Schema.Struct({
   ["name"]: Schema.String,
   ["agent_id"]: Schema.NullOr(Schema.String),
   ["runtime"]: Schema.NullOr(Schema.String),
-  ["joined_at"]: Schema.Number,
+  ["joined_at"]: Schema.Finite,
 })
 export type UpsertParticipantParams = typeof UpsertParticipantParams.Type
 
@@ -26,7 +26,7 @@ export const upsertParticipant = Effect.fn("UpsertParticipant")(function* (param
 })
 
 export const ParticipantLeftParams = Schema.Struct({
-  ["left_at"]: Schema.NullOr(Schema.Number),
+  ["left_at"]: Schema.NullOr(Schema.Finite),
   ["id"]: Schema.String,
 })
 export type ParticipantLeftParams = typeof ParticipantLeftParams.Type
@@ -54,8 +54,8 @@ export const ParticipantsResult = Schema.Struct({
   ["name"]: Schema.String,
   ["agent_id"]: Schema.NullOr(Schema.String),
   ["runtime"]: Schema.NullOr(Schema.String),
-  ["joined_at"]: Schema.Number,
-  ["left_at"]: Schema.NullOr(Schema.Number),
+  ["joined_at"]: Schema.Finite,
+  ["left_at"]: Schema.NullOr(Schema.Finite),
 })
 export type ParticipantsResult = typeof ParticipantsResult.Type
 

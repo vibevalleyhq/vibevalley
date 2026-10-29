@@ -112,12 +112,8 @@ export function embedOf(url: string, html: string): Embed | undefined {
  * here, not by the client, so each hop's address is checked before it is asked. */
 export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resolve: Resolve = resolveAll) {
   const client = yield* HttpClient.HttpClient;
-  let url: URL;
-  try {
-    url = new URL(link);
-  } catch {
-    return undefined;
-  }
+  if (!URL.canParse(link)) return undefined;
+  let url = new URL(link);
   for (let hop = 0; hop <= redirectsMax; hop++) {
     const at = url;
     if (!(yield* Effect.promise(() => reachable(at, resolve)))) return undefined;

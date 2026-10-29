@@ -21,12 +21,9 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
     let input: unknown;
     if (endpoint.input) {
       const text = yield* request.text;
-      let json: unknown;
-      try {
-        json = JSON.parse(text === "" ? "{}" : text);
-      } catch (e) {
-        return badRequest(messageOf(e));
-      }
+      const parsed = yield* Effect.result(Effect.try({ try: (): unknown => JSON.parse(text === "" ? "{}" : text), catch: messageOf }));
+      if (parsed._tag === "Failure") return badRequest(parsed.failure);
+      const json = parsed.success;
       const decoded = Schema.decodeUnknownExit(endpoint.input)(json);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
       input = decoded.value;

@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
+import { messageOf } from "../errors.ts";
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
@@ -80,7 +81,7 @@ const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.D
 const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
-  if ((yield* repository(path).tip(branch)) !== checked) return yield* Effect.fail(MergeFailure.check(t("server.project.branchMoved")));
+  if ((yield* repository(path).tip(branch)) !== checked) return yield* MergeFailure.check(t("server.project.branchMoved"));
 });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
@@ -144,7 +145,7 @@ const localeCompare = (a: string, b: string) => {
 
 /** tokei --output json: each language's lines and the files it read. */
 const tokeiOutput = jsonOrNone(
-  Schema.Record(Schema.String, Schema.Struct({ code: Schema.Number, comments: Schema.Number, blanks: Schema.Number, reports: Schema.Array(Schema.Unknown) })),
+  Schema.Record(Schema.String, Schema.Struct({ code: Schema.Finite, comments: Schema.Finite, blanks: Schema.Finite, reports: Schema.Array(Schema.Unknown) })),
 );
 
 /** Its total, and languages with nothing but blank lines, left out; undefined when it is not tokei's output. */
@@ -434,7 +435,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         .trim()
         .split("\n")
         .slice(-40);
-      return yield* Effect.fail(MergeFailure.check(why + "\n" + lines.join("\n")));
+      return yield* MergeFailure.check(why + "\n" + lines.join("\n"));
     });
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
@@ -444,7 +445,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       const into = target || (yield* repository(path).main);
       const checked = yield* repository(path).tip(place.branch!);
       const conflicts = yield* repository(path).conflicts(into, checked);
-      if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(into, conflicts));
+      if (conflicts.length > 0) return yield* MergeFailure.conflict(into, conflicts);
       yield* projectCheck(place.cwd);
       return checked;
     });
@@ -457,7 +458,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         Effect.gen(function* () {
           const main = yield* repository(path).main;
           const files = yield* repository(path).conflicts(main, place.branch!);
-          if (files.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, files));
+          if (files.length > 0) return yield* MergeFailure.conflict(main, files);
           yield* git(place.cwd, ...asFarm, "merge", "--no-edit", main);
           return main;
         }),
@@ -470,7 +471,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       const main = checkedOut ?? (yield* repository(path).main);
       // A merge that would conflict is not tried: the session resolves it on its branch first.
       const conflicts = yield* repository(path).conflicts(main, branch);
-      if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, conflicts));
+      if (conflicts.length > 0) return yield* MergeFailure.conflict(main, conflicts);
       const ahead = yield* repository(path).ahead(main, branch);
       if (ahead > 0) {
         const merged = yield* gitRun(path, "merge", "--no-edit", branch);
@@ -664,7 +665,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               Effect.gen(function* () {
                 yield* unchangedBranch(path, place.branch!, checked);
                 const head = yield* repository(path).main;
-                if (!(yield* repository(path).isAncestor(head, checked))) return yield* Effect.fail(MergeFailure.check(t("server.project.mainMoved")));
+                if (!(yield* repository(path).isAncestor(head, checked))) return yield* MergeFailure.check(t("server.project.mainMoved"));
                 const { main, ahead } = yield* mergeMain(path, place.branch!, t("server.project.keptBoth", { branch: place.branch! }), head);
                 const warning = yield* cleanupMerged(place, path);
                 return {
@@ -680,14 +681,14 @@ export const make = (hooks: ProjectHooks = {}) =>
         toMergeFailure(
           Effect.gen(function* () {
             const path = join(root, place.project);
-            if (!place.branch) return yield* Effect.fail(MergeFailure.error(t("server.project.inProjectNothing")));
+            if (!place.branch) return yield* MergeFailure.error(t("server.project.inProjectNothing"));
             const checked = yield* checkMerge(place, target);
             return yield* serially(
               place.project,
               Effect.gen(function* () {
                 yield* unchangedBranch(path, place.branch!, checked);
                 const conflicts = yield* repository(path).conflicts(target, place.branch!);
-                if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(target, conflicts));
+                if (conflicts.length > 0) return yield* MergeFailure.conflict(target, conflicts);
                 const brought = (yield* git(path, "log", "--reverse", "--format=%h", `${target}..${place.branch}`)).split("\n").filter((s) => s !== "");
                 if (brought.length > 0) {
                   const ours = yield* repository(path).tip(target);
@@ -828,12 +829,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
             else {
               const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-              let permission: string | null | undefined;
-              try {
-                permission = view.ok ? repoView(view.out).viewerPermission : undefined;
-              } catch {
-                permission = undefined;
-              }
+              const permission = view.ok
+                ? Option.getOrUndefined(yield* Effect.option(Effect.try({ try: () => repoView(view.out).viewerPermission, catch: messageOf })))
+                : undefined;
               c =
                 permission === undefined
                   ? { available: false, reason: t("server.project.github.noPermission") }
@@ -863,7 +861,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const files = yield* repository(path)
               .conflicts(main, checked)
               .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
-            if (files.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, files));
+            if (files.length > 0) return yield* MergeFailure.conflict(main, files);
             const pushed = hooks.push
               ? yield* hooks.push(place.cwd, place.branch!)
               : (yield* run("git", ["push", "-u", "origin", place.branch!], {
@@ -875,12 +873,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             // Recover a creation whose receipt was lost before it was saved.
             const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
             if (!listed.ok) return yield* fail(t("server.project.github.listFailed"));
-            let existing: readonly { url: string; number: number }[];
-            try {
-              existing = openPullRequests(listed.out);
-            } catch {
-              return yield* fail(t("server.project.github.listUnread"));
-            }
+            const existing = yield* Effect.try({ try: () => openPullRequests(listed.out), catch: messageOf }).pipe(
+              Effect.catch(() => fail(t("server.project.github.listUnread"))),
+            );
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
             const check = lexists(join(place.cwd, ".vibevalley/check")) ? t("server.project.github.checked") : t("server.project.github.noCheck");
             // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
@@ -914,12 +909,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         if (repo === "") return yield* fail(t("server.project.github.notGithub"));
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
         if (!viewed.ok) return yield* fail(t("server.project.github.viewFailed", { n }));
-        let result: { readonly state: string; readonly mergedAt?: string | null | undefined };
-        try {
-          result = pullRequestView(viewed.out);
-        } catch {
-          return yield* fail(t("server.project.github.stateUnread", { n }));
-        }
+        const result = yield* Effect.try({ try: () => pullRequestView(viewed.out), catch: messageOf }).pipe(
+          Effect.catch(() => fail(t("server.project.github.stateUnread", { n }))),
+        );
         if (result.mergedAt || result.state === "MERGED") return "merged" as const;
         if (result.state === "OPEN") return "open" as const;
         if (result.state === "CLOSED") return "closed" as const;

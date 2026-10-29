@@ -10,7 +10,7 @@ export const InsertDeliveryParams = Schema.Struct({
   ["reason"]: Schema.String,
   ["wakes"]: Schema.Boolean,
   ["held_by"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type InsertDeliveryParams = typeof InsertDeliveryParams.Type
 
@@ -27,7 +27,7 @@ export const insertDelivery = Effect.fn("InsertDelivery")(function* (params: Ins
 
 export const MarkAnnouncedParams = Schema.Struct({
   ["launch"]: Schema.NullOr(Schema.String),
-  ["announced_at"]: Schema.NullOr(Schema.Number),
+  ["announced_at"]: Schema.NullOr(Schema.Finite),
   ["recipient_id"]: Schema.String,
   ["message_id"]: Schema.String,
 })
@@ -46,7 +46,7 @@ export const markAnnounced = Effect.fn("MarkAnnounced")(function* (params: MarkA
 
 export const MarkHandedParams = Schema.Struct({
   ["launch"]: Schema.NullOr(Schema.String),
-  ["handed_at"]: Schema.NullOr(Schema.Number),
+  ["handed_at"]: Schema.NullOr(Schema.Finite),
   ["recipient_id"]: Schema.String,
   ["message_id"]: Schema.String,
 })
@@ -64,7 +64,7 @@ export const markHanded = Effect.fn("MarkHanded")(function* (params: MarkHandedP
 })
 
 export const SeenHandedParams = Schema.Struct({
-  ["seen_at"]: Schema.NullOr(Schema.Number),
+  ["seen_at"]: Schema.NullOr(Schema.Finite),
   ["recipient_id"]: Schema.String,
   ["launch"]: Schema.NullOr(Schema.String),
 })
@@ -145,7 +145,7 @@ export const rollbackAnnounced = Effect.fn("RollbackAnnounced")(function* (param
 })
 
 export const SeenUpToParams = Schema.Struct({
-  ["at"]: Schema.NullOr(Schema.Number),
+  ["at"]: Schema.NullOr(Schema.Finite),
   ["recipient"]: Schema.String,
   ["channel"]: Schema.String,
   ["upto"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
@@ -164,7 +164,7 @@ export const seenUpTo = Effect.fn("SeenUpTo")(function* (params: SeenUpToParams)
 })
 
 export const SeenOneParams = Schema.Struct({
-  ["seen_at"]: Schema.NullOr(Schema.Number),
+  ["seen_at"]: Schema.NullOr(Schema.Finite),
   ["recipient_id"]: Schema.String,
   ["message_id"]: Schema.String,
 })
@@ -230,7 +230,7 @@ export type LastAgentWakesParams = typeof LastAgentWakesParams.Type
 
 export const LastAgentWakesResult = Schema.Struct({
   ["recipient_id"]: Schema.String,
-  ["at"]: Schema.NullOr(Schema.Number),
+  ["at"]: Schema.NullOr(Schema.Finite),
 })
 export type LastAgentWakesResult = typeof LastAgentWakesResult.Type
 
@@ -267,7 +267,7 @@ export const AllOpenDeliveriesResult = Schema.Struct({
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
   ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
   ["name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["channel_type"]: Schema.String,

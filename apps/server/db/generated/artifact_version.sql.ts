@@ -12,7 +12,7 @@ export const AddArtifactVersionParams = Schema.Struct({
   ["note"]: Schema.NullOr(Schema.String),
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type AddArtifactVersionParams = typeof AddArtifactVersionParams.Type
 
@@ -60,7 +60,7 @@ export const ArtifactVersionsResult = Schema.Struct({
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["message_id"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
   ["message_channel"]: Schema.NullOr(Schema.String),
   ["message_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
@@ -94,7 +94,7 @@ export const ArtifactVersionResult = Schema.Struct({
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["message_id"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type ArtifactVersionResult = typeof ArtifactVersionResult.Type
 

@@ -1,6 +1,7 @@
 // A file the server keeps (state.json…), saved whole or not at all and in order: each
 // write goes to a temporary file renamed over it, so a crash never leaves half a file; the last write asked for wins.
 
+import { messageOf } from "../errors.ts";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { Clock, Effect } from "effect";
@@ -14,18 +15,14 @@ import { randomUUID } from "node:crypto";
 export const readOrSetAside = <A>(file: string, read: (text: string) => A, startsFrom: string): Effect.Effect<A | undefined> =>
   Effect.gen(function* () {
     if (!existsSync(file)) return undefined;
-    try {
-      return read(readFileSync(file, "utf8"));
-    } catch (e) {
-      const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
-      try {
-        renameSync(file, aside);
-      } catch (moved) {
-        return yield* Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${String(moved)}`));
-      }
-      yield* Effect.logWarning(`${file} could not be read (${String(e)}): kept as ${aside}, ${startsFrom}`);
-      return undefined;
-    }
+    const got = yield* Effect.result(Effect.try({ try: () => read(readFileSync(file, "utf8")), catch: messageOf }));
+    if (got._tag === "Success") return got.success;
+    const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
+    yield* Effect.try({ try: () => renameSync(file, aside), catch: messageOf }).pipe(
+      Effect.catch((moved) => Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${moved}`))),
+    );
+    yield* Effect.logWarning(`${file} could not be read (${got.failure}): kept as ${aside}, ${startsFrom}`);
+    return undefined;
   });
 
 export class FileWriter {

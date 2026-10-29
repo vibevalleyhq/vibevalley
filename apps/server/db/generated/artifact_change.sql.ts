@@ -17,7 +17,7 @@ export const ArtifactChangeByBatchResult = Schema.Struct({
   ["actor"]: Schema.String,
   ["block_ids"]: Schema.String,
   ["results"]: Schema.String,
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type ArtifactChangeByBatchResult = typeof ArtifactChangeByBatchResult.Type
 
@@ -40,7 +40,7 @@ export const AddArtifactChangeParams = Schema.Struct({
   ["actor"]: Schema.String,
   ["block_ids"]: Schema.String,
   ["results"]: Schema.String,
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type AddArtifactChangeParams = typeof AddArtifactChangeParams.Type
 

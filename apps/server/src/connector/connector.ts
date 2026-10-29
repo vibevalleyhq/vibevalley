@@ -42,7 +42,7 @@ import { reasonOf } from "../errors.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { type Failure, type Inbound, type Linked, type Progress, type Adapter } from "./adapter.ts";
+import { type Failure, type Inbound, type Linked, type Progress, type Adapter, ConnectorFailed } from "./adapter.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
@@ -177,7 +177,7 @@ export const make = (options: ConnectorOptions = {}) =>
           return;
         }
         const r = row.value;
-        const secrets = Schema.decodeUnknownOption(Schema.fromJsonString(Secrets))(r.secrets);
+        const secrets = Schema.decodeOption(Schema.fromJsonString(Secrets))(r.secrets);
         if (Option.isNone(secrets)) {
           setErr(t("server.connector.unreadSecrets"));
           yield* Effect.logError(`vibevalley: ${id}: the saved secrets cannot be read`);
@@ -429,7 +429,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const drainInbox = Effect.gen(function* () {
         const rows = yield* run(inboundQ.pendingInbound({ connector: id }));
         for (const row of rows) {
-          const m = Schema.decodeUnknownOption(Schema.fromJsonString(InboundSchema))(row.payload);
+          const m = Schema.decodeOption(Schema.fromJsonString(InboundSchema))(row.payload);
           if (Option.isNone(m) || m.value.id !== row.ext_id) {
             // A malformed row can never be delivered; settle it explicitly so later valid messages are not blocked.
             yield* Effect.logError(`vibevalley: ${id}: discarding malformed durable inbound ${row.ext_id}`);
@@ -526,12 +526,12 @@ export const make = (options: ConnectorOptions = {}) =>
         verifyCode = "";
         changed();
       };
-      const loginResult = (g: Fiber.Fiber<unknown>, result: Linked | Error) =>
+      const loginResult = (g: Fiber.Fiber<unknown>, result: Linked | ConnectorFailed) =>
         commands.withPermits(1)(
           Effect.gen(function* () {
             if (g !== current) return;
             yield* stopGeneration;
-            let failure = result instanceof Error ? result.message : undefined;
+            let failure = result instanceof ConnectorFailed ? result.message : undefined;
             if (failure === undefined && !closing) {
               const linked = result as Linked;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
@@ -575,7 +575,7 @@ export const make = (options: ConnectorOptions = {}) =>
               },
               () => verifyCode,
             ),
-          catch: (e) => (e instanceof Error ? e : new Error(String(e))),
+          catch: (cause) => new ConnectorFailed({ message: messageOf(cause), cause }),
         });
         // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
         const g: Fiber.Fiber<unknown> = generation(

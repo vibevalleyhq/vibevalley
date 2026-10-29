@@ -22,8 +22,8 @@ export const OpenAgentTasksResult = Schema.Struct({
   ["state"]: Schema.String,
   ["result"]: Schema.String,
   ["tries"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["updated_at"]: Schema.Number,
-  ["finished_at"]: Schema.NullOr(Schema.Number),
+  ["updated_at"]: Schema.Finite,
+  ["finished_at"]: Schema.NullOr(Schema.Finite),
 })
 export type OpenAgentTasksResult = typeof OpenAgentTasksResult.Type
 
@@ -67,7 +67,7 @@ export const AddAgentTaskParams = Schema.Struct({
   ["state"]: Schema.String,
   ["result"]: Schema.String,
   ["tries"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
 })
 export type AddAgentTaskParams = typeof AddAgentTaskParams.Type
 
@@ -83,7 +83,7 @@ export const addAgentTask = Effect.fn("AddAgentTask")(function* (params: AddAgen
 })
 
 export const FinishAgentTasksParams = Schema.Struct({
-  ["finished_at"]: Schema.NullOr(Schema.Number),
+  ["finished_at"]: Schema.NullOr(Schema.Finite),
   ["keeper"]: Schema.String,
 })
 export type FinishAgentTasksParams = typeof FinishAgentTasksParams.Type

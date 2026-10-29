@@ -9,7 +9,7 @@ export const InsertAttachmentParams = Schema.Struct({
   ["name"]: Schema.String,
   ["type"]: Schema.String,
   ["size"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type InsertAttachmentParams = typeof InsertAttachmentParams.Type
 

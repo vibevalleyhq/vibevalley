@@ -13,7 +13,7 @@ export const AddArtifactParams = Schema.Struct({
   ["by_id"]: Schema.String,
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
 })
 export type AddArtifactParams = typeof AddArtifactParams.Type
 
@@ -45,8 +45,8 @@ export const ArtifactResult = Schema.Struct({
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
-  ["updated_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
+  ["updated_at"]: Schema.Finite,
   ["said_channel"]: Schema.NullOr(Schema.String),
   ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
@@ -81,8 +81,8 @@ export const ArtifactsInChannelResult = Schema.Struct({
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
-  ["updated_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
+  ["updated_at"]: Schema.Finite,
   ["said_channel"]: Schema.NullOr(Schema.String),
   ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
@@ -117,8 +117,8 @@ export const ArtifactsForIssueResult = Schema.Struct({
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
-  ["updated_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
+  ["updated_at"]: Schema.Finite,
   ["said_channel"]: Schema.NullOr(Schema.String),
   ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
@@ -153,8 +153,8 @@ export const ArtifactsResult = Schema.Struct({
   ["by_name"]: Schema.String,
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
-  ["updated_at"]: Schema.Number,
+  ["created_at"]: Schema.Finite,
+  ["updated_at"]: Schema.Finite,
   ["said_channel"]: Schema.NullOr(Schema.String),
   ["said_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
@@ -174,7 +174,7 @@ export const artifacts = Effect.fn("Artifacts")(function* (params: ArtifactsPara
 
 export const ArtifactVersionedParams = Schema.Struct({
   ["version"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
   ["id"]: Schema.String,
 })
 export type ArtifactVersionedParams = typeof ArtifactVersionedParams.Type
@@ -192,7 +192,7 @@ export const artifactVersioned = Effect.fn("ArtifactVersioned")(function* (param
 
 export const ArtifactAcceptedParams = Schema.Struct({
   ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
   ["id"]: Schema.String,
 })
 export type ArtifactAcceptedParams = typeof ArtifactAcceptedParams.Type
@@ -227,7 +227,7 @@ export const artifactSaid = Effect.fn("ArtifactSaid")(function* (params: Artifac
 
 export const ArtifactRenamedParams = Schema.Struct({
   ["title"]: Schema.String,
-  ["updated_at"]: Schema.Number,
+  ["updated_at"]: Schema.Finite,
   ["id"]: Schema.String,
 })
 export type ArtifactRenamedParams = typeof ArtifactRenamedParams.Type
