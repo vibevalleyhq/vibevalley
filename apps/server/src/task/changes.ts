@@ -1,9 +1,9 @@
 import { list, t } from "@vibevalley/i18n";
+import type { GraphEventKind, Task, TaskFieldChange, TaskGraph, GraphEvent } from "@vibevalley/protocol";
+import { taskOf } from "./graph.ts";
+
 // What changed in a task graph, step by step, and how each change is said. What is kept is the fact (a field's key, a
 // count), so the history reads in the locale of whoever reads it.
-
-import type { GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
-import { taskOf } from "./graph.ts";
 
 /** A graph event before it is stored: no id, actor or time yet. */
 export interface GraphChange {
@@ -174,3 +174,14 @@ export function graphEventText(e: GraphChange, titleOf: (task: string) => string
       return t("server.task.event.taskRemoved", { title: e.detail || (e.task ?? "") });
   }
 }
+
+export const changeOf = (e: GraphEvent) => ({
+  graph: e.graph,
+  ...(e.task !== undefined ? { task: e.task } : {}),
+  kind: e.kind,
+  ...(e.session !== undefined ? { session: e.session } : {}),
+  // A change is sparse: what the event has nothing of is left out.
+  ...(e.detail ? { detail: e.detail } : {}),
+  ...(e.changes.length > 0 ? { changes: e.changes } : {}),
+  ...(e.commits.length > 0 ? { commits: e.commits } : {}),
+});

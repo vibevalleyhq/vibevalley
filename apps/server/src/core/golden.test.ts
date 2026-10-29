@@ -14,7 +14,7 @@ import { attentionOf } from "@/issue/attention.ts";
 import { effectsOf, viewOf } from "@/game/view.ts";
 import { inbox } from "@/notice/inbox.ts";
 import { reduce } from "@/projection/reduce.ts";
-import { acceptanceChecks, readyTasks } from "@/task/rules.ts";
+import { acceptanceChecks, readyTasks } from "@/task/graph.ts";
 import { graphText } from "@/task/prompts.ts";
 import { cronProblem } from "@/cron/due.ts";
 import { yuan } from "@/runtime/money.ts";

@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 import { messageOf } from "@/errors.ts";
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
-import type { MemorySourceConfig } from "@/setting/rules.ts";
+import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
 import { termsOf } from "./terms.ts";

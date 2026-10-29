@@ -20,7 +20,7 @@ import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
 import { layersOf } from "@/task/graph.ts";
 import { achievementInWords, levelForCommits } from "./view.ts";
-import { graphOf } from "@/task/rules.ts";
+import { graphOf } from "@/task/issues.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
 export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;

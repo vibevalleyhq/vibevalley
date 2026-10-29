@@ -10,7 +10,7 @@ import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { Memory } from "@vibevalley/protocol";
 import { Clock, Effect, Option, Schema } from "effect";
 import { redact } from "@/base/redact.ts";
-import type { MemorySourceConfig } from "@/setting/rules.ts";
+import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 

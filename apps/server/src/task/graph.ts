@@ -1,8 +1,8 @@
 import { list, t } from "@vibevalley/i18n";
-// A task graph's rules. Texts are measured as JavaScript does.
-
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/agent/dag";
+
+// A task graph's rules. Texts are measured as JavaScript does.
 
 /** More steps than this means the job should be split into tasks. */
 /** A step as the frame shows it before its acts are worked out (graphFrom does that): none yet. */
@@ -123,3 +123,56 @@ export const canEditTask = (graph: TaskGraph, task: Task | undefined) =>
 
 /** canEditTask but a failed step is skipped, not deleted. */
 export const canRemoveTask = (graph: TaskGraph, task: Task | undefined) => !!task && canEditTask(graph, task) && task.state !== "failed";
+
+/** The farm's limits come on top. */
+export function startable(graph: TaskGraph): Task[] {
+  const working = graph.tasks.filter((n) => n.state === "working").length;
+  return readyTasks(graph).slice(0, Math.max(0, graph.parallel - working));
+}
+
+export const allSettled = (graph: TaskGraph) => graph.tasks.length > 0 && graph.tasks.every(isSettled);
+
+export function frozenOf(graph: TaskGraph, task: Task): string[] {
+  const out: string[] = [];
+  for (const n of acceptancesOf(graph, task)) for (const f of n.frozen) if (!out.includes(f)) out.push(f);
+  return out;
+}
+
+export const frozenTouched = (graph: TaskGraph, task: Task, changed: readonly string[]) => {
+  const frozen = frozenOf(graph, task);
+  return changed.filter((f) => frozen.includes(f));
+};
+
+export const defaultParallel = 3;
+
+export const autoRetries = 2;
+
+export const readyTasks = (graph: TaskGraph): Task[] =>
+  graph.state !== "running" ? [] : graph.tasks.filter((n) => n.state === "waiting" && blockedBy(graph, n).length === 0);
+
+export const withTask = (graph: TaskGraph, id: string, change: (n: Task) => Task): TaskGraph => ({
+  ...graph,
+  tasks: graph.tasks.map((n) => (n.id === id ? change(n) : n)),
+});
+
+export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
+  const seen = new Set<string>();
+  const visit = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    for (const need of taskOf(graph, id)?.needs ?? []) visit(need);
+  };
+  for (const need of task.needs) visit(need);
+  return graph.tasks.filter((n) => n.id !== task.id && seen.has(n.id));
+}
+
+export const acceptancesOf = (graph: TaskGraph, task: Task) => ancestorsOf(graph, task).filter((n) => isAcceptance(n) && n.state === "merged");
+
+export const isLast = (graph: TaskGraph, task: Task) => !graph.tasks.some((n) => n.needs.includes(task.id));
+
+export function acceptanceChecks(graph: TaskGraph, task: Task): string[] {
+  const out: string[] = [];
+  if (!isLast(graph, task)) return out;
+  for (const n of acceptancesOf(graph, task)) if (n.check && !out.includes(n.check) && n.check !== task.check) out.push(n.check);
+  return out;
+}

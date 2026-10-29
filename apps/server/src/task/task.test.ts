@@ -1,21 +1,20 @@
 import { describe, expect, it } from "@effect/vitest";
 import { sampleAgent } from "@/testing/agents.ts";
-import { freshTask } from "./rules.ts";
-import { graphView } from "./graph.ts";
+import { freshTask } from "./editing.ts";
+import { graphView, blockedBy, isAcceptance, taskOf } from "./graph.ts";
 import { orchestrator, owner } from "@/base/actor.ts";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
-import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
 import { inbox } from "@/notice/inbox.ts";
 import { clip } from "@/base/clip.ts";
-import { graphOf, parseSplit, taskIssueID } from "./rules.ts";
-import { taskBrief } from "./prompts.ts";
+import { graphOf, taskIssueID } from "./issues.ts";
+import { parseSplit } from "./splitting.ts";
+import { taskBrief, splitBrief } from "./prompts.ts";
 import { Effect, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
-import { splitBrief } from "./prompts.ts";
 import { type Hired, type HireOptions, type Roster, NotTakenIn, type Sessions } from "@/session/session.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { notTakenIn } from "@/session/takeIn.ts";
@@ -23,8 +22,8 @@ import { testConfig } from "@/testing/layers.ts";
 import { worldBelowTasks } from "@/testing/world.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
 import { nextTurn, untilGot, whenTrue } from "@/testing/until.ts";
-import * as q from "../../db/generated/task_event.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
+import * as q from "../../db/generated/task_event.sql.ts";
 
 const step = (id: string, ...needs: string[]) => ({
   id,

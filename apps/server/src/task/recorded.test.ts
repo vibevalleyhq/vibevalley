@@ -1,9 +1,10 @@
 import type { TaskEdit, TaskGraph } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
-import { allSettled, editTask, type EditResult, frozenTouched, parseSplit, removeTask, startable } from "./rules.ts";
+import { allSettled, frozenTouched, startable } from "./graph.ts";
+import { editTask, type EditResult, removeTask } from "./editing.ts";
+import { parseSplit } from "./splitting.ts";
 import { acceptancePassedText, checkFailedText, frozenTouchedText, taskBrief } from "./prompts.ts";
-
 const edited = (e: EditResult) => (e.ok ? { ok: true, task: e.graph } : { ok: false, problem: e.problem });
 
 test("the recorded cases", () => {

@@ -1,10 +1,11 @@
 // A task graph is issues: the graph's own and one per step.
 
-import type { WorkspaceState, Issue, TaskGraph } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, TaskGraph, GraphState, Task, IssueId } from "@vibevalley/protocol";
 import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
 import { compare, compareText, or } from "@/base/order.ts";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
+import { issueId } from "@vibevalley/protocol/schema";
 export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   const g = parent.graph!;
   const graph: TaskGraph = omitUndefined({
@@ -65,3 +66,100 @@ export function graphsOf(state: WorkspaceState): TaskGraph[] {
     .map((t) => graphFrom(t, issues))
     .sort((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
 }
+
+export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
+
+/** An issue of a task graph as it is written down: what the graph says, and what only the issue knows from before. */
+export type GraphIssue = Draft & Pick<Issue, "priority" | "createdAt">;
+
+/** What only the issues know (priority, when they were written down and closed) comes from before; one closing now closes at now. */
+export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): GraphIssue[] {
+  const was = new Map(before.map((item) => [item.id, item]));
+  const keep = (draft: Draft, closed: Closing | undefined): GraphIssue => {
+    const { delivered: _delivered, canceled: _canceled, closedAt: drafted, ...rest } = draft;
+    const old = was.get(draft.id);
+    const closedAt = closed === undefined ? drafted : (old?.closedAt ?? now);
+    return {
+      ...rest,
+      priority: old?.priority ?? "medium",
+      createdAt: old?.createdAt ?? graph.createdAt,
+      ...closed,
+      ...(closedAt !== undefined ? { closedAt } : {}),
+    };
+  };
+  const project = graph.project;
+  const out = [
+    keep(
+      omitUndefined({
+        id: issueId(graph.id),
+        title: graph.title,
+        description: graph.goal,
+        project,
+        // A helper's issue split under it keeps who it was given to.
+        assignee: was.get(issueId(graph.id))?.assignee,
+        deliver: "change" as const,
+        blockedBy: [],
+        graph: omitUndefined({ state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note || undefined }),
+      }),
+      graphClosed(graph.state),
+    ),
+  ];
+  graph.tasks.forEach((n, i) => {
+    out.push(
+      keep(
+        omitUndefined({
+          id: taskIssueID(graph.id, n.id),
+          title: n.title,
+          description: n.brief,
+          project,
+          deliver: "change" as const,
+          assignee: n.agent,
+          rank: i > 0 ? i : undefined,
+          parent: issueId(graph.id),
+          blockedBy: n.needs.map((need) => taskIssueID(graph.id, need)),
+          task: omitUndefined({
+            key: n.id,
+            state: n.state,
+            check: n.check,
+            scope: n.scope,
+            acceptance: n.acceptance,
+            frozen: n.frozen,
+            session: n.session,
+            conclusion: n.conclusion || undefined,
+            commits: n.commits,
+            spent: n.spent,
+            tries: n.tries,
+            failures: n.failures,
+          }),
+        }),
+        taskClosed(graph.state, n),
+      ),
+    );
+  });
+  return out;
+}
+
+export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
+  const issues = state.issues;
+  const item = issues.find((issue) => issue.id === id && issue.graph);
+  return item ? graphFrom(item, issues) : undefined;
+}
+
+/** How a task graph's issue closes: done with what it delivered, or canceled. */
+type Closing = { readonly delivered: "merged" | "merged_into_parent" } | { readonly canceled: "dismissed" };
+
+const graphClosed = (s: GraphState): Closing | undefined =>
+  s === "done" ? { delivered: "merged" } : s === "abandoned" ? { canceled: "dismissed" } : undefined;
+
+/** A step merged into its graph's branch is done; one skipped, or left when its graph ended, is not. */
+function taskClosed(graph: GraphState, n: Task): Closing | undefined {
+  if (n.state === "merged") return { delivered: "merged_into_parent" };
+  if (n.state === "skipped" || graph === "done" || graph === "abandoned") return { canceled: "dismissed" };
+  return undefined;
+}
+
+// Criteria and checks are no graph's: the issues it writes carry none (Issues.putTask).
+type Draft = Omit<
+  Issue,
+  "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "review" | "findings" | "questions" | "attention" | "criteria" | "checks"
+>;

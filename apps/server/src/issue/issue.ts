@@ -38,7 +38,7 @@ import { cut } from "@/base/clip.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { attentionIn } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { graphIssues } from "@/task/rules.ts";
+import { graphIssues } from "@/task/issues.ts";
 import { dueText } from "@/cron/due.ts";
 import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
 import { filledKinds, sentTitles } from "./templates.ts";

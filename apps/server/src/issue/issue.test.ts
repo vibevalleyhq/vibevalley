@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { freshTask } from "@/task/rules.ts";
+import { freshTask } from "@/task/editing.ts";
 import { graphView } from "@/task/graph.ts";
 import { owner } from "@/base/actor.ts";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
