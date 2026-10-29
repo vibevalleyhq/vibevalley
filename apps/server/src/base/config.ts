@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
 import { parse } from "yaml";
 
-export interface Config {
+export interface ConfigShape {
   /** VIBEVALLEY_HOME, or ~/.vibevalley; the YAML file is in it, so it cannot be set there. */
   readonly home: string;
   readonly version: string;
@@ -47,7 +47,7 @@ export interface Config {
 
 export const noticeBatchMs = 3_000;
 
-export function defaults(home = homedir()): Config {
+export function defaults(home = homedir()): ConfigShape {
   return {
     home: join(home, ".vibevalley"),
     version: "0.1.0",
@@ -87,7 +87,7 @@ const list = (name: string) =>
   );
 
 /** Every key but home and version, by its snake_case name, with its default (d). */
-const keys = (d: Config) =>
+const keys = (d: ConfigShape) =>
   Keys.all({
     workRoot: text("work_root", d.workRoot),
     db: text("db", d.db),
@@ -149,7 +149,7 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
 export const loadConfig = Effect.fnUntraced(function* (
   file: string = "",
   env: Readonly<Record<string, string | undefined>> = process.env,
-): Effect.fn.Return<Config, ConfigError, FileSystem.FileSystem> {
+): Effect.fn.Return<ConfigShape, ConfigError, FileSystem.FileSystem> {
   const base = defaults();
   const home = env.VIBEVALLEY_HOME || base.home;
   const optional = file === "";
@@ -172,25 +172,25 @@ export const loadConfig = Effect.fnUntraced(function* (
     if (n < 0 || n > 65535) return yield* new ConfigError({ message: t("server.base.notPort", { path, name, port: n }) });
   }
   if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: t("server.base.prPoll") });
-  const c: Config = { ...base, ...read, home };
+  const c: ConfigShape = { ...base, ...read, home };
   return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
 });
 
 /** The database's folder, or "memory". */
-export function dbDir(c: Config): string {
+export function dbDir(c: ConfigShape): string {
   if (c.db === "memory") return "memory";
   if (c.db === "") return join(c.home, "db");
   return c.db;
 }
 
 /** The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. */
-export const serverAddress = (c: Config) => `127.0.0.1:${c.port}`;
+export const serverAddress = (c: ConfigShape) => `127.0.0.1:${c.port}`;
 
 /** Where the projects are: each folder in it is one. */
-export const projectsDir = (c: Config) => join(c.workRoot, "projects");
+export const projectsDir = (c: ConfigShape) => join(c.workRoot, "projects");
 
 /** A profile's own folder, an orchestrator's conversation, MEMORY.md, archive and evals among what it keeps there. */
-export const agentHome = (c: Config, agent: string) => join(c.home, "agent", agent);
+export const agentHome = (c: ConfigShape, agent: string) => join(c.home, "agent", agent);
 
 /** The configuration, as a service. */
-export class Settings extends Context.Service<Settings, Config>()("vibevalley/Config") {}
+export class Config extends Context.Service<Config, ConfigShape>()("vibevalley/Config") {}

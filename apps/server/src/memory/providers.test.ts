@@ -3,7 +3,7 @@ import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { layer as agentLayer } from "../agent/agent.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
@@ -81,7 +81,7 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
-    Layer.provideMerge(Layer.succeed(Settings, testConfig())),
+    Layer.provideMerge(Layer.succeed(Config, testConfig())),
   );
 
 const nowledgeOn: MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };

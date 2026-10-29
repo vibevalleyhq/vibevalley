@@ -26,7 +26,7 @@ import {
   type Preview,
 } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer, Semaphore } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
@@ -80,7 +80,7 @@ const missingArtifact = (id: string) => missing(t("server.artifact.missing", { i
 
 export const make = (options: ArtifactOptions = {}) =>
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const chat = yield* Channels;
     const { run: db, one } = yield* Db;
     // One change of an artifact's row at a time: a version's number is the latest's plus one.

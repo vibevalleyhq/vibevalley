@@ -33,7 +33,7 @@ import {
 import { slice } from "../base/text.ts";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
 import { jsonOf } from "../base/json.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import {
@@ -279,7 +279,7 @@ export interface ProjectHooks {
 
 export const make = (hooks: ProjectHooks = {}) =>
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const work = resolve(config.workRoot);
     const root = join(work, "projects");
     // A file call that fails where the sync one would have thrown: a defect, as before.

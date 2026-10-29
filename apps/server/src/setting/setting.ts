@@ -11,7 +11,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { setLocale } from "@vibevalley/i18n";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
@@ -110,7 +110,7 @@ export function savedLocale(home: string): Locale {
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
 
 export const make = Effect.gen(function* () {
-  const config = yield* Settings;
+  const config = yield* Config;
   const file = join(config.home, "settings.json");
   const disk = new FileWriter(file, 0o600);
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };

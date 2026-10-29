@@ -9,7 +9,7 @@ import { Layer } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { FetchHttpClient } from "effect/http";
 import { layer as agent } from "./agent/agent.ts";
-import { type Config, Settings } from "./base/config.ts";
+import { type ConfigShape, Config } from "./base/config.ts";
 import { Database, DbLayer } from "./base/db.ts";
 import { layer as core } from "./core/core.ts";
 import { type ArtifactOptions, layer as artifact } from "./artifact/artifact.ts";
@@ -56,9 +56,9 @@ export interface ServiceOptions {
 
 /** Platform: Node's services (files, paths, processes), an HTTP client, the database, the settings and secrets, the core state (folded by
  * the projection, which reads every module's rules). */
-export const platform = (config: Config) =>
+export const platform = (config: ConfigShape) =>
   Database.pipe(
-    Layer.provideMerge(Layer.succeed(Settings, config)),
+    Layer.provideMerge(Layer.succeed(Config, config)),
     Layer.provideMerge(NodeServices.layer),
     Layer.provideMerge(FetchHttpClient.layer),
     on(DbLayer),
@@ -137,7 +137,7 @@ export const notificationsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => buil
 export const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(gameStart));
 
 /** The whole farm: every module built, then every startup in module order. */
-export const services = (config: Config, options: ServiceOptions = {}) =>
+export const services = (config: ConfigShape, options: ServiceOptions = {}) =>
   platform(config).pipe(
     agents(options),
     sourceControl(options),

@@ -10,7 +10,7 @@ import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { remember, rewriteMemory } from "@vibevalley/agent/memory";
-import { agentHome, Settings } from "../base/config.ts";
+import { agentHome, Config } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
 import { layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -24,7 +24,7 @@ const world = (config = testConfig()) =>
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
-    Layer.provideMerge(Layer.succeed(Settings, config)),
+    Layer.provideMerge(Layer.succeed(Config, config)),
   );
 
 describe("memory", () => {

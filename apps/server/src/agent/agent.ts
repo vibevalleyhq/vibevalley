@@ -18,7 +18,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings } from "./seed.ts";
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
@@ -143,7 +143,7 @@ const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
 export const make = Effect.gen(function* () {
-  const config = yield* Settings;
+  const config = yield* Config;
   const file = join(config.home, "config.json");
   const disk = new FileWriter(file);
   const forkHere = yield* FiberSet.makeRuntime<never>();

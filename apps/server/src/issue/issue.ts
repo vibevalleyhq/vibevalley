@@ -64,7 +64,7 @@ import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
@@ -226,7 +226,7 @@ export interface IssueOptions {
 export const make = (options: IssueOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const store = yield* Agents;
     const projects = yield* Projects;

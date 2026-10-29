@@ -10,7 +10,7 @@ import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./r
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
@@ -202,7 +202,7 @@ export const layer = Layer.effect(Crons, make);
 /** Ticks once every service is built, so what the first tick finds due reaches the orchestrator (once ready). */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const crons = yield* Crons;
     const every = Math.max(config.cron.tickMs, 1);
     yield* Effect.forkScoped(crons.tick.pipe(Effect.repeat(Schedule.spaced(every))));

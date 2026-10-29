@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { type Runtime } from "@botiverse/oar";
 import type { AccountUsage } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
-import { type Config } from "../base/config.ts";
+import { type ConfigShape } from "../base/config.ts";
 import { type GitHubRun, type ProjectHooks } from "../project/project.ts";
 import { registryOf } from "../runtime/runtime.ts";
 import { agentSessions, agents, collaboration, issuesBelowTaskGraphs, platform, type ServiceOptions, sourceControl } from "../services.ts";
@@ -34,7 +34,7 @@ export const quietApp = {
 } satisfies ServiceOptions;
 
 export interface WorldOptions {
-  readonly config?: Config;
+  readonly config?: ConfigShape;
   /** The runtimes sessions run on; each is probed as installed. */
   readonly runtimes?: readonly Runtime[];
   readonly projects?: ProjectHooks;

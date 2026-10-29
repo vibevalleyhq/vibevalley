@@ -9,7 +9,7 @@ import { Clock, Context, Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "@vibevalley/agent/memory";
-import { agentHome, Settings } from "../base/config.ts";
+import { agentHome, Config } from "../base/config.ts";
 import { type ApiError, memoriesOf, missing, refused } from "../errors.ts";
 import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
@@ -77,7 +77,7 @@ const defaultBuild: BuildSource = (c, http) => (c.kind === "nowledge" ? nowledge
 
 export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
   Effect.gen(function* () {
-    const config = yield* Settings;
+    const config = yield* Config;
     const setting = yield* Setting;
     const agents = yield* Agents;
     const local = yield* makeMemories;

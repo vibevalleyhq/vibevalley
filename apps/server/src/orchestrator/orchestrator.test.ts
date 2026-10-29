@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
 import { messageText } from "@vibevalley/agent/messages";
 import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
-import type { Config } from "../base/config.ts";
+import type { ConfigShape } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
@@ -75,7 +75,7 @@ const respond = (c: Request): Answer => {
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
 /** The patrol runs by hand: heartbeatMinutes 0 leaves nothing to the timer. */
-const farm = (f: Reply = respond, config: Config = testConfig(), clock?: () => number) => {
+const farm = (f: Reply = respond, config: ConfigShape = testConfig(), clock?: () => number) => {
   const { llm, requests } = scriptedLLM(Array.from({ length: 100 }, () => f));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },

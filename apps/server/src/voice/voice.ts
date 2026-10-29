@@ -17,7 +17,7 @@ import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftS
 import agoraToken from "agora-token";
 import { Clock, Context, Effect, FiberSet, Layer, Schema, type Scope, Stream } from "effect";
 import { chatCompletions } from "../orchestrator/openai.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
@@ -377,7 +377,7 @@ async function tunnelAnswers(url: string): Promise<boolean> {
 export const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const notices = yield* Notices;
     const settings = yield* Setting;

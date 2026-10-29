@@ -17,7 +17,7 @@ import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";
 import { dbStores } from "../agent/taskStore.ts";
-import { projectsDir, Settings } from "../base/config.ts";
+import { projectsDir, Config } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
@@ -191,7 +191,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const clock = yield* Clock.Clock;
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* callbackLog;
-    const config = yield* Settings;
+    const config = yield* Config;
     const core = yield* Core;
     const store = yield* Agents;
     const registry = options.registry ?? registryOf();
@@ -556,7 +556,7 @@ export const layer = (options: RuntimeOptions = {}) =>
     Runtimes,
     Effect.gen(function* () {
       if (options.registry) return yield* make(options);
-      const config = yield* Settings;
+      const config = yield* Config;
       const keys = yield* Setting;
       const time = yield* timeHere;
       const service = yield* Llm;

@@ -7,7 +7,7 @@ import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { Layer } from "effect";
 import { withCast } from "../agent/agent.ts";
 import { builtInDir, builtInIds, profileOf, readTemplate } from "../agent/template.ts";
-import { defaults, Settings, type Config } from "../base/config.ts";
+import { defaults, Config, type ConfigShape } from "../base/config.ts";
 import { Database } from "../base/db.ts";
 
 /** A built-in template as a farm whose agent.starters names it has it: under the template's own id. */
@@ -19,7 +19,7 @@ export const starter = (id: string): Agent => {
 /** Every built-in template's profile but the default orchestrator's, in their order: what a test farm starts with. */
 const starters = () => builtInIds().filter((id) => id !== defaultOrchestrator);
 
-export function testConfig(change: Partial<Config> = {}): Config {
+export function testConfig(change: Partial<ConfigShape> = {}): ConfigShape {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-test-"));
   const config = defaults(home);
   // Every listener on a free port: two farms in tests (or worktrees) never take each other's 8787, 8788, 8790.
@@ -36,6 +36,6 @@ export function testConfig(change: Partial<Config> = {}): Config {
   };
 }
 
-export const testSettings = (change: Partial<Config> = {}) => Layer.succeed(Settings, testConfig(change));
+export const testSettings = (change: Partial<ConfigShape> = {}) => Layer.succeed(Config, testConfig(change));
 
-export const testDatabase = (change: Partial<Config> = {}) => Database.pipe(Layer.provide(testSettings(change)));
+export const testDatabase = (change: Partial<ConfigShape> = {}) => Database.pipe(Layer.provide(testSettings(change)));

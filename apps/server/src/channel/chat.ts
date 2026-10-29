@@ -64,7 +64,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
-import { Settings } from "../base/config.ts";
+import { Config } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
@@ -477,7 +477,7 @@ export interface Helpers {
 
 export const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const config = yield* Settings;
+  const config = yield* Config;
   const core = yield* Core;
   const agents = yield* Agents;
   let helpers: Helpers | undefined;
