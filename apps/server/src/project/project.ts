@@ -31,7 +31,7 @@ import {
   type Repo,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
+import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
 import { jsonOf, jsonOrNone } from "../base/json.ts";
 import { ServerConfig } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
@@ -165,11 +165,8 @@ export function countsOf(output: string): LanguageCount[] | undefined {
   return out.sort((a, b) => b.code + b.comments - (a.code + a.comments) || localeCompare(a.name, b.name));
 }
 
-const pad = (n: number) => String(n).padStart(2, "0");
-const localDay = (ms: number) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+/** The calendar day an instant falls on where the farm runs, as yyyy-mm-dd. */
+const localDay = (ms: number) => DateTime.formatIsoDate(DateTime.makeZonedUnsafe(ms, { timeZone: DateTime.zoneMakeLocal() }));
 
 export function activityOf(log: string, dayOf: (ms: number) => string = localDay): { days: DayCount[]; authors: Author[] } {
   const byDay = new Map<string, number>();
@@ -565,7 +562,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           total: 0,
         };
         if (!p.git) return out;
-        const since = new Date(now - yearDays * 86_400_000).toISOString();
+        const since = DateTime.formatIso(DateTime.subtract(DateTime.makeUnsafe(now), { days: yearDays }));
         const log = yield* gitQuiet(p.path, "log", "--all", "--no-merges", "--since=" + since, "--format=%at%x09%aN");
         const total = yield* gitQuiet(p.path, "rev-list", "--all", "--no-merges", "--count");
         const roots = yield* gitQuiet(p.path, "log", "--all", "--max-parents=0", "--format=%at");
