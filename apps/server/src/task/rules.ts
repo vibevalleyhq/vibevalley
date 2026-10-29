@@ -2,6 +2,7 @@ import { t } from "@vibevalley/i18n";
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
+import { messageOf } from "../errors.ts";
 import {
   type WorkspaceState,
   type GraphEvent,
@@ -74,7 +75,7 @@ function parseJson(body: string): unknown {
   try {
     return JSON.parse(body);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = messageOf(e);
     throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message, { cause: e });
   }
 }

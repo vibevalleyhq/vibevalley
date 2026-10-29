@@ -1,6 +1,7 @@
 // MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
 // sampling. A server that cannot be reached is left out and said why; the others still come.
 
+import { messageOf } from "./core/errors.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { Schema } from "effect";
 import type { Tool } from "./core/loop.ts";
@@ -107,7 +108,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   }
   const fail = (e: unknown) => {
     const last = stderr.trim().split("\n").at(-1) ?? "";
-    return new Error(mcpWords.connectFailed(server.name, e instanceof Error ? e.message : String(e), last));
+    return new Error(mcpWords.connectFailed(server.name, messageOf(e), last));
   };
   const client = new Client({ name: "vibevalley-agent", version: "0.1.0" });
   const close = async () => {
@@ -144,7 +145,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
           signal: tc.signal,
         });
       } catch (e) {
-        throw new Error(mcpWords.callFailed(server, t.name, e instanceof Error ? e.message : String(e)), { cause: e });
+        throw new Error(mcpWords.callFailed(server, t.name, messageOf(e)), { cause: e });
       }
       let text = mcpContentText((r.content as Block[] | undefined) ?? []);
       if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : mcpWords.noContent;

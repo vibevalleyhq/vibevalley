@@ -4,6 +4,7 @@
 // agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
+import { asError } from "./core/errors.ts";
 import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
 import { join } from "node:path";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
@@ -106,8 +107,6 @@ const reminderTickMs = 20_000;
 export const resumedUnknown = words.resumedUnknown;
 
 const taskMessage = (text: string, now: number) => customMessage("task", text, now);
-
-const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)));
 
 const allowed = (tools: readonly Tool[], disallowed: readonly string[] = []) => tools.filter((t) => !disallowed.includes(t.name));
 

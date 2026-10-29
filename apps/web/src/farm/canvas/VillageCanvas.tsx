@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
 
+import { messageOf } from "../../base/format";
 import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
 
 import type { Agent } from "@vibevalley/protocol";
@@ -78,7 +79,7 @@ export function VillageCanvas() {
         },
         (e: unknown) => {
           console.error("vibevalley: the village did not start:", e);
-          if (live) setFailed(e instanceof Error ? e.message : String(e));
+          if (live) setFailed(messageOf(e));
         },
       );
       return () => {

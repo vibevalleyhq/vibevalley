@@ -45,3 +45,6 @@ export const big = (n: number, digits: number) => t("web.base.big", { n: current
 
 export const spentText = (spent: Spent) =>
   [...(spent.cny !== undefined ? [t("web.base.money.about", { yuan: yuan(spent.cny) })] : []), `${wan(spent.tokens)} token`].join(" · ");
+
+/** What a thrown or rejected value says: an Error's message, anything else as text. */
+export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));

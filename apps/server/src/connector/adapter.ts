@@ -40,5 +40,3 @@ export interface Adapter {
   receive(signal: AbortSignal, secrets: Record<string, string>, io: Receiving): Promise<Failure | undefined>;
   send(signal: AbortSignal, secrets: Record<string, string>, to: string, text: string, reply: string): Promise<string | Failure>;
 }
-
-export const message = (e: unknown) => (e instanceof Error ? e.message : String(e));

@@ -2,6 +2,7 @@ import { list, maybe, t } from "@vibevalley/i18n";
 // The session's rules, pure: how a run's end reads, whether there is room for one
 // more helper, which profile a job goes to, and what a session is told about the farm. Lengths are UTF-16 units.
 
+import { messageOf } from "../errors.ts";
 import { recallHead, recallIntro } from "./prompts.ts";
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
@@ -105,7 +106,7 @@ export function parseAnswer(text: string): { answer?: IssueAnswer; problem: stri
         next: answerLines(raw.next, "next"),
       };
     } catch (e) {
-      problem = t("server.session.answer.unreadable", { why: e instanceof Error ? e.message : String(e) });
+      problem = t("server.session.answer.unreadable", { why: messageOf(e) });
       continue;
     }
     if (!a.conclusion) problem = t("server.session.answer.empty");

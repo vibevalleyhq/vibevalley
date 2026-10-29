@@ -3,6 +3,7 @@
 // edited in place: an old database is not upgraded, it is made again (AGENTS.md: no compatibility). The queries in
 // db/queries are compiled by effect-sqlc into db/generated (scripts/db-generate.ts).
 
+import { messageOf } from "../errors.ts";
 import { PGlite } from "@electric-sql/pglite";
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
 import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";
@@ -109,7 +110,7 @@ export const Database = PgliteClient.layerFrom(
 /** What the database said, from under the SqlError around it. */
 export function causeMessage(e: unknown): string {
   let at: unknown = e;
-  let said = e instanceof Error ? e.message : String(e);
+  let said = messageOf(e);
   while (at instanceof Error && at.cause !== undefined) {
     at = at.cause;
     if (at instanceof Error && at.message) said = at.message;

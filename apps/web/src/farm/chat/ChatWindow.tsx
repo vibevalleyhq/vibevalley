@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
 // the phone large.
 
+import { messageOf } from "../../base/format";
 import { farmChannelLabel } from "./text";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
@@ -304,9 +305,7 @@ export function ChatWindow() {
                     setProblem(undefined);
                     const c = shown();
                     if (!c) return;
-                    void say(line, c, newSendKey(), undefined).catch((e: unknown) =>
-                      setProblem(t("web.farm.chat.notSent", { why: e instanceof Error ? e.message : String(e) })),
-                    );
+                    void say(line, c, newSendKey(), undefined).catch((e: unknown) => setProblem(t("web.farm.chat.notSent", { why: messageOf(e) })));
                   }}
                   class="max-w-40 shrink-0 cursor-pointer truncate bg-cream-200 px-2.5 py-0.5 text-[12px] text-bark-800 hover:bg-leaf-300 hover:text-bark-900"
                 >

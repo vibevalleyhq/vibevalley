@@ -2,10 +2,11 @@ import { t } from "@vibevalley/i18n";
 // WeChat, written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
+import { messageOf } from "../errors.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
-import { type Adapter, message } from "./adapter.ts";
+import { type Adapter } from "./adapter.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
@@ -176,14 +177,14 @@ export class WeixinClient implements WeixinApi {
         signal,
       });
     } catch (e) {
-      throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
+      throw new WeixinError(label + ": " + messageOf(e));
     }
     const text = await res.text();
     if (res.status < 200 || res.status > 299) throw new WeixinError(`${label}: ${res.status}`);
     try {
       return Schema.decodeUnknownSync(Schema.fromJsonString(schema))(text.replace(lossless, '"$1"$2:$3"$4"'));
     } catch (e) {
-      throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
+      throw new WeixinError(label + ": " + messageOf(e));
     }
   }
 
@@ -237,7 +238,7 @@ export class WeixinClient implements WeixinApi {
       [code, show] = await this.qrCode(signal);
     } catch (e) {
       if (signal.aborted) throw e;
-      throw new Error(t("server.connector.weixin.noQr", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
+      throw new Error(t("server.connector.weixin.noQr", { why: messageOf(e) }), { cause: e });
     }
     progress("waiting", show);
     const attempt = AbortSignal.any([signal, AbortSignal.timeout(8 * 60_000)]);
@@ -265,7 +266,7 @@ export class WeixinClient implements WeixinApi {
             [code, show] = await this.qrCode(attempt);
           } catch (e) {
             if (attempt.aborted) break;
-            throw new Error(t("server.connector.weixin.noQr", { why: e instanceof Error ? e.message : String(e) }), { cause: e });
+            throw new Error(t("server.connector.weixin.noQr", { why: messageOf(e) }), { cause: e });
           }
           progress("waiting", show);
           break;
@@ -399,7 +400,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         try {
           updates = decodeUpdates(await api.getUpdates(signal, account, buf, timeout));
         } catch (e) {
-          return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
+          return signal.aborted ? undefined : { kind: "failed", reason: messageOf(e) };
         }
         if (signal.aborted) return undefined;
         const code = failed(updates.ret, updates.errcode);
@@ -421,7 +422,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         try {
           await io.accept(messages, updates.get_updates_buf ?? "");
         } catch (e) {
-          return { kind: "failed", reason: message(e) };
+          return { kind: "failed", reason: messageOf(e) };
         }
         if (updates.get_updates_buf) buf = updates.get_updates_buf;
       }
@@ -434,7 +435,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         const code = e instanceof WeixinError ? e.code : 0;
         return {
           kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed",
-          reason: message(e),
+          reason: messageOf(e),
         };
       }
     },

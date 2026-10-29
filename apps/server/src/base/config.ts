@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
 
+import { messageOf } from "../errors.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
@@ -143,7 +144,7 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
   const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
   return yield* Effect.try({
     try: (): unknown => parse(body),
-    catch: (e) => new ConfigError({ message: `${path}: ${e instanceof Error ? e.message : String(e)}` }),
+    catch: (e) => new ConfigError({ message: `${path}: ${messageOf(e)}` }),
   });
 });
 

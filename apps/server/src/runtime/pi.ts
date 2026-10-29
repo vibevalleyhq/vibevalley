@@ -2,6 +2,7 @@ import { t } from "@vibevalley/i18n";
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
 
+import { messageOf } from "../errors.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -102,7 +103,7 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
       signal: AbortSignal.timeout(readTimeoutMs),
     });
   } catch (e) {
-    return unavailable(e instanceof Error ? e.message : String(e));
+    return unavailable(messageOf(e));
   }
   if (!res.ok) return unavailable(`HTTP ${res.status}`);
   let b: typeof BalanceResponse.Type;

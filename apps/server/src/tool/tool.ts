@@ -1,4 +1,5 @@
 import { maybe, t } from "@vibevalley/i18n";
+import { messageOf } from "../errors.ts";
 import { artifactMax } from "../artifact/rules.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -416,7 +417,7 @@ export const make = Effect.gen(function* () {
           if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
           return readFile(full, "utf8");
         },
-        catch: (e) => refused(e instanceof Error ? e.message : String(e)),
+        catch: (e) => refused(messageOf(e)),
       });
     });
 

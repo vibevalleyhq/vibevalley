@@ -1,5 +1,6 @@
 // A tool that fails throws (or fails, as an Effect): the model reads the error's message as a failed result.
 
+import { asError } from "./errors.ts";
 import { Effect, Schema } from "effect";
 import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
 import type { Tool } from "./loop.ts";
@@ -33,8 +34,6 @@ export interface TextToolSpec<P> {
 }
 
 const answered = (text: string) => ({ content: [{ type: "text" as const, text: clip(text) }] });
-
-const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)));
 
 export const textTool = <P>(spec: TextToolSpec<P>): Tool => ({
   name: spec.name,

@@ -3,6 +3,7 @@ import { list, t } from "@vibevalley/i18n";
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
+import { messageOf } from "../errors.ts";
 import { join } from "node:path";
 import {
   type Agent,
@@ -180,7 +181,7 @@ export const make = Effect.gen(function* () {
         disk.write(() => JSON.stringify(next));
         s = next;
       },
-      catch: (e) => refused(t("server.agent.notSaved", { file, why: e instanceof Error ? e.message : String(e) })),
+      catch: (e) => refused(t("server.agent.notSaved", { file, why: messageOf(e) })),
     });
 
   const all = () => structuredClone([...s.agents]);
@@ -328,7 +329,7 @@ export const make = Effect.gen(function* () {
       if (templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));
       yield* Effect.try({
         try: () => copyTemplate(path, config.home, item.id),
-        catch: (e) => refused(t("server.agent.notSaved", { file: path, why: e instanceof Error ? e.message : String(e) })),
+        catch: (e) => refused(t("server.agent.notSaved", { file: path, why: messageOf(e) })),
       });
       return { ...item, installed: [] };
     }),
@@ -336,7 +337,7 @@ export const make = Effect.gen(function* () {
       Effect.flatMap(deletableTemplate(id), (item) =>
         Effect.try({
           try: () => removeTemplate(config.home, item.id),
-          catch: (e) => refused(t("server.agent.notSaved", { file: id, why: e instanceof Error ? e.message : String(e) })),
+          catch: (e) => refused(t("server.agent.notSaved", { file: id, why: messageOf(e) })),
         }),
       ),
     previewRemoveTemplate: (id) =>

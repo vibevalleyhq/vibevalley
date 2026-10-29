@@ -3,6 +3,7 @@
 // system messages and tools in the request are not. Only the agent's words come back, without usage. Who may ask (paths,
 // keys) is the mounting side's business.
 
+import { messageOf } from "../errors.ts";
 import { randomBytes } from "node:crypto";
 import { Schema } from "effect";
 
@@ -81,7 +82,7 @@ export function chatCompletions(c: ChatCompletions) {
     try {
       req = Schema.decodeUnknownSync(ChatRequest)(await request.json());
     } catch (e) {
-      return refuse(400, "invalid_request_error", "invalid_json", e instanceof Error ? e.message : String(e));
+      return refuse(400, "invalid_request_error", "invalid_json", messageOf(e));
     }
     const model = req.model ?? "";
     const answer = c.answerer(model);

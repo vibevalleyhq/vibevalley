@@ -1,6 +1,7 @@
 // Running git and other tools: the output, the exit code and stderr; a tool
 // that is not there is code -1.
 
+import { messageOf } from "../errors.ts";
 import { spawn } from "node:child_process";
 import { Data, Effect } from "effect";
 import { afterRealTime } from "../base/time.ts";
@@ -100,6 +101,6 @@ export const gitQuiet = (cwd: string, ...args: string[]) => Effect.map(gitRun(cw
 
 /** The first line that says something. */
 export const reason = (e: unknown) => {
-  const text = e instanceof Error ? e.message : String(e);
+  const text = messageOf(e);
   return text.split("\n").find((l) => l.trim() !== "") ?? text;
 };

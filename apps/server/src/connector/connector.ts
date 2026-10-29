@@ -9,6 +9,7 @@ import { t } from "@vibevalley/i18n";
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
+import { messageOf } from "../errors.ts";
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
@@ -24,7 +25,7 @@ import { reasonOf } from "../errors.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { type Failure, type Inbound, type Linked, message, type Progress, type Adapter } from "./adapter.ts";
+import { type Failure, type Inbound, type Linked, type Progress, type Adapter } from "./adapter.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
@@ -254,7 +255,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const send = (secrets: Record<string, string>, to: string, text: string, reply: string) =>
         Effect.tryPromise({
           try: (signal) => adapter.send(signal, secrets, to, text, reply),
-          catch: (e): Failure => ({ kind: "failed", reason: message(e) }),
+          catch: (e): Failure => ({ kind: "failed", reason: messageOf(e) }),
         }).pipe(Effect.catch((f) => Effect.succeed(f)));
 
       // The outbox: one drain at a time, in order. True when nothing is left that it could send now.
@@ -434,7 +435,7 @@ export const make = (options: ConnectorOptions = {}) =>
                   cursor,
                   accept: (messages, c) => (sealed || signal.aborted ? Promise.reject(new Error("canceled")) : acceptHere(accept(messages, c))),
                 }),
-              catch: (e): Failure => ({ kind: "failed", reason: message(e) }),
+              catch: (e): Failure => ({ kind: "failed", reason: messageOf(e) }),
             }).pipe(
               Effect.catch((f) => Effect.succeed(f)),
               Effect.ensuring(

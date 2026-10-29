@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 //	node --import tsx src/cli.ts runtime chat claude
 //	node --import tsx src/cli.ts issue list
 
+import { messageOf } from "./errors.ts";
 import "./cli/locale.ts";
 
 import { Cause, Console, Effect, Exit, Option, type Stdio } from "effect";
@@ -26,9 +27,7 @@ const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } :
 /** A conversation in the terminal. It takes Ctrl+C itself (stop the turn, again to quit), so the signal that interrupts
  * any other command must not end it: it runs uninterruptible and ends when the conversation does. */
 const chat = (talk: () => Promise<void>) =>
-  Effect.uninterruptible(
-    Effect.tryPromise({ try: talk, catch: (e) => new Failure({ code: exit.other, tag: "Chat", text: e instanceof Error ? e.message : String(e) }) }),
-  );
+  Effect.uninterruptible(Effect.tryPromise({ try: talk, catch: (e) => new Failure({ code: exit.other, tag: "Chat", text: messageOf(e) }) }));
 
 const prompt = text("prompt", t("server.cli.flag.prompt")).pipe(Flag.withAlias("p"));
 

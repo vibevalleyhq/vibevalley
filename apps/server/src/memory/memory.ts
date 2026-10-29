@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
+import { messageOf } from "../errors.ts";
 import { fromOwner } from "./prompts.ts";
 import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer } from "effect";
@@ -138,7 +139,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       });
 
     // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
-    const fileRefused = (e: unknown) => refused(e instanceof Error ? e.message : String(e));
+    const fileRefused = (e: unknown) => refused(messageOf(e));
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
       const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));

@@ -59,3 +59,6 @@ export const memoriesOf = (agent: string): Next => ({ say: t("server.lookIn.memo
 /** An error's words, whatever its tag. */
 export const reasonOf = (e: ApiError): string =>
   "reason" in e && typeof e.reason === "string" ? e.reason : "what" in e && typeof e.what === "string" ? e.what : e._tag;
+
+/** What a thrown or rejected value says: an Error's message, anything else as text. */
+export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));

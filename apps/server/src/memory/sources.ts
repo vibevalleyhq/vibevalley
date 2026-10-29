@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
+import { messageOf } from "../errors.ts";
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
@@ -34,7 +35,7 @@ export interface EndedSession {
 /** Why a source did not answer: a service down, a bad answer, stopped. */
 export class SourceError extends Data.TaggedError("SourceError")<{ readonly message: string }> {}
 
-export const sourceError = (e: unknown) => new SourceError({ message: e instanceof Error ? e.message : String(e) });
+export const sourceError = (e: unknown) => new SourceError({ message: messageOf(e) });
 
 /** Interrupting one of its operations ends it: a source outside the farm aborts its request. */
 export interface Source {

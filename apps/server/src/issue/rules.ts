@@ -1,5 +1,6 @@
 import { maybe, t } from "@vibevalley/i18n";
 
+import { messageOf } from "../errors.ts";
 import { reportVerdict } from "../session/rules.ts";
 import type {
   Deliverable,
@@ -116,7 +117,7 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
         files: linesOf(raw.files, "files"),
       };
     } catch (e) {
-      problem = t("server.issue.refinement.unreadable", { why: e instanceof Error ? e.message : String(e) });
+      problem = t("server.issue.refinement.unreadable", { why: messageOf(e) });
       continue;
     }
     const title = clip(d.title, 80);

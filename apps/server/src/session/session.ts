@@ -10,6 +10,7 @@ import { t } from "@vibevalley/i18n";
 // the sender leaves its trigger on the hand first and the turn takes the oldest. Admission serializes room and opening
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
+import { messageOf } from "../errors.ts";
 import { scopedPubSub } from "../base/pubsub.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -776,7 +777,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               ...(resume ? { resume } : {}),
               env: r.env,
             })
-            .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: e instanceof Error ? e.message : String(e) })),
+            .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: messageOf(e) })),
         );
         if (spawned.kind !== "spawned") return yield* failedOpening(allocation, t("shared.join.aside", { text: spawned.reason, aside: spawned.code }));
         const verb = resume ? "woke" : "sent";
@@ -892,9 +893,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             const launch = h.launch;
             if (starts) expect(h, by);
             const sent = yield* Effect.promise(() =>
-              s.agent
-                .send(withRecall(recall, text), "followup")
-                .catch((e: unknown) => ({ kind: "error" as const, reason: e instanceof Error ? e.message : String(e) })),
+              s.agent.send(withRecall(recall, text), "followup").catch((e: unknown) => ({ kind: "error" as const, reason: messageOf(e) })),
             );
             if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch };
             if (starts) unexpect(h);

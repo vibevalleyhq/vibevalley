@@ -3,6 +3,7 @@ import { t } from "@vibevalley/i18n";
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
+import { messageOf } from "../errors.ts";
 import { scopedPubSub } from "../base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
 import type { Actor } from "../base/actor.ts";
@@ -114,7 +115,7 @@ export const make = Effect.gen(function* () {
         );
         if (written._tag === "Failure") {
           const failure = written.failure;
-          yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${failure instanceof Error ? failure.message : String(failure)}`);
+          yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`);
           continue;
         }
         yield* core.apply({ type: "cron", cron: after });
