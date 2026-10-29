@@ -1,3 +1,4 @@
+import { Meter } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
@@ -69,17 +70,16 @@ function Stamina(props: { quota: Quota; cells?: number; width: number; height: n
   const cells = () => props.cells ?? 10;
   const lit = () => Math.round(props.quota.fill * cells());
   return (
-    <span
-      role="meter"
+    <Meter.Root
+      value={Math.round(props.quota.fill * 100)}
       aria-label={props.quota.text}
-      aria-valuenow={Math.round(props.quota.fill * 100)}
       class="inline-flex gap-px rounded-sm bg-bark-800 p-px"
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
         {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-on-rail/13"]} />}
       </For>
-    </span>
+    </Meter.Root>
   );
 }
 

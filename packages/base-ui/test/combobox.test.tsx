@@ -73,3 +73,38 @@ test("arrows skip disabled options, a click picks without taking the focus, and 
   await settle();
   expect(document.querySelector("[data-testid=list]")).toBe(null);
 });
+
+test("inline, as a command palette: always open, the first option highlighted as the list changes, and Escape is left to what holds it", async () => {
+  const picked: string[] = [];
+  const escaped: string[] = [];
+  function Palette() {
+    const [text, setText] = createSignal("");
+    const shown = () => runtimes.filter((r) => r.toLowerCase().includes(text().toLowerCase()));
+    return (
+      <div onKeyDown={(e) => e.key === "Escape" && escaped.push("escape")}>
+        <Combobox.Root inline autoHighlight inputValue={text()} onInputValueChange={setText}>
+          <Combobox.Input aria-label="go to" data-testid="input" />
+          <Combobox.Popup aria-label="places" data-testid="list">
+            <For each={shown()}>
+              {(r) => (
+                <Combobox.Item value={r} onClick={() => picked.push(r)}>
+                  {r}
+                </Combobox.Item>
+              )}
+            </For>
+          </Combobox.Popup>
+        </Combobox.Root>
+      </div>
+    );
+  }
+  mount(() => <Palette />);
+  await settle();
+  expect([$("[data-testid=input]").getAttribute("aria-expanded"), active()]).toEqual(["true", "Pi"]);
+  $("[data-testid=input]").focus();
+  await userEvent.keyboard("gem");
+  await settle();
+  expect(active()).toBe("Gemini");
+  await userEvent.keyboard("{Enter}{Escape}");
+  await settle();
+  expect([picked, escaped, document.querySelector("[data-testid=list]") !== null]).toEqual([["Gemini"], ["escape"], true]);
+});

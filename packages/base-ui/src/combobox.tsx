@@ -37,10 +37,27 @@ export interface ComboboxRootProps extends FloatingRootProps<ComboboxOpenChangeR
   inputValue?: string | undefined;
   defaultInputValue?: string | undefined;
   onInputValueChange?: ((text: string) => void) | undefined;
+  /** The list is always shown in place, as in a command palette: no Portal, nothing closes it. */
+  inline?: boolean | undefined;
+  /** An option is always highlighted: the first, whenever the highlighted one goes away. */
+  autoHighlight?: boolean | undefined;
 }
 
 function Root(props: ComboboxRootProps) {
-  const f = createFloating<ComboboxOpenChangeReason>(props, "input");
+  const f = createFloating<ComboboxOpenChangeReason>(
+    {
+      get open() {
+        return props.inline ? true : props.open;
+      },
+      get defaultOpen() {
+        return props.defaultOpen;
+      },
+      get onOpenChange() {
+        return props.onOpenChange;
+      },
+    },
+    "input",
+  );
   const [value, setValue] = createControllable<string | undefined>({
     value: () => props.value,
     initial: props.defaultValue,
@@ -78,10 +95,24 @@ function Root(props: ComboboxRootProps) {
     count,
     counted: () => {
       setCount((n) => n + 1);
-      return () => setCount((n) => n - 1);
+      keepHighlight();
+      return () => {
+        setCount((n) => n - 1);
+        keepHighlight();
+      };
     },
   };
-  createDismiss({ open: f.open, elements: () => [f.trigger(), f.positioner()], dismiss: (why) => ctx.setOpen(false, why) });
+  // After the options have changed: the first, if the highlighted one is gone.
+  const keepHighlight = () => {
+    if (!props.autoHighlight) return;
+    queueMicrotask(() => {
+      const h = highlighted();
+      const l = list();
+      if (h?.isConnected && l?.contains(h)) return;
+      ctx.highlight(l ? itemsIn(l, option)[0] : undefined);
+    });
+  };
+  createDismiss({ open: () => !props.inline && f.open(), elements: () => [f.trigger(), f.positioner()], dismiss: (why) => ctx.setOpen(false, why) });
   return <Context value={ctx}>{props.children}</Context>;
 }
 
