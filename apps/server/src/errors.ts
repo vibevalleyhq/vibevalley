@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
+import { Data } from "effect";
 import { type ApiError, commandOf, type Next } from "@vibevalley/protocol/api";
 
 export type { ApiError, Next };
@@ -62,3 +63,7 @@ export const reasonOf = (e: ApiError): string =>
 
 /** What a thrown or rejected value says: an Error's message, anything else as text. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is
+ * held to. Died with, so it is a bug to fix, found by this name. */
+export class Inconsistent extends Data.TaggedError("Inconsistent")<{ readonly message: string }> {}

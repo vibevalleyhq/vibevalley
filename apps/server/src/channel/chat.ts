@@ -76,7 +76,7 @@ import { linksIn, readEmbed } from "./embeds.ts";
 import { Audience } from "./audience.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
-import { type ApiError, refused, lookIn, missing } from "../errors.ts";
+import { type ApiError, refused, lookIn, missing, Inconsistent } from "../errors.ts";
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
@@ -780,7 +780,7 @@ export const make = Effect.gen(function* () {
   const settle = Effect.fn("Channels.settle")(function* (inserted: MsgRow) {
     let row = inserted;
     const ch = model.channel(row.channel_id);
-    if (!ch) return yield* Effect.die(new Error(`no channel ${row.channel_id}`));
+    if (!ch) return yield* Effect.die(new Inconsistent({ message: `no channel ${row.channel_id}` }));
     const meta = metaOf(row.meta);
     const orchestrators = orchestratorIds();
     const here = orchestratorOfRow(ch);
@@ -894,7 +894,7 @@ export const make = Effect.gen(function* () {
         }
         // The row as MessageByID would read it back: the sender's name and kind are the participant's.
         const sender = model.participant(w.from);
-        if (!sender) return yield* Effect.die(new Error(`no participant ${w.from}`));
+        if (!sender) return yield* Effect.die(new Inconsistent({ message: `no participant ${w.from}` }));
         const id = newId();
         const meta = metaText(w.meta);
         const created_at = yield* Clock.currentTimeMillis;

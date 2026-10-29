@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
+import { Inconsistent } from "../errors.ts";
 import type { CoreEvent } from "@vibevalley/agent/brain";
 import { messageText } from "@vibevalley/agent/messages";
 import type { Outcome, RunTrigger } from "@vibevalley/protocol";
@@ -95,7 +96,7 @@ export class AgentExecution {
       if (self.closed) return;
       if (input) {
         // The loop hands a consumed input with the message_start it opened: anything else is a bug in the host.
-        if (e.type !== "message_start") return yield* Effect.die(new Error("run input requires a message start"));
+        if (e.type !== "message_start") return yield* Effect.die(new Inconsistent({ message: "run input requires a message start" }));
         yield* self.begin(input);
         if (input.heard && input.heard.length > 0) {
           for (const id of input.heard) if (!self.heard.includes(id)) self.heard.push(id);
