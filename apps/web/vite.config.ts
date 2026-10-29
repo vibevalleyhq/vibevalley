@@ -56,6 +56,11 @@ export default defineConfig({
     tasks: {
       test: "vp test run",
       build: { command: "vp build", cache: { input: [{ auto: true }, "!node_modules", "!node_modules/.vite-temp/**"] } },
+      // The stories (vite.stories.config.ts), built beside the page so a story that no longer compiles fails the check.
+      "build:stories": {
+        command: "vp build --config vite.stories.config.ts",
+        cache: { input: [{ auto: true }, "!node_modules", "!node_modules/.vite-temp/**"] },
+      },
     },
   },
 });

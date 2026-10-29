@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vp dev",
     "e2e": "vp run build && playwright test",
-    "e2e:dev": "VIBEVALLEY_WEB_DEV=1 playwright test"
+    "e2e:dev": "VIBEVALLEY_WEB_DEV=1 playwright test",
+    "stories": "vp dev --config vite.stories.config.ts"
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
@@ -14,6 +15,7 @@
     "@vibevalley/engine": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
+    "@vibevalley/stories": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
     "effect": "catalog:",
     "hast-util-to-dom": "catalog:",

@@ -1462,11 +1462,13 @@ export const catalogs = {
         diagramFailed: "这张图画不出来：{why}",
         longMore: "展开全文",
         longLess: "收起",
+        taskDone: "已完成",
+        taskOpen: "没完成",
       },
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
-      tab: { sprites: "图", cursors: "指针", sounds: "音效", kit: "界面" },
+      tab: { sprites: "图", cursors: "指针", sounds: "音效" },
       shelves: "图鉴的书架",
       find: "找素材",
       background: "底色",
@@ -1521,39 +1523,6 @@ export const catalogs = {
         langs: { label: "语言", hint: "项目页上种了什么" },
         ui: { label: "界面", hint: "精力瓶、田头的按钮、日历的格子" },
         other: { label: "其他", hint: "没归上类的" },
-      },
-      kit: {
-        intro: "工作台的令牌和零件，两种主题并排。这里画的就是页面在用的类和组件，改了 style.css 或 ui/，这里跟着变。",
-        light: "浅色",
-        dark: "深色",
-        colour: "颜色",
-        type: "字号",
-        shape: "圆角和影",
-        motion: "动效",
-        replay: "再放一次",
-        icons: "图标的大小",
-        atoms: "零件",
-        primary: "新建工单",
-        plain: "普通",
-        quiet: "安静",
-        danger: "危险",
-        disabled: "不能点",
-        pressed: "按下",
-        delete: "删除档案",
-        question: "删了就找不回来。",
-        view: "视图",
-        list: "列表",
-        board: "看板",
-        toggle: "开着",
-        done: "完成",
-        failed: "失败",
-        sent: "派出",
-        field: "名字",
-        hint: "说明在框下面。",
-        placeholder: "填点什么",
-        select: "选一个",
-        pixel: "像素皮",
-        sample: "派给帮工的工单 Issue 42",
       },
     },
     "web.channel": {
@@ -5105,11 +5074,13 @@ export const catalogs = {
         diagramFailed: "This diagram cannot be drawn: {why}",
         longMore: "Show all",
         longLess: "Show less",
+        taskDone: "Done",
+        taskOpen: "Not done",
       },
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
-      tab: { sprites: "Pictures", cursors: "Cursors", sounds: "Sounds", kit: "Kit" },
+      tab: { sprites: "Pictures", cursors: "Cursors", sounds: "Sounds" },
       shelves: "The catalog's shelves",
       find: "Find a picture",
       background: "Background",
@@ -5164,40 +5135,6 @@ export const catalogs = {
         langs: { label: "Languages", hint: "What a project page has planted" },
         ui: { label: "Interface", hint: "The energy bottle, the farm chat's buttons, the calendar's cells" },
         other: { label: "Other", hint: "What fits no shelf" },
-      },
-      kit: {
-        intro:
-          "The workbench's tokens and atoms, both themes side by side. These are the classes and components the pages use: change style.css or ui/ and this follows.",
-        light: "Light",
-        dark: "Dark",
-        colour: "Colour",
-        type: "Type sizes",
-        shape: "Radii and shadows",
-        motion: "Motion",
-        replay: "Play again",
-        icons: "Icon sizes",
-        atoms: "Atoms",
-        primary: "New issue",
-        plain: "Plain",
-        quiet: "Quiet",
-        danger: "Danger",
-        disabled: "Disabled",
-        pressed: "Pressed",
-        delete: "Delete profile",
-        question: "It cannot be undone.",
-        view: "View",
-        list: "List",
-        board: "Board",
-        toggle: "On",
-        done: "Done",
-        failed: "Failed",
-        sent: "Sent",
-        field: "Name",
-        hint: "The hint sits under the box.",
-        placeholder: "Type something",
-        select: "Pick one",
-        pixel: "Pixel skin",
-        sample: "An issue for a helper, Issue 42",
       },
     },
     "web.channel": {
@@ -8734,6 +8671,8 @@ export interface Messages {
   "web.base.rich.longLess": undefined;
   "web.base.rich.longMore": undefined;
   "web.base.rich.more": undefined;
+  "web.base.rich.taskDone": undefined;
+  "web.base.rich.taskOpen": undefined;
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
@@ -8814,37 +8753,6 @@ export interface Messages {
   "web.catalog.ground.grass": undefined;
   "web.catalog.ground.night": undefined;
   "web.catalog.head": undefined;
-  "web.catalog.kit.atoms": undefined;
-  "web.catalog.kit.board": undefined;
-  "web.catalog.kit.colour": undefined;
-  "web.catalog.kit.danger": undefined;
-  "web.catalog.kit.dark": undefined;
-  "web.catalog.kit.delete": undefined;
-  "web.catalog.kit.disabled": undefined;
-  "web.catalog.kit.done": undefined;
-  "web.catalog.kit.failed": undefined;
-  "web.catalog.kit.field": undefined;
-  "web.catalog.kit.hint": undefined;
-  "web.catalog.kit.icons": undefined;
-  "web.catalog.kit.intro": undefined;
-  "web.catalog.kit.light": undefined;
-  "web.catalog.kit.list": undefined;
-  "web.catalog.kit.motion": undefined;
-  "web.catalog.kit.pixel": undefined;
-  "web.catalog.kit.placeholder": undefined;
-  "web.catalog.kit.plain": undefined;
-  "web.catalog.kit.pressed": undefined;
-  "web.catalog.kit.primary": undefined;
-  "web.catalog.kit.question": undefined;
-  "web.catalog.kit.quiet": undefined;
-  "web.catalog.kit.replay": undefined;
-  "web.catalog.kit.sample": undefined;
-  "web.catalog.kit.select": undefined;
-  "web.catalog.kit.sent": undefined;
-  "web.catalog.kit.shape": undefined;
-  "web.catalog.kit.toggle": undefined;
-  "web.catalog.kit.type": undefined;
-  "web.catalog.kit.view": undefined;
   "web.catalog.marks": undefined;
   "web.catalog.moves": undefined;
   "web.catalog.noCursors": undefined;
@@ -8891,7 +8799,6 @@ export interface Messages {
   "web.catalog.soundsRecipes": undefined;
   "web.catalog.stop": undefined;
   "web.catalog.tab.cursors": undefined;
-  "web.catalog.tab.kit": undefined;
   "web.catalog.tab.sounds": undefined;
   "web.catalog.tab.sprites": undefined;
   "web.catalog.unrecorded": undefined;

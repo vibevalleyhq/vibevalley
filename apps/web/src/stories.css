@@ -1,0 +1,4 @@
+/* The stories' page: the workbench's own styles, and the viewer's classes (packages/stories), which Tailwind would not
+   find on its own behind node_modules. */
+@import "./style.css";
+@source "../../../packages/stories/src";

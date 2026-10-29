@@ -6,13 +6,15 @@ The page, in Solid 2 (`solid-js`, `@solidjs/web`, pinned to one RC): the workben
 
 ```
 src/main.tsx        sends an unpaired remote browser to /pair, then renders App
+src/stories.tsx     the stories' page (stories.html, vite.stories.config.ts): every src/**/*.stories.tsx in packages/stories' viewer
 src/app/            the wiring: App (the routes, each place a feature's page), Root (router, state frames, the farm's store,
                     the query cache, <Loading>), the shell, places
 src/base/           what every layer stands on: the state stream (frames.ts, framework-free; frame.ts, its Solid store), the
                     API client (api.ts), rooms (gateway.ts), the live stream, REST queries (query.ts, agents.ts), external.ts,
                     the router, prefs, the host, saving settings, times and money in words (format.ts), the shared words
-src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Qr, Chips, A (a
-                    link), the window strip, the list-and-detail layout (layout.tsx), a helper's look (cast.ts)
+src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
+                    (a link), the window strip, the list-and-detail layout (layout.tsx), a helper's look (cast.ts); each with its
+                    X.stories.tsx beside it
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the project map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, task, channel, session, agent, memory,
@@ -22,7 +24,7 @@ src/farm/           the pixel farm at /, outside the shell (its README: who owns
 src/tree/           the memory tree at /tree, outside the shell like the farm: the tree grown from the memories, its panel and the
                     memory sky, on one canvas; made-up
                     memories (mock.ts) until the server sums them up (.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
-test/               Playwright against a real server per worker (fixtures.ts)
+test/               Playwright against a real server per worker (fixtures.ts); stories.spec.ts serves the built stories instead
 ```
 
 ## Rules
@@ -49,6 +51,12 @@ test/               Playwright against a real server per worker (fixtures.ts)
 - **Design tokens.** The workbench's colours, corners, type sizes, shadows, motion and layers are the tokens in
   `src/style.css` (lint: `vibevalley/no-hex-color`, `vibevalley/design-tokens`); which one to pick, the atoms' looks and
   the checklist before handing a page in are in docs/style/design.md. The pixel skins and faces are drawn and keep theirs.
+- **Stories.** Every part in `src/ui` (and `src/ui/pixel`) has an `X.stories.tsx` beside it (`src/stories.test.ts`;
+  the few without say why there): its states with made-up data, in both themes, at a few widths. `vp run --filter
+  @vibevalley/web stories` serves them; `build:stories` (in `web:check`) builds them to `dist-stories/`, never into
+  `dist/`; `test/stories.spec.ts` opens each in its themes with axe. A part that reads the page's data to draw itself is
+  split so its drawing takes arguments (`Shortcuts` in `ShortcutSheet.tsx`). The format and the viewer are
+  `packages/stories`.
 - **App icons** are in `public/icons/`: `app-32.png`, `app-64.png` and `app-256.png`. The site build copies these packaged
   files; it does not keep another set.
 - **The host** (`@vibevalley/protocol/host`, found by `currentHost()` in `src/base/host.ts`) is the only way to the machine; a capability that is null is not drawn.

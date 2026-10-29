@@ -202,6 +202,8 @@
     "diagram": "图",
     "diagramFailed": "这张图画不出来：{why}",
     "longMore": "展开全文",
-    "longLess": "收起"
+    "longLess": "收起",
+    "taskDone": "已完成",
+    "taskOpen": "没完成"
   }
 }
