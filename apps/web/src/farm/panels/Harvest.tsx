@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-// Harvesting a helper's plot and the warehouse of what was harvested; the checklist's rules are src/features/issue/state.ts.
+// Harvesting a helper's plot and the warehouse of what was harvested; the checklist's rules are src/features/issue/status.ts.
 
 import { For, Match, Show, Switch } from "solid-js";
 

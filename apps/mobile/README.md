@@ -13,7 +13,7 @@ src/base/host.ts         one loaded page's native host: answers bridge calls, ke
 src/farm.ts          FarmConnection owns the current choice, pending pairing and serialized keychain commits
 src/rtc.ts           the call on Agora's native SDK: owns pending microphone permission, the engine and release
 src/notify.ts        the page's notices as the phone's own (expo-notifications)
-src/rules.ts         pure: pairing links, the phone's name, the key's cookie, levels; with its vitest
+src/pairing.ts       pure: pairing links, the phone's name, the key's cookie, levels; with its vitest
 scripts/e2e.ts       pairs a built app on an emulator or simulator with a sandboxed farm, and screenshots it
 ```
 

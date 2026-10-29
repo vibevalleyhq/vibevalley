@@ -1,5 +1,5 @@
 // An html artifact's version, a GET since an <iframe src> can only GET. Its headers keep an HTML page from ever running as one of
-// the farm's (artifact/rules.ts); a version never changes once made, so it is cached for good.
+// the farm's (artifact/policy.ts); a version never changes once made, so it is cached for good.
 
 import { Effect } from "effect";
 import { artifactPrefix as prefix } from "@vibevalley/protocol";

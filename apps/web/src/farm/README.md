@@ -2,7 +2,7 @@
 
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
 shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/base/frame.ts`); this folder
-only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `state.ts`
+only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `ui.ts` and `frames.ts`
 (`useFarm`, `timeOfDay`, `commands`; the frames as they came are `base/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
 the pad).
 
@@ -38,7 +38,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 
 ## The store (`store.ts`)
 
-`useFarm(select)` (`state.ts`) reads a slice, an accessor that changes only when the slice does; `farmState()` reads it
+`useFarm(select)` (`ui.ts`) reads a slice, an accessor that changes only when the slice does; `farmState()` reads it
 outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
 
 | Action | Does |
@@ -79,9 +79,9 @@ village's size and the cuts are `farmFraming` in `@vibevalley/protocol/host`, wh
 
 ## Commands (`commands.ts`)
 
-`commands` (`state.ts`, `farmCommands` over the latest frame) is the `FarmCommands`: what a plot does with its effect on the bed
+`commands` (`frames.ts`, `farmCommands` over the latest frame) is the `FarmCommands`: what a plot does with its effect on the bed
 (`water`, `resolve`, `cure`, `harvest`, `shovel`, `stop`, `plant`, `aim`, `act`), and `chooseTitle`, `refreshRuntime`. Each calls
-the API and then plays the bed's effect. A task graph's calls are `features/task/data.ts`, shared with the workbench.
+the API and then plays the bed's effect. A task graph's calls are `features/task/queries.ts`, shared with the workbench.
 `clickBed(commands, bed)` is a plot click as the farm page does it; `openPlace(place, navigate)` a yard place's click
 (a panel, or a workbench page the web page has: `webRoutes`). `fire(promise)`: the server's notice tells a refusal.
 

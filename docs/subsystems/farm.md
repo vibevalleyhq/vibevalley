@@ -28,8 +28,8 @@
 - **音效** `ui/pixel/sound.ts`：配方（`SOUNDS`）和分组（`SOUND_GROUPS`），几张皮共用；农场什么时候响在 `farm/cues.ts`（`farmCues` 比前后两刻，`support.ts` 的 `farmSounds` 照它响）；合成在 `packages/engine/src/audio`。指针在 `apps/web/public/cursors/`，字体 Fusion Pixel 12px 在 `public/fonts/`。
 - **手机** `farm/phone/`：`Phone.tsx` 机身，`calls.ts` 来电和记录，`screens.tsx` 主屏；小游戏的规则是纯函数（`games/blocks.ts`、`dino.ts`、`sokoban.ts`、`bugSnake.ts`、`merge.ts`），画面是 `*Game.tsx`。
 - **通知** `apps/web/src/features/notice/tray.ts`（`noticeFor`、`CallBell`、`traySummary`），由 `src/features/notice/Follow.tsx` 交给宿主。
-- **地图** `apps/web/src/features/project/rules.ts`（纯函数，`islandsOf`、`islandLooks`）、`features/project/ProjectMap.tsx`；挂在工作台「项目」页（`/projects` 的「全部」，选一个项目是它的岛）。
-- **图鉴** `apps/web/src/features/catalog/`（`/catalog`）：规则在 `features/catalog/rules.ts` 的 `shelves`、`framesOf`、`remakeOf`。
+- **地图** `apps/web/src/features/project/islands.ts`（纯函数，`islandsOf`、`islandLooks`）、`features/project/ProjectMap.tsx`；挂在工作台「项目」页（`/projects` 的「全部」，选一个项目是它的岛）。
+- **图鉴** `apps/web/src/features/catalog/`（`/catalog`）：规则在 `features/catalog/shelves.ts` 的 `shelves`、`framesOf`、`remakeOf`。
 
 服务端这边只有两样给皮的东西：`StateFrame.view`（`FarmView`，`viewOf`）和 `StateFrame.inbox`（`inbox`）；地图另读项目列表里的 `ProjectSummary.maxSessions`。
 
@@ -78,7 +78,7 @@
 - **打电话是手机的事**：田头没有通话键，输入行左边也不再有管家的头像（它是旧的小窗用来收起的）；手机的「管家」一屏就是这通电话（打给管家、通话中、挂断、没接通的原因），田头头上写管家在听、在想，没接通的原因和「去设置」在田头头下，都读同一个 `voiceCall`。
 - **小游戏的规则是纯函数**：一局是一个值，每一步是值到值，带种子的随机，能重放；画面只跑动画帧、接十字键和 A、B、画在 canvas 上。最好成绩只在这次打开里；推箱子的棋盘放在农场的 store 里，收起手机、来电都不丢，5 个固定关卡，能逐步撤销、重开本关。小游戏不进账本、不给金币。
 - **通知和来电用同一套规则**：都从帧里的 `inbox` 读，话是来电自带的 `words`，同一个来电只响一次（`freshOf`）；窗口在前面时不弹系统通知。页面没开着时什么都收不到，那时靠连接器把话送到微信、飞书或 QQ。
-- **地图上的地 = 在做的工单 + 空位**（`features/project/rules.ts` 的 `islandsOf`）：项目里的每个帮工一块（不管在干、熟了还是歇着），按来的先后排；后面是空位，个数是项目的上限减去在干活的，也不超过农场还空着的地；被农场的地挡住的画成锁住的地。一座岛最多 6 块。上限来自 `ProjectSummary.maxSessions`（`project.max_sessions`，默认 3；没设或超过 6 时是 6）；空位和服务端拒绝开工（`noRoom`）用的是同一条规则 `roomLeft`（`packages/protocol/src/rules/phase.ts`），不各算一份。排上队的待办（`queuedAt`）按先后是院门外的种子袋。不在项目列表里的项目只画它的帮工、不再给空位。岛下面的名牌写着「进岛」并带箭头，点它或岛进这个项目的岛视图。
+- **地图上的地 = 在做的工单 + 空位**（`features/project/islands.ts` 的 `islandsOf`）：项目里的每个帮工一块（不管在干、熟了还是歇着），按来的先后排；后面是空位，个数是项目的上限减去在干活的，也不超过农场还空着的地；被农场的地挡住的画成锁住的地。一座岛最多 6 块。上限来自 `ProjectSummary.maxSessions`（`project.max_sessions`，默认 3；没设或超过 6 时是 6）；空位和服务端拒绝开工（`noRoom`）用的是同一条规则 `roomLeft`（`packages/protocol/src/rules/phase.ts`），不各算一份。排上队的待办（`queuedAt`）按先后是院门外的种子袋。不在项目列表里的项目只画它的帮工、不再给空位。岛下面的名牌写着「进岛」并带箭头，点它或岛进这个项目的岛视图。
 - **每块地写着项目**：几个项目的地混在一个农场里，有帮工的地在牌子那一栏写它的项目名；有牌子（等你验收、等你回答……）时项目名在牌子下面一行。
 - **岛是整张的画**：六种样子（`islandLooks`），项目用哪座由名字定；每座中间留一块空院子，`process.py` 找出院子、把岛缩到院子 150 格宽，院子的位置写进 `sprites.json` 的 `yard`，页面按它摆地。
 - **图鉴只读已打包的东西**：图来自 `sprites.json`，指针来自 `cursors.json`，音效来自 `sound.ts` 的配方；没有自己的清单，切了新图就出现。分类按名字前缀（`shelves`），帧按编号认（`framesOf`），重画和重切的命令按清单里的 `sheet`（切自哪张原图）给出（`remakeOf`）；改了命名前缀要同时改 `shelves`，否则新图落进「其他」。
@@ -158,5 +158,5 @@
 - `apps/web/src/farm/phone/calls.test.ts`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，别处处理掉自己停；`games/*.test.ts` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在 `apps/server/src/core` 的黄金数据（`core/golden.test.ts`）。
 - `apps/web/src/features/notice/tray.test.ts`（来电变通知、只响一次、菜单栏摘要）、`projects.test.ts`（worktree 和空位、锁住的地，一座岛最多 6 块）、`catalog.test.ts`（书架、帧、重画的命令）。
 - Playwright：`farm.spec.ts`（画布没有错误、农场和工作台互相链）、`farm-canvas.spec.ts`（村子跑一阵不出错、指针跟着农具说能不能用、帮工走进来、干活、去书屋，夜里点灯）、`farm-hud.spec.ts`（等级和农具、数字键挑农具、每个面板打开和 Esc 关、点空地打开播种袋、「草稿」写进备选）、`farm-chat.spec.ts`（田头说话、管家回答、频道菜单、点帮工的地打开它的工单）、`farm-phone.spec.ts`（手机打开、小游戏接十字键、来电响铃、接听去那块地并记下）、`farm-title.spec.ts`（首页）、`projects.spec.ts`（地图和岛）、`catalog.spec.ts`。
-- 服务端：`project/stack.test.ts`（每种标记文件、锁文件选包管理器）、`issue/rules.test.ts`（目录里每个模板都填得满、按栈填命令）、`issue/issue.test.ts`（排着队的待办从播种袋开工）、`project/project.test.ts`（项目的上限在农场的上限以内）。
+- 服务端：`project/stack.test.ts`（每种标记文件、锁文件选包管理器）、`issue/recorded.test.ts`（目录里每个模板都填得满、按栈填命令）、`issue/issue.test.ts`（排着队的待办从播种袋开工）、`project/project.test.ts`（项目的上限在农场的上限以内）。
 - 改了画面，照 `acceptance/page.md` 在真的页面上截图看一遍。

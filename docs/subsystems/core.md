@@ -18,7 +18,7 @@
 
 - `apps/server/src/core/core.ts`（`Core`）：施加、存盘、各条流；`services.ts` 让它最先建、最后关。
 - `packages/protocol`：形状在 `shapes.ts`（`WorkspaceState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
-- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/state.ts`、`channel/state.ts`、`issue/state.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`cron/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。
+- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/roster.ts`、`channel/folded.ts`、`issue/status.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`cron/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。
 - `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers.ts` 实现 `Handlers`。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue work`；`runtime chat` 和自己的 agent 不经服务端。

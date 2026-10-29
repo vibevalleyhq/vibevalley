@@ -8,7 +8,8 @@ import { createContext, createSignal, createUniqueId, omit, onSettled, Show, use
 import { createDismiss } from "./internal/dismiss";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 import { itemsIn } from "./internal/roving";
-import { call, createControllable, type DivProps, flag, refs } from "./internal/state";
+import { call, type DivProps, flag, refs } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 export type ComboboxOpenChangeReason = "input" | "item" | "escape" | "outside" | "tab";
 

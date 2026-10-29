@@ -5,7 +5,8 @@ import { createContext, createUniqueId, omit, Show, useContext } from "solid-js"
 import type { JSX } from "@solidjs/web";
 import type { Orientation } from "./internal/composite";
 import { roveFocus } from "./internal/roving";
-import { type ButtonProps, call, createControllable, type DivProps, flag, refs } from "./internal/state";
+import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 interface RootCtx {
   readonly open: (value: string) => boolean;

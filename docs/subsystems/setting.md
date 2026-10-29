@@ -16,7 +16,7 @@
 ## 在哪
 
 - 配置：`apps/server/src/base/config.ts`（`ServerConfig`：接口和服务同名；`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
-- 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`rules.ts`（`settingsProblem`、`keyHint`、记性来源的校验和合并、语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
+- 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`saving.ts`（`settingsProblem`）、`keys.ts`（`keyHint`，钥匙和地址的写法）、`memorySources.ts`（记性来源的校验和合并）、`voice.ts`（语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`apps/server/src/base/redact.ts`（`redact`、`redactOutput`）。
 - 接口：`setting.get`、`setting.validate`、`setting.update`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
 - 页面：`apps/web/src/features/setting/SettingsPage.tsx`，表单 `SettingsForm.tsx`。
@@ -122,6 +122,6 @@
 ## 怎么验证
 
 - `apps/server/src/base/config.test.ts`：默认、文件、环境变量依次覆盖；读不成的拒绝（找不到的 `--config`、读不成数字的端口）；主接口的地址总在回环上；提 PR 的配置。
-- `setting/setting.test.ts`：这里存的钥匙比配置的优先、只露出末四位；格式不对什么都不存；语音只存和默认不同的、默认由配置定；语音服务的 key 只给提示；记性来源的 key 留到清掉。`setting/rules.test.ts`：黄金数据和设置拒绝什么、语音只存差异、记性来源。
+- `setting/setting.test.ts`：这里存的钥匙比配置的优先、只露出末四位；格式不对什么都不存；语音只存和默认不同的、默认由配置定；语音服务的 key 只给提示；记性来源的 key 留到清掉。`setting/recorded.test.ts`：黄金数据和设置拒绝什么、语音只存差异、记性来源。
 - `base/base.test.ts`：钥匙从文字里抹掉、别的留着；服务端写出的字抹过钥匙；存的文件整份写、封住以后不再写；一个家目录一个服务端。
 - 页面：`apps/web/test/settings.spec.ts`（DeepSeek 的钥匙存、只露末尾、清掉；记性的来源；声音页的两部分）。

@@ -3,7 +3,8 @@
 
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
 import { itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, call, createControllable, type DivProps, flag, refs, type SpanProps } from "./internal/state";
+import { type ButtonProps, call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 interface GroupCtx {
   readonly value: () => string | undefined;

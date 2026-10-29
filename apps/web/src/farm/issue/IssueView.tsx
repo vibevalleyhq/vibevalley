@@ -2,7 +2,7 @@ import { list, t } from "@vibevalley/i18n";
 // A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
 // workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
-// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
+// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/status.ts.
 
 import { OutfitValues, SpeciesValues, type SessionView } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";

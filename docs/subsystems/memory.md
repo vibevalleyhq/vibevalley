@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 帮工的档案的记性：存、挑、记下、忘掉、上限 | 提醒块怎么拼进输入、干活过程怎么显示「想起了」（`session/rules.ts` 的 `withRecall`，`session/facts.ts`） |
+| 帮工的档案的记性：存、挑、记下、忘掉、上限 | 提醒块怎么拼进输入、干活过程怎么显示「想起了」（`session/briefing.ts` 的 `withRecall`，`session/facts.ts`） |
 | 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在库里它那一行） |
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_create` 背后的检索和写入，回给模型的话（`foundText`） | 工具的参数、谁能用、范围由谁定（`apps/server/src/tool`；帮工经 `/mcp`，`mcp`） |

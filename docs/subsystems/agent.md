@@ -18,7 +18,7 @@
 ## 在哪
 
 - **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、默认管家（没有就从内置的 `orchestrator` 模板装上）、模板的装和更新、角色的规则（`roleProblem`，`orchestrators`、`isOrchestrator`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`packages/agent` 是 VibeValley 自己的 agent（[VibeValley 自己的 agent](docs/subsystems/brain.md)）。
-- **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时任务读取、今天的花费、`assess`、`resolve`、`check`；`rules.ts` 的 `agentProblems`、`moneyStop`、额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
+- **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时任务读取、今天的花费、`assess`、`resolve`、`check`；`fit.ts` 的 `agentProblems`、`sessionOptions`、`chooseAgent`，`quota.ts` 的 `moneyStop` 和额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
 - **模板**：`apps/server/src/agent/template.ts` 读一个模板文件夹（`readTemplate`）、内置的目录（`builtInTemplates`，`templates/<id>/`，次序在 `templates/index.json`）、本机加进来的（`addedTemplates`，`$VIBEVALLEY_HOME/agent-templates/<id>/`），照模板做出档案（`profileOf`）和照模板更新（`updatedFrom`）。
 - **种子**：`apps/server/src/agent/seeds.json` 的 `defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seed.ts` 读它（`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
@@ -29,7 +29,7 @@
 
 - **角色（`role`）是封闭的两种**（`AgentRoleValues`）：`orchestrator`、`worker`，新建默认是帮工。派活用的档案（`agents()`、`named`、`chooseAgent`）只有帮工；全部档案（`all()`）和按 id 取的含管家。管家只在 `vibevalley` 上跑：保存、新建一份管家档案时农机不是它就拒绝（`roleProblem`）；默认管家（`defaultOrchestrator`）改成帮工拒绝。
 - **职责（`duty`）和适合的活（`tags`）是两个字段，用法不同。**
-  - `duty` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Duty>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Duty>；适合的活：<Tags>」（`session/rules.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
+  - `duty` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Duty>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Duty>；适合的活：<Tags>」（`session/report.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
   - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时任务，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
 - **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了或不符合形状的 `config.json` 不覆盖**：文件按档案、技能和农机设置的 Schema 读回；读取、解析或形状校验失败就改名成 `config.json.unreadable-<毫秒>` 留着，像新农场一样起；改不了名就不开机。
@@ -50,7 +50,7 @@
 - **清单在工作目录 `projects/` 下读**（`projectsDir`）：农机自己装的技能、MCP 服务器、工具，各最多等 10 秒，读不到或不是 `ok` 就是 `null`。MCP 的说明拼成「状态 · N 个工具」；技能和工具的来源取路径、MCP 的 id，没有就取 `source`。
 - **这台电脑上装的技能**：页面把各农机清单里的技能按名字合成一份（`installedSkills`：第一个非空的说明，加上每台带着它的农机和来源，按名字排），只读；用这些农机的帮工自己按需加载。VibeValley 不复制它们。
 - **技能库**是 Agent Skills 的形状（`id`、名字、description、正文）。档案勾上的，派活时按勾的顺序以「## 名字」加正文接在人设后面，不管用哪台农机；人设交给农机的三种方式见[帮工](docs/subsystems/session.md)。
-- **预检和开会话用同一份选项规则**（`runtime/rules.ts` 的 `sessionOptions`）：先合并农机默认值与档案覆盖，再定模型回退，并检查农机能力与模型档位。`agentProblems` 把这些问题连同派新活的条件给预检；每次开会话的 `resolve` 也检查当次有效选项，有错就拒绝，不依赖较早的预检结果。设置存好就参与预检和解析，不等新探测完成。派活前（`issue` 的 `hire` 经 `check`，管家、计划、`dispatch` 挑人经 `assess`）和页面（`agent.validate`）跑同一个检查。`error` 让它派不出去，`warn` 只提醒，每条带出问题的字段：
+- **预检和开会话用同一份选项规则**（`runtime/fit.ts` 的 `sessionOptions`）：先合并农机默认值与档案覆盖，再定模型回退，并检查农机能力与模型档位。`agentProblems` 把这些问题连同派新活的条件给预检；每次开会话的 `resolve` 也检查当次有效选项，有错就拒绝，不依赖较早的预检结果。设置存好就参与预检和解析，不等新探测完成。派活前（`issue` 的 `hire` 经 `check`，管家、计划、`dispatch` 挑人经 `assess`）和页面（`agent.validate`）跑同一个检查。`error` 让它派不出去，`warn` 只提醒，每条带出问题的字段：
   - `runtime`：不认识的农机；这台机器上找不到；在农具页被停用；以及钱的一条（`moneyStop`：额度用完、余额用完、到了每日预算，[帮工](docs/subsystems/session.md)）。
   - `persona`：写了人设、方式是追加或替换、农机不接受这个选项，原因后面加「把人设改成「写进工单开头」。」。
   - `effort`、`env`、`mcpServers`、`disallowedTools`：填了而农机不接受。
@@ -109,7 +109,7 @@
 
 - **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`ServerConfig`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
 - **工单（`issue`）**：`hire` 读档案、跑 `check`，有 `error` 就回「<档案> 派不出去：<原因>」；档案停用另回「<档案> 被停用了」。
-- **管家（`orchestrator`）、工具（`tool`）、计划（`task`）**：`Runtimes.candidates` 是每个档案和它现在能不能派（`assess`），`Runtimes.choose` 在其中按 `runtime/rules.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进现状。
+- **管家（`orchestrator`）、工具（`tool`）、计划（`task`）**：`Runtimes.candidates` 是每个档案和它现在能不能派（`assess`），`Runtimes.choose` 在其中按 `runtime/fit.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进现状。
 - **记性（`memory`）**、**定时任务（`cron`）**：`Agents` 列档案（不填档案的检索、定时任务派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
 - **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。
@@ -144,6 +144,6 @@
 
 - `apps/server/src/agent/template.test.ts`：内置的每个文件夹都在 `index.json` 里、各读得通，第一个是默认管家，英文的是英文。
 - `apps/server/src/agent/agent.test.ts`：新农场只有默认管家和配置列的模板；一个模板装好几份，照模板更新只在叫它时做、留着这台机器的；本机的文件夹加进来、装上、删掉，读不通的说哪一栏；读不了的 `config.json` 挪到一边、像新农场一样开始；挪不开就不开机、不碰它；没有动物的档案补上页面画的那只；管家是有角色的档案：好几个管家各只在 VibeValley 自己的农机上，默认的删不了、改不成帮工，派活只派帮工；新建的 id 各不相同、带 id 的草稿被拒；给出去的是副本。
-- `runtime/runtime.test.ts`：接受的探测拥有读用量的安装、慢的不覆盖新的；完整探测和额度更新交错时，两种完成顺序都保留新完整探测；适配器的拒绝挡住档案和继承的选项、农场的说法盖在上面；有效思考强度按实际模型或回退模型检查；设置已存而探测未完成时预检和解析一致；预检通过后改成不兼容设置，开会话仍拒绝；已有 Session 的解析不重套启停与预算；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；存不上的设置被拒、不探测；`resolve` 管默认、覆盖和模型的退回；价目。`runtime/rules.test.ts`：`agentProblems`、`moneyStop`、额度的字照黄金数据。
-- `session/rules.test.ts`：挑档案（按名字、按农机、选定的、按适合的活）。
+- `runtime/runtime.test.ts`：接受的探测拥有读用量的安装、慢的不覆盖新的；完整探测和额度更新交错时，两种完成顺序都保留新完整探测；适配器的拒绝挡住档案和继承的选项、农场的说法盖在上面；有效思考强度按实际模型或回退模型检查；设置已存而探测未完成时预检和解析一致；预检通过后改成不兼容设置，开会话仍拒绝；已有 Session 的解析不重套启停与预算；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；存不上的设置被拒、不探测；`resolve` 管默认、覆盖和模型的退回；价目。`runtime/recorded.test.ts`：`agentProblems`、`moneyStop`、额度的字照黄金数据。
+- `session/report.test.ts`：挑档案（按名字、按农机、选定的、按适合的活）。
 - 页面：`apps/web/test/agents.spec.ts`（捏一个帮工、改、停用、删；不存在的档案说清楚；整页的样子）、`runtime-avatars.spec.ts`（两种农机的头像角标、全名、辅助阅读、16 px 小头像、桌面和手机截图）、`runtimes.spec.ts`（照 oar 找到的列、存设置再改回去）、`settings.spec.ts`（VibeValley 自己的技能写、列、删）。

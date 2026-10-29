@@ -8,7 +8,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 
 | 管 | 不管（谁管） |
 |---|---|
-| 拆：派规划的帮工、读它给的计划、打回一次；帮工把自己的工单拆成计划 | 规划的帮工读什么、拆的规矩（`session/rules.ts` 的 `splitBrief`） |
+| 拆：派规划的帮工、读它给的计划、打回一次；帮工把自己的工单拆成计划 | 规划的帮工读什么、拆的规矩（`session/report.ts` 的 `splitBrief`） |
 | 计划和每一件的状态、能做哪些动作、能改哪些件 | 父工单、子工单的存取和核心状态（[工单](docs/subsystems/issue.md)，`issue.PutTask`） |
 | 调度：哪几件能开工、并行数、派谁 | 挑档案的打分（`session.ChooseAgent`）、农场的地满没满（`issue.Hire`） |
 | 每一件做完的验证：检查命令、验收、冻结的文件 | 帮工怎么跑一轮、汇报怎么读（[帮工](docs/subsystems/session.md)） |
@@ -18,16 +18,16 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 
 ## 在哪
 
-- 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；`rules.ts` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）。
-- 规则：只有服务端跑的，都在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）、`graph.ts`（出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`）；边的规则在 `packages/agent/src/dag.ts`，和 `packages/agent` 自己的任务共用。工单状态怎么从计划算在 `issue/state.ts` 的 `issueStatusOf`。
+- 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；只有它用的纯函数：`splitting.ts` 读规划的回答（`parseSplit`），`editing.ts` 改步骤（`editTask`、`removeTask`、`freshTask`），`graph.ts` 计划本身（`startable`、冻结文件的判断），`prompts.ts` 交给帮工的几句话。
+- 规则：只有服务端跑的，都在 `apps/server/src/task`：`changes.ts`（两版计划比出经过和它的说法，`changeOf`）、`graph.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`，出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`、`graphOf`，`graphIssues` 把计划拆成一家工单）；边的规则在 `packages/agent/src/dag.ts`，和 `packages/agent` 自己的任务共用。工单状态怎么从计划算在 `issue/status.ts` 的 `issueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`graph.split`、`graph.list`、`graph.get`、`graph.task.update`、`graph.task.delete`、`graph.act`、`graph.task.act`、`graph.diff.get`、`graph.event.list`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graph_list`、`graph_get`、`graph_task_update`、`graph_task_delete`、`graph_act`、`graph_task_act`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
-- 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/features/issue/cards.ts`），子工单的标题前加计划名（`features/issue/rules.ts` 的 `issueTitle`）；工单详情里的一件是 `features/issue/TaskDetail.tsx`。两边对计划的调用（拆、动作、改一件、删一件）和分支的改动都经 `apps/web/src/features/task/data.ts`：每个调用回一句话（成了，或为什么不行），之后重读工单。
+- 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/features/issue/cards.ts`），子工单的标题前加计划名（`features/issue/titles.ts` 的 `issueTitle`）；工单详情里的一件是 `features/issue/TaskDetail.tsx`。两边对计划的调用（拆、动作、改一件、删一件）和分支的改动都经 `apps/web/src/features/task/queries.ts`：每个调用回一句话（成了，或为什么不行），之后重读工单。
 
 ## 模型和不变量
 
-- **计划是父工单，每一件是子工单。** 父工单的 id 是计划的 id：管家起的是 `p1`、`p2`……（`issue/rules.ts` 的 `nextTaskId`），帮工拆的就是原来那张工单的 id。标题和说明是计划的标题和目标；父工单原来的编号、帮工（assignee）、优先级、验收标准和干活记录都留着，`graphIssues` 不重写它们。`graph`（`IssueGraph`）存状态、计划分支、并行数、一句说明。子工单的 id 是 `<计划>.<件>`（`p1.api`，`taskIssueID`），`parent` 指父工单，`blockedBy` 是它要等的子工单，标题和说明是这件的标题和工单，`task`（`IssueTask`）存其余：状态、检查命令、该改的地方（`scope`）、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数。
+- **计划是父工单，每一件是子工单。** 父工单的 id 是计划的 id：管家起的是 `p1`、`p2`……（`issue/stored.ts` 的 `nextTaskId`），帮工拆的就是原来那张工单的 id。标题和说明是计划的标题和目标；父工单原来的编号、帮工（assignee）、优先级、验收标准和干活记录都留着，`graphIssues` 不重写它们。`graph`（`IssueGraph`）存状态、计划分支、并行数、一句说明。子工单的 id 是 `<计划>.<件>`（`p1.api`，`taskIssueID`），`parent` 指父工单，`blockedBy` 是它要等的子工单，标题和说明是这件的标题和工单，`task`（`IssueTask`）存其余：状态、检查命令、该改的地方（`scope`）、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数。
 - **一次写整家**：每写一次计划，`issue.PutTask` 在一个事务里写父工单和全部子工单，提交后一次施加（`applyBatch`），先子工单、后父工单；计划在核心状态里总是完整的。核心状态只留最近 50 家关了的工单时，只数没有父工单的，子工单跟着父工单留、跟着父工单走。
 - **计划的状态**：`splitting`、`draft`、`running`、`paused`、`ready`（都做完了，等合进主分支）、`done`、`abandoned`。**每一件**：`waiting`、`working`、`merged`、`failed`、`skipped`；`merged`、`skipped` 算定下了，等它的件能开工。
 - **工单的状态跟着计划算**，不另存：父工单在拆、在做是 `in_progress`，草稿、暂停、都做完了是 `in_review`，合进主分支了是完成、交付 `merged`，放弃了是不做了（`dismissed`）。子工单等着是 `backlog`，帮工在干是 `in_progress`，帮工停着或没做成是 `in_review`，合进去了是完成、交付 `merged_into_parent`，跳过或计划结束了是不做了（`dismissed`）。
@@ -125,6 +125,6 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 
 - `apps/server/src/task/task.test.ts`（执行和 git 的测试适配器）：菱形的图拆开、两件同时做、合进去后下一件看得到它们的文件、合进主分支；验收这一步先做、冻结；做不成的一件先打回、再留给主人重试或跳过；有问题的计划打回一次；农场停下时在做的计划暂停、继续后接着做；挑档案和规划帮工读的话；计划是父工单、每件是它下面的工单；帮工拆自己的工单，各件马上开工。
 - `apps/server/src/task/lifecycle.test.ts`（oar 的 `scriptedRuntime`、真的 git 仓库）：计划验收占住已停止的执行，带话不能在检查与合并之间插入未验的代码；其他执行仍能接话、叫停；验收失败后由同一个执行接着修。
-- `task/rules.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
+- `task/recorded.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
 - `apps/server/src/core/golden.test.ts`：计划拆成工单再拼回来、各张工单的状态、经过的说法（`rules.jsonl.gz`）。
 - 页面：`apps/web/test/farm-hud.spec.ts`（计划板打开），`issues.spec.ts`（计划的工单在看板上）。

@@ -4,7 +4,7 @@
 
 import type { JSX } from "@solidjs/web";
 import { createContext, createUniqueId, omit, onSettled, createSignal, Show, useContext } from "solid-js";
-import { type DivProps, flag, type SpanProps } from "./internal/state";
+import { type DivProps, flag, type SpanProps } from "./internal/element";
 
 interface Ctx {
   readonly value: () => number | null;

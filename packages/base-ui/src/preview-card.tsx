@@ -6,7 +6,7 @@ import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, omit, onCleanup, useContext } from "solid-js";
 import { createDismiss } from "./internal/dismiss";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
-import { call, type DivProps, flag, refs, type Render } from "./internal/state";
+import { call, type DivProps, flag, refs, type Render } from "./internal/element";
 
 export type PreviewCardOpenChangeReason = "hover" | "focus" | "escape" | "outside";
 

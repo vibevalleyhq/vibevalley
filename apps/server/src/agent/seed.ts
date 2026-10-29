@@ -32,7 +32,7 @@ const Seeds = Schema.Struct({
   runtimeFacts: Schema.Record(Schema.String, S.RuntimeFacts),
 });
 /** A template as template_catalog.json writes it: done may still hold {test}, {lint} and {build}; its text is made when
- * it is filled for a project (issue/rules.ts filledTemplate). */
+ * it is filled for a project (issue/brief.ts filledTemplate). */
 const WrittenTemplate = Schema.Struct({ id: Schema.String, title: Schema.String, done: Schema.String });
 export type WrittenTemplate = typeof WrittenTemplate.Type;
 const WrittenKind = Schema.Struct({ id: Schema.String, name: Schema.String, icon: Schema.String, templates: Schema.Array(WrittenTemplate) });

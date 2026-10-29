@@ -35,7 +35,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
 - **The page does not fold facts.** It reads the folded `StateFrame` (`useCore()`, `useFrames()`); REST reads go through
   Solid Query (`base/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
   not rewritten here. Presentation rules (lanes, grouping, ordering, feed merging) are pure functions in the feature they
-  belong to (`features/issue/display.ts`, `features/channel/rules.ts`), each with its test.
+  belong to (`features/issue/display.ts`, `features/channel/unread.ts`), each with its test.
 - **Layers, one way.** `base` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`: a file imports from
   its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in `scripts/oxlint-plugin.ts`). A
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle

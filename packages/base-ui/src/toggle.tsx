@@ -3,7 +3,8 @@
 // several be pressed at once, else pressing one releases the others.
 
 import { createContext, createSignal, omit, useContext } from "solid-js";
-import { type ButtonProps, call, createControllable, type DivProps, flag, refs } from "./internal/state";
+import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 import type { Orientation } from "./internal/composite";
 import { itemsIn, roveFocus } from "./internal/roving";
 

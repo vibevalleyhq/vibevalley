@@ -6,7 +6,8 @@ import { dynamic } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
 import type { Orientation } from "./internal/composite";
 import { roveFocus } from "./internal/roving";
-import { type ButtonProps, buttonType, call, createControllable, type DivProps, flag, type Renderable, refs } from "./internal/state";
+import { type ButtonProps, buttonType, call, type DivProps, flag, type Renderable, refs } from "./internal/element";
+import { createControllable } from "./internal/controllable";
 
 interface Ctx {
   readonly value: () => string | undefined;
