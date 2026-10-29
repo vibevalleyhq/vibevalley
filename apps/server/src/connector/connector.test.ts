@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { rmSync } from "node:fs";
 import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
-import { Effect, Layer } from "effect";
+import { Deferred, Effect, Layer, Queue } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 import { Channels } from "../channel/chat.ts";
@@ -10,8 +10,9 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Connectors } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
-import { type QQApi, type Message as QQMessage, SendError } from "./qq.ts";
-import { type Message as WeixinMessage, type WeixinApi, WeixinError, baseUrl } from "./weixin.ts";
+import { type QQApi, type Message as QQMessage } from "./qq.ts";
+import { type Message as WeixinMessage, type Updates, type WeixinApi, baseUrl } from "./weixin.ts";
+import { AppFailed, failedWith } from "./adapter.ts";
 import { gate, untilGot as until, waitFor, whenState } from "../testing/until.ts";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -25,42 +26,25 @@ interface Sent {
   readonly reply: string;
 }
 
-/** Messages waiting to be taken, one at a time. */
+/** Messages waiting to be taken, one at a time: a take waits, as a long poll does, until one is pushed or it is called off. */
 class Inbox<A> {
-  private readonly items: A[] = [];
-  private wake: (() => void) | undefined;
+  private readonly queue = Effect.runSync(Queue.unbounded<A>());
+  private ended = Deferred.makeUnsafe<void>();
   push(a: A) {
-    this.items.push(a);
-    this.wake?.();
+    Queue.offerUnsafe(this.queue, a);
   }
   /** Ends the poll waiting now with nothing, as the platform's long poll does in time. */
   end() {
-    this.ended?.();
+    Deferred.doneUnsafe(this.ended, Effect.void);
+    this.ended = Deferred.makeUnsafe<void>();
   }
-  private ended: (() => void) | undefined;
-  /** The next one, as a long poll: it waits until one is pushed, the poll is ended, or it is called off. */
-  async take(signal: AbortSignal): Promise<A | undefined> {
-    for (;;) {
-      const next = this.items.shift();
-      if (next !== undefined) return next;
-      if (signal.aborted) return undefined;
-      const woke = await new Promise<boolean>((resolve) => {
-        this.wake = () => resolve(true);
-        this.ended = () => resolve(false);
-        signal.addEventListener("abort", () => resolve(false), { once: true });
-      });
-      this.wake = this.ended = undefined;
-      if (!woke) return undefined;
-    }
-  }
+  readonly take: Effect.Effect<A | undefined> = Effect.suspend(() =>
+    Effect.raceFirst(Queue.take(this.queue), Effect.as(Deferred.await(this.ended), undefined)),
+  );
 }
 
-/** Until the gate opens: false when the call is called off first. */
-const past = (g: { readonly opened: Promise<void> }, signal: AbortSignal) =>
-  new Promise<boolean>((resolve) => {
-    void g.opened.then(() => resolve(true));
-    signal.addEventListener("abort", () => resolve(false), { once: true });
-  });
+/** Until the test opens the gate; a login called off first is interrupted there. */
+const past = (g: { readonly opened: Promise<void> }) => Effect.promise(() => g.opened);
 
 /** The three apps, played: what they are sent is kept; restricted, they refuse a reply as an expired window does, but
  * one to a message the owner has just sent (opened), as the real window opens again. */
@@ -81,55 +65,43 @@ class Script {
     return this.sent.length;
   }
   by = (app: ConnectorID) => this.sent.filter((s) => s.app === app);
+  /** WeChat's long poll: the next message, or nothing when the poll is ended; a test may answer otherwise. */
+  updates = (buf: string): Effect.Effect<Updates> =>
+    Effect.map(this.weixinIn.take, (m) => (m ? { ret: 0, msgs: [m], get_updates_buf: buf + "+" } : { ret: 0, get_updates_buf: buf }));
 
   readonly weixin: WeixinApi = {
-    login: async (signal, progress) => {
-      progress("waiting", "https://liteapp.weixin.qq.com/q/q1");
-      if (!(await past(this.weixinScan, signal))) throw new Error("canceled");
-      progress("scanned", "https://liteapp.weixin.qq.com/q/q1");
-      return { account: { baseUrl, token: "tok" }, botId: "bot1@im.bot", owner };
-    },
-    getUpdates: async (signal, _account, buf) => {
-      const m = await this.weixinIn.take(signal);
-      return m ? { ret: 0, msgs: [m], get_updates_buf: buf + "+" } : { ret: 0, get_updates_buf: buf };
-    },
-    sendText: async (_signal, _account, to, text, contextToken) => {
-      if (this.refuses(contextToken)) throw new WeixinError("sendmessage: -2", -2);
-      return "wx" + this.record({ app: "weixin", to, text, reply: contextToken });
-    },
+    login: (progress) =>
+      Effect.gen({ self: this }, function* () {
+        yield* progress("waiting", "https://liteapp.weixin.qq.com/q/q1");
+        yield* past(this.weixinScan);
+        yield* progress("scanned", "https://liteapp.weixin.qq.com/q/q1");
+        return { account: { baseUrl, token: "tok" }, botId: "bot1@im.bot", owner };
+      }),
+    getUpdates: (_account, buf) => Effect.suspend(() => this.updates(buf)),
+    sendText: (_account, to, text, contextToken) =>
+      this.refuses(contextToken)
+        ? Effect.fail(new AppFailed({ kind: "restricted", message: "sendmessage: -2" }))
+        : Effect.sync(() => "wx" + this.record({ app: "weixin", to, text, reply: contextToken })),
   };
 
   readonly feishu: FeishuApi = {
-    login: async (signal, progress) => {
-      progress("https://open.feishu.cn/page/cli?user_code=AB");
-      if (!(await past(this.feishuScan, signal))) throw new Error("canceled");
-      return { app: { appId: "cli_1", appSecret: "s", domain: "feishu" }, owner: "" };
-    },
-    listen: async (signal, _app, got) => {
-      for (;;) {
-        const m = await this.feishuIn.take(signal);
-        if (!m) return;
-        await got(m);
-      }
-    },
-    sendText: async (_signal, _app, openId, text) => "om_" + this.record({ app: "feishu", to: openId, text, reply: "" }),
+    login: (progress) =>
+      Effect.gen({ self: this }, function* () {
+        yield* progress("https://open.feishu.cn/page/cli?user_code=AB");
+        yield* past(this.feishuScan);
+        return { app: { appId: "cli_1", appSecret: "s", domain: "feishu" as const }, owner: "" };
+      }),
+    listen: (_app, got) => Effect.forever(Effect.flatMap(this.feishuIn.take, (m) => (m ? got(m) : Effect.void))),
+    sendText: (_app, openId, text) => Effect.sync(() => "om_" + this.record({ app: "feishu", to: openId, text, reply: "" })),
   };
 
   readonly qq: QQApi = {
-    check: async (_signal, app) => {
-      if (app.secret !== "right") throw new Error("QQ 鉴权：AppID 或 AppSecret 不对");
-    },
-    listen: async (signal, _app, got) => {
-      for (;;) {
-        const m = await this.qqIn.take(signal);
-        if (!m) return;
-        await got(m);
-      }
-    },
-    sendText: async (_signal, _app, openId, text, msgId) => {
-      if (this.refuses(msgId)) throw new SendError("QQ 发消息：被动回复超时", 400);
-      return "qq" + this.record({ app: "qq", to: openId, text, reply: msgId });
-    },
+    check: (app) => (app.secret !== "right" ? Effect.fail(failedWith("QQ 鉴权：AppID 或 AppSecret 不对")) : Effect.void),
+    listen: (_app, got) => Effect.forever(Effect.flatMap(this.qqIn.take, (m) => (m ? got(m) : Effect.void))),
+    sendText: (_app, openId, text, msgId) =>
+      this.refuses(msgId)
+        ? Effect.fail(new AppFailed({ kind: "restricted", message: "QQ 发消息：被动回复超时" }))
+        : Effect.sync(() => "qq" + this.record({ app: "qq", to: openId, text, reply: msgId })),
   };
 }
 
@@ -166,8 +138,10 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
     feishu: script.feishu,
     qq: script.qq,
     ...retry,
-    say: (text, channel, chat) =>
-      Effect.flatMap(chat.say(text, channel, ""), ({ message }) => chat.orchestratorSays(message.channel, "收到：**" + text + "**", "", defaultOrchestrator)),
+    say: (text, channel, sendKey, chat) =>
+      Effect.flatMap(chat.say(text, channel, sendKey), ({ message, again }) =>
+        again ? Effect.void : chat.orchestratorSays(message.channel, "收到：**" + text + "**", "", defaultOrchestrator),
+      ),
   }).pipe(Layer.provideMerge(Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 
 const statusOf = (id: ConnectorID) =>
@@ -401,18 +375,17 @@ describe("the chat apps", () => {
   it.effect("a QQ gateway that fails mid-message: what it was handing over arrives, a late handover is refused, and it listens again", () => {
     const script = new Script();
     let listens = 0;
-    let late: ((m: QQMessage) => Promise<void>) | undefined;
+    let late: ((m: QQMessage) => Effect.Effect<void, AppFailed>) | undefined;
     const qq = script.qq;
-    // The SDK's handler can outlive its listen: this one keeps got, and fails the gateway while a message is in flight.
+    // The SDK's handler can outlive its listen: this one keeps got, and fails the gateway once a message is handed over.
     (script as { qq: QQApi }).qq = {
       ...script.qq,
-      listen: async (signal, app, got) => {
+      listen: (app, got) => {
         listens++;
-        return qq.listen(signal, app, async (m) => {
+        return qq.listen(app, (m) => {
           if (m.content !== "断开") return got(m);
-          void got(qqMsg("owner-openid", "断开前的一句"));
           late = got;
-          throw new Error("网关断了");
+          return Effect.andThen(got(qqMsg("owner-openid", "断开前的一句")), Effect.fail(failedWith("网关断了")));
         });
       },
     };
@@ -429,13 +402,8 @@ describe("the chat apps", () => {
         "it listens again",
       );
       expect(yield* saidIn(chat.defaultChannel())).toContain("断开前的一句");
-      const refused = yield* Effect.promise(() =>
-        late!(qqMsg("owner-openid", "迟到的一句")).then(
-          () => "",
-          (e: Error) => e.message,
-        ),
-      );
-      expect(refused).toBe("canceled");
+      const refused = yield* Effect.flip(late!(qqMsg("owner-openid", "迟到的一句")));
+      expect(refused.message).toBe("canceled");
       script.qqIn.push(qqMsg("owner-openid", "重连后的一句"));
       yield* waitFor(saidIn(chat.defaultChannel()), (said) => said.includes("重连后的一句"), "the next words");
       expect(yield* saidIn(chat.defaultChannel())).not.toContain("迟到的一句");
@@ -629,10 +597,11 @@ describe("the chat apps", () => {
       yield* sql
         .unsafe(`create trigger fail_pause before update of paused_until on connector_account for each row execute function fail_pause()`)
         .pipe(Effect.orDie);
-      script.weixin.getUpdates = async () => {
-        polls++;
-        return { ret: -14 };
-      };
+      script.updates = () =>
+        Effect.sync(() => {
+          polls++;
+          return { ret: -14 };
+        });
       script.weixinIn.end();
       yield* until(() => polls === 1, "the first stale poll");
       // Nothing to wait on shows it does not spin: a loop would poll again within this, the backoff (80 ms) not.

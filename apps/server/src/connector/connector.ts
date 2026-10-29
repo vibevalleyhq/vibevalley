@@ -9,29 +9,12 @@ import { t } from "@vibevalley/i18n";
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
-import { messageOf } from "../errors.ts";
-import { randomInt } from "node:crypto";
+import { HttpClient } from "effect/http";
+import { createHash, randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf } from "../channel/state.ts";
-import {
-  Cause,
-  Clock,
-  Context,
-  Data,
-  Deferred,
-  Duration,
-  Effect,
-  Fiber,
-  FiberSet,
-  Layer,
-  Option,
-  Predicate,
-  Schedule,
-  Schema,
-  Semaphore,
-  Stream,
-} from "effect";
+import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -42,7 +25,7 @@ import { reasonOf } from "../errors.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
-import { type Failure, type Inbound, type Linked, type Progress, type Adapter, ConnectorFailed } from "./adapter.ts";
+import { type Adapter, AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
@@ -56,8 +39,8 @@ const InboundSchema: Schema.Codec<Inbound> = Schema.Struct({
   id: Schema.String,
   from: Schema.String,
   text: Schema.String,
-  reply: Schema.optionalKey(Schema.String),
-  quoted: Schema.optionalKey(Schema.String),
+  reply: Schema.String,
+  quoted: Schema.String,
 });
 
 interface Account {
@@ -102,7 +85,7 @@ export interface ConnectorOptions {
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
   /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
-  readonly say?: (text: string, channel: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
+  readonly say?: (text: string, channel: string | undefined, sendKey: string, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
 /** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */
@@ -139,7 +122,8 @@ export const make = (options: ConnectorOptions = {}) =>
     const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
     const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);
     let closing = false;
-    const say = (text: string, channel: string | undefined) => (options.say ? options.say(text, channel, chat) : orchestrator.say(text, {}, channel, ""));
+    const say = (text: string, channel: string | undefined, sendKey: string) =>
+      options.say ? options.say(text, channel, sendKey, chat) : orchestrator.say(text, {}, channel, sendKey);
 
     const bridgeOf = (adapter: Adapter) => {
       const id = adapter.id;
@@ -275,12 +259,6 @@ export const make = (options: ConnectorOptions = {}) =>
         return (yield* Effect.mapError(chat.messageLocation(message), bridgeError))?.channel.id;
       });
 
-      const send = (secrets: Record<string, string>, to: string, text: string, reply: string) =>
-        Effect.tryPromise({
-          try: (signal) => adapter.send(signal, secrets, to, text, reply),
-          catch: (e): Failure => ({ kind: "failed", reason: messageOf(e) }),
-        }).pipe(Effect.catch((f) => Effect.succeed(f)));
-
       // The outbox: one drain at a time, in order. True when nothing is left that it could send now.
       const draining = Semaphore.makeUnsafe(1);
       let wakeOutbox: (() => void) | undefined;
@@ -302,10 +280,10 @@ export const make = (options: ConnectorOptions = {}) =>
                 ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0]! }]
                 : pending.map((r) => ({ ids: [r.id], text: r.body }));
             for (const out of batches) {
-              const sent = yield* send(a.secrets, a.owner, out.text, a.replyContext);
-              if (Predicate.isString(sent)) {
+              const sent = yield* Effect.result(adapter.send(a.secrets, a.owner, out.text, a.replyContext));
+              if (sent._tag === "Success") {
                 const marked = yield* Effect.result(
-                  inTx(Effect.forEach(out.ids, (oid) => db(outboxQ.outboxSent({ sent_at: now(), ext_id: sent || null, id: oid })), { discard: true })),
+                  inTx(Effect.forEach(out.ids, (oid) => db(outboxQ.outboxSent({ sent_at: now(), ext_id: sent.success || null, id: oid })), { discard: true })),
                 );
                 if (marked._tag === "Failure") {
                   outboxChanged();
@@ -316,11 +294,12 @@ export const make = (options: ConnectorOptions = {}) =>
                 setErr("");
                 continue;
               }
-              for (const oid of out.ids) yield* kept(run(outboxQ.outboxFailed({ error: sent.reason || null, id: oid })));
-              if (sent.kind === "stale") yield* pause;
+              const refused = sent.failure;
+              for (const oid of out.ids) yield* kept(run(outboxQ.outboxFailed({ error: refused.message || null, id: oid })));
+              if (refused.kind === "stale") yield* pause;
               // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
-              else if (sent.kind === "restricted") setErr("");
-              else setErr(sent.reason);
+              else if (refused.kind === "restricted") setErr("");
+              else setErr(refused.message);
               return false;
             }
             return true;
@@ -391,7 +370,7 @@ export const make = (options: ConnectorOptions = {}) =>
           );
           // Told once the owner has the word: the status is not paired before the app's confirmation went out.
           yield* reloadAccount;
-          yield* send(a.secrets, m.from, t("server.connector.paired"), m.reply ?? "");
+          yield* Effect.ignore(adapter.send(a.secrets, m.from, t("server.connector.paired"), m.reply));
           told();
           return;
         }
@@ -402,7 +381,9 @@ export const make = (options: ConnectorOptions = {}) =>
         yield* drain(true);
         if (!m.text) return;
         const channel = (yield* quotedChannel(m.quoted)) ?? snapshot()?.channel;
-        yield* Effect.mapError(say(m.text, channel), (e) => new BridgeError({ message: reasonOf(e) }));
+        // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
+        const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
+        yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e) }));
       });
 
       // The inbox: what the app handed over, delivered to the orchestrator in order.
@@ -449,33 +430,21 @@ export const make = (options: ConnectorOptions = {}) =>
         ),
       );
 
-      // An SDK handler may outlive receive: acceptance is sealed and the writes it accepted joined before it returns.
-      const receive = (secrets: Record<string, string>) =>
-        Effect.scoped(
-          Effect.gen(function* () {
-            const row = yield* run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
-            const cursor = Option.match(row, { onNone: () => "", onSome: (a) => a.cursor });
-            const accepting = yield* FiberSet.make<void, BridgeError>();
-            const acceptHere = yield* FiberSet.runtimePromise(accepting)<never>();
-            let sealed = false;
-            return yield* Effect.tryPromise({
-              try: (signal) =>
-                adapter.receive(signal, secrets, {
-                  cursor,
-                  accept: (messages, c) => (sealed || signal.aborted ? Promise.reject(new Error("canceled")) : acceptHere(accept(messages, c))),
-                }),
-              catch: (e): Failure => ({ kind: "failed", reason: messageOf(e) }),
-            }).pipe(
-              Effect.catch((f) => Effect.succeed(f)),
-              Effect.ensuring(
-                Effect.suspend(() => {
-                  sealed = true;
-                  return FiberSet.awaitEmpty(accepting);
-                }),
-              ),
-            );
-          }),
-        );
+      /** Until the app's connection ends; what it hands over is kept durably before the app is told it is taken. Once it has
+       * ended, acceptance is sealed: a late handover (an SDK callback that outlived it) must not land after a newer
+       * account's work began. */
+      const receive = (secrets: Secrets) =>
+        Effect.gen(function* () {
+          const row = yield* run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
+          const cursor = Option.match(row, { onNone: () => "", onSome: (a) => a.cursor });
+          let sealed = false;
+          const io = {
+            cursor,
+            accept: (messages: readonly Inbound[], c: string) =>
+              Effect.suspend(() => (sealed ? Effect.fail(failedWith("canceled")) : Effect.mapError(accept(messages, c), (e) => failedWith(e.message)))),
+          };
+          return yield* adapter.receive(secrets, io).pipe(Effect.ensuring(Effect.sync(() => (sealed = true))));
+        });
       const receiving = Effect.gen(function* () {
         let failures = 0;
         for (;;) {
@@ -491,14 +460,14 @@ export const make = (options: ConnectorOptions = {}) =>
             continue;
           }
           const stopped = yield* receive(a.secrets).pipe(
-            Effect.map((f): Failure => f ?? { kind: "failed", reason: t("server.connector.stopped") }),
-            Effect.catch((e) => Effect.succeed<Failure>({ kind: "failed", reason: e.message })),
+            Effect.as(failedWith(t("server.connector.stopped"))),
+            Effect.catch((e) => Effect.succeed(e instanceof AppFailed ? e : failedWith(e.message))),
           );
           if (stopped.kind === "stale") {
             if (!(yield* pause)) yield* Effect.sleep(Math.min(30_000, retryMost));
             continue;
           }
-          setErr(stopped.reason);
+          setErr(stopped.message);
           failures++;
           let wait = 2_000;
           if (failures >= 3) {
@@ -528,12 +497,12 @@ export const make = (options: ConnectorOptions = {}) =>
         verifyCode = "";
         changed();
       };
-      const loginResult = (g: Fiber.Fiber<unknown>, result: Linked | ConnectorFailed) =>
+      const loginResult = (g: Fiber.Fiber<unknown, unknown>, result: Linked | AppFailed) =>
         commands.withPermits(1)(
           Effect.gen(function* () {
             if (g !== current) return;
             yield* stopGeneration;
-            let failure = result instanceof ConnectorFailed ? result.message : undefined;
+            let failure = result instanceof AppFailed ? result.message : undefined;
             if (failure === undefined && !closing) {
               const linked = result as Linked;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
@@ -566,24 +535,23 @@ export const make = (options: ConnectorOptions = {}) =>
           }),
         );
       const loggingIn = (input: ConnectorLogin) => {
-        const login = Effect.tryPromise({
-          try: (signal) =>
-            adapter.login(
-              signal,
-              input,
-              (p) => {
-                if (!signal.aborted) progress = p;
-                changed();
-              },
-              () => verifyCode,
-            ),
-          catch: (cause) => new ConnectorFailed({ message: messageOf(cause), cause }),
-        });
-        // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
-        const g: Fiber.Fiber<unknown> = generation(
-          Effect.flatMap(Effect.result(login), (r) => Effect.sync(() => void forkHere(loginResult(g, r._tag === "Success" ? r.success : r.failure)))),
+        // A login a newer one replaced is interrupted, so its progress cannot come after the newer one's.
+        const login = adapter.login(
+          input,
+          (p) =>
+            Effect.sync(() => {
+              progress = p;
+              changed();
+            }),
+          Effect.sync(() => verifyCode),
         );
-        return g;
+        // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
+        // The fiber reads itself: a login that settles at once runs before fork returns it.
+        return generation(
+          Effect.withFiber((g) =>
+            Effect.flatMap(Effect.result(login), (r) => Effect.sync(() => void forkHere(loginResult(g, r._tag === "Success" ? r.success : r.failure)))),
+          ),
+        );
       };
 
       return {
@@ -604,7 +572,7 @@ export const make = (options: ConnectorOptions = {}) =>
               attempt++;
               setErr("");
               verifyCode = "";
-              progress = { state: "waiting" };
+              progress = { state: "waiting", qr: "" };
               current = loggingIn(input);
               told();
               return attempt;
@@ -623,7 +591,7 @@ export const make = (options: ConnectorOptions = {}) =>
         verify: (code: string) =>
           Effect.suspend(() => {
             verifyCode = code.trim();
-            if (progress?.state === "verify") progress = { state: "scanned", ...(progress.qr ? { qr: progress.qr } : {}) };
+            if (progress?.state === "verify") progress = { state: "scanned", qr: progress.qr };
             told();
             return status;
           }),
@@ -663,10 +631,11 @@ export const make = (options: ConnectorOptions = {}) =>
       };
     };
 
+    const http = yield* HttpClient.HttpClient;
     const adapters = [
-      weixinAdapter(options.weixin ?? new WeixinClient()),
-      feishuAdapter(options.feishu ?? new FeishuClient()),
-      qqAdapter(options.qq ?? new QQClient()),
+      weixinAdapter(options.weixin ?? new WeixinClient(http)),
+      feishuAdapter(options.feishu ?? new FeishuClient(http)),
+      qqAdapter(options.qq ?? new QQClient(http)),
     ];
     const bridges = adapters.map(bridgeOf);
     for (const b of bridges) yield* Effect.orDie(b.load);

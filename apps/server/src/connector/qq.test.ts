@@ -1,7 +1,11 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vite-plus/test";
+import { Effect } from "effect";
+import { FetchHttpClient, HttpClient } from "effect/http";
 import { decodeGatewayEvent, QQClient } from "./qq.ts";
+
+const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
 
 describe("QQ gateway events", () => {
   it("decodes an event and rejects null and wrong field types", () => {
@@ -29,12 +33,8 @@ describe("QQ sign-in", () => {
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     try {
       const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-      await expect(
-        new QQClient(url, url + "/token").check(new AbortController().signal, {
-          appId: "a1",
-          secret: "bad",
-        }),
-      ).rejects.toThrow("QQ 鉴权：invalid appid or secret");
+      const refused = await Effect.runPromise(Effect.flip(new QQClient(http, url, url + "/token").check({ appId: "a1", secret: "bad" })));
+      expect(refused).toMatchObject({ _tag: "AppFailed", kind: "failed", message: "QQ 鉴权：invalid appid or secret" });
     } finally {
       server.close();
     }
