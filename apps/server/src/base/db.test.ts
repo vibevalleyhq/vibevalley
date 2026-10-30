@@ -79,7 +79,7 @@ describe("the database", () => {
   // A new folder on disk starts from the copy of the baseline the first database in memory left (db.ts).
   it.effect("a new database on disk made from the copy keeps what is written, across a reopen", () => {
     const where = join(tempDir("vibevalley-db-"), "db");
-    const open = (f: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
+    const open = <A, E>(f: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
     return Effect.gen(function* () {
       yield* lanDevices().pipe(Effect.provide(testDatabase()), Effect.orDie);
       yield* open(addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1 }));

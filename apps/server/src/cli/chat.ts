@@ -195,7 +195,7 @@ export interface RuntimeChat {
 }
 
 /** A conversation with one runtime on this machine: no issue, any folder, and nothing in the core state, trajectories or spending. */
-export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void, unknown> =>
+export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void, Effect.Error<ReturnType<typeof ownChat>> | string> =>
   id === "vibevalley"
     ? ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) })
     : Effect.gen(function* () {

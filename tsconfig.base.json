@@ -50,7 +50,7 @@
           "missingEffectContext": "error",
           "missingEffectError": "error",
           "missingLayerContext": "error",
-          "anyUnknownInErrorContext": "off",
+          "anyUnknownInErrorContext": "error",
           "lazyEffect": "off",
           "effectSucceedWithVoid": "off",
           "schemaNumber": "warning",

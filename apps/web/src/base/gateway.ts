@@ -30,11 +30,7 @@ import.meta.hot?.dispose(() => {
 
 /** Each event of one subscription until stop() is called, or until it ends (the farm ended it, or the line broke): then
  * ended(), and the caller follows again from what it has. */
-function run(
-  stream: (c: SubscriptionsClient["Service"]) => Stream.Stream<ChannelEvent, unknown>,
-  on: (e: ChannelEvent) => void,
-  ended: () => void,
-): () => void {
+function run<E>(stream: (c: SubscriptionsClient["Service"]) => Stream.Stream<ChannelEvent, E>, on: (e: ChannelEvent) => void, ended: () => void): () => void {
   runtime ??= ManagedRuntime.make(SubscriptionsClient.layer);
   let stopped = false;
   const fiber = runtime.runFork(

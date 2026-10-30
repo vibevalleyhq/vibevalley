@@ -24,7 +24,7 @@ import { Notices, type Overdue } from "@/notice/notice.ts";
 import { Projects } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
-import { type AgentHost, Caller } from "@/session/host.ts";
+import { type AgentHost, Caller, type NotAnswered } from "@/session/host.ts";
 import { Sessions } from "@/session/session.ts";
 import { Setting } from "@/setting/setting.ts";
 import { isOpen } from "@/task/graph.ts";
@@ -87,7 +87,7 @@ export class Orchestrator extends Context.Service<
     readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
     /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in the default channel
      * as always; the whole answer comes back to be read out. Interrupting ends only this wait, not the shared run. */
-    readonly brief: (line: string) => Effect.Effect<string, unknown>;
+    readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
     /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
      * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
     readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;

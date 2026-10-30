@@ -13,6 +13,7 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { notificationsStart } from "@/services.ts";
+import { NotAnswered } from "@/session/host.ts";
 import { Setting } from "@/setting/setting.ts";
 import { defaultVoice } from "@/setting/voice.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -169,7 +170,7 @@ describe("a call's agent", () => {
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture, brief?: (line: string) => Effect.Effect<string, unknown>) => {
+const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
   const config = {
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
@@ -488,7 +489,7 @@ describe("voice", () => {
     const brief = () =>
       Effect.suspend(() => {
         asks++;
-        return asks === 1 ? Effect.fail("brief failed") : Effect.succeed("第二件说完了");
+        return asks === 1 ? Effect.fail(new NotAnswered({ message: "brief failed", cause: undefined })) : Effect.succeed("第二件说完了");
       });
     return Effect.gen(function* () {
       const voice = yield* Voice;

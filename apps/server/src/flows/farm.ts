@@ -76,7 +76,7 @@ export const watch = Effect.gen(function* () {
 export const until = (ok: () => boolean | Promise<boolean>, what: string) => untilHeld(ok, what, 10_000);
 
 /** The value got once ok says so. */
-export const await_ = <A>(get: () => Effect.Effect<A, unknown> | A, ok: (a: A) => boolean, what: string) =>
+export const await_ = <A, E>(get: () => Effect.Effect<A, E> | A, ok: (a: A) => boolean, what: string) =>
   waitFor(
     Effect.suspend(() => {
       const got = get();

@@ -156,7 +156,7 @@ const make = Effect.gen(function* () {
   // Named by its endpoint (toolName): the name is never written a second time.
   const toolOf =
     <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
-    <K extends keyof All & Op>(op: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
+    <K extends keyof All & Op, E>(op: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, E>) => {
       const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
       return effectTool<unknown>({
         name: toolName(op),

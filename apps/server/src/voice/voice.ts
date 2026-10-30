@@ -203,7 +203,7 @@ export const retrying =
     );
 
 /** Runs an Effect for the Promise side (the Agora SDK's fetch) on the service's fibers, so its sleeps are on its Clock. */
-export type Run = <A>(effect: Effect.Effect<A, unknown>, options?: { readonly signal: AbortSignal }) => Promise<A>;
+export type Run = <A>(effect: Effect.Effect<A>, options?: { readonly signal: AbortSignal }) => Promise<A>;
 
 export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
