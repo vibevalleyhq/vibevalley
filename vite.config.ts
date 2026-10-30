@@ -30,7 +30,7 @@ export default defineConfig({
       "web:check": ["vp check", "vp run web:test"],
       // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.
       "web:test": [
-        "vp run --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/stories --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
+        "vp run --filter @vibevalley/bridge --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/stories --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
         "vp run --filter @vibevalley/web build",
         "vp run --filter @vibevalley/web build:stories",
       ],
@@ -42,6 +42,7 @@ export default defineConfig({
         "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/bridge/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/testkit/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/health/tsconfig.json --strict",
         "effect-tsgo diagnostics --project apps/web/tsconfig.json --strict",
