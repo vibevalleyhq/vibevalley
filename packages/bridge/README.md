@@ -1,7 +1,7 @@
 # @vibevalley/bridge
 
 Calls between the page and the program around it (the desktop's Electron main, the phone's React Native shell), written
-once as a contract and carried over any link ([plan](.agents/notes/proposed/architecture/2026-10-30-host-bridge.md)).
+once as a contract and carried over any link ([the client](docs/subsystems/app.md)).
 The contracts themselves are in `packages/protocol/src/host.ts`; the links are each host's own.
 
 | Where | What |
