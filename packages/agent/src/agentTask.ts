@@ -2,6 +2,8 @@
 // others. The edges' rules are protocol's (dagProblems), shared with a task graph's steps; what a task's states mean is
 // this file's. Every function here is pure: a graph in, a new graph out.
 
+import { Schema } from "effect";
+
 import { dagIDValid, dagProblems } from "./dag.ts";
 import { head } from "./head.ts";
 import { agentTask as words } from "./prompts.ts";
@@ -95,17 +97,17 @@ export interface Change {
 
 const stateWords: Record<State, string> = words.stateWords;
 
-export class AgentTaskError extends Error {}
+export class AgentTaskError extends Schema.TaggedError<AgentTaskError, { readonly brand: unique symbol }>()("AgentTaskError", { message: Schema.String }) {}
 
 export function update(g: readonly AgentTask[], id: string, c: Change): AgentTask[] {
   const i = find(g, id);
-  if (i < 0) throw new AgentTaskError(words.notFound(id));
+  if (i < 0) throw new AgentTaskError({ message: words.notFound(id) });
   const was = g[i]!;
   const open = was.state === "waiting" || was.state === "failed";
-  if ((c.brief !== undefined || c.after !== undefined) && !open) throw new AgentTaskError(words.cannotChangeBrief(id, stateWords[was.state]));
+  if ((c.brief !== undefined || c.after !== undefined) && !open) throw new AgentTaskError({ message: words.cannotChangeBrief(id, stateWords[was.state]) });
   let t: AgentTask = { ...was };
   if (c.brief !== undefined) {
-    if (!c.brief.trim()) throw new AgentTaskError(words.emptyBrief);
+    if (!c.brief.trim()) throw new AgentTaskError({ message: words.emptyBrief });
     t = { ...t, brief: c.brief.trim() };
   }
   if (c.after !== undefined) t = { ...t, after: [...c.after] };
@@ -114,13 +116,13 @@ export function update(g: readonly AgentTask[], id: string, c: Change): AgentTas
     const to = c.state;
     if (to === "waiting" && (t.state === "failed" || t.state === "skipped")) t = { ...t, tries: (t.tries ?? 0) + 1, state: "waiting" };
     else if ((to === "done" || to === "failed" || to === "skipped") && (t.state === "waiting" || t.state === "working")) t = { ...t, state: to };
-    else throw new AgentTaskError(words.cannotMove(id, stateWords[t.state], stateWords[to]));
+    else throw new AgentTaskError({ message: words.cannotMove(id, stateWords[t.state], stateWords[to]) });
   }
   const next = [...g];
   next[i] = t;
   if (c.after !== undefined) {
     const problems = edgeProblems(next);
-    if (problems.length > 0) throw new AgentTaskError(words.problems(problems));
+    if (problems.length > 0) throw new AgentTaskError({ message: words.problems(problems) });
   }
   return next;
 }

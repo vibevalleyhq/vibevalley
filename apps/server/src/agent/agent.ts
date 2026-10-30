@@ -324,7 +324,7 @@ const make = Effect.gen(function* () {
     addTemplate: Effect.fn("Agents.addTemplate")(function* (path) {
       const read = Effect.try({
         try: () => readTemplate(path, "added"),
-        catch: (e) => refused(e instanceof TemplateProblem ? e.message : String(e)),
+        catch: (e) => refused(Schema.is(TemplateProblem)(e) ? e.message : String(e)),
       });
       const item = yield* read;
       if (templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));

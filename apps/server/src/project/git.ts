@@ -3,7 +3,7 @@
 
 import { spawn } from "node:child_process";
 
-import { Data, Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { afterRealTime } from "@/base/time.ts";
 import { messageOf } from "@/errors.ts";
@@ -84,7 +84,11 @@ export const run = (command: string, args: readonly string[], options: RunOption
     return Effect.sync(killGroup);
   });
 
-export class GitError extends Data.TaggedError("GitError")<{ readonly code: number; readonly stderr: string; readonly message: string }> {
+export class GitError extends Schema.TaggedError<GitError, { readonly brand: unique symbol }>()("GitError", {
+  code: Schema.Finite,
+  stderr: Schema.String,
+  message: Schema.String,
+}) {
   static of(code: number, stderr: string) {
     return new GitError({ code, stderr, message: stderr.trim() || `git exited ${code}` });
   }

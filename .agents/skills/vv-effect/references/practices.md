@@ -20,15 +20,15 @@ agent 写 Effect 时最常见的错，为什么会写出来，和这个仓库里
 | Effect 漂着没运行；`map` 里返回 Effect；`yield` 少了 `*` | 把 Effect 当成 Promise | 已拦：`floatingEffect`、`effectMapFlatten`、`missingStarInYieldEffectGen` |
 | gen 里写 `try { yield* … } catch` | async/await 的习惯 | 已拦：`tryCatchInEffectGen` |
 | 抛错时没写 `return yield*` | 同上 | 已拦：`missingReturnYieldStar` |
-| `throw new Error()`、`class X extends Error`、`Effect.fail(new Error("…"))` | JS 的习惯 | 部分已拦（`globalErrorInEffectFailure`）；`extendsNativeError`、`preferSchemaTaggedError` 有命中，未开，见[提案](.agents/notes/proposed/architecture/2026-10-31-effect-practices.md) |
+| `throw new Error()`、`class X extends Error`、`Effect.fail(new Error("…"))` | JS 的习惯 | 已拦：`globalErrorInEffectFailure`、`extendsNativeError`、`preferSchemaTaggedError`；要留成原生 `Error` 的（交给不跑 Effect 的代码）在那一行关掉并说为什么 |
 | 一个 `Effect.catch` 吞掉所有错误，或者到处 `Effect.orDie` 让类型编过 | 想让类型通过 | 已拦一部分：`catchToIgnore`、`redundantOrDie`，逃生口的棘轮（`orDie`、`ignored`、`swallowed`）；其余审 |
 | 在服务里 `Effect.runPromise`、`runSync` | 不知道怎么从回调回到 Effect | 已拦：`runEffectInsideEffect`；回调用 `FiberSet.makeRuntime*` |
 | 服务的方法签名里带依赖（R） | 嫌在 layer 里拿依赖麻烦 | 已拦：`leakingRequirements` |
 | 到处 `Effect.provide`、连着 provide | 哪里缺服务就在哪里补 | 已拦：`multipleEffectProvide`；layer 只在 `services.ts` 叠 |
 | `Date.now()`、`setTimeout`、`console.log`、`process.env`、`fetch`、`Math.random` | 习惯 | 已拦：`vibevalley/no-wall-clock`、`no-console`，`globalRandomInEffect`、`processEnvInEffect`、`globalFetchInEffect` 等 |
-| `Effect.tryPromise(() => …)` 不写 `catch`；不把 `AbortSignal` 传下去 | 最短的写法 | 审（失败时只剩 `UnknownError`）；以后做成 lint，见提案 |
+| `Effect.tryPromise(() => …)` 不写 `catch`；不把 `AbortSignal` 传下去 | 最短的写法 | 已拦：`vibevalley/try-promise-catch`（失败时只剩 `UnknownError`）；`AbortSignal` 审 |
 | 手写类型守卫，`as` 断言外面来的数据 | 最短的写法 | 已拦：逃生口的棘轮（`as`）、`unsafeEffectTypeAssertion`；对象用 `Predicate.isObject` |
-| 函数只是 `return Effect.gen(…)`，没有名字和 span | v3 的写法 | 审：`effectFnOpportunity` 是建议级；服务方法补名字见提案 |
+| 函数只是 `return Effect.gen(…)`，没有名字和 span | v3 的写法 | 服务的方法已拦：`vibevalley/service-method-names`；其余审（`effectFnOpportunity` 是建议级） |
 | 测试里 `Effect.runPromise` + `expect`；`it()` 里返回 Effect | vitest 的习惯 | 已拦：`floatingEffectInVitest`；服务端用 `it.effect` |
 | 以为 `Effect.all`、`forEach` 是并行的 | `Promise.all` 的直觉 | 审：并发要写 `{ concurrency }` |
 | `Ref`、`Deferred`、`Fiber` 直接 `yield*` | v3 里它们是 Effect | 已拦：类型；用 `Ref.get`、`Deferred.await`、`Fiber.join` |

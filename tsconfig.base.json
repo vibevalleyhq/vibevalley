@@ -70,7 +70,9 @@
           "unnecessaryEffectGen": "warning",
           "schemaSyncInEffect": "warning",
           "abortControllerInEffect": "warning",
-          "globalFetchInEffect": "error"
+          "globalFetchInEffect": "error",
+          "preferSchemaTaggedError": "error",
+          "extendsNativeError": "error"
         }
       }
     ]

@@ -17,6 +17,8 @@ import { LiveCaptions } from "./captions";
 
 export type CallPhase = "idle" | "connecting" | "live" | "ending";
 
+// Rejects the Promise a call's setup races against when the owner hangs up; the page's call code is not Effect.
+// @effect-diagnostics-next-line extendsNativeError:off
 class Cancelled extends Error {}
 
 const sendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");

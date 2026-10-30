@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Context, Data, Effect, Layer, Predicate, Schema } from "effect";
+import { Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
@@ -81,7 +81,10 @@ export interface AgoraCredentials {
   readonly appCertificate: string;
 }
 
-export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
+export class SettingRefused extends Schema.TaggedError<SettingRefused, { readonly brand: unique symbol }>()("SettingRefused", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 export class Setting extends Context.Service<
   Setting,
@@ -199,7 +202,7 @@ const make = Effect.gen(function* () {
     const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
     yield* Effect.try({
       try: () => disk.write(() => JSON.stringify(kept, null, 2) + "\n"),
-      catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }) }),
+      catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }), cause: e }),
     });
     stored = kept;
     setLocale(kept.locale ?? "zh");

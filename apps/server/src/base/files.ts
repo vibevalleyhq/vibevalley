@@ -6,11 +6,14 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { Clock, Data, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import { errnoOf, messageOf } from "@/errors.ts";
 
-export class NotWritten extends Data.TaggedError("NotWritten")<{ readonly message: string; readonly cause: unknown }> {}
+export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand: unique symbol }>()("NotWritten", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
 
 const notWritten = (cause: unknown) => new NotWritten({ message: messageOf(cause), cause });
 

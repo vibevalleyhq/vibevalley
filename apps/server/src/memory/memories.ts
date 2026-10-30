@@ -2,7 +2,7 @@
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
-import { Clock, Data, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
@@ -48,7 +48,10 @@ export interface Note {
   readonly by: Actor;
 }
 
-class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
+class MemoryRefused extends Schema.TaggedError<MemoryRefused, { readonly brand: unique symbol }>()("MemoryRefused", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** Fading marks the ones that would go if this many more were kept. */
 const fadingSoon = 10;
@@ -177,7 +180,10 @@ export const makeMemories = Effect.gen(function* () {
     const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
     const { id, at } = yield* insertNote(n.agent, body, project, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
-        Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed") }))),
+        Effect.andThen(
+          Effect.logWarning(`a note for ${n.agent}: ${String(e)}`),
+          Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed"), cause: e })),
+        ),
       ),
     );
     return {

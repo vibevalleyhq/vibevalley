@@ -13,7 +13,7 @@ import { connect, type Socket } from "node:net";
 import { hostname, networkInterfaces } from "node:os";
 
 import { NodeSink, NodeStream } from "@effect/platform-node";
-import { Cause, Clock, Context, Data, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Schema, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -52,7 +52,10 @@ export const deviceHeader = "x-vibevalley-lan-device";
 const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
 
 /** The loopback server could not be reached, or its answer could not be streamed back to the device. */
-class ForwardFailed extends Data.TaggedError("ForwardFailed")<{ readonly message: string; readonly cause: unknown }> {}
+class ForwardFailed extends Schema.TaggedError<ForwardFailed, { readonly brand: unique symbol }>()("ForwardFailed", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
 
 const forwardFailed = (cause: unknown) => new ForwardFailed({ message: messageOf(cause), cause });
 

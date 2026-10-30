@@ -1,6 +1,6 @@
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
-import { Data, Effect, Predicate } from "effect";
+import { Effect, Predicate, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { type ApiError, commandOf, type Next } from "@vibevalley/protocol/api";
@@ -70,7 +70,7 @@ export const errnoOf = (e: unknown): string | undefined => (e instanceof Error &
 
 /** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is
  * held to. Died with, so it is a bug to fix, found by this name. */
-export class Inconsistent extends Data.TaggedError("Inconsistent")<{ readonly message: string }> {}
+export class Inconsistent extends Schema.TaggedError<Inconsistent, { readonly brand: unique symbol }>()("Inconsistent", { message: Schema.String }) {}
 
 /** A lookup's answer, or Missing (what was not found, and where to look) when it found none. */
 export const orMissing =

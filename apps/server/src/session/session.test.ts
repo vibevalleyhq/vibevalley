@@ -111,7 +111,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
-      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
       expect((yield* sessions.deliver(id, "resume the work", { kind: "comment" })).kind).toBe("run");
       yield* until(() => phase(core, id) === "done" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
       expect(opens).toBe(3);
@@ -176,7 +176,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
-      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
       const resumed = yield* sessions.deliver(id, "resume the work", { kind: "comment" });
       expect(resumed.kind).toBe("refused");
       expect(JSON.stringify(resumed)).toContain("did not stop");

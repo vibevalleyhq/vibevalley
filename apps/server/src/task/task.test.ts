@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, type Scope, Stream } from "effect";
+import { Effect, Predicate, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
@@ -168,7 +168,7 @@ class FakeWork implements TaskWork {
   handOver: Sessions["Service"]["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
       Effect.mapError((e) => {
-        const failure = e instanceof MergeFailure ? e : MergeFailure.error(String(e));
+        const failure = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(String(e));
         const words = notTakenIn(failure, id, settle);
         return new NotTakenIn({ failure, ...words, message: words.owner });
       }),

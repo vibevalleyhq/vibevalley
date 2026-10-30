@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { type Cause, Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { type Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, type HttpClientError, HttpEffect } from "effect/http";
 import type { Socket } from "effect/socket";
 
@@ -75,7 +75,10 @@ const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => (
   ...(settings ? { settings } : {}),
 });
 /** A step of a call outside the farm (Agora, the orchestrator's answer) that did not go; cause is what it threw. */
-class CallStepFailed extends Data.TaggedError("CallStepFailed")<{ readonly message: string; readonly cause: unknown }> {}
+class CallStepFailed extends Schema.TaggedError<CallStepFailed, { readonly brand: unique symbol }>()("CallStepFailed", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
 
 const callStepFailed = (cause: unknown) => new CallStepFailed({ message: messageOf(cause), cause });
 
@@ -367,7 +370,10 @@ export interface Tunnel {
 }
 
 /** Why the voice line cannot be had now; the message is the owner's. */
-class LineFailed extends Data.TaggedError("LineFailed")<{ readonly message: string }> {}
+class LineFailed extends Schema.TaggedError<LineFailed, { readonly brand: unique symbol }>()("LineFailed", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 const cloudflared = (port: number) =>
   Effect.callback<Tunnel, LineFailed>((resume) => {
@@ -375,7 +381,7 @@ const cloudflared = (port: number) =>
     try {
       child = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      return resume(Effect.fail(new LineFailed({ message: messageOf(e) })));
+      return resume(Effect.fail(new LineFailed({ message: messageOf(e), cause: e })));
     }
     const close = () => child.kill();
     let settled = false;

@@ -81,6 +81,8 @@ import type * as T from "./shapes";
 import { t } from "@vibevalley/i18n";
 
 /** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
+// The client is Promise-based and its callers (the page, the shells) reject and catch plain Errors, not Effect failures.
+// @effect-diagnostics-next-line extendsNativeError:off
 export class VibeValleyApiError extends Error {
   readonly status: number;
   readonly tag: string | undefined;

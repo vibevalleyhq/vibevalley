@@ -14,7 +14,6 @@ import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   Clock,
   Context,
-  Data,
   Deferred,
   Effect,
   Exit,
@@ -22,14 +21,14 @@ import {
   FiberSet,
   FileSystem,
   Layer,
+  Metric,
   Option,
   Predicate,
   PubSub,
+  Schema,
   type Scope,
   Semaphore,
-  Schema,
   Stream,
-  Metric,
 } from "effect";
 import type { SqlClient } from "effect/sql";
 
@@ -270,24 +269,27 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Executions open now" });
 
 /** A write of a session's own records (a run, the issue it works) that did not go through. */
-export class NotRecorded extends Data.TaggedError("NotRecorded")<{ readonly message: string; readonly cause?: unknown }> {}
+export class NotRecorded extends Schema.TaggedError<NotRecorded, { readonly brand: unique symbol }>()("NotRecorded", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** oar's runtime session or its subagents did not close. */
-class NotClosed extends Data.TaggedError("NotClosed")<{ readonly message: string; readonly cause: unknown }> {}
+class NotClosed extends Schema.TaggedError<NotClosed, { readonly brand: unique symbol }>()("NotClosed", { message: Schema.String, cause: Schema.Defect() }) {}
 
 const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause), cause });
 
 /** Work that did not go in (see handOver); the session stays. */
-export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
-  readonly failure: MergeFailure;
+export class NotTakenIn extends Schema.TaggedError<NotTakenIn, { readonly brand: unique symbol }>()("NotTakenIn", {
+  failure: MergeFailure,
   /** What the helper is sent back with; "" when the owner settles it. */
-  readonly fix: string;
+  fix: Schema.String,
   /** What the owner is told; also the message. */
-  readonly owner: string;
-  readonly notice: string;
-  readonly short: string;
-  readonly message: string;
-}> {}
+  owner: Schema.String,
+  notice: Schema.String,
+  short: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** A failure's words, whatever it is. */
 const reasonText = (e: unknown): string => (e instanceof Error ? e.message : Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : String(e));

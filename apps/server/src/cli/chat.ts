@@ -9,7 +9,7 @@ import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
-import { Clock, Data, Effect, FiberHandle, Option, Predicate, Queue, Stream } from "effect";
+import { Clock, Effect, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
 
 import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { Brain, type BrainEvent, standaloneOwner } from "@vibevalley/agent/brain";
@@ -92,7 +92,7 @@ const terminal = Stream.callback<Typed>((queue) =>
 );
 
 /** The owner is done: /exit, Ctrl+C with nothing under way, or the input's end. */
-class Quit extends Data.TaggedError("Quit") {}
+class Quit extends Schema.TaggedError<Quit, { readonly brand: unique symbol }>()("Quit", {}) {}
 
 const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));
 

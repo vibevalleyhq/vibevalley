@@ -5,7 +5,7 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
-import { Clock, Context, Data, Effect, Layer, Predicate, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -124,7 +124,10 @@ export function toolStart(name: string, args: unknown): ToolStart {
 const spaces = /\s+/gu;
 
 /** Told to the model as the tool's failed result: the message is what it reads. */
-class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly message: string }> {}
+class ToolRefusal extends Schema.TaggedError<ToolRefusal, { readonly brand: unique symbol }>()("ToolRefusal", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
 
@@ -134,7 +137,7 @@ const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is
 const said = (e: unknown) => toFailed(e).message;
 
 /** who throws for a caller nobody knows: the model reads it as the tool's failure. */
-const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e) }) });
+const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
 
 const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;

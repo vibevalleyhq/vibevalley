@@ -1,7 +1,7 @@
 // What connector.ts asks of each chat app: log in, receive until the connection fails, send. Each app's adapter sits
 // beside its client (weixin.ts, feishu.ts, qq.ts); each is stopped by interrupting it.
 
-import { Data, type Effect } from "effect";
+import { type Effect, Schema } from "effect";
 
 import type { ConnectorID, ConnectorLogin, ConnectorState } from "@vibevalley/protocol";
 
@@ -20,15 +20,16 @@ export interface Inbound {
 
 /** Why an app did not do what it was asked: stale is a login it no longer honours, restricted a reply it will not take
  * now (its window has closed), failed anything else. The message is what the owner sees. */
-export class AppFailed extends Data.TaggedError("AppFailed")<{
-  readonly kind: "restricted" | "stale" | "failed";
-  readonly message: string;
-}> {}
+export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: unique symbol }>()("AppFailed", {
+  kind: Schema.Literals(["restricted", "stale", "failed"]),
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 export const failedWith = (message: string) => new AppFailed({ kind: "failed", message });
 
 /** A thrown or rejected value, as an app's failure. */
-export const failedOf = (e: unknown) => failedWith(messageOf(e));
+export const failedOf = (e: unknown) => new AppFailed({ kind: "failed", message: messageOf(e), cause: e });
 
 export type Secrets = Readonly<Record<string, string>>;
 

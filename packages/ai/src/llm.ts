@@ -1,6 +1,6 @@
 // The farm's models over the wire: a request (request.ts) out, its stream read (response.ts) back, as pi-ai's events.
 
-import { Clock, Context, Data, Effect, Layer, Stream, Predicate } from "effect";
+import { Clock, Context, Effect, Layer, Stream, Predicate, Schema } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
 import type { AssistantMessage, Context as LlmContext } from "./messages.ts";
@@ -9,20 +9,26 @@ import type { Model } from "./models.ts";
 import { type RequestOptions, requestBody } from "./request.ts";
 import { type AssistantMessageEvent, Fold, SseData } from "./response.ts";
 
+// messages.ts keeps pi-ai's shapes as interfaces, not schemas; the fold builds this value itself, so its role is enough to
+// tell it apart.
+const AnswerSoFar = Schema.declare((u): u is AssistantMessage => Predicate.hasProperty(u, "role") && u.role === "assistant");
+
 export interface StreamOptions extends RequestOptions {
   readonly apiKey: string;
 }
 
 /** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. What the
  * model did answer (content filtered, no finish) ends the stream as an error event instead, as pi-ai's does. */
-export class LlmError extends Data.TaggedError("LlmError")<{
-  readonly reason: "network" | "status" | "stream";
+export class LlmError extends Schema.TaggedError<LlmError, { readonly brand: unique symbol }>()("LlmError", {
+  reason: Schema.Literals(["network", "status", "stream"]),
   /** The HTTP status, for status. */
-  readonly status?: number;
-  readonly message: string;
+  status: Schema.optionalKey(Schema.Int),
+  message: Schema.String,
   /** What had come when it failed. */
-  readonly partial?: AssistantMessage;
-}> {}
+  partial: Schema.optionalKey(AnswerSoFar),
+  /** The connection's own failure, for network. */
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 export class Llm extends Context.Service<
   Llm,
@@ -77,7 +83,9 @@ export const make = Effect.gen(function* () {
           HttpClientRequest.bearerToken(options.apiKey),
           HttpClientRequest.bodyJsonUnsafe(requestBody(model, context, options)),
         );
-        const res = yield* http.execute(request).pipe(Effect.mapError((e) => new LlmError({ reason: "network", message: `Connection error: ${e.message}` })));
+        const res = yield* http
+          .execute(request)
+          .pipe(Effect.mapError((e) => new LlmError({ reason: "network", message: `Connection error: ${e.message}`, cause: e })));
         if (res.status >= 400) {
           const text = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
           return yield* new LlmError({ reason: "status", status: res.status, message: statusMessage(res.status, text) });

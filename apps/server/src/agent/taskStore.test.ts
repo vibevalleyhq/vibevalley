@@ -28,7 +28,7 @@ describe("an agent's own tasks, kept", () => {
         expect(yield* s.load, name).toEqual(g);
         const refused = yield* Effect.flip(
           s.change(() => {
-            throw new AgentTaskError("不改了");
+            throw new AgentTaskError({ message: "不改了" });
           }),
         );
         expect(refused, name).toMatchObject({ _tag: "ToolFailed", message: "不改了" });

@@ -10,24 +10,7 @@
 
 import { createHash, randomInt } from "node:crypto";
 
-import {
-  Cause,
-  Clock,
-  Context,
-  Data,
-  Deferred,
-  Duration,
-  Effect,
-  Fiber,
-  FiberSet,
-  Layer,
-  Option,
-  Schedule,
-  Schema,
-  Semaphore,
-  Stream,
-  Predicate,
-} from "effect";
+import { Cause, Clock, Context, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
 import { HttpClient } from "effect/http";
 import type { SqlClient, SqlError } from "effect/sql";
 
@@ -79,10 +62,14 @@ interface Account {
 const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil > now;
 
 /** Why a step of the bridge did not go through: the database, the orchestrator, or an app. Said as the status's error. */
-class BridgeError extends Data.TaggedError("BridgeError")<{ readonly message: string }> {}
+class BridgeError extends Schema.TaggedError<BridgeError, { readonly brand: unique symbol }>()("BridgeError", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** A bridge's step that the database or the farm failed, in the words its status says. */
-const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError | ApiError) => new BridgeError({ message: causeMessage(e) });
+const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError | ApiError) =>
+  new BridgeError({ message: causeMessage(e), cause: e });
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
@@ -408,7 +395,7 @@ const make = (options: ConnectorOptions = {}) =>
         const channel = (yield* quotedChannel(m.quoted)) ?? snapshot()?.channel;
         // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
         const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
-        yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e) }));
+        yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e), cause: e }));
       });
 
       // The inbox: what the app handed over, delivered to the orchestrator in order.

@@ -12,6 +12,8 @@ const maxKeyLen = 256;
 
 export const validKey = (k: string) => k !== "" && k.length <= maxKeyLen && !k.endsWith("0") && [...k].every((c) => keyDigits.includes(c));
 
+// keyBetween is a plain function the page calls outside Effect; the server wraps it in Effect.try where it needs a failure.
+// @effect-diagnostics-next-line extendsNativeError:off
 class KeyError extends Error {}
 
 /** A key after a and before b; "" for a is the start, "" for b the end. */

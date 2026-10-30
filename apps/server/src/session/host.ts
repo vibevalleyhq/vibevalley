@@ -5,7 +5,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, Queue, Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Deferred, Effect, Exit, Fiber, Queue, Schema, Scope, Semaphore, Stream } from "effect";
 
 import { Brain, type BrainEvent, sessionUnfinished } from "@vibevalley/agent/brain";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -27,7 +27,10 @@ import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
 
 /** The input a caller waited on was not taken; cause is whatever stopped it, a defect included. */
-export class NotAnswered extends Data.TaggedError("NotAnswered")<{ readonly message: string; readonly cause: unknown }> {}
+export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly brand: unique symbol }>()("NotAnswered", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
 
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before.
  * Its words are read once: what came before the reader is kept for it. */
@@ -68,7 +71,10 @@ export class Caller {
 }
 
 /** Why the agent did not start: the model missing a key, or the host closing. The message is what the owner reads. */
-class CannotStart extends Data.TaggedError("CannotStart")<{ readonly message: string }> {}
+class CannotStart extends Schema.TaggedError<CannotStart, { readonly brand: unique symbol }>()("CannotStart", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** An input as the host keeps it: its route (kept in the transcript), and in process only the run it starts and the
  * caller waiting on its words. */
@@ -285,7 +291,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
     const start = Effect.gen(function* () {
       if (brain) return brain.brain;
       if (closing) return yield* new CannotStart({ message: stopped() });
-      const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e) }) });
+      const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e), cause: e }) });
       const scope = yield* Scope.fork(owner);
       // The brain publishes on its own fibers and waits for its listeners: its events go through a queue, followed one
       // at a time in order, so that the brain waits for none of what they start. The queue ends after the brain's own

@@ -26,7 +26,7 @@ const alive = (pid: number) => {
 /** server.json: where the server using this home listens, and its process. */
 const announcement = jsonOrNone(Schema.Struct({ url: Schema.String, pid: Schema.Finite }));
 
-export class HomeTaken extends Error {}
+export class HomeTaken extends Schema.TaggedError<HomeTaken, { readonly brand: unique symbol }>()("HomeTaken", { message: Schema.String }) {}
 
 /** Takes the home, or throws HomeTaken; the function it returns gives it back. */
 export function leaseHome(home: string): () => void {
@@ -49,11 +49,11 @@ export function leaseHome(home: string): () => void {
     } catch (e) {
       if (errnoOf(e) !== "EEXIST") throw e;
       const pid = Number(readFileSync(path, "utf8"));
-      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken(t("server.base.homeTaken", { home }));
+      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken({ message: t("server.base.homeTaken", { home }) });
       unlinkSync(path);
     }
   }
-  throw new HomeTaken(t("server.base.homeUnlocked", { home }));
+  throw new HomeTaken({ message: t("server.base.homeUnlocked", { home }) });
 }
 
 /** The home a server or the command line uses: VIBEVALLEY_HOME, or ~/.vibevalley (as loadConfig reads it). */

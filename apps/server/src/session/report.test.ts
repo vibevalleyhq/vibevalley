@@ -304,7 +304,7 @@ describe("shell", () => {
 
 describe("work that does not go in", () => {
   it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
-    const check = notTakenIn(MergeFailure.check("测试没过"), "阿狐", "owner");
+    const check = notTakenIn(MergeFailure.failedCheck("测试没过"), "阿狐", "owner");
     expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "项目检查没通过"]);
     const conflict = MergeFailure.conflict("main", ["a.ts", "b.ts"]);
     expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");

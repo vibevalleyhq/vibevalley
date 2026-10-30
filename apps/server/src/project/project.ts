@@ -88,7 +88,7 @@ const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.D
 const failed = (e: MergeFailure | GitError | ProjectError) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
-  if ((yield* repository(path).tip(branch)) !== checked) return yield* MergeFailure.check(t("server.project.branchMoved"));
+  if ((yield* repository(path).tip(branch)) !== checked) return yield* MergeFailure.failedCheck(t("server.project.branchMoved"));
 });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
@@ -335,7 +335,7 @@ const make = (hooks: ProjectHooks = {}) =>
         }
         return path;
       },
-      Effect.mapError((e) => (Predicate.isTagged(e, "ProjectError") ? e : new ProjectError({ message: reason(e) }))),
+      Effect.mapError((e) => (Predicate.isTagged(e, "ProjectError") ? e : new ProjectError({ message: reason(e), cause: e }))),
     );
 
     const list = Effect.fn("Projects.list")(function* () {
@@ -415,7 +415,7 @@ const make = (hooks: ProjectHooks = {}) =>
     const describe = (project: string, cwd: string, branch: string | undefined) =>
       repository(join(root, project))
         .describe(project, cwd, branch)
-        .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+        .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
 
     /** The project's own setup for a new worktree: .vibevalley/setup (installing what it needs), run outside the project's
      * turn and with the check's time limit; one that fails is logged, and the helper starts all the same. */
@@ -442,7 +442,7 @@ const make = (hooks: ProjectHooks = {}) =>
         .trim()
         .split("\n")
         .slice(-40);
-      return yield* MergeFailure.check(why + "\n" + lines.join("\n"));
+      return yield* MergeFailure.failedCheck(why + "\n" + lines.join("\n"));
     });
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
@@ -623,7 +623,7 @@ const make = (hooks: ProjectHooks = {}) =>
               from ||= main;
             }
             const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
-            yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+            yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
             made = true;
             return { project, cwd, branch };
           }),
@@ -648,7 +648,7 @@ const make = (hooks: ProjectHooks = {}) =>
           const added = yield* git(cwd, "ls-files", "--others", "--exclude-standard");
           return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].toSorted();
         },
-        Effect.mapError((e) => new ProjectError({ message: reason(e) })),
+        Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })),
       ),
       conflict: Effect.fn("Projects.conflict")(function* (place, baseBranch = "") {
         if (!place.branch) return undefined;
@@ -669,7 +669,7 @@ const make = (hooks: ProjectHooks = {}) =>
           Effect.gen(function* () {
             yield* unchangedBranch(path, place.branch!, checked);
             const head = yield* repository(path).main;
-            if (!(yield* repository(path).isAncestor(head, checked))) return yield* MergeFailure.check(t("server.project.mainMoved"));
+            if (!(yield* repository(path).isAncestor(head, checked))) return yield* MergeFailure.failedCheck(t("server.project.mainMoved"));
             const { main, ahead } = yield* mergeMain(path, place.branch!, t("server.project.keptBoth", { branch: place.branch! }), head);
             const warning = yield* cleanupMerged(place, path);
             return {
@@ -760,7 +760,7 @@ const make = (hooks: ProjectHooks = {}) =>
             const main = yield* repository(join(root, place.project)).main;
             yield* git(place.cwd, "checkout", "-q", "-f", "-B", place.branch!, main);
             yield* git(place.cwd, "clean", "-q", "-f", "-d");
-          }).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) }))),
+          }).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e }))),
         );
       }),
       clear: Effect.fn("Projects.clear")(function* (project, issueNumber, work = "discard") {
@@ -801,7 +801,7 @@ const make = (hooks: ProjectHooks = {}) =>
           project,
           Effect.gen(function* () {
             const path = yield* ensure(project);
-            yield* git(path, "branch", branch, from || "HEAD").pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+            yield* git(path, "branch", branch, from || "HEAD").pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
           }),
         );
       }),
@@ -861,10 +861,10 @@ const make = (hooks: ProjectHooks = {}) =>
             yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
             const repo = githubOrigin(yield* repository(path).origin);
             if (repo === "") return yield* fail(t("server.project.github.notGithub"));
-            const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+            const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
             const files = yield* repository(path)
               .conflicts(main, checked)
-              .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+              .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
             if (files.length > 0) return yield* MergeFailure.conflict(main, files);
             const pushed = hooks.push
               ? yield* hooks.push(place.cwd, place.branch!)

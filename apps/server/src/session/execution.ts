@@ -2,7 +2,7 @@
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
-import { Data, Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import type { CoreEvent } from "@vibevalley/agent/brain";
 import type { ToolResult } from "@vibevalley/agent/core/loop";
@@ -20,7 +20,7 @@ import type { NotRecorded, RunStore } from "./session.ts";
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
 
 /** A failed start asked while another run is still going: it is not recorded as its own run. */
-export class ExecutionBusy extends Data.TaggedError("ExecutionBusy")<{ readonly message: string }> {}
+export class ExecutionBusy extends Schema.TaggedError<ExecutionBusy, { readonly brand: unique symbol }>()("ExecutionBusy", { message: Schema.String }) {}
 
 export interface RunInput {
   readonly issue?: string;
