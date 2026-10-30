@@ -6,8 +6,6 @@ import type { AddressInfo } from "node:net";
 
 import { expect, test } from "./fixtures";
 
-type Counted = Window & { heard: number };
-
 const said = "hello there";
 
 test.use({
@@ -34,11 +32,11 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
     // What the capture worklet hands the page is counted, so the recording stops once there is something to send.
     await page.addInitScript(() => {
       const Real = AudioWorkletNode;
-      (window as unknown as Counted).heard = 0;
+      window.heard = 0;
       window.AudioWorkletNode = class extends Real {
         constructor(...a: ConstructorParameters<typeof AudioWorkletNode>) {
           super(...a);
-          this.port.addEventListener("message", () => (window as unknown as Counted).heard++);
+          this.port.addEventListener("message", () => (window.heard = (window.heard ?? 0) + 1));
         }
       };
       localStorage.setItem("vibevalley.title.seen", "true");
@@ -47,7 +45,7 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
     const dictate = page.getByTestId("dictate");
     await expect(dictate).toBeEnabled();
     await dictate.click();
-    await expect.poll(() => page.evaluate(() => (window as unknown as Counted).heard)).toBeGreaterThan(2);
+    await expect.poll(() => page.evaluate(() => window.heard ?? 0)).toBeGreaterThan(2);
     await expect(dictate).toHaveAttribute("data-state", "recording");
     await dictate.click();
     await expect(page.locator("textarea")).toHaveValue(new RegExp(said, "u"));

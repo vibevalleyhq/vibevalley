@@ -76,19 +76,18 @@ export interface IslandOptions {
   open: (issue: string) => void;
 }
 
-/** What the desktop test reads (apps/desktop/test): the last glance, whether the helper runs, and its click. */
+/** The island as the desktop test reads it (probe.ts): the last glance, whether the helper runs, and its click. */
 export interface IslandProbe {
   glance: Glance | undefined;
   helper: boolean;
   open: (issue: string) => void;
 }
 
-export function startIsland(o: IslandOptions): { stop: () => void } {
+export function startIsland(o: IslandOptions): { stop: () => void; probe: IslandProbe } {
   const abort = new AbortController();
   let helper: ChildProcess | undefined;
   let last = "";
   const probe: IslandProbe = { glance: undefined, helper: false, open: o.open };
-  Object.assign(globalThis, { vibevalleyIsland: probe });
 
   const send = (glance: Glance) => {
     probe.glance = glance;
@@ -129,6 +128,7 @@ export function startIsland(o: IslandOptions): { stop: () => void } {
   follow();
 
   return {
+    probe,
     stop: () => {
       abort.abort();
       helper?.stdin?.end();

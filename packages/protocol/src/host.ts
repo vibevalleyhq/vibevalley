@@ -88,8 +88,21 @@ export const ThemeChoiceValues = ["light", "dark", "system"] as const;
 export type ThemeChoice = (typeof ThemeChoiceValues)[number];
 export const ThemeChoice: Schema.Codec<ThemeChoice> = Schema.Literals(ThemeChoiceValues);
 
-/** The property a host's preload (or injected script) sets on window. */
-export const hostKey = "vibevalleyHost";
+// The only way between the page and a shell's own world is a property on window. Each is declared here, once, so what
+// reads or sets one needs no cast and names it from this list.
+declare global {
+  interface Window {
+    /** The desktop's preload sets it (contextBridge). */
+    vibevalleyHost?: Host;
+    /** React Native's WebView sets it in the phone's shell. */
+    ReactNativeWebView?: { postMessage(text: string): void };
+    /** The page sets it for the phone's shell to call with each message for it (mobileBridge). */
+    vibevalleyFromHost?: (message: unknown) => void;
+  }
+}
+
+/** The property a host's preload sets on window. */
+export const hostKey = "vibevalleyHost" satisfies keyof Window;
 
 /** The key the desktop hears while another program is in front, in Electron's accelerator notation: main registers it,
  * the page shows it (Host.voiceShortcut). */
@@ -123,7 +136,7 @@ export const mobileBridge = {
 };
 
 /** The function on window the phone's shell calls with each message for the page. */
-export const fromNativeKey = "vibevalleyFromHost";
+export const fromNativeKey = "vibevalleyFromHost" satisfies keyof Window;
 
 /** The phone's host over its bridge. Only the current line hears its events; an older one keeps its own line for a late
  * leave. */

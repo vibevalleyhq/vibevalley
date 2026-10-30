@@ -1,8 +1,8 @@
-// The host the page runs in (@vibevalley/protocol/host): the desktop's preload sets hostKey; the phone's WebView brings
-// ReactNativeWebView, and its host is built here, over the bridge; a browser tab has none.
+// The host the page runs in (@vibevalley/protocol/host): the desktop's preload sets window.vibevalleyHost; the phone's
+// WebView brings window.ReactNativeWebView, and its host is built here, over the bridge; a browser tab has none.
 
 import type { Link } from "@vibevalley/bridge";
-import { fromNativeKey, type Host, hostKey, mobileHost } from "@vibevalley/protocol/host";
+import { type Host, mobileHost } from "@vibevalley/protocol/host";
 
 /** A browser tab: no host around the page. */
 export const browserHost: Host = {
@@ -11,9 +11,9 @@ export const browserHost: Host = {
 
 let phone: Host | undefined;
 
-function webViewLink(native: { postMessage(text: string): void }, g: Record<string, unknown>): Link {
+function webViewLink(native: { postMessage(text: string): void }): Link {
   const ears = new Set<(m: unknown) => void>();
-  g[fromNativeKey] = (m: unknown) => {
+  window.vibevalleyFromHost = (m) => {
     for (const fn of ears) fn(m);
   };
   return {
@@ -26,13 +26,10 @@ function webViewLink(native: { postMessage(text: string): void }, g: Record<stri
 }
 
 export function currentHost(): Host {
-  const g = globalThis as Record<string, unknown>;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the desktop shell's preload puts a Host here (this file is the contract)
-  const given = g[hostKey] as Host | undefined;
+  const given = window.vibevalleyHost;
   if (given) return given;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- React Native's WebView puts its bridge here
-  const native = g.ReactNativeWebView as { postMessage(text: string): void } | undefined;
+  const native = window.ReactNativeWebView;
   if (!native) return browserHost;
-  phone ??= mobileHost(webViewLink(native, g));
+  phone ??= mobileHost(webViewLink(native));
   return phone;
 }

@@ -9,7 +9,8 @@ import { join } from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
 import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
-import type { Notice } from "@vibevalley/protocol/host";
+
+import type { DesktopProbe } from "../src/probe";
 
 // The server and the agents it runs read keys from the environment: a test must never reach a real model, voice service or
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
@@ -30,7 +31,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
   const app = await electron.launch({
     // Electron applies this before main.ts requests its single-instance lock; the owner's running app has another profile.
     args: [`--user-data-dir=${userData}`, join(import.meta.dirname, "..")],
-    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work") },
+    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work"), VIBEVALLEY_DESKTOP_PROBE: "1" },
   });
   let server = "";
   try {
@@ -47,24 +48,20 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await expect(page.locator(`[data-testid="issue-card"][data-key="${seen.id}"]`)).toBeVisible();
 
     const host = await page.evaluate(async () => {
-      const h = (window as unknown as { vibevalleyHost: { name: string; notify: (n: Notice) => Promise<void> } }).vibevalleyHost;
-      await h.notify({ title: "小吴 做完了", body: "打卡写好了" });
-      return h.name;
+      const h = window.vibevalleyHost;
+      await h?.notify?.({ title: "小吴 做完了", body: "打卡写好了" });
+      return h?.name;
     });
     expect(host).toBe("desktop");
-    const notices = await app.evaluate(() => (globalThis as { vibevalleyNotices?: Notice[] }).vibevalleyNotices ?? []);
+    const notices = await app.evaluate(() => globalThis.vibevalleyProbe?.notices ?? []);
     expect(notices).toEqual([{ title: "小吴 做完了", body: "打卡写好了" }]);
     // The page keeps the menu bar's tray to the farm, and has the key that calls the manager from anywhere.
-    await expect.poll(() => app.evaluate(() => (globalThis as { vibevalleyTray?: { lines: string[] } }).vibevalleyTray?.lines ?? [])).toContain("还没开工");
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { vibevalleyHost: { voiceShortcut: { accelerator: string } | null } }).vibevalleyHost.voiceShortcut?.accelerator,
-      ),
-    ).toBe("Alt+Shift+Space");
+    await expect.poll(() => app.evaluate(() => globalThis.vibevalleyProbe?.tray?.lines ?? [])).toContain("还没开工");
+    expect(await page.evaluate(() => window.vibevalleyHost?.voiceShortcut?.accelerator)).toBe("Alt+Shift+Space");
     // The window's own parts follow the theme the page chose (设置 › 外观).
-    await page.evaluate(() => (window as unknown as { vibevalleyHost: { theme: (t: string) => void } }).vibevalleyHost.theme("dark"));
+    await page.evaluate(() => window.vibevalleyHost?.theme?.("dark"));
     await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe("dark");
-    await page.evaluate(() => (window as unknown as { vibevalleyHost: { theme: (t: string) => void } }).vibevalleyHost.theme("system"));
+    await page.evaluate(() => window.vibevalleyHost?.theme?.("system"));
     await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe("system");
     // The menu bar speaks the farm's language, and follows it when the page loads in another.
     const menu = () => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((i) => i.label) ?? []);
@@ -76,7 +73,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await page.reload();
     await expect.poll(menu).toContain("编辑");
     // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
-    const titleBar = await page.evaluate(() => (window as unknown as { vibevalleyHost: { titleBar: { left: number } | null } }).vibevalleyHost.titleBar);
+    const titleBar = await page.evaluate(() => window.vibevalleyHost?.titleBar);
     if (titleBar) expect((await page.getByTestId("rail").boundingBox())?.width).toBeGreaterThan(titleBar.left);
     // Between two whole scales the farm would have bars around it: when a resize ends, the window takes the nearest size
     // it fills.
@@ -135,13 +132,10 @@ test("the island follows the issues in flight and opens one", async () => {
       VIBEVALLEY_WORK_ROOT: join(dir, "work"),
       VIBEVALLEY_TEST_RUNTIMES: "1",
       VIBEVALLEY_AGENT_STARTERS: starters(),
+      VIBEVALLEY_DESKTOP_PROBE: "1",
     },
   });
-  type Probe = {
-    glance?: { working: number; waiting: number; strip: { working: string; waiting: string }; rows: { issue: string; tone: string; doing: string }[] };
-    helper: boolean;
-  };
-  const probe = () => app.evaluate(() => (globalThis as { vibevalleyIsland?: Probe }).vibevalleyIsland);
+  const probe = (): Promise<DesktopProbe["island"]> => app.evaluate(() => globalThis.vibevalleyProbe?.island);
   try {
     const page = await app.firstWindow();
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//u, { timeout: 45_000 });
@@ -160,7 +154,7 @@ test("the island follows the issues in flight and opens one", async () => {
       .toEqual([[made.id, "waiting", "等你回答"]]);
     expect((await probe())?.glance?.waiting).toBe(1);
 
-    await app.evaluate((_, id) => (globalThis as { vibevalleyIsland?: { open: (issue: string) => void } }).vibevalleyIsland?.open(id), made.id);
+    await app.evaluate((_, id) => globalThis.vibevalleyProbe?.island?.open(id), made.id);
     await page.waitForURL(new RegExp(`/issues/${made.id}$`, "u"));
     await expect(page.getByTestId("issue")).toBeVisible();
   } finally {

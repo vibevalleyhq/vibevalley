@@ -24,13 +24,14 @@ import { serve, type Link } from "@vibevalley/bridge";
 import { filledNear } from "@vibevalley/engine/framing";
 import { t, currentLocale, setLocale } from "@vibevalley/i18n";
 import { VibeValleyApi } from "@vibevalley/protocol";
-import { desktopBridge, desktopVoiceShortcut, farmFraming, type Notice } from "@vibevalley/protocol/host";
+import { desktopBridge, desktopVoiceShortcut, farmFraming } from "@vibevalley/protocol/host";
 
 import { bridgeChannel } from "./bridge";
 import { watchForDev } from "./dev";
 import { startIsland } from "./island";
 import { followSavedLocale } from "./locale";
 import { setAppMenu } from "./menu";
+import { probe } from "./probe";
 import { loginShellPath, type RunningServer, startServer } from "./server";
 
 // In the repository the server is apps/server, the page apps/web/dist and the island apps/island's release build
@@ -47,10 +48,6 @@ const files = () => {
     log: join(home, "logs", "desktop-server.log"),
   };
 };
-
-// What the page asked to show, newest last; the Playwright test reads it (apps/desktop/test).
-const notices: Notice[] = [];
-Object.assign(globalThis, { vibevalleyNotices: notices });
 
 /** Where macOS's window buttons sit: centred in the page's 28 px drag strip (preload titleBar). */
 const trafficLights = { x: 12, y: 8 };
@@ -159,7 +156,7 @@ const pageLink: Link = {
 
 const page = serve(desktopBridge, pageLink, {
   notify: (notice) => {
-    notices.push(notice);
+    probe?.notices.push(notice);
     if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
   },
   // Only a path on this machine (the contract takes an absolute one), shown in Finder; never opened or run.
@@ -175,7 +172,7 @@ const page = serve(desktopBridge, pageLink, {
     setAppMenu();
   },
   tray: (summary) => {
-    Object.assign(globalThis, { vibevalleyTray: summary });
+    if (probe) probe.tray = summary;
     if (!tray) {
       const icon = nativeImage.createFromPath(join(files().web, "pixel", "app-sprout.png")).resize({ width: 16, height: 16 });
       tray = new Tray(icon);
@@ -240,6 +237,7 @@ if (!app.requestSingleInstanceLock()) {
       server: () => server?.url ?? "",
       open: openIssue,
     });
+    if (probe) probe.island = island.probe;
     app.on("will-quit", island.stop);
     if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1") {
       const stopWatching = watchForDev({

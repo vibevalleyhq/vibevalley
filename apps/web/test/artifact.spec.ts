@@ -72,7 +72,7 @@ test("Markdown handed in is read into blocks to write on, without running the HT
   await expect(shown.locator("script, img")).toHaveCount(0);
   // Every artifact is listed on 产出, whichever way it came.
   await expect(page.locator(`[data-testid="artifact-row"][data-key="${made.id}"]`)).toHaveAttribute("aria-current", "page");
-  expect(await page.evaluate(() => (window as unknown as { ran?: number }).ran)).toBeUndefined();
+  expect(await page.evaluate(() => window.ran)).toBeUndefined();
 });
 
 test("an issue lists the artifacts made for it", async ({ page, api }) => {
