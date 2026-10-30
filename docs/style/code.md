@@ -5,6 +5,8 @@
 ## 格式
 
 - 格式交给 oxfmt（`vp check --fix`，160 列，设置在根目录 `vite.config.ts`），lint 交给 oxlint（`vp check`），不手调；Markdown 不排，表格照写成 `|---|`。
+- import 由 oxfmt 排成五组，从远到近：Node、外面的包、`@vibevalley/*`、本 app 的 `@/`、同目录；Tailwind 的类照 Tailwind 自己的顺序（读 `apps/web/src/style.css`，`cx(…)` 里的也排）。文件开头的说明注释在 import 上面。
+- 提交钩子和 CI 一样跑 `vp check --fix --deny-warnings`：警告也挡提交。
 - 工具管不到的（文件里的先后、错误怎么说）照周围的代码；命名照 [naming.md](docs/style/naming.md)。
 - 注释里认得出来的交给 lint：分隔线和给一段代码起的标题（`vibevalley/no-comment-divider`）；认不出来的（换个说法复述名字、概述、测试里一步步讲），`vpx scripts/comment-review.ts` 让模型照下面「注释」一节审这个分支新加的注释（`--all <目录>` 审一块已有的），只报不改，怎么核实、删改照 [vv-comments](.agents/skills/vv-comments/SKILL.md)（[理由](docs/subsystems/process.md#为什么这样)）。
 
@@ -27,9 +29,17 @@
 
 - 不写 `T | null | undefined`：外面来的 `null` 在进门的那一处换成 `undefined`（`jsonOrNone`、`?? undefined`），里面只认一种。
 - 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、测试的黄金数据、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
-- 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。
+- 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。数字和布尔不这样：`0`、`false` 是值，写 `??`（lint 的 `prefer-nullish-coalescing` 查）。
+- 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/server/src/base/order.ts`、`apps/web/src/base/order.ts`），不写 `a - b || …`。
 - 给人看的话只在帧上：核心形状（`Session`、`Cron`、`Doing`）只有事实，帧用视图形状（`SessionView`、`CronView`、`WorkspaceView`）带上必有的说法；读说法的函数收视图形状，只读事实的收核心形状（视图形状能当核心形状用）。
 - 闭合的一组词在库里是枚举类型（`<表>_<列>`，`schema.test.ts` 查），生成的查询读出来就是词的联合；从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`（页面），都不写 `as`。
+
+## 检查管着的写法
+
+- 不写收窄的 `as`：外面来的值用 Schema 或类型守卫读，DOM 的值用 `instanceof`；确实只能断言的（库的类型缺口、自己写出又读回的文件），在那一行写 `// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- <为什么成立>`。测试、故事和样例不查：断言错了，读它的断言会失败。
+- 正则都带 `u`：中文和 emoji 按码点算，`.`、`[^x]` 不会切开一个字。
+- 不就地排序、倒序：`toSorted`、`toReversed`，帧和核心状态是共享的。
+- 循环里的 `await`：彼此无关的改成 `Promise.all`；一步要等上一步的（轮询、分页的游标、一个会话的轮次、按次序的批）在那一行写明为什么。Playwright 的测试不查：一页只能一步步点。
 
 ## 注释
 
