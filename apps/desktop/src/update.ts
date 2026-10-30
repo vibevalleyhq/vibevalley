@@ -1,8 +1,5 @@
-// The packaged app updates itself from the repository's GitHub releases. It is not signed, so macOS's own updater
-// (Squirrel.Mac, which Electron's autoUpdater uses) cannot install it; this does what it would: read the latest release's
-// release.json, download this Mac's build, check its size and SHA-512 against it, unpack it, and once this process has
-// quit, put it in place of the running .app (the old one kept beside the download until the next update).
-// It is trusted as the first download is: GitHub's HTTPS and the release's files.
+// The app is not signed, so macOS's own updater (Squirrel.Mac, under Electron's autoUpdater) cannot install it; this
+// does what it would. It is trusted as the first download is: GitHub's HTTPS and the release's files.
 
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -37,8 +34,7 @@ const writable = (path: string) => {
   }
 };
 
-// Waits for the app to quit, then moves the running .app beside the download and the new one in its place; if the second
-// move fails, the old one goes back. The quarantine a browser would add is taken off, and the app opened again if asked.
+// Runs once this process has quit: if the new .app cannot be moved in, the old one goes back.
 const swapScript = `#!/bin/sh
 pid="$1"; current="$2"; next="$3"; old="$4"; reopen="$5"
 while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
@@ -138,7 +134,6 @@ export function updater(o: {
   return {
     state: () => state,
     check,
-    /** Checks now and every few hours. */
     start: () => {
       void check();
       timer = setInterval(() => void check(), everyMs);

@@ -72,8 +72,6 @@ export function watchForDev(h: DevHooks): () => void {
   return () => watchers.forEach((w) => w.close());
 }
 
-/** The development wiring for the app: the window reloads, and the server starts again on its port, the window coming
- * back on the place it showed. */
 export function devMode(o: { readonly web: string; readonly repo: string; readonly server: ServerKeeper; readonly window: MainWindow }) {
   return watchForDev({
     web: o.web,

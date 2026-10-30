@@ -106,8 +106,7 @@ export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0
   });
 }
 
-/** The one server the app runs: coming up, running, started again (in development), and stopped before the app quits,
- * a start still under way waited for, so it is stopped rather than left running. */
+/** stop waits for a start still under way, so that server is stopped rather than left running. */
 export function serverKeeper(files: ServerFiles, env: NodeJS.ProcessEnv) {
   let running: RunningServer | undefined;
   let starting: Promise<RunningServer> | undefined;

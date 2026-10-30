@@ -1,11 +1,9 @@
-// A child that speaks one JSON value a line (the server's ready line, the island's clicks).
-
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
 
 import { Schema } from "effect";
 
-/** fn hears each line that is one value of schema; every line, that or not, goes to each (a log) first. */
+/** each hears every line first, a value of schema or not. */
 export function jsonLines<S extends Schema.Codec<unknown, unknown>>(input: Readable, schema: S, fn: (said: S["Type"]) => void, each?: (line: string) => void) {
   const read = Schema.decodeUnknownOption(schema);
   createInterface({ input }).on("line", (line) => {
@@ -21,5 +19,4 @@ export function jsonLines<S extends Schema.Codec<unknown, unknown>>(input: Reada
   });
 }
 
-/** What an error says, for a log or the owner. */
 export const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));

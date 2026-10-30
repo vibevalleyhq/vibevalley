@@ -1,13 +1,9 @@
-// The desktop's bridge (@vibevalley/protocol/host's desktopBridge) goes over one channel both ways: the preload's calls,
-// and main's answers and pushes to the window's page.
-
 import { type IpcMainEvent, type IpcRendererEvent, ipcMain, ipcRenderer, type WebContents } from "electron";
 
 import type { Link } from "@vibevalley/bridge";
 
 const channel = "vibevalley:bridge";
 
-/** The preload's end. */
 export const rendererLink = (): Link => ({
   send: (m) => ipcRenderer.send(channel, m),
   receive: (fn) => {
@@ -17,7 +13,7 @@ export const rendererLink = (): Link => ({
   },
 });
 
-/** Main's end, to the page in page(): what another sender says is not heard. */
+/** Only the page in page() is heard: what another sender says is not. */
 export const mainLink = (page: () => WebContents | undefined): Link => ({
   send: (m) => page()?.send(channel, m),
   receive: (fn) => {

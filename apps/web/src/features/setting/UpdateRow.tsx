@@ -1,5 +1,3 @@
-// 关于's update row: what the desktop's update is doing, and the one thing to do about it.
-
 import { Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

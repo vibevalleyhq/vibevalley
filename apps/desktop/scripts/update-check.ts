@@ -1,8 +1,5 @@
-// The desktop app's own update, end to end on real packages (acceptance desktop-update.md): it builds 0.0.1 and 0.0.2,
-// puts 0.0.1 in a folder of its own as if installed, serves 0.0.2's release as a feed on this machine, then runs the
-// installed app twice: against a feed whose SHA-512 is wrong (the update fails, nothing changes), and against the real
-// one (it downloads, and quitting puts 0.0.2 in place). Last it opens the app again and reads its version.
-// The farm's home and Electron's user data are temporary; the owner's app and ~/.vibevalley are not touched.
+// The steps and what they prove: acceptance desktop-update.md. The farm's home and Electron's user data are temporary;
+// the owner's app and ~/.vibevalley are not touched.
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -50,7 +47,6 @@ await new Promise<void>((resolve) => files.listen(0, "127.0.0.1", resolve));
 const address = files.address();
 const feed = (name: string) => `http://127.0.0.1:${typeof address === "object" && address !== null ? address.port : 0}/${name}/release.json`;
 
-/** Runs the installed app on a feed until its update settles; returns how, and quits it. */
 async function run(feedUrl: string) {
   const dir = mkdtempSync(join(work, "run-"));
   const app = await electron.launch({

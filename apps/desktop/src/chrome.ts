@@ -1,10 +1,7 @@
-// The window's own parts around the page, which main draws and the preload tells the page about.
-
 /** On macOS the window has no title bar: the page reaches the top edge and leaves a strip to drag the window by (top),
  * whose start the window's buttons take (left). The preload hands this to the page (Host.titleBar). */
 export const titleBar = { top: 28, left: 76 };
 
-/** The window's buttons, centred in that strip. */
 export const trafficLights = { x: 12, y: 8 };
 
 /** The workbench's page in either theme (apps/web style.css): what the window is painted with between one page and the

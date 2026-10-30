@@ -1,5 +1,3 @@
-// Main's end of the page's host (@vibevalley/protocol/host's desktopBridge): what the preload asks for, done here.
-
 import { nativeTheme, Notification, shell } from "electron";
 
 import { serve } from "@vibevalley/bridge";

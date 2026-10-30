@@ -93,7 +93,6 @@ function Rail(props: { here?: Place | undefined }) {
         </For>
       </div>
       <div class="mt-auto flex flex-col items-center gap-2 pt-2">
-        {/* A new version is ready: 关于 says what and restarts into it. */}
         <Show when={ready()}>
           {(r) => (
             <Slot to="/settings/about" place="update" label={t("web.base.updateReady", { next: r().next })}>

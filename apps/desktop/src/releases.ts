@@ -1,5 +1,4 @@
-// What a release says about itself (release.json, written by scripts/package.ts beside its files), and the rules an
-// update follows with it. Pure, so they are tested without a release or a Mac.
+// release.json is written by scripts/package.ts beside the release's files.
 
 import { Schema } from "effect";
 
@@ -58,5 +57,4 @@ export function placeProblem(bundle: string, writable: boolean): UpdateManual | 
  * yet (no mark) loses nothing. */
 export const startsNewFarm = (release: string, farm: string | undefined) => farm !== undefined && farm.trim() !== release;
 
-/** The version an Info.plist says (CFBundleShortVersionString). */
 export const plistVersion = (xml: string) => /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]*)<\/string>/u.exec(xml)?.[1];

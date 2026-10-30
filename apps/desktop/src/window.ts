@@ -1,6 +1,3 @@
-// The app's one window: made when first asked for, again after it was closed. It shows the bar while the server comes up
-// (apps/web public/opening.html), then the page the server serves, and never leaves the server's origin.
-
 import { join } from "node:path";
 
 import { app, BrowserWindow, nativeTheme, screen, shell } from "electron";

@@ -29,8 +29,8 @@ sh(island, "swift", "build", "-c", "release");
 const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: island, encoding: "utf8" }).trim(), "VibeValleyIsland");
 
 rmSync(stage, { recursive: true, force: true });
-// The server with exactly the versions the lockfile has, its workspace packages copied in: pnpm deploy. (npm without
-// the lockfile let a transitive dependency float past the effect the rest is pinned to.)
+// Everything at the versions the lockfile pins, the workspace packages copied in: npm without the lockfile let a
+// transitive dependency float past what the rest is pinned to.
 sh(repo, "pnpm", "--filter", "@vibevalley/server", "deploy", "--prod", server);
 // What only the tests read does not ship: test files, golden data, test helpers, in the server and its packages.
 const testOnly = /\.test\.tsx?$|(^|\/)(testdata|testing)$/u;
