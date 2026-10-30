@@ -4,9 +4,10 @@
 export const LocaleValues = ["zh", "en"] as const;
 export type Locale = (typeof LocaleValues)[number];
 
-// In a page, the attribute is there before any module runs, so even words read while modules load are in the right one.
-const page = (globalThis as { document?: { documentElement: { dataset: Record<string, string | undefined> } } }).document;
-let current: Locale = page?.documentElement.dataset.locale === "en" ? "en" : "zh";
+// In a page, the attribute is there before any module runs, so even words read while modules load are in the right one. A
+// preload runs before the page has an <html> at all: the DOM's documentElement is null there.
+const page = (globalThis as { document?: { documentElement: { dataset: Record<string, string | undefined> } | null } }).document;
+let current: Locale = page?.documentElement?.dataset.locale === "en" ? "en" : "zh";
 
 export const currentLocale = (): Locale => current;
 

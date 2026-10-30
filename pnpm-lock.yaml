@@ -389,6 +389,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      '@vibevalley/bridge':
+        specifier: workspace:*
+        version: link:../../packages/bridge
       '@vibevalley/engine':
         specifier: workspace:*
         version: link:../../packages/engine
