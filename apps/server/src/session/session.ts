@@ -24,6 +24,7 @@ import {
   FileSystem,
   Layer,
   Option,
+  Predicate,
   PubSub,
   type Scope,
   Semaphore,
@@ -31,7 +32,7 @@ import {
   Stream,
   Metric,
 } from "effect";
-import { SqlClient, SqlError } from "effect/sql";
+import { type SqlClient, SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -70,7 +71,7 @@ import { Core, type FactIn } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { Memories } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
-import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 
 import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
@@ -206,7 +207,7 @@ export class Sessions extends Context.Service<
     readonly handOver: (
       id: string,
       closed: SessionClose,
-      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
       settle?: Settle,
     ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
     /** What the session's branch would bring now; the conflict it shows is kept on the session. */
@@ -401,11 +402,10 @@ export const make = (options: SessionOptionsIn = {}) =>
     const chat = yield* Channels;
     const projects = yield* Projects;
     const runtimes = yield* Runtimes;
-    const sql = yield* SqlClient.SqlClient;
-    const { run: db } = yield* Db;
+    const { run: db, attempt } = yield* Db;
     /** A write that must not stop a run: logged, and the run goes on. */
     const logged = <A, E>(what: string, e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(
+      attempt(e).pipe(
         Effect.asVoid,
         Effect.catch((err) => Effect.logWarning(`vibevalley: ${what}: ${String(err)}`)),
       );
@@ -414,8 +414,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
-    const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
+      attempt(e).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+    const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
     const timers = yield* FiberMap.make<string>();
@@ -729,7 +729,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         });
         forkHere(
           close.pipe(
-            Effect.mapError((e) => (e instanceof Cause.UnknownError ? e.cause : e)),
+            Effect.mapError((e) => (Cause.isUnknownError(e) ? e.cause : e)),
             Effect.onExit((exit) => Deferred.done(closing, exit)),
             Effect.ignore,
           ),
@@ -945,7 +945,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const handOver = Effect.fn("Sessions.handOver")(function* (
       id: string,
       closed: SessionClose,
-      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
       settle: Settle = "owner",
     ) {
       const h = hands.get(id);
@@ -962,7 +962,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           yield* rest(h);
           const merged = yield* use(h.place, h.lastText).pipe(
             Effect.mapError((e) => {
-              const f = e instanceof MergeFailure ? e : MergeFailure.error(reasonText(e));
+              const f = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reasonText(e));
               if (f.kind === "conflict") apply({ type: "conflict", id: current.id, conflict: { base: f.base, files: [...f.files] } });
               const words = notTakenIn(f, current.name, settle);
               return new NotTakenIn({ failure: f, ...words, message: words.owner });

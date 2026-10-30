@@ -3,7 +3,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { Effect, Schema } from "effect";
+import { Effect, Schema, Predicate } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -172,7 +172,7 @@ export class WeixinClient implements WeixinApi {
       const text = yield* res.text;
       if (res.status < 200 || res.status > 299) return yield* failedWith(`${label}: ${res.status}`);
       return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(text.replace(lossless, '"$1"$2:$3"$4"'));
-    }).pipe(Effect.mapError((e) => (e instanceof AppFailed ? e : failedWith(label + ": " + e.message))));
+    }).pipe(Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(label + ": " + e.message))));
   }
 
   private post<T>(label: string, url: string, body: unknown, token: string, schema: Schema.Codec<T>) {

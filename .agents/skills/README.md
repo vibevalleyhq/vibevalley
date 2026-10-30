@@ -12,4 +12,5 @@
 | [vv-comments](.agents/skills/vv-comments/SKILL.md) | 写完代码提 PR 前；主人要清一块代码里的注释 | 留下的每条注释都是删了会让人写错的：模型初审、逐条对着代码核实过，删的删、改名的改名、改短的改短，模型判错的列出理由 |
 | [vv-simplify](.agents/skills/vv-simplify/SKILL.md) | 想找一块代码里能简化的地方 | 一份核实过、排好序的清单：每处删掉什么、调用方少知道什么、靠哪个测试证明没变坏；主人点了再改 |
 | [vv-governance](.agents/skills/vv-governance/SKILL.md) | 要加一条规矩或一个检查；评审一块代码有没有在变坏；写计划前问清边界；做纯重构；一次机械的改动跨很多文件；主人提到白皮书、治理、五层金字塔、十条铁律 | 新检查用了最便宜的手段、失败时说得出怎么改；评审按六种病逐条查过；《AI 智能体时代的软件维护与工程治理白皮书》的每个要点在这里已有、已做、以后做还是不做，同目录的 `whitepaper.md` 逐条对照 |
+| [vv-effect](.agents/skills/vv-effect/SKILL.md) | 写、改、评审用到 Effect 的代码；`effect:check` 或 `vp check` 报了 `effecttsgo` 的诊断；不确定一个 API 在 v4 叫什么 | 照官方指南（`node_modules/effect/AGENTS.md`）和本仓库的约定写：服务、库、文件、时间、Promise 的交界、错误、命名、测试；评审时查出检查看不到的（错误的原因丢了、该说的错误变成了缺陷、fiber 不归服务的作用域） |
 | [effect-ts](.agents/skills/effect-ts/SKILL.md) | 给一个用 Effect 的仓库做准备：装 `effect`、在 AGENTS.md 里指到它自带的 `AGENTS.md` 和源码（照抄自 [Effect-TS/skills](https://github.com/Effect-TS/skills/tree/main/skills/effect-ts)，不改） | 写 Effect 的 agent 先读 Effect 自己的指南，再查 `node_modules/effect/src` |

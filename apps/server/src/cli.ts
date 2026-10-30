@@ -8,7 +8,7 @@
 //	node --import tsx src/cli.ts issue list
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
+import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio, Predicate } from "effect";
 
 import "./cli/locale.ts";
 
@@ -105,9 +105,9 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
     Effect.provideService(Console.Console, console_),
     Effect.andThen(flush(out)),
     Effect.as(exit.ok as number),
-    Effect.catch((e: unknown) => {
+    Effect.catch((e) => {
       if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.as(flush(out), exit.ok as number);
-      const f = e instanceof Failure ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
+      const f = Predicate.isTagged(e, "Failure") ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
       return flush(err).pipe(Effect.andThen(printFailure(f)), Effect.as(f.code));
     }),
   );

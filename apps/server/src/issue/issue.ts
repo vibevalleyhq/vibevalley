@@ -673,10 +673,10 @@ const make = (options: IssueOptions = {}) =>
     /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
     const commitsOf = (issue: Issue) =>
       issue.project
-        ? Effect.map(
-            projects.branchChanges(issue.project, issueBranch(issue.number)).pipe(Effect.mapError((e) => refused(e.message))),
-            (c) => c?.commits.length ?? 0,
-          )
+        ? Effect.mapBoth(projects.branchChanges(issue.project, issueBranch(issue.number)), {
+            onFailure: (e) => refused(e.message),
+            onSuccess: (c) => c?.commits.length ?? 0,
+          })
         : Effect.succeed(0);
 
     /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything

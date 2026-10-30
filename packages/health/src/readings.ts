@@ -100,7 +100,7 @@ export interface Escapes {
   readonly lintOff: number;
   /** Effect.orDie, Effect.orDieWith: an error the type declares is turned into a defect, out of the error channel. */
   readonly orDie: number;
-  /** Effect.ignore, Effect.ignoreCause: an error is dropped, and nobody hears of it. */
+  /** Effect.ignore, Effect.ignoreCause without { log }: an error is dropped, and nobody hears of it. */
   readonly ignored: number;
   /** An empty catch {}, or a promise's .catch(() => {}) that returns nothing: the error is swallowed. */
   readonly swallowed: number;
@@ -115,7 +115,7 @@ export const escapeAdvice: Record<keyof Escapes, string> = {
   cast: "decode or narrow the value; a type the checker should infer is fixed where it is made, not where it is read",
   lintOff: "write it the way the rule asks; its message says how",
   orDie: "keep the error in the channel (declare it, or catchTag it where it can be answered) instead of turning it into a defect",
-  ignored: "answer the error where it is known (catchTag) or log it with Effect.ignoreLogged, so a failure is seen",
+  ignored: 'answer the error where it is known (catchTag), or keep going with the failure logged: Effect.ignore({ log: "Warn" })',
   swallowed: "handle the error, or log it and say at the catch why it is safe to go on",
 };
 
@@ -139,6 +139,8 @@ export function escapesIn(path: string, text: string): Escapes {
   let orDie = 0;
   let ignored = 0;
   let swallowed = 0;
+  // An ignore given { log } logs the failure it drops, so it is no escape: counted here and taken off below.
+  let logged = 0;
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) return value.forEach(visit);
     if (typeof value !== "object" || value === null) return;
@@ -159,6 +161,15 @@ export function escapesIn(path: string, text: string): Escapes {
     if (node.type === "CatchClause" && isEmpty({ body: node.body })) swallowed++;
     if (node.type === "CallExpression") {
       const callee = nodeOf(node.callee);
+      const ignoring =
+        callee.type === "MemberExpression" &&
+        nodeOf(callee.object).name === "Effect" &&
+        ["ignore", "ignoreCause"].includes(String(nodeOf(callee.property).name));
+      const args = Array.isArray(node.arguments) ? node.arguments.map(nodeOf) : [];
+      const withLog = args.some(
+        (a) => a.type === "ObjectExpression" && Array.isArray(a.properties) && a.properties.map(nodeOf).some((p) => nodeOf(p.key).name === "log"),
+      );
+      if (ignoring && withLog) logged++;
       const [handler] = Array.isArray(node.arguments) ? node.arguments.map(nodeOf) : [];
       const isFunction = handler?.type === "ArrowFunctionExpression" || handler?.type === "FunctionExpression";
       if (callee.type === "MemberExpression" && nodeOf(callee.property).name === "catch" && handler && isFunction && isEmpty(handler)) swallowed++;
@@ -167,7 +178,7 @@ export function escapesIn(path: string, text: string): Escapes {
   };
   visit(parsed.program);
   const lintOff = parsed.comments.filter((c) => /^\s*(?:oxlint|eslint)-disable/u.test(c.value)).length;
-  return { nonNull, doubleCast, cast, lintOff, orDie, ignored, swallowed };
+  return { nonNull, doubleCast, cast, lintOff, orDie, ignored: ignored - logged, swallowed };
 }
 
 /** The escapes of the counted sources, summed by area, areas in order. */

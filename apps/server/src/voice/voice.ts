@@ -339,7 +339,7 @@ export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
   /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
-  readonly tunnel?: (port: number) => Effect.Effect<Tunnel, unknown>;
+  readonly tunnel?: (port: number) => Effect.Effect<Tunnel, LineFailed>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
   /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
@@ -511,7 +511,7 @@ const make = (options: VoiceOptions = {}) =>
       return opening.withPermits(1)(
         Effect.gen(function* () {
           if (tunnel) return tunnel.url;
-          const item = yield* openTunnel(linePort).pipe(Effect.mapError((e) => (e instanceof LineFailed ? e : new LineFailed({ message: messageOf(e) }))));
+          const item = yield* openTunnel(linePort);
           if (stopped) {
             item.close();
             return yield* lineClosed();
@@ -811,7 +811,11 @@ const make = (options: VoiceOptions = {}) =>
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
-        if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""));
+        if (call.quick && text.trim() !== call.greeting)
+          yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""), {
+            log: "Warn",
+            message: "vibevalley: voice: the orchestrator's spoken words were not kept",
+          });
       }),
       verifyMoss: Effect.fn("Voice.verifyMoss")(function* (given) {
         const key = given.trim() || settings.mossKey();

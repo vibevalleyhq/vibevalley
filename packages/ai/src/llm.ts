@@ -92,7 +92,7 @@ export const make = Effect.gen(function* () {
             if (data === undefined) return Effect.succeed([] as AssistantMessageEvent[]);
             return Effect.try({ try: () => JSON.parse(data) as unknown, catch: () => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`) }).pipe(
               Effect.flatMap((chunk) => {
-                const error: unknown = typeof chunk === "object" && chunk !== null && "error" in chunk ? chunk.error : undefined;
+                const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
                 return error !== undefined && error !== null
                   ? Effect.fail(
                       failed(

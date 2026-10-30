@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Context, Data, Effect, Layer, Schema } from "effect";
+import { Context, Data, Effect, Layer, Predicate, Schema } from "effect";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
@@ -194,7 +194,7 @@ const make = Effect.gen(function* () {
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
-    if (typeof next.voice === "object" && next.voice !== null && Object.keys(next.voice).length === 0) next.voice = undefined;
+    if (Predicate.isObject(next.voice) && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
     yield* Effect.try({

@@ -95,8 +95,11 @@ describe("the database", () => {
 /** Where a failed query is a value, not a defect (Db.attempt), and why. */
 const attempting: Readonly<Record<string, string>> = {
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
+  "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
   "memory/memories.ts": "a memory read or write that fails is logged and taken as none",
+  "session/session.ts": "a session's record or run that is not kept is logged or told as NotRecorded, and the run goes on",
+  "task/task.ts": "a task graph event that is not kept is logged, and the graph goes on",
 };
 
 it("attempt is used only where a failed query is told or retried, each with its reason", () => {

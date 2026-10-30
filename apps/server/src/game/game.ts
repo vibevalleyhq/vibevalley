@@ -56,10 +56,10 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const core = yield* Core;
   const projects = yield* Projects;
-  const { attempt: db } = yield* Db;
+  const { attempt: db, run } = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.
-  const rows = yield* Effect.orDie(db(q.ledgerEntries()));
+  const rows = yield* run(q.ledgerEntries());
   const entries: LedgerEntry[] = [];
   for (const row of rows) {
     const fields = payloadOf(row.payload);

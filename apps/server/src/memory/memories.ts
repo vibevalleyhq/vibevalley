@@ -58,7 +58,7 @@ const recutBatch = 100;
 export const makeMemories = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const sql = yield* SqlClient.SqlClient;
-  const { attempt: db } = yield* Db;
+  const { attempt: db, run } = yield* Db;
 
   const list = (agent: string) =>
     db(
@@ -197,7 +197,7 @@ export const makeMemories = Effect.gen(function* () {
     } satisfies Memory;
   });
 
-  const forget = (agent: string, id: string) => db(q.forget({ agent, id })).pipe(Effect.orDie);
+  const forget = (agent: string, id: string) => run(q.forget({ agent, id }));
 
   /** Cuts again what an older termsVersion cut, a batch at a time: the terms are an index derived from the body. */
   const recutTerms = Effect.gen(function* () {

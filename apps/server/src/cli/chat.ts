@@ -9,7 +9,7 @@ import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
-import { Clock, Data, Effect, FiberHandle, Option, Queue, Stream } from "effect";
+import { Clock, Data, Effect, FiberHandle, Option, Predicate, Queue, Stream } from "effect";
 
 import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { Brain, type BrainEvent, standaloneOwner } from "@vibevalley/agent/brain";
@@ -236,9 +236,8 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
           { cursor: { sessionId: session.id, afterSeq: -1 } },
         );
         const said = (r: unknown, words: "rejected" | "notSent") => {
-          const refused = typeof r === "object" && r !== null ? r : {};
-          const why = "reason" in refused && typeof refused.reason === "string" ? refused.reason : "";
-          if ("kind" in refused && refused.kind === "rejected") console.log(dim(t(`server.cli.chat.${words}`, { why })));
+          const why = Predicate.hasProperty(r, "reason") && typeof r.reason === "string" ? r.reason : "";
+          if (Predicate.hasProperty(r, "kind") && r.kind === "rejected") console.log(dim(t(`server.cli.chat.${words}`, { why })));
         };
         // One turn at a time: a line typed while it runs is steered into it or queued after it. Interrupting the turn's
         // fiber aborts the prompt (its signal).

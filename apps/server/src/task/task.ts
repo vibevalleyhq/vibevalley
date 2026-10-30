@@ -1,7 +1,7 @@
 // Everything here runs one at a time.
 
-import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient, SqlError } from "effect/sql";
+import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream, Predicate } from "effect";
+import { SqlError } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
 import type {
@@ -38,7 +38,7 @@ import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
 import { sessionOf } from "@/session/roster.ts";
-import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
+import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
 
 import * as q from "../../db/generated/task_event.sql.ts";
 import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
@@ -187,8 +187,7 @@ export const make = (options: TaskOptions = {}) =>
       handOver: live.handOver,
     };
     const projects: TaskGit = options.git ?? (yield* Projects);
-    const sql = yield* SqlClient.SqlClient;
-    const { run: db } = yield* Db;
+    const { run: db, attempt } = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
     const newsHub = yield* scopedPubSub<string>();
@@ -221,7 +220,7 @@ export const make = (options: TaskOptions = {}) =>
             ...(c.changes && c.changes.length > 0 ? { changes: c.changes } : {}),
             ...(c.commits && c.commits.length > 0 ? { commits: c.commits } : {}),
           };
-          return Effect.provideService(
+          return attempt(
             q.addGraphEvent({
               id: newId(),
               graph_id: c.graph,
@@ -231,8 +230,6 @@ export const make = (options: TaskOptions = {}) =>
               payload: JSON.stringify(payload),
               created_at: clock.currentTimeMillisUnsafe(),
             }),
-            SqlClient.SqlClient,
-            sql,
           ).pipe(Effect.catch((e) => Effect.logWarning(`vibevalley: a task graph event was not kept: ${String(e)}`)));
         },
         { discard: true },
@@ -393,7 +390,7 @@ export const make = (options: TaskOptions = {}) =>
         const f = merged.failure;
         // A failed check or a conflict sends the helper back to fix it (a conflict: it merges the graph's branch into its
         // own); then this runs again.
-        if (f instanceof NotTakenIn) return yield* f.fix ? sendBack(graph, task, sessionId, f.fix, f.short) : taskFailed(graph, task, f.short);
+        if (Predicate.isTagged(f, "NotTakenIn")) return yield* f.fix ? sendBack(graph, task, sessionId, f.fix, f.short) : taskFailed(graph, task, f.short);
         return yield* taskFailed(graph, task, reasonOf(f));
       }
       let next = withTask(graph, task.id, (n) => ({

@@ -53,7 +53,7 @@ import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
+import { type ApiError, errnoOf, refused, lookIn, messageOf as errorText, missing, Inconsistent } from "@/errors.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qa from "../../db/generated/channel_attachment.sql.ts";
@@ -1335,12 +1335,12 @@ const make = Effect.gen(function* () {
 
   /** One message changed, in one transaction with the channel's next revision; then it goes to whoever follows its
    * channel as it now is. A change is not news: no fact, no delivery, no wake. */
-  const change = Effect.fnUntraced(function* (row: MsgRow, work: (revision: number, now: number) => Effect.Effect<void, unknown>) {
+  const change = Effect.fnUntraced(function* (row: MsgRow, work: (revision: number, now: number) => Effect.Effect<void>) {
     const now = yield* Clock.currentTimeMillis;
     yield* tx(
       Effect.gen(function* () {
         const { revision } = yield* db(qc.bumpRevision({ id: row.channel_id }));
-        yield* Effect.orDie(work(revision, now));
+        yield* work(revision, now);
       }),
     );
     const message = toMessage((yield* one(qm.messageByID({ id: row.id })))!);
@@ -1554,13 +1554,16 @@ const make = Effect.gen(function* () {
         if (bytes.length === 0) return yield* Effect.fail(refused(t("server.channel.emptyFile")));
         if (bytes.length > attachmentMax) return yield* Effect.fail(refused(t("server.channel.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) })));
         const id = createHash("sha256").update(bytes).digest("hex");
-        yield* Effect.tryPromise(async () => {
-          await mkdir(filesDir, { recursive: true });
-          // The same bytes are the same file: a second upload leaves the first.
-          await writeFile(filesAt(id), bytes, { flag: "wx" }).catch((e: NodeJS.ErrnoException) => {
-            if (e.code !== "EEXIST") throw e;
-          });
-        }).pipe(Effect.mapError((e) => refused(String(e))));
+        yield* Effect.tryPromise({
+          try: async () => {
+            await mkdir(filesDir, { recursive: true });
+            // The same bytes are the same file: a second upload leaves the first.
+            await writeFile(filesAt(id), bytes, { flag: "wx" }).catch((e: unknown) => {
+              if (errnoOf(e) !== "EEXIST") throw e;
+            });
+          },
+          catch: (e) => refused(errorText(e)),
+        });
         const type = upload.type.trim() || "application/octet-stream";
         yield* db(qa.insertAttachment({ id, name, type, size: bytes.length, created_at: yield* Clock.currentTimeMillis }));
         return { id, name, type, size: bytes.length };

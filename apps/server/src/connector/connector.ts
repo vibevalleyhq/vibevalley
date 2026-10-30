@@ -10,7 +10,24 @@
 
 import { createHash, randomInt } from "node:crypto";
 
-import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  Data,
+  Deferred,
+  Duration,
+  Effect,
+  Fiber,
+  FiberSet,
+  Layer,
+  Option,
+  Schedule,
+  Schema,
+  Semaphore,
+  Stream,
+  Predicate,
+} from "effect";
 import { HttpClient } from "effect/http";
 import { SqlClient } from "effect/sql";
 
@@ -30,7 +47,7 @@ import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
-import { type Adapter, AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
+import { type Adapter, type AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
@@ -373,7 +390,10 @@ const make = (options: ConnectorOptions = {}) =>
           );
           // Told once the owner has the word: the status is not paired before the app's confirmation went out.
           yield* reloadAccount;
-          yield* Effect.ignore(adapter.send(a.secrets, m.from, t("server.connector.paired"), m.reply));
+          yield* Effect.ignore(adapter.send(a.secrets, m.from, t("server.connector.paired"), m.reply), {
+            log: "Warn",
+            message: `vibevalley: ${id}: the pairing confirmation was not sent`,
+          });
           told();
           return;
         }
@@ -464,7 +484,7 @@ const make = (options: ConnectorOptions = {}) =>
           }
           const stopped = yield* receive(a.secrets).pipe(
             Effect.as(failedWith(t("server.connector.stopped"))),
-            Effect.catch((e) => Effect.succeed(e instanceof AppFailed ? e : failedWith(e.message))),
+            Effect.catch((e) => Effect.succeed(Predicate.isTagged(e, "AppFailed") ? e : failedWith(e.message))),
           );
           if (stopped.kind === "stale") {
             if (!(yield* pause)) yield* Effect.sleep(Math.min(30_000, retryMost));
@@ -482,7 +502,7 @@ const make = (options: ConnectorOptions = {}) =>
       });
 
       /** Starts work as the account's generation, on the service's fibers: a failure is logged, an interruption is the stop. */
-      const generation = (work: Effect.Effect<unknown, unknown>) =>
+      const generation = <A, E>(work: Effect.Effect<A, E>) =>
         forkHere(
           work.pipe(
             Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.void : Effect.logError(`vibevalley: ${id}: ${Cause.pretty(cause)}`))),
@@ -505,8 +525,8 @@ const make = (options: ConnectorOptions = {}) =>
           Effect.gen(function* () {
             if (g !== current) return;
             yield* stopGeneration;
-            let failure = result instanceof AppFailed ? result.message : undefined;
-            if (!(result instanceof AppFailed) && !closing) {
+            let failure = Predicate.isTagged(result, "AppFailed") ? result.message : undefined;
+            if (!Predicate.isTagged(result, "AppFailed") && !closing) {
               const linked = result;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
               const at = yield* Clock.currentTimeMillis;

@@ -4,6 +4,8 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+import { Predicate } from "effect";
+
 import type { BrainMessage, CompactionSummaryMessage } from "./messages.ts";
 
 export function applySummary(messages: readonly BrainMessage[], summary: CompactionSummaryMessage): BrainMessage[] {
@@ -27,7 +29,7 @@ function parseLines(text: string): BrainMessage[] {
       const m: unknown = JSON.parse(line);
       // A line cut off by a crash: the rest still reads.
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a line this file wrote: a whole one is a BrainMessage
-      if (typeof m === "object" && m !== null && "role" in m && typeof m.role === "string") out.push(m as BrainMessage);
+      if (Predicate.hasProperty(m, "role") && typeof m.role === "string") out.push(m as BrainMessage);
     } catch {
       continue;
     }

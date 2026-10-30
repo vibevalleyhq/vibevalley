@@ -466,7 +466,7 @@ const make = (options: OrchestratorOptions = {}) =>
         if (model !== orchestratorModel) return undefined;
         if (on === "api") return (text, signal) => answer(lineWords.owner(text), signal);
         return (text, signal) => {
-          forkHere(Effect.ignore(chat.spoken(ownerId, text, "")));
+          forkHere(Effect.ignore(chat.spoken(ownerId, text, ""), { log: "Warn", message: "vibevalley: voice: the owner's spoken words were not kept" }));
           return answer(voiceNote + "\n" + lineWords.owner(text), signal);
         };
       },

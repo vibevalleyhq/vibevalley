@@ -149,10 +149,10 @@ export function nowledge(c: MemorySourceConfig): Source {
     if (q !== "") args.query = q;
     if (!everything) args.filter_labels = agent ? label("agent", agent) : app;
     const text = yield* call("memory_search", args);
-    return yield* Effect.mapError(
-      Schema.decodeEffect(SearchResponse)(text),
-      () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
-    ).pipe(Effect.map((r): Hit[] => r.results ?? []));
+    return yield* Effect.mapBoth(Schema.decodeEffect(SearchResponse)(text), {
+      onFailure: () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
+      onSuccess: (r): Hit[] => r.results ?? [],
+    });
   });
 
   const add = Effect.fnUntraced(function* (agent: string, text: string, project: string) {

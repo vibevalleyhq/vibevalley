@@ -10,7 +10,7 @@
 import { lstatSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
+import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime, Predicate } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -334,7 +334,7 @@ const make = (hooks: ProjectHooks = {}) =>
         }
         return path;
       },
-      Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError({ message: reason(e) }))),
+      Effect.mapError((e) => (Predicate.isTagged(e, "ProjectError") ? e : new ProjectError({ message: reason(e) }))),
     );
 
     const list = Effect.fn("Projects.list")(function* () {
@@ -490,7 +490,7 @@ const make = (hooks: ProjectHooks = {}) =>
       return { main, ahead };
     });
 
-    const toMergeFailure = <A, R>(e: Effect.Effect<A, unknown, R>) => Effect.mapError(e, failed);
+    const toMergeFailure = <A, E, R>(e: Effect.Effect<A, E, R>) => Effect.mapError(e, failed);
 
     const shape = Projects.of({
       root,
@@ -876,9 +876,10 @@ const make = (hooks: ProjectHooks = {}) =>
             // Recover a creation whose receipt was lost before it was saved.
             const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
             if (!listed.ok) return yield* fail(t("server.project.github.listFailed"));
-            const existing = yield* Effect.try({ try: () => openPullRequests(listed.out), catch: messageOf }).pipe(
-              Effect.catch(() => fail(t("server.project.github.listUnread"))),
-            );
+            const existing = yield* Effect.try({
+              try: () => openPullRequests(listed.out),
+              catch: () => new ProjectError({ message: t("server.project.github.listUnread") }),
+            });
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
             const check = lexists(join(place.cwd, ".vibevalley/check")) ? t("server.project.github.checked") : t("server.project.github.noCheck");
             // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
@@ -912,9 +913,10 @@ const make = (hooks: ProjectHooks = {}) =>
         if (repo === "") return yield* fail(t("server.project.github.notGithub"));
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
         if (!viewed.ok) return yield* fail(t("server.project.github.viewFailed", { n }));
-        const result = yield* Effect.try({ try: () => pullRequestView(viewed.out), catch: messageOf }).pipe(
-          Effect.catch(() => fail(t("server.project.github.stateUnread", { n }))),
-        );
+        const result = yield* Effect.try({
+          try: () => pullRequestView(viewed.out),
+          catch: () => new ProjectError({ message: t("server.project.github.stateUnread", { n }) }),
+        });
         if (result.mergedAt || result.state === "MERGED") return "merged" as const;
         if (result.state === "OPEN") return "open" as const;
         if (result.state === "CLOSED") return "closed" as const;

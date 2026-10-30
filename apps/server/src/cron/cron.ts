@@ -3,7 +3,6 @@
 // is published for the orchestrator, who does it.
 
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
@@ -69,8 +68,7 @@ const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agents;
   const chat = yield* Channels;
-  const sql = yield* SqlClient.SqlClient;
-  const { run: db } = yield* Db;
+  const { run: db, attempt } = yield* Db;
   // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
   const clock = yield* Clock.Clock;
   const now = () => clock.currentTimeMillisUnsafe();
@@ -113,9 +111,7 @@ const make = Effect.gen(function* () {
       for (const s of dueCrons(core.state().crons, at)) {
         const missed = isMissed(s, at);
         const after = afterRun(s, at);
-        const written = yield* Effect.result(
-          Effect.provideService(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id }), SqlClient.SqlClient, sql),
-        );
+        const written = yield* Effect.result(attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })));
         if (written._tag === "Failure") {
           const failure = written.failure;
           yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`);

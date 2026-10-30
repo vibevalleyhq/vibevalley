@@ -5,7 +5,7 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
-import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Data, Effect, Layer, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -105,7 +105,7 @@ const named = ["id", "agent", "assignee", "session", "project", "name", "title",
 export function toolStart(name: string, args: unknown): ToolStart {
   let about = "";
   for (const k of named) {
-    const v: unknown = typeof args === "object" && args !== null ? Reflect.get(args, k) : undefined;
+    const v: unknown = Predicate.hasProperty(args, k) ? args[k] : undefined;
     if (typeof v === "string" && v.trim() !== "") {
       about = v;
       break;
