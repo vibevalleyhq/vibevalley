@@ -32,7 +32,7 @@ import {
   Stream,
   Metric,
 } from "effect";
-import { type SqlClient, SqlError } from "effect/sql";
+import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -1161,7 +1161,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             Effect.gen(function* () {
               if (opt.hiring) yield* opt.hiring(session);
               return yield* logOf(session);
-            }).pipe(Effect.catchDefect((e) => (SqlError.isSqlError(e) ? Effect.fail(e) : Effect.die(e)))),
+            }),
           ).pipe(Effect.onError((cause) => failedOpening(opened.session, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(cause) }))));
           if (registered._tag === "Failure") {
             const failed = yield* failedOpening(

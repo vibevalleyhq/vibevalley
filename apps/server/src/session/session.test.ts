@@ -21,7 +21,7 @@ import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import { Sessions, type SessionsInside, watchStalls } from "./session.ts";
+import { NotRecorded, Sessions, type SessionsInside, watchStalls } from "./session.ts";
 const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
@@ -389,7 +389,7 @@ describe("sessions", () => {
       const sql = yield* SqlClient.SqlClient;
       const got = yield* sessions.send(lab(), "another", "demo", {
         issue: { id: issueId("i2"), number: 2 },
-        hiring: () => Effect.orDie(sql.unsafe("select no_such_column from issue_session")),
+        hiring: () => Effect.mapError(sql.unsafe("select no_such_column from issue_session"), (cause) => new NotRecorded({ message: cause.message, cause })),
       });
       expect(got.refused).toContain("工单没记下来");
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));

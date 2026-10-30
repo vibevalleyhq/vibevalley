@@ -55,6 +55,12 @@
  *   globalThis or self, and Object.assign or Object.defineProperty onto them; declare global outside a door is too
  *   (vite.config.ts lists the doors).
  *
+ *   db-door: the server reaches the database through the Db service (apps/server/src/base/db.ts), which says what a
+ *   failed query becomes: run and inTx make it a defect, attempt and attemptTx keep it for a caller that tells or retries
+ *   it. A module that takes the SqlClient itself, or opens its own withTransaction, decides that again by hand, and
+ *   the usual way back is to die and catchDefect the SqlError. A type-only import (a query's SqlClient requirement in a
+ *   signature) touches no client and is not reported; vite.config.ts says where the rule runs.
+ *
  *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
  *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
  *   and moving a file does not change what its imports say. Siblings and children stay ./x.
@@ -515,6 +521,39 @@ const globalDoors = defineRule({
   },
 });
 
+const dbDoor = defineRule({
+  meta: {
+    messages: {
+      client: says(
+        "a module that takes the SqlClient itself decides again what a failed query becomes, outside the Db service",
+        '`const { run, attempt, one, inTx, attemptTx } = yield* Db` and pass the generated query to it (`run(q.x(…))`); a type in a signature is `import type { SqlClient } from "effect/sql"`',
+        "apps/server/src/base/db.ts",
+      ),
+      transaction: says(
+        "a withTransaction of its own leaves the database's failure for each module to turn into a defect or a refusal by hand",
+        '`inTx(work)` when a failure is a bug, `attemptTx(work)` when it is told to the owner or retried (`.pipe(Effect.catchTag("SqlError", …))`)',
+        "apps/server/src/base/db.ts",
+      ),
+    },
+  },
+  create(context) {
+    if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/base/db.ts")) return {};
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "effect/sql" || node.importKind === "type") return;
+        for (const s of node.specifiers)
+          if (s.type === "ImportSpecifier" && s.importKind !== "type" && s.imported.type === "Identifier" && s.imported.name === "SqlClient")
+            context.report({ node: s, messageId: "client" });
+      },
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type === "MemberExpression" && c.property.type === "Identifier" && c.property.name === "withTransaction")
+          context.report({ node, messageId: "transaction" });
+      },
+    };
+  },
+});
+
 const parentImportRule = defineRule({
   meta: {
     messages: {
@@ -561,6 +600,7 @@ export default definePlugin({
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
+    "db-door": dbDoor,
     "promise-boundary": promiseBoundary,
     "one-absent": oneAbsent,
     "global-doors": globalDoors,

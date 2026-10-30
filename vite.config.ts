@@ -448,6 +448,12 @@ export default defineConfig({
         rules: { "vibevalley/one-absent": "off" },
       },
       {
+        // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/db-door": "error" },
+      },
+      {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).
         files: ["apps/web/src/**", "apps/server/src/**"],
         rules: { "vibevalley/parent-import": "error" },

@@ -1,7 +1,6 @@
 // Everything here runs one at a time.
 
 import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream, Predicate } from "effect";
-import { SqlError } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
 import type {
@@ -239,11 +238,7 @@ export const make = (options: TaskOptions = {}) =>
       const before = get(graph.id);
       yield* issues
         .putTask(graph)
-        .pipe(
-          Effect.catchDefect((d) =>
-            SqlError.isSqlError(d) ? Effect.fail(refused(t("server.task.notSaved", { title: graph.title, why: causeMessage(d) }))) : Effect.die(d),
-          ),
-        );
+        .pipe(Effect.catchTag("SqlError", (e) => Effect.fail(refused(t("server.task.notSaved", { title: graph.title, why: causeMessage(e) })))));
       yield* record(before, graph, by.kind, why);
     });
 

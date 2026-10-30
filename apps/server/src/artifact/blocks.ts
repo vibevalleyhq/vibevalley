@@ -3,7 +3,6 @@
 // its seq goes up in order. Part of Artifacts (artifact.ts), which owns the artifact's row.
 
 import { Clock, Effect, Option, Schema, Semaphore } from "effect";
-import { SqlClient } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
 import type {
@@ -110,8 +109,7 @@ export interface BlocksOptions {
 /** found: the artifact's row, failing when there is none or it is not a blocks one. */
 export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResult, ApiError>, options: BlocksOptions = {}) =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    const { run: db } = yield* Db;
+    const { run: db, inTx } = yield* Db;
     const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
     const tick = options.tickMs ?? 1000;
@@ -139,82 +137,80 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
     /** One batch, under the lock the caller holds. */
     const submitLocked = (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">): Effect.Effect<BlockAck, ApiError> => {
       if (!body.batchId.trim()) return Effect.fail(refused(t("server.artifact.noBatch")));
-      return sql
-        .withTransaction(
-          Effect.gen(function* () {
-            const row = yield* found(id);
-            const seen = yield* db(Effect.catchNoSuchElement(qc.artifactChangeByBatch({ batch_id: body.batchId })));
-            if (Option.isSome(seen)) return yield* again(id, seen.value);
-            const now = yield* Clock.currentTimeMillis;
-            const p = new Page(id, actor, now, yield* blocksOf(id));
-            // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
-            const revisions = new Map<string, TextSpan[]>();
-            for (const op of body.ops) {
-              if (op.op !== "update_text" && op.op !== "split_block") continue;
-              const b = p.find(op.blockId);
-              if (!b || op.baseRev > b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
-              // An earlier op in this batch can advance rev without changing this text.
-              if (op.baseRev === b.rev) {
-                revisions.set(`${b.id}@${op.baseRev}`, b.text);
-                continue;
-              }
-              const raw = yield* db(Effect.catchNoSuchElement(qr.artifactBlockRevision({ block_id: b.id, rev: op.baseRev })));
-              if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
+      return inTx(
+        Effect.gen(function* () {
+          const row = yield* found(id);
+          const seen = yield* db(Effect.catchNoSuchElement(qc.artifactChangeByBatch({ batch_id: body.batchId })));
+          if (Option.isSome(seen)) return yield* again(id, seen.value);
+          const now = yield* Clock.currentTimeMillis;
+          const p = new Page(id, actor, now, yield* blocksOf(id));
+          // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
+          const revisions = new Map<string, TextSpan[]>();
+          for (const op of body.ops) {
+            if (op.op !== "update_text" && op.op !== "split_block") continue;
+            const b = p.find(op.blockId);
+            if (!b || op.baseRev > b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
+            // An earlier op in this batch can advance rev without changing this text.
+            if (op.baseRev === b.rev) {
+              revisions.set(`${b.id}@${op.baseRev}`, b.text);
+              continue;
             }
-            const taken = new Set<string>();
-            for (const op of body.ops) {
-              const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
-              if (fresh && Option.isSome(yield* db(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
-            }
-            p.base = (block, rev) => revisions.get(`${block}@${rev}`);
-            p.taken = (block) => taken.has(block);
-            const results = body.ops.map((op) => p.apply(op));
-            const changed = p.changedBlocks();
-            for (const b of changed)
-              yield* db(
-                qb.putArtifactBlock({
-                  id: b.id,
-                  artifact_id: id,
-                  parent_id: b.parentId ?? null,
-                  order_key: b.orderKey,
-                  type: b.type,
-                  attrs: JSON.stringify(b.attrs),
-                  spans: JSON.stringify(b.text),
-                  rev: b.rev,
-                  deleted: !(b.deleted !== true),
-                  updated_by: b.updatedBy,
-                  updated_at: b.updated,
-                }),
-              );
-            for (const r of p.revisions)
-              yield* db(
-                qr.addArtifactBlockRevision({
-                  id: newId(),
-                  block_id: r.block,
-                  rev: r.rev,
-                  spans: JSON.stringify(r.spans),
-                  actor,
-                  kind: r.kind,
-                  created_at: now,
-                }),
-              );
-            const seq = row.seq + 1;
+            const raw = yield* db(Effect.catchNoSuchElement(qr.artifactBlockRevision({ block_id: b.id, rev: op.baseRev })));
+            if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
+          }
+          const taken = new Set<string>();
+          for (const op of body.ops) {
+            const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
+            if (fresh && Option.isSome(yield* db(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
+          }
+          p.base = (block, rev) => revisions.get(`${block}@${rev}`);
+          p.taken = (block) => taken.has(block);
+          const results = body.ops.map((op) => p.apply(op));
+          const changed = p.changedBlocks();
+          for (const b of changed)
             yield* db(
-              qc.addArtifactChange({
+              qb.putArtifactBlock({
+                id: b.id,
                 artifact_id: id,
-                seq,
-                batch_id: body.batchId,
+                parent_id: b.parentId ?? null,
+                order_key: b.orderKey,
+                type: b.type,
+                attrs: JSON.stringify(b.attrs),
+                spans: JSON.stringify(b.text),
+                rev: b.rev,
+                deleted: !(b.deleted !== true),
+                updated_by: b.updatedBy,
+                updated_at: b.updated,
+              }),
+            );
+          for (const r of p.revisions)
+            yield* db(
+              qr.addArtifactBlockRevision({
+                id: newId(),
+                block_id: r.block,
+                rev: r.rev,
+                spans: JSON.stringify(r.spans),
                 actor,
-                block_ids: JSON.stringify(p.changed),
-                results: JSON.stringify(results),
+                kind: r.kind,
                 created_at: now,
               }),
             );
-            yield* db(qa.artifactAccepted({ id, seq, updated_at: now }));
-            return { batchId: body.batchId, seq, results, blocks: changed };
-          }),
-        )
-        .pipe(Effect.catchTag("SqlError", Effect.die));
+          const seq = row.seq + 1;
+          yield* db(
+            qc.addArtifactChange({
+              artifact_id: id,
+              seq,
+              batch_id: body.batchId,
+              actor,
+              block_ids: JSON.stringify(p.changed),
+              results: JSON.stringify(results),
+              created_at: now,
+            }),
+          );
+          yield* db(qa.artifactAccepted({ id, seq, updated_at: now }));
+          return { batchId: body.batchId, seq, results, blocks: changed };
+        }),
+      );
     };
 
     const submit = (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">) => lock.withPermits(1)(submitLocked(id, actor, body));

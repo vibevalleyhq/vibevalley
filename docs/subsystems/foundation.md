@@ -58,7 +58,7 @@
 - **工单和执行的 id 带品牌**：`IssueId`、`SessionId`（protocol 的 `shapes.ts`），线上和库里仍是字符串。从库的行、外来的字符串、新起的 id 变成它们时用 `@vibevalley/protocol/schema` 的 `issueId`、`sessionId`（`Brand.nominal`，不检查），只在知道是哪一种的地方用；提及、参与者这种几种 id 混着走的地方是 `string`，和品牌比较不用转。
 - **定期的后台任务用 `Schedule`**：`x.pipe(Effect.repeat(Schedule.spaced(n)))`，先等一个周期再做的加 `Effect.delay(n)`；不写 `Effect.forever` 加 `Effect.sleep`。等到有事才攒一阵的（核心状态出帧）不是定期，照旧用 `Effect.forever`。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
-- **库经 `Db` 服务用**（`base/db.ts`，`platform` 提供）：`run` 跑生成的查询、失败是缺陷；`attempt` 留着失败给要记日志或说成拒绝的调用方；`one` 取单行，只把 `NoSuchElementError` 折成 `undefined`，`SqlError`、`SchemaError` 照旧是缺陷，不用 `Effect.option` 把它们当成「没有这一行」；`inTx` 包一个事务。模块不各写一份 `provideService(SqlClient)`。
+- **库经 `Db` 服务用**（`base/db.ts`，`platform` 提供）：`run` 跑生成的查询、失败是缺陷；`attempt` 留着失败给要记日志或说成拒绝的调用方；`one` 取单行，只把 `NoSuchElementError` 折成 `undefined`，`SqlError`、`SchemaError` 照旧是缺陷，不用 `Effect.option` 把它们当成「没有这一行」；`inTx` 包一个事务，库的失败是缺陷；`attemptTx` 也包一个事务，留着 `SqlError` 给要说成拒绝的调用方（`catchTag("SqlError", …)`），不先 die 再 `catchDefect` 接回来。模块不各写一份 `provideService(SqlClient)`，也不自己 `withTransaction`（lint `vibevalley/db-door`）。
 - **错误带 `_tag`**：服务自己的错误是 `Data.TaggedError`（`ProjectError`、`MergeFailure`、`GitError`、`NotTakenIn`、`SettingRefused`、`MemoryRefused`、记性来源的 `SourceError`、工具的 `ToolRefusal`、配置的 `ConfigError`），按 `catchTag` 接、能直接 `yield*`，不用 `instanceof` 分；`MergeFailure` 由 `MergeFailure.conflict(base, files)`、`.check(why)`、`.error(why)` 造。只在同步或 Promise 的代码里抛的照旧是 `Error`。
 
 **形状和规则**

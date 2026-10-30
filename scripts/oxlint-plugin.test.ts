@@ -155,6 +155,22 @@ tester.run("promise-boundary", rule("promise-boundary"), {
   ],
 });
 
+tester.run("db-door", rule("db-door"), {
+  valid: [
+    { code: "const { run, attemptTx } = yield* Db;", filename: "/repo/apps/server/src/issue/issue.ts" },
+    { code: 'import type { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/merge.ts" },
+    { code: 'import { type SqlClient, SqlError } from "effect/sql";', filename: "/repo/apps/server/src/session/session.ts" },
+    {
+      code: 'import { SqlClient } from "effect/sql";\nconst t = sql.withTransaction(work);',
+      filename: "/repo/apps/server/src/base/db.ts",
+    },
+  ],
+  invalid: [
+    { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
+    { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/memories.ts", errors: [{ messageId: "transaction" }] },
+  ],
+});
+
 tester.run("one-absent", rule("one-absent"), {
   valid: [
     { code: "let a: string | undefined;", filename: "/repo/apps/server/src/a.ts" },

@@ -21,7 +21,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 |---|---|---|
 | 服务 | `class Issues extends Context.Service<Issues, { … }>()("vibevalley/Issue") { static readonly layer = … }`，`make` 里 `yield*` 用到的服务，用 `Issues.of({ … })` 拼出来；要类型写 `Issues["Service"]` | [AGENTS.md](AGENTS.md#规矩)「服务端的服务」 |
 | layer 的次序 | `apps/server/src/services.ts` 按次序叠，模块只用排在它前面的；开机要做的放在最后的 `start`、`ready` | [architecture.md](docs/architecture.md) |
-| 库 | 经 `Db` 服务（`run`、`attempt`、`one`、`inTx`），模块不自己 `provideService(SqlClient)`；SQL 只写在 `db/queries/<表>.sql` | [地基](docs/subsystems/foundation.md) |
+| 库 | 经 `Db` 服务（`run`、`attempt`、`one`、`inTx`、`attemptTx`），模块不自己 `provideService(SqlClient)`、`withTransaction`（lint `vibevalley/db-door`）；SQL 只写在 `db/queries/<表>.sql` | [地基](docs/subsystems/foundation.md) |
 | 文件、进程、外面的 HTTP | `FileSystem`、`ChildProcessSpawner`、`HttpClient`；不用 `node:fs/promises`、`fetch` | [地基](docs/subsystems/foundation.md) |
 | 时间 | `Clock`、`Effect.sleep`、`TestClock`；类里用它拿到的 `Time`（`apps/server/src/base/time.ts`）；lint `vibevalley/no-wall-clock` | [地基](docs/subsystems/foundation.md) |
 | Promise | 只在外面的库的一次调用上：`Effect.tryPromise({ try: (signal) => lib.call(…, { signal }), catch: (e) => new XError({ cause: e }) })`。不写 `catch` 的形式失败时只剩 `UnknownError`，原因丢了；lint `vibevalley/promise-boundary` | [地基](docs/subsystems/foundation.md) |
@@ -36,7 +36,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 写的时候不用记，撞上了照报错改；报错不懂时看这里对应的那一行。
 
 - **`vp run effect:check`**（`@effect/tsgo` 的语言服务，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）和 **`vp check` 里的 `effecttsgo/*`**（同一张表，`scripts/effect-lint.ts`）：漂着没运行的 Effect、少了 `return yield*`、`yield` 少了 `*`、v3 的旧 API、gen 里的 `try/catch`、Effect 里再 `run*` 一个 Effect、方法签名里漏出的依赖、服务没写成类、`Math.random`、`process.env`、`fetch`……开着哪些、为什么关着哪些，看那张表和[地基](docs/subsystems/foundation.md)的说明。真要在一行上违反一条时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。
-- **`vibevalley/*` lint**：`promise-boundary`（async 和 `new Promise` 只在 `Effect.tryPromise`、`Effect.promise` 里）、`no-wall-clock`、`no-test-sleep`。
+- **`vibevalley/*` lint**：`promise-boundary`（async 和 `new Promise` 只在 `Effect.tryPromise`、`Effect.promise` 里）、`db-door`（`SqlClient`、`withTransaction` 只在 `base/db.ts`）、`no-wall-clock`、`no-test-sleep`。
 - **逃生口的棘轮**：`as`、`!`、关 lint 的注释、`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch`，按区只许减。
 
 ## 4. 评审一段 Effect 代码
@@ -55,4 +55,4 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 ## 5. 还没做的
 
-几处较大的整改（错误通道里的 `unknown`、给 `Db` 一个保留错误类型的事务、服务方法的命名、手写的重试和解码）和以后要加的检查，在[提案](.agents/notes/proposed/architecture/2026-10-31-effect-practices.md)里，各写了什么时候做。改到那一块时先看一眼。
+几处较大的整改（错误通道里的 `unknown`、服务方法的命名、手写的重试和解码）和以后要加的检查，在[提案](.agents/notes/proposed/architecture/2026-10-31-effect-practices.md)里，各写了什么时候做。改到那一块时先看一眼。

@@ -3,7 +3,6 @@
 // stops a run: it is logged, and the run goes on without it.
 
 import { Clock, Data, Effect } from "effect";
-import { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
@@ -57,8 +56,7 @@ const recutBatch = 100;
 
 export const makeMemories = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const sql = yield* SqlClient.SqlClient;
-  const { attempt: db, run } = yield* Db;
+  const { attempt: db, run, attemptTx } = yield* Db;
 
   const list = (agent: string) =>
     db(
@@ -136,33 +134,31 @@ export const makeMemories = Effect.gen(function* () {
   const keep = (run: FinishedRun) =>
     run.outcome === "interrupted"
       ? Effect.void
-      : sql
-          .withTransaction(
-            Effect.gen(function* () {
-              const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
-              for (const note of memoryNotesOf(run.said)) {
-                const project = note.everywhere ? undefined : run.project;
-                if (!memoryIsNewNote(known, note.text, project)) continue;
-                yield* insertNote(run.agent, note.text, project, run.session, "session");
-                known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
-              }
-              const job = memoryJobText(run.job, run.summary, run.outcome);
-              yield* db(
-                q.keepJob({
-                  id: newId(),
-                  agent: run.agent,
-                  body: job,
-                  terms: termsText(job),
-                  terms_of: termsVersion,
-                  project: run.project,
-                  session: run.session,
-                  created_at: yield* Clock.currentTimeMillis,
-                }),
-              );
-              for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
-            }),
-          )
-          .pipe(Effect.catch((e) => Effect.logWarning(`what ${run.session} learned was not kept: ${String(e)}`)));
+      : attemptTx(
+          Effect.gen(function* () {
+            const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
+            for (const note of memoryNotesOf(run.said)) {
+              const project = note.everywhere ? undefined : run.project;
+              if (!memoryIsNewNote(known, note.text, project)) continue;
+              yield* insertNote(run.agent, note.text, project, run.session, "session");
+              known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
+            }
+            const job = memoryJobText(run.job, run.summary, run.outcome);
+            yield* db(
+              q.keepJob({
+                id: newId(),
+                agent: run.agent,
+                body: job,
+                terms: termsText(job),
+                terms_of: termsVersion,
+                project: run.project,
+                session: run.session,
+                created_at: yield* Clock.currentTimeMillis,
+              }),
+            );
+            for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
+          }),
+        ).pipe(Effect.catch((e) => Effect.logWarning(`what ${run.session} learned was not kept: ${String(e)}`)));
 
   const listed = Effect.fnUntraced(
     function* (agent: string) {

@@ -8,7 +8,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
 import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";
-import { SqlClient } from "effect/sql";
+import { SqlClient, type SqlError } from "effect/sql";
 
 import { messageOf } from "@/errors.ts";
 
@@ -128,8 +128,8 @@ export function causeMessage(e: unknown): string {
 
 /**
  * The farm's database as the services use it: a generated query (db/generated) run against it. The database is in this
- * process, so a query that fails is a bug or a full disk: run makes it a defect; attempt keeps the failure for the
- * callers that log it and go on, or tell it as a refusal (db.test.ts names them and why).
+ * process, so a query that fails is a bug or a full disk: run and inTx make it a defect; attempt and attemptTx keep the
+ * failure for the callers that log it and go on, or tell it as a refusal (db.test.ts names them and why).
  */
 export class Db extends Context.Service<
   Db,
@@ -140,6 +140,8 @@ export class Db extends Context.Service<
     readonly one: <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
     /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
     readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+    /** work in one transaction, its queries' failures and the commit's kept: what a caller tells as a refusal. */
+    readonly attemptTx: <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E | SqlError.SqlError>;
   }
 >()("vibevalley/Db") {
   static readonly layer = Layer.effect(
@@ -155,6 +157,7 @@ export class Db extends Context.Service<
         inTx: <A, E>(work: Effect.Effect<A, E>) =>
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- catchTag takes SqlError out of E; TypeScript cannot work that out for a generic E
           sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>,
+        attemptTx: (work) => attempt(sql.withTransaction(work)),
       });
     }),
   );

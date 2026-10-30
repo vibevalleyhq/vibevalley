@@ -29,7 +29,7 @@ import {
   Predicate,
 } from "effect";
 import { HttpClient } from "effect/http";
-import { SqlClient } from "effect/sql";
+import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
@@ -124,8 +124,7 @@ const make = (options: ConnectorOptions = {}) =>
     // The farm's own waits and times (a pause, a retry, when a message went out) on the service's Clock.
     const clock = yield* Clock.Clock;
     const now = () => clock.currentTimeMillisUnsafe();
-    const sql = yield* SqlClient.SqlClient;
-    const { attempt: db } = yield* Db;
+    const { attempt: db, attemptTx } = yield* Db;
     const chat = yield* Channels;
     const core = yield* Core;
     const notices = yield* Notices;
@@ -141,7 +140,7 @@ const make = (options: ConnectorOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     /** The database's own failures stay failures here: the status says them. */
     const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
-    const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);
+    const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(attemptTx(work), bridgeError);
     let closing = false;
     const say = (text: string, channel: string | undefined, sendKey: string) =>
       options.say ? options.say(text, channel, sendKey, chat) : orchestrator.say(text, {}, channel, sendKey);

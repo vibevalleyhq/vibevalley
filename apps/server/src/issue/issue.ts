@@ -1,5 +1,5 @@
 import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient, SqlError } from "effect/sql";
+import type { SqlError } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
 import {
@@ -129,8 +129,9 @@ export class Issues extends Context.Service<
     readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
     /** A session starts on an existing issue: open it and link the session in one write. */
     readonly ran: (id: string, session: Session) => Effect.Effect<void, NotRecorded>;
-    /** The issues of a task graph as the graph has them now, published as one commit once written. */
-    readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
+    /** The issues of a task graph as the graph has them now, published as one commit once written; the database refusing
+     * the write is kept, for the task to tell. */
+    readonly putTask: (graph: TaskGraph) => Effect.Effect<void, SqlError.SqlError>;
     readonly nextTaskId: () => Effect.Effect<string>;
     /** Issues for the orchestrator, subscribed before it returns. */
     readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
@@ -227,8 +228,7 @@ const make = (options: IssueOptions = {}) =>
     const sessions = yield* Sessions;
     const chat = yield* Channels;
     const crons = yield* Crons;
-    const sql = yield* SqlClient.SqlClient;
-    const { run: db, one, inTx } = yield* Db;
+    const { run: db, attempt, one, inTx, attemptTx } = yield* Db;
     const worked = new IssueSessions();
     /** After an issue is removed: its sessions' rows went with it, and its children's. */
     const reloadSessions = Effect.suspend(() => Effect.map(db(qs.allSessions()), (rows) => worked.load(rows)));
@@ -350,10 +350,11 @@ const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, cron?: string, talk?: string) {
+    /** add, with the database refusing the row kept as a failure: hire tells it to the owner. */
+    const attemptAdd = Effect.fn("Issues.attemptAdd")(function* (req: IssueRequest, cron?: string, talk?: string) {
       const [title, description] = yield* issueWords(req);
       const id = newId();
-      yield* db(
+      yield* attempt(
         q.addIssue({
           id,
           title,
@@ -371,6 +372,9 @@ const make = (options: IssueOptions = {}) =>
       yield* publish(id);
       return yield* get(id);
     });
+
+    const add = (req: IssueRequest, cron?: string, talk?: string) =>
+      attemptAdd(req, cron, talk).pipe(Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }));
 
     const complete = (id: string, delivered: Delivery) =>
       Effect.andThen(db(q.completeIssue({ closed_at: clock.currentTimeMillisUnsafe(), delivered, id })), publish(id));
@@ -424,19 +428,14 @@ const make = (options: IssueOptions = {}) =>
 
     /** The issue already owns its number and workplace before its session starts. */
     const ran = Effect.fn("Issues.ran")(function* (id: string, session: Session) {
-      yield* sql
-        .withTransaction(
-          Effect.gen(function* () {
-            yield* q.reopenIssue({ id });
-            yield* q.assignIssue({ id, assignee: session.agent });
-            yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
-            yield* qq.dequeueIssue({ issue: id });
-          }),
-        )
-        .pipe(
-          Effect.provideService(SqlClient.SqlClient, sql),
-          Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
-        );
+      yield* attemptTx(
+        Effect.gen(function* () {
+          yield* q.reopenIssue({ id });
+          yield* q.assignIssue({ id, assignee: session.agent });
+          yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
+          yield* qq.dequeueIssue({ issue: id });
+        }),
+      ).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
       worked.added(session.id, id);
       yield* publish(id);
     });
@@ -489,10 +488,12 @@ const make = (options: IssueOptions = {}) =>
       if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";
       const prepared = yield* Effect.result(
-        (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
-          // The database failing (a full disk) is told as a refusal; any other defect is a bug and stays one.
-          Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(causeMessage(d))) : Effect.die(d))),
-        ),
+        opt.issue
+          ? get(opt.issue)
+          : attemptAdd({ title: task, project: where, assignee: agent.id }).pipe(
+              // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
+              Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
+            ),
       );
       if (prepared._tag === "Failure") return { refused: t("server.issue.notRecorded", { name: agent.name, why: reasonOf(prepared.failure) }) };
       const issue = prepared.success;
@@ -1217,37 +1218,35 @@ const make = (options: IssueOptions = {}) =>
         });
         const before = yield* family(graph.id);
         const issues = graphIssues(graph, before, yield* Clock.currentTimeMillis);
-        const gone = yield* inTx(
+        const gone = yield* attemptTx(
           Effect.gen(function* () {
             for (const issue of issues)
-              yield* db(
-                q.putIssue({
-                  id: issue.id,
-                  title: issue.title,
-                  description: issue.description,
-                  project: nullText(issue.project),
-                  assignee: nullText(issue.assignee),
-                  priority: issue.priority,
-                  rank: issue.rank ?? 0,
-                  created_at: issue.createdAt,
-                  closed_at: issue.closedAt ?? null,
-                  delivered: issue.delivered ?? null,
-                  canceled: issue.canceled ?? null,
-                  parent: nullText(issue.parent),
-                  blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
-                  graph: jsonOrNull(issue.graph, !!issue.graph),
-                  task: jsonOrNull(issue.task, !!issue.task),
-                }),
-              );
+              yield* q.putIssue({
+                id: issue.id,
+                title: issue.title,
+                description: issue.description,
+                project: nullText(issue.project),
+                assignee: nullText(issue.assignee),
+                priority: issue.priority,
+                rank: issue.rank ?? 0,
+                created_at: issue.createdAt,
+                closed_at: issue.closedAt ?? null,
+                delivered: issue.delivered ?? null,
+                canceled: issue.canceled ?? null,
+                parent: nullText(issue.parent),
+                blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
+                graph: jsonOrNull(issue.graph, !!issue.graph),
+                task: jsonOrNull(issue.task, !!issue.task),
+              });
             const out: string[] = [];
             for (const old of before)
               if (!issues.some((issue) => issue.id === old.id)) {
-                yield* db(q.removeIssue({ id: old.id }));
+                yield* q.removeIssue({ id: old.id });
                 out.push(old.id);
               }
             return out;
           }),
-        );
+        ).pipe(Effect.catchTag("SchemaError", Effect.die));
         if (gone.length > 0) yield* reloadSessions;
         // Published in one core.apply, once the transaction has succeeded.
         const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (item) => get(item.id).pipe(Effect.orDie));
