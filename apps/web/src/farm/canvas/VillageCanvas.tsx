@@ -147,7 +147,7 @@ export function VillageCanvas() {
       </Show>
       <div ref={(el) => (host = el)} class="absolute inset-0" data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
-        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">{t("web.farm.canvas.noMap", { why: String(why()) })}</p>}
+        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">{t("web.farm.canvas.noMap", { why: why() })}</p>}
       </Show>
     </div>
   );

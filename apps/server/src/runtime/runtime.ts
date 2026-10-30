@@ -97,7 +97,7 @@ export class Runtimes extends Context.Service<
           home: () => config.home,
           llm: (model) => modelClient(model, keys.deepseekApiKey, service),
           time,
-          owner: { run: yield* FiberSet.makeRuntimePromise<never>(), scope: yield* Effect.scope },
+          owner: { run: yield* FiberSet.makeRuntimePromise(), scope: yield* Effect.scope },
           tasks: yield* dbStores,
         });
         return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
@@ -219,7 +219,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const store = yield* Agents;
     const registry = options.registry ?? registryOf();
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
     const usageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) =>
@@ -241,7 +241,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const usageTaken = new Map<string, number>();
     // The waits started from spend and usageSoon: one fiber per key, all ended with the service.
     const timers = yield* FiberMap.make<string>();
-    const later = yield* FiberMap.runtime(timers)<never>();
+    const later = yield* FiberMap.runtime(timers)();
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");

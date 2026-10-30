@@ -143,7 +143,7 @@ export const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
     const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;

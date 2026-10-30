@@ -65,7 +65,10 @@ type Polled =
   | { readonly status: "pending"; readonly domain: Domain };
 
 export class FeishuClient implements FeishuApi {
-  constructor(private readonly http: HttpClient.HttpClient) {}
+  private readonly http: HttpClient.HttpClient;
+  constructor(http: HttpClient.HttpClient) {
+    this.http = http;
+  }
 
   private form(domain: Domain, fields: Record<string, string>) {
     return this.http.execute(HttpClientRequest.bodyUrlParams(HttpClientRequest.post(accounts[domain] + "/oauth/v1/app/registration"), fields)).pipe(
@@ -140,7 +143,7 @@ export class FeishuClient implements FeishuApi {
     return Effect.scoped(
       Effect.gen(function* () {
         // The SDK calls back outside any fiber: each message is taken on this listen's fibers, ended with it.
-        const take = yield* FiberSet.makeRuntimePromise<never>();
+        const take = yield* FiberSet.makeRuntimePromise();
         return yield* Effect.callback<void, AppFailed>((resume) => {
           const client = new Lark.WSClient({
             appId: app.appId,

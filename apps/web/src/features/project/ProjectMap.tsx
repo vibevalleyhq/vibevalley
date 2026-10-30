@@ -34,12 +34,11 @@ import { useRouter } from "@/base/router";
 import { useCore, useFrames } from "@/base/frame";
 import { defaultOf } from "@/features/channel";
 import { ready, useAgents, useProjects } from "@/base/query";
-import { PixelCard } from "@/ui/pixel";
+import { PixelCard, SpriteIcon } from "@/ui/pixel";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { AgentFace } from "@/ui/Face";
 import { TextArea } from "@/ui/Field";
-import { SpriteIcon } from "@/ui/pixel";
 import { PoseSprite } from "@/ui/PoseSprite";
 import { Card, Quiet } from "@/ui/layout";
 

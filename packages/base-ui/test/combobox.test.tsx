@@ -39,7 +39,7 @@ const active = () => {
 test("typing opens the list on the first match; arrows move the highlight while the focus stays in the input; Enter picks", async () => {
   const picked: string[] = [];
   mount(() => <View picked={picked} />);
-  const input = $<HTMLInputElement>("[data-testid=input]");
+  const input = $("[data-testid=input]", HTMLInputElement);
   await userEvent.click(input);
   await userEvent.keyboard("c");
   await settle();
@@ -57,7 +57,7 @@ test("typing opens the list on the first match; arrows move the highlight while 
 test("arrows skip disabled options, a click picks without taking the focus, and nothing matching shows Empty", async () => {
   const picked: string[] = [];
   mount(() => <View picked={picked} />);
-  const input = $<HTMLInputElement>("[data-testid=input]");
+  const input = $("[data-testid=input]", HTMLInputElement);
   input.focus();
   await userEvent.keyboard("{ArrowUp}");
   await settle();

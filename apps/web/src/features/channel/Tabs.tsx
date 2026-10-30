@@ -22,7 +22,7 @@ export function Jobs(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
-  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : !!props.channel.default));
+  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.default));
   return (
     <Show
       when={sessions().length > 0}

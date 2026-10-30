@@ -389,7 +389,7 @@ export function watchStalls(
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
-    const runSync = Effect.runSyncWith(yield* Effect.context<never>());
+    const runSync = Effect.runSyncWith(yield* Effect.context());
     const config = yield* ServerConfig;
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
@@ -407,8 +407,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         Effect.catch((err) => Effect.logWarning(`vibevalley: ${what}: ${String(err)}`)),
       );
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const run = yield* FiberSet.makeRuntimePromise<never>();
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const run = yield* FiberSet.makeRuntimePromise();
+    const forkHere = yield* FiberSet.makeRuntime();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
@@ -416,7 +416,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
     const timers = yield* FiberMap.make<string>();
-    const later = yield* FiberMap.runtime(timers)<never>();
+    const later = yield* FiberMap.runtime(timers)();
     // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
     // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
     const apply = (...facts: FactIn[]) => runSync(core.apply(...facts));

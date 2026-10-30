@@ -42,6 +42,7 @@ const voiceKeys = ["area", "language", "asr", "answer", "tts", "persona", "greet
 
 export function voiceSettingsOver(defaults: VoiceSettings, overrides: SettingsUpdateVoice): VoiceSettings {
   const out: VoiceSettings = { ...defaults };
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- one K ties out[key] to overrides[key]: with the union, TypeScript cannot.
   const take = <K extends (typeof voiceKeys)[number]>(key: K) => {
     const value = overrides[key];
     if (value !== undefined) out[key] = value;

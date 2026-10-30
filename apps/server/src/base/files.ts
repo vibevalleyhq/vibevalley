@@ -28,10 +28,12 @@ export const readOrSetAside = <A>(file: string, read: (text: string) => A, start
 export class FileWriter {
   private finished = false;
 
-  constructor(
-    private readonly path: string,
-    private readonly mode = 0o644,
-  ) {}
+  private readonly path: string;
+  private readonly mode: number;
+  constructor(path: string, mode: number = 0o644) {
+    this.path = path;
+    this.mode = mode;
+  }
 
   /** body is asked when this write's turn comes: the state as it is then. */
   write(body: () => string) {

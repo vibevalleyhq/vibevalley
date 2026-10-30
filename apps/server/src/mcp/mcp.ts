@@ -41,7 +41,7 @@ export const make = (options: McpOptions = {}) =>
     const tools = yield* Tools;
     const who = options.who ?? sessions.who;
     // A call runs on this service's fibers: it ends with the service.
-    const runHere = yield* FiberSet.makeRuntimePromise<never>();
+    const runHere = yield* FiberSet.makeRuntimePromise();
 
     // A session no longer in the fields still talks; its profile and project are empty.
     const callerOf = (id: string): Caller => {

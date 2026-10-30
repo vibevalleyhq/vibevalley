@@ -1,10 +1,9 @@
-import { type GraphAction } from "@vibevalley/protocol";
+import { type GraphAction, type Doing, type DoingView, type GameEffect, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
 import { t } from "@vibevalley/i18n";
 // What the client gets. The words for people (a session's phaseText, a cron's
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
-import type { Doing, DoingView, GameEffect, StateFrame, WorkspaceState, WorkspaceView } from "@vibevalley/protocol";
 import { inbox } from "@/notice/inbox.ts";
 import { phaseWords } from "@vibevalley/protocol/rules";
 import { nextText, whenText } from "@/cron/when.ts";

@@ -297,6 +297,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         let continuing = false;
         outer: while (true) {
           let more = true;
+          // asked grows by new arrays, not pushes: each version is handed out (prepareRequest, answer, finishTurn), and one
+          // already handed out must not change under its holder.
+          // oxlint-disable-next-line oxc/no-accumulating-spread -- see above.
           while (more || pending.length > 0) {
             if (!first) {
               if (pending.length === 0) pending = yield* takeOne(steering);
@@ -306,9 +309,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             for (const m of pending) {
               yield* options.onEvent({ type: "message_start", message: m });
               yield* emit({ type: "message_end", message: m });
-              asked = [...asked, m];
               fresh.push(m);
             }
+            asked = [...asked, ...pending];
             pending = [];
             const prepared = options.prepareRequest
               ? yield* Effect.raceFirst(options.prepareRequest(asked, yield* Deferred.isDone(stop)), Effect.as(Deferred.await(stop), undefined))

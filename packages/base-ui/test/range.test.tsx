@@ -30,7 +30,7 @@ test("a radio group is one tab stop; arrows move and check, wrapping, past disab
   await userEvent.keyboard("{ArrowDown}");
   await settle();
   expect([(document.activeElement as HTMLElement).dataset.value, document.querySelector("[data-testid=dot-a]") !== null]).toEqual(["a", true]);
-  expect([said, new FormData($<HTMLFormElement>("[data-testid=form]")).get("look")]).toEqual([["c", "a"], "a"]);
+  expect([said, new FormData($("[data-testid=form]", HTMLFormElement)).get("look")]).toEqual([["c", "a"], "a"]);
   await expectAccessible();
 });
 

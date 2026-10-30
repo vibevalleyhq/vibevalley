@@ -152,7 +152,7 @@ export const make = Effect.gen(function* () {
   // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
   // it rather than putting it off. The wait is a fiber of this service's, ended with it.
   const saves = yield* FiberMap.make<"save">();
-  const later = yield* FiberMap.runtime(saves)<never>();
+  const later = yield* FiberMap.runtime(saves)();
   const save = () => {
     if (!closed)
       later(

@@ -151,7 +151,6 @@
     "notMerged": "Not merged: {why}. The plan's branch {branch} is kept",
     "mergeNotSaved": "The plan's branch is merged into main, but its done state could not be saved: {why}",
     "merged": "The plan \"{title}\" is merged: {text}",
-    "unknownAction": "Unknown action {action}",
     "noStep": "The plan has no step \"{id}\"",
     "graphIs": "The plan is {state}",
     "notFailed": "\"{title}\" did not fail; there is nothing to retry",

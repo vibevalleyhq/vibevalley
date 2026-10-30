@@ -53,7 +53,7 @@ export default defineConfig({
   // scripts/'s own tests; each package has its vite.config.ts with its own.
   test: { include: ["scripts/**/*.test.ts"] },
   // The pre-commit hook (.vite-hooks/pre-commit) runs these on the staged files.
-  staged: { "*": "vp check --fix" },
+  staged: { "*": "vp check --fix --deny-warnings" },
   fmt: {
     printWidth: 160,
     // site/ is its own project; the rest are written by tools or are data, and docs keep their compact tables.
@@ -103,6 +103,16 @@ export default defineConfig({
       "eslint/no-fallthrough": "error",
       // A deprecated API is moved off when it is met; one kept on purpose says why at the call.
       "typescript/no-deprecated": "error",
+      // A module imported twice says two things about one dependency.
+      "import/no-duplicates": "error",
+      // Type arguments, conversions and type parameters that change nothing are noise a reader has to see through.
+      "typescript/no-unnecessary-type-arguments": "error",
+      "typescript/no-unnecessary-type-conversion": "error",
+      "typescript/no-unnecessary-type-parameters": "error",
+      // A spread inside a reduce copies everything so far on every step: quadratic.
+      "oxc/no-accumulating-spread": "error",
+      "unicorn/prefer-set-has": "error",
+      "unicorn/prefer-array-find": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

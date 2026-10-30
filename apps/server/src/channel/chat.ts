@@ -504,7 +504,7 @@ export const make = Effect.gen(function* () {
   const lastRead = new Map<string, string>();
   let closed = false;
   // Work set off by a timer belongs to this service: it ends with it and keeps its services.
-  const forkHere = yield* FiberSet.makeRuntime<never>();
+  const forkHere = yield* FiberSet.makeRuntime();
 
   /** Runs fn under the lock a little later, unless the chat has stopped. */
   /** What goes wrong in the background is logged, and the chat goes on with the next thing. */
@@ -515,7 +515,7 @@ export const make = Effect.gen(function* () {
   // The waits are keyed fibers of this service's, so one can be called off (a notice gathering, when its session leaves);
   // once a wait is over, what it runs is handed to forkHere, and calling the wait off no longer cuts it short.
   const waits = yield* FiberMap.make<string>();
-  const wait = yield* FiberMap.runtime(waits)<never>();
+  const wait = yield* FiberMap.runtime(waits)();
   const later = (key: string, ms: number, fn: () => Effect.Effect<void>) =>
     void wait(
       key,
@@ -608,7 +608,7 @@ export const make = Effect.gen(function* () {
     return {
       id: row.id,
       type: channelType(row.type),
-      default: !!row.is_default,
+      default: row.is_default,
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
       orchestrator: orchestratorOfRow(row),
       category: row.category ?? "",

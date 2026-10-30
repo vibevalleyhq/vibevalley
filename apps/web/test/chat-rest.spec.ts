@@ -259,7 +259,7 @@ test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with
 test("a link to a farm message shows that message under it, and a press goes there", async ({ page, api, server }) => {
   const from = await api.channel.create({ name: "source" });
   await api.channel.message.send({ id: from, text: "the apples on the south slope are ripe" });
-  const [said] = (await api.channel.message.list({ id: from })).filter((m) => m.text === "the apples on the south slope are ripe");
+  const said = (await api.channel.message.list({ id: from })).find((m) => m.text === "the apples on the south slope are ripe");
   const to = await api.channel.create({ name: "retold" });
   await api.channel.message.send({ id: to, text: `look ${server.url}/chat/${from}?m=${said!.number}` });
   await page.goto(`/chat/${to}`);
@@ -268,6 +268,6 @@ test("a link to a farm message shows that message under it, and a press goes the
   await card.click();
   await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`));
   // The server reads no preview of the farm's own address.
-  const [linking] = (await api.channel.message.list({ id: to })).filter((m) => m.text.startsWith("look "));
+  const linking = (await api.channel.message.list({ id: to })).find((m) => m.text.startsWith("look "));
   expect(linking!.embeds).toEqual([]);
 });

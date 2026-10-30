@@ -48,12 +48,16 @@ interface LdtkProject {
 }
 
 export class Level {
-  private constructor(
-    readonly width: number,
-    readonly height: number,
-    private readonly ground: LdtkLayer,
-    private readonly things: ReadonlyMap<string, readonly Thing[]>,
-  ) {}
+  readonly width: number;
+  readonly height: number;
+  private readonly ground: LdtkLayer;
+  private readonly things: ReadonlyMap<string, readonly Thing[]>;
+  private constructor(width: number, height: number, ground: LdtkLayer, things: ReadonlyMap<string, readonly Thing[]>) {
+    this.width = width;
+    this.height = height;
+    this.ground = ground;
+    this.things = things;
+  }
 
   static parse(text: string): Level {
     const level = (JSON.parse(text) as LdtkProject).levels[0];

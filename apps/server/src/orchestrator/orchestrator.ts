@@ -125,7 +125,7 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const service = yield* Llm;
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     const scope = yield* Effect.scope;
 
     const toolsFor = (id: string) => (current: () => Route) =>

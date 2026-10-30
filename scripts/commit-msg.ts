@@ -71,8 +71,8 @@ export function subjectProblems(subject: string): string[] {
 /** What is wrong with a pull request's body: the template's sections, written in English. */
 export function bodyProblems(body: string): string[] {
   const problems: string[] = [];
-  const headings = body.split(/\r?\n/).map((line) => line.trim());
-  for (const section of bodySections) if (!headings.includes(section)) problems.push(`the body has no "${section}" section`);
+  const headings = new Set(body.split(/\r?\n/).map((line) => line.trim()));
+  for (const section of bodySections) if (!headings.has(section)) problems.push(`the body has no "${section}" section`);
   const chinese = chineseIn(body);
   if (chinese !== undefined) problems.push(`write the body in English, quoting the interface's words in 「」 and logs in backticks: "${chinese}"`);
   return problems;

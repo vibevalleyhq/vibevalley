@@ -31,7 +31,6 @@
     "unknownType": "不认识的块类型 {type}",
     "badKey": "不是有效的顺序键：{key}",
     "missing": "没有这一块",
-    "unknownOp": "不认识的改动 {op}",
     "noText": "这一块没有字",
     "noRev": "没有第 {rev} 版",
     "changed": "这一块刚被别人改过",

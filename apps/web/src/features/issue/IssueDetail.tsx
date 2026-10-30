@@ -1,6 +1,6 @@
 import { Checkbox } from "@/ui/Checkbox";
 import { list, t } from "@vibevalley/i18n";
-import { plainText } from "@vibevalley/protocol/rules";
+import { plainText, closedText } from "@vibevalley/protocol/rules";
 import { Dot } from "@/ui/Dot";
 import type { IconName } from "@/ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
@@ -18,12 +18,11 @@ import {
   type SessionView,
 } from "@vibevalley/protocol";
 import { api } from "@/base/api";
-import { createIssueActs, perform } from "./acts";
+import { createIssueActs, perform, run } from "./acts";
 import { issueTag, tagOpen, tagText } from "./tags";
 import { runText } from "./runs";
 import { changesLine } from "./changes";
 import { type CriterionRow, issueState, noStepsText, attentionTone } from "./overview";
-import { closedText } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "@/base/format";
 import { toast } from "@/ui/toasts";
 import { ready } from "@/base/query";
@@ -33,11 +32,9 @@ import { TextArea } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { Markdown } from "@/ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { run } from "./acts";
-import { useGraphs } from "./queries";
+import { useGraphs, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { IssueArtifacts } from "@/features/artifact";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { useAgent } from "@/base/agents";
 import { createSessionEvents } from "@/features/session";
 

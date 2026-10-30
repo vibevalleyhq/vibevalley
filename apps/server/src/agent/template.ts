@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { t, currentLocale } from "@vibevalley/i18n";
 // A profile's template: a folder of agent.json (what it is), agent.en.json (its words in English), persona.md and
 // persona.en.md, read in the farm's language. The built-in ones are templates/ beside this file, in the order of
 // templates/index.json; those added on this machine are copies in the home's agent-templates/.
@@ -8,7 +8,6 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from
 import { join } from "node:path";
 import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { currentLocale } from "@vibevalley/i18n";
 import { Schema } from "effect";
 
 export const builtInDir = join(import.meta.dirname, "templates");

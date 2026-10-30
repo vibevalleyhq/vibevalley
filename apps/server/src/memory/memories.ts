@@ -136,12 +136,12 @@ export const makeMemories = Effect.gen(function* () {
       : sql
           .withTransaction(
             Effect.gen(function* () {
-              let known: readonly Pick<Memory, "kind" | "text" | "project">[] = yield* list(run.agent);
+              const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
               for (const note of memoryNotesOf(run.said)) {
                 const project = note.everywhere ? undefined : run.project;
                 if (!memoryIsNewNote(known, note.text, project)) continue;
                 yield* insertNote(run.agent, note.text, project, run.session, "session");
-                known = [...known, { kind: "note", text: note.text, ...(project ? { project } : {}) }];
+                known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
               }
               const job = memoryJobText(run.job, run.summary, run.outcome);
               yield* db(

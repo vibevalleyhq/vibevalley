@@ -31,7 +31,6 @@
     "unknownType": "Unknown block type {type}",
     "badKey": "Not a valid order key: {key}",
     "missing": "There is no such block",
-    "unknownOp": "Unknown change {op}",
     "noText": "This block has no text",
     "noRev": "There is no version {rev}",
     "changed": "Someone else just changed this block",

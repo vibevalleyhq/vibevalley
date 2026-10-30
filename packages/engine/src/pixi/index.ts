@@ -273,11 +273,11 @@ export class Walker {
   private path: Point[] = [];
   private target: Point;
 
-  constructor(
-    from: Point,
-    private readonly speed: number,
-    private readonly route: (from: Point, to: Point) => Point[],
-  ) {
+  private readonly speed: number;
+  private readonly route: (from: Point, to: Point) => Point[];
+  constructor(from: Point, speed: number, route: (from: Point, to: Point) => Point[]) {
+    this.speed = speed;
+    this.route = route;
     this.x = from.x;
     this.y = from.y;
     this.target = from;

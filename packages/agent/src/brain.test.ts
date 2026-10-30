@@ -249,7 +249,7 @@ describe("the agent", () => {
           () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined),
           'r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined)',
         );
-        const last = r.requests.filter((c) => !summarizing(c)).at(-1)!;
+        const last = r.requests.findLast((c) => !summarizing(c))!;
         expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/);
         expect(r.agent.history()[0]!.role).toBe("compactionSummary");
       },
@@ -337,7 +337,7 @@ describe("the agent", () => {
   effectIt.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
-      const move = Effect.runPromiseWith(yield* Effect.context<never>());
+      const move = Effect.runPromiseWith(yield* Effect.context());
       const scope = yield* Effect.scope;
       const dir = home();
       writeFileSync(

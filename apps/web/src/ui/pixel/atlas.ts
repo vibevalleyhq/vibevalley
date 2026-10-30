@@ -36,10 +36,12 @@ interface Raw {
 }
 
 export class SpriteAtlas {
-  private constructor(
-    private readonly sprites: ReadonlyMap<string, SpriteInfo>,
-    readonly density: number,
-  ) {}
+  private readonly sprites: ReadonlyMap<string, SpriteInfo>;
+  readonly density: number;
+  private constructor(sprites: ReadonlyMap<string, SpriteInfo>, density: number) {
+    this.sprites = sprites;
+    this.density = density;
+  }
 
   static parse(text: string): SpriteAtlas {
     const raw = JSON.parse(text) as Record<string, Raw>;

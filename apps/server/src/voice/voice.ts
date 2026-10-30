@@ -422,8 +422,8 @@ export const make = (options: VoiceOptions = {}) =>
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     // Fibers started from callbacks belong to this service: they end with it, and sleep on its Clock.
-    const forkHere = yield* FiberSet.makeRuntime<never>();
-    const runHere: Run = yield* FiberSet.makeRuntimePromise<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
+    const runHere: Run = yield* FiberSet.makeRuntimePromise();
     const now = () => clock.currentTimeMillisUnsafe();
 
     const grants = new Map<string, Grant>();

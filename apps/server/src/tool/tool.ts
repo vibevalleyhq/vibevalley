@@ -1,7 +1,7 @@
 import { maybe, t } from "@vibevalley/i18n";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
-import { messageOf } from "@/errors.ts";
+import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
 import { artifactMax } from "@/artifact/policy.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -24,7 +24,6 @@ import { effectTool } from "@vibevalley/agent/core/tool";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { Channels, type Info, type Spoken } from "@/channel/chat.ts";
-import { type ApiError, reasonOf, refused } from "@/errors.ts";
 import { Issues } from "@/issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
@@ -153,7 +152,7 @@ export const make = Effect.gen(function* () {
   // A tool's arguments are read by its Schema before it runs; the model's JSON Schema is made from the same one.
   // Named by its endpoint (toolName): the name is never written a second time.
   const toolOf =
-    <All extends { readonly [op: string]: Schema.Codec<unknown, unknown, never, never> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
+    <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
     <K extends keyof All & Op>(op: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
       const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
       return effectTool<unknown>({

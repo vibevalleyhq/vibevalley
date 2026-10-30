@@ -1,4 +1,4 @@
-import { t } from "@vibevalley/i18n";
+import { t, currentLocale } from "@vibevalley/i18n";
 // The DeepSeek key (模型), the language (通用) and the memory sources (记性), a part at a time (setting.update); and what
 // the server found of gh (GitHub).
 
@@ -24,7 +24,6 @@ import { KeyRow, SettingRow, SettingsGroup } from "@/ui/settings";
 import { Segmented } from "@/ui/Segmented";
 import { Hint, Tip } from "@/ui/Tip";
 import { toast } from "@/ui/toasts";
-import { currentLocale } from "@vibevalley/i18n";
 import { Quiet, SecretInput, Toggle } from "@/ui/layout";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 

@@ -7,16 +7,21 @@ import { t } from "@vibevalley/i18n";
 
 /** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
 export class VibeValleyApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly tag: string | undefined,
-    readonly reason: string,
-    /** The error as the server wrote it, for what it carries besides the reason. */
-    readonly error?: ApiError,
-    /** The response exactly as received, including plain text that was not JSON. */
-    readonly body?: string,
-  ) {
+  readonly status: number;
+  readonly tag: string | undefined;
+  readonly reason: string;
+  /** The error as the server wrote it, for what it carries besides the reason. */
+  readonly error: ApiError | undefined;
+  /** The response exactly as received, including plain text that was not JSON. */
+  readonly body: string | undefined;
+
+  constructor(status: number, tag: string | undefined, reason: string, error?: ApiError, body?: string) {
     super(reason);
+    this.status = status;
+    this.tag = tag;
+    this.reason = reason;
+    this.error = error;
+    this.body = body;
   }
 }
 
@@ -50,11 +55,14 @@ function apiErrorOf(value: unknown): ApiError | undefined {
 
 /** The server's HTTP API, one object per module and noun, a method per op: `api.issue.status.update({ id, status })`. */
 export class VibeValleyApi {
-  /** base: the server's address; empty is the page's own origin, which serves it. */
-  constructor(
-    readonly base = "",
-    private readonly fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
-  ) {}
+  /** The server's address; empty is the page's own origin, which serves it. */
+  readonly base: string;
+  private readonly fetcher: (url: string, init: RequestInit) => Promise<Response>;
+
+  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)) {
+    this.base = base;
+    this.fetcher = fetcher;
+  }
 
   readonly server = {
     health: {

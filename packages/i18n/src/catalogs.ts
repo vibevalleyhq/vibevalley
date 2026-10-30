@@ -151,7 +151,6 @@ export const catalogs = {
         unknownType: "不认识的块类型 {type}",
         badKey: "不是有效的顺序键：{key}",
         missing: "没有这一块",
-        unknownOp: "不认识的改动 {op}",
         noText: "这一块没有字",
         noRev: "没有第 {rev} 版",
         changed: "这一块刚被别人改过",
@@ -386,7 +385,6 @@ export const catalogs = {
         every: "间隔至少 {min} 分钟",
         time: "时间写成 HH:MM，比如 09:00：{time}",
         days: "每周的哪几天：0 到 6，0 是周日",
-        kind: "不认识这种定时任务",
       },
       due: "{missed, select, true {⏰ 定时任务「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时任务「{name}」到点了：{text}}}",
       noCron: "没有 {id} 号定时任务",
@@ -992,7 +990,6 @@ export const catalogs = {
         notMerged: "没合进去：{why}。计划分支 {branch} 留着",
         mergeNotSaved: "计划分支已合进主分支，但完成状态没能保存：{why}",
         merged: "计划「{title}」合进去了：{text}",
-        unknownAction: "不认识 {action} 这个动作",
         noStep: "计划里没有「{id}」这一步",
         graphIs: "计划{state}",
         notFailed: "「{title}」没有失败，不用重试",
@@ -3690,7 +3687,6 @@ export const catalogs = {
         unknownType: "Unknown block type {type}",
         badKey: "Not a valid order key: {key}",
         missing: "There is no such block",
-        unknownOp: "Unknown change {op}",
         noText: "This block has no text",
         noRev: "There is no version {rev}",
         changed: "Someone else just changed this block",
@@ -3925,7 +3921,6 @@ export const catalogs = {
         every: "The interval is at least {min} minutes",
         time: "Write the time as HH:MM, such as 09:00: {time}",
         days: "Which days of the week: 0 to 6, 0 is Sunday",
-        kind: "Unknown kind of scheduled task",
       },
       due: '{missed, select, true {⏰ The scheduled task "{name}" is due (missed while the server was off, made up once): {text}} other {⏰ The scheduled task "{name}" is due: {text}}}',
       noCron: "There is no scheduled task {id}",
@@ -4577,7 +4572,6 @@ export const catalogs = {
         notMerged: "Not merged: {why}. The plan's branch {branch} is kept",
         mergeNotSaved: "The plan's branch is merged into main, but its done state could not be saved: {why}",
         merged: 'The plan "{title}" is merged: {text}',
-        unknownAction: "Unknown action {action}",
         noStep: 'The plan has no step "{id}"',
         graphIs: "The plan is {state}",
         notFailed: '"{title}" did not fail; there is nothing to retry',
@@ -7392,7 +7386,6 @@ export interface Messages {
   "server.artifact.op.splitOutside": { readonly at: string | number; readonly length: string | number };
   "server.artifact.op.taken": { readonly id: string | number };
   "server.artifact.op.underSelf": undefined;
-  "server.artifact.op.unknownOp": { readonly op: string | number };
   "server.artifact.op.unknownType": { readonly type: string | number };
   "server.artifact.otherArtifact": { readonly batch: string | number };
   "server.artifact.preview.cards": undefined;
@@ -7584,7 +7577,6 @@ export interface Messages {
   "server.cron.noProject": { readonly channel: string | number };
   "server.cron.problem.days": undefined;
   "server.cron.problem.every": { readonly min: string | number };
-  "server.cron.problem.kind": undefined;
   "server.cron.problem.noName": undefined;
   "server.cron.problem.noText": undefined;
   "server.cron.problem.past": undefined;
@@ -8141,7 +8133,6 @@ export interface Messages {
   "server.task.act.started": { readonly branch: string | number; readonly title: string | number };
   "server.task.act.stepAct": { readonly action: string | number; readonly title: string | number };
   "server.task.act.stepsWrong": { readonly problems: string | number };
-  "server.task.act.unknownAction": { readonly action: string | number };
   "server.task.act.working": { readonly title: string | number };
   "server.task.actor.orchestrator": undefined;
   "server.task.actor.owner": undefined;

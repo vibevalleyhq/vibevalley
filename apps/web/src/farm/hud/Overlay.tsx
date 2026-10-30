@@ -119,14 +119,8 @@ export function Overlay() {
       let card: Card | undefined;
       let where: "above" | "rail" | "middle" = "rail";
       const reward =
-        bed.station < 0
-          ? undefined
-          : rewards()
-              .filter((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station))
-              .at(-1);
-      const note = bedFx()
-        .filter((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"))
-        .at(-1);
+        bed.station < 0 ? undefined : rewards().findLast((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station));
+      const note = bedFx().findLast((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"));
       if (hoverBed() === bed.index) {
         const issue = session ? state.issues.find((i) => i.id === issueOf(session)) : undefined;
         const aim = aimTool(tool(), bed, session, plot, level, issue);

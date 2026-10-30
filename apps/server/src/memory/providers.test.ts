@@ -27,7 +27,10 @@ class Fake {
   synced: FinishedRun[] = [];
   added: Note[] = [];
   forgot: string[] = [];
-  constructor(readonly name: string) {}
+  readonly name: string;
+  constructor(name: string) {
+    this.name = name;
+  }
   get can() {
     return { list: true, forget: !this.noForget, transcripts: false };
   }
@@ -250,7 +253,7 @@ describe("memory sources", () => {
       old.forget = async (_, __, signal) => void (await read(signal));
       old.stop = async () => void (stopped = true);
       return Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         yield* save(nowledgeOn);
         const m = yield* Memories;
         const pending = runPromise(

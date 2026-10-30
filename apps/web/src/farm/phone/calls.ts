@@ -49,7 +49,10 @@ export class PhoneCalls {
   private openedByRing = false;
   private bell: (() => void)[] = [];
 
-  constructor(private readonly host: PhoneHost) {}
+  private readonly host: PhoneHost;
+  constructor(host: PhoneHost) {
+    this.host = host;
+  }
 
   readonly get = () => this.state;
 

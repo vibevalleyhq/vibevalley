@@ -15,7 +15,7 @@ export interface Time {
 
 /** The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context. */
 export const timeHere: Effect.Effect<Time> = Effect.gen(function* () {
-  const context = yield* Effect.context<never>();
+  const context = yield* Effect.context();
   const clock = yield* Clock.Clock;
   const run = Effect.runPromiseWith(context);
   const fork = Effect.runForkWith(context);

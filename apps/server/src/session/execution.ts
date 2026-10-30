@@ -40,12 +40,15 @@ export class AgentExecution {
   /** The end could not be written: retried before anything else, and the run takes no more inputs. */
   private ending = false;
 
-  constructor(
-    private readonly session: string,
-    private readonly journal: Journal,
-    private readonly toolStart: (tool: string, args: unknown) => ToolStart,
-    private readonly store: RunStore,
-  ) {
+  private readonly session: string;
+  private readonly journal: Journal;
+  private readonly toolStart: (tool: string, args: unknown) => ToolStart;
+  private readonly store: RunStore;
+  constructor(session: string, journal: Journal, toolStart: (tool: string, args: unknown) => ToolStart, store: RunStore) {
+    this.session = session;
+    this.journal = journal;
+    this.toolStart = toolStart;
+    this.store = store;
     store.register(session, () => this.currentRun());
   }
 

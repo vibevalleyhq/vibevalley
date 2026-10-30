@@ -117,7 +117,7 @@ describe("runtime", () => {
       }),
     ]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       let used = "";
       const options: RuntimeOptions = { registry, background: false, usageOf: async () => null };
       const r = yield* make(options);
@@ -144,7 +144,7 @@ describe("runtime", () => {
       const fullGate = new Promise<void>((resolve) => (releaseFull = resolve));
       const usageGate = new Promise<void>((resolve) => (releaseUsage = resolve));
       return Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         let full = 0;
         let usageCalls = 0;
         const changed: AccountUsage = { status: "ok", subscription: "pro", windows: [] };
@@ -274,7 +274,7 @@ describe("runtime", () => {
     const latest = deferred<RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const r = yield* runtimes({
         probe: (id) => {
           if (id !== "pi") return notFound(id);
@@ -416,7 +416,7 @@ describe("runtime", () => {
     let release!: () => void;
     const held = new Promise<void>((done) => (release = done));
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       let probes = 0;
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("pi")]),

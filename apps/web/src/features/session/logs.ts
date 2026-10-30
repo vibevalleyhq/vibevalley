@@ -14,10 +14,12 @@ export class SessionLogs {
   private readonly logs = new Map<string, Log>();
   private stop: (() => void) | undefined;
 
-  constructor(
-    private readonly read: (id: string) => Promise<SessionEvent[]>,
-    private readonly follow: (event: (e: LiveEvent) => void, connected: () => void) => () => void,
-  ) {}
+  private readonly read: (id: string) => Promise<SessionEvent[]>;
+  private readonly follow: (event: (e: LiveEvent) => void, connected: () => void) => () => void;
+  constructor(read: (id: string) => Promise<SessionEvent[]>, follow: (event: (e: LiveEvent) => void, connected: () => void) => () => void) {
+    this.read = read;
+    this.follow = follow;
+  }
 
   subscribe(id: string, listener: (steps: SessionEvent[]) => void): () => void {
     let log = this.logs.get(id);

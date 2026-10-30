@@ -75,10 +75,12 @@ export class Fold {
   private rawStopReason: string | undefined;
   private errorMessage: string | undefined;
 
-  constructor(
-    private readonly model: Model,
-    private readonly timestamp: number,
-  ) {}
+  private readonly model: Model;
+  private readonly timestamp: number;
+  constructor(model: Model, timestamp: number) {
+    this.model = model;
+    this.timestamp = timestamp;
+  }
 
   start(): AssistantMessageEvent {
     return { type: "start", partial: this.message() };

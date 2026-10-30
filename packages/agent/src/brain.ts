@@ -14,8 +14,7 @@ import { finished, type AgentTask } from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction, type Summarized } from "./compaction.ts";
 import type { ModelClient } from "@vibevalley/ai/client";
-import type { McpServer } from "./mcp.ts";
-import { connectAll, type McpConnections } from "./mcp.ts";
+import { type McpServer, connectAll, type McpConnections } from "./mcp.ts";
 import { memoryFileLines, readMemory } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, type CustomMessage, customMessage, messageText, requestContext, userMessage } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
@@ -206,12 +205,14 @@ export class Brain {
     });
   }
 
-  private constructor(
-    private readonly options: BrainOptions,
-    private readonly mcp: McpConnections,
-    /** The Clock of the scope it was made in. */
-    private readonly now: () => number,
-  ) {
+  private readonly options: BrainOptions;
+  private readonly mcp: McpConnections;
+  /** The Clock of the scope it was made in. */
+  private readonly now: () => number;
+  private constructor(options: BrainOptions, mcp: McpConnections, now: () => number) {
+    this.options = options;
+    this.mcp = mcp;
+    this.now = now;
     this.maxSteps = options.maxSteps ?? 40;
     const sessionName = options.session || options.name;
     if (!options.noSession) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));

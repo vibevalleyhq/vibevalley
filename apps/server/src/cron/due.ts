@@ -51,7 +51,6 @@ export function cronProblem(req: CronRequest, now: number): string {
     case "cron":
       return exprProblem(w.expr, now, req.tz);
   }
-  return t("server.cron.problem.kind");
 }
 
 export function dueText(s: Cron, missed: boolean): string {

@@ -56,7 +56,6 @@ export function nextRun(s: Cron): number | undefined {
     case "cron":
       return cronNext(from, w.expr, s.tz);
   }
-  return undefined;
 }
 
 export function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
@@ -91,7 +90,6 @@ export function whenText(when: CronWhen, tz: string): string {
     case "cron":
       return cronText(when.expr);
   }
-  return "";
 }
 
 export function nextText(s: Cron): string {

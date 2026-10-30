@@ -57,7 +57,9 @@ export class VillageWorld {
   readonly places: ReadonlyMap<string, { readonly at: Point; readonly facing: Facing }>;
   private navMap: NavMap | undefined;
 
-  constructor(readonly level: Level) {
+  readonly level: Level;
+  constructor(level: Level) {
+    this.level = level;
     this.plots = new Map(level.thingsOf("Plot").map((t) => [Number(t.field("index")), t.at]));
     this.gate = level.theThing("Gate").at;
     this.queue = level.theThing("Queue").at;
@@ -211,12 +213,16 @@ export class Whereabouts {
   static readonly settle = 1.2;
   static readonly dwell = 2;
 
-  constructor(
-    public place: string,
-    public since: number,
-    public want: string,
-    public wantSince: number,
-  ) {}
+  place: string;
+  since: number;
+  want: string;
+  wantSince: number;
+  constructor(place: string, since: number, want: string, wantSince: number) {
+    this.place = place;
+    this.since = since;
+    this.want = want;
+    this.wantSince = wantSince;
+  }
 
   moveOn(to: string, now: number, urgent = false) {
     if (to !== this.want) {

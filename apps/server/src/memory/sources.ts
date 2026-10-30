@@ -195,7 +195,7 @@ interface Generation {
   readonly all: Source[];
   readonly off: MemorySourceInfo[];
   readonly scope: Scope.Closeable;
-  readonly operations: FiberSet.FiberSet<unknown, unknown>;
+  readonly operations: FiberSet.FiberSet;
   /** Background writes, in order, taken by the writer. */
   readonly writes: Queue.Queue<Effect.Effect<void>, Cause.Done>;
   readonly writer: Fiber.Fiber<void>;
@@ -232,8 +232,8 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const timeoutMs = options.timeoutMs ?? prefetchTimeoutMs;
     // Generations are made and retired from synchronous calls (the settings changed under info): with the service's
     // services (its logger, its Clock), on its fibers.
-    const forkHere = yield* FiberSet.makeRuntime<never>();
-    const runHere = Effect.runSyncWith(yield* Effect.context<never>());
+    const forkHere = yield* FiberSet.makeRuntime();
+    const runHere = Effect.runSyncWith(yield* Effect.context());
     const generations = new Set<Generation>();
     let current: Generation | undefined;
     let built: string | undefined;

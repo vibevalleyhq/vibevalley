@@ -2,10 +2,10 @@ import { type Accessor, createEffect, createSignal, For, onSettled, untrack } fr
 import type { JSX } from "@solidjs/web";
 
 /** A ref that focuses its element once it is on the page: what React's autoFocus does on mount. */
-export function autofocus<T extends HTMLElement>() {
-  let el: T | undefined;
+export function autofocus() {
+  let el: HTMLElement | undefined;
   onSettled(() => el?.focus());
-  return (next: T) => {
+  return (next: HTMLElement) => {
     el = next;
   };
 }

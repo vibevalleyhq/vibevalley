@@ -73,16 +73,27 @@ export class Journal {
   private run: string | undefined;
   private readonly disk: FileWriter;
 
+  private readonly file: string;
+  private readonly push: (e: SessionEvent) => void;
+  /** Where a save that failed is said: the service's logger. */
+  private readonly warn: (message: string) => void;
+  /** The service's Clock: the steps' times and the push and save windows. */
+  private readonly time: Time;
+  private readonly keep: number;
+
   constructor(
-    private readonly file: string,
+    file: string,
     initial: readonly SessionEvent[],
-    private readonly push: (e: SessionEvent) => void,
-    /** Where a save that failed is said: the service's logger. */
-    private readonly warn: (message: string) => void,
-    /** The service's Clock: the steps' times and the push and save windows. */
-    private readonly time: Time,
-    private readonly keep = keepEvents,
+    push: (e: SessionEvent) => void,
+    warn: (message: string) => void,
+    time: Time,
+    keep: number = keepEvents,
   ) {
+    this.file = file;
+    this.push = push;
+    this.warn = warn;
+    this.time = time;
+    this.keep = keep;
     this.disk = new FileWriter(file);
     this.steps = [...initial];
     const last = this.steps.at(-1);
@@ -280,14 +291,16 @@ export class Trajectories {
   private readonly open = new Map<string, Journal>();
   private readonly dir: string;
 
-  constructor(
-    home: string,
-    private readonly push: (id: string, e: SessionEvent) => void,
-    /** Where a log that could not be saved is said: the service's logger (Effect.logWarning on its fiber). */
-    private readonly warn: (message: string) => void,
-    /** The service's Clock, handed to every log. */
-    private readonly time: Time,
-  ) {
+  private readonly push: (id: string, e: SessionEvent) => void;
+  /** Where a log that could not be saved is said: the service's logger (Effect.logWarning on its fiber). */
+  private readonly warn: (message: string) => void;
+  /** The service's Clock, handed to every log. */
+  private readonly time: Time;
+
+  constructor(home: string, push: (id: string, e: SessionEvent) => void, warn: (message: string) => void, time: Time) {
+    this.push = push;
+    this.warn = warn;
+    this.time = time;
     this.dir = join(home, "events");
   }
 

@@ -7,10 +7,9 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
+import { api, reasonOf, newSendKey } from "@/base/api";
 import { fire } from "@/farm/commands";
 import { playSound } from "@/ui/pixel/sound";
-import { newSendKey } from "@/base/api";
 import { writeIssue } from "@/features/issue";
 import { aria } from "@/base/util";
 import { useRouter } from "@/base/router";

@@ -45,8 +45,7 @@
     "past": "A one-off time must be in the future",
     "every": "The interval is at least {min} minutes",
     "time": "Write the time as HH:MM, such as 09:00: {time}",
-    "days": "Which days of the week: 0 to 6, 0 is Sunday",
-    "kind": "Unknown kind of scheduled task"
+    "days": "Which days of the week: 0 to 6, 0 is Sunday"
   },
   "due": "{missed, select, true {⏰ The scheduled task \"{name}\" is due (missed while the server was off, made up once): {text}} other {⏰ The scheduled task \"{name}\" is due: {text}}}",
   "noCron": "There is no scheduled task {id}",

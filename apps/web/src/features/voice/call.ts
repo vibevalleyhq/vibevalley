@@ -41,7 +41,9 @@ export class VoiceCall {
   private readonly listeners = new Set<() => void>();
 
   /** The helper the owner picked to send work to, or undefined for the orchestrator's choice. */
-  constructor(private readonly agentPick: () => string | undefined = () => undefined) {
+  private readonly agentPick: () => string | undefined;
+  constructor(agentPick: () => string | undefined = () => undefined) {
+    this.agentPick = agentPick;
     this.captions.onHeard = (text) => this.caption(text, true);
     this.captions.onAnswered = (text) => this.caption(text, false);
   }

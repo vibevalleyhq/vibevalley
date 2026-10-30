@@ -154,10 +154,12 @@ const sendFailure = (code: number, message: string) =>
   new AppFailed({ kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed", message });
 
 export class WeixinClient implements WeixinApi {
-  constructor(
-    private readonly http: HttpClient.HttpClient,
-    private readonly base = baseUrl,
-  ) {}
+  private readonly http: HttpClient.HttpClient;
+  private readonly base: string;
+  constructor(http: HttpClient.HttpClient, base: string = baseUrl) {
+    this.http = http;
+    this.base = base;
+  }
 
   private request<T>(label: string, request: HttpClientRequest.HttpClientRequest, token: string, auth: boolean, schema: Schema.Codec<T>) {
     return Effect.gen({ self: this }, function* () {

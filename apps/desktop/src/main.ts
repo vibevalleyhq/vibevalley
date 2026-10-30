@@ -1,8 +1,7 @@
-import { t } from "@vibevalley/i18n";
+import { t, currentLocale, setLocale } from "@vibevalley/i18n";
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
 // through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
-import { currentLocale, setLocale } from "@vibevalley/i18n";
 import { followSavedLocale } from "./locale";
 import { setAppMenu } from "./menu";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";

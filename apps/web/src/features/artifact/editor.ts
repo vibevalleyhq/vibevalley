@@ -111,10 +111,12 @@ export class BlockEditor {
   /** Bumped on every change: what useSyncExternalStore reads. */
   version = 0;
 
-  constructor(
-    private readonly api: VibeValleyApi,
-    readonly artifactId: string,
-  ) {}
+  private readonly api: VibeValleyApi;
+  readonly artifactId: string;
+  constructor(api: VibeValleyApi, artifactId: string) {
+    this.api = api;
+    this.artifactId = artifactId;
+  }
 
   subscribe = (f: () => void) => {
     this.listeners.add(f);
@@ -419,7 +421,7 @@ export class BlockEditor {
 
   /** A new paragraph at the end, focused: what a click below the last block does. */
   append() {
-    const last = this.blocks.filter((b) => b.parentId === undefined).at(-1);
+    const last = this.blocks.findLast((b) => b.parentId === undefined);
     const nb: BlockInput = {
       id: newBlockId(),
       orderKey: keyBetween(last?.orderKey ?? "", ""),

@@ -63,10 +63,12 @@ class FakeWork implements TaskWork {
   release!: () => void;
   released = new Promise<void>((r) => (this.release = r));
 
-  constructor(
-    readonly core: Core["Service"],
-    readonly issues: Issues["Service"],
-  ) {}
+  readonly core: Core["Service"];
+  readonly issues: Issues["Service"];
+  constructor(core: Core["Service"], issues: Issues["Service"]) {
+    this.core = core;
+    this.issues = issues;
+  }
 
   private async work(h: Session, input: string): Promise<[string, string]> {
     if (!h.graph?.task) {
@@ -173,7 +175,10 @@ class FakeWork implements TaskWork {
 class FakeGit implements TaskGit {
   branches: string[] = [];
   from = new Map<string, string>();
-  constructor(readonly work: FakeWork) {}
+  readonly work: FakeWork;
+  constructor(work: FakeWork) {
+    this.work = work;
+  }
   run = (_cwd: string, command: string) =>
     Effect.sync(() => {
       for (const m of command.matchAll(/steps\/(\w+)\.txt/g))
@@ -460,7 +465,7 @@ describe("task graphs", () => {
   it.live("a graph is a parent issue, its steps the issues under it", () =>
     run((f) =>
       Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         const id = yield* f.split("菱形", "diamond");
         yield* f.until(id, (g) => g.state === "draft");
         const parent = yield* f.issues.get(id);

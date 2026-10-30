@@ -15,7 +15,7 @@ import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Ma
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
 export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {
   const [text, setText] = createSignal("");
-  const focus = autofocus<HTMLInputElement>();
+  const focus = autofocus();
   const submit = (e: KeyboardEvent) => {
     if (e.key !== "Enter" || e.isComposing) return;
     const t = text().trim();

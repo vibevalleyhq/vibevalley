@@ -18,8 +18,8 @@ const ACCEPTANCE = "acceptance";
 const errors: string[] = [];
 
 const sectioned = (file: string, text: string) => {
-  const headings = text.split("\n").filter((line) => line.startsWith("## "));
-  for (const section of SECTIONS) if (!headings.includes(section)) errors.push(`${file}: missing section "${section}"`);
+  const headings = new Set(text.split("\n").filter((line) => line.startsWith("## ")));
+  for (const section of SECTIONS) if (!headings.has(section)) errors.push(`${file}: missing section "${section}"`);
 };
 
 const link = resolve(root, ".claude/skills");

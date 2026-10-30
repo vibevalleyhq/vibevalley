@@ -4,9 +4,9 @@ import type { JSX } from "@solidjs/web";
 export const flag = (on: boolean | undefined): "" | undefined => (on ? "" : undefined);
 
 /** Calls a handler given as a JSX prop: a function, or Solid's [handler, data] pair. */
-export function call<E extends Event>(handler: unknown, event: E) {
-  if (typeof handler === "function") (handler as (e: E) => void)(event);
-  else if (Array.isArray(handler) && typeof handler[0] === "function") (handler[0] as (d: unknown, e: E) => void)(handler[1], event);
+export function call(handler: unknown, event: Event) {
+  if (typeof handler === "function") (handler as (e: Event) => void)(event);
+  else if (Array.isArray(handler) && typeof handler[0] === "function") (handler[0] as (d: unknown, e: Event) => void)(handler[1], event);
 }
 
 /** A ref given as a JSX prop, and the component's own, both told of the element. */

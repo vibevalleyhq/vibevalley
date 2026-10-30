@@ -38,7 +38,10 @@ export class ToastStore {
   private paused = false;
 
   /** The rest wait hidden behind. */
-  constructor(readonly limit = 3) {}
+  readonly limit: number;
+  constructor(limit: number = 3) {
+    this.limit = limit;
+  }
 
   /** Newest first. */
   get toasts(): readonly ToastData[] {

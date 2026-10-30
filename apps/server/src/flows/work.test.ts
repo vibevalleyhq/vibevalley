@@ -69,7 +69,7 @@ describe("a session's work", () => {
   it.live("goes in the ledger when merged", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const w = yield* watch;
       const issues = yield* Issues;
       const sql = yield* SqlClient.SqlClient;

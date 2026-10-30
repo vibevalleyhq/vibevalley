@@ -1,8 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { plainText } from "@vibevalley/protocol/rules";
-import { tookText } from "@/base/format";
+import { tookText, spentText } from "@/base/format";
 import type { IconName } from "@/ui/icons";
-import { spentText } from "@/base/format";
 
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

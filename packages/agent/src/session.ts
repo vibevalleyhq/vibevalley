@@ -43,7 +43,10 @@ export function readLines(file: string): BrainMessage[] {
 }
 
 export class SessionFile {
-  constructor(readonly file: string) {}
+  readonly file: string;
+  constructor(file: string) {
+    this.file = file;
+  }
 
   load(): BrainMessage[] {
     return replay(readLines(this.file));

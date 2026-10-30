@@ -146,7 +146,7 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
 
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {
-    const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     const c = yield* Connectors;
     return () => runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
   });
@@ -470,7 +470,7 @@ describe("the chat apps", () => {
       yield* Effect.scoped(Effect.provide(weixinConnected(before), farm(before, config)));
       const script = new Script();
       yield* Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         const chat = yield* Channels;
         expect((yield* Effect.promise(yield* statusOf("weixin"))).state).toBe("connected");
         script.weixinIn.push(wx(owner, "又见面了"));
@@ -616,7 +616,7 @@ describe("the chat apps", () => {
   it.live("keep the account when retiring what waited fails", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const c = yield* Connectors;
       const chat = yield* Channels;
       const sql = yield* SqlClient.SqlClient;

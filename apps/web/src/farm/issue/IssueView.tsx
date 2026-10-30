@@ -1,12 +1,21 @@
 import { list, t } from "@vibevalley/i18n";
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
 
-import { OutfitValues, SpeciesValues, type SessionView } from "@vibevalley/protocol";
+import {
+  OutfitValues,
+  SpeciesValues,
+  type SessionView,
+  type Agent,
+  type Deliverable,
+  DeliverableValues,
+  type Issue,
+  type IssueAct,
+  type Session,
+} from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import { type Agent, type Deliverable, DeliverableValues, type Issue, type IssueAct, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "@/base/api";
 import {
   createIssueActs,

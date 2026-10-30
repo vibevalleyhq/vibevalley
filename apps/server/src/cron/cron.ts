@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // is published for the orchestrator, who does it.
 
 import { whenText } from "./when.ts";
-import { messageOf } from "@/errors.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
 import type { Actor } from "@/base/actor.ts";
@@ -19,7 +19,6 @@ import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import * as q from "../../db/generated/cron.sql.ts";
 
 export interface Due {
@@ -93,7 +92,7 @@ export const make = Effect.gen(function* () {
       created: row.created_at,
       ...(row.last_run ? { lastRun: row.last_run } : {}),
       by: row.set_by,
-      pending: !!row.pending,
+      pending: row.pending,
     };
     yield* core.apply({ type: "cron", cron: s });
   }

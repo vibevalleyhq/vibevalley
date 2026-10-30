@@ -3,7 +3,7 @@ import { list, t } from "@vibevalley/i18n";
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
-import { messageOf } from "@/errors.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { join } from "node:path";
 import {
   type Agent,
@@ -21,7 +21,6 @@ import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate
 import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
-import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
 
 interface Stored {
   readonly agents: readonly Agent[];
@@ -153,7 +152,7 @@ export const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "config.json");
   const disk = new FileWriter(file);
-  const forkHere = yield* FiberSet.makeRuntime<never>();
+  const forkHere = yield* FiberSet.makeRuntime();
   const builtIn = builtInTemplates();
   const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.

@@ -83,11 +83,13 @@ export class Reminders {
   readonly tools: Tool[];
   private readonly file: string;
 
-  constructor(
-    private readonly home: string,
-    /** The brain's clock: when a reminder is due. */
-    private readonly now: () => number,
-  ) {
+  private readonly home: string;
+  /** The brain's clock: when a reminder is due. */
+  private readonly now: () => number;
+
+  constructor(home: string, now: () => number) {
+    this.home = home;
+    this.now = now;
     this.file = join(home, "reminders.json");
     this.tools = this.makeTools();
   }

@@ -22,7 +22,7 @@ test("the trigger opens a modal in the top layer, named by its title, with the f
   expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
   await userEvent.click(trigger);
   await settle();
-  const popup = $<HTMLDialogElement>("[data-testid=popup]");
+  const popup = $("[data-testid=popup]", HTMLDialogElement);
   expect([popup.open, popup.matches(":modal"), popup.hasAttribute("data-open"), trigger.hasAttribute("data-popup-open")]).toEqual([true, true, true, true]);
   expect($(`#${popup.getAttribute("aria-labelledby")}`).textContent).toBe("Settings");
   expect($(`#${popup.getAttribute("aria-describedby")}`).textContent).toBe("What this machine keeps.");
@@ -34,7 +34,7 @@ test("Escape, the close button and a press on the backdrop close it, and the foc
   const said: [boolean, DialogCloseReason][] = [];
   mount(() => view(said));
   const trigger = $("button");
-  const popup = $<HTMLDialogElement>("[data-testid=popup]");
+  const popup = $("[data-testid=popup]", HTMLDialogElement);
   await userEvent.click(trigger);
   await settle();
   await userEvent.keyboard("{Escape}");
@@ -66,7 +66,7 @@ test("an alert dialog is not closed by its backdrop, and reads as an alert dialo
     </AlertDialog.Root>
   ));
   await settle();
-  const popup = $<HTMLDialogElement>("[data-testid=popup]");
+  const popup = $("[data-testid=popup]", HTMLDialogElement);
   expect([popup.open, popup.getAttribute("role")]).toEqual([true, "alertdialog"]);
   await userEvent.click(popup, { position: { x: 1, y: 1 } });
   await settle();

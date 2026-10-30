@@ -98,12 +98,13 @@ export class Page {
   /** A block id another artifact has. */
   taken: (id: string) => boolean = () => false;
 
-  constructor(
-    readonly artifact: string,
-    readonly actor: string,
-    readonly now: number,
-    blocks: readonly Block[],
-  ) {
+  readonly artifact: string;
+  readonly actor: string;
+  readonly now: number;
+  constructor(artifact: string, actor: string, now: number, blocks: readonly Block[]) {
+    this.artifact = artifact;
+    this.actor = actor;
+    this.now = now;
     for (const b of blocks) this.blocks.set(b.id, { ...b });
   }
 
@@ -239,7 +240,6 @@ export class Page {
       case "merge_blocks":
         return this.merge(op);
     }
-    return rejected("", t("server.artifact.op.unknownOp", { op: (op as { op: string }).op }));
   }
 
   private updateText(o: BlockOpUpdateText): BlockOpResult {

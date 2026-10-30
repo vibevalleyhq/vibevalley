@@ -341,7 +341,7 @@ describe("issues", () => {
     });
     const f = farm([worker]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       yield* (yield* Agents).save(lab());
@@ -529,7 +529,7 @@ describe("issues", () => {
   it.live("a queued issue keeps the channel it was first sent from", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
@@ -560,7 +560,7 @@ describe("issues", () => {
     const clock = { now: 1_800_000_000_000 };
     const c = config();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
@@ -605,7 +605,7 @@ describe("issues", () => {
   it.live("an issue handed over goes on in the same issue with another profile", () => {
     const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const chat = yield* Channels;
@@ -636,7 +636,7 @@ describe("issues", () => {
   it.live("an issue still being worked is not handed over", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const chat = yield* Channels;
       const agents = yield* Agents;

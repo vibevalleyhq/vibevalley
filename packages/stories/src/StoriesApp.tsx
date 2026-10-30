@@ -519,7 +519,7 @@ function Pick<T extends string>(props: {
             aria-checked={props.value === o ? "true" : "false"}
             aria-label={props.looks[o].label}
             title={props.looks[o].label}
-            data-value={String(o)}
+            data-value={o}
             onClick={() => props.onChange(o)}
             class="flex h-7 min-w-7 items-center justify-center rounded-sm px-1 text-muted hover:text-ink aria-checked:bg-selected aria-checked:text-ink"
           >

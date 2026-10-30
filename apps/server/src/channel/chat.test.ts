@@ -137,7 +137,7 @@ const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) 
 
 /** The services of a test, and its helpers. */
 const farm = Effect.gen(function* () {
-  const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+  const runPromise = Effect.runPromiseWith(yield* Effect.context());
   const core = yield* Core;
   const chat = yield* Channels;
   const sql = yield* SqlClient.SqlClient;
@@ -161,7 +161,7 @@ type Farm = Effect.Success<typeof farm>;
 
 const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string, issue?: string) =>
   Effect.gen(function* () {
-    const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     yield* f.core.apply({
       type: "hired",
       session: {
@@ -367,7 +367,7 @@ describe("the chat", () => {
   it.live("a search reads its filters, and an edit can take a message's files off", () =>
     run((f) =>
       Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         const general = f.chat.defaultChannel();
         const file = yield* f.chat.attach({ name: "图.png", type: "image/png", data: Buffer.from("x").toString("base64") });
         const pictured = (yield* f.chat.say("看图", undefined, "", { attachments: [file.id] })).message;

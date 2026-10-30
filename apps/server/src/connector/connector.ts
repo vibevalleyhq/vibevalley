@@ -117,7 +117,7 @@ export const make = (options: ConnectorOptions = {}) =>
     );
     // The bridges' fibers (each account's generation, the status said to the core) belong to this service: they end with
     // it and keep its services (the logger, the Clock).
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     /** The database's own failures stay failures here: the status says them. */
     const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
     const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);

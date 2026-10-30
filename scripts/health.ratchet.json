@@ -27,7 +27,7 @@
     "nonNull": 18,
     "doubleCast": 2,
     "cast": 7,
-    "lintOff": 0
+    "lintOff": 1
   },
   "packages/ai": {
     "nonNull": 11,
@@ -92,7 +92,7 @@
   "server: Collaboration": {
     "nonNull": 42,
     "doubleCast": 0,
-    "cast": 5,
+    "cast": 4,
     "lintOff": 0
   },
   "server: Gamification": {
@@ -104,7 +104,7 @@
   "server: Gateway": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 22,
+    "cast": 21,
     "lintOff": 1
   },
   "server: Issues": {
@@ -129,7 +129,7 @@
     "nonNull": 6,
     "doubleCast": 0,
     "cast": 4,
-    "lintOff": 1
+    "lintOff": 2
   },
   "server: Source Control": {
     "nonNull": 35,

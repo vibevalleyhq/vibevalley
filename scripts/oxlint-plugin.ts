@@ -348,8 +348,8 @@ const oneAbsent = defineRule({
   create(context) {
     return {
       TSUnionType(node) {
-        const kinds = node.types.map((t) => t.type);
-        if (kinds.includes("TSNullKeyword") && kinds.includes("TSUndefinedKeyword")) context.report({ node, messageId: "both" });
+        const kinds = new Set(node.types.map((t) => t.type));
+        if (kinds.has("TSNullKeyword") && kinds.has("TSUndefinedKeyword")) context.report({ node, messageId: "both" });
       },
     };
   },

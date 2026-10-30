@@ -654,7 +654,6 @@ export const make = (options: TaskOptions = {}) =>
             return t("server.task.act.merged", { title: graph.title, text: merged.success });
           }
         }
-        return yield* Effect.fail(refused(t("server.task.act.unknownAction", { action: String(action satisfies never) })));
       }, lock.withPermits(1)),
       taskAct: Effect.fn("Tasks.taskAct")(function* (id, taskId, action, by) {
         const graph = yield* need(id);
@@ -698,7 +697,6 @@ export const make = (options: TaskOptions = {}) =>
             return t("server.task.act.skipped", { title: task.title });
           }
         }
-        return yield* Effect.fail(refused(t("server.task.act.unknownAction", { action: String(action satisfies never) })));
       }, lock.withPermits(1)),
       editTask: (id, task, edit, by) => edited(id, (g) => editTask(g, task, edit), by),
       removeTask: (id, task, by) => edited(id, (g) => removeTask(g, task), by),

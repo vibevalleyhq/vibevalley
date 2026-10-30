@@ -6,7 +6,7 @@ import type { Message } from "@vibevalley/ai/messages";
 import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { Said } from "@/testing/said.ts";
-import { starter } from "@/testing/layers.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
 import { Effect, Fiber, Layer } from "effect";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,7 +20,6 @@ import { Issues } from "@/issue/issue.ts";
 import { Crons } from "@/cron/cron.ts";
 import { Notices } from "@/notice/notice.ts";
 import { Sessions } from "@/session/session.ts";
-import { testConfig } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 import { Orchestrator } from "./orchestrator.ts";
 import { deepseekModel, orchestratorModel } from "./model.ts";
@@ -31,11 +30,7 @@ import { gate, untilGot as until, whenTrue, within } from "@/testing/until.ts";
 const onPhone = (o: Orchestrator["Service"], text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
-const lastInput = (c: Request) =>
-  c.messages
-    .map(userText)
-    .filter((t): t is string => t !== undefined)
-    .at(-1) ?? "";
+const lastInput = (c: Request) => c.messages.map(userText).findLast((t) => t !== undefined) ?? "";
 const heads = ["【现在】", "【现状】", "【现状变了】", "【记性有更新】", "这期间群聊里的汇报"];
 /** An input without what the orchestrator puts before the words. */
 const words = (input: string) => {
@@ -428,7 +423,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const { in: saidIn } = yield* Said;
@@ -473,7 +468,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;

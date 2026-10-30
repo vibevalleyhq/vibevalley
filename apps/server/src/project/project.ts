@@ -289,7 +289,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const perProject = config.project.maxSessions;
     const checkTimeoutMs = config.project.checkTimeoutSeconds * 1000;
     const tokei = config.tokei || "tokei";
-    const prProjects = [...config.github.prProjects];
+    const prProjects = new Set([...config.github.prProjects]);
     const gh = hooks.gh ?? runGitHub;
 
     const queues = new Map<string, Semaphore.Semaphore>();
@@ -403,7 +403,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       return moved.code === 0 ? main : yield* kept;
     });
 
-    const usesPullRequests = (name: string) => prProjects.includes(name) && capability(name).available;
+    const usesPullRequests = (name: string) => prProjects.has(name) && capability(name).available;
 
     const describe = (project: string, cwd: string, branch: string | undefined) =>
       repository(join(root, project))

@@ -251,7 +251,7 @@ describe("voice", () => {
   // Agora's retries, on the service's Clock (voice.ts retrying): moved through, not waited for.
   it.effect("retries 408, 429 and 5xx twice on the Clock, as Agora's SDK would, and nothing else", () =>
     Effect.gen(function* () {
-      const run = Effect.runPromiseWith(yield* Effect.context<never>());
+      const run = Effect.runPromiseWith(yield* Effect.context());
       // A retry's sleep is taken after the answer comes back: let it be taken, then move the clock.
       const step = (ms: number) =>
         Effect.andThen(
