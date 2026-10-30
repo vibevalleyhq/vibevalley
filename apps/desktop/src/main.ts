@@ -4,13 +4,29 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
+import {
+  BrowserWindow,
+  type IpcMainEvent,
+  Menu,
+  Notification,
+  Tray,
+  app,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  nativeImage,
+  nativeTheme,
+  screen,
+  shell,
+} from "electron";
 
+import { serve, type Link } from "@vibevalley/bridge";
 import { filledNear } from "@vibevalley/engine/framing";
 import { t, currentLocale, setLocale } from "@vibevalley/i18n";
 import { VibeValleyApi } from "@vibevalley/protocol";
-import { farmFraming, type Notice, type TraySummary } from "@vibevalley/protocol/host";
+import { desktopBridge, desktopVoiceShortcut, farmFraming, type Notice } from "@vibevalley/protocol/host";
 
+import { bridgeChannel } from "./bridge";
 import { watchForDev } from "./dev";
 import { startIsland } from "./island";
 import { followSavedLocale } from "./locale";
@@ -126,55 +142,61 @@ function openIssue(issue: string) {
   app.focus({ steal: true });
 }
 
-ipcMain.handle("host:notify", (_event, notice: Notice) => {
-  notices.push(notice);
-  if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
-});
-
-// Only a path on this machine, shown in Finder; never opened or run.
-ipcMain.handle("host:reveal", (_event, path: string) => {
-  if (typeof path === "string" && path.startsWith("/")) shell.showItemInFolder(path);
-});
-// The window's own parts (menus, scroll bars, the title strip) follow the theme the page chose.
-ipcMain.handle("host:theme", (_event, theme: string) => {
-  nativeTheme.themeSource = theme === "light" || theme === "dark" ? theme : "system";
-  window?.setBackgroundColor(ground());
-});
-
-ipcMain.handle("host:locale", (_event, locale: string) => {
-  const next = locale === "en" ? "en" : "zh";
-  if (next === currentLocale()) return;
-  setLocale(next);
-  setAppMenu();
-});
-
 // The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
 let tray: Tray | undefined;
-ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
-  Object.assign(globalThis, { vibevalleyTray: summary });
-  if (!tray) {
-    const icon = nativeImage.createFromPath(join(files().web, "pixel", "app-sprout.png")).resize({ width: 16, height: 16 });
-    tray = new Tray(icon);
-    tray.setToolTip("VibeValley");
-  }
-  if (process.platform === "darwin") tray.setTitle(summary.title);
-  const show = () => {
-    if (window?.isMinimized() === true) window.restore();
-    window?.show();
-    window?.focus();
-  };
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      ...summary.lines.map((label) => ({ label, click: show })),
-      { type: "separator" },
-      { label: t("desktop.open"), click: show },
-      { label: t("desktop.quit"), role: "quit" },
-    ]),
-  );
-});
 
-/** Starts and ends a call to the orchestrator while another program is in front (the page's voiceShortcut). */
-const voiceShortcut = "Alt+Shift+Space";
+/** The page's end of the bridge is the preload in the one window: what another sender says is not heard. */
+const pageLink: Link = {
+  send: (m) => window?.webContents.send(bridgeChannel, m),
+  receive: (fn) => {
+    const heard = (event: IpcMainEvent, m: unknown) => {
+      if (event.sender === window?.webContents) fn(m);
+    };
+    ipcMain.on(bridgeChannel, heard);
+    return () => void ipcMain.off(bridgeChannel, heard);
+  },
+};
+
+const page = serve(desktopBridge, pageLink, {
+  notify: (notice) => {
+    notices.push(notice);
+    if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
+  },
+  // Only a path on this machine (the contract takes an absolute one), shown in Finder; never opened or run.
+  reveal: (path) => shell.showItemInFolder(path),
+  // The window's own parts (menus, scroll bars, the title strip) follow the theme the page chose.
+  theme: (theme) => {
+    nativeTheme.themeSource = theme;
+    window?.setBackgroundColor(ground());
+  },
+  locale: (locale) => {
+    if (locale === currentLocale()) return;
+    setLocale(locale);
+    setAppMenu();
+  },
+  tray: (summary) => {
+    Object.assign(globalThis, { vibevalleyTray: summary });
+    if (!tray) {
+      const icon = nativeImage.createFromPath(join(files().web, "pixel", "app-sprout.png")).resize({ width: 16, height: 16 });
+      tray = new Tray(icon);
+      tray.setToolTip("VibeValley");
+    }
+    if (process.platform === "darwin") tray.setTitle(summary.title);
+    const show = () => {
+      if (window?.isMinimized() === true) window.restore();
+      window?.show();
+      window?.focus();
+    };
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        ...summary.lines.map((label) => ({ label, click: show })),
+        { type: "separator" },
+        { label: t("desktop.open"), click: show },
+        { label: t("desktop.quit"), role: "quit" },
+      ]),
+    );
+  },
+});
 
 if (!app.requestSingleInstanceLock()) {
   // The one already open is brought to the front (second-instance there); said, so a script that started this one knows.
@@ -250,7 +272,7 @@ if (!app.requestSingleInstanceLock()) {
       app.on("will-quit", stopWatching);
     }
     // Taken by another program: the call button still works.
-    globalShortcut.register(voiceShortcut, () => window?.webContents.send("host:voice-shortcut"));
+    globalShortcut.register(desktopVoiceShortcut, () => page.push("voiceShortcut", undefined));
     app.on("activate", () => {
       if (!window && server) open(server.url);
     });

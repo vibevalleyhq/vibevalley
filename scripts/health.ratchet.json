@@ -8,8 +8,8 @@
   "apps/mobile": {
     "nonNull": 1,
     "doubleCast": 1,
-    "cast": 4,
-    "lintOff": 6
+    "cast": 3,
+    "lintOff": 5
   },
   "apps/server": {
     "nonNull": 0,
@@ -40,6 +40,12 @@
     "doubleCast": 0,
     "cast": 4,
     "lintOff": 5
+  },
+  "packages/bridge": {
+    "nonNull": 0,
+    "doubleCast": 1,
+    "cast": 2,
+    "lintOff": 3
   },
   "packages/engine": {
     "nonNull": 40,

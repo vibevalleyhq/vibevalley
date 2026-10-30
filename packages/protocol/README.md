@@ -10,7 +10,7 @@ state's fold and the frame (`apps/server/src/projection`). No files, no network.
 | `@vibevalley/protocol/schema` | a Schema for every shape, each typed `Codec<T.X>` (`Schema.Codec<T.X, Wire<T.X>>`, the wire side without the ids' brands): it fails to compile when the two differ |
 | `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call), `Handlers`, `errorStatus` |
 | `@vibevalley/protocol/rpc` | `Subscriptions`: the RPCs a page follows a channel and the farm's reports by, over the WebSocket at `rpcPath` |
-| `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `ToNative`, `FromNative` and `mobileHost`, the page's end of the phone's bridge |
+| `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `desktopBridge` and `mobileBridge`, the contracts each host's calls go over (`@vibevalley/bridge`), and `mobileHost`, the page's end of the phone's |
 | `@vibevalley/protocol/rules` | the core state's fold (`reduce`, `frameOf`), the inbox, plots and achievements, task graphs, schedules, the doc's order keys, text as JavaScript measures it |
 
 The golden cases of the fold and the frame are the server's (`apps/server/src/core/testdata`, `core/golden.test.ts`).
@@ -29,9 +29,10 @@ over the bridge, `browserHost` otherwise).
 | `rtc(grant, events)` | null (the page's Agora Web SDK) | Agora's native SDK, going on with the screen locked | null |
 | `locale(locale)` | the tray's menu and the island follow the page's language | null (the shell speaks the phone's) | null |
 
-On the phone, what the page asks goes out as `ToNative` and is answered by id; the call's events come back as
-`FromNative`. Each `RtcLine` keeps its own identity across the bridge: its controls and events cannot act on a later
-call, including a join that finishes after the page cancelled it.
+What a host carries to another program goes by a contract here over `@vibevalley/bridge`: the desktop's preload to
+Electron's main by `desktopBridge`, the phone's page to its shell by `mobileBridge`, the call's events coming back as
+pushes with their line. Each `RtcLine` keeps its own line across the bridge: its controls and events cannot act on a
+later call, including a join that finishes after the page cancelled it.
 
 ```bash
 vp run test     # vitest: the rules and the phone's bridge (types: vp check at the root)

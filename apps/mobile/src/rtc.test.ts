@@ -1,7 +1,8 @@
 import type { IRtcEngineEventHandler } from "react-native-agora";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
-import { type FromNative, mobileHost, type RtcEvents } from "@vibevalley/protocol/host";
+import type { BridgeMessage, Link } from "@vibevalley/bridge";
+import { mobileHost, type RtcEvents } from "@vibevalley/protocol/host";
 
 import { nativeHost } from "./host";
 import { nativeRtc } from "./rtc";
@@ -53,6 +54,27 @@ const connection = (channel: string) => ({ channelId: channel, localUid: 7 });
 const events: RtcEvents = { joined() {}, left() {}, stream() {}, levels() {}, problem() {}, expiring() {} };
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
+/** The shell's messages are held in replies until deliver hands one to the page; the page's calls (ask) reach the shell at once. */
+function held() {
+  const toShell = new Set<(m: unknown) => void>();
+  const toPage = new Set<(m: unknown) => void>();
+  const copy = (m: BridgeMessage): unknown => JSON.parse(JSON.stringify(m));
+  const ear = (set: Set<(m: unknown) => void>) => (fn: (m: unknown) => void) => {
+    set.add(fn);
+    return () => void set.delete(fn);
+  };
+  const replies: unknown[] = [];
+  const ask = (m: BridgeMessage) => {
+    for (const fn of toShell) fn(copy(m));
+  };
+  const page: Link = { send: ask, receive: ear(toPage) };
+  const shell: Link = { send: (m) => replies.push(copy(m)), receive: ear(toShell) };
+  const deliver = (m: unknown) => {
+    for (const fn of toPage) fn(m);
+  };
+  return { page, shell, replies, deliver, ask };
+}
+
 test("an older microphone permission reply cannot replace a newer call", async () => {
   const permission = Promise.withResolvers<string>();
   sdk.request.mockReturnValueOnce(permission.promise);
@@ -83,27 +105,27 @@ test("a rejected join releases its microphone and engine", async () => {
 });
 
 test("late cleanup and native events from an old line cannot affect its successor across the bridge", async () => {
-  const replies: FromNative[] = [];
-  const native = nativeHost((m) => replies.push(m));
-  const page = mobileHost((m) => void native.receive(m));
+  const { page: pageLink, shell, replies, deliver } = held();
+  const native = nativeHost(shell);
+  const page = mobileHost(pageLink);
   const heard: string[] = [];
   try {
-    const old = page.host.rtc!(grant("old"), events);
+    const old = page.rtc!(grant("old"), events);
     await settle();
     const oldHandler = sdk.handler;
     oldHandler?.onJoinChannelSuccess?.(connection("old"), 0);
     await settle();
-    const next = page.host.rtc!(grant("new"), { ...events, joined: () => heard.push("new") });
+    const next = page.rtc!(grant("new"), { ...events, joined: () => heard.push("new") });
     await settle();
     sdk.handler?.onJoinChannelSuccess?.(connection("new"), 0);
     await settle();
-    page.receive(replies[1]);
+    deliver(replies[1]);
     const current = await next;
-    page.receive(replies[0]);
+    deliver(replies[0]);
     const late = await old;
     const cleaning = late.leave();
     await settle();
-    page.receive(replies[2]);
+    deliver(replies[2]);
     await cleaning;
     expect(sdk.release).toHaveBeenCalledTimes(1);
 
@@ -111,16 +133,16 @@ test("late cleanup and native events from an old line cannot affect its successo
     sdk.handler?.onUserJoined?.(connection("new"), 9, 0);
     await settle();
     expect(replies).toHaveLength(4);
-    page.receive(replies[3]);
+    deliver(replies[3]);
     expect(heard).toEqual(["new"]);
 
     const muted = current.mute(true);
     await settle();
-    page.receive(replies[4]);
+    deliver(replies[4]);
     await muted;
     const renewed = current.renew("fresh");
     await settle();
-    page.receive(replies[5]);
+    deliver(replies[5]);
     await renewed;
     expect(sdk.mute).toHaveBeenCalledWith(true);
     expect(sdk.renew).toHaveBeenCalledWith("fresh");
@@ -133,23 +155,23 @@ test("late cleanup and native events from an old line cannot affect its successo
 test("closing a page cancels its pending join and silences replies before a new page opens", async () => {
   const permission = Promise.withResolvers<string>();
   sdk.request.mockReturnValueOnce(permission.promise);
-  const oldReplies: FromNative[] = [];
-  const oldPage = nativeHost((m) => oldReplies.push(m));
-  const oldJoin = oldPage.receive({ id: 1, call: "rtc.join", line: 1, grant: grant("old") });
+  const before = held();
+  const oldPage = nativeHost(before.shell);
+  before.ask({ id: 1, call: "rtcJoin", input: { line: 1, grant: grant("old") } });
   oldPage.close();
-  await oldJoin;
+  await settle();
 
-  const replies: FromNative[] = [];
-  const currentPage = nativeHost((m) => replies.push(m));
+  const now = held();
+  const currentPage = nativeHost(now.shell);
   try {
-    const current = currentPage.receive({ id: 1, call: "rtc.join", line: 1, grant: grant("new") });
+    now.ask({ id: 1, call: "rtcJoin", input: { line: 1, grant: grant("new") } });
     await settle();
     sdk.handler?.onJoinChannelSuccess?.(connection("new"), 0);
-    await current;
+    await settle();
     permission.resolve("yes");
     await settle();
-    expect(oldReplies).toEqual([]);
-    expect(replies).toEqual([{ id: 1, ok: true }]);
+    expect(before.replies).toEqual([]);
+    expect(now.replies).toEqual([{ id: 1, ok: true }]);
     expect(sdk.initialize).toHaveBeenCalledTimes(1);
     expect(sdk.release).not.toHaveBeenCalled();
   } finally {

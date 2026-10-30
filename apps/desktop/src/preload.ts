@@ -1,29 +1,33 @@
-// The host interface for the page (@vibevalley/protocol/host), over IPC to the main process.
+// The host interface for the page (@vibevalley/protocol/host), over the desktop's bridge to the main process.
 
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-import { type Host, hostKey } from "@vibevalley/protocol/host";
+import { connect, type Link } from "@vibevalley/bridge";
+import { desktopBridge, desktopVoiceShortcut, type Host, hostKey } from "@vibevalley/protocol/host";
 
-/** The main process registers it (main.ts voiceShortcut). */
-const voiceShortcut = "Alt+Shift+Space";
+import { bridgeChannel } from "./bridge";
+
+const link: Link = {
+  send: (m) => ipcRenderer.send(bridgeChannel, m),
+  receive: (fn) => {
+    const heard = (_event: IpcRendererEvent, m: unknown) => fn(m);
+    ipcRenderer.on(bridgeChannel, heard);
+    return () => void ipcRenderer.off(bridgeChannel, heard);
+  },
+};
+const main = connect(desktopBridge, link);
+const told = (sent: Promise<void>) => void sent.catch((e: unknown) => console.error("vibevalley:", e));
 
 const host: Host = {
   name: "desktop",
-  notify: (notice) => ipcRenderer.invoke("host:notify", { title: notice.title, body: notice.body }),
-  tray: (summary) => ipcRenderer.invoke("host:tray", { title: summary.title, lines: [...summary.lines] }),
-  locale: (locale) => void ipcRenderer.invoke("host:locale", locale),
-  reveal: (path) => void ipcRenderer.invoke("host:reveal", path),
-  theme: (theme) => void ipcRenderer.invoke("host:theme", theme),
+  notify: (notice) => main.call.notify(notice),
+  tray: (summary) => main.call.tray(summary),
+  locale: (locale) => told(main.call.locale(locale)),
+  reveal: (path) => told(main.call.reveal(path)),
+  theme: (theme) => told(main.call.theme(theme)),
   // On macOS the window's title bar is hidden and its traffic lights sit over the page (main.ts trafficLights).
   ...(process.platform === "darwin" ? { titleBar: { top: 28, left: 76 } } : {}),
-  voiceShortcut: {
-    accelerator: voiceShortcut,
-    on: (fn) => {
-      const listener = () => fn();
-      ipcRenderer.on("host:voice-shortcut", listener);
-      return () => void ipcRenderer.off("host:voice-shortcut", listener);
-    },
-  },
+  voiceShortcut: { accelerator: desktopVoiceShortcut, on: (fn) => main.on("voiceShortcut", fn) },
 };
 
 contextBridge.exposeInMainWorld(hostKey, host);

@@ -31,6 +31,7 @@ packages/i18n/             对主人说的话：locales/<语言>/<宿主.模块>
 packages/ai/               模型：DeepSeek 的请求和流、消息形状、模型表和价格、工具参数的 Schema、照脚本回答的测试模型
 packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具，其余是 Brain（对话、压缩、技能、记性、帮手、自己的任务）；
                            不认识农场，lint 查方向（ai ← agent ← apps/server）
+packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器
 packages/testkit/          测试共用的：黄金数据、在真实时间上等条件、测试金字塔（只在 devDependencies）
 packages/health/           仓库的体检：热点（改动次数乘行数）和类型逃生口的棘轮；这个仓库的配置在 scripts/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面

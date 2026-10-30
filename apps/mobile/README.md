@@ -1,7 +1,7 @@
 # apps/mobile
 
 The phone's shell (Expo, React Native): it pairs with a farm once, then shows the page that farm serves through its
-lan listener (连接到本机) in a WebView, and is that page's host (`@vibevalley/protocol/host`, over the bridge
+lan listener (连接到本机) in a WebView, and is that page's host (`@vibevalley/protocol/host`, over its `mobileBridge`
 whose page end is `mobileHost` there). How it fits with the desktop and the browser: [the client](docs/subsystems/app.md);
 pairing and keys: [连接到本机](docs/subsystems/lan.md).
 

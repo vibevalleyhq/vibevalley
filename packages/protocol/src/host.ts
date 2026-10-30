@@ -1,21 +1,28 @@
 // What the page may ask of the program around it: the desktop's shell, the phone's, or none in a browser tab. Every host
 // gives the whole interface; a capability it lacks is null, and the page draws nothing for it. The page never asks which
-// host it is in (it finds its host in apps/web/src/base/host.ts). The phone's host is over its WebView's bridge: the page posts
-// a call as JSON and the shell answers it by id, the call's events come back the same way; mobileHost is the page's end of
-// it, and the shell (apps/mobile) the other.
+// host it is in (it finds its host in apps/web/src/base/host.ts). What a host carries to another program goes over a
+// bridge (@vibevalley/bridge) by one of the contracts here: the desktop's preload to Electron's main (desktopBridge), the
+// phone's page to its shell (mobileBridge, whose page end is mobileHost).
 
+import { Schema } from "effect";
+
+import { call, connect, type Link, push } from "@vibevalley/bridge";
+
+import { AgoraGrant as AgoraGrantSchema, Locale as LocaleSchema } from "./schema";
 import type { AgoraGrant, Locale } from "./shapes";
 
 export interface Notice {
-  title: string;
-  body: string;
+  readonly title: string;
+  readonly body: string;
 }
+export const Notice: Schema.Codec<Notice> = Schema.Struct({ title: Schema.String, body: Schema.String });
 
 /** The farm at a glance, where the host keeps one (the menu bar's tray): a short title and a line each. */
 export interface TraySummary {
-  title: string;
-  lines: string[];
+  readonly title: string;
+  readonly lines: readonly string[];
 }
+export const TraySummary: Schema.Codec<TraySummary> = Schema.Struct({ title: Schema.String, lines: Schema.Array(Schema.String) });
 
 /** A key the host hears while another program is in front. */
 export interface Shortcut {
@@ -79,98 +86,83 @@ export interface Host {
 /** Light, dark, or as the system is. */
 export const ThemeChoiceValues = ["light", "dark", "system"] as const;
 export type ThemeChoice = (typeof ThemeChoiceValues)[number];
+export const ThemeChoice: Schema.Codec<ThemeChoice> = Schema.Literals(ThemeChoiceValues);
 
 /** The property a host's preload (or injected script) sets on window. */
 export const hostKey = "vibevalleyHost";
 
-/** What the page asks of the shell; each is answered once by its id. */
-export type ToNative =
-  | { readonly id: number; readonly call: "notify"; readonly notice: Notice }
-  | { readonly id: number; readonly call: "rtc.join"; readonly line: number; readonly grant: AgoraGrant }
-  | { readonly id: number; readonly call: "rtc.mute"; readonly line: number; readonly on: boolean }
-  | { readonly id: number; readonly call: "rtc.renew"; readonly line: number; readonly token: string }
-  | { readonly id: number; readonly call: "rtc.leave"; readonly line: number };
+/** The key the desktop hears while another program is in front, in Electron's accelerator notation: main registers it,
+ * the page shows it (Host.voiceShortcut). */
+export const desktopVoiceShortcut = "Alt+Shift+Space";
 
-/** The shell's answers, and the call's events. */
-export type FromNative =
-  | { readonly id: number; readonly ok: true }
-  | { readonly id: number; readonly ok: false; readonly error: string }
-  | { readonly event: "rtc.joined"; readonly line: number }
-  | { readonly event: "rtc.left"; readonly line: number }
-  | { readonly event: "rtc.stream"; readonly line: number; readonly text: string }
-  | { readonly event: "rtc.levels"; readonly line: number; readonly mine: number; readonly theirs: number }
-  | { readonly event: "rtc.problem"; readonly line: number; readonly text: string }
-  | { readonly event: "rtc.expiring"; readonly line: number };
+/** The desktop's preload asks Electron's main (apps/desktop). reveal takes only a path on this machine. */
+export const desktopBridge = {
+  notify: call({ input: Notice, output: Schema.Void }),
+  tray: call({ input: TraySummary, output: Schema.Void }),
+  locale: call({ input: LocaleSchema, output: Schema.Void }),
+  reveal: call({ input: Schema.String.check(Schema.isPattern(/^\//u)), output: Schema.Void }),
+  theme: call({ input: ThemeChoice, output: Schema.Void }),
+  voiceShortcut: push(Schema.Void),
+};
 
-/** The function on window the shell calls with each FromNative. */
+const Line = { line: Schema.Finite };
+
+/** The phone's page asks its shell (apps/mobile); a call's events come back as pushes, each with the line it is for. */
+export const mobileBridge = {
+  notify: call({ input: Notice, output: Schema.Void }),
+  rtcJoin: call({ input: Schema.Struct({ ...Line, grant: AgoraGrantSchema }), output: Schema.Void }),
+  rtcMute: call({ input: Schema.Struct({ ...Line, on: Schema.Boolean }), output: Schema.Void }),
+  rtcRenew: call({ input: Schema.Struct({ ...Line, token: Schema.String }), output: Schema.Void }),
+  rtcLeave: call({ input: Schema.Struct(Line), output: Schema.Void }),
+  rtcJoined: push(Schema.Struct(Line)),
+  rtcLeft: push(Schema.Struct(Line)),
+  rtcStream: push(Schema.Struct({ ...Line, text: Schema.String })),
+  rtcLevels: push(Schema.Struct({ ...Line, mine: Schema.Finite, theirs: Schema.Finite })),
+  rtcProblem: push(Schema.Struct({ ...Line, text: Schema.String })),
+  rtcExpiring: push(Schema.Struct(Line)),
+};
+
+/** The function on window the phone's shell calls with each message for the page. */
 export const fromNativeKey = "vibevalleyFromHost";
 
-type Question = ToNative extends infer T ? (T extends { id: number } ? Omit<T, "id"> : never) : never;
-
-/** Only the current line delivers events; older handles keep their own identity for late cleanup. */
-export function mobileHost(post: (m: ToNative) => void) {
+/** The phone's host over its bridge. Only the current line hears its events; an older one keeps its own line for a late
+ * leave. */
+export function mobileHost(link: Link): Host {
+  const native = connect(mobileBridge, link);
   let next = 1;
-  const waiting = new Map<number, { resolve: () => void; reject: (e: Error) => void }>();
   let active: { line: number; events: RtcEvents } | undefined;
-  const ask = (m: Question) =>
-    new Promise<void>((resolve, reject) => {
-      const id = next++;
-      waiting.set(id, { resolve, reject });
-      post({ ...m, id });
-    });
-  const host: Host = {
+  const to = (line: number) => (active?.line === line ? active.events : undefined);
+  native.on("rtcJoined", ({ line }) => to(line)?.joined());
+  native.on("rtcLeft", ({ line }) => to(line)?.left());
+  native.on("rtcStream", ({ line, text }) => to(line)?.stream(text));
+  native.on("rtcLevels", ({ line, mine, theirs }) => to(line)?.levels(mine, theirs));
+  native.on("rtcProblem", ({ line, text }) => to(line)?.problem(text));
+  native.on("rtcExpiring", ({ line }) => to(line)?.expiring());
+  return {
     name: "mobile",
-    notify: (notice) => ask({ call: "notify", notice: { title: notice.title, body: notice.body } }),
+    notify: (notice) => native.call.notify(notice),
     // The phone's shell speaks the phone's language (apps/mobile words.ts).
     // Files on the phone are not the farm's; the phone's status bar follows the system's theme.
     rtc: async (grant, on) => {
-      const line = next;
+      const line = next++;
       active = { line, events: on };
       const detach = () => {
         if (active?.line === line) active = undefined;
       };
       try {
-        await ask({ call: "rtc.join", line, grant: { appId: grant.appId, channel: grant.channel, uid: grant.uid, token: grant.token } });
+        await native.call.rtcJoin({ line, grant });
       } catch (e) {
         detach();
         throw e;
       }
       return {
-        mute: (on) => ask({ call: "rtc.mute", line, on }),
-        renew: (token) => ask({ call: "rtc.renew", line, token }),
+        mute: (on) => native.call.rtcMute({ line, on }),
+        renew: (token) => native.call.rtcRenew({ line, token }),
         leave: () => {
           detach();
-          return ask({ call: "rtc.leave", line });
+          return native.call.rtcLeave({ line });
         },
       } satisfies RtcLine;
     },
   };
-  const receive = (m: FromNative) => {
-    if ("id" in m) {
-      const w = waiting.get(m.id);
-      waiting.delete(m.id);
-      if (m.ok) w?.resolve();
-      else w?.reject(new Error(m.error));
-      return;
-    }
-    if (active?.line !== m.line) return;
-    const events = active.events;
-    switch (m.event) {
-      case "rtc.joined":
-        return events.joined();
-      case "rtc.left":
-        return events.left();
-      case "rtc.stream":
-        return events.stream(m.text);
-      case "rtc.levels":
-        return events.levels(m.mine, m.theirs);
-      case "rtc.problem":
-        return events.problem(m.text);
-      case "rtc.expiring":
-        return events.expiring();
-      default:
-        return m satisfies never;
-    }
-  };
-  return { host, receive };
 }
