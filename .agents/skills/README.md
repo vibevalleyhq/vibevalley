@@ -11,4 +11,5 @@
 | [vv-pr](.agents/skills/vv-pr/SKILL.md) | 做完一件事要开 PR、改 PR、合 PR；手上几处改动不知道该合还是拆 | 切成几个 PR 是对的；分支名、英文的标题和正文合规矩、带着验收的证据；合之前 PR 上的标题和正文又查过一遍 |
 | [vv-comments](.agents/skills/vv-comments/SKILL.md) | 写完代码提 PR 前；主人要清一块代码里的注释 | 留下的每条注释都是删了会让人写错的：模型初审、逐条对着代码核实过，删的删、改名的改名、改短的改短，模型判错的列出理由 |
 | [vv-simplify](.agents/skills/vv-simplify/SKILL.md) | 想找一块代码里能简化的地方 | 一份核实过、排好序的清单：每处删掉什么、调用方少知道什么、靠哪个测试证明没变坏；主人点了再改 |
+| [vv-governance](.agents/skills/vv-governance/SKILL.md) | 要加一条规矩或一个检查；评审一块代码有没有在变坏；写计划前问清边界；做纯重构；一次机械的改动跨很多文件；主人提到白皮书、治理、五层金字塔、十条铁律 | 新检查用了最便宜的手段、失败时说得出怎么改；评审按六种病逐条查过；《AI 智能体时代的软件维护与工程治理白皮书》的每个要点在这里已有、已做、以后做还是不做，同目录的 `whitepaper.md` 逐条对照 |
 | [effect-ts](.agents/skills/effect-ts/SKILL.md) | 给一个用 Effect 的仓库做准备：装 `effect`、在 AGENTS.md 里指到它自带的 `AGENTS.md` 和源码（照抄自 [Effect-TS/skills](https://github.com/Effect-TS/skills/tree/main/skills/effect-ts)，不改） | 写 Effect 的 agent 先读 Effect 自己的指南，再查 `node_modules/effect/src` |

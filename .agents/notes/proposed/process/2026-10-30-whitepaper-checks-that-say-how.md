@@ -17,6 +17,9 @@ Status: proposed
 | 契约的 diff 进 CI 的摘要、审查压缩比 | 主人看清每个 PR 动了哪些接口（2026-10-30 回放 `main` 最近 100 个 PR：契约约占改动的 1/22，三分之一的 PR 一行契约都没动） | 主人要按契约审 PR 时。回放同时显示：后来修掉的缺陷只有 1.5% 当初写在契约里，读契约挡不住缺陷，挡缺陷靠测试和验收 |
 | 热路径的 I/O 次数断言 | 次数不随机器波动，N+1 一出现就红（`docs/subsystems/foundation.md` 里「频道一句话从 22 条查询降到 10 条」是手量的，没有测试守着） | 出现第一个这类回归时，从那条路径开始：测试的库和 git 端口各带一个计数器，模块测试断言上限 |
 | 流按任意切片测、`reduce` 的不变量 | 挡解析器假设「一次到一整行」、挡核心状态出现非法组合 | 同上，出现第一个这类问题时 |
+| 子进程只在拥有它的模块里起 | 超时、杀进程组只写在一处（`apps/server/src/project/git.ts`），别处另起进程会漏 | 写成 `vite.config.ts` 的 `no-restricted-imports`：服务端只有 `project/git.ts`、`runtime/dsh.ts`、`voice/voice.ts` 和 `testing/` 能 import `node:child_process`；先把测试里自己 `execFileSync("git", …)` 的改成 `testing/git.ts` 的 `gitSync` |
+| 常驻集合由谁删 | 服务端一直开着，只加不删的 `Map`、`Set` 会慢慢长大 | 逐处清点服务端非测试代码里的 `new Map(`（7 处）：键是什么、什么时候删；清点完再看值不值得写成 lint |
+| 重复代码、布尔字段进体检的报告 | 抄了两份的逻辑改一处漏一处；几个布尔字段拼出来的状态可能是没写出来的联合 | 并进[体检](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)的读数表：jscpd 15 行以上的重复块、两个以上布尔字段的形状，只出报告 |
 | `refactor/` 不许动契约、模块按接口重写 | 实现可以整个换掉，人只读接口和测试 | 契约稳定以后：回放里 28 个 `refactor/` PR 有 25 个改了契约，现在立这条会挡下大多数重构 |
 | 骨架化、回归测试的 skill | 把判断固定下来 | 同一件事做到第二次、步骤还成立时，写成 `.agents/skills/` 下的 skill |
 
