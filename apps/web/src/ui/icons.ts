@@ -1,5 +1,6 @@
 import {
   Add,
+  Download,
   AngleDown,
   Check,
   Minus,
@@ -142,6 +143,7 @@ export const icons = {
   call: Call,
   realtime: SoundwaveCircle,
   devices: Laptop,
+  update: Download,
 } satisfies Record<string, IconFunction>;
 
 export type IconName = keyof typeof icons;

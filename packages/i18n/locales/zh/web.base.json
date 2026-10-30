@@ -201,5 +201,6 @@
     "longLess": "收起",
     "taskDone": "已完成",
     "taskOpen": "没完成"
-  }
+  },
+  "updateReady": "{next} 已下好，去「关于」重启"
 }

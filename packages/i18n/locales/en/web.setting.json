@@ -117,6 +117,26 @@
     "settingsHint": "The keys and these pages' settings",
     "copy": "Copy the path",
     "copied": "Path copied",
-    "reveal": "Show in Finder"
+    "reveal": "Show in Finder",
+    "update": "Updates",
+    "updateHint": "The desktop app updates itself from the releases on GitHub",
+    "upToDate": "Up to date",
+    "checking": "Looking for a new version…",
+    "downloading": "Downloading {next} ({percent}%)",
+    "ready": "{next} is ready and goes in when you quit",
+    "readyNewFarm": "{next} is ready: it starts a new farm and keeps the old one aside",
+    "manual": {
+      "diskImage": "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
+      "translocated": "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
+      "readOnly": "{next} needs installing by hand: the app's folder cannot be written",
+      "noBuild": "{next} has no build for this Mac"
+    },
+    "failed": "Could not check: {why}",
+    "check": "Check for updates",
+    "restart": "Restart to update",
+    "restartQuestion": "Restart into the new version?",
+    "workingQuestion": "{n} helpers are working; restarting cuts them off. Restart now?",
+    "newFarmQuestion": "The new version starts a new farm; the old one stays in the home folder. Restart now?",
+    "download": "Download"
   }
 }

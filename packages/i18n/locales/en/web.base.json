@@ -201,5 +201,6 @@
     "longLess": "Show less",
     "taskDone": "Done",
     "taskOpen": "Not done"
-  }
+  },
+  "updateReady": "{next} is ready: restart from About"
 }
