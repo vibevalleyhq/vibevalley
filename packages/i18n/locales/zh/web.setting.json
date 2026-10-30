@@ -117,6 +117,26 @@
     "settingsHint": "钥匙和这几页的设置",
     "copy": "复制路径",
     "copied": "路径复制好了",
-    "reveal": "在访达里显示"
+    "reveal": "在访达里显示",
+    "update": "更新",
+    "updateHint": "桌面版从 GitHub 上的发布自己更新",
+    "upToDate": "已是最新",
+    "checking": "正在查有没有新版本…",
+    "downloading": "正在下载 {next}（{percent}%）",
+    "ready": "{next} 已下好，退出时装上",
+    "readyNewFarm": "{next} 已下好：它会从一个新农场开始，旧的留在一边",
+    "manual": {
+      "diskImage": "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
+      "translocated": "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
+      "readOnly": "{next} 要手动装：应用所在的文件夹不能写",
+      "noBuild": "{next} 没有这台 Mac 的版本"
+    },
+    "failed": "没查成：{why}",
+    "check": "检查更新",
+    "restart": "重启更新",
+    "restartQuestion": "重启到新版本？",
+    "workingQuestion": "{n} 个帮工在干活，重启会打断它们。现在重启？",
+    "newFarmQuestion": "新版本从一个新农场开始，旧的留在家目录里。现在重启？",
+    "download": "去下载"
   }
 }

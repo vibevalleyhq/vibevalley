@@ -1,293 +1,124 @@
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
 // through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
-import { homedir } from "node:os";
 import { join } from "node:path";
 
-import {
-  BrowserWindow,
-  type IpcMainEvent,
-  Menu,
-  Notification,
-  Tray,
-  app,
-  dialog,
-  globalShortcut,
-  ipcMain,
-  nativeImage,
-  nativeTheme,
-  screen,
-  shell,
-} from "electron";
+import { app, dialog, globalShortcut, nativeImage } from "electron";
 
-import { serve, type Link } from "@vibevalley/bridge";
-import { filledNear } from "@vibevalley/engine/framing";
-import { t, currentLocale, setLocale } from "@vibevalley/i18n";
-import { VibeValleyApi } from "@vibevalley/protocol";
-import { desktopBridge, desktopVoiceShortcut, farmFraming } from "@vibevalley/protocol/host";
+import { t } from "@vibevalley/i18n";
+import { desktopVoiceShortcut } from "@vibevalley/protocol/host";
 
-import { bridgeChannel } from "./bridge";
-import { watchForDev } from "./dev";
+import { devMode } from "./dev";
+import { serveHost } from "./host";
 import { startIsland } from "./island";
+import { reasonOf } from "./lines";
 import { followSavedLocale } from "./locale";
 import { setAppMenu } from "./menu";
+import { appPaths, farmHome } from "./paths";
 import { probe } from "./probe";
-import { loginShellPath, type RunningServer, startServer } from "./server";
+import { loginShellPath, type ServerKeeper, serverKeeper } from "./server";
+import { menuBar } from "./tray";
+import { defaultFeed, type Updater, updater } from "./update";
+import { mainWindow } from "./window";
 
-// In the repository the server is apps/server, the page apps/web/dist and the island apps/island's release build
-// (scripts/build.ts); a packaged app has them in its resources (server/, web/, island/).
-const home = process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
-followSavedLocale(home);
-
-const files = () => {
-  const repo = join(app.getAppPath(), "..");
-  return {
-    server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, "server"),
-    web: app.isPackaged ? join(process.resourcesPath, "web") : join(repo, "web", "dist"),
-    island: app.isPackaged ? join(process.resourcesPath, "island", "VibeValleyIsland") : join(repo, "island", ".build", "release", "VibeValleyIsland"),
-    log: join(home, "logs", "desktop-server.log"),
-  };
-};
-
-/** Where macOS's window buttons sit: centred in the page's 28 px drag strip (preload titleBar). */
-const trafficLights = { x: 12, y: 8 };
-
-let server: RunningServer | undefined;
-/** The server while it comes up: quitting then waits for it, to stop it rather than leave it running. */
-let starting: Promise<RunningServer> | undefined;
-let window: BrowserWindow | undefined;
-
-/** The workbench's page in either theme (apps/web style.css): what the window is painted with between one page and the
- * next, so a reload goes from the page to the same ground (apps/web public/opening.html) and back. */
-const ground = () => (nativeTheme.shouldUseDarkColors ? "#1d1813" : "#fffaf0");
-
-/** The smallest window: twice the farm. */
-const minSize = { w: farmFraming.picture.w * 2, h: farmFraming.picture.h * 2 };
-
-/** The one window, made when first asked for. */
-function windowNow(): BrowserWindow {
-  if (window) return window;
-  const made = new BrowserWindow({
-    // The farm's proportions, so that it meets the window's edges (farmFraming: it is scaled by whole steps only): three
-    // times its 384 × 256, and 3 : 2 however the window is sized.
-    width: farmFraming.picture.w * 3,
-    height: farmFraming.picture.h * 3,
-    useContentSize: true,
-    minWidth: minSize.w,
-    minHeight: minSize.h,
-    title: "VibeValley",
-    show: false,
-    backgroundColor: ground(),
-    // The page reaches the top edge; it leaves the strip the host says (preload titleBar) to drag the window by.
-    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: trafficLights } : {}),
-    webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
-  });
-  made.setAspectRatio(3 / 2);
-  // A size between two whole scales leaves bars around the farm: once a resize ends, the window takes the nearest size
-  // the farm fills. A maximized or full-screen window keeps the screen's size.
-  made.on("resized", () => {
-    if (made.isFullScreen() || made.isMaximized()) return;
-    const [w = 0, h = 0] = made.getContentSize();
-    const area = screen.getDisplayMatching(made.getBounds()).workAreaSize;
-    const to = filledNear({ w, h }, farmFraming.picture, farmFraming.cut, minSize, { w: area.width, h: area.height });
-    if (to.w !== w || to.h !== h) made.setContentSize(to.w, to.h, true);
-  });
-  // The page stays on the server's origin; any other link opens in the browser.
-  made.webContents.setWindowOpenHandler(({ url: to }) => {
-    void shell.openExternal(to);
-    return { action: "deny" };
-  });
-  made.webContents.on("will-navigate", (event, to) => {
-    const target = new URL(to);
-    if (server && target.origin === new URL(server.url).origin) return;
-    event.preventDefault();
-    if (target.protocol === "http:" || target.protocol === "https:") void shell.openExternal(to);
-  });
-  made.once("ready-to-show", () => made.show());
-  made.on("closed", () => (window = undefined));
-  window = made;
-  return made;
-}
-
-/** A load the next one replaced fails with ERR_ABORTED (-3): that is no failure. Any other is logged. */
-const loaded = (load: Promise<void>) =>
-  load.catch((e: unknown) => {
-    if (!(typeof e === "object" && e !== null && "errno" in e && e.errno === -3)) console.error("vibevalley: the window could not load its page:", e);
-  });
-
-/** The bar's load. Why the server did not come up waits for it: a load that cuts off the window's first one can leave
- * the window without a page for a moment, and a server that fails at once would do that every time. */
-let bar: Promise<void> = Promise.resolve();
-
-/** The bar while the server comes up (apps/web public/opening.html, from the app's files), or why it did not. */
-function opening(problem?: string) {
-  const load = () => loaded(windowNow().loadFile(join(files().web, "opening.html"), { query: { locale: currentLocale(), ...(problem ? { problem } : {}) } }));
-  bar = problem ? bar.then(load) : load();
-}
-
-function open(url: string) {
-  void loaded(windowNow().loadURL(url));
-}
-
-/** Brings the window up on an issue: what a click on the island's row asks. */
-function openIssue(issue: string) {
-  if (!server) return;
-  open(server.url.replace(/\/$/u, "") + "/issues/" + encodeURIComponent(issue));
-  const w = windowNow();
-  if (w.isMinimized()) w.restore();
-  w.show();
-  app.focus({ steal: true });
-}
-
-// The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
-let tray: Tray | undefined;
-
-/** The page's end of the bridge is the preload in the one window: what another sender says is not heard. */
-const pageLink: Link = {
-  send: (m) => window?.webContents.send(bridgeChannel, m),
-  receive: (fn) => {
-    const heard = (event: IpcMainEvent, m: unknown) => {
-      if (event.sender === window?.webContents) fn(m);
-    };
-    ipcMain.on(bridgeChannel, heard);
-    return () => void ipcMain.off(bridgeChannel, heard);
-  },
-};
-
-const page = serve(desktopBridge, pageLink, {
-  notify: (notice) => {
-    probe?.notices.push(notice);
-    if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
-  },
-  // Only a path on this machine (the contract takes an absolute one), shown in Finder; never opened or run.
-  reveal: (path) => shell.showItemInFolder(path),
-  // The window's own parts (menus, scroll bars, the title strip) follow the theme the page chose.
-  theme: (theme) => {
-    nativeTheme.themeSource = theme;
-    window?.setBackgroundColor(ground());
-  },
-  locale: (locale) => {
-    if (locale === currentLocale()) return;
-    setLocale(locale);
-    setAppMenu();
-  },
-  tray: (summary) => {
-    if (probe) probe.tray = summary;
-    if (!tray) {
-      const icon = nativeImage.createFromPath(join(files().web, "pixel", "app-sprout.png")).resize({ width: 16, height: 16 });
-      tray = new Tray(icon);
-      tray.setToolTip("VibeValley");
-    }
-    if (process.platform === "darwin") tray.setTitle(summary.title);
-    const show = () => {
-      if (window?.isMinimized() === true) window.restore();
-      window?.show();
-      window?.focus();
-    };
-    tray.setContextMenu(
-      Menu.buildFromTemplate([
-        ...summary.lines.map((label) => ({ label, click: show })),
-        { type: "separator" },
-        { label: t("desktop.open"), click: show },
-        { label: t("desktop.quit"), role: "quit" },
-      ]),
-    );
-  },
-});
+followSavedLocale(farmHome());
 
 if (!app.requestSingleInstanceLock()) {
   // The one already open is brought to the front (second-instance there); said, so a script that started this one knows.
   console.error("vibevalley: VibeValley is already open; this one quits and brings that window to the front");
   app.quit();
 } else {
-  app.on("second-instance", () => {
-    if (window?.isMinimized() === true) window.restore();
-    window?.focus();
-  });
   app.setName("VibeValley");
+  const paths = appPaths();
+  let server: ServerKeeper | undefined;
+  let updates: Updater | undefined;
+  // The server gets its time to save before the app goes; then is the moment an update is put in place.
+  let stopped = false;
+  const quitAfterSave = async (then: () => void) => {
+    await server?.stop();
+    stopped = true;
+    then();
+    app.quit();
+  };
+  app.on("before-quit", (event) => {
+    if (stopped) return;
+    event.preventDefault();
+    void quitAfterSave(() => updates?.installOnQuit());
+  });
+
+  const window = mainWindow({ web: paths.web, server: () => server?.url() });
+  const page = serveHost({
+    window,
+    tray: menuBar(paths.trayIcon, () => window.show()),
+    updates: {
+      state: () => updates?.state() ?? { _tag: "idle", version: app.getVersion() },
+      check: async () => updates?.check(),
+      install: async () => {
+        if (updates) await quitAfterSave(() => updates?.installNow());
+      },
+    },
+  });
+  app.on("second-instance", () => window.show());
+
   void app.whenReady().then(async () => {
     setAppMenu();
     // A packaged app has its icon (resources/icon.icns); run from the repository, the Dock shows Electron's unless set.
-    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(join(files().web, "icons", "app-256.png")));
+    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(paths.dockIcon));
     // The window comes at once, on the bar: reading the login shell's PATH and starting the server take seconds.
-    opening();
+    window.opening();
     const path = await loginShellPath(process.env);
-    const env = path ? { ...process.env, PATH: path } : process.env;
+    const keeper = serverKeeper(paths, path ? { ...process.env, PATH: path } : process.env);
+    server = keeper;
     try {
-      starting = startServer(files(), env);
-      server = await starting;
+      await keeper.start();
     } catch (e) {
-      const why = e instanceof Error ? e.message : String(e);
       // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
-      if (!window) {
-        dialog.showErrorBox(t("desktop.cannotStart"), why);
+      const open = window.current();
+      if (!open) {
+        dialog.showErrorBox(t("desktop.cannotStart"), reasonOf(e));
         app.exit(1);
         return;
       }
-      opening(why);
-      window.once("closed", () => app.exit(1));
+      window.opening(reasonOf(e));
+      open.once("closed", () => app.exit(1));
       return;
-    } finally {
-      starting = undefined;
     }
-    open(server.url);
+    window.open();
     const island = startIsland({
-      binary: process.platform === "darwin" ? files().island : undefined,
-      font: join(files().web, "fonts", "fusion-pixel-12px-proportional-zh_hans.otf"),
-      server: () => server?.url ?? "",
-      open: openIssue,
+      binary: process.platform === "darwin" ? paths.island : undefined,
+      font: paths.font,
+      server: () => keeper.url() ?? "",
+      open: (issue) => {
+        window.open("/issues/" + encodeURIComponent(issue));
+        window.show(true);
+      },
     });
     if (probe) probe.island = island.probe;
     app.on("will-quit", island.stop);
-    if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1") {
-      const stopWatching = watchForDev({
-        web: files().web,
-        repo: join(app.getAppPath(), "..", ".."),
-        reloadPage: () => {
-          console.log("vibevalley dev: the page was built again, reloading");
-          window?.webContents.reloadIgnoringCache();
-        },
-        working: async () => {
-          if (!server) return 0;
-          try {
-            const sessions = await new VibeValleyApi(server.url.replace(/\/$/u, "")).session.list({});
-            return sessions.filter((s) => s.phase._tag === "working").length;
-          } catch {
-            return 0;
-          }
-        },
-        restartServer: async () => {
-          const was = server;
-          if (!was) return;
-          const url = new URL(was.url);
-          const at = window ? new URL(window.webContents.getURL()) : undefined;
-          console.log("vibevalley dev: the server's code changed, starting it again");
-          await was.stop();
-          server = await startServer(files(), env, Number(url.port));
-          void window?.loadURL(server.url.replace(/\/$/u, "") + (at ? at.pathname + at.search : "/"));
-        },
+    if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1")
+      app.on("will-quit", devMode({ web: paths.web, repo: join(app.getAppPath(), "..", ".."), server: keeper, window }));
+    // Only a packaged app updates itself: run from the repository, the executable is Electron's own.
+    if (app.isPackaged) {
+      updates = updater({
+        version: app.getVersion(),
+        arch: process.arch,
+        exe: app.getPath("exe"),
+        home: paths.home,
+        dir: paths.updates,
+        feed: process.env.VIBEVALLEY_UPDATE_FEED || defaultFeed,
+        heard: (state) => page.push("update", state),
       });
-      app.on("will-quit", stopWatching);
+      updates.start();
+      app.on("will-quit", updates.stop);
     }
     // Taken by another program: the call button still works.
     globalShortcut.register(desktopVoiceShortcut, () => page.push("voiceShortcut", undefined));
     app.on("activate", () => {
-      if (!window && server) open(server.url);
+      if (keeper.url() !== undefined) window.show();
     });
   });
   app.on("will-quit", () => globalShortcut.unregisterAll());
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
-  });
-  // The server gets its time to save before the app goes.
-  let stopped = false;
-  app.on("before-quit", (event) => {
-    if (stopped || (!server && !starting)) return;
-    event.preventDefault();
-    const coming = starting;
-    void (async () => (server ?? (await coming?.catch(() => undefined)))?.stop())().finally(() => {
-      stopped = true;
-      app.quit();
-    });
   });
 }

@@ -65,7 +65,8 @@ vp run desktop:test                                             # 改完 apps/de
 vp run desktop:dev                                              # 桌面版：构建壳和页面，带着 apps/server 起来；改页面窗口自己刷新，改服务端或 protocol 服务端自己重启（有帮工在干活就等它们干完）
 vp run --filter @vibevalley/island test                          # 改完灵动岛（swift test）：消息和位置的测试（macOS）；样子用它的 --snapshot 画出来看（apps/island/README.md）
 vp run --filter @vibevalley/mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
-vp run package:mac                                              # macOS 应用和 .dmg（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
+vp run package:mac                                              # macOS 应用、.dmg 和更新用的 .zip、release.json（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
+vp run --filter @vibevalley/desktop update-check                 # 改了桌面版的更新或打包：两个真的包上走一遍更新（十分钟上下）；推 v* 的 tag 发布草稿 Release
 vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
 vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键

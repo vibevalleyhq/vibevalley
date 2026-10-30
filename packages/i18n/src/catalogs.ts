@@ -1501,6 +1501,7 @@ export const catalogs = {
         taskDone: "已完成",
         taskOpen: "没完成",
       },
+      updateReady: "{next} 已下好，去「关于」重启",
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -3267,6 +3268,26 @@ export const catalogs = {
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
+        update: "更新",
+        updateHint: "桌面版从 GitHub 上的发布自己更新",
+        upToDate: "已是最新",
+        checking: "正在查有没有新版本…",
+        downloading: "正在下载 {next}（{percent}%）",
+        ready: "{next} 已下好，退出时装上",
+        readyNewFarm: "{next} 已下好：它会从一个新农场开始，旧的留在一边",
+        manual: {
+          diskImage: "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
+          translocated: "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
+          readOnly: "{next} 要手动装：应用所在的文件夹不能写",
+          noBuild: "{next} 没有这台 Mac 的版本",
+        },
+        failed: "没查成：{why}",
+        check: "检查更新",
+        restart: "重启更新",
+        restartQuestion: "重启到新版本？",
+        workingQuestion: "{n} 个帮工在干活，重启会打断它们。现在重启？",
+        newFarmQuestion: "新版本从一个新农场开始，旧的留在家目录里。现在重启？",
+        download: "去下载",
       },
     },
     "web.tree": {
@@ -5116,6 +5137,7 @@ export const catalogs = {
         taskDone: "Done",
         taskOpen: "Not done",
       },
+      updateReady: "{next} is ready: restart from About",
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -6966,6 +6988,26 @@ export const catalogs = {
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
+        update: "Updates",
+        updateHint: "The desktop app updates itself from the releases on GitHub",
+        upToDate: "Up to date",
+        checking: "Looking for a new version…",
+        downloading: "Downloading {next} ({percent}%)",
+        ready: "{next} is ready and goes in when you quit",
+        readyNewFarm: "{next} is ready: it starts a new farm and keeps the old one aside",
+        manual: {
+          diskImage: "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
+          translocated: "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
+          readOnly: "{next} needs installing by hand: the app's folder cannot be written",
+          noBuild: "{next} has no build for this Mac",
+        },
+        failed: "Could not check: {why}",
+        check: "Check for updates",
+        restart: "Restart to update",
+        restartQuestion: "Restart into the new version?",
+        workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
+        newFarmQuestion: "The new version starts a new farm; the old one stays in the home folder. Restart now?",
+        download: "Download",
       },
     },
     "web.tree": {
@@ -8769,6 +8811,7 @@ export interface Messages {
   "web.base.time.yesterday": undefined;
   "web.base.toasts": undefined;
   "web.base.unreachable": undefined;
+  "web.base.updateReady": { readonly next: string | number };
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
   "web.catalog.all": undefined;
@@ -10488,16 +10531,34 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
+  "web.setting.about.check": undefined;
+  "web.setting.about.checking": undefined;
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
+  "web.setting.about.download": undefined;
+  "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
+  "web.setting.about.failed": { readonly why: string | number };
   "web.setting.about.files": undefined;
   "web.setting.about.home": undefined;
   "web.setting.about.homeHint": undefined;
+  "web.setting.about.manual.diskImage": { readonly next: string | number };
+  "web.setting.about.manual.noBuild": { readonly next: string | number };
+  "web.setting.about.manual.readOnly": { readonly next: string | number };
+  "web.setting.about.manual.translocated": { readonly next: string | number };
+  "web.setting.about.newFarmQuestion": undefined;
+  "web.setting.about.ready": { readonly next: string | number };
+  "web.setting.about.readyNewFarm": { readonly next: string | number };
+  "web.setting.about.restart": undefined;
+  "web.setting.about.restartQuestion": undefined;
   "web.setting.about.reveal": undefined;
   "web.setting.about.settings": undefined;
   "web.setting.about.settingsHint": undefined;
+  "web.setting.about.upToDate": undefined;
+  "web.setting.about.update": undefined;
+  "web.setting.about.updateHint": undefined;
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
+  "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;

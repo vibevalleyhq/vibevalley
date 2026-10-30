@@ -1,6 +1,6 @@
 ---
 name: acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收：起一个和主人的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、用真模型重放管家的评测（管家的提示、工具描述、packages/agent，花钱，先问主人）。用在：主人说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下管家的评测」；改了接口、服务、表结构、页面、手机壳之后汇报之前。只改了纯函数、测试已经覆盖的，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收：起一个和主人的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/update.ts、scripts/package.ts）、用真模型重放管家的评测（管家的提示、工具描述、packages/agent，花钱，先问主人）。用在：主人说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下管家的评测」；改了接口、服务、表结构、页面、手机壳之后汇报之前。只改了纯函数、测试已经覆盖的，跑测试就够。
 ---
 
 # 验收
@@ -14,6 +14,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收：起�
 | `apps/server/src/**`、`apps/server/db`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/acceptance/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
 | `apps/web/src/**`、`apps/web/public` 的画面、组件、贴图 | [page.md](.agents/skills/acceptance/page.md) | 对着真的服务端，页面画出来是对的（截图） |
 | `apps/mobile/**`、`packages/protocol/src/host.ts`、`apps/server/src/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/acceptance/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
+| `apps/desktop/src/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/acceptance/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
 | 管家的提示、`apps/server/src/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了管家的样例 | [orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
 
 一次改动碰了几块，就读几份，在同一个沙箱子命令里一起做（造数据、调接口、截图）。

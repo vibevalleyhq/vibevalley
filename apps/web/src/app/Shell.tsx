@@ -10,6 +10,7 @@ import { t } from "@vibevalley/i18n";
 import { useCore, useFrames } from "@/base/frame";
 import { useRouter } from "@/base/router";
 import { pressed } from "@/base/shortcuts";
+import { useUpdates } from "@/base/updates";
 import { QuickSwitcher, switcher } from "@/features/channel";
 import { waitingOnOwner } from "@/features/notice";
 import { A } from "@/ui/A";
@@ -62,6 +63,11 @@ function Rail(props: { here?: Place | undefined }) {
   const frames = useFrames();
   const waiting = () => waitingOnOwner(frames.frame?.inbox ?? []);
   const settings = settingsPlace;
+  const updates = useUpdates();
+  const ready = () => {
+    const s = updates();
+    return s?._tag === "ready" ? s : undefined;
+  };
   return (
     <nav
       aria-label={t("web.base.rail")}
@@ -87,6 +93,13 @@ function Rail(props: { here?: Place | undefined }) {
         </For>
       </div>
       <div class="mt-auto flex flex-col items-center gap-2 pt-2">
+        <Show when={ready()}>
+          {(r) => (
+            <Slot to="/settings/about" place="update" label={t("web.base.updateReady", { next: r().next })}>
+              <Icon name="update" size={20} />
+            </Slot>
+          )}
+        </Show>
         <Slot to={settings.path} place={settings.id} label={`${settings.label} · ${settings.hint}`} current={props.here === settings}>
           <PlaceIcon place={settings} />
         </Slot>

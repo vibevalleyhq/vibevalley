@@ -4,11 +4,14 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import { createInterface } from "node:readline";
+
+import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { type Attention, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
 import { attentionWantsOwner, phaseText } from "@vibevalley/protocol/rules";
+
+import { jsonLines } from "./lines";
 
 /** How a row is drawn. The shapes here are apps/island IslandCore Messages.swift's; keep the two the same. */
 export type Tone = "working" | "waiting" | "stuck";
@@ -107,15 +110,7 @@ export function startIsland(o: IslandOptions): { stop: () => void; probe: Island
       probe.helper = false;
       if (!abort.signal.aborted) console.error(`vibevalley: the island quit (${code}); it is not started again until the app is`);
     });
-    createInterface({ input: child.stdout }).on("line", (line) => {
-      try {
-        const said: unknown = JSON.parse(line);
-        const open = typeof said === "object" && said !== null && "open" in said ? said.open : undefined;
-        if (typeof open === "string") o.open(open);
-      } catch {
-        // Not a line it means for us.
-      }
-    });
+    jsonLines(child.stdout, Schema.Struct({ open: Schema.String }), ({ open }) => o.open(open));
   }
 
   // Reconnects a second after the stream drops (the server restarting, in development).

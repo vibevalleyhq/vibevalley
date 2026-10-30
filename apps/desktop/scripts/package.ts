@@ -1,15 +1,18 @@
-// Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg and the .app beside it): the shell from build/, and three
+// Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg for a first install, .zip for the app's own updates, and
+// release.json that says what they are: src/releases.ts): the shell from build/, and three
 // resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, island/ the island's
-// release build, server/ is apps/server with its production dependencies installed as real copies. The server runs unbundled with tsx, as it does in the
+// release build, server/ is apps/server deployed with its production dependencies. The server runs unbundled with tsx, as it does in the
 // repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { createHash } from "node:crypto";
+import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
-import { workspaceClosure } from "../src/workspace.ts";
+import { baselineHash } from "../../server/src/base/baseline.ts";
+import type { Release } from "../src/releases.ts";
 
 const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");
@@ -26,47 +29,17 @@ sh(island, "swift", "build", "-c", "release");
 const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: island, encoding: "utf8" }).trim(), "VibeValleyIsland");
 
 rmSync(stage, { recursive: true, force: true });
-mkdirSync(server, { recursive: true });
-const skip = (path: string) => !/\.test\.ts$|\/testdata(\/|$)|\/testing(\/|$)/u.test(path);
-for (const dir of ["src", "db"]) cpSync(join(repo, "apps/server", dir), join(server, dir), { recursive: true, filter: skip });
-// Each workspace package the server runs on sits beside it as stage/<folder>, its src only: the code runs from source.
-const packages = workspaceClosure(repo, join(repo, "apps/server"));
-for (const dir of packages.values()) cpSync(join(dir, "src"), join(stage, basename(dir), "src"), { recursive: true, filter: skip });
-
-// npm does not read pnpm's catalog: each "catalog:" becomes the version pnpm installed for the package, as the lockfile has it.
-const installed = (dir: string): Record<string, string> => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pnpm list --json's shape
-  const [listed] = JSON.parse(execFileSync("pnpm", ["list", "--prod", "--depth", "0", "--json"], { cwd: dir, encoding: "utf8" })) as {
-    dependencies?: Record<string, { version: string }>;
-  }[];
-  return Object.fromEntries(Object.entries(listed?.dependencies ?? {}).map(([name, d]) => [name, d.version]));
+// Everything at the versions the lockfile pins, the workspace packages copied in: npm without the lockfile let a
+// transitive dependency float past what the rest is pinned to.
+sh(repo, "pnpm", "--filter", "@vibevalley/server", "deploy", "--prod", server);
+// What only the tests read does not ship: test files, golden data, test helpers, in the server and its packages.
+const testOnly = /\.test\.tsx?$|(^|\/)(testdata|testing)$/u;
+const prune = (dir: string) => {
+  for (const name of readdirSync(dir, { recursive: true, encoding: "utf8" }))
+    if (testOnly.test(name) && !name.includes("node_modules/.pnpm/node_modules")) rmSync(join(dir, name), { recursive: true, force: true });
 };
-const staged = (dir: string, dependencies: Record<string, string>) => {
-  const versions = installed(dir);
-  return Object.fromEntries(
-    Object.entries(dependencies).map(([name, spec]) => {
-      if (!spec.startsWith("catalog:")) return [name, spec];
-      const version = versions[name];
-      if (version === undefined) throw new Error(`${name} is not installed in ${dir}`);
-      return [name, version];
-    }),
-  );
-};
-
-// The workspace's own packages become local folders (npm does not read workspace:); --install-links copies them into
-// node_modules, so the staged server needs nothing outside itself.
-const local = (dependencies: Record<string, string>) =>
-  Object.fromEntries(
-    Object.entries(dependencies).map(([name, spec]) => [name, spec.startsWith("workspace:") ? `file:../${basename(packages.get(name)!)}` : spec]),
-  );
-const stageManifest = (dir: string, to: string) => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a workspace package's own package.json
-  const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-  const dependencies = local(staged(dir, pkg.dependencies ?? {}));
-  writeFileSync(join(to, "package.json"), JSON.stringify({ ...pkg, dependencies, scripts: undefined, devDependencies: undefined }, null, 2));
-};
-for (const dir of packages.values()) stageManifest(dir, join(stage, basename(dir)));
-stageManifest(join(repo, "apps/server"), server);
+prune(join(server, "src"));
+for (const name of readdirSync(join(server, "node_modules", "@vibevalley"))) prune(join(server, "node_modules", "@vibevalley", name, "src"));
 // tsx reads the nearest tsconfig; the repository's extends a file the app does not carry.
 writeFileSync(
   join(server, "tsconfig.json"),
@@ -87,16 +60,22 @@ writeFileSync(
     2,
   ),
 );
-sh(server, "npm", "install", "--omit=dev", "--install-links", "--no-audit", "--no-fund", "--no-package-lock");
 
-const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/u, "");
+// The version is the tag the release is built from (v0.2.0); between tags, 0.0.0, which no release is older than.
+// VIBEVALLEY_VERSION gives one outright (scripts/update-check.ts builds two in a row).
+// What git says when it finds nothing (no tag before) is not the package's to print.
+const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+const described = git("describe", "--tags", "--always").replace(/^v/u, "");
+const asked = process.env.VIBEVALLEY_VERSION ?? described;
+const version = /^\d+\.\d+\.\d+$/u.test(asked) ? asked : "0.0.0";
+const dist = join(desktop, "dist");
 await build({
-  targets: Platform.MAC.createTarget(["dmg"]),
+  targets: Platform.MAC.createTarget(["dmg", "zip"]),
   config: {
     appId: "dev.vibevalley.app",
     productName: "VibeValley",
-    extraMetadata: { version: /^\d+\.\d+\.\d+/u.test(version) ? version : "0.0.0" },
-    directories: { output: join(desktop, "dist"), buildResources: join(desktop, "resources") },
+    extraMetadata: { version },
+    directories: { output: dist, buildResources: join(desktop, "resources") },
     files: ["build/**", "package.json"],
     extraResources: [
       { from: join(repo, "apps/web/dist"), to: "web" },
@@ -106,7 +85,47 @@ await build({
     afterPack: async (ctx) => {
       cpSync(server, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app/Contents/Resources/server`), { recursive: true, verbatimSymlinks: true });
     },
-    mac: { category: "public.app-category.developer-tools", icon: join(desktop, "resources/icon.icns"), identity: null },
+    mac: {
+      category: "public.app-category.developer-tools",
+      icon: join(desktop, "resources/icon.icns"),
+      identity: null,
+      artifactName: "VibeValley-${version}-${arch}.${ext}",
+    },
     npmRebuild: false,
   },
 });
+
+// What the release says about itself: its build for this Mac, the merged pull requests since the tag before (their
+// titles are main's commit subjects), and the baseline its server makes a database from.
+const arch = process.arch;
+const zip = `VibeValley-${version}-${arch}.zip`;
+const previous = (() => {
+  try {
+    return git("describe", "--tags", "--abbrev=0", "HEAD^");
+  } catch {
+    return undefined;
+  }
+})();
+const notes =
+  version === "0.0.0"
+    ? []
+    : git("log", "--format=%s", previous === undefined ? "HEAD" : `${previous}..HEAD`)
+        .split("\n")
+        .filter((l) => l !== "");
+const release: Release = {
+  version,
+  notes,
+  schema: baselineHash(),
+  page: `https://github.com/vibevalleyhq/vibevalley/releases/tag/v${version}`,
+  builds: [
+    {
+      arch,
+      file: zip,
+      size: statSync(join(dist, zip)).size,
+      sha512: createHash("sha512")
+        .update(readFileSync(join(dist, zip)))
+        .digest("hex"),
+    },
+  ],
+};
+writeFileSync(join(dist, "release.json"), JSON.stringify(release, null, 2) + "\n");

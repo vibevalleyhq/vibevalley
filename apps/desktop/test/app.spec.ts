@@ -85,6 +85,11 @@ test("the desktop app shows the live board and sends a notice", async () => {
     });
     expect(resized).toEqual([1152, 768]);
 
+    // Run from the repository it never checks: the update stays idle.
+    await page.goto(server + "/settings/about");
+    await expect(page.getByTestId("update-state")).toHaveAttribute("data-state", "idle");
+    await expect(page.getByTestId("update-check")).toBeVisible();
+
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
   } finally {
     await app.close();

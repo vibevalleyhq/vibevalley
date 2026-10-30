@@ -12,6 +12,8 @@ import { Quiet } from "@/ui/layout";
 import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
 import { toast } from "@/ui/toasts";
 
+import { UpdateRow } from "./UpdateRow";
+
 function PathRow(props: { label: string; hint: string; path: string }) {
   const reveal = currentHost().reveal;
   return (
@@ -48,6 +50,7 @@ export function AboutPage() {
               <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")}>
                 <span class="font-mono text-sm">{s().version}</span>
               </SettingRow>
+              <UpdateRow />
             </SettingsGroup>
             <SettingsGroup title={t("web.setting.about.files")}>
               <For

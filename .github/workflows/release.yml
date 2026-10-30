@@ -1,0 +1,40 @@
+# A version tag (v0.2.0) builds the macOS app and puts it in a draft release: the .dmg for a first install, the .zip and
+# release.json the desktop app updates itself from (apps/desktop src/update.ts). The draft is published by hand once
+# someone has looked at it; until then the app's latest/download does not see it.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+
+# Only this workflow writes: it makes the draft release and uploads its files.
+permissions:
+  contents: write
+
+env:
+  VP_GIT_HOOKS: "0"
+
+jobs:
+  mac:
+    name: mac
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      # The whole history and its tags: the release's notes are the pull requests since the tag before.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
+      - run: vp run package:mac
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          jq -r '.notes | map("- " + .) | join("\n")' apps/desktop/dist/release.json > notes.md
+          gh release create "$TAG" --draft --verify-tag --title "VibeValley $version" --notes-file notes.md \
+            apps/desktop/dist/VibeValley-"$version"-*.dmg apps/desktop/dist/VibeValley-"$version"-*.zip apps/desktop/dist/release.json
