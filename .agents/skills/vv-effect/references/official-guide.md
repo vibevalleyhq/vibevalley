@@ -14,10 +14,10 @@
 | Working with Streams | 用：SSE 的帧、帮工的事件、频道的消息；有界的 relay 见 [architecture.md](docs/architecture.md) |
 | Integrating Effect into existing applications（`ManagedRuntime`） | 少用：Promise 一侧只剩外面库的一次调用；桌面壳和页面不是 Effect |
 | Batching external requests（`RequestResolver`） | 不用：外面的请求没有批量的需要 |
-| Working with Schedules（`Effect.retry`、`Effect.repeat`） | 应该用；还有手写的重试和轮询，见提案 |
+| Working with Schedules（`Effect.retry`、`Effect.repeat`） | 照做：语音的重试、隧道的探问是 `Schedule`；连接器收消息的循环按分支（暂停到某一刻、换代、失败的节奏）各等各的，留着手写 |
 | Working with DateTime | 时间经 `Clock`；格式化在需要的地方用 |
 | Observability（日志、OTLP 追踪） | 用：日志经 Effect（`base/log.ts`），OTLP 在 `main.ts` 接上 |
-| Testing Effect programs（`@effect/vitest`、共享 layer） | 服务端照做：`it.effect`、`TestClock`、`testing/world.ts` 搭农场；`packages/agent` 的测试还是 Promise 写法，见提案 |
+| Testing Effect programs（`@effect/vitest`、共享 layer） | 照做：`it.effect`、`TestClock`；服务端用 `testing/world.ts` 搭农场，`packages/agent` 用 `testing.ts` 的 `withAgent`（大脑在测试的纤程上，钟是 `TestClock`） |
 | Runtime type guards（`Predicate`） | 照做：对象用 `Predicate.isObject`、`Predicate.hasProperty`，不手写 |
 | Working with SQL databases（`effect/sql`） | 用，经 `Db` 服务和 effect-sqlc 生成的查询（`apps/server/db/`） |
 | Effect HttpClient | 外面的 HTTP 经 `HttpClient`（[地基](docs/subsystems/foundation.md)）；还有几处直接 `fetch`，见提案 |

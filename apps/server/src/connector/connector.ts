@@ -470,6 +470,8 @@ const make = (options: ConnectorOptions = {}) =>
           };
           return yield* adapter.receive(secrets, io).pipe(Effect.ensuring(Effect.sync(() => (sealed = true))));
         });
+      // A loop, not a Schedule: each branch waits its own way (until the pause ends, a breath after a stale login, longer
+      // after every third failure), and only a failure counts toward the longer wait.
       const receiving = Effect.gen(function* () {
         let failures = 0;
         for (;;) {

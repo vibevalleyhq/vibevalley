@@ -55,4 +55,4 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 ## 5. 还没做的
 
-几处较大的整改（手写的重试、`packages/agent` 的 Promise 写法的测试、只有 `message` 的错误）和以后要加的检查，在[提案](.agents/notes/proposed/architecture/2026-10-31-effect-practices.md)里，各写了什么时候做。改到那一块时先看一眼。
+较大的整改（只有 `message` 的错误换成 `Schema.TaggedError`）和以后要加的检查，在[提案](.agents/notes/proposed/architecture/2026-10-31-effect-practices.md)里，各写了什么时候做。改到那一块时先看一眼。

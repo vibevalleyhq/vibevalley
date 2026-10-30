@@ -3,8 +3,8 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
-import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
-import { FetchHttpClient } from "effect/http";
+import { Clock, Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
@@ -21,7 +21,19 @@ import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { onCallLine } from "./prompts.ts";
-import { Voice, agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, vendorsFor, voiceAgentUid, voiceUnknown } from "./voice.ts";
+import {
+  Voice,
+  agentFor,
+  type CallLine,
+  clientOf,
+  retrying,
+  speakPieces,
+  tokenSeconds,
+  tunnelAnswers,
+  vendorsFor,
+  voiceAgentUid,
+  voiceUnknown,
+} from "./voice.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -298,6 +310,34 @@ describe("voice", () => {
       yield* step(2_000);
       expect((yield* Fiber.join(downCall)).status).toBe(500);
       expect(down.seen).toEqual([500, 500, 500]);
+    }),
+  );
+
+  it.effect("asks a new tunnel every 2 s until it refuses a keyless request, and starts no ask after a minute", () =>
+    Effect.gen(function* () {
+      const asking = (answer: (n: number) => number) => {
+        const asked: number[] = [];
+        const client = HttpClient.make((request) =>
+          Effect.map(Clock.currentTimeMillis, (at) => {
+            asked.push(at);
+            return HttpClientResponse.fromWeb(request, new Response(null, { status: answer(asked.length) }));
+          }),
+        );
+        return { asked, answers: Effect.forkChild(tunnelAnswers(client, "https://line.example")) };
+      };
+
+      const late = asking((n) => (n < 3 ? 502 : 401));
+      const lateFiber = yield* late.answers;
+      yield* TestClock.adjust(4_000);
+      expect(yield* Fiber.join(lateFiber)).toBe(true);
+      expect(late.asked).toEqual([0, 2_000, 4_000]);
+
+      const start = yield* Clock.currentTimeMillis;
+      const never = asking(() => 404);
+      const neverFiber = yield* never.answers;
+      yield* TestClock.adjust(60_000);
+      expect(yield* Fiber.join(neverFiber)).toBe(false);
+      expect(never.asked.map((at) => at - start)).toEqual(Array.from({ length: 30 }, (_, i) => i * 2_000));
     }),
   );
 

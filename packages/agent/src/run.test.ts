@@ -1,15 +1,15 @@
-import { Effect } from "effect";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it } from "@effect/vitest";
+import { Effect, Fiber } from "effect";
 
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
 import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { whenTrue } from "@vibevalley/testkit/until";
+import { until } from "@vibevalley/testkit/until";
 
 import * as engine from "./agentTask.ts";
 import { memoryStore } from "./agentTaskStore.ts";
 import { makeTaskRunner } from "./agentTaskTools.ts";
-import { type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./brain.ts";
+import { Brain, type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { textTool } from "./core/tool.ts";
 import { type BrainMessage, messageText, userMessage } from "./messages.ts";
@@ -46,10 +46,11 @@ const echo = textTool<object>({
   run: () => "ok",
 });
 
-async function receiptAgent(steps: readonly Step[], extra: Partial<BrainOptions> = {}) {
+/** A bare brain and the receipts of its runs; it closes with the test's scope. */
+const receiptAgent = Effect.fnUntraced(function* (steps: readonly Step[], extra: Partial<BrainOptions> = {}) {
   const { llm } = scriptedLLM(steps);
   const dir = home();
-  const agent = await openBrain(standaloneOwner(), {
+  const agent = yield* Brain.make({
     name: "receipt",
     instructions: "",
     llm,
@@ -63,84 +64,93 @@ async function receiptAgent(steps: readonly Step[], extra: Partial<BrainOptions>
     ...extra,
   });
   const receipts: RunResult[] = [];
-  agent.subscribe((e) => {
-    if (e.type === "agent_settled") receipts.push(e.run);
-  });
+  agent.subscribe((e) =>
+    Effect.sync(() => {
+      if (e.type === "agent_settled") receipts.push(e.run);
+    }),
+  );
   return { agent, receipts };
-}
+});
 
 describe("a run's receipt", () => {
-  it("takes in its tool turns, and each run its own usage", async () => {
-    const tool = toolCall("echo", {});
-    const { agent, receipts } = await receiptAgent(
-      [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
-      { tools: [echo] },
-    );
-    expect(await agent.ask(userMessage("one", Date.now()))).toBe("first");
-    await whenTrue(() => receipts.length === 1, "receipts.length === 1");
-    expect(receipts[0]).toMatchObject({
-      id: 1,
-      settled: true,
-      usage: { input: 60, output: 12, cacheRead: 15 },
-      contextTokens: 43,
-    });
-    expect(await agent.ask(userMessage("two", Date.now()))).toBe("second");
-    await whenTrue(() => receipts.length === 2, "receipts.length === 2");
-    expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
-    expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
-    await agent.close();
-  });
+  it.effect("takes in its tool turns, and each run its own usage", () =>
+    Effect.gen(function* () {
+      const tool = toolCall("echo", {});
+      const { agent, receipts } = yield* receiptAgent(
+        [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
+        { tools: [echo] },
+      );
+      expect(yield* agent.ask(userMessage("one", Date.now()))).toBe("first");
+      yield* until(() => receipts.length === 1, "receipts.length === 1");
+      expect(receipts[0]).toMatchObject({
+        id: 1,
+        settled: true,
+        usage: { input: 60, output: 12, cacheRead: 15 },
+        contextTokens: 43,
+      });
+      expect(yield* agent.ask(userMessage("two", Date.now()))).toBe("second");
+      yield* until(() => receipts.length === 2, "receipts.length === 2");
+      expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
+      expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
+    }),
+  );
 
-  it("keeps a failure's words and goes by the last answer", async () => {
-    const failed = { stopReason: "error", errorMessage: "broken" } as const;
-    const { agent, receipts } = await receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
-    expect(await agent.ask(userMessage("fail", Date.now()))).toBe("failed words");
-    await whenTrue(() => receipts.length === 1, "receipts.length === 1");
-    expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
-    await agent.ask(userMessage("retry", Date.now()));
-    await whenTrue(() => receipts.length === 2, "receipts.length === 2");
-    expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
-    await agent.close();
-    const accounting = new RunAccounting();
-    accounting.begin();
-    accounting.message({ ...billedMessage("failed words", 7, 2, 1), ...failed });
-    accounting.message(billedMessage("ok", 3, 1, 0));
-    expect(accounting.settle(false)).toMatchObject({ error: "", usage: { input: 10 } });
-  });
+  it.effect("keeps a failure's words and goes by the last answer", () =>
+    Effect.gen(function* () {
+      const failed = { stopReason: "error", errorMessage: "broken" } as const;
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const { agent, receipts } = yield* receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
+          expect(yield* agent.ask(userMessage("fail", Date.now()))).toBe("failed words");
+          yield* until(() => receipts.length === 1, "receipts.length === 1");
+          expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
+          yield* agent.ask(userMessage("retry", Date.now()));
+          yield* until(() => receipts.length === 2, "receipts.length === 2");
+          expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
+        }),
+      );
+      const accounting = new RunAccounting();
+      accounting.begin();
+      accounting.message({ ...billedMessage("failed words", 7, 2, 1), ...failed });
+      accounting.message(billedMessage("ok", 3, 1, 0));
+      expect(accounting.settle(false)).toMatchObject({ error: "", usage: { input: 10 } });
+    }),
+  );
 
-  it("says nothing for an ask a follow-up took over, when the run ends on tools", async () => {
-    let release!: () => void;
-    const released = new Promise<void>((r) => (release = r));
-    let calls = 0;
-    let entered = false;
-    const slow = textTool<object>({
-      name: "echo",
-      description: "",
-      parameters: objectSchema(),
-      run: async () => {
-        if (++calls === 1) {
-          entered = true;
-          await released;
-        }
-        return "ok";
-      },
-    });
-    const { agent, receipts } = await receiptAgent(
-      [billed([text("A"), toolCall("echo", {})], 2, 1, 0), billed("A done", 3, 1, 0), billed([toolCall("echo", {})], 4, 1, 0)],
-      {
-        tools: [slow],
-        maxSteps: 3,
-      },
-    );
-    const answer = agent.ask(userMessage("A", Date.now()));
-    await whenTrue(() => entered, "entered");
-    await agent.later(userMessage("B", Date.now()));
-    release();
-    expect(await answer).toBe("");
-    await whenTrue(() => receipts.length === 1, "receipts.length === 1");
-    expect(receipts[0]).toMatchObject({ id: 1, text: "", usage: { input: 9 } });
-    await agent.close();
-  });
+  it.effect("says nothing for an ask a follow-up took over, when the run ends on tools", () =>
+    Effect.gen(function* () {
+      let release!: () => void;
+      const released = new Promise<void>((r) => (release = r));
+      let calls = 0;
+      let entered = false;
+      const slow = textTool<object>({
+        name: "echo",
+        description: "",
+        parameters: objectSchema(),
+        run: async () => {
+          if (++calls === 1) {
+            entered = true;
+            await released;
+          }
+          return "ok";
+        },
+      });
+      const { agent, receipts } = yield* receiptAgent(
+        [billed([text("A"), toolCall("echo", {})], 2, 1, 0), billed("A done", 3, 1, 0), billed([toolCall("echo", {})], 4, 1, 0)],
+        {
+          tools: [slow],
+          maxSteps: 3,
+        },
+      );
+      const answer = yield* Effect.forkChild(agent.ask(userMessage("A", Date.now())), { startImmediately: true });
+      yield* until(() => entered, "entered");
+      yield* agent.later(userMessage("B", Date.now()));
+      release();
+      expect(yield* Fiber.join(answer)).toBe("");
+      yield* until(() => receipts.length === 1, "receipts.length === 1");
+      expect(receipts[0]).toMatchObject({ id: 1, text: "", usage: { input: 9 } });
+    }),
+  );
 
   it("shows usage from an answer that has only started, and does not count it twice", () => {
     const accounting = new RunAccounting();
@@ -155,40 +165,44 @@ describe("a run's receipt", () => {
     });
   });
 
-  it("keeps an answer cut off by closing, with what it used", async () => {
-    const { llm } = scriptedLLM([billed("partial", 7, 3, 2, { hangAfter: 7 })]);
-    const dir = home();
-    const agent = await openBrain(standaloneOwner(), {
-      name: "partial",
-      instructions: "",
-      llm,
-      home: dir,
-      cwd: dir,
-      noSkills: true,
-      noMemory: true,
-      noSubagents: true,
-      noSession: true,
-      reminders: false,
-    });
-    const events: BrainEvent[] = [];
-    agent.subscribe((e) => events.push(e));
-    void agent.send(userMessage("start", Date.now()));
-    await whenTrue(
-      () => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"),
-      'events.some((e) => e.type === "message_update" && messageText(e.message) === "partial")',
-    );
-    expect(agent.progress().current.settled).toBe(false);
-    await Promise.all(Array.from({ length: 8 }, () => agent.close()));
-    expect(agent.progress()).toMatchObject({
-      current: { settled: true, aborted: true },
-      lifetime: { input: 7, output: 3, cacheRead: 2 },
-    });
-    const receipt = events.find((e) => e.type === "agent_settled");
-    expect(receipt?.type === "agent_settled" && receipt.run).toMatchObject({
-      usage: { input: 7, output: 3 },
-      text: "partial",
-    });
-  });
+  it.effect("keeps an answer cut off by closing, with what it used", () =>
+    Effect.gen(function* () {
+      const { llm } = scriptedLLM([billed("partial", 7, 3, 2, { hangAfter: 7 })]);
+      const dir = home();
+      const agent = yield* Effect.promise(() =>
+        openBrain(standaloneOwner(), {
+          name: "partial",
+          instructions: "",
+          llm,
+          home: dir,
+          cwd: dir,
+          noSkills: true,
+          noMemory: true,
+          noSubagents: true,
+          noSession: true,
+          reminders: false,
+        }),
+      );
+      const events: BrainEvent[] = [];
+      agent.subscribe((e) => events.push(e));
+      void agent.send(userMessage("start", Date.now()));
+      yield* until(
+        () => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"),
+        'events.some((e) => e.type === "message_update" && messageText(e.message) === "partial")',
+      );
+      expect(agent.progress().current.settled).toBe(false);
+      yield* Effect.promise(() => Promise.all(Array.from({ length: 8 }, () => agent.close())));
+      expect(agent.progress()).toMatchObject({
+        current: { settled: true, aborted: true },
+        lifetime: { input: 7, output: 3, cacheRead: 2 },
+      });
+      const receipt = events.find((e) => e.type === "agent_settled");
+      expect(receipt?.type === "agent_settled" && receipt.run).toMatchObject({
+        usage: { input: 7, output: 3 },
+        text: "partial",
+      });
+    }),
+  );
 });
 
 describe("a compaction", () => {
@@ -228,7 +242,7 @@ const subagentBrief = (c: Request) => messageText(c.messages[0]!);
 
 describe("the agent's own tasks", () => {
   // A and B go out together; C waits for both, then goes; each comes back to the agent as an input.
-  it("sends a subagent's tasks when ready, and they come back", async () => {
+  it.effect("sends a subagent's tasks when ready, and they come back", () => {
     const dir = home();
     const store = memoryStore();
     const sent: string[] = [];
@@ -256,19 +270,20 @@ describe("the agent's own tasks", () => {
         ]);
       return answer("派好了");
     };
-    await withAgent(
+    return withAgent(
       dir,
       Array.from({ length: 12 }, () => reply),
-      async (r) => {
-        await r.ask("查三样");
-        await whenTrue(() => sent.length === 3 && told === 3, "sent.length === 3 && told === 3");
-        expect(await Effect.runPromise(store.load)).toEqual([]);
-      },
+      (r) =>
+        Effect.gen(function* () {
+          yield* r.ask("查三样");
+          yield* until(() => sent.length === 3 && told === 3, "sent.length === 3 && told === 3");
+          expect(yield* store.load).toEqual([]);
+        }),
       { tasks: store, reminders: false },
     );
   });
 
-  it("calls the subagents back when the agent is stopped", async () => {
+  it.effect("calls the subagents back when the agent is stopped", () => {
     const dir = home();
     const store = memoryStore();
     let started = false;
@@ -287,72 +302,76 @@ describe("the agent's own tasks", () => {
       if (!answered(c)) return answer([toolCall("todo_add", { tasks: [{ id: "a", brief: "查 A", by: "subagent" }] })]);
       return answer("派好了");
     };
-    await withAgent(
+    return withAgent(
       dir,
       Array.from({ length: 4 }, () => reply),
-      async (r) => {
-        expect(await r.ask("查")).toBe("派好了");
-        await whenTrue(() => started, "started");
-        await r.agent.stop();
-        const g = await Effect.runPromise(store.load);
-        expect(g[0]).toMatchObject({ state: "waiting" });
-        expect(g[0]!.tries ?? 0).toBe(0);
-      },
+      (r) =>
+        Effect.gen(function* () {
+          expect(yield* r.ask("查")).toBe("派好了");
+          yield* until(() => started, "started");
+          yield* r.agent.stop();
+          const g = yield* store.load;
+          expect(g[0]).toMatchObject({ state: "waiting" });
+          expect(g[0]!.tries ?? 0).toBe(0);
+        }),
       { tools: [wait], tasks: store, reminders: false },
     );
   });
 
   // A run that stops with its own tasks ready is reminded, at most maxNudges times while the graph stays the same.
-  it("reminds a stopped run of its own tasks a few times", async () => {
-    const dir = home();
-    let nudged = 0;
-    const reply = (c: Request): Answer => {
-      if (lastUser(c).includes("这一轮停了，还有 2 件你可以做：a、b")) {
-        nudged++;
-        return answer("还没空");
-      }
-      if (!answered(c))
-        return answer([
-          toolCall("todo_add", {
-            tasks: [
-              { id: "a", brief: "读" },
-              { id: "b", brief: "写" },
-            ],
+  it.effect("reminds a stopped run of its own tasks a few times", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      let nudged = 0;
+      const reply = (c: Request): Answer => {
+        if (lastUser(c).includes("这一轮停了，还有 2 件你可以做：a、b")) {
+          nudged++;
+          return answer("还没空");
+        }
+        if (!answered(c))
+          return answer([
+            toolCall("todo_add", {
+              tasks: [
+                { id: "a", brief: "读" },
+                { id: "b", brief: "写" },
+              ],
+            }),
+          ]);
+        return answer("先这样");
+      };
+      let events: BrainEvent[] = [];
+      yield* withAgent(
+        dir,
+        Array.from({ length: 10 }, () => reply),
+        (r) =>
+          Effect.gen(function* () {
+            yield* r.ask("拆一下");
+            yield* until(() => nudged >= 2, "nudged >= 2");
+            yield* until(() => !r.agent.busy(), "!r.agent.busy()");
+            expect(nudged).toBe(2);
+            events = [...r.events];
           }),
-        ]);
-      return answer("先这样");
-    };
-    let events: BrainEvent[] = [];
-    await withAgent(
-      dir,
-      Array.from({ length: 10 }, () => reply),
-      async (r) => {
-        await r.ask("拆一下");
-        await whenTrue(() => nudged >= 2, "nudged >= 2");
-        await whenTrue(() => !r.agent.busy(), "!r.agent.busy()");
-        expect(nudged).toBe(2);
-        events = [...r.events];
-      },
-      { tasks: memoryStore(), maxNudges: 2, reminders: false },
-    );
-    const changed = events.filter((e) => e.type === "tasks_changed");
-    // The task was one change.
-    expect(changed.length).toBe(1);
-    expect(changed[0]!.type === "tasks_changed" && changed[0]!.tasks.length).toBe(2);
-  });
+        { tasks: memoryStore(), maxNudges: 2, reminders: false },
+      );
+      const changed = events.filter((e) => e.type === "tasks_changed");
+      // The task was one change.
+      expect(changed.length).toBe(1);
+      expect(changed[0]!.type === "tasks_changed" && changed[0]!.tasks.length).toBe(2);
+    }),
+  );
 
-  it("carries the open graph into a fold's summary", async () => {
-    const store = memoryStore();
-    const summaries = await Effect.runPromise(
-      Effect.scoped(
+  it.effect("carries the open graph into a fold's summary", () =>
+    Effect.gen(function* () {
+      const store = memoryStore();
+      const summaries = yield* Effect.scoped(
         Effect.gen(function* () {
           const runner = yield* makeTaskRunner(store, undefined, () => Effect.void);
           const before = yield* runner.summary;
           yield* store.change((g) => engine.add(g, [{ id: "a", brief: "读" }])[0]);
           return [before, yield* runner.summary];
         }),
-      ),
-    );
-    expect(summaries).toEqual(["", "【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读"]);
-  });
+      );
+      expect(summaries).toEqual(["", "【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读"]);
+    }),
+  );
 });

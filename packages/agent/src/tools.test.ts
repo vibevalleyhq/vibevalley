@@ -1,14 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Effect } from "effect";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it } from "@effect/vitest";
+import { Effect, Exit, Fiber } from "effect";
 
 import { objectSchema, toolArguments } from "@vibevalley/ai/tools";
 
 import { memoryStore } from "./agentTaskStore.ts";
 import { taskTools } from "./agentTaskTools.ts";
-import { openBrain, standaloneOwner } from "./brain.ts";
+import { Brain } from "./brain.ts";
 import { codingTools, htmlText } from "./coding.ts";
 import { ToolFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
@@ -30,103 +30,106 @@ afterEach(() => {
   for (const done of homes.splice(0)) done();
 });
 
-/** As the agent calls it: arguments checked first, a bad one said as an error. */
-async function call(tools: readonly Tool[], name: string, params: unknown): Promise<string> {
+/** As the agent calls it: arguments checked first, a bad one said as a failure. */
+const call = Effect.fnUntraced(function* (tools: readonly Tool[], name: string, params: unknown) {
   const tool = tools.find((t) => t.name === name);
-  if (!tool) throw new Error(`no ${name}`);
+  if (!tool) return yield* Effect.die(new Error(`no ${name}`));
   const args = toolArguments(name, params, tool.parameters);
-  if ("refused" in args) throw new Error(args.refused);
-  const result = await Effect.runPromise(tool.execute(args.ok, { id: "t" }));
+  if ("refused" in args) return yield* new ToolFailed({ message: args.refused });
+  const result = yield* tool.execute(args.ok, { id: "t" });
   return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
-}
-const fails = async (p: Promise<string>) => {
-  try {
-    await p;
-  } catch (e) {
-    return (e as Error).message;
-  }
-  throw new Error("expected a failure");
-};
+});
+/** The failure's message; a call that goes fails the test. */
+const fails = (called: Effect.Effect<string, ToolFailed>) => Effect.map(Effect.flip(called), (e) => e.message);
 
 describe("the task tools", () => {
-  it("task and mark the agent's own tasks", async () => {
-    const tools = taskTools(memoryStore(), false, Effect.void);
-    expect(await call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/u);
-    expect(await fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/u);
-    const added = await call(tools, "todo_add", {
-      tasks: [
-        { id: "read", brief: "读代码" },
-        { id: "fix", title: "改 auth", brief: "改", after: ["read"] },
-      ],
-    });
-    expect(added).toMatch(/任务（2 件，1 件可以做）/u);
-    expect(added).toMatch(/\[等着\] fix 改 auth（等 read）/u);
-    expect(await call(tools, "todo_update", { id: "read", state: "done", result: "在 jwt.go" })).toMatch(/\[可以做\] fix/u);
-    expect(await fails(call(tools, "todo_update", { id: "read", state: "waiting" }))).toMatch(/不能改成/u);
-    expect(await call(tools, "todo_list", {})).toMatch(/read 读代码 → 在 jwt.go/u);
-    expect(await call(tools, "todo_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/u);
-    expect(await call(tools, "todo_list", {})).toBe("现在没有任务。");
-  });
+  it.effect("task and mark the agent's own tasks", () =>
+    Effect.gen(function* () {
+      const tools = taskTools(memoryStore(), false, Effect.void);
+      expect(yield* call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/u);
+      expect(yield* fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/u);
+      const added = yield* call(tools, "todo_add", {
+        tasks: [
+          { id: "read", brief: "读代码" },
+          { id: "fix", title: "改 auth", brief: "改", after: ["read"] },
+        ],
+      });
+      expect(added).toMatch(/任务（2 件，1 件可以做）/u);
+      expect(added).toMatch(/\[等着\] fix 改 auth（等 read）/u);
+      expect(yield* call(tools, "todo_update", { id: "read", state: "done", result: "在 jwt.go" })).toMatch(/\[可以做\] fix/u);
+      expect(yield* fails(call(tools, "todo_update", { id: "read", state: "waiting" }))).toMatch(/不能改成/u);
+      expect(yield* call(tools, "todo_list", {})).toMatch(/read 读代码 → 在 jwt.go/u);
+      expect(yield* call(tools, "todo_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/u);
+      expect(yield* call(tools, "todo_list", {})).toBe("现在没有任务。");
+    }),
+  );
 });
 
 describe("a tool whose work is an Effect", () => {
-  it("is interrupted when the run stops", async () => {
-    let interrupted = false;
-    const waits = effectTool({
-      name: "waits",
-      description: "",
-      parameters: objectSchema(),
-      run: () =>
-        Effect.never.pipe(
-          Effect.onInterrupt(() =>
-            Effect.sync(() => {
-              interrupted = true;
-            }),
+  it.effect("is interrupted when the run stops", () =>
+    Effect.gen(function* () {
+      let interrupted = false;
+      const waits = effectTool({
+        name: "waits",
+        description: "",
+        parameters: objectSchema(),
+        run: () =>
+          Effect.never.pipe(
+            Effect.onInterrupt(() =>
+              Effect.sync(() => {
+                interrupted = true;
+              }),
+            ),
           ),
-        ),
-    });
-    const stop = new AbortController();
-    const answer = Effect.runPromise(waits.execute({}, { id: "t" }), { signal: stop.signal });
-    stop.abort();
-    await expect(answer).rejects.toThrow();
-    expect(interrupted).toBe(true);
-  });
+      });
+      const answer = yield* Effect.forkChild(waits.execute({}, { id: "t" }), { startImmediately: true });
+      yield* Fiber.interrupt(answer);
+      expect(Exit.hasInterrupts(yield* Fiber.await(answer))).toBe(true);
+      expect(interrupted).toBe(true);
+    }),
+  );
 
-  it("says a failure's message as its failed result", async () => {
-    const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new ToolFailed({ message: "不行" })) });
-    expect(await fails(call([refuses], "refuses", {}))).toBe("不行");
-  });
+  it.effect("says a failure's message as its failed result", () =>
+    Effect.gen(function* () {
+      const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new ToolFailed({ message: "不行" })) });
+      expect(yield* fails(call([refuses], "refuses", {}))).toBe("不行");
+    }),
+  );
 });
 
 describe("the coding tools", () => {
-  it("read, write and edit a file", async () => {
-    const dir = home();
-    const tools = codingTools({ cwd: dir });
-    expect(await call(tools, "write_file", { path: "src/a.ts", content: "one\ntwo\nthree\ntwo" })).toBe("写好了 src/a.ts（4 行）");
-    expect(await call(tools, "read_file", { path: "src/a.ts", offset: 2, limit: 1 })).toBe("     2\ttwo\n（共 4 行，这里到第 2 行；接着读用 offset=3）");
-    expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }))).toMatch(/出现了 2 次/u);
-    expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }))).toMatch(/找不到 old_text/u);
-    await call(tools, "edit_file", {
-      path: "src/a.ts",
-      old_text: "two",
-      new_text: "$&2",
-      replace_all: true,
-    });
-    expect(readFileSync(join(dir, "src/a.ts"), "utf8")).toBe("one\n$&2\nthree\n$&2");
-  });
+  it.effect("read, write and edit a file", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      const tools = codingTools({ cwd: dir });
+      expect(yield* call(tools, "write_file", { path: "src/a.ts", content: "one\ntwo\nthree\ntwo" })).toBe("写好了 src/a.ts（4 行）");
+      expect(yield* call(tools, "read_file", { path: "src/a.ts", offset: 2, limit: 1 })).toBe("     2\ttwo\n（共 4 行，这里到第 2 行；接着读用 offset=3）");
+      expect(yield* fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }))).toMatch(/出现了 2 次/u);
+      expect(yield* fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }))).toMatch(/找不到 old_text/u);
+      yield* call(tools, "edit_file", {
+        path: "src/a.ts",
+        old_text: "two",
+        new_text: "$&2",
+        replace_all: true,
+      });
+      expect(readFileSync(join(dir, "src/a.ts"), "utf8")).toBe("one\n$&2\nthree\n$&2");
+    }),
+  );
 
-  it("list, search and run", async () => {
-    const dir = home();
-    mkdirSync(join(dir, "node_modules", "x"), { recursive: true });
-    mkdirSync(join(dir, "lib"), { recursive: true });
-    writeFileSync(join(dir, "lib", "b.txt"), "needle here\n");
-    const tools = codingTools({ cwd: dir, commandTimeoutMs: 1_000 });
-    expect(await call(tools, "list_dir", { depth: 2 })).toBe("lib/\n  b.txt");
-    const found = await call(tools, "grep", { pattern: "needle" }).catch((e: Error) => e.message);
-    if (found !== "这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。") expect(found).toContain("b.txt:1:needle here");
-    expect(await call(tools, "bash", { command: "echo hi; exit 3" })).toBe("hi\n（退出码 3）");
-    expect(await call(tools, "bash", { command: "sleep 5", timeout_seconds: 0.2 })).toMatch(/超时，停掉了/u);
-  });
+  it.effect("list, search and run", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      mkdirSync(join(dir, "node_modules", "x"), { recursive: true });
+      mkdirSync(join(dir, "lib"), { recursive: true });
+      writeFileSync(join(dir, "lib", "b.txt"), "needle here\n");
+      const tools = codingTools({ cwd: dir, commandTimeoutMs: 1_000 });
+      expect(yield* call(tools, "list_dir", { depth: 2 })).toBe("lib/\n  b.txt");
+      const found = yield* Effect.catch(call(tools, "grep", { pattern: "needle" }), (e) => Effect.succeed(e.message));
+      if (found !== "这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。") expect(found).toContain("b.txt:1:needle here");
+      expect(yield* call(tools, "bash", { command: "echo hi; exit 3" })).toBe("hi\n（退出码 3）");
+      expect(yield* call(tools, "bash", { command: "sleep 5", timeout_seconds: 0.2 })).toMatch(/超时，停掉了/u);
+    }),
+  );
 
   it("turn a web page into its words", () => {
     expect(htmlText("<html><style>x{}</style><h1>标题</h1><p>一 &amp; 二</p><script>no()</script></html>")).toBe("标题\n一 & 二");
@@ -152,22 +155,24 @@ describe("skills and memory", () => {
     expect(() => readSkill(skills, "nope")).toThrow(/有：tidy/u);
   });
 
-  it("remember, rewrite and search the archive", async () => {
-    const dir = home();
-    const tools = selfTools({ now: Date.now, home: dir, skills: () => [], memory: true });
-    await call(tools, "remember", { note: "用户喜欢\n简短的回答" });
-    expect(readMemory(dir).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/u);
-    await call(tools, "rewrite_memory", { content: "- 只说中文" });
-    expect(readMemory(dir).prompt).toBe("- 只说中文");
-    expect(await call(tools, "search_archive", { query: "端口" })).toBe("还没有归档的旧对话。");
-    archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好", new Date());
-    expect(await call(tools, "search_archive", { query: "端口" })).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/u);
-    expect(selfTools({ now: Date.now, home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
-    const lines = readMemory(dir).lines;
-    expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
-    forgetLine(dir, lines[0]!.id);
-    expect(readMemory(dir).lines).toEqual([]);
-  });
+  it.effect("remember, rewrite and search the archive", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      const tools = selfTools({ now: Date.now, home: dir, skills: () => [], memory: true });
+      yield* call(tools, "remember", { note: "用户喜欢\n简短的回答" });
+      expect(readMemory(dir).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/u);
+      yield* call(tools, "rewrite_memory", { content: "- 只说中文" });
+      expect(readMemory(dir).prompt).toBe("- 只说中文");
+      expect(yield* call(tools, "search_archive", { query: "端口" })).toBe("还没有归档的旧对话。");
+      archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好", new Date());
+      expect(yield* call(tools, "search_archive", { query: "端口" })).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/u);
+      expect(selfTools({ now: Date.now, home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
+      const lines = readMemory(dir).lines;
+      expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
+      forgetLine(dir, lines[0]!.id);
+      expect(readMemory(dir).lines).toEqual([]);
+    }),
+  );
 });
 
 describe("reminders", () => {
@@ -185,30 +190,32 @@ describe("reminders", () => {
     expect(describeReminder(every)).toMatch(/^- e「e」每 30 分钟；下次 /u);
   });
 
-  it("run a missed reminder once", async () => {
-    const dir = home();
-    // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
-    let at = Date.now();
-    const s = new Reminders(dir, () => ++at);
-    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/u);
-    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/u);
-    await call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
-    await call(s.tools, "reminder", {
-      name: "提醒",
-      message: "开会",
-      at: new Date(Date.now() + 60_000).toISOString(),
-    });
-    expect(await call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/u);
-    const later = new Date(Date.now() + 3_600_000);
-    const woke = s.tick(later);
-    expect(woke.length).toBe(2);
-    expect(woke[0]).toMatch(/^【提醒「巡检」到点了/u);
-    expect(s.tick(later)).toEqual([]);
-    const left = JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")) as Reminder[];
-    expect(left.map((j) => j.name)).toEqual(["巡检"]);
-    await call(s.tools, "cancel_reminder", { id: left[0]!.id });
-    expect(await call(s.tools, "list_reminders", {})).toBe("没有定好的事。");
-  });
+  it.effect("run a missed reminder once", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
+      let at = Date.now();
+      const s = new Reminders(dir, () => ++at);
+      expect(yield* fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/u);
+      expect(yield* fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/u);
+      yield* call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
+      yield* call(s.tools, "reminder", {
+        name: "提醒",
+        message: "开会",
+        at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      expect(yield* call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/u);
+      const later = new Date(Date.now() + 3_600_000);
+      const woke = s.tick(later);
+      expect(woke.length).toBe(2);
+      expect(woke[0]).toMatch(/^【提醒「巡检」到点了/u);
+      expect(s.tick(later)).toEqual([]);
+      const left = JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")) as Reminder[];
+      expect(left.map((j) => j.name)).toEqual(["巡检"]);
+      yield* call(s.tools, "cancel_reminder", { id: left[0]!.id });
+      expect(yield* call(s.tools, "list_reminders", {})).toBe("没有定好的事。");
+    }),
+  );
 
   it("come due only once the claim is stored", () => {
     const dir = home();
@@ -252,16 +259,18 @@ describe("reminders", () => {
     expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
   });
 
-  it("do not read a damaged file as an empty list", async () => {
-    const dir = home();
-    const s = new Reminders(dir, Date.now);
-    const damaged = `[{"id":"important"`;
-    writeFileSync(join(dir, "reminders.json"), damaged);
-    await fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));
-    await fails(call(s.tools, "list_reminders", {}));
-    expect(() => s.tick()).toThrow();
-    expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
-  });
+  it.effect("do not read a damaged file as an empty list", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      const s = new Reminders(dir, Date.now);
+      const damaged = `[{"id":"important"`;
+      writeFileSync(join(dir, "reminders.json"), damaged);
+      yield* fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));
+      yield* fails(call(s.tools, "list_reminders", {}));
+      expect(() => s.tick()).toThrow();
+      expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
+    }),
+  );
 });
 
 const fakeMCP = `
@@ -312,48 +321,57 @@ describe("MCP", () => {
     expect(() => readMcpConfig(directory)).toThrow();
   });
 
-  it("gets a server's tools over stdio, every page, and leaves out one that cannot be reached", async () => {
-    const dir = home();
-    writeFileSync(join(dir, "fake.cjs"), fakeMCP);
-    const all = await connectAll([
-      { name: "calc", command: process.execPath, args: [join(dir, "fake.cjs")] },
-      { name: "gone", command: join(dir, "no-such-server") },
-    ]);
-    try {
+  it.effect("gets a server's tools over stdio, every page, and leaves out one that cannot be reached", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      writeFileSync(join(dir, "fake.cjs"), fakeMCP);
+      const all = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          connectAll([
+            { name: "calc", command: process.execPath, args: [join(dir, "fake.cjs")] },
+            { name: "gone", command: join(dir, "no-such-server") },
+          ]),
+        ),
+        (connected) => Effect.promise(() => connected.close()),
+      );
       expect(all.tools.map((t) => t.name)).toEqual(["calc__add", "calc__boom"]);
       expect(all.failed.length).toBe(1);
       expect(all.failed[0]).toMatch(/^连不上 MCP 服务 gone/u);
-      expect(await call(all.tools, "calc__add", { a: 2, b: 3 })).toBe("5");
-      expect(await fails(call(all.tools, "calc__boom", {}))).toBe("炸了");
-    } finally {
-      await all.close();
-    }
-  });
+      expect(yield* call(all.tools, "calc__add", { a: 2, b: 3 })).toBe("5");
+      expect(yield* fails(call(all.tools, "calc__boom", {}))).toBe("炸了");
+    }),
+  );
 
-  it("belongs to the agent that connected it", async () => {
-    const dir = home();
-    writeFileSync(join(dir, "mcp.cjs"), fakeMCP);
-    const agent = await openBrain(standaloneOwner(), {
-      name: "test",
-      instructions: "",
-      llm: scriptedLLM().llm,
-      home: dir,
-      cwd: dir,
-      noSession: true,
-      noSkills: true,
-      noSubagents: true,
-      mcpServers: [
-        { name: "calc", command: process.execPath, args: [join(dir, "mcp.cjs")] },
-        { name: "gone", command: join(dir, "missing") },
-      ],
-    });
-    const status = agent.mcpStatus();
-    expect(status.toolCount).toBe(2);
-    expect(status.failed.length).toBe(1);
-    const tools = agent.tools();
-    expect(await call(tools, "calc__add", { a: 2, b: 3 })).toBe("5");
-    await agent.close();
-    await fails(call(tools, "calc__add", { a: 2, b: 3 }));
-    expect(existsSync(join(dir, "test.jsonl"))).toBe(false);
-  });
+  it.effect("belongs to the agent that connected it", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      writeFileSync(join(dir, "mcp.cjs"), fakeMCP);
+      // The brain's scope is this one: its end closes the brain, and its MCP servers with it.
+      const tools = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const agent = yield* Brain.make({
+            name: "test",
+            instructions: "",
+            llm: scriptedLLM().llm,
+            home: dir,
+            cwd: dir,
+            noSession: true,
+            noSkills: true,
+            noSubagents: true,
+            mcpServers: [
+              { name: "calc", command: process.execPath, args: [join(dir, "mcp.cjs")] },
+              { name: "gone", command: join(dir, "missing") },
+            ],
+          });
+          const status = agent.mcpStatus();
+          expect(status.toolCount).toBe(2);
+          expect(status.failed.length).toBe(1);
+          expect(yield* call(agent.tools(), "calc__add", { a: 2, b: 3 })).toBe("5");
+          return agent.tools();
+        }),
+      );
+      yield* fails(call(tools, "calc__add", { a: 2, b: 3 }));
+      expect(existsSync(join(dir, "test.jsonl"))).toBe(false);
+    }),
+  );
 });

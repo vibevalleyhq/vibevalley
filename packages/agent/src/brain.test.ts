@@ -1,22 +1,34 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { it as effectIt } from "@effect/vitest";
+import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Fiber, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { gate, nextTurn, whenTrue } from "@vibevalley/testkit/until";
+import { aTurn, gate, until, waitFor, whenTrue } from "@vibevalley/testkit/until";
 
-import { resumedUnknown, sessionUnfinished } from "./brain.ts";
+import { type BrainEvent, openBrain, resumedUnknown, sessionUnfinished, standaloneOwner } from "./brain.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { stopped, textTool } from "./core/tool.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
-import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, withAgent } from "./testing.ts";
+import {
+  answered,
+  lastUser,
+  type Request,
+  results,
+  type Rig,
+  scriptedLLM,
+  type Step,
+  systemPrompt,
+  tempHome,
+  testBrain,
+  toolsOf,
+  withAgent,
+} from "./testing.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -41,7 +53,7 @@ const settled = (r: Rig) => r.events.find((e) => e.type === "agent_settled") as 
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
-  it("stops waiting for an ask that is interrupted, and goes on with the run", async () => {
+  it.effect("stops waiting for an ask that is interrupted, and goes on with the run", () => {
     const dir = home();
     const wake = gate();
     let napping = false;
@@ -55,114 +67,116 @@ describe("the agent", () => {
         return "醒了";
       },
     });
-    await withAgent(
+    return withAgent(
       dir,
       [answer([toolCall("nap", {})]), answer("睡好了")],
-      async (r) => {
-        const asking = Effect.runFork(r.agent.brain.ask(userMessage("睡", Date.now())));
-        await whenTrue(() => napping, "napping");
-        await Effect.runPromise(Fiber.interrupt(asking));
-        wake.open();
-        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-        expect(messageText(r.agent.history().at(-1)!)).toBe("睡好了");
-      },
+      (r) =>
+        Effect.gen(function* () {
+          const asking = yield* Effect.forkChild(r.agent.ask(userMessage("睡", Date.now())));
+          yield* until(() => napping, "napping");
+          yield* Fiber.interrupt(asking);
+          wake.open();
+          yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+          expect(messageText(r.agent.history().at(-1)!)).toBe("睡好了");
+        }),
       { tools: [nap] },
     );
   });
 
-  it("shares the actual close with every concurrent caller", async () => {
-    const dir = home();
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    const { llm } = scriptedLLM();
-    const held = {
-      ...llm,
-      service: { ...llm.service, stream: () => Stream.fromEffect(Effect.uninterruptible(Effect.promise(() => gate))).pipe(Stream.drain) },
-    };
-    await withAgent(
-      dir,
-      [],
-      async (r) => {
-        await r.agent.send(userMessage("说", Date.now()));
-        await whenTrue(() => r.has("message_end"), 'r.has("message_end")');
-        try {
-          const first = r.agent.close();
-          const second = r.agent.close();
-          expect(second).toBe(first);
-          let done = false;
-          void second.then(() => {
-            done = true;
-          });
-          // A close that did not wait for the gate would have ended by the next turn.
-          await nextTurn();
-          expect(done).toBe(false);
-          release();
-          await Promise.all([first, second]);
-          expect(done).toBe(true);
-        } finally {
-          release();
-        }
-      },
-      { llm: held },
-    );
-  });
+  it.effect("shares the actual close with every concurrent caller", () =>
+    Effect.gen(function* () {
+      const release = gate();
+      const { llm } = scriptedLLM();
+      const held = {
+        ...llm,
+        service: { ...llm.service, stream: () => Stream.fromEffect(Effect.uninterruptible(Effect.promise(() => release.opened))).pipe(Stream.drain) },
+      };
+      const agent = yield* Effect.promise(() => openBrain(standaloneOwner(), testBrain(home(), held)));
+      const events: BrainEvent[] = [];
+      agent.subscribe((e) => events.push(e));
+      yield* Effect.gen(function* () {
+        yield* Effect.promise(() => agent.send(userMessage("说", Date.now())));
+        yield* until(() => events.some((e) => e.type === "message_end"), 'r.has("message_end")');
+        const first = agent.close();
+        const second = agent.close();
+        expect(second).toBe(first);
+        let done = false;
+        void second.then(() => {
+          done = true;
+        });
+        // A close that did not wait for the gate would have ended by the next turn.
+        yield* aTurn;
+        expect(done).toBe(false);
+        release.open();
+        yield* Effect.promise(() => Promise.all([first, second]));
+        expect(done).toBe(true);
+      }).pipe(
+        Effect.ensuring(
+          Effect.andThen(
+            Effect.sync(() => release.open()),
+            Effect.promise(() => agent.close()),
+          ),
+        ),
+      );
+    }),
+  );
 
-  it("cuts off a run under way when its owner's scope closes", async () => {
-    let [started, cut] = [false, false];
-    const owner = Scope.makeUnsafe();
-    const { llm } = scriptedLLM();
-    const asked = Effect.onInterrupt(
-      Effect.andThen(
-        Effect.sync(() => (started = true)),
-        Effect.never,
-      ),
-      () => Effect.sync(() => (cut = true)),
-    );
-    const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(asked) } };
-    await withAgent(
-      home(),
-      [],
-      async (r) => {
-        void r.agent.send(userMessage("说", Date.now()));
-        await whenTrue(() => started, "started");
-        await Effect.runPromise(Scope.close(owner, Exit.void));
-        await whenTrue(() => cut, "cut");
-      },
-      { llm: held },
-      { run: (effect) => Effect.runPromise(effect), scope: owner },
-    );
-  });
+  it.effect("cuts off a run under way when its owner's scope closes", () =>
+    Effect.gen(function* () {
+      let [started, cut] = [false, false];
+      const owner = yield* Scope.make();
+      const { llm } = scriptedLLM();
+      const asked = Effect.onInterrupt(
+        Effect.andThen(
+          Effect.sync(() => (started = true)),
+          Effect.never,
+        ),
+        () => Effect.sync(() => (cut = true)),
+      );
+      const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(asked) } };
+      const agent = yield* Effect.promise(() => openBrain({ run: standaloneOwner().run, scope: owner }, testBrain(home(), held)));
+      yield* Effect.gen(function* () {
+        void agent.send(userMessage("说", Date.now()));
+        yield* until(() => started, "started");
+        yield* Scope.close(owner, Exit.void);
+        yield* until(() => cut, "cut");
+      }).pipe(Effect.ensuring(Effect.promise(() => agent.close())));
+    }),
+  );
 
-  it("runs a tool and gives its result back", async () => {
-    const dir = home();
-    writeFileSync(join(dir, "notes.txt"), "第一行\n第二行\n");
-    await withAgent(
-      dir,
-      [
-        answer([thinking("先读文件"), toolCall("read_file", { path: "notes.txt" })]),
-        step((c) => answer(results(c)[0]?.text.includes("第二行") === true ? "读到了：两行" : "读到了：没读到")),
-      ],
-      async (r) => {
-        expect(await r.ask("看看 notes.txt")).toBe("读到了：两行");
-        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-        expect(r.events.flatMap((e) => (e.type === "tool_execution_start" || e.type === "tool_execution_end" ? [e.type + ":" + e.toolName] : []))).toEqual([
-          "tool_execution_start:read_file",
-          "tool_execution_end:read_file",
-        ]);
-        // The thinking goes back with the answer it came with.
-        expect(r.requests[1]!.messages.some((m) => m.role === "assistant" && m.content.some((c) => c.type === "thinking" && c.thinking === "先读文件"))).toBe(
-          true,
-        );
-        expect(r.events.at(-1)!.type).toBe("agent_settled");
-      },
-    );
-    expect(roles(readFileSync(join(dir, "test.jsonl"), "utf8"))).toEqual(["user", "assistant", "toolResult", "assistant"]);
-  });
+  it.effect("runs a tool and gives its result back", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      writeFileSync(join(dir, "notes.txt"), "第一行\n第二行\n");
+      yield* withAgent(
+        dir,
+        [
+          answer([thinking("先读文件"), toolCall("read_file", { path: "notes.txt" })]),
+          step((c) => answer(results(c)[0]?.text.includes("第二行") === true ? "读到了：两行" : "读到了：没读到")),
+        ],
+        (r) =>
+          Effect.gen(function* () {
+            expect(yield* r.ask("看看 notes.txt")).toBe("读到了：两行");
+            yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+            expect(r.events.flatMap((e) => (e.type === "tool_execution_start" || e.type === "tool_execution_end" ? [e.type + ":" + e.toolName] : []))).toEqual([
+              "tool_execution_start:read_file",
+              "tool_execution_end:read_file",
+            ]);
+            // The thinking goes back with the answer it came with.
+            expect(
+              r.requests[1]!.messages.some((m) => m.role === "assistant" && m.content.some((c) => c.type === "thinking" && c.thinking === "先读文件")),
+            ).toBe(true);
+            expect(r.events.at(-1)!.type).toBe("agent_settled");
+          }),
+      );
+      expect(roles(readFileSync(join(dir, "test.jsonl"), "utf8"))).toEqual(["user", "assistant", "toolResult", "assistant"]);
+    }),
+  );
 
-  it("tells the model why a tool failed", async () => {
+  it.effect("tells the model why a tool failed", () => {
     const dir = home();
     writeFileSync(join(dir, "a.txt"), "x x\n");
-    await withAgent(
+    return withAgent(
       dir,
       [
         answer([toolCall("edit_file", { path: "a.txt", old_text: "x", new_text: "y" }), toolCall("read_file", { file: "oops" })]),
@@ -174,13 +188,11 @@ describe("the agent", () => {
           ),
         ),
       ],
-      async (r) => {
-        expect(await r.ask("改")).toMatch(/^true:old_text 在 a\|true:\S/u);
-      },
+      (r) => Effect.map(r.ask("改"), (said) => expect(said).toMatch(/^true:old_text 在 a\|true:\S/u)),
     );
   });
 
-  it("steers with send and waits with later", async () => {
+  it.effect("steers with send and waits with later", () => {
     const dir = home();
     // The nap lasts until the test has said its two lines: they come while the tool runs.
     const wake = gate();
@@ -195,99 +207,106 @@ describe("the agent", () => {
         return "醒了";
       },
     });
-    await withAgent(
+    return withAgent(
       dir,
       [answer([toolCall("nap", {})]), step((c) => answer("第二次听到：" + lastUser(c))), step((c) => answer("第三次听到：" + lastUser(c)))],
-      async (r) => {
-        await r.agent.send(userMessage("开始", Date.now()));
-        await whenTrue(() => napping, "napping");
-        await r.agent.later(userMessage("完了再说这个", Date.now()));
-        await r.agent.send(userMessage("顺便", Date.now()));
-        wake.open();
-        await whenTrue(() => r.agent.history().length >= 7, "r.agent.history().length >= 7");
-        expect(said(r.agent.history())).toEqual([
-          "user:开始",
-          "assistant:",
-          "toolResult:醒了",
-          "user:顺便",
-          "assistant:第二次听到：顺便",
-          "user:完了再说这个",
-          "assistant:第三次听到：完了再说这个",
-        ]);
-      },
+      (r) =>
+        Effect.gen(function* () {
+          yield* r.agent.send(userMessage("开始", Date.now()));
+          yield* until(() => napping, "napping");
+          yield* r.agent.later(userMessage("完了再说这个", Date.now()));
+          yield* r.agent.send(userMessage("顺便", Date.now()));
+          wake.open();
+          yield* until(() => r.agent.history().length >= 7, "r.agent.history().length >= 7");
+          expect(said(r.agent.history())).toEqual([
+            "user:开始",
+            "assistant:",
+            "toolResult:醒了",
+            "user:顺便",
+            "assistant:第二次听到：顺便",
+            "user:完了再说这个",
+            "assistant:第三次听到：完了再说这个",
+          ]);
+        }),
       { tools: [nap] },
     );
   });
 
-  it("stops at its step limit", async () => {
-    const dir = home();
-    await withAgent(
-      dir,
+  it.effect("stops at its step limit", () =>
+    withAgent(
+      home(),
       repeat(4, answer([toolCall("list_dir", {})])),
-      async (r) => {
-        await r.ask("一直列");
-        expect(r.requests.length).toBe(3);
-      },
+      (r) =>
+        Effect.gen(function* () {
+          yield* r.ask("一直列");
+          expect(r.requests.length).toBe(3);
+        }),
       { maxSteps: 3 },
-    );
-  });
+    ),
+  );
 
-  it("goes on with its session when started again", async () => {
-    const dir = home();
-    const countUsers = step((c) => answer(`第 ${c.messages.filter((m) => m.role === "user").length} 句`));
-    await withAgent(dir, [countUsers], async (r) => expect(await r.ask("一")).toBe("第 1 句"));
-    await withAgent(dir, [countUsers], async (r) => expect(await r.ask("二")).toBe("第 2 句"));
-  });
+  it.effect("goes on with its session when started again", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      const countUsers = step((c) => answer(`第 ${c.messages.filter((m) => m.role === "user").length} 句`));
+      yield* withAgent(dir, [countUsers], (r) => Effect.map(r.ask("一"), (said) => expect(said).toBe("第 1 句")));
+      yield* withAgent(dir, [countUsers], (r) => Effect.map(r.ask("二"), (said) => expect(said).toBe("第 2 句")));
+    }),
+  );
 
-  it("folds a long conversation", async () => {
-    const dir = home();
-    const long = step((c) => answer(summarizing(c) ? "摘要：说了五件事" : "好的。".repeat(150)));
-    const options = { contextTokens: 900, keepRecent: 2 };
-    await withAgent(
-      dir,
-      repeat(12, long),
-      async (r) => {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
-        for (let n = 1; n <= 5; n++) await r.ask(`第 ${n} 件事`);
-        await whenTrue(
-          () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined),
-          'r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined)',
-        );
-        const last = r.requests.findLast((c) => !summarizing(c))!;
-        expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/u);
-        expect(r.agent.history()[0]!.role).toBe("compactionSummary");
-      },
-      options,
-    );
-    expect(readdirSync(join(dir, "archive")).length).toBeGreaterThanOrEqual(1);
-    await withAgent(
-      dir,
-      [],
-      async (r) => {
-        const history = r.agent.history();
-        expect(history[0]!.role).toBe("compactionSummary");
-        expect(history.length).toBeLessThanOrEqual(6);
-      },
-      options,
-    );
-  });
+  it.effect("folds a long conversation", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      const long = step((c) => answer(summarizing(c) ? "摘要：说了五件事" : "好的。".repeat(150)));
+      const options = { contextTokens: 900, keepRecent: 2 };
+      yield* withAgent(
+        dir,
+        repeat(12, long),
+        (r) =>
+          Effect.gen(function* () {
+            for (let n = 1; n <= 5; n++) yield* r.ask(`第 ${n} 件事`);
+            yield* until(
+              () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined),
+              'r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined)',
+            );
+            const last = r.requests.findLast((c) => !summarizing(c))!;
+            expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/u);
+            expect(r.agent.history()[0]!.role).toBe("compactionSummary");
+          }),
+        options,
+      );
+      expect(readdirSync(join(dir, "archive")).length).toBeGreaterThanOrEqual(1);
+      yield* withAgent(
+        dir,
+        [],
+        (r) =>
+          Effect.sync(() => {
+            const history = r.agent.history();
+            expect(history[0]!.role).toBe("compactionSummary");
+            expect(history.length).toBeLessThanOrEqual(6);
+          }),
+        options,
+      );
+    }),
+  );
 
-  it("lists its skills and reads one", async () => {
+  it.effect("lists its skills and reads one", () => {
     const dir = home();
     mkdirSync(join(dir, "skills", "tidy"), { recursive: true });
     writeFileSync(join(dir, "skills", "tidy", "SKILL.md"), "---\nname: tidy\ndescription: 整理代码时用\n---\n先跑 lint");
-    await withAgent(
+    return withAgent(
       dir,
       [answer([toolCall("load_skill", { name: "tidy" })]), step((c) => answer(results(c)[0]!.text.split("\n").at(-1)!))],
-      async (r) => {
-        expect(await r.ask("整理一下")).toBe("先跑 lint");
-        expect(systemPrompt(r.requests[0]!)).toContain("- tidy：整理代码时用");
-      },
+      (r) =>
+        Effect.gen(function* () {
+          expect(yield* r.ask("整理一下")).toBe("先跑 lint");
+          expect(systemPrompt(r.requests[0]!)).toContain("- tidy：整理代码时用");
+        }),
       { noSkills: false, skills: [join(dir, "skills")] },
     );
   });
 
-  it("sends subagents that work side by side", async () => {
+  it.effect("sends subagents that work side by side", () => {
     const dir = home();
     let running = 0;
     let most = 0;
@@ -312,134 +331,133 @@ describe("the agent", () => {
           .join("；"),
       );
     });
-    await withAgent(
+    return withAgent(
       dir,
       repeat(6, subagentOrNot),
-      async (r) => {
-        expect(await r.ask("同时查 A 和 B")).toBe("查 A 做完了；查 B 做完了");
-        expect(most).toBe(2);
-      },
+      (r) =>
+        Effect.gen(function* () {
+          expect(yield* r.ask("同时查 A 和 B")).toBe("查 A 做完了；查 B 做完了");
+          expect(most).toBe(2);
+        }),
       { tools: [nap], reminders: false },
     );
   });
 
-  it("is woken by a reminder that comes due", async () => {
-    const dir = home();
-    writeFileSync(
-      join(dir, "reminders.json"),
-      `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
-    );
-    await withAgent(dir, [step((c) => answer("收到：" + lastUser(c)))], async (r) => {
-      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-      const history = r.agent.history();
-      expect(history[0]!.role).toBe("custom");
-      expect(messageText(history[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
-    });
-    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
-  });
+  it.effect("is woken by a reminder that comes due", () =>
+    Effect.gen(function* () {
+      // Its first look at the reminders is when it opens: by then this one is due.
+      yield* TestClock.setTime(Date.parse("2026-01-02T00:00:00.000Z"));
+      const dir = home();
+      writeFileSync(
+        join(dir, "reminders.json"),
+        `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
+      );
+      yield* withAgent(dir, [step((c) => answer("收到：" + lastUser(c)))], (r) =>
+        Effect.gen(function* () {
+          yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+          const history = r.agent.history();
+          expect(history[0]!.role).toBe("custom");
+          expect(messageText(history[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
+        }),
+      );
+      expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
+    }),
+  );
 
-  effectIt.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
+  it.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
-      const move = Effect.runPromiseWith(yield* Effect.context());
-      const scope = yield* Effect.scope;
       const dir = home();
       writeFileSync(
         join(dir, "reminders.json"),
         `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-03-01T09:00:00.000Z","created":"2026-03-01T08:00:00.000Z"}]`,
       );
-      yield* Effect.promise(() =>
-        withAgent(
-          dir,
-          [step((c) => answer("收到：" + lastUser(c)))],
-          async (r) => {
-            await move(TestClock.adjust(59 * 60_000));
-            expect(r.has("agent_start")).toBe(false);
-            await move(TestClock.adjust(60_000 + 20_000));
-            await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-            expect(messageText(r.agent.history()[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
-          },
-          {},
-          { run: move, scope },
-        ),
+      yield* withAgent(dir, [step((c) => answer("收到：" + lastUser(c)))], (r) =>
+        Effect.gen(function* () {
+          yield* TestClock.adjust(59 * 60_000);
+          expect(r.has("agent_start")).toBe(false);
+          yield* TestClock.adjust(60_000 + 20_000);
+          yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+          expect(messageText(r.agent.history()[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
+        }),
       );
     }),
   );
 
-  it("keeps the same system prompt between folds and tells memory news in the input", async () => {
+  it.effect("keeps the same system prompt between folds and tells memory news in the input", () => {
     const dir = home();
     writeFileSync(memoryFile(dir), "- 2026-10-01 主人叫阿周\n- 2026-10-02 用中文\n");
-    await withAgent(dir, [answer("一"), answer("二")], async (r) => {
-      expect(r.agent.memoryNews()).toBe("");
-      await r.ask("a");
-      remember(dir, "主人喜欢短句", new Date(2026, 9, 18, 9));
-      forgetLine(dir, readMemory(dir).lines.find((l) => l.text === "用中文")!.id);
-      const news = r.agent.memoryNews();
-      expect(news).toBe("【记性有更新】\n+ 2026-10-18 主人喜欢短句\n− 2026-10-02 用中文");
-      expect(r.agent.memoryNews()).toBe("");
-      await r.ask(news + "\n\nb");
-      expect(systemPrompt(r.requests[1]!)).toBe(systemPrompt(r.requests[0]!));
-      expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/u);
-      expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/u);
-      expect(prefixChanges(r)).toEqual([]);
-    });
+    return withAgent(dir, [answer("一"), answer("二")], (r) =>
+      Effect.gen(function* () {
+        expect(r.agent.memoryNews()).toBe("");
+        yield* r.ask("a");
+        remember(dir, "主人喜欢短句", new Date(2026, 9, 18, 9));
+        forgetLine(dir, readMemory(dir).lines.find((l) => l.text === "用中文")!.id);
+        const news = r.agent.memoryNews();
+        expect(news).toBe("【记性有更新】\n+ 2026-10-18 主人喜欢短句\n− 2026-10-02 用中文");
+        expect(r.agent.memoryNews()).toBe("");
+        yield* r.ask(news + "\n\nb");
+        expect(systemPrompt(r.requests[1]!)).toBe(systemPrompt(r.requests[0]!));
+        expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/u);
+        expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/u);
+        expect(prefixChanges(r)).toEqual([]);
+      }),
+    );
   });
 
-  it("makes the system prompt anew after a fold", async () => {
+  it.effect("makes the system prompt anew after a fold", () => {
     const dir = home();
     const long = step((c) => answer(summarizing(c) ? "摘要" : "好的。".repeat(150)));
-    await withAgent(
+    return withAgent(
       dir,
       repeat(12, long),
-      async (r) => {
-        await r.ask("第 1 件事");
-        remember(dir, "记在折叠之前", new Date());
-        const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
-        // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
-        for (let n = 2; n <= 5 && !folded(); n++) await r.ask(`第 ${n} 件事`);
-        await whenTrue(folded, "the history folded");
-        await r.ask("折叠之后");
-        const prompts = r.requests.filter((c) => !summarizing(c)).map(systemPrompt);
-        expect(prompts[0]).not.toContain("记在折叠之前");
-        expect(prompts.at(-1)).toContain("记在折叠之前");
-        expect(prefixChanges(r)).toEqual([]);
-      },
+      (r) =>
+        Effect.gen(function* () {
+          yield* r.ask("第 1 件事");
+          remember(dir, "记在折叠之前", new Date());
+          const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
+          for (let n = 2; n <= 5 && !folded(); n++) yield* r.ask(`第 ${n} 件事`);
+          yield* until(folded, "the history folded");
+          yield* r.ask("折叠之后");
+          const prompts = r.requests.filter((c) => !summarizing(c)).map(systemPrompt);
+          expect(prompts[0]).not.toContain("记在折叠之前");
+          expect(prompts.at(-1)).toContain("记在折叠之前");
+          expect(prefixChanges(r)).toEqual([]);
+        }),
       { contextTokens: 900, keepRecent: 2 },
     );
   });
 
-  it("stops the run under way", async () => {
-    const dir = home();
-    await withAgent(
-      dir,
-      [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })],
-      async (r) => {
-        await r.agent.send(userMessage("说", Date.now()));
-        await whenTrue(
+  it.effect("stops the run under way", () =>
+    withAgent(home(), [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })], (r) =>
+      Effect.gen(function* () {
+        yield* r.agent.send(userMessage("说", Date.now()));
+        yield* until(
           () => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"),
           'r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta")',
         );
-        await r.agent.stop();
-        await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
+        yield* r.agent.stop();
+        yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(settled(r)!.run.aborted).toBe(true);
         const last = r.agent.history().at(-1)!;
         expect(last.role === "assistant" && last.stopReason).toBe("aborted");
-      },
-    );
-  });
+      }),
+    ),
+  );
 
-  it("is stopped while a tool runs", async () => {
-    const dir = home();
-    await withAgent(dir, [answer([toolCall("bash", { command: "sleep 5" })])], async (r) => {
-      await r.agent.send(userMessage("睡", Date.now()));
-      await whenTrue(() => r.has("tool_execution_start"), 'r.has("tool_execution_start")');
-      await r.agent.stop();
-      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-      expect(settled(r)!.run.aborted).toBe(true);
-      const last = r.agent.history().at(-1)!;
-      expect(last.role).toBe("toolResult");
-    });
-  });
+  it.effect("is stopped while a tool runs", () =>
+    withAgent(home(), [answer([toolCall("bash", { command: "sleep 5" })])], (r) =>
+      Effect.gen(function* () {
+        yield* r.agent.send(userMessage("睡", Date.now()));
+        yield* until(() => r.has("tool_execution_start"), 'r.has("tool_execution_start")');
+        yield* r.agent.stop();
+        yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+        expect(settled(r)!.run.aborted).toBe(true);
+        const last = r.agent.history().at(-1)!;
+        expect(last.role).toBe("toolResult");
+      }),
+    ),
+  );
 
   it("reads back a session file", () => {
     const dir = home();
@@ -456,24 +474,26 @@ describe("the agent", () => {
     expect(history.map((m) => JSON.stringify(m))).toEqual([lines[3], lines[1], lines[2], lines[4]]);
   });
 
-  it("tells a changed tool as a changed prefix", async () => {
-    const dir = home();
-    await withAgent(dir, [answer("一"), answer("二")], async (r) => {
-      await r.ask("a");
-      await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-      expect(prefixChanges(r)).toEqual([]);
-      (r.agent.tools()[0] as { description: string }).description = "改过的说明";
-      await r.ask("b");
-      await whenTrue(() => prefixChanges(r).length > 0, "prefixChanges(r).length > 0");
-      expect(prefixChanges(r)[0]).toContain("tools");
-    });
-  });
+  it.effect("tells a changed tool as a changed prefix", () =>
+    withAgent(home(), [answer("一"), answer("二")], (r) =>
+      Effect.gen(function* () {
+        yield* r.ask("a");
+        yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+        expect(prefixChanges(r)).toEqual([]);
+        (r.agent.tools()[0] as { description: string }).description = "改过的说明";
+        yield* r.ask("b");
+        yield* until(() => prefixChanges(r).length > 0, "prefixChanges(r).length > 0");
+        expect(prefixChanges(r)[0]).toContain("tools");
+      }),
+    ),
+  );
 
   describe("an idle conversation", () => {
-    const idleRig = async (
+    const idleFoldAfterMs = 50;
+    const idleRig = <E>(
       wakeSoon: ((ms: number) => boolean) | undefined,
       summary: (c: Request) => Answer,
-      body: (r: Rig, choices: Map<number, unknown>) => Promise<void>,
+      body: (r: Rig, choices: Map<number, unknown>) => Effect.Effect<void, E>,
     ) => {
       const dir = home();
       const choices = new Map<number, unknown>();
@@ -487,69 +507,73 @@ describe("the agent", () => {
         if (systemPrompt(c).startsWith(summaryInstructions)) return answer("另起的摘要");
         return answer("好的。".repeat(150));
       };
-      await withAgent(dir, repeat(8, reply), (r) => body(r, choices), {
+      return withAgent(dir, repeat(8, reply), (r) => body(r, choices), {
         keepRecent: 2,
         idleFoldAt: 300,
-        idleFoldAfterMs: 50,
+        idleFoldAfterMs,
         ...(wakeSoon ? { wakeSoon } : {}),
       });
     };
     const idleFolded = (r: Rig) => r.events.some((e) => e.type === "compaction_end" && e.reason === "idle" && e.compaction !== undefined);
+    /** Lets the idle wait go by until ok holds: the wait is set going after the run settles, on a fiber that may not be
+     * asleep yet when the test first moves the clock. */
+    const idleUntil = (ok: () => boolean, what: string) => waitFor(Effect.andThen(TestClock.adjust(idleFoldAfterMs), Effect.sync(ok)), (held) => held, what);
+    const talk = (r: Rig) => Effect.forEach(["一", "二", "三"], (words) => r.ask(words), { discard: true });
 
-    it("is folded with the same start", async () => {
-      await idleRig(
+    it.effect("is folded with the same start", () =>
+      idleRig(
         undefined,
         () => answer("就地的摘要"),
-        async (r, choices) => {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
-          for (const words of ["一", "二", "三"]) await r.ask(words);
-          expect(r.requests.length).toBe(3);
-          await whenTrue(() => idleFolded(r), "idleFolded(r)");
-          expect(r.requests.length).toBe(4);
-          const [before, folding] = [r.requests[2]!, r.requests[3]!];
-          expect(systemPrompt(folding)).toBe(systemPrompt(before));
-          expect(JSON.stringify(toolsOf(folding))).toBe(JSON.stringify(toolsOf(before)));
-          expect(JSON.stringify(folding.messages.slice(0, before.messages.length))).toBe(JSON.stringify(before.messages));
-          expect(folding.messages.length).toBe(before.messages.length + 2);
-          expect([...choices.values()]).toEqual(["none"]);
-          const history = r.agent.history();
-          expect((history[0] as CompactionSummaryMessage).summary).toBe("就地的摘要");
-          expect(said(history.slice(1))).toEqual(["user:三", "assistant:" + "好的。".repeat(150)]);
-        },
-      );
-    });
+        (r, choices) =>
+          Effect.gen(function* () {
+            yield* talk(r);
+            expect(r.requests.length).toBe(3);
+            yield* idleUntil(() => idleFolded(r), "idleFolded(r)");
+            expect(r.requests.length).toBe(4);
+            const [before, folding] = [r.requests[2]!, r.requests[3]!];
+            expect(systemPrompt(folding)).toBe(systemPrompt(before));
+            expect(JSON.stringify(toolsOf(folding))).toBe(JSON.stringify(toolsOf(before)));
+            expect(JSON.stringify(folding.messages.slice(0, before.messages.length))).toBe(JSON.stringify(before.messages));
+            expect(folding.messages.length).toBe(before.messages.length + 2);
+            expect([...choices.values()]).toEqual(["none"]);
+            const history = r.agent.history();
+            expect((history[0] as CompactionSummaryMessage).summary).toBe("就地的摘要");
+            expect(said(history.slice(1))).toEqual(["user:三", "assistant:" + "好的。".repeat(150)]);
+          }),
+      ),
+    );
 
-    it("asks again on its own when a tool is called instead of a summary", async () => {
-      await idleRig(
+    it.effect("asks again on its own when a tool is called instead of a summary", () =>
+      idleRig(
         undefined,
         () => answer([toolCall("list_dir", {})]),
-        async (r) => {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
-          for (const words of ["一", "二", "三"]) await r.ask(words);
-          await whenTrue(() => idleFolded(r), "idleFolded(r)");
-          expect((r.agent.history()[0] as CompactionSummaryMessage).summary).toBe("另起的摘要");
-        },
-      );
-    });
+        (r) =>
+          Effect.gen(function* () {
+            yield* talk(r);
+            yield* idleUntil(() => idleFolded(r), "idleFolded(r)");
+            expect((r.agent.history()[0] as CompactionSummaryMessage).summary).toBe("另起的摘要");
+          }),
+      ),
+    );
 
-    it("is not folded when it will be woken soon", async () => {
+    it.effect("is not folded when it will be woken soon", () => {
       let asked = 0;
-      await idleRig(
+      return idleRig(
         (within) => {
           expect(within).toBe(50);
           asked++;
           return true;
         },
         () => answer("摘要"),
-        async (r) => {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
-          for (const words of ["一", "二", "三"]) await r.ask(words);
-          await whenTrue(() => asked > 0, "asked > 0");
-          await whenTrue(() => !r.agent.busy(), "!r.agent.busy()");
-          expect(asked).toBe(1);
-          expect(r.requests.length).toBe(3);
-          expect(r.agent.history()[0]!.role).toBe("user");
-        },
+        (r) =>
+          Effect.gen(function* () {
+            yield* talk(r);
+            yield* idleUntil(() => asked > 0, "asked > 0");
+            yield* until(() => !r.agent.busy(), "!r.agent.busy()");
+            expect(asked).toBe(1);
+            expect(r.requests.length).toBe(3);
+            expect(r.agent.history()[0]!.role).toBe("user");
+          }),
       );
     });
   });
@@ -605,48 +629,57 @@ describe("the agent", () => {
       ["stopped", [asked, call, stop], false, false],
     ];
     for (const [name, lines, isUnfinished, resumed] of cases)
-      it(name, async () => {
-        const dir = home();
-        const file = join(dir, "test.jsonl");
-        writeFileSync(file, lines.map((m) => JSON.stringify(m)).join("\n") + "\n");
-        expect(sessionUnfinished(file)).toBe(isUnfinished);
-        await withAgent(dir, [step((c) => answer(JSON.stringify(results(c))))], async (r) => {
-          expect(await r.agent.resume(30 * 60_000)).toBe(resumed);
-          if (!resumed) {
-            // Not resumed: nothing was started to wait for.
-            expect(r.requests.length).toBe(0);
-            return;
-          }
-          await whenTrue(() => r.has("agent_settled"), 'r.has("agent_settled")');
-          expect(r.requests.length).toBe(1);
-          expect(results(r.requests[0]!)).toEqual(
-            name === "cut off in a tool" ? [{ failed: true, text: resumedUnknown }] : [{ failed: false, text: "（空的）" }],
+      it.effect(name, () =>
+        Effect.gen(function* () {
+          // How old the conversation is, is told by the brain's Clock.
+          yield* TestClock.setTime(now);
+          const dir = home();
+          const file = join(dir, "test.jsonl");
+          writeFileSync(file, lines.map((m) => JSON.stringify(m)).join("\n") + "\n");
+          expect(sessionUnfinished(file)).toBe(isUnfinished);
+          yield* withAgent(dir, [step((c) => answer(JSON.stringify(results(c))))], (r) =>
+            Effect.gen(function* () {
+              expect(yield* r.agent.resume(30 * 60_000)).toBe(resumed);
+              if (!resumed) {
+                // Not resumed: nothing was started to wait for.
+                expect(r.requests.length).toBe(0);
+                return;
+              }
+              yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+              expect(r.requests.length).toBe(1);
+              expect(results(r.requests[0]!)).toEqual(
+                name === "cut off in a tool" ? [{ failed: true, text: resumedUnknown }] : [{ failed: false, text: "（空的）" }],
+              );
+            }),
           );
-        });
-        if (resumed)
-          expect(roles(readFileSync(file, "utf8")).slice(lines.length)).toEqual(name === "cut off in a tool" ? ["toolResult", "assistant"] : ["assistant"]);
-      });
+          if (resumed)
+            expect(roles(readFileSync(file, "utf8")).slice(lines.length)).toEqual(name === "cut off in a tool" ? ["toolResult", "assistant"] : ["assistant"]);
+        }),
+      );
   });
 
-  it("drops the tools it is told not to have only after all are assembled", async () => {
-    const dir = home();
-    const blocked = ["custom", "load_skill", "spawn_agent", "reminder", "list_reminders", "cancel_reminder"];
-    await withAgent(
-      dir,
-      [],
-      async (r) => {
-        const names = r.agent.tools().map((t) => t.name);
-        for (const b of blocked) expect(names).not.toContain(b);
-        expect(names).toContain("remember");
-        expect(names).toContain("search_archive");
-      },
-      {
-        noSession: true,
-        reminders: true,
-        tools: [textTool({ name: "custom", description: "", parameters: objectSchema(), run: () => "" })],
-        disallowedTools: blocked,
-      },
-    );
-    expect(existsSync(join(dir, "test.jsonl"))).toBe(false);
-  });
+  it.effect("drops the tools it is told not to have only after all are assembled", () =>
+    Effect.gen(function* () {
+      const dir = home();
+      const blocked = ["custom", "load_skill", "spawn_agent", "reminder", "list_reminders", "cancel_reminder"];
+      yield* withAgent(
+        dir,
+        [],
+        (r) =>
+          Effect.sync(() => {
+            const names = r.agent.tools().map((t) => t.name);
+            for (const b of blocked) expect(names).not.toContain(b);
+            expect(names).toContain("remember");
+            expect(names).toContain("search_archive");
+          }),
+        {
+          noSession: true,
+          reminders: true,
+          tools: [textTool({ name: "custom", description: "", parameters: objectSchema(), run: () => "" })],
+          disallowedTools: blocked,
+        },
+      );
+      expect(existsSync(join(dir, "test.jsonl"))).toBe(false);
+    }),
+  );
 });

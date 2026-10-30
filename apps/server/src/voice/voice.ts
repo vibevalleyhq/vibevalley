@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { type Cause, Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
+import { type Cause, Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, type HttpClientError, HttpEffect } from "effect/http";
 import type { Socket } from "effect/socket";
 
@@ -184,21 +184,29 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
 
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
 
-/** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
- * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
+/** As Agora's SDK retries on its own: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute), else 1 s
+ * then 2 s; the last answer is the one handed back. */
+const agoraRetries = Schedule.exponential("1 second").pipe(
+  Schedule.setInputType<Response>(),
+  Schedule.while(({ input, attempt }) => attempt <= 2 && ([408, 429].includes(input.status) || input.status >= 500)),
+  Schedule.modifyDelay(({ input, duration }) => {
+    const after = Number(input.headers.get("Retry-After"));
+    return Effect.succeed(after > 0 ? Math.min(after * 1000, 60_000) : duration);
+  }),
+  Schedule.passthrough,
+);
+
+/** Agora's REST calls retried as its SDK would, but sleeping on the service's Clock: the SDK's own retries wait on real
+ * time, out of its reach. */
 export const retrying =
   (fetcher: typeof fetch, run: Run): typeof fetch =>
   (input, init) =>
     run(
-      Effect.gen(function* () {
-        for (let attempt = 0; ; attempt++) {
-          // A failed fetch goes back to the SDK as it is: it rejects the SDK's call, as the fetch itself would.
-          const res = yield* Effect.promise(() => fetcher(input, init));
-          if (attempt >= 2 || !([408, 429].includes(res.status) || res.status >= 500)) return res;
-          const after = Number(res.headers.get("Retry-After"));
-          yield* Effect.sleep(after > 0 ? Math.min(after * 1000, 60_000) : 1000 * 2 ** attempt);
-        }
-      }),
+      // A failed fetch goes back to the SDK as it is: it rejects the SDK's call, as the fetch itself would.
+      Effect.repeat(
+        Effect.promise(() => fetcher(input, init)),
+        agoraRetries,
+      ),
       init?.signal ? { signal: init.signal } : undefined,
     );
 
@@ -401,16 +409,24 @@ const cloudflared = (port: number) =>
     });
   });
 
-/** The line refusing a keyless request counts as an answer. Asked over the real network. */
-const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
+/** The line refusing a keyless request counts as an answer. Asked over the real network every 2 s; no ask starts after
+ * lineReadyMs. */
+export const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
   Effect.gen(function* () {
     const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
-    while ((yield* Clock.currentTimeMillis) < deadline) {
-      const res = yield* client.post(url + "/llm/ready/chat/completions").pipe(Effect.timeout("5 seconds"), Effect.option);
-      if (res._tag === "Some" && res.value.status === 401) return true;
-      yield* Effect.sleep(2_000);
-    }
-    return false;
+    const every = 2_000;
+    return yield* client.post(url + "/llm/ready/chat/completions").pipe(
+      Effect.timeout("5 seconds"),
+      Effect.option,
+      Effect.map((res) => res._tag === "Some" && res.value.status === 401),
+      Effect.repeat(
+        Schedule.spaced(every).pipe(
+          Schedule.setInputType<boolean>(),
+          Schedule.while(({ input, now }) => !input && now + every < deadline),
+          Schedule.passthrough,
+        ),
+      ),
+    );
   });
 
 const make = (options: VoiceOptions = {}) =>

@@ -12,13 +12,11 @@ Status: proposed
 
 | 编号 | 问题 | 做法 | 什么时候做 |
 |---|---|---|---|
-| B7 | 手写的重试和轮询（`voice/voice.ts` 两处、connector 的收消息） | 换成 `Effect.retry`、`Effect.repeat` 和 `Schedule`，用 `TestClock` 测 | 和[扩展点只填空](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)的 connector 骨架一起 |
-| B9 | `packages/agent` 的测试是 Promise 写法（约 57 个 `it`） | 换成 `@effect/vitest` 的 `it.effect` | 改 `packages/agent` 的测试时 |
 | B10 | 25 个 `Data.TaggedError` 只有 `{ message: string }`，`extends Error` 的还有 8 处；`preferSchemaTaggedError`、`extendsNativeError` 因此没开 | 要跨线或要编码的错误换成 `Schema.TaggedError`，原因放进 `cause`；全换完再打开这两条 | 一个模块的错误要过线时 |
 
 ## Alternatives considered
 
-**一次全改完。** 剩下几项分在 voice 和 connector 的重试、`packages/agent` 的测试、各模块的错误里，一起改和别的工作冲突的面大；每一项挂在下一次改那块代码的时候做，改动和理由在一起。
+**一次全改完。** 剩下的错误分在各个模块里，一起改和别的工作冲突的面大；挂在下一次改那块代码的时候做，改动和理由在一起。
 
 **写成文字规矩，不加检查。** agent 照已有的代码抄，存量不改、只写规矩，新代码还会照着旧的写；所以每一项都以「改完存量、再开检查」收尾。
 
