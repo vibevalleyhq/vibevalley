@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vpx scripts/build.ts",
     "dev": "vpx scripts/dev.ts",
-    "package": "vpx scripts/package.ts"
+    "package": "vpx scripts/package.ts",
+    "update-check": "vpx scripts/update-check.ts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

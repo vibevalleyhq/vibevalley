@@ -62,10 +62,12 @@ writeFileSync(
 );
 
 // The version is the tag the release is built from (v0.2.0); between tags, 0.0.0, which no release is older than.
+// VIBEVALLEY_VERSION gives one outright (scripts/update-check.ts builds two in a row).
 // What git says when it finds nothing (no tag before) is not the package's to print.
 const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const described = git("describe", "--tags", "--always").replace(/^v/u, "");
-const version = /^\d+\.\d+\.\d+$/u.test(described) ? described : "0.0.0";
+const asked = process.env.VIBEVALLEY_VERSION ?? described;
+const version = /^\d+\.\d+\.\d+$/u.test(asked) ? asked : "0.0.0";
 const dist = join(desktop, "dist");
 await build({
   targets: Platform.MAC.createTarget(["dmg", "zip"]),
