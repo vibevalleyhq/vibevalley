@@ -23,7 +23,6 @@ const isSchema = (v: unknown): v is JsonSchema => typeof v === "object" && v !==
 
 /** A JSON object whose fields can be set: an argument being coerced. */
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-/** A schema's properties, each a schema. */
 const propertiesOf = (schema: JsonSchema): Record<string, JsonSchema> =>
   isSchema(schema.properties) ? Object.fromEntries(Object.entries(schema.properties).filter((e): e is [string, JsonSchema] => isSchema(e[1]))) : {};
 const requiredOf = (schema: JsonSchema): string[] => (Array.isArray(schema.required) ? schema.required.filter((k): k is string => typeof k === "string") : []);

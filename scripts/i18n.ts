@@ -371,8 +371,7 @@ function closing(text: string, open: number): number {
   return -1;
 }
 
-/** text with an import added after its header comment (the file's first lines of // or a block, and the blank line
- * after them), so the header stays first; the formatter sorts it among the others. */
+/** The import goes after the file's header comment, so the header stays first; the formatter sorts it among the others. */
 function withImport(text: string, line: string): string {
   const header = /^(?:(?:\/\/[^\n]*\n)+|\/\*[\s\S]*?\*\/\n)\n/u.exec(text)?.[0] ?? "";
   return header + line + "\n" + text.slice(header.length);

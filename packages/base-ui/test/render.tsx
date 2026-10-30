@@ -27,7 +27,6 @@ export const settle = async () => {
   flush();
 };
 
-/** The element selector finds, checked to be a kind (HTMLElement when none is given). */
 export function $(selector: string): HTMLElement;
 export function $<T extends Element>(selector: string, kind: abstract new () => T): T;
 export function $(selector: string, kind: abstract new () => Element = HTMLElement): Element {
