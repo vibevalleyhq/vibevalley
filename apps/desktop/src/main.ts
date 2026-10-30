@@ -31,7 +31,7 @@ const files = () => {
 
 // What the page asked to show, newest last; the Playwright test reads it (apps/desktop/test).
 const notices: Notice[] = [];
-(globalThis as { vibevalleyNotices?: Notice[] }).vibevalleyNotices = notices;
+Object.assign(globalThis, { vibevalleyNotices: notices });
 
 /** Where macOS's window buttons sit: centred in the page's 28 px drag strip (preload titleBar). */
 const trafficLights = { x: 12, y: 8 };
@@ -96,7 +96,7 @@ function windowNow(): BrowserWindow {
 /** A load the next one replaced fails with ERR_ABORTED (-3): that is no failure. Any other is logged. */
 const loaded = (load: Promise<void>) =>
   load.catch((e: unknown) => {
-    if ((e as { errno?: number }).errno !== -3) console.error("vibevalley: the window could not load its page:", e);
+    if (!(typeof e === "object" && e !== null && "errno" in e && e.errno === -3)) console.error("vibevalley: the window could not load its page:", e);
   });
 
 /** The bar's load. Why the server did not come up waits for it: a load that cuts off the window's first one can leave
@@ -148,7 +148,7 @@ ipcMain.handle("host:locale", (_event, locale: string) => {
 // The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
 let tray: Tray | undefined;
 ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
-  (globalThis as { vibevalleyTray?: TraySummary }).vibevalleyTray = summary;
+  Object.assign(globalThis, { vibevalleyTray: summary });
   if (!tray) {
     const icon = nativeImage.createFromPath(join(files().web, "pixel", "app-sprout.png")).resize({ width: 16, height: 16 });
     tray = new Tray(icon);

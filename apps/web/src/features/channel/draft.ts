@@ -88,7 +88,9 @@ const sending =
       xhr.onload = () =>
         resolve(new Response(xhr.responseText, { status: xhr.status, headers: { "content-type": xhr.getResponseHeader("content-type") ?? "" } }));
       xhr.onerror = () => reject(new Error(t("web.base.unreachable")));
-      xhr.send(init?.body as XMLHttpRequestBodyInit | null | undefined);
+      const body = init?.body;
+      if (body instanceof ReadableStream) throw new TypeError("a streamed body has no upload progress");
+      xhr.send(body);
     });
 
 /** A file uploaded for a message; progress is told in whole percents as it goes up. */

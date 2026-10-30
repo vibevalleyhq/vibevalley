@@ -127,6 +127,7 @@ type State = "B" | "E" | "M" | "S";
 
 let emitTable: Record<State, Record<string, number>> | undefined;
 const emit = () =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
   (emitTable ??= JSON.parse(gunzipSync(readFileSync(join(dataDir, "hmm_emit.json.gz"))).toString("utf8")) as Record<State, Record<string, number>>);
 
 const minFloat = -3.14e100;

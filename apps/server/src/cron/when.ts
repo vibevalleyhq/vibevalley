@@ -7,6 +7,7 @@ import { Cron as EffectCron, DateTime, Option } from "effect";
 import type { Cron, CronWhen } from "@vibevalley/protocol";
 
 /** A day of the week by its number, Sunday 0. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a cron day of the week is 0 to 6
 const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
 export const minEveryMinutes = 1;
 
@@ -132,6 +133,7 @@ export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u20
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi } = cronFields[i]!;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- i indexes cronFields' five fields
   const bad = t("server.cron.expr.badField", { name: t(`server.cron.expr.fields.${i as 0 | 1 | 2 | 3 | 4}`), field });
   const bits = new Set<number>();
   for (const item of field.split(",")) {

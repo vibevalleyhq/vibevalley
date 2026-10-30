@@ -216,8 +216,8 @@ export class MossLine {
         this.cut(str(d.run_id), str(d.turn_id));
         break;
       case "error": {
-        const e = d.error as { message?: unknown } | undefined;
-        this.problem = typeof e?.message === "string" ? e.message : data;
+        const e: unknown = d.error;
+        this.problem = typeof e === "object" && e !== null && "message" in e && typeof e.message === "string" ? e.message : data;
         break;
       }
       default:

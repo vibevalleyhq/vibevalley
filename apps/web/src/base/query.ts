@@ -33,7 +33,7 @@ export function useQuery<TQueryFnData, TError = Error, TData = TQueryFnData, TQu
     };
   });
   return new Proxy(observer.getCurrentResult(), {
-    get: (_, key) => result()[key as keyof ReturnType<typeof observer.getCurrentResult>],
+    get: (_, key): unknown => Reflect.get(result(), key),
   });
 }
 
@@ -48,6 +48,7 @@ export type Sprites = Record<string, { w: number; h: number; ax?: number; ay?: n
 export const useSprites = () =>
   useQuery(() => ({
     queryKey: ["sprites"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => (await (await fetch("/pixel/sprites.json")).json()) as Sprites,
     staleTime: Infinity,
   }));

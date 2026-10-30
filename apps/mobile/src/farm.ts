@@ -41,6 +41,7 @@ async function readFarm(): Promise<Farm | undefined> {
   const text = await SecureStore.getItemAsync(where);
   if (!text) return undefined;
   try {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the paired computer's answer, in the shape of its version of protocol
     const farm = JSON.parse(text) as Farm;
     return farm.url && farm.key ? farm : undefined;
   } catch {
@@ -160,7 +161,8 @@ export class FarmConnection {
       if (!response.ok) {
         let problem = text;
         try {
-          problem = (JSON.parse(text) as { reason?: string }).reason ?? text;
+          const said: unknown = JSON.parse(text);
+          if (typeof said === "object" && said !== null && "reason" in said && typeof said.reason === "string") problem = said.reason;
         } catch {
           // Not the farm's refusal: its text as it is.
         }

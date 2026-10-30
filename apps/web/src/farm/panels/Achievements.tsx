@@ -20,7 +20,7 @@ import { tint, Tinted } from "./bits";
 const walls: AchievementCategory[] = ["harvest", "craft", "thrift", "team"];
 
 /** A tier's metal: bronze, silver, gold. */
-const tierText = (tier: number) => (tier >= 1 && tier <= 3 ? t(`web.farm.achievements.tier.${tier as 1 | 2 | 3}`) : "");
+const tierText = (tier: number) => (tier === 1 || tier === 2 || tier === 3 ? t(`web.farm.achievements.tier.${tier}`) : "");
 
 const categoryText: Record<AchievementCategory, string> = {
   starter: t("web.farm.achievements.category.starter"),

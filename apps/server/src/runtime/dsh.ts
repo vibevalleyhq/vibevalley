@@ -23,6 +23,7 @@ import { Predicate, Schema } from "effect";
 import { afterRealTime } from "@/base/time.ts";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oar's own modules, not in its exports; T names what we use of them
 const internal = <T>(path: string) => import(new URL(path, dist).href) as Promise<T>;
 
 const { acpSession } = await internal<{
@@ -120,7 +121,7 @@ const records = (v: unknown): Rec[] => (Array.isArray(v) ? v.filter(Predicate.is
  * catalog rides on every new session as the `model` option, its choices grouped by provider or flat. The effort menu
  * is the thought_level option, the same for every model; `off` is a toggle, not a level, and is dropped. */
 export function projectModels(response: unknown): ModelEntry[] | undefined {
-  const options = records((response as Rec | undefined)?.configOptions);
+  const options = records(Predicate.isObject(response) && "configOptions" in response ? response.configOptions : undefined);
   const model = options.find((o) => o.id === "model");
   if (!model) return undefined;
   const thinking = options.find((o) => o.category === "thought_level");
@@ -217,6 +218,7 @@ const startSession = acpSession({
 
 export const dshRuntime = defineRuntime({
   id: "dsh",
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oar's Brand lists the runtimes it ships; dsh is ours
   brand: { name: "DeepSeek Harness" } as never,
   // OAR_DSH_BIN pins one; its version is `dsh --version`, which loads the CLI, slowly.
   installation: executableInstallation("OAR_DSH_BIN", "dsh", undefined, undefined, {
@@ -236,7 +238,7 @@ export const dshRuntime = defineRuntime({
     try {
       response = await readNewSession(installation.command, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
     } catch (e) {
-      if ((e as { code?: number }).code === -32601) return { kind: "unsupported", reason: "this dsh build has no session/new method" };
+      if (Predicate.isObject(e) && "code" in e && e.code === -32601) return { kind: "unsupported", reason: "this dsh build has no session/new method" };
       throw e;
     }
     const models = projectModels(response);

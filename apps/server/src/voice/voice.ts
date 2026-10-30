@@ -18,7 +18,7 @@ import type { Socket } from "effect/socket";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
@@ -239,13 +239,11 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
 
 /** Already left or leaving counts as success, as the quickstart treats it. */
 function alreadyStopping(e: unknown): boolean {
-  const err = e as {
-    statusCode?: number;
-    body?: { detail?: string; reason?: string };
-    message?: string;
-  } | null;
-  if (err?.statusCode === 404) return true;
-  return [err?.body?.detail, err?.body?.reason, err?.message].join(" ").toLowerCase().includes("already in the process of shutting down");
+  if (!Predicate.isObject(e)) return false;
+  if ("statusCode" in e && e.statusCode === 404) return true;
+  const body = "body" in e && Predicate.isObject(e.body) ? e.body : {};
+  const said = [Reflect.get(body, "detail"), Reflect.get(body, "reason"), "message" in e ? e.message : undefined];
+  return said.some((s) => typeof s === "string" && s.toLowerCase().includes("already in the process of shutting down"));
 }
 
 const sign = (c: AgoraCredentials, channel: string, uid: string): AgoraGrant => ({

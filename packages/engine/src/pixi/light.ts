@@ -45,12 +45,15 @@ export interface LightingOptions {
 }
 
 /** A loaded texture's picture as RGBA, its own pixels (at its resolution), read through a canvas: call once, when it loads. */
+const isDrawable = (r: unknown): r is CanvasImageSource =>
+  r instanceof HTMLImageElement || r instanceof HTMLCanvasElement || r instanceof ImageBitmap || r instanceof OffscreenCanvas || r instanceof HTMLVideoElement;
+
 export function pixelsOf(texture: Texture): { readonly rgba: Uint8ClampedArray; readonly w: number; readonly h: number } | undefined {
   const res = texture.source.resolution;
   const w = Math.round(texture.frame.width * res);
   const h = Math.round(texture.frame.height * res);
-  const resource = texture.source.resource as CanvasImageSource | undefined;
-  if (!resource || w === 0 || h === 0) return undefined;
+  const resource: unknown = texture.source.resource;
+  if (!isDrawable(resource) || w === 0 || h === 0) return undefined;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;

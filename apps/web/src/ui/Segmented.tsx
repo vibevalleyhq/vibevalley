@@ -48,7 +48,10 @@ export function Segmented<T extends string>(props: {
       ref={setTrack}
       value={[props.value]}
       // Pressing the taken choice again would leave none: one is always taken.
-      onValueChange={(v) => v[0] !== undefined && props.onChange(v[0] as T)}
+      onValueChange={(v) => {
+        const option = props.options.find((o) => o.value === v[0]);
+        if (option) props.onChange(option.value);
+      }}
       aria-label={props.label}
       data-testid={props.testid}
       // w-fit: in a column (a card's body) a track would otherwise stretch to its width, the thumb small at one end.

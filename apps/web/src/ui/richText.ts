@@ -24,7 +24,11 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 };
 
-const iconOf = (name: "copy" | "expand" | "check", size = 14) => icons[name === "check" ? "check" : name]({ size }) as unknown as Node;
+const iconOf = (name: "copy" | "expand" | "check", size = 14): Node => {
+  const icon: unknown = icons[name === "check" ? "check" : name]({ size });
+  if (!(icon instanceof Node)) throw new TypeError("an icon renders to one element");
+  return icon;
+};
 
 /** An SVG string as nodes, with nothing that could run or reach out: no scripts, no foreign HTML, no event handlers, no
  * links but in-page ones. Pele escapes and filters too (links and images off); this is the page's own guarantee. */
@@ -46,6 +50,14 @@ export function cleanSvg(svg: string): Node {
 
 /** The work richen starts that outlives it: diagrams' observers, unmounted with the nodes. */
 export type Undo = () => void;
+
+/** toDom's answer as a fragment: it gives one for { fragment: true }, typed as any node. */
+export function fragmentOf(node: Node): DocumentFragment {
+  if (node instanceof DocumentFragment) return node;
+  const f = document.createDocumentFragment();
+  f.append(node);
+  return f;
+}
 
 /** Rewrites rendered Markdown in place. Returns what to undo when the nodes go. */
 export function richen(root: ParentNode, o: RichOptions = {}): Undo {

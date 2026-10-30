@@ -152,6 +152,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
       const messages = brain?.brain.history() ?? [];
       for (let i = messages.length - 1; i >= 0; i--) {
         const m = messages[i]!;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
         if (isHosted(m, o.inputType)) return local.get(m) ?? { route: m.details as R, run: { by: { kind: "" } } };
       }
       return input;
@@ -225,6 +226,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         switch (e.type) {
           case "message_start":
             if (isHosted(e.message, o.inputType)) {
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
               const next = local.get(e.message) ?? { route: e.message.details as R, run: { by: { kind: "" } } };
               // An input that joins the run takes the words from here on: the one before has what it got, and ends now, or a
               // caller waiting on it (a brief, a call's line) would wait for the run's end with no words.

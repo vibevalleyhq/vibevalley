@@ -66,7 +66,7 @@ const atLeast = (counts: Record<string, number>, id: string, value: number) => (
 
 function tallied(p: Progress, e: LedgerEntry): Progress {
   const field = e.kind === "hired" ? "hired" : e.kind === "harvested" ? "harvested" : e.kind === "failed" ? "failed" : undefined;
-  const agent = field ? (e as { agent?: string }).agent : undefined;
+  const agent = field && "agent" in e ? e.agent : undefined;
   if (!field || !agent) return p;
   const was = p.agents[agent] ?? { hired: 0, harvested: 0, failed: 0 };
   return { ...p, agents: { ...p.agents, [agent]: { ...was, [field]: was[field] + 1 } } };

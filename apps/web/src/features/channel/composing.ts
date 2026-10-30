@@ -194,7 +194,7 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
     send,
     onKey,
     /** The caret moves without typing too (arrow keys, a click): the @ menu follows it. */
-    follow: (e: Event) => setCaret((e.currentTarget as HTMLTextAreaElement).selectionStart),
+    follow: (e: Event) => e.currentTarget instanceof HTMLTextAreaElement && setCaret(e.currentTarget.selectionStart),
     /** The menu closes when the box loses the focus and comes back with it. */
     blur: () => setClosed(true),
     focus: () => setClosed(false),

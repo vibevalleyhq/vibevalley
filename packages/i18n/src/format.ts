@@ -6,7 +6,8 @@ export type Value = string | number | boolean;
 export type Params = Readonly<Record<string, Value>>;
 
 /** The parts of a message: text, and placeholders with their branches. */
-type Kind = "plural" | "selectordinal" | "select";
+const kinds = ["plural", "selectordinal", "select"] as const;
+type Kind = (typeof kinds)[number];
 type Part = string | { readonly name: string; readonly kind?: Kind; readonly cases?: Readonly<Record<string, Part[]>> };
 
 const parsed = new Map<string, Part[]>();
@@ -37,7 +38,8 @@ function parse(text: string): Part[] {
     const m = /^\{\s*([A-Za-z_$][\w$]*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/.exec(text.slice(start));
     if (!m) return undefined;
     i = start + m[0].length;
-    if (!m[2]) {
+    const kind = kinds.find((k) => k === m[2]);
+    if (!kind) {
       if (text[i] !== "}") return void (i = start);
       i++;
       return { name: m[1]! };
@@ -53,7 +55,7 @@ function parse(text: string): Part[] {
     while (text[i] === " ") i++;
     if (text[i] !== "}") return void (i = start);
     i++;
-    return { name: m[1]!, kind: m[2] as Kind, cases };
+    return { name: m[1]!, kind, cases };
   };
   return parts("");
 }

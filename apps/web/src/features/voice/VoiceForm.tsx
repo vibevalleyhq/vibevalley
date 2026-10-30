@@ -62,7 +62,9 @@ type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey"
 
 const keyFrom: Record<KeySource, string> = { settings: t("web.base.form.from.settings"), config: t("web.base.form.from.config") };
 
-const options = <T extends string>(labels: Record<T, string>) => (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
+const options = <T extends string>(labels: Record<T, string>) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- labels is written out as a literal, one key per T and no more
+  (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
 
 /** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or

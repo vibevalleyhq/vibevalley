@@ -93,6 +93,7 @@ export class Fold {
     if (typeof c.id === "string" && !this.responseId) this.responseId = c.id;
     if (typeof c.model === "string" && c.model.length > 0 && c.model !== this.model.id) this.responseModel ??= c.model;
     if (c.usage) this.usage = usageOf(c.usage, this.model);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
     const choice = Array.isArray(c.choices) ? (c.choices[0] as Choice | undefined) : undefined;
     if (!choice) return [];
     if (!c.usage && choice.usage) this.usage = usageOf(choice.usage, this.model);
@@ -108,8 +109,8 @@ export class Fold {
     if (!delta) return events;
     // Thinking before the text: a proxy may put both in one delta, and the thinking block comes first.
     const field = reasoningFields.find((f) => typeof delta[f] === "string" && delta[f].length > 0);
-    if (field) {
-      const piece = delta[field] as string;
+    const piece = field === undefined ? undefined : delta[field];
+    if (field !== undefined && typeof piece === "string") {
       if (!this.thinking) {
         this.thinking = { kind: "thinking", thinking: "", signature: field };
         events.push(this.opened("thinking_start", this.thinking));
@@ -125,6 +126,7 @@ export class Fold {
       this.text.text += delta.content;
       events.push({ type: "text_delta", contentIndex: this.blocks.indexOf(this.text), delta: delta.content, partial: this.message() });
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
     for (const call of Array.isArray(delta.tool_calls) ? (delta.tool_calls as ToolCallDelta[]) : []) {
       const block = this.toolBlock(call, events);
       if (!block.id && call.id) {
@@ -145,9 +147,11 @@ export class Fold {
   /** The stream ended: each block closes, then done, or error when the model's answer was not a complete one. */
   end(): AssistantMessageEvent[] {
     const events = this.blocks.map((b) => this.closed(b));
-    if (this.stopReason === "error") return [...events, this.failed(this.errorMessage || "Provider returned an error stop reason", false)];
-    if (!this.finished || this.stopReason === "pending") return [...events, this.failed("Stream ended without finish_reason", false)];
-    return [...events, { type: "done", reason: this.stopReason as "stop" | "length" | "toolUse", message: this.message() }];
+    const reason = this.stopReason;
+    if (reason === "error" || reason === "aborted")
+      return [...events, this.failed(this.errorMessage || "Provider returned an error stop reason", reason === "aborted")];
+    if (!this.finished || reason === "pending") return [...events, this.failed("Stream ended without finish_reason", false)];
+    return [...events, { type: "done", reason, message: this.message() }];
   }
 
   /** The request failed, or was stopped, partway: the blocks stay as they are. */
@@ -165,7 +169,7 @@ export class Fold {
       provider: this.model.provider,
       model: this.model.id,
       usage: this.usage,
-      // pending only while streaming; a partial message is not read for it.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pending only while streaming; a partial message is not read for it
       stopReason: this.stopReason as StopReason,
       timestamp: this.timestamp,
       ...(this.responseId !== undefined ? { responseId: this.responseId } : {}),
@@ -209,7 +213,7 @@ export class Fold {
         const parsed = toolCallArguments(block.partial);
         block.arguments = parsed.arguments;
         if (parsed.argumentsError !== undefined) block.argumentsError = parsed.argumentsError;
-        return { type: "toolcall_end", contentIndex, toolCall: contentOf(block) as ToolCall, partial: this.message() };
+        return { type: "toolcall_end", contentIndex, toolCall: toolCallOf(block), partial: this.message() };
       }
     }
   }
@@ -222,14 +226,18 @@ function contentOf(b: Block): TextContent | ThinkingContent | ToolCall {
     case "thinking":
       return { type: "thinking", thinking: b.thinking, thinkingSignature: b.signature };
     case "tool":
-      return {
-        type: "toolCall",
-        id: b.id,
-        name: b.name,
-        arguments: b.arguments,
-        ...(b.argumentsError !== undefined ? { argumentsError: b.argumentsError } : {}),
-      };
+      return toolCallOf(b);
   }
+}
+
+function toolCallOf(b: Extract<Block, { kind: "tool" }>): ToolCall {
+  return {
+    type: "toolCall",
+    id: b.id,
+    name: b.name,
+    arguments: b.arguments,
+    ...(b.argumentsError !== undefined ? { argumentsError: b.argumentsError } : {}),
+  };
 }
 
 interface Choice {

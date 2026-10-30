@@ -237,6 +237,7 @@ export const make = (options: LanOptions = {}) =>
         res.writeHead(answer.status, Object.fromEntries(answer.headers));
         const streamed = answer.body;
         if (!streamed) return void res.end();
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same web stream: the DOM's and Node's types name it apart
         yield* Effect.tryPromise((signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }));
       });
 

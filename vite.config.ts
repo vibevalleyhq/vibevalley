@@ -129,6 +129,8 @@ export default defineConfig({
       ],
       // x || d takes 0 and false for none; ?? takes only null and undefined. A string's "" is its none, so || stays for strings.
       "typescript/prefer-nullish-coalescing": ["error", { ignorePrimitives: { string: true } }],
+      // A cast that narrows is a claim nothing checks: read it with a Schema or a guard, or say at the cast why it holds.
+      "typescript/no-unsafe-type-assertion": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -175,6 +177,22 @@ export default defineConfig({
           "typescript/no-unsafe-member-access": "off",
           "typescript/no-unsafe-return": "off",
         },
+      },
+      {
+        // A test's cast is checked by the test: a wrong claim fails the expectation that reads it. Stories and samples are
+        // looked at.
+        files: [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "**/*.stories.tsx",
+          "**/*.samples.ts",
+          "apps/*/test/**",
+          "packages/*/test/**",
+          "apps/server/src/testing/**",
+          "packages/*/src/testing.ts",
+          "packages/testkit/src/**",
+        ],
+        rules: { "typescript/no-unsafe-type-assertion": "off" },
       },
       {
         // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; so does

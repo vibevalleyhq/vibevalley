@@ -303,7 +303,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
         setOver(true);
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+        if (!e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null)) setOver(false);
       }}
       onDrop={(e) => {
         setOver(false);

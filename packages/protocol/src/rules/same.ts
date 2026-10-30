@@ -3,14 +3,9 @@
 export function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) {
-    const y = b as unknown[];
-    return a.length === y.length && a.every((v, i) => same(v, y[i]));
-  }
-  const x = a as Record<string, unknown>;
-  const y = b as Record<string, unknown>;
-  const keys = (o: Record<string, unknown>) => Object.keys(o).filter((k) => o[k] !== undefined);
-  const kx = keys(x);
-  return kx.length === keys(y).length && kx.every((k) => same(x[k], y[k]));
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => same(v, b[i]));
+  const kept = (o: object) => Object.entries(o).filter(([, v]) => v !== undefined);
+  const x = kept(a);
+  const y = new Map(kept(b));
+  return x.length === y.size && x.every(([k, v]) => y.has(k) && same(v, y.get(k)));
 }

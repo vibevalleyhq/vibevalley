@@ -28,6 +28,7 @@ interface Nested {
 
 const han = /\p{Script=Han}/u;
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const same = new Set((JSON.parse(readFileSync(join(pkg, "same.json"), "utf8")) as { keys: string[] }).keys);
 const placeholdersOf = (text: string) => placeholders(text).sort();
 
@@ -39,6 +40,7 @@ const namespaces = (locale: Locale) =>
         .sort()
     : [];
 
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const readCatalog = (locale: Locale, ns: string): Nested => JSON.parse(readFileSync(join(localesDir, locale, ns + ".json"), "utf8")) as Nested;
 
 function flatten(prefix: string, v: string | Nested, out: Map<string, string>) {
@@ -199,6 +201,7 @@ function templateOf(fn: Function): string | undefined {
   if (names.length === 0 || names.length !== fn.length) return undefined;
   const call = (args: unknown[]) => {
     try {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a word table's entry is a function of its parameters
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" ? r : undefined;
     } catch {
@@ -224,6 +227,7 @@ function choiceOf(fn: Function): string | undefined {
   if (names.length === 0 || names.length !== fn.length) return undefined;
   const call = (args: unknown[]) => {
     try {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a word table's entry is a function of its parameters
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" && !/undefined|NaN|\[object /.test(r) ? r : undefined;
     } catch {
@@ -234,6 +238,7 @@ function choiceOf(fn: Function): string | undefined {
   const agrees = (message: string, samples: unknown[][]) =>
     samples.every((args) => {
       const want = call(args);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the arguments made above for these names are strings, numbers and booleans
       const params = Object.fromEntries(names.map((n, i) => [n, args[i] as string | number | boolean]));
       return want !== undefined && format(message, params) === want;
     });
@@ -274,7 +279,9 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
   const skipped: string[] = [];
   const out = { zh: {} as Nested, en: {} as Nested };
   const walk = (z: unknown, e: unknown, path: string[], zo: Nested, eo: Nested) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- walk is called on the parsed catalogs' objects
     for (const [k, zv] of Object.entries(z as object)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- walk is called on the parsed catalogs' objects
       const ev = (e as Record<string, unknown> | undefined)?.[k];
       const at = [...path, k];
       if (typeof zv === "string" && typeof ev === "string") {
@@ -292,6 +299,7 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
       } else if (Array.isArray(zv) && Array.isArray(ev) && zv.length === ev.length && [...zv, ...ev].every((x) => typeof x === "string")) {
         // A list of sentences or names is kept by index: weekdays.0 … weekdays.6.
         zo[k] = Object.fromEntries(zv.map((x, i) => [String(i), x]));
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a catalog's arrays hold strings
         eo[k] = Object.fromEntries(ev.map((x, i) => [String(i), x as string]));
       } else if (typeof zv === "object" && zv !== null && !Array.isArray(zv)) {
         zo[k] = {};
@@ -366,10 +374,13 @@ function closing(text: string, open: number): number {
 async function migrate(file: string) {
   const abs = join(root, file);
   const ns = namespaceOf(abs);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- packages/i18n's own modules
   const locale = (await import(pathToFileURL(join(pkg, "src/locale.ts")).href)) as { setLocale: (l: Locale) => void };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a module's exports
   const mod = (await import(pathToFileURL(abs).href)) as Record<string, unknown>;
   const accessorName = Object.keys(mod).find((k) => typeof mod[k] === "function" && /(ording|Words)$|^wording$/.test(k));
   if (!accessorName) throw new Error(`no word table in ${file}`);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the word table's accessor, found by its name above
   const accessor = mod[accessorName] as () => unknown;
   locale.setLocale("zh");
   const zh = accessor();

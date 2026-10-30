@@ -104,7 +104,7 @@ function Trigger(props: TooltipTriggerProps) {
       }}
       onFocusOut={(e: FocusEvent) => {
         call(props.onFocusOut, e);
-        if (!(e.relatedTarget instanceof Node && (e.currentTarget as Element).contains(e.relatedTarget))) hide("focus");
+        if (!(e.relatedTarget instanceof Node && e.currentTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) hide("focus");
       }}
     />
   );

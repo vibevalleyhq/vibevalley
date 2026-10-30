@@ -58,7 +58,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     },
     (step) => {
       if (!step) return;
-      const [what, at, n] = step.split(":") as [string, string, string];
+      const [what = "", at = "", n = ""] = step.split(":");
       if (what === "older") return void followed.loadOlder(at);
       requestAnimationFrame(() => log?.querySelector(`[data-number="${n}"]`)?.scrollIntoView({ block: "center" }));
       setLit(Number(n));

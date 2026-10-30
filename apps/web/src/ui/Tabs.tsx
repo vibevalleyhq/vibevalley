@@ -36,7 +36,13 @@ export function Tabs<T extends string>(props: {
 }) {
   const look = () => looks[props.look ?? "pills"];
   return (
-    <Base.Root value={props.value} onValueChange={(v) => props.onChange?.(v as T)}>
+    <Base.Root
+      value={props.value}
+      onValueChange={(v) => {
+        const item = props.items.find((i) => i.value === v);
+        if (item) props.onChange?.(item.value);
+      }}
+    >
       <Base.List aria-label={props.label} class={[look().list, props.class]}>
         <For each={props.items}>
           {(item) => (

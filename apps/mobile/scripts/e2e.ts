@@ -66,6 +66,7 @@ function android(): Device {
       let port = 9333;
       for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/g) ?? [])) {
         adb("forward", `tcp:${++port}`, "localabstract:" + socket);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Chrome's DevTools list
         const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).catch(() => undefined))?.json().catch(() => [])) as
           | { url: string; webSocketDebuggerUrl: string }[]
           | undefined;
@@ -77,6 +78,7 @@ function android(): Device {
       await new Promise((r) => ws.addEventListener("open", r, { once: true }));
       const answer = new Promise<unknown>((resolve) =>
         ws.addEventListener("message", (e) => {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the DevTools protocol's answer
           const m = JSON.parse(String(e.data)) as { id?: number; result?: { result?: { value?: unknown } } };
           if (m.id === 1) resolve(m.result?.result?.value);
         }),

@@ -25,6 +25,7 @@ function parseLines(text: string): BrainMessage[] {
     try {
       const m: unknown = JSON.parse(line);
       // A line cut off by a crash: the rest still reads.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a line this file wrote: a whole one is a BrainMessage
       if (typeof m === "object" && m !== null && "role" in m && typeof m.role === "string") out.push(m as BrainMessage);
     } catch {
       continue;

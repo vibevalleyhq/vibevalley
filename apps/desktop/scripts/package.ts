@@ -33,6 +33,7 @@ for (const dir of packages.values()) cpSync(join(dir, "src"), join(stage, basena
 
 // npm does not read pnpm's catalog: each "catalog:" becomes the version pnpm installed for the package, as the lockfile has it.
 const installed = (dir: string): Record<string, string> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pnpm list --json's shape
   const [listed] = JSON.parse(execFileSync("pnpm", ["list", "--prod", "--depth", "0", "--json"], { cwd: dir, encoding: "utf8" })) as {
     dependencies?: Record<string, { version: string }>;
   }[];
@@ -57,6 +58,7 @@ const local = (dependencies: Record<string, string>) =>
     Object.entries(dependencies).map(([name, spec]) => [name, spec.startsWith("workspace:") ? `file:../${basename(packages.get(name)!)}` : spec]),
   );
 const stageManifest = (dir: string, to: string) => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a workspace package's own package.json
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
   const dependencies = local(staged(dir, pkg.dependencies ?? {}));
   writeFileSync(join(to, "package.json"), JSON.stringify({ ...pkg, dependencies, scripts: undefined, devDependencies: undefined }, null, 2));

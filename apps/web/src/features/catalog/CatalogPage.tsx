@@ -52,6 +52,7 @@ function Img(props: { p: Picture; scale: number }) {
 const usePictures = () =>
   useQuery(() => ({
     queryKey: ["pictures"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => picturesOf((await (await fetch("/pixel/sprites.json")).json()) as Parameters<typeof picturesOf>[0]),
     staleTime: Infinity,
   }));
@@ -429,6 +430,7 @@ function Cursors(props: { tabs: JSX.Element }) {
     queryKey: ["cursors"],
     queryFn: async () => {
       const r = await fetch("/cursors/cursors.json");
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
       return r.ok ? ((await r.json()) as Record<string, { hx: number; hy: number }>) : null;
     },
     staleTime: Infinity,

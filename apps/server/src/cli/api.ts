@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 // is sent. Nothing here knows an endpoint by name but the composite commands, which call them by op; a new endpoint is a
 // new command with its help.
 
-import { Config, Effect, FileSystem, Option, Schema, Stream } from "effect";
+import { Config, Effect, FileSystem, Option, Predicate, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
@@ -115,6 +115,9 @@ const json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The input, --json's fields and the arguments together, checked against the endpoint's Schema here, so a wrong field is
  * named before anything is sent. */
+/** A string flag's value as Command gives it: an Option of the text, or nothing when the flag is not declared. */
+const flagText = (v: unknown): Option.Option<string> => (Option.isOption(v) ? Option.filter(v, Predicate.isString) : Option.none());
+
 const checkedInput = Effect.fnUntraced(function* (
   e: Endpoint,
   input: Schema.Codec<unknown>,
@@ -124,7 +127,7 @@ const checkedInput = Effect.fnUntraced(function* (
 ) {
   const text = given === "" ? "{}" : yield* bodyText(given, path);
   const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.notJson", { why: issue.message }), "InvalidJson")));
-  const value = { ...(fields as Record<string, unknown>), ...args };
+  const value: Readonly<Record<string, unknown>> = { ...(Predicate.isObject(fields) ? Object.fromEntries(Object.entries(fields)) : {}), ...args };
   const missing = e.about.find((name) => value[name] === undefined);
   if (missing !== undefined) return yield* usage(path, t("server.cli.failure.missingArgument", { name: missing }), "MissingArgument");
   yield* Schema.decodeEffect(input)(value).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))));
@@ -140,17 +143,18 @@ function endpointCommand(e: Endpoint) {
   for (const name of e.about) config[name] = Argument.String(name).pipe(Argument.optional);
   // Any input takes --json, what it is about included: a script writes the whole input in one place.
   if (e.input) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.json")));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- effect's Command types a command by flags written out; these are built from the endpoint table
   return Command.make(path.at(-1) ?? e.op, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
       const args = Object.fromEntries(
-        e.about.flatMap((name) => Option.match(given[name] as Option.Option<string>, { onNone: () => [], onSome: (v) => [[name, v] as const] })),
+        e.about.flatMap((name) => Option.match(flagText(given[name]), { onNone: () => [], onSome: (v) => [[name, v] as const] })),
       );
       const body = e.input
         ? yield* checkedInput(
             e,
             e.input,
-            Option.getOrElse((given.json as Option.Option<string> | undefined) ?? Option.none(), () => ""),
+            Option.getOrElse(flagText(given.json), () => ""),
             args,
             path,
           )
@@ -256,6 +260,7 @@ export function groupCommands(extra: Readonly<Record<string, readonly Command.Co
   }
   for (const [m, commands] of Object.entries(extra)) of(m).own.push(...commands);
   const group = (name: string, commands: readonly Command.Command.Any[]) =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- effect's Command types a command by flags written out; these are built from the endpoint table
     Command.make(name).pipe(Command.withSubcommands(commands as never), Command.withDescription(t("server.cli.command.group", { group: name })));
   return [...modules].map(([m, { own, nouns }]) => group(m, [...own, ...[...nouns].map(([n, cs]) => group(n, cs))])) as Command.Command.Any[];
 }

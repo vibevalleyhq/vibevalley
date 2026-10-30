@@ -40,6 +40,7 @@ export const textTool = <P>(spec: TextToolSpec<P>): Tool => ({
   description: spec.description,
   parameters: spec.parameters,
   execute: (params, call) =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the loop checked the arguments against parameters before execute
     Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params as P, { callId: call.id, signal }), catch: toolFailed }), answered),
 });
 
@@ -52,6 +53,7 @@ export const effectTool = <P>(spec: EffectToolSpec<P>): Tool => ({
   name: spec.name,
   description: spec.description,
   parameters: spec.parameters,
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the loop checked the arguments against parameters before execute
   execute: (params) => Effect.map(spec.run(params as P), answered),
 });
 
@@ -62,6 +64,7 @@ export interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> e
 /** A tool whose parameters are a Schema: the model is shown parametersOf, and the arguments are read by the Schema
  * before run (a refusal is the failed result the model reads). */
 export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaToolSpec<S>): Tool {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
   const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
   return textTool<unknown>({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
 }
@@ -71,6 +74,7 @@ export interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fiel
 }
 
 export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaEffectToolSpec<S>): Tool {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
   const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
   return effectTool<unknown>({
     ...spec,

@@ -35,6 +35,7 @@ const timing = (i: number) => `${-(i * puffSeconds) / puffs.length}s`;
 export function TitleStage(props: { scene: TitleScene }) {
   const sizesQuery = useQuery(() => ({
     queryKey: ["title-sprites"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => (await (await fetch("/title/sprites.json")).json()) as TitleSprites,
     staleTime: Infinity,
   }));

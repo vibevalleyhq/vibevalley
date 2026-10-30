@@ -48,7 +48,7 @@ const priceOf = (cost: Price | undefined): Price | undefined =>
       }
     : undefined;
 
-// pi-ai types the lookup by its generated catalog; any name we hold is a string, and an unknown one gives undefined.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pi-ai types the lookup by its generated catalog; our names are strings, and an unknown one gives undefined
 const builtinCost = getBuiltinModel as unknown as (provider: string, model: string) => { readonly cost: Price } | undefined;
 
 function piPrice(model: string): Price | undefined {

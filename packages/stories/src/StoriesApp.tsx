@@ -106,7 +106,10 @@ const writeView = (v: View) => {
 const toggledKey = "stories.toggled";
 const readToggled = () => {
   try {
-    return new Map<string, boolean>(JSON.parse(localStorage.getItem(toggledKey) ?? "[]") as [string, boolean][]);
+    const stored: unknown = JSON.parse(localStorage.getItem(toggledKey) ?? "[]");
+    return new Map(
+      Array.isArray(stored) ? stored.filter((e): e is [string, boolean] => Array.isArray(e) && typeof e[0] === "string" && typeof e[1] === "boolean") : [],
+    );
   } catch {
     return new Map<string, boolean>();
   }

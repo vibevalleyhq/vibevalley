@@ -139,7 +139,7 @@ function LaneView(props: {
         setOver(true);
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+        if (!e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null)) setOver(false);
       }}
       onDrop={(e) => {
         e.preventDefault();

@@ -45,6 +45,7 @@ export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as con
 
 /** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). */
 export const orchestratorToolNames = () => [
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- schemas has one key per Op and no more
   ...(Object.keys(schemas) as Op[]).map(toolName),
   ...selfTools({ home: "", skills: () => [], memory: true, now: () => 0 }).map((t) => t.name),
 ];
@@ -126,6 +127,7 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
   } catch {
     return [];
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- cases are written by orchestrator.eval.create, in this file's EvalCase
   return names.sort().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
 }
 

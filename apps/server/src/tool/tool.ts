@@ -99,10 +99,9 @@ export class Tools extends Context.Service<
 const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
-  const fields = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
   let about = "";
   for (const k of named) {
-    const v = fields[k];
+    const v: unknown = typeof args === "object" && args !== null ? Reflect.get(args, k) : undefined;
     if (typeof v === "string" && v.trim() !== "") {
       about = v;
       break;

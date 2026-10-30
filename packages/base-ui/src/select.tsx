@@ -25,6 +25,9 @@ interface Ctx extends Floating<SelectOpenChangeReason> {
   readonly setStart: (start: "chosen" | "last") => void;
 }
 
+type Items = NonNullable<SelectRootProps["items"]>;
+const isList = (items: Items): items is Extract<Items, readonly unknown[]> => Array.isArray(items);
+
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
@@ -59,8 +62,8 @@ function Root(props: SelectRootProps) {
     labelOf: (v) => {
       const items = props.items;
       if (!items) return undefined;
-      if (Array.isArray(items)) return (items as readonly { value: string; label: string }[]).find((i) => i.value === v)?.label;
-      return (items as Readonly<Record<string, string>>)[v];
+      if (isList(items)) return items.find((i) => i.value === v)?.label;
+      return items[v];
     },
     disabled: () => props.disabled ?? false,
     start,

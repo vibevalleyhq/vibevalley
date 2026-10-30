@@ -5,7 +5,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { type Plugin, unified } from "unified";
 import { markdownClass, remarkMentions } from "./mentions";
-import { richen } from "./richText";
+import { fragmentOf, richen } from "./richText";
 import { remarkIssueRefs } from "./richRules";
 import { useRouter } from "@/base/router";
 
@@ -13,12 +13,15 @@ import { useRouter } from "@/base/router";
 const plain = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- MdNode types only the mdast fields the plugin reads and writes
   .use(remarkIssueRefs as unknown as Plugin)
   .use(remarkRehype);
 const withMentions = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- MdNode types only the mdast fields the plugin reads and writes
   .use(remarkMentions as unknown as Plugin)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- MdNode types only the mdast fields the plugin reads and writes
   .use(remarkIssueRefs as unknown as Plugin)
   .use(remarkRehype);
 
@@ -28,7 +31,7 @@ export function Markdown(props: { text: string; class?: string; mentions?: boole
   const nodes = createMemo(() => {
     const md = props.mentions === true ? withMentions : plain;
     const tree = md.runSync(md.parse(props.text));
-    const root = toDom(tree, { fragment: true }) as DocumentFragment;
+    const root = fragmentOf(toDom(tree, { fragment: true }));
     onCleanup(richen(root, { navigate: (to) => router.navigate(to) }));
     return [...root.childNodes];
   });

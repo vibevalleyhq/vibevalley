@@ -155,6 +155,7 @@ export class Db extends Context.Service<
         attempt,
         one: (query) => Effect.map(run(Effect.catchNoSuchElement(query)), Option.getOrUndefined),
         inTx: <A, E>(work: Effect.Effect<A, E>) =>
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- catchTag takes SqlError out of E; TypeScript cannot work that out for a generic E
           sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>,
       });
     }),

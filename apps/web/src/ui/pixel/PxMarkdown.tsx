@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { type Plugin, unified } from "unified";
-import { richen } from "@/ui/richText";
+import { fragmentOf, richen } from "@/ui/richText";
 import { remarkIssueRefs } from "@/ui/richRules";
 import { mentionHref, withMentions } from "./markdown";
 import { cx, pxText } from "./style";
@@ -29,12 +29,13 @@ const reading = cx(
 const md = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- MdNode types only the mdast fields the plugin reads and writes
   .use(remarkIssueRefs as unknown as Plugin)
   .use(remarkRehype);
 
 /** The tree as DOM: a mention link becomes its tag, a link opens through `open` or a new tab, a rule becomes the dashed line. */
 function render(text: string, open: ((url: string) => void) | undefined): Node[] {
-  const root = toDom(md.runSync(md.parse(text)), { fragment: true }) as DocumentFragment;
+  const root = fragmentOf(toDom(md.runSync(md.parse(text)), { fragment: true }));
   // Made safe, its code and diagrams drawn, before the links below are given their pixel look.
   onCleanup(richen(root, { pixel: true }));
   for (const a of [...root.querySelectorAll("a")]) {

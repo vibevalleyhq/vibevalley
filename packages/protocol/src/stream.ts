@@ -37,6 +37,7 @@ export async function readStream<P extends keyof Streams>(
         .map((line) => line.slice(6))
         .join("\n");
       buffer = buffer.slice(end + 2);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server writes each stream's frames in the shape Streams gives its path
       if (data) onEvent(JSON.parse(data) as Streams[P]);
     }
   }

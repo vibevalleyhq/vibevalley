@@ -237,7 +237,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             if (yield* Deferred.isDone(stop)) break;
             continue;
           }
-          const args = (read as { ok: unknown }).ok;
+          const args = read && "ok" in read ? read.ok : undefined;
           entries.push(
             Effect.gen(function* () {
               if (yield* Deferred.isDone(stop)) {
@@ -409,9 +409,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       prompt: (m) => start(m),
       continue: Effect.gen(function* () {
         const all = yield* Ref.get(messages);
-        const last = all.at(-1) as { role?: string } | undefined;
-        if (!last) return yield* new CannotContinue({ message: "No messages to continue from" });
-        if (last.role === "assistant") {
+        const last: unknown = all.at(-1);
+        if (last === undefined) return yield* new CannotContinue({ message: "No messages to continue from" });
+        if (typeof last === "object" && last !== null && "role" in last && last.role === "assistant") {
           const steered = yield* takeOne(steering);
           if (steered.length > 0) return yield* start(steered, true);
           const later = yield* takeOne(followUps);

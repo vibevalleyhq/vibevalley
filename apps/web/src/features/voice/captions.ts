@@ -135,7 +135,7 @@ export class LiveCaptions {
         return undefined;
       }
     }
-    const [id, index, total, data] = parts as [string, string, string, string];
+    const [id = "", index = "", total = "", data = ""] = parts;
     const i = /^\d+$/.test(index) ? Number(index) : NaN;
     const n = total === "???" ? undefined : /^\d+$/.test(total) ? Number(total) : NaN;
     if (!(i >= 1) || (n !== undefined && (!(n >= 1) || i > n))) return undefined;

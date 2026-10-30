@@ -67,7 +67,7 @@ export const subscribePrefs = (l: () => void) => {
 
 function set(patch: Partial<Prefs>) {
   const next = { ...prefs, ...patch };
-  if ((Object.keys(next) as (keyof Prefs)[]).every((k) => next[k] === prefs[k])) return;
+  if (Object.entries(next).every(([k, v]) => v === Reflect.get(prefs, k))) return;
   prefs = next;
   try {
     localStorage.setItem(key, JSON.stringify(prefs));

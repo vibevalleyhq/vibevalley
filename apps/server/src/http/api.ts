@@ -55,6 +55,7 @@ export function api(handlers: Handlers, only?: (e: Endpoint) => boolean) {
   return HttpRouter.use((router) =>
     Effect.forEach(
       endpoints.filter((e) => !only || only(e)),
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- each handler takes its endpoint's input, which serve decodes with e.input; pathOf starts with a slash
       (e) => router.add("POST", pathOf(e.op) as HttpRouter.PathInput, serve(e, handlers[e.op] as (input: unknown) => Effect.Effect<unknown, ApiError>)),
       { discard: true },
     ),

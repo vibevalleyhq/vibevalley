@@ -123,7 +123,7 @@ const listeners = new Set<() => void>();
 
 const set = (patch: Partial<FarmUi> | ((s: FarmUi) => Partial<FarmUi>)) => {
   const next = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
-  if (Object.keys(next).every((k) => next[k as keyof FarmUi] === state[k as keyof FarmUi])) return;
+  if (Object.entries(next).every(([k, v]) => v === Reflect.get(state, k))) return;
   state = next;
   for (const l of listeners) l();
 };

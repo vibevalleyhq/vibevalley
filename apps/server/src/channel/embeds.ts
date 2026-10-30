@@ -32,7 +32,7 @@ export function linksIn(text: string): string[] {
 export function privateAddress(ip: string): boolean {
   const v4 = ip.startsWith("::ffff:") ? ip.slice(7) : ip;
   if (isIP(v4) === 4) {
-    const [a, b] = v4.split(".").map(Number) as [number, number];
+    const [a = 0, b = 0] = v4.split(".").map(Number);
     return (
       a === 0 ||
       a === 10 ||

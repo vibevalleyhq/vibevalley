@@ -111,6 +111,7 @@ export const dateText = (at: number) => {
 };
 
 export const dayText = (d: Date) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- getDay() is 0 to 6
   t("web.base.time.day", { m: d.getMonth() + 1, d: d.getDate(), weekday: t(`web.base.time.weekdays.${d.getDay() as Weekday}`) });
 
 /** A day of the week as Date.getDay counts it, Sunday first. */

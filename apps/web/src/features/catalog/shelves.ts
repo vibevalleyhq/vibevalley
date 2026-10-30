@@ -22,7 +22,8 @@ export interface Picture {
 
 /** The manifest in art pixels: its sizes over the map's density against the level's width (384). */
 export function picturesOf(manifest: Record<string, Record<string, unknown>>): Picture[] {
-  const density = (manifest.map?.w as number) / 384;
+  const w = manifest.map?.w;
+  const density = (typeof w === "number" ? w : Number.NaN) / 384;
   const art = (v: unknown) => (typeof v === "number" ? v / density : undefined);
   return Object.entries(manifest).map(([name, m]) =>
     omitUndefined({

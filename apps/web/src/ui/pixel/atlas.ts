@@ -44,6 +44,7 @@ export class SpriteAtlas {
   }
 
   static parse(text: string): SpriteAtlas {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     const raw = JSON.parse(text) as Record<string, Raw>;
     const map = raw.map;
     if (!map) throw new Error("sprites.json: no map");

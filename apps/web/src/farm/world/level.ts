@@ -60,6 +60,7 @@ export class Level {
   }
 
   static parse(text: string): Level {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     const level = (JSON.parse(text) as LdtkProject).levels[0];
     if (!level) throw new Error("village.ldtk: no level");
     const layer = (name: string) => {

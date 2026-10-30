@@ -325,7 +325,7 @@ function NotCounted(props: { reason: string }) {
   );
 }
 
-const levelName = (level: number) => (level >= 0 && level <= 4 ? t(`web.project.level.${level as 0 | 1 | 2 | 3 | 4}`) : "");
+const levelName = (level: number) => (level === 0 || level === 1 || level === 2 || level === 3 || level === 4 ? t(`web.project.level.${level}`) : "");
 const tile = 12;
 const tileGap = 3;
 

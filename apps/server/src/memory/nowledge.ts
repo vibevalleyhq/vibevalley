@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { Memory } from "@vibevalley/protocol";
-import { Clock, Effect, Option, Schema } from "effect";
+import { Clock, Effect, Option, Predicate, Schema } from "effect";
 import { redact } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
@@ -130,7 +130,9 @@ export function nowledge(c: MemorySourceConfig): Source {
             return sourceError(e);
           },
         });
-        const text = ((res.content ?? []) as { type: string; text?: string }[]).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
+        const text = (Array.isArray(res.content) ? res.content : [])
+          .map((x: unknown) => (Predicate.isObject(x) && "type" in x && x.type === "text" && "text" in x && typeof x.text === "string" ? x.text : ""))
+          .join("");
         if (res.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),

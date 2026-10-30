@@ -10,6 +10,7 @@ interface Manifest {
   readonly dependencies?: Record<string, string>;
 }
 
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a workspace package's own package.json
 const manifest = (dir: string) => JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as Manifest;
 
 /** name → folder under packages/. */

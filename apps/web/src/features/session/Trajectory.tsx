@@ -54,7 +54,7 @@ const darkInk = "#2f1f13";
 const luminance = (hex: string) => {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex);
   if (!m) return 1;
-  const [r, g, b] = m.slice(1).map((h) => parseInt(h, 16) / 255) as [number, number, number];
+  const [r = 0, g = 0, b = 0] = m.slice(1).map((h) => parseInt(h, 16) / 255);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 };
@@ -534,7 +534,10 @@ export function TrajectoryList(props: { agent: string }) {
             <ul aria-label={t("web.session.trajectory.sent")} class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
-                  const ended = () => (h().phase._tag === "closed" ? (h().phase as { at: number }).at : undefined);
+                  const ended = () => {
+                    const phase = h().phase;
+                    return phase._tag === "closed" ? phase.at : undefined;
+                  };
                   return (
                     <li>
                       <button

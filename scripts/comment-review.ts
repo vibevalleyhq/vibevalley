@@ -119,27 +119,29 @@ Answer with a JSON object only: {"verdicts":[{"id":<number>,"verdict":"keep"|"de
   ];
 }
 
-const verdicts = new Set<string>(["keep", "delete", "rewrite"]);
+const verdicts = ["keep", "delete", "rewrite"] as const;
 
 /** The model's answer for these comments; a missing or malformed verdict is an error, never a keep. */
 export function readVerdicts(answer: string, comments: readonly Comment[]): Finding[] {
-  const parsed = JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/g, "")) as { verdicts?: unknown };
-  if (!Array.isArray(parsed.verdicts)) throw new Error("the answer has no verdicts array");
-  const byId = new Map<number, Record<string, unknown>>();
-  for (const v of parsed.verdicts as Record<string, unknown>[]) byId.set(Number(v.id), v);
+  const parsed: unknown = JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+  const all: unknown = typeof parsed === "object" && parsed !== null && "verdicts" in parsed ? parsed.verdicts : undefined;
+  if (!Array.isArray(all)) throw new Error("the answer has no verdicts array");
+  const byId = new Map<number, Readonly<Record<string, unknown>>>();
+  for (const v of all as unknown[]) if (typeof v === "object" && v !== null) byId.set(Number(Reflect.get(v, "id")), Object.fromEntries(Object.entries(v)));
   return comments.flatMap((comment, id) => {
     const v = byId.get(id);
     if (!v) throw new Error(`no verdict for ${comment.file}:${comment.line}`);
-    if (typeof v.verdict !== "string" || !verdicts.has(v.verdict)) throw new Error(`${comment.file}:${comment.line}: verdict ${JSON.stringify(v.verdict)}`);
-    if (v.verdict === "keep") return [];
+    const verdict = verdicts.find((x) => x === v.verdict);
+    if (verdict === undefined) throw new Error(`${comment.file}:${comment.line}: verdict ${JSON.stringify(v.verdict)}`);
+    if (verdict === "keep") return [];
     const text = (k: string) => (typeof v[k] === "string" ? v[k] : "");
     return [
       {
         comment,
-        verdict: v.verdict as Finding["verdict"],
+        verdict,
         rule: text("rule"),
         reason: text("reason"),
-        rewrite: v.verdict === "rewrite" ? text("rewrite") : "",
+        rewrite: verdict === "rewrite" ? text("rewrite") : "",
       },
     ];
   });
@@ -173,6 +175,7 @@ const deepseek =
       body: JSON.stringify({ model, messages, response_format: { type: "json_object" } }),
     });
     if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${await res.text()}`);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- DeepSeek's chat completion; a missing field reads as no answer below
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content;
     if (!content) throw new Error("DeepSeek answered nothing");

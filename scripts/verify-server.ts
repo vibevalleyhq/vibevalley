@@ -14,7 +14,10 @@ export interface VerificationResult {
 
 /** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
  * starts with, as a farm whose agent.starters names them. */
+const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
+
 const starters = () =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the starters' index, a list of names
   (JSON.parse(readFileSync(join(import.meta.dirname, "..", "apps", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
     .filter((id) => id !== "orchestrator")
     .join(",");
@@ -99,8 +102,8 @@ export async function runVerification(command: string[] = [], options: Verificat
       process.kill(-child.pid, signal);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
-      if ((error as NodeJS.ErrnoException).code === "EPERM") return false;
+      if (errorCode(error) === "ESRCH") return true;
+      if (errorCode(error) === "EPERM") return false;
       throw error;
     }
   };
@@ -109,8 +112,8 @@ export async function runVerification(command: string[] = [], options: Verificat
       process.kill(-child.pid, 0);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
-      if ((error as NodeJS.ErrnoException).code === "EPERM") return true;
+      if (errorCode(error) === "ESRCH") return false;
+      if (errorCode(error) === "EPERM") return true;
       throw error;
     }
   };

@@ -12,6 +12,7 @@ const openingWords = () => {
   const locales = join(import.meta.dirname, "../../packages/i18n/locales");
   const words: Record<string, Record<string, string>> = {};
   for (const locale of readdirSync(locales)) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by scripts/i18n.ts
     const catalog = JSON.parse(readFileSync(join(locales, locale, "web.json"), "utf8")) as { opening: Record<string, string> };
     words[locale] = Object.fromEntries(Object.entries(openingKeys).map(([name, key]) => [name, catalog.opening[key.slice("web.opening.".length)]!]));
   }

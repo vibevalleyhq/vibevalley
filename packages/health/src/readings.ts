@@ -103,6 +103,8 @@ export interface Escapes {
 export const escapeKinds = ["nonNull", "doubleCast", "cast", "lintOff"] as const satisfies readonly (keyof Escapes)[];
 
 type Node = { readonly type?: unknown; readonly [key: string]: unknown };
+/** Any object is a Node: every field is read as unknown. */
+const nodeOf = (v: unknown): Node => (typeof v === "object" && v !== null ? Object.fromEntries(Object.entries(v)) : {});
 
 export function escapesIn(path: string, text: string): Escapes {
   const parsed = parseSync(path, text, { lang: path.endsWith(".tsx") ? "tsx" : "ts" });
@@ -112,13 +114,13 @@ export function escapesIn(path: string, text: string): Escapes {
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) return value.forEach(visit);
     if (typeof value !== "object" || value === null) return;
-    const node = value as Node;
+    const node = nodeOf(value);
     if (node.type === "TSNonNullExpression") nonNull++;
     if (node.type === "TSAsExpression") {
-      const inner = node.expression as Node;
-      const to = node.typeAnnotation as Node;
-      const toConst = to.type === "TSTypeReference" && (to.typeName as Node).name === "const";
-      if (inner.type === "TSAsExpression" && (inner.typeAnnotation as Node).type === "TSUnknownKeyword") doubleCast++;
+      const inner = nodeOf(node.expression);
+      const to = nodeOf(node.typeAnnotation);
+      const toConst = to.type === "TSTypeReference" && nodeOf(to.typeName).name === "const";
+      if (inner.type === "TSAsExpression" && nodeOf(inner.typeAnnotation).type === "TSUnknownKeyword") doubleCast++;
       else if (!toConst && to.type !== "TSUnknownKeyword") cast++;
     }
     for (const key in node) if (key !== "parent") visit(node[key]);

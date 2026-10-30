@@ -32,6 +32,8 @@ const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs
 const aboutOf = (call: InboxItem) => t("shared.join.sentence", { text: t("shared.join.labeled", { label: call.who, text: call.words.label }) }) + call.text;
 
 /** room: the most it may take, inside the farm's box. */
+const listOf = (app: PhoneApp) => (app === "missed" || app === "log" ? app : undefined);
+
 export function Phone(props: { room: { w: number; h: number } }) {
   const phone = phoneState();
   const router = useRouter();
@@ -112,8 +114,8 @@ export function Phone(props: { room: { w: number; h: number } }) {
             <Match when={app() === "games"}>
               <GamesScreen onOpen={open} />
             </Match>
-            <Match when={app() === "missed" || app() === "log"}>
-              <ListScreen screen={app() as "missed" | "log"} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("orchestrator")} />
+            <Match when={listOf(app())}>
+              {(screen) => <ListScreen screen={screen()} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("orchestrator")} />}
             </Match>
             <Match when={app() === "orchestrator"}>
               <OrchestratorScreen />

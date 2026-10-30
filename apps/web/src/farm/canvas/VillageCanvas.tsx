@@ -34,6 +34,7 @@ export function VillageCanvas() {
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const hotspotsQuery = useQuery(() => ({
     queryKey: ["cursors"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => (await (await fetch("/cursors/cursors.json")).json()) as Hotspots,
     staleTime: Infinity,
   }));

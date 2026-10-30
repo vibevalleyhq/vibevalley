@@ -87,7 +87,7 @@ export function startIsland(o: IslandOptions): { stop: () => void } {
   let helper: ChildProcess | undefined;
   let last = "";
   const probe: IslandProbe = { glance: undefined, helper: false, open: o.open };
-  (globalThis as { vibevalleyIsland?: IslandProbe }).vibevalleyIsland = probe;
+  Object.assign(globalThis, { vibevalleyIsland: probe });
 
   const send = (glance: Glance) => {
     probe.glance = glance;
@@ -110,7 +110,8 @@ export function startIsland(o: IslandOptions): { stop: () => void } {
     });
     createInterface({ input: child.stdout }).on("line", (line) => {
       try {
-        const { open } = JSON.parse(line) as { open?: unknown };
+        const said: unknown = JSON.parse(line);
+        const open = typeof said === "object" && said !== null && "open" in said ? said.open : undefined;
         if (typeof open === "string") o.open(open);
       } catch {
         // Not a line it means for us.

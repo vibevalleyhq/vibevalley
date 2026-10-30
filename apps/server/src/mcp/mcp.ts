@@ -72,7 +72,7 @@ export const make = (options: McpOptions = {}) =>
       // oxlint-disable-next-line typescript/no-deprecated
       const server = new Server({ name: "vibevalley", version: config.version }, { capabilities: { tools: {} } });
       server.setRequestHandler(ListToolsRequestSchema, async () => ({
-        tools: list.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters as { type: "object" } })),
+        tools: list.map((t) => ({ name: t.name, description: t.description, inputSchema: { ...t.parameters, type: "object" as const } })),
       }));
       server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const tool = list.find((t) => t.name === req.params.name);

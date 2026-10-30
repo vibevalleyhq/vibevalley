@@ -30,8 +30,11 @@ export function useMarkRead(channel: Accessor<Channel | undefined>) {
     },
     (read) => {
       if (!read) return;
-      const [id, number] = JSON.parse(read) as [string, number];
-      api.channel.markRead({ id, number }).catch(() => {});
+      const parsed: unknown = JSON.parse(read);
+      if (!Array.isArray(parsed)) return;
+      const id: unknown = parsed[0];
+      const number: unknown = parsed[1];
+      if (typeof id === "string" && typeof number === "number") api.channel.markRead({ id, number }).catch(() => {});
     },
   );
 }

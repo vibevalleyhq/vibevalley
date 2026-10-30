@@ -16,6 +16,7 @@ const { values } = parseArgs({ options: { config: { type: "string" }, check: { t
 if (!values.config) throw new Error("--config <file>: the repository's Health (packages/health/README.md)");
 
 const configPath = resolve(values.config);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- --config names the repository's Health module, which exports one by default
 const health = ((await import(configPath)) as { default: Health }).default;
 const root = execRoot(dirname(configPath));
 const ratchetPath = resolve(root, health.ratchet);
@@ -23,6 +24,7 @@ const ratchetPath = resolve(root, health.ratchet);
 const now = headTime(root);
 const files = sources(root);
 const escapes = escapesByArea(files, health);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the ratchet is written by --write below
 const kept: Record<string, Escapes> = existsSync(ratchetPath) ? (JSON.parse(readFileSync(ratchetPath, "utf8")) as Record<string, Escapes>) : {};
 
 if (values.write === true) {

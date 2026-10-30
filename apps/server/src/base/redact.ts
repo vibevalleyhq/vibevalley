@@ -29,6 +29,7 @@ export function redact(text: string): string {
 /** Everything the process writes to stream goes through redact first: the server's log, and what a library prints. A
  * secret split across two writes gets through; console writes a line at a time. */
 export function redactOutput(stream: NodeJS.WriteStream) {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every overload of write takes the chunk first and passes the rest on
   const write = stream.write.bind(stream) as (chunk: unknown, ...rest: unknown[]) => boolean;
   stream.write = (chunk: unknown, ...rest: unknown[]) =>
     write(typeof chunk === "string" ? redact(chunk) : chunk instanceof Uint8Array ? redact(Buffer.from(chunk).toString("utf8")) : chunk, ...rest);

@@ -71,7 +71,7 @@ export function PxPick(props: {
   createEffect(open, (on) => {
     if (!on) return;
     const away = (e: PointerEvent) => {
-      if (!wrap.contains(e.target as Node)) setOpen(false);
+      if (!(e.target instanceof Node && wrap.contains(e.target))) setOpen(false);
     };
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
@@ -100,7 +100,7 @@ export function PxPick(props: {
         aria-controls={open() ? listId : undefined}
         aria-activedescendant={open() ? `${listId}-${highlight()}` : undefined}
         onClick={() => (open() ? setOpen(false) : show())}
-        onBlur={(e) => !wrap.contains(e.relatedTarget as Node | null) && setOpen(false)}
+        onBlur={(e) => !wrap.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null) && setOpen(false)}
         onKeyDown={(e) => {
           const n = items().length;
           if (!open()) {
