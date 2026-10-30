@@ -6,6 +6,10 @@
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
 
+import { VibeValleyApi } from "@vibevalley/protocol";
+
+import type { ServerKeeper } from "./server";
+import type { MainWindow } from "./window";
 import { workspaceClosure } from "./workspace.ts";
 
 /** A build writes many files; one reload once they are all there. */
@@ -66,4 +70,33 @@ export function watchForDev(h: DevHooks): () => void {
       }),
     );
   return () => watchers.forEach((w) => w.close());
+}
+
+/** The development wiring for the app: the window reloads, and the server starts again on its port, the window coming
+ * back on the place it showed. */
+export function devMode(o: { readonly web: string; readonly repo: string; readonly server: ServerKeeper; readonly window: MainWindow }) {
+  return watchForDev({
+    web: o.web,
+    repo: o.repo,
+    reloadPage: () => {
+      console.log("vibevalley dev: the page was built again, reloading");
+      o.window.current()?.webContents.reloadIgnoringCache();
+    },
+    working: async () => {
+      const url = o.server.url();
+      if (url === undefined) return 0;
+      try {
+        const sessions = await new VibeValleyApi(url).session.list({});
+        return sessions.filter((s) => s.phase._tag === "working").length;
+      } catch {
+        return 0;
+      }
+    },
+    restartServer: async () => {
+      const shown = o.window.current()?.webContents.getURL();
+      const at = shown === undefined ? undefined : new URL(shown);
+      console.log("vibevalley dev: the server's code changed, starting it again");
+      if ((await o.server.restart()) !== undefined) o.window.open(at ? at.pathname + at.search : "");
+    },
+  });
 }

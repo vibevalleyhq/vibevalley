@@ -6,9 +6,12 @@
 import { execFile, spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { createInterface } from "node:readline";
+
+import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
+
+import { jsonLines } from "./lines";
 
 /** The first start builds the database. */
 const startTimeoutMs = 40_000;
@@ -41,10 +44,13 @@ export interface ServerFiles {
 }
 
 export interface RunningServer {
-  /** Where the page and the API answer. */
+  /** Where the page and the API answer, with no slash at the end. */
   url: string;
   stop(): Promise<void>;
 }
+
+/** The line the server prints once it listens (--ready-json). */
+const ServerReady = Schema.Struct({ url: Schema.String });
 
 /** port 0 picks a free one; a restart in development (dev.ts) asks for the one it had, so the page keeps its origin and
  * what it stored there. */
@@ -86,19 +92,51 @@ export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0
       fail(t("desktop.exited", { code: String(code) }));
     });
     let ready = false;
-    createInterface({ input: child.stdout }).on("line", (line) => {
-      log.write(line + "\n");
-      if (ready) return;
-      try {
-        const said: unknown = JSON.parse(line);
-        const url = typeof said === "object" && said !== null && "url" in said ? said.url : undefined;
-        if (typeof url !== "string") return;
+    jsonLines(
+      child.stdout,
+      ServerReady,
+      ({ url }) => {
+        if (ready) return;
         ready = true;
         clearTimeout(timer);
-        resolve({ url, stop });
-      } catch {
-        // Not the ready line.
-      }
-    });
+        resolve({ url: url.replace(/\/$/u, ""), stop });
+      },
+      (line) => log.write(line + "\n"),
+    );
   });
 }
+
+/** The one server the app runs: coming up, running, started again (in development), and stopped before the app quits,
+ * a start still under way waited for, so it is stopped rather than left running. */
+export function serverKeeper(files: ServerFiles, env: NodeJS.ProcessEnv) {
+  let running: RunningServer | undefined;
+  let starting: Promise<RunningServer> | undefined;
+  return {
+    /** Where the running one answers; undefined until it is up. */
+    url: () => running?.url,
+    start: async () => {
+      starting = startServer(files, env);
+      try {
+        running = await starting;
+        return running.url;
+      } finally {
+        starting = undefined;
+      }
+    },
+    /** The same port again, so the page keeps its origin and what it stored there. */
+    restart: async () => {
+      const was = running;
+      if (!was) return undefined;
+      await was.stop();
+      running = await startServer(files, env, Number(new URL(was.url).port));
+      return running.url;
+    },
+    stop: async () => {
+      const it = running ?? (await starting?.catch(() => undefined));
+      running = undefined;
+      await it?.stop();
+    },
+  };
+}
+
+export type ServerKeeper = ReturnType<typeof serverKeeper>;

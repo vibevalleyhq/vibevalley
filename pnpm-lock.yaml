@@ -401,6 +401,9 @@ importers:
       '@vibevalley/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.5
       electron:
         specifier: 'catalog:'
         version: 44.9.3(supports-color@8.1.1)

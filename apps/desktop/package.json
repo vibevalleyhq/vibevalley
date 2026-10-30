@@ -15,6 +15,7 @@
     "@vibevalley/engine": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
+    "effect": "catalog:",
     "electron": "catalog:",
     "electron-builder": "catalog:",
     "esbuild": "catalog:",
