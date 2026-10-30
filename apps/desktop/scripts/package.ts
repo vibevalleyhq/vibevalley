@@ -1,14 +1,18 @@
-// Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg and the .app beside it): the shell from build/, and three
+// Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg for a first install, .zip for the app's own updates, and
+// release.json that says what they are: src/releases.ts): the shell from build/, and three
 // resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, island/ the island's
 // release build, server/ is apps/server with its production dependencies installed as real copies. The server runs unbundled with tsx, as it does in the
 // repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
+import { baselineHash } from "../../server/src/base/baseline.ts";
+import type { Release } from "../src/releases.ts";
 import { workspaceClosure } from "../src/workspace.ts";
 
 const desktop = join(import.meta.dirname, "..");
@@ -89,14 +93,18 @@ writeFileSync(
 );
 sh(server, "npm", "install", "--omit=dev", "--install-links", "--no-audit", "--no-fund", "--no-package-lock");
 
-const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/u, "");
+// The version is the tag the release is built from (v0.2.0); between tags, 0.0.0, which no release is older than.
+const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+const described = git("describe", "--tags", "--always").replace(/^v/u, "");
+const version = /^\d+\.\d+\.\d+$/u.test(described) ? described : "0.0.0";
+const dist = join(desktop, "dist");
 await build({
-  targets: Platform.MAC.createTarget(["dmg"]),
+  targets: Platform.MAC.createTarget(["dmg", "zip"]),
   config: {
     appId: "dev.vibevalley.app",
     productName: "VibeValley",
-    extraMetadata: { version: /^\d+\.\d+\.\d+/u.test(version) ? version : "0.0.0" },
-    directories: { output: join(desktop, "dist"), buildResources: join(desktop, "resources") },
+    extraMetadata: { version },
+    directories: { output: dist, buildResources: join(desktop, "resources") },
     files: ["build/**", "package.json"],
     extraResources: [
       { from: join(repo, "apps/web/dist"), to: "web" },
@@ -106,7 +114,47 @@ await build({
     afterPack: async (ctx) => {
       cpSync(server, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app/Contents/Resources/server`), { recursive: true, verbatimSymlinks: true });
     },
-    mac: { category: "public.app-category.developer-tools", icon: join(desktop, "resources/icon.icns"), identity: null },
+    mac: {
+      category: "public.app-category.developer-tools",
+      icon: join(desktop, "resources/icon.icns"),
+      identity: null,
+      artifactName: "VibeValley-${version}-${arch}.${ext}",
+    },
     npmRebuild: false,
   },
 });
+
+// What the release says about itself: its build for this Mac, the merged pull requests since the tag before (their
+// titles are main's commit subjects), and the baseline its server makes a database from.
+const arch = process.arch;
+const zip = `VibeValley-${version}-${arch}.zip`;
+const previous = (() => {
+  try {
+    return git("describe", "--tags", "--abbrev=0", "HEAD^");
+  } catch {
+    return undefined;
+  }
+})();
+const notes =
+  version === "0.0.0"
+    ? []
+    : git("log", "--format=%s", previous === undefined ? "HEAD" : `${previous}..HEAD`)
+        .split("\n")
+        .filter((l) => l !== "");
+const release: Release = {
+  version,
+  notes,
+  schema: baselineHash(),
+  page: `https://github.com/vibevalleyhq/vibevalley/releases/tag/v${version}`,
+  builds: [
+    {
+      arch,
+      file: zip,
+      size: statSync(join(dist, zip)).size,
+      sha512: createHash("sha512")
+        .update(readFileSync(join(dist, zip)))
+        .digest("hex"),
+    },
+  ],
+};
+writeFileSync(join(dist, "release.json"), JSON.stringify(release, null, 2) + "\n");
