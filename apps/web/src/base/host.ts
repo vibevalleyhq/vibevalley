@@ -11,7 +11,6 @@ export const browserHost: Host = {
 
 let phone: Host | undefined;
 
-/** The page's end of the phone's bridge: it posts text, and the shell calls fromNativeKey with each message. */
 function webViewLink(native: { postMessage(text: string): void }, g: Record<string, unknown>): Link {
   const ears = new Set<(m: unknown) => void>();
   g[fromNativeKey] = (m: unknown) => {

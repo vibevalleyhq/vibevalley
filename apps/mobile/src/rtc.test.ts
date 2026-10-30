@@ -54,8 +54,7 @@ const connection = (channel: string) => ({ channelId: channel, localUid: 7 });
 const events: RtcEvents = { joined() {}, left() {}, stream() {}, levels() {}, problem() {}, expiring() {} };
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-/** A page and a shell joined so the test holds what the shell sends: replies collects it, deliver hands one to the page.
- * The page's calls reach the shell at once; ask sends one as the page would. */
+/** The shell's messages are held in replies until deliver hands one to the page; the page's calls (ask) reach the shell at once. */
 function held() {
   const toShell = new Set<(m: unknown) => void>();
   const toPage = new Set<(m: unknown) => void>();

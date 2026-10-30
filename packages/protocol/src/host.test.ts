@@ -7,7 +7,6 @@ import { mobileHost, type RtcEvents } from "./host";
 
 const grant = (channel: string) => ({ appId: "a", channel, uid: "7", token: "t" });
 
-/** The page's host, and the shell's end as a test drives it: what was asked, and the answers and pushes sent back. */
 function phone() {
   const [page, shell] = linkPair();
   const asked: BridgeMessage[] = [];

@@ -1,6 +1,4 @@
-// Calls between two programs that share no types at run time (a page and its desktop or phone shell), written once as a
-// contract: each call's input and output, each push's payload, as Schemas. The side that answers decodes what comes in;
-// the side that asks gets typed methods. What carries the messages is a Link, which knows nothing of the contract.
+// The two sides share no types at run time: each input, output and payload is a Schema, and the side it reaches decodes it.
 
 import { Schema } from "effect";
 
@@ -32,14 +30,11 @@ export type InputOf<C extends Contract, K extends keyof C> = C[K] extends Call<i
 export type OutputOf<C extends Contract, K extends keyof C> = C[K] extends Call<AnyCodec, infer O> ? O["Type"] : never;
 export type PayloadOf<C extends Contract, K extends keyof C> = C[K] extends Push<infer P> ? P["Type"] : never;
 
-/** The answering side's handlers: one for each call, and no call left out. */
 export type Handlers<C extends Contract> = { readonly [K in CallName<C>]: (input: InputOf<C, K>) => OutputOf<C, K> | Promise<OutputOf<C, K>> };
 
-/** The asking side's methods: one for each call. */
 export type Calls<C extends Contract> = { readonly [K in CallName<C>]: (input: InputOf<C, K>) => Promise<OutputOf<C, K>> };
 
-/** What goes over a link: a call by its id, its answer by the same id, and a push. Input, output and payload are
- * encoded by the contract's Schemas; a void one is left out. */
+/** Input, output and payload are encoded by the contract's Schemas; a void one is left out. */
 export const BridgeMessage = Schema.Union([
   Schema.Struct({ id: Schema.Finite, call: Schema.String, input: Schema.optionalKey(Schema.Unknown) }),
   Schema.Struct({ id: Schema.Finite, ok: Schema.Literal(true), output: Schema.optionalKey(Schema.Unknown) }),
@@ -48,8 +43,7 @@ export const BridgeMessage = Schema.Union([
 ]);
 export type BridgeMessage = typeof BridgeMessage.Type;
 
-/** A way to the other side: send a message, and hear each one that comes back until the returned function is called. A
- * link that carries text (a WebView) does the JSON itself. */
+/** A link that carries text (a WebView) does the JSON itself. */
 export interface Link {
   readonly send: (message: BridgeMessage) => void;
   readonly receive: (fn: (message: unknown) => void) => () => void;
@@ -65,7 +59,7 @@ const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const entryOf = (contract: Contract, name: string) => (Object.hasOwn(contract, name) ? contract[name] : undefined);
 
-/** Answers the calls that come over link with handlers, and sends pushes. Nothing is answered after close. */
+/** Nothing is answered after close. */
 export function serve<C extends Contract>(contract: C, link: Link, handlers: Handlers<C>) {
   let closed = false;
   const answer = async (id: number, name: string, input: unknown) => {
@@ -102,8 +96,7 @@ export function serve<C extends Contract>(contract: C, link: Link, handlers: Han
   };
 }
 
-/** The asking side: a method for each call, answered over link, and the pushes it hears. close rejects what is still
- * unanswered and hears nothing after. */
+/** close rejects what is still unanswered and hears nothing after. */
 export function connect<C extends Contract>(contract: C, link: Link) {
   let next = 1;
   let closed = false;
