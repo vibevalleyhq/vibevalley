@@ -96,7 +96,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **「连接到本机」（`lan`）**：它的监听把页面放给任何人（页面里没有农场的东西），接口和流只放带钥匙的；配对的链接是 `http://<地址>:<端口>/pair?c=<码>`，手机相机扫开就是浏览器里的 `/pair`。
 - **设置（`setting`）**：设置页读写设置，保存前问 `settings/check`；钥匙从不回到页面，页面只看到来源和末四位。
 - **语音（`voice`）**：通话在 `src/features/voice/call.ts`（`voiceCall`），按钮和 ⌥⇧Space 发同一个动作；Agora 的 SDK 只在那里动态 import。
-- **验证脚本**：`scripts/verify-server.ts` 起一个隔离的服务端，`acceptance/page.md` 对着它用 Playwright 截图。
+- **验证脚本**：`scripts/verify-server.ts` 起一个隔离的服务端，`vv-acceptance/references/page.md` 对着它用 Playwright 截图。
 
 ## 为什么这样
 
@@ -142,5 +142,5 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键；家目录是个文件、服务端起不来时，窗口先开在加载条上，再换成原因；服务端用照字眼干活的帮工（`VIBEVALLEY_TEST_RUNTIMES`）时，一张先问清楚的工单进了岛的摘要（「等你回答」），macOS 上岛真的起来了，点它把窗口开到那张工单。`apps/desktop/src/island.test.ts` 查摘要的规则。
 - 灵动岛：`apps/island` 的 `swift test`（消息、刘海和没有刘海时的位置），CI 的 `island` 跑在 macOS 上；样子用 `--snapshot` 画成图看（`apps/island/README.md`）。
 - 打包：`vp run package:mac` 后用临时家目录开 `apps/desktop/dist/mac-arm64/VibeValley.app`，`desktop-server.log` 里有收据，`curl` 那个地址拿到页面和接口。
-- 自己更新：`vp run --filter @vibevalley/desktop update-check` 打 0.0.1 和 0.0.2 两个包，在本机的更新源上走一遍（SHA-512 不对时不换；对的下好、退出时换上、再开是 0.0.2；[验收的分册](.agents/skills/acceptance/desktop-update.md)）。`src/releases.test.ts` 查版本、装在哪、换不换新农场的规则。
-- 真程序：`acceptance/page.md`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。
+- 自己更新：`vp run --filter @vibevalley/desktop update-check` 打 0.0.1 和 0.0.2 两个包，在本机的更新源上走一遍（SHA-512 不对时不换；对的下好、退出时换上、再开是 0.0.2；[验收的分册](.agents/skills/vv-acceptance/references/desktop-update.md)）。`src/releases.test.ts` 查版本、装在哪、换不换新农场的规则。
+- 真程序：`vv-acceptance/references/page.md`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。

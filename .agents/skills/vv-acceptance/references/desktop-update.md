@@ -1,6 +1,6 @@
 # 验收桌面版的自己更新
 
-[验收](.agents/skills/acceptance/SKILL.md)的一份分册：在真的打包上走一遍更新。`desktop:test` 跑的是仓库里的应用，它不更新自己（可执行文件是 Electron 自己的）；只有打包的 `.app` 会查、下、换。`apps/desktop/scripts/update-check.ts` 打出 0.0.1 和 0.0.2 两个包，把 0.0.1 放进一个临时的「应用程序」，在本机放一份 0.0.2 的发布当更新源，再跑这个装好的应用。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：在真的打包上走一遍更新。`desktop:test` 跑的是仓库里的应用，它不更新自己（可执行文件是 Electron 自己的）；只有打包的 `.app` 会查、下、换。`apps/desktop/scripts/update-check.ts` 打出 0.0.1 和 0.0.2 两个包，把 0.0.1 放进一个临时的「应用程序」，在本机放一份 0.0.2 的发布当更新源，再跑这个装好的应用。
 
 ## 什么时候用
 

@@ -49,7 +49,7 @@
 在这里：已有：依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog（`catalogMode: strict`，`scripts/catalog.test.ts` 查）；方向由 `apps/server/src/modules.test.ts`、`vibevalley/page-layers`、`import/no-cycle`、各包的 `no-restricted-imports`（`packages/ai` 不认识 agent，agent 不认识农场）守住；规矩写在 `AGENTS.md`，每次会话都在上下文里。
 
 **六、认知赤字，审查破产。** 机理：人一小时读三五百行，六个 agent 一夜改八千行，人读不过来。例子：先坚持逐行审，分支积压；两周后看见 CI 绿就合；第二个月线上死锁，没人看得懂被改了十几遍的三千行异步调度。
-在这里：已有：一个 PR 讲一件事，正文写现在的行为和证据（[vv-pr](.agents/skills/vv-pr/SKILL.md)），改了接口和页面照 [acceptance](.agents/skills/acceptance/SKILL.md) 在真的程序上验证并附证据，子系统文档写「为什么这样」。回放（2026-10-30，`main` 最近 100 个 PR）：契约约占改动的 1/22，后来修掉的缺陷只有 1.5% 当初写在契约里：读契约挡不住缺陷，挡缺陷靠测试和验收。以后做：契约的 diff 进 CI 摘要。
+在这里：已有：一个 PR 讲一件事，正文写现在的行为和证据（[vv-pr](.agents/skills/vv-pr/SKILL.md)），改了接口和页面照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真的程序上验证并附证据，子系统文档写「为什么这样」。回放（2026-10-30，`main` 最近 100 个 PR）：契约约占改动的 1/22，后来修掉的缺陷只有 1.5% 当初写在契约里：读契约挡不住缺陷，挡缺陷靠测试和验收。以后做：契约的 diff 进 CI 摘要。
 
 ## 十条铁律
 

@@ -89,7 +89,7 @@
   | 流程 | 整座农场（`flows/farm.ts`） | 全部模块、真 git | 同上 | 同上 | 2 秒 | `src/flows` |
   | 页面 | HTTP 和 SSE | 一个真的服务端进程 | 环境里没有钥匙，runtime 换成照字眼干活的帮工 | 真时间，随时间走的画面用 `page.clock` | 3 秒 | `apps/web/test` |
   | 整个应用 | 宿主接口（`@vibevalley/protocol/host`） | Electron、模拟器 | — | 真时间 | 不设 | `apps/desktop`、`apps/mobile` |
-  | 真模型 | 管家的提示和工具描述 | 真模型 | — | — | 不计；手动跑，先问主人 | 评测样例、`acceptance` skill |
+  | 真模型 | 管家的提示和工具描述 | 真模型 | — | — | 不计；手动跑，先问主人 | 评测样例、`vv-acceptance` skill |
 
   一个行为在能看见它的最低一层测；模块测试主要在验证一个决定时任务，把决定抽成纯函数、模块测试只留一个接线；流程测试只写跨模块的用户故事。边界由检查守：`testing/pyramid.test.ts`（流程的农场只在 `src/flows`，各模块重放黄金数据的 `recorded.test.ts` 留在进程里）、`apps/web/src/pageTests.test.ts`（页面测试只经浏览器、Playwright 和协议）、lint `vibevalley/no-test-sleep`（不靠时间等）。预算超两倍的由 `@vibevalley/testkit/budgets` 和 `apps/web/test/budgets.ts` 在每次跑完列出来，不算失败。
 
@@ -165,7 +165,7 @@
 - **表按模块命名。** 一个库里十几个模块的表共用一个命名空间：频道占了 `message`，`delivery` 会撞。规矩写进 `schema.test.ts`，加一张不合的表测试就失败。
 - **一份表结构，不留兼容，不搬数据。** 每次改名都多一段搬旧数据的代码，都在每次启动的路上；项目还没有外部用户，搬数据的代码只让架构成形期的每一步更慢。放弃了「改表写迁移」和「开机看到旧文件顺手导入」。以后有了用户，改存盘要重新写迁移：在 `0001_schema.up.sql` 后面加文件，并改这一条。
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
-- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)、`acceptance/server.md`）。
+- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[vv-acceptance/references/orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md)、`vv-acceptance/references/server.md`）。
 - **一套工具管格式、lint、构建和测试。** Vite+ 把 Vite、Vitest、oxlint、oxfmt 收在一个 `vp` 里，设置写在一个 `vite.config.ts`；oxlint 的带类型规则（没处理的 promise、数字不带比较函数的 `sort`、没用上的组件）在落地前就报出来。放弃了各装一份 ESLint、Prettier：两份设置、两套插件，慢一个量级。几条规则关掉，因为这里是有意的写法：`[...text]` 按码点切字、改之前先拷一份再遍历、`Effect.gen` 前的 `const self = this`。规则一条一条开、只开成 error：开之前在仓库上量一遍命中，一处不剩的直接开、锁住；几十处以内的同一个改动里改完再开；几百上千处的（非空断言、`strict-boolean-expressions`、没核过的 `as`）多半和这里的写法相冲，不开。整类（pedantic、style、restriction）不开：一开几千到几万处，真问题淹在里面。上线的代码不让 `any` 流过（`no-unsafe-*`，只在 `apps/*/src`、`packages/*/src`）：JSON、库、`getPrototypeOf` 给的在进来的地方定类型；测试和脚本读的是自己写的 JSON，不管。`no-unnecessary-condition` 试过不开（188 处）：死掉的 `?? []`、`?.` 是真的，可四十来处「总是真、总是假」几乎都是 `signal.aborted`、`closed`、`disposed` 这种在 `await` 或回调里被别处改掉的标志，TypeScript 的收窄看不见那一下，照它删就是把竞态的守卫删了。
 - **话在一个 i18n 包里，按键取，词典按语言分文件。** 以前是 42 张 TS 对象（`words.ts`，`typeof zh` 查英文）：类型挡住了漏翻，可话和代码绑在一起，按文字找不到一句在哪，没人用的词条、英文里混进的中文没人报，加一种语言要复制 42 份对象。现在词典是 JSON，代码写 `t("key")`，`scripts/i18n.ts` 照 x18n 的路子扫键、查问题、按文字找，词典能单独交给翻译或 agent。类型没丢：`gen` 从中文写出每个键和参数，写错照样编不过。搬的时候查出 70 条早就没人用的词条，删了。`catalogs.ts` 把词典写成数据而不是 import JSON：Metro、esbuild、Vite 和 Node 读 `.ts` 都一样，读 JSON 要的 import 属性各家支持不一。放弃了直接用 x18n（我们只要五个命令，自己写更好控制，CI 不依赖外部；词典格式标准，以后要接随时能接）、i18next 这类库（运行时、按需加载、后端都用不上，`t` 只要取值和替换占位）、一种语言一个大文件（并行的分支几乎每次都冲突）、英文做源头（产品先是中文的，中文写得最准）。
 - **服务端写好话再发，页面不拼。** 帮工在干什么、工单等什么、通知怎么说由服务端写进帧，桌面的菜单栏、灵动岛、命令行、连接器也要同一句；放弃了只发结构、各处自己拼，那会每处各拼一遍。代价是语言跟着进程：服务端换了语言，新算的帧才是新语言，所以页面换语言时整页重开。

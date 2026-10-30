@@ -117,7 +117,7 @@ Status: proposed
 - 项目目录 `.agents/skills/` 里的技能，在这个项目干活的帮工都看得到。
 - 只有默认工具集的帮工经 `/mcp` 列不出、调不了 `issue_create`；主人给它的档案加上 `issue` 后能建工单；干活时去掉，下一次调用被拒。`Record<工具, Toolset>` 漏一个工具编不过。
 - 输入框打 `/` 列出这处的管家能用的技能和三个内置命令；发 `/review 看看 #41` 以后，频道里是一个「review」标签加「看看 #41」，管家这一轮的输入里有技能的正文；`/stop` 停下这处的管家。
-- 服务端测试、页面 e2e、`vp run desktop:test` 通过；改了管家的工具表或提示，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md) 真模型重放（花钱，先问主人）。
+- 服务端测试、页面 e2e、`vp run desktop:test` 通过；改了管家的工具表或提示，照 [vv-acceptance/references/orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) 真模型重放（花钱，先问主人）。
 
 ## Risks
 

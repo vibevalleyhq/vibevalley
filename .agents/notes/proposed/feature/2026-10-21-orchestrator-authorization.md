@@ -32,7 +32,7 @@ Status: proposed
 
 - 管家自己看出来的开工、换人、取消（这一轮没有主人的话）被工具拒，回一句要它先问主人。
 - 主人同意过的定时到点：开工能做，合并仍被拒。
-- 评测样例覆盖「帮工的汇报让它再派一个」不照做；真模型重放照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)，花钱，先问主人。
+- 评测样例覆盖「帮工的汇报让它再派一个」不照做；真模型重放照 [vv-acceptance/references/orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md)，花钱，先问主人。
 
 ## Risks
 

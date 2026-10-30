@@ -44,7 +44,7 @@ description: 给 VibeValley 开、改、合 PR：先定这次的改动该是几�
 照模板写三段，英文，正文就是 `main` 上那条提交的说明：
 
 - `## What changed`：现在的行为和为什么；一处问题一条，说清以前会怎样（输入、结果），现在怎样。链接 Agent Note 或 issue。看过、决定不改的，也写一句和理由，下一个人不用再查一遍。
-- `## Checks`：跑了的命令和它们打出的结果（`vp check`、`server:check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [acceptance](.agents/skills/acceptance/SKILL.md) 要的证据。
+- `## Checks`：跑了的命令和它们打出的结果（`vp check`、`server:check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 要的证据。
 - `## Not verified`：没验的和原因（真机、花钱的评测、真的厂商）。都验了写 `None.`。
 - `## Regression`（要的时候才有）：这个 PR 删了或改了名字以 `regression: ` 开头的测试，逐个写出测试名和为什么（行为有意改了、挪了地方）；`fix/` 没补回归测试时写为什么补不了。CI 的 `scripts/regression.ts` 查。
 

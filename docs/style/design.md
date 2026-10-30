@@ -253,4 +253,4 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 - [ ] 长的字会截断或折叠（`min-w-0`、`truncate`、`line-clamp-*`），窄窗口不撑破（新的一处加进 `test/narrow.spec.ts` 的 `places`）。
 - [ ] 空的、加载中、出错三种样子都有。
 - [ ] 动效有因果，减少动效时停得下。
-- [ ] 照 [验收](.agents/skills/acceptance/SKILL.md) 的页面分册截图，浅色、深色各一张。
+- [ ] 照 [验收](.agents/skills/vv-acceptance/SKILL.md) 的页面分册截图，浅色、深色各一张。

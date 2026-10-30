@@ -159,4 +159,4 @@
 - `apps/web/src/features/notice/tray.test.ts`（来电变通知、只响一次、菜单栏摘要）、`projects.test.ts`（worktree 和空位、锁住的地，一座岛最多 6 块）、`catalog.test.ts`（书架、帧、重画的命令）。
 - Playwright：`farm.spec.ts`（画布没有错误、农场和工作台互相链）、`farm-canvas.spec.ts`（村子跑一阵不出错、指针跟着农具说能不能用、帮工走进来、干活、去书屋，夜里点灯）、`farm-hud.spec.ts`（等级和农具、数字键挑农具、每个面板打开和 Esc 关、点空地打开播种袋、「草稿」写进备选）、`farm-chat.spec.ts`（田头说话、管家回答、频道菜单、点帮工的地打开它的工单）、`farm-phone.spec.ts`（手机打开、小游戏接十字键、来电响铃、接听去那块地并记下）、`farm-title.spec.ts`（首页）、`projects.spec.ts`（地图和岛）、`catalog.spec.ts`。
 - 服务端：`project/stack.test.ts`（每种标记文件、锁文件选包管理器）、`issue/recorded.test.ts`（目录里每个模板都填得满、按栈填命令）、`issue/issue.test.ts`（排着队的待办从播种袋开工）、`project/project.test.ts`（项目的上限在农场的上限以内）。
-- 改了画面，照 `acceptance/page.md` 在真的页面上截图看一遍。
+- 改了画面，照 `vv-acceptance/references/page.md` 在真的页面上截图看一遍。
