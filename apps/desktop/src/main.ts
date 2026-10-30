@@ -16,8 +16,9 @@ import { followSavedLocale } from "./locale";
 import { setAppMenu } from "./menu";
 import { appPaths, farmHome } from "./paths";
 import { probe } from "./probe";
-import { loginShellPath, serverKeeper } from "./server";
+import { loginShellPath, type ServerKeeper, serverKeeper } from "./server";
 import { menuBar } from "./tray";
+import { defaultFeed, type Updater, updater } from "./update";
 import { mainWindow } from "./window";
 
 followSavedLocale(farmHome());
@@ -29,9 +30,34 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.setName("VibeValley");
   const paths = appPaths();
-  let url: () => string | undefined = () => undefined;
-  const window = mainWindow({ web: paths.web, server: () => url() });
-  const page = serveHost({ window, tray: menuBar(paths.trayIcon, () => window.show()) });
+  let server: ServerKeeper | undefined;
+  let updates: Updater | undefined;
+  // The server gets its time to save before the app goes; then is the moment an update is put in place.
+  let stopped = false;
+  const quitAfterSave = async (then: () => void) => {
+    await server?.stop();
+    stopped = true;
+    then();
+    app.quit();
+  };
+  app.on("before-quit", (event) => {
+    if (stopped) return;
+    event.preventDefault();
+    void quitAfterSave(() => updates?.installOnQuit());
+  });
+
+  const window = mainWindow({ web: paths.web, server: () => server?.url() });
+  const page = serveHost({
+    window,
+    tray: menuBar(paths.trayIcon, () => window.show()),
+    updates: {
+      state: () => updates?.state() ?? { _tag: "idle", version: app.getVersion() },
+      check: async () => updates?.check(),
+      install: async () => {
+        if (updates) await quitAfterSave(() => updates?.installNow());
+      },
+    },
+  });
   app.on("second-instance", () => window.show());
 
   void app.whenReady().then(async () => {
@@ -41,20 +67,10 @@ if (!app.requestSingleInstanceLock()) {
     // The window comes at once, on the bar: reading the login shell's PATH and starting the server take seconds.
     window.opening();
     const path = await loginShellPath(process.env);
-    const server = serverKeeper(paths, path ? { ...process.env, PATH: path } : process.env);
-    url = server.url;
-    // The server gets its time to save before the app goes.
-    let stopped = false;
-    app.on("before-quit", (event) => {
-      if (stopped) return;
-      event.preventDefault();
-      void server.stop().finally(() => {
-        stopped = true;
-        app.quit();
-      });
-    });
+    const keeper = serverKeeper(paths, path ? { ...process.env, PATH: path } : process.env);
+    server = keeper;
     try {
-      await server.start();
+      await keeper.start();
     } catch (e) {
       // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
       const open = window.current();
@@ -71,7 +87,7 @@ if (!app.requestSingleInstanceLock()) {
     const island = startIsland({
       binary: process.platform === "darwin" ? paths.island : undefined,
       font: paths.font,
-      server: () => server.url() ?? "",
+      server: () => keeper.url() ?? "",
       open: (issue) => {
         window.open("/issues/" + encodeURIComponent(issue));
         window.show(true);
@@ -80,11 +96,25 @@ if (!app.requestSingleInstanceLock()) {
     if (probe) probe.island = island.probe;
     app.on("will-quit", island.stop);
     if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1")
-      app.on("will-quit", devMode({ web: paths.web, repo: join(app.getAppPath(), "..", ".."), server, window }));
+      app.on("will-quit", devMode({ web: paths.web, repo: join(app.getAppPath(), "..", ".."), server: keeper, window }));
+    // Only a packaged app updates itself: run from the repository, the executable is Electron's own.
+    if (app.isPackaged) {
+      updates = updater({
+        version: app.getVersion(),
+        arch: process.arch,
+        exe: app.getPath("exe"),
+        home: paths.home,
+        dir: paths.updates,
+        feed: process.env.VIBEVALLEY_UPDATE_FEED || defaultFeed,
+        heard: (state) => page.push("update", state),
+      });
+      updates.start();
+      app.on("will-quit", updates.stop);
+    }
     // Taken by another program: the call button still works.
     globalShortcut.register(desktopVoiceShortcut, () => page.push("voiceShortcut", undefined));
     app.on("activate", () => {
-      if (server.url() !== undefined) window.show();
+      if (keeper.url() !== undefined) window.show();
     });
   });
   app.on("will-quit", () => globalShortcut.unregisterAll());

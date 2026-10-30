@@ -3,9 +3,7 @@
 // edited in place: an old database is not upgraded, it is made again (AGENTS.md: no compatibility). The queries in
 // db/queries are compiled by effect-sqlc into db/generated (scripts/db-generate.ts).
 
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
@@ -14,11 +12,8 @@ import { SqlClient } from "effect/sql";
 
 import { messageOf } from "@/errors.ts";
 
+import { baselineHash, baselineSql } from "./baseline.ts";
 import { dbDir, ServerConfig } from "./config.ts";
-
-const baseline = resolve(import.meta.dirname, "../../db/migrations/0001_schema.up.sql");
-const baselineSql = () => readFileSync(baseline, "utf8");
-export const baselineHash = () => createHash("sha256").update(baselineSql()).digest("hex").slice(0, 16);
 
 /** A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>: it is not
  * upgraded (AGENTS.md: no compatibility) and never deleted. The baseline it was made from is in <folder>.schema; a

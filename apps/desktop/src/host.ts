@@ -4,14 +4,20 @@ import { nativeTheme, Notification, shell } from "electron";
 
 import { serve } from "@vibevalley/bridge";
 import { currentLocale, setLocale } from "@vibevalley/i18n";
-import { desktopBridge, type TraySummary } from "@vibevalley/protocol/host";
+import { desktopBridge, type TraySummary, type UpdateState } from "@vibevalley/protocol/host";
 
 import { mainLink } from "./bridge";
 import { setAppMenu } from "./menu";
 import { probe } from "./probe";
 import type { MainWindow } from "./window";
 
-export function serveHost(o: { readonly window: MainWindow; readonly tray: (summary: TraySummary) => void }) {
+export interface HostUpdates {
+  readonly state: () => UpdateState;
+  readonly check: () => Promise<void>;
+  readonly install: () => Promise<void>;
+}
+
+export function serveHost(o: { readonly window: MainWindow; readonly tray: (summary: TraySummary) => void; readonly updates: HostUpdates }) {
   return serve(
     desktopBridge,
     mainLink(() => o.window.current()?.webContents),
@@ -36,6 +42,9 @@ export function serveHost(o: { readonly window: MainWindow; readonly tray: (summ
         if (probe) probe.tray = summary;
         o.tray(summary);
       },
+      updateState: () => o.updates.state(),
+      updateCheck: () => o.updates.check(),
+      updateInstall: () => o.updates.install(),
     },
   );
 }

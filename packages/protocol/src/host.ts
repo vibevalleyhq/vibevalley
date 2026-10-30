@@ -58,6 +58,38 @@ export type Rtc = (grant: AgoraGrant, events: RtcEvents) => Promise<RtcLine>;
  * is scaled by a whole number: the page frames the farm by it, and the desktop keeps its window at a size the farm fills. */
 export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, down: 0.08 } } as const;
 
+/** Why an update cannot put itself in place: the app runs from its disk image, or where macOS moved it to run it
+ * (App Translocation), or from a folder it cannot write; or the release has no build for this Mac. */
+export const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
+export type UpdateManual = (typeof UpdateManualValues)[number];
+
+/** The desktop's own updates (apps/desktop src/update.ts). version is the running one's; next the release's. newFarm: the
+ * release's database is made from another baseline, so the farm starts over (the old one is kept aside), and it is put
+ * in place only when the owner says. manual: it cannot put itself in place; page is where to download it by hand. */
+export type UpdateState =
+  | { readonly _tag: "idle"; readonly version: string }
+  | { readonly _tag: "checking"; readonly version: string }
+  | { readonly _tag: "downloading"; readonly version: string; readonly next: string; readonly percent: number }
+  | { readonly _tag: "ready"; readonly version: string; readonly next: string; readonly notes: readonly string[]; readonly newFarm: boolean }
+  | { readonly _tag: "manual"; readonly version: string; readonly next: string; readonly why: UpdateManual; readonly page: string }
+  | { readonly _tag: "failed"; readonly version: string; readonly why: string };
+
+export const UpdateState: Schema.Codec<UpdateState> = Schema.Union([
+  Schema.TaggedStruct("idle", { version: Schema.String }),
+  Schema.TaggedStruct("checking", { version: Schema.String }),
+  Schema.TaggedStruct("downloading", { version: Schema.String, next: Schema.String, percent: Schema.Finite }),
+  Schema.TaggedStruct("ready", { version: Schema.String, next: Schema.String, notes: Schema.Array(Schema.String), newFarm: Schema.Boolean }),
+  Schema.TaggedStruct("manual", { version: Schema.String, next: Schema.String, why: Schema.Literals(UpdateManualValues), page: Schema.String }),
+  Schema.TaggedStruct("failed", { version: Schema.String, why: Schema.String }),
+]);
+
+/** The host updating itself: watch hears the state now and each change after; install restarts into the new version. */
+export interface Updates {
+  readonly watch: (fn: (state: UpdateState) => void) => () => void;
+  readonly check: () => Promise<void>;
+  readonly install: () => Promise<void>;
+}
+
 export interface Host {
   /** For logs and the about box only. */
   readonly name: "desktop" | "mobile" | "browser";
@@ -81,6 +113,8 @@ export interface Host {
   /** Told the theme the page chose, so the host's own parts (menus, scroll bars, the title strip) follow; absent where the
    * host draws nothing of its own. */
   readonly theme?: (theme: ThemeChoice) => void;
+  /** The app's own updates; absent where the host is not updated from here (a browser tab, the phone's store app). */
+  readonly update?: Updates;
 }
 
 /** Light, dark, or as the system is. */
@@ -115,7 +149,11 @@ export const desktopBridge = {
   locale: call({ input: LocaleSchema, output: Schema.Void }),
   reveal: call({ input: Schema.String.check(Schema.isPattern(/^\//u)), output: Schema.Void }),
   theme: call({ input: ThemeChoice, output: Schema.Void }),
+  updateState: call({ input: Schema.Void, output: UpdateState }),
+  updateCheck: call({ input: Schema.Void, output: Schema.Void }),
+  updateInstall: call({ input: Schema.Void, output: Schema.Void }),
   voiceShortcut: push(Schema.Void),
+  update: push(UpdateState),
 };
 
 const Line = { line: Schema.Finite };

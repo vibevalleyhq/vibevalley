@@ -20,6 +20,14 @@ const host: Host = {
   theme: (theme) => told(main.call.theme(theme)),
   ...(process.platform === "darwin" ? { titleBar } : {}),
   voiceShortcut: { accelerator: desktopVoiceShortcut, on: (fn) => main.on("voiceShortcut", fn) },
+  update: {
+    watch: (fn) => {
+      told(main.call.updateState().then(fn));
+      return main.on("update", fn);
+    },
+    check: () => main.call.updateCheck(),
+    install: () => main.call.updateInstall(),
+  },
 };
 
 contextBridge.exposeInMainWorld(hostKey, host);
