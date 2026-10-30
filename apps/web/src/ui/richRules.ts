@@ -30,7 +30,7 @@ export const remarkIssueRefs = () => (tree: MdNode) => {
   };
   const walk = (node: MdNode) => {
     if (!node.children || node.type === "link" || node.type === "linkReference") return;
-    node.children = node.children.flatMap((c) => (c.type === "text" && c.value?.includes("#") ? split(c.value) : (walk(c), [c])));
+    node.children = node.children.flatMap((c) => (c.type === "text" && c.value?.includes("#") === true ? split(c.value) : (walk(c), [c])));
   };
   walk(tree);
 };

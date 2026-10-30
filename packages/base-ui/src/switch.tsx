@@ -30,13 +30,13 @@ function Root(props: SwitchRootProps) {
         role="switch"
         {...rest}
         aria-checked={checked() ? "true" : "false"}
-        aria-readonly={props.readOnly ? "true" : undefined}
+        aria-readonly={props.readOnly === true ? "true" : undefined}
         data-checked={flag(checked())}
         data-unchecked={flag(!checked())}
         data-disabled={flag(disabled())}
         onClick={(e) => {
           call(props.onClick, e);
-          if (!e.defaultPrevented && !props.readOnly) setChecked(!checked());
+          if (!e.defaultPrevented && props.readOnly !== true) setChecked(!checked());
         }}
       >
         {props.children}
@@ -47,7 +47,6 @@ function Root(props: SwitchRootProps) {
 
 function Thumb(props: SpanProps) {
   const c = useContext(Context);
-  if (!c) throw new Error("Switch.Thumb belongs inside Switch.Root");
   return <span aria-hidden="true" {...props} data-checked={flag(c.checked())} data-unchecked={flag(!c.checked())} data-disabled={flag(c.disabled())} />;
 }
 

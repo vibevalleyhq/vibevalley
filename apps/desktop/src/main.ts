@@ -156,7 +156,7 @@ ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
   }
   if (process.platform === "darwin") tray.setTitle(summary.title);
   const show = () => {
-    if (window?.isMinimized()) window.restore();
+    if (window?.isMinimized() === true) window.restore();
     window?.show();
     window?.focus();
   };
@@ -179,7 +179,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (window?.isMinimized()) window.restore();
+    if (window?.isMinimized() === true) window.restore();
     window?.focus();
   });
   app.setName("VibeValley");

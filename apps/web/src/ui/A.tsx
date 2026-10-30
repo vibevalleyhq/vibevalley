@@ -13,7 +13,7 @@ export function A(props: { href: string; replace?: boolean } & Omit<JSX.AnchorHT
       onClick={(e) => {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        router.navigate(props.href, props.replace ? { replace: true } : undefined);
+        router.navigate(props.href, props.replace === true ? { replace: true } : undefined);
       }}
     />
   );

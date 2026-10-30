@@ -56,12 +56,12 @@ export function roundsOf(steps: SessionEvent[]): Round[] {
   let current: SessionEvent[] = [];
   for (const s of steps) {
     if (s.type === "user/message" && s.under === undefined) {
-      if (asked || current.length) rounds.push(omitUndefined({ asked, steps: current }));
+      if (asked || current.length > 0) rounds.push(omitUndefined({ asked, steps: current }));
       asked = s;
       current = [];
     } else current.push(s);
   }
-  if (asked || current.length) rounds.push(omitUndefined({ asked, steps: current }));
+  if (asked || current.length > 0) rounds.push(omitUndefined({ asked, steps: current }));
   return rounds;
 }
 
@@ -172,7 +172,7 @@ export function readableInput(step: SessionEvent) {
   if (!raw) return "";
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
+    if (typeof parsed === "object" && parsed !== null) {
       const command = (parsed as { command?: unknown }).command;
       if (!Array.isArray(parsed) && typeof command === "string") return `$ ${command}`;
       return JSON.stringify(parsed, null, 2);

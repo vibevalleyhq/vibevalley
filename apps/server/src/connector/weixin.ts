@@ -6,6 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
+import { numberIn } from "@/base/number.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
@@ -124,7 +125,7 @@ export interface WeixinApi {
 export const failed = (ret?: number, errcode?: number) => (ret !== undefined && ret !== 0 ? ret : errcode !== undefined && errcode !== 0 ? errcode : undefined);
 
 const clientVersion = (v: string) => {
-  const [a = 0, b = 0, c = 0] = v.split(".").map((x) => Number.parseInt(x, 10) || 0);
+  const [a = 0, b = 0, c = 0] = v.split(".").map((x) => numberIn(x));
   return ((a & 0xff) << 16) | ((b & 0xff) << 8) | (c & 0xff);
 };
 
@@ -327,7 +328,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
           const code = failed(updates.ret, updates.errcode);
           if (code === staleToken) return yield* new AppFailed({ kind: "stale", message: t("server.connector.staleLogin") });
           if (code !== undefined) return yield* failedWith("getupdates: " + (updates.errmsg || String(code)));
-          if (updates.longpolling_timeout_ms && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
+          if (updates.longpolling_timeout_ms != null && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
           // Its own messages echo back; groups are not for the farm.
           const messages = (updates.msgs ?? []).flatMap((m) =>
             m.message_type !== 2 && !m.group_id && m.from_user_id

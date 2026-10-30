@@ -72,7 +72,7 @@ export function wrapLines(text: string, style: TextStyle, maxWidth: number, maxL
 }
 
 /** What a spec looks like, to tell when it changed. */
-const keyOf = (spec: CardSpec) => JSON.stringify(spec, (k, v: unknown) => (k === "icon" && v && typeof v === "object" && "uid" in v ? v.uid : v));
+const keyOf = (spec: CardSpec) => JSON.stringify(spec, (k, v: unknown) => (k === "icon" && typeof v === "object" && v !== null && "uid" in v ? v.uid : v));
 
 export function card(theme: Theme): Card {
   const node = new Container();
@@ -121,7 +121,8 @@ export function card(theme: Theme): Card {
           continue;
         }
         const style = new TextStyle({ fontFamily: theme.font, fontSize: piece.size ?? theme.size, fill: piece.color ?? spec.ink ?? theme.ink });
-        const lines = spec.maxWidth && pieces.length === 1 ? wrapLines(piece.text, style, spec.maxWidth, spec.maxLines) : [piece.text];
+        const lines =
+          spec.maxWidth != null && spec.maxWidth !== 0 && pieces.length === 1 ? wrapLines(piece.text, style, spec.maxWidth, spec.maxLines) : [piece.text];
         const block = new Container();
         lines.forEach((line, i) => {
           const t = new Text({ text: line, style, roundPixels: true });

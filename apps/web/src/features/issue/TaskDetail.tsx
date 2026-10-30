@@ -33,7 +33,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
   const settled = () => Math.round(g().settled ?? 0);
   const byId = () => new Map(g().tasks.map((t) => [t.id, t]));
   // The order they can run in; before the server has laid them out, the order they were written in.
-  const layers = () => (g().layers.length ? g().layers : g().tasks.map((t) => [t.id]));
+  const layers = () => (g().layers.length > 0 ? g().layers : g().tasks.map((t) => [t.id]));
   const actions = () => g().actions;
   const word = (a: GraphAction) => g().actionText[a] ?? "";
   const act = async (a: GraphAction) => {
@@ -119,7 +119,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                         return [
                           step.stateText || step.state,
                           ...(step.agent ? [nameOf()(step.agent)] : []),
-                          ...(step.state === "waiting" && waitsOn.length
+                          ...(step.state === "waiting" && waitsOn.length > 0
                             ? [t("web.issue.task.waitsOn", { steps: waitsOn.join(t("web.issue.task.stepSeparator")) })]
                             : []),
                         ].join(" · ");

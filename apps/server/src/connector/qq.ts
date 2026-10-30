@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
+import { numberIn } from "@/base/number.ts";
 
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
@@ -98,7 +99,7 @@ export class QQClient implements QQApi {
         Effect.mapError((e) => (e instanceof AppFailed ? e : failedWith(t("server.connector.qq.auth", { why: e.message })))),
       );
       if (!body.access_token) return yield* failedWith(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
-      const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(body.expires_in ?? "") || 7200;
+      const seconds = typeof body.expires_in === "number" ? body.expires_in : numberIn(body.expires_in, 7200);
       this.tokens.set(key, { token: body.access_token, until: now + (seconds - 60) * 1000 });
       return body.access_token;
     });

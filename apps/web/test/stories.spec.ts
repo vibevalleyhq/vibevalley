@@ -122,7 +122,7 @@ for (const title of titles)
     for (const key of keys) {
       await page.goto(`/?${new URLSearchParams({ s: key, theme: "both", w: "full" })}`);
       await expect(page.getByTestId("story-frame").first()).toBeVisible();
-      if (await page.getByTestId("story-error").count()) found.push(`${key}: ${await page.getByTestId("story-error").first().innerText()}`);
+      if ((await page.getByTestId("story-error").count()) !== 0) found.push(`${key}: ${await page.getByTestId("story-error").first().innerText()}`);
       // Measured once things have moved in; a pulse that never ends is not waited for.
       await page.evaluate(() =>
         Promise.all(

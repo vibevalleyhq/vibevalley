@@ -88,7 +88,7 @@ export class Fold {
 
   /** A data event's JSON. */
   chunk(chunk: unknown): AssistantMessageEvent[] {
-    if (!chunk || typeof chunk !== "object") return [];
+    if (typeof chunk !== "object" || chunk === null) return [];
     const c = chunk as { id?: unknown; model?: unknown; usage?: RawUsage; choices?: unknown };
     if (typeof c.id === "string" && !this.responseId) this.responseId = c.id;
     if (typeof c.model === "string" && c.model.length > 0 && c.model !== this.model.id) this.responseModel ??= c.model;
@@ -250,17 +250,17 @@ interface RawUsage {
 
 /** input is the prompt not read from the cache; output already counts reasoning. */
 function usageOf(raw: RawUsage, model: Model): Usage {
-  const prompt = raw.prompt_tokens || 0;
+  const prompt = raw.prompt_tokens ?? 0;
   const cacheRead = raw.prompt_tokens_details?.cached_tokens ?? raw.prompt_cache_hit_tokens ?? raw.cached_tokens ?? 0;
-  const cacheWrite = raw.prompt_tokens_details?.cache_write_tokens || 0;
+  const cacheWrite = raw.prompt_tokens_details?.cache_write_tokens ?? 0;
   const input = Math.max(0, prompt - cacheRead - cacheWrite);
-  const output = raw.completion_tokens || 0;
+  const output = raw.completion_tokens ?? 0;
   const usage = {
     input,
     output,
     cacheRead,
     cacheWrite,
-    reasoning: raw.completion_tokens_details?.reasoning_tokens || 0,
+    reasoning: raw.completion_tokens_details?.reasoning_tokens ?? 0,
     totalTokens: input + output + cacheRead + cacheWrite,
   };
   return { ...usage, cost: costOf(model, usage) };

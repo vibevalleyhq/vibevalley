@@ -18,7 +18,7 @@ export function FarmScreen({ farm, forgotten }: { farm: Farm; forgotten: () => v
   const view = useRef<WebView<object>>(null);
   const send = (m: FromNative) => view.current?.injectJavaScript(`window.${fromNativeKey}?.(${JSON.stringify(m)}); true;`);
   const bridge = useRef<ReturnType<typeof nativeHost> | null>(null);
-  if (!bridge.current) bridge.current = nativeHost(send);
+  bridge.current ??= nativeHost(send);
   useEffect(() => () => bridge.current?.close(), []);
 
   const onMessage = (e: WebViewMessageEvent) => {

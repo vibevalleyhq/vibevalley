@@ -69,7 +69,9 @@ export function Section(props: { title: string; count?: number; aside?: JSX.Elem
 
 function recalledText(recalled: number, recalledAt: number | undefined, now: number) {
   const n = Math.round(recalled);
-  return recalledAt ? t("web.memory.memory.recalledLast", { n, last: ago(recalledAt, now) }) : t("web.memory.memory.recalled", { n });
+  return recalledAt != null && recalledAt !== 0
+    ? t("web.memory.memory.recalledLast", { n, last: ago(recalledAt, now) })
+    : t("web.memory.memory.recalled", { n });
 }
 
 function Pill(props: { label: string; on: boolean; onClick: () => void }) {
@@ -405,7 +407,7 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
         data-testid="note-input"
         aria-label={t("web.memory.memory.note")}
         rows={2}
-        placeholder={props.withProject ? t("web.memory.memory.noteProject") : t("web.memory.memory.noteOrchestrator")}
+        placeholder={props.withProject === true ? t("web.memory.memory.noteProject") : t("web.memory.memory.noteOrchestrator")}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
@@ -429,7 +431,9 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
       </div>
       <Show
         when={error()}
-        fallback={<span class="text-xs text-faint">{props.withProject ? t("web.memory.memory.noteHintProject") : t("web.memory.memory.noteHint")}</span>}
+        fallback={
+          <span class="text-xs text-faint">{props.withProject === true ? t("web.memory.memory.noteHintProject") : t("web.memory.memory.noteHint")}</span>
+        }
       >
         <span class="text-xs text-berry">{error()}</span>
       </Show>
@@ -439,9 +443,14 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
 
 export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | undefined; meta: string[]; faded?: boolean; warning?: string | undefined }) {
   return (
-    <div data-testid="memory" data-key={props.memory.id} class={[item, "group flex items-start gap-2 px-3 py-2"]} data-faded={props.faded ? "" : undefined}>
+    <div
+      data-testid="memory"
+      data-key={props.memory.id}
+      class={[item, "group flex items-start gap-2 px-3 py-2"]}
+      data-faded={props.faded === true ? "" : undefined}
+    >
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span class={["text-sm", { "text-muted": !!props.faded }]}>{props.memory.text}</span>
+        <span class={["text-sm", { "text-muted": !(props.faded !== true) }]}>{props.memory.text}</span>
         <span class="flex flex-wrap gap-x-2 text-xs text-muted">
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>

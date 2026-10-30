@@ -34,10 +34,10 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
       data-place={props.place}
       title={props.label}
       aria-label={props.label}
-      aria-current={props.current ? "page" : undefined}
-      data-badge={props.badge || undefined}
+      aria-current={props.current === true ? "page" : undefined}
+      data-badge={props.badge !== undefined && props.badge > 0 ? props.badge : undefined}
       class="relative flex h-11 w-11 items-center justify-center rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
-      style={props.current ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
+      style={props.current === true ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
     >
       {props.children}
       {/* How many wait on the owner there: the place to go next, seen from anywhere. */}

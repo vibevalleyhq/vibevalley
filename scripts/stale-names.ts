@@ -301,7 +301,7 @@ for (const source of [...files, ...catalogs]) {
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
-      if (rule.except?.test(file)) continue;
+      if (rule.except?.test(file) === true) continue;
       if (wordTable.test(file) && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }

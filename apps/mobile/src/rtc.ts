@@ -82,7 +82,7 @@ export function nativeRtc() {
             let theirs = 0;
             // uid 0 is this phone.
             for (const s of speakers) {
-              if (!s.uid) mine = level(s.volume);
+              if (s.uid == null || s.uid === 0) mine = level(s.volume);
               else theirs = level(s.volume);
             }
             events.levels(mine, theirs);

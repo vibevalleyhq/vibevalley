@@ -88,8 +88,8 @@ export const flatLight = (sky: Sky): Rgb => [
 ];
 
 function normal(v: Vec3): Vec3 {
-  const len = Math.hypot(v[0], v[1], v[2]) || 1;
-  return [v[0] / len, v[1] / len, v[2] / len];
+  const len = Math.hypot(v[0], v[1], v[2]);
+  return len === 0 ? v : [v[0] / len, v[1] / len, v[2] / len];
 }
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;

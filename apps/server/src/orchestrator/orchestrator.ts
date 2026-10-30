@@ -194,7 +194,7 @@ export const make = (options: OrchestratorOptions = {}) =>
                 quiet: (r) => r.quiet ?? false,
                 say: (r, text, runId) => chat.orchestratorSays(r.channel, text, runId, id),
                 // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
-                state: (s, r) => core.setOrchestrator(id, s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.channel : undefined),
+                state: (s, r) => core.setOrchestrator(id, s, r && (s === "thinking" || s === "speaking") && r.quiet !== true ? r.channel : undefined),
                 fresh: () => {
                   me.shown = "";
                 },
@@ -277,7 +277,7 @@ export const make = (options: OrchestratorOptions = {}) =>
           ...(i.agent ? { agent: i.agent } : {}),
           source: i.source,
           ...(i.issue ? { issue: i.issue } : {}),
-          ...(i.owner ? { owner: true } : {}),
+          ...(i.owner === true ? { owner: true } : {}),
         };
         const taken = yield* me.host.submit(
           (busy, memoryNews) =>
@@ -358,7 +358,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         let line = lineWords.issue(w.issue.title, w.issue.description, again, channel.name);
         const s = w.cron;
         if (s) {
-          const missed = w.by.missed ? lineWords.missed : "";
+          const missed = w.by.missed === true ? lineWords.missed : "";
           line = lineWords.cron(s.name, missed, s.text, channel.name, s.id);
         }
         // The issue's assignee is the orchestrator it is for; a cron that names none is its channel's orchestrator's.

@@ -132,7 +132,7 @@ function Item(props: MenuItemProps) {
       role="menuitem"
       tabindex={-1}
       {...rest}
-      aria-disabled={props.disabled ? "true" : undefined}
+      aria-disabled={props.disabled === true ? "true" : undefined}
       data-disabled={flag(props.disabled)}
       data-highlighted={flag(highlighted())}
       data-label={props.label}
@@ -146,7 +146,7 @@ function Item(props: MenuItemProps) {
       }}
       onPointerMove={(e) => {
         call(props.onPointerMove, e);
-        if (!props.disabled && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
+        if (props.disabled !== true && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
       }}
       onPointerLeave={(e) => {
         call(props.onPointerLeave, e);
@@ -159,7 +159,7 @@ function Item(props: MenuItemProps) {
         e.currentTarget.click();
       }}
       onClick={(e) => {
-        if (props.disabled) return;
+        if (props.disabled === true) return;
         call(props.onClick, e);
         if (!e.defaultPrevented && props.closeOnClick !== false) c.setOpen(false, "item");
       }}

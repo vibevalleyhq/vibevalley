@@ -221,7 +221,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
           <span class="block text-[13px]">
             {worn() && title()
               ? tierTitle(worn()!, Math.round(title()!.tier))
-              : earned().length
+              : earned().length > 0
                 ? t("web.farm.achievements.pick")
                 : t("web.farm.achievements.earnFirst")}
           </span>

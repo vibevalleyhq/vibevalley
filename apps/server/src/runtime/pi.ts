@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
 import { Schema } from "effect";
 import { jsonOf } from "@/base/json.ts";
+import { numberIn } from "@/base/number.ts";
 
 /** Past this a read of pi's balance counts as unknown. */
 const readTimeoutMs = 10_000;
@@ -118,7 +119,7 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
     available: b.is_available ?? true,
     balances: (b.balance_infos ?? []).map((x) => ({
       currency: x.currency,
-      amount: Number.parseFloat(x.total_balance) || 0,
+      amount: numberIn(x.total_balance),
     })),
   };
 }

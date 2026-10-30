@@ -23,9 +23,9 @@ function parseLines(text: string): BrainMessage[] {
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     try {
-      const m = JSON.parse(line) as BrainMessage;
+      const m: unknown = JSON.parse(line);
       // A line cut off by a crash: the rest still reads.
-      if (m && typeof m === "object" && typeof m.role === "string") out.push(m);
+      if (typeof m === "object" && m !== null && "role" in m && typeof m.role === "string") out.push(m as BrainMessage);
     } catch {
       continue;
     }

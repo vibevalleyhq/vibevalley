@@ -10,7 +10,7 @@ function runTriggerText(trigger: RunTrigger) {
     case "task":
       return t("web.issue.trigger.task");
     case "cron":
-      return trigger.missed ? t("web.issue.trigger.missed") : t("web.issue.trigger.cron");
+      return trigger.missed === true ? t("web.issue.trigger.missed") : t("web.issue.trigger.cron");
     case "refine":
       return t("web.issue.trigger.refine");
     case "runtime":
@@ -24,5 +24,5 @@ export const runText = (r: Run, now: number, took: (ms: number) => string) =>
     r.outcome ? t(`shared.outcome.${r.outcome}`) : t("web.issue.run.working"),
     took((r.endedAt ?? now) - r.startedAt),
     ...(r.spent?.cny !== undefined ? [`¥${r.spent.cny.toFixed(2)}`] : []),
-    ...(r.heard.length ? [t("web.issue.run.heard", { n: r.heard.length })] : []),
+    ...(r.heard.length > 0 ? [t("web.issue.run.heard", { n: r.heard.length })] : []),
   ].join(" · ");

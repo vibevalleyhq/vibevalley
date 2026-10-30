@@ -90,7 +90,7 @@ const picture = (o: Obstacle, t: number): readonly string[] => (o.kind === "bird
 const five = (n: number) => String(n).padStart(5, "0");
 
 export function DinoGame(props: { big?: boolean }) {
-  const zoom = () => (props.big ? 3 : 2);
+  const zoom = () => (props.big === true ? 3 : 2);
   const [d, setD] = createSignal<Dino>();
   const [top, setTop] = best.use();
   let canvas: HTMLCanvasElement | undefined;
@@ -169,8 +169,10 @@ export function DinoGame(props: { big?: boolean }) {
         <Show when={!playing()}>
           <div class="absolute inset-0 grid place-items-center text-center">
             <span class="px-2" style={{ background: lcd.paper }}>
-              {d()?.over ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
-              <span class="phone-blink">{t("web.farm.phone.pressA", { what: d()?.over ? t("web.farm.phone.again") : t("web.farm.phone.start") })}</span>
+              {d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
+              <span class="phone-blink">
+                {t("web.farm.phone.pressA", { what: d()?.over === true ? t("web.farm.phone.again") : t("web.farm.phone.start") })}
+              </span>
             </span>
           </div>
         </Show>

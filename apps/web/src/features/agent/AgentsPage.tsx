@@ -118,14 +118,20 @@ function AgentsPage() {
 
 function CardShell(props: { agent: Agent; to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
   return (
-    <div data-testid="agent-card" data-key={props.agent.id} data-role={props.agent.role} data-muted={props.muted ? "" : undefined} class="group relative">
+    <div
+      data-testid="agent-card"
+      data-key={props.agent.id}
+      data-role={props.agent.role}
+      data-muted={props.muted === true ? "" : undefined}
+      class="group relative"
+    >
       <A
         href={props.to}
         aria-label={props.label}
         class={[
           "flex h-full flex-col rounded-lg border border-line bg-page p-4 transition-colors hover:border-ink/20 hover:bg-page focus-visible:outline-2 focus-visible:outline-focus",
           // Off, it says so by its dashed edge and greyed face, not by fading its words below what can be read.
-          { "border-dashed": !!props.muted },
+          { "border-dashed": !(props.muted !== true) },
         ]}
       >
         {props.children}

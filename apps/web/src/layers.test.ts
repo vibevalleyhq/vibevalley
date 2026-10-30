@@ -33,7 +33,7 @@ function cycleIn(edges: Map<string, Set<string>>): string[] {
     path.push(f);
     for (const g of edges.get(f) ?? []) {
       const found = visit(g);
-      if (found.length) return found;
+      if (found.length > 0) return found;
     }
     path.pop();
     done.add(f);
@@ -41,7 +41,7 @@ function cycleIn(edges: Map<string, Set<string>>): string[] {
   };
   for (const f of edges.keys()) {
     const found = visit(f);
-    if (found.length) return found;
+    if (found.length > 0) return found;
   }
   return [];
 }

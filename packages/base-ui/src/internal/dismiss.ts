@@ -15,7 +15,7 @@ const layers: Layer[] = [];
 export function createDismiss(o: { open: () => boolean; elements: () => readonly (Element | undefined)[]; dismiss: (reason: DismissReason) => void }) {
   createEffect(o.open, (on) => {
     if (!on) return;
-    const layer: Layer = { inside: (target) => o.elements().some((el) => el?.contains(target)) };
+    const layer: Layer = { inside: (target) => o.elements().some((el) => el?.contains(target) === true) };
     layers.push(layer);
     const top = () => layers.at(-1) === layer;
     const press = (e: PointerEvent) => {

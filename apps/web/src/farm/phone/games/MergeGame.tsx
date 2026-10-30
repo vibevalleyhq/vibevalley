@@ -189,7 +189,14 @@ const cellsOf = (rows: readonly string[]) => rows.flatMap((row, y) => [...row].f
 function Crop(props: { stage: number; size: number; faint?: boolean }) {
   const cells = () => cellsOf(pictures[Math.min(props.stage, mergeGoal) - 1]!);
   return (
-    <svg width={props.size} height={props.size} viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true" style={{ opacity: props.faint ? 0.25 : 1 }}>
+    <svg
+      width={props.size}
+      height={props.size}
+      viewBox="0 0 12 12"
+      shape-rendering="crispEdges"
+      aria-hidden="true"
+      style={{ opacity: props.faint === true ? 0.25 : 1 }}
+    >
       <For each={cells()}>{(c) => <rect x={c.x} y={c.y} width={1} height={1} fill={c.fill} />}</For>
     </svg>
   );
@@ -299,15 +306,15 @@ export function MergeGame() {
         <span class="tabular-nums">
           {t("web.farm.phone.blocks.score")} {score()}
         </span>
-        <span class="ml-auto">{reached() ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
+        <span class="ml-auto">{reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
       </div>
       <div
         role="img"
         data-testid="merge-board"
-        data-count={g() ? board().filter((c) => c).length : undefined}
+        data-count={g() ? board().filter((c) => c !== 0).length : undefined}
         aria-label={
           g()
-            ? t("web.farm.phone.merge.field", { n: board().filter((c) => c).length, top: mergeStageName(Math.max(reached(), 1)) })
+            ? t("web.farm.phone.merge.field", { n: board().filter((c) => c !== 0).length, top: mergeStageName(Math.max(reached(), 1)) })
             : t("web.farm.phone.game.merge")
         }
         class="relative grid shrink-0 touch-none"
@@ -327,7 +334,10 @@ export function MergeGame() {
           {(stage, i) => (
             <div
               class="flex flex-col items-center justify-center"
-              style={{ background: stage() ? lcd.paper : lcd.light, "box-shadow": g()?.grown.includes(i) ? `inset 0 0 0 2px ${lcd.ink}` : undefined }}
+              style={{
+                background: stage() !== 0 ? lcd.paper : lcd.light,
+                "box-shadow": g()?.grown.includes(i) === true ? `inset 0 0 0 2px ${lcd.ink}` : undefined,
+              }}
             >
               <Show when={stage() > 0}>
                 <Crop stage={stage()} size={36} />

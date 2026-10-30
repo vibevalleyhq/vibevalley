@@ -283,8 +283,8 @@ export function IssueDetail(props: {
               <Markdown class="text-sm text-ink/90" text={s().description} />
             </Fold>
           </Show>
-          <Fold label={t("web.issue.detail.steps")} summary={steps().length ? stepsLine(steps()) : undefined}>
-            <Show when={steps().length ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
+          <Fold label={t("web.issue.detail.steps")} summary={steps().length > 0 ? stepsLine(steps()) : undefined}>
+            <Show when={steps().length > 0 ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
               {(st) => <WorkLog steps={st()} />}
             </Show>
           </Fold>

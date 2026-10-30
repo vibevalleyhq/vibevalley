@@ -14,7 +14,7 @@ const fromText = (s: KeySource) => t(`web.base.form.from.${s}`);
 /** In use (and from where), not set, or to be removed on save. */
 export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
   const text = () =>
-    props.removing
+    props.removing === true
       ? t("web.base.form.removeOnSave")
       : props.status.source
         ? props.status.hint
@@ -26,7 +26,7 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
       <span
         role="img"
         data-testid="key-mark"
-        data-state={props.removing ? "removing" : (props.status.source ?? "unset")}
+        data-state={props.removing === true ? "removing" : (props.status.source ?? "unset")}
         data-hint={props.status.hint}
         aria-label={text()}
         tabindex={0}
@@ -34,15 +34,15 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
       >
         {/* Said, not only drawn: a hollow dot did not read as "none saved". The key itself shows as its last four. */}
         <Show
-          when={props.removing || props.status.source}
+          when={props.removing === true || props.status.source !== undefined}
           fallback={
             <span class="text-faint" aria-hidden="true">
               {t("web.base.form.unset")}
             </span>
           }
         >
-          <Icon name={props.removing ? "cross" : "check"} size={12} class={props.removing ? "text-berry" : "text-leaf"} />
-          <Show when={!props.removing && props.status.hint}>
+          <Icon name={props.removing === true ? "cross" : "check"} size={12} class={props.removing === true ? "text-berry" : "text-leaf"} />
+          <Show when={props.removing !== true && props.status.hint}>
             <span class="font-mono text-muted" aria-hidden="true">
               {props.status.hint}
             </span>
@@ -69,7 +69,7 @@ export function KeyField(props: {
   return (
     <div class="flex flex-col gap-1.5">
       <div class="flex items-center gap-1.5">
-        <span class={props.small ? "text-xs font-medium text-muted" : "text-sm font-semibold"}>{props.label}</span>
+        <span class={props.small === true ? "text-xs font-medium text-muted" : "text-sm font-semibold"}>{props.label}</span>
         <KeyMark status={props.status} removing={props.removing} />
         <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         <span class="flex-1" />

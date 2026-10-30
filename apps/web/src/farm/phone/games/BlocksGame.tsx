@@ -18,7 +18,7 @@ const cellBig = 14;
 const shade = [lcd.dark, lcd.ink, lcd.dark, lcd.mid, lcd.ink, lcd.mid, lcd.dark];
 
 export function BlocksGame(props: { big?: boolean }) {
-  const cell = () => (props.big ? cellBig : cellSmall);
+  const cell = () => (props.big === true ? cellBig : cellSmall);
   const [g, setG] = game.use();
   const [top, setTop] = best.use();
   const [playing, setPlaying] = createSignal(false);
@@ -34,7 +34,7 @@ export function BlocksGame(props: { big?: boolean }) {
   const apply = (next: Blocks) => {
     const was = game.get();
     if (next.lines > (was?.lines ?? 0)) playSound("coin");
-    if (next.over && !was?.over) {
+    if (next.over && was?.over !== true) {
       playSound("nope");
       setPlaying(false);
       if (next.score > best.get()) setTop(next.score);
@@ -103,7 +103,7 @@ export function BlocksGame(props: { big?: boolean }) {
         ctx.fillRect(px + 3 * b, py + 3 * b, size - 1 - 6 * b, size - 1 - 6 * b);
       };
       if (!state) return;
-      state.well.forEach((c, i) => c && block(i % blocksWidth, Math.floor(i / blocksWidth), shade[c - 1]));
+      state.well.forEach((c, i) => c !== 0 && block(i % blocksWidth, Math.floor(i / blocksWidth), shade[c - 1]));
       if (!state.over) {
         for (const [x, y] of cellsOf(landingOf(state))) block(x, y, undefined);
         for (const [x, y] of cellsOf(state.piece)) block(x, y, shade[pieceKinds.indexOf(state.piece.kind)]);
@@ -115,7 +115,7 @@ export function BlocksGame(props: { big?: boolean }) {
     <div
       data-testid="blocks"
       data-state={!g() ? "ready" : g()!.over ? "over" : playing() ? "playing" : "paused"}
-      class={["flex min-h-0 flex-1 px-2 pt-2", props.big ? "gap-4" : "gap-2"]}
+      class={["flex min-h-0 flex-1 px-2 pt-2", props.big === true ? "gap-4" : "gap-2"]}
     >
       <div class="relative shrink-0 self-start" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
@@ -129,7 +129,7 @@ export function BlocksGame(props: { big?: boolean }) {
         <Show when={!g() || g()!.over || !playing()}>
           <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
             <span>
-              {g()?.over ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
+              {g()?.over === true ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
               <span class="phone-blink">
                 {t("web.farm.phone.pressA", { what: g() && !g()!.over ? t("web.farm.phone.resume") : t("web.farm.phone.start") })}

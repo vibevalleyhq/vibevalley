@@ -303,10 +303,10 @@ const spansText = (spans: readonly TextSpan[]) =>
     .map(
       (s) =>
         JSON.stringify(s.t) +
-        (s.marks.bold ? "B" : "") +
-        (s.marks.italic ? "I" : "") +
-        (s.marks.code ? "C" : "") +
-        (s.marks.strike ? "S" : "") +
+        (s.marks.bold === true ? "B" : "") +
+        (s.marks.italic === true ? "I" : "") +
+        (s.marks.code === true ? "C" : "") +
+        (s.marks.strike === true ? "S" : "") +
         (s.marks.link !== undefined ? `L(${s.marks.link})` : ""),
     )
     .join("+");

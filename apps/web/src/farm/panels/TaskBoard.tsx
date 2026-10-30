@@ -348,7 +348,7 @@ function SmallBtn(props: { label: string; onClick?: (() => void) | undefined; pr
       onClick={() => props.onClick?.()}
       class={[
         "px-2.5 py-0.5 text-[12px] enabled:cursor-pointer disabled:opacity-40",
-        props.primary ? "bg-leaf-500 text-bark-900 enabled:hover:bg-leaf-hover" : "bg-cream-50 text-bark-800 enabled:hover:bg-cream-200",
+        props.primary === true ? "bg-leaf-500 text-bark-900 enabled:hover:bg-leaf-hover" : "bg-cream-50 text-bark-800 enabled:hover:bg-cream-200",
       ]}
     >
       {props.label}
@@ -443,7 +443,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.title}
         </span>
         <Show when={props.node.acceptance}>
-          <span title={props.node.frozen.length ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
+          <span title={props.node.frozen.length > 0 ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
             <FarmTag text={t("web.farm.plot.review")} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
@@ -466,7 +466,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
       </div>
       <Show when={props.node.needs.length > 0}>
         <p class="mt-1 text-[12px] text-bark-600">
-          {waits().length
+          {waits().length > 0
             ? t("web.farm.graph.waits", { titles: list(waits().map(titleOf)) })
             : t("web.farm.graph.after", { titles: list(props.node.needs.map(titleOf)) })}
         </p>

@@ -25,7 +25,7 @@ export function createRouter(): Router {
   return {
     path,
     navigate: (to, options) => {
-      if (options?.replace) history.replaceState(null, "", to);
+      if (options?.replace === true) history.replaceState(null, "", to);
       else if (to !== here()) history.pushState(null, "", to);
       setPath(here());
     },

@@ -247,10 +247,12 @@ const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: nu
   const files = meta.attachments ?? [];
   return {
     ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
-    ...(row.edited_at ? { edited: true } : {}),
-    ...(row.deleted_at ? { deleted: true } : {}),
+    ...(row.edited_at != null && row.edited_at !== 0 ? { edited: true } : {}),
+    ...(row.deleted_at != null && row.deleted_at !== 0 ? { deleted: true } : {}),
     ...(files.length > 0 ? { attachments: files.map((f) => ({ name: f.name, path: filesAt(f.id) })) } : {}),
-    ...(meta.artifact && !row.deleted_at ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } } : {}),
+    ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
+      ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
+      : {}),
   };
 };
 
@@ -650,7 +652,7 @@ export const make = Effect.gen(function* () {
     else if (row.type === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
     // Any other thread (one opened under a message, with no session of its own) by the message it hangs under.
     if (!title && row.type === "thread" && row.root_id) title = oneLine((yield* one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
-    const last = row.last_number ? yield* one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
+    const last = row.last_number != null && row.last_number !== 0 ? yield* one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
     return toChannel(row, n ?? 0, title, last);
   });
 
@@ -820,8 +822,8 @@ export const make = Effect.gen(function* () {
       cooling,
       broken: breaker.tripped(),
       ...(meta.outcome ? { outcome: meta.outcome } : {}),
-      forTask: !!meta.forTask,
-      spoken: !!meta.spoken,
+      forTask: !(meta.forTask !== true),
+      spoken: !(meta.spoken !== true),
     });
     for (const d of deliveries) {
       yield* db(
@@ -970,7 +972,7 @@ export const make = Effect.gen(function* () {
     yield* publishMessage(written.row, answers);
     embedLater(written.row);
     yield* publishChannel(channel);
-    if (written.ownerMentionsChanged) yield* publishOwnerMentions;
+    if (written.ownerMentionsChanged === true) yield* publishOwnerMentions;
     if (written.thread) yield* publishChannel(written.thread);
     if (written.held) yield* write({ channel, from: "system", kind: "notice", text: hopLimitText(hopLimit), meta: { code: "hop_limit" } });
     for (const r of written.recipients) yield* kick(r);
@@ -1010,7 +1012,7 @@ export const make = Effect.gen(function* () {
       out.push({
         target: targetOfRow(r.type, r.root_number, null, null, r.channel_name || null),
         unread: r.unread ?? 0,
-        mentionsYou: !!r.mentions_you,
+        mentionsYou: !(r.mentions_you !== true),
         ...(latest ? { latest: latest.sender_name } : {}),
       });
     }
@@ -1371,10 +1373,10 @@ export const make = Effect.gen(function* () {
       return yield* Effect.fail(refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") })));
     const used = yield* db(qc.channelInUse({ id }));
     const why = [
-      used.crons ? t("server.channel.cronsThere", { n: used.crons }) : "",
-      used.connectors ? t("server.channel.connectorsThere") : "",
-      used.queued ? t("server.channel.queuedThere", { n: used.queued }) : "",
-      used.issue_threads ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
+      used.crons != null && used.crons !== 0 ? t("server.channel.cronsThere", { n: used.crons }) : "",
+      used.connectors != null && used.connectors !== 0 ? t("server.channel.connectorsThere") : "",
+      used.queued != null && used.queued !== 0 ? t("server.channel.queuedThere", { n: used.queued }) : "",
+      used.issue_threads != null && used.issue_threads !== 0 ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
     ].filter(Boolean);
     if (why.length > 0) return yield* Effect.fail(refused(t("server.channel.inUse", { why: list(why) })));
     const threads = model.threadsOf(id);
@@ -1567,7 +1569,7 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!helpers?.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
+            if (helpers?.present(session) !== true) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
             yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
@@ -1603,10 +1605,10 @@ export const make = Effect.gen(function* () {
           }
           // Posting on a channel right after reading a thread: confirm once.
           const last = lastRead.get(from) ?? "";
-          if (row.type !== "thread" && !opt.confirm && last && last !== target) return { kind: "confirm", target, lastRead: last };
+          if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
           // Newer messages it has not seen: show them instead of sending.
           const unseen = (yield* db(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
-          if (unseen.length > 0 && !opt.anyway) {
+          if (unseen.length > 0 && opt.anyway !== true) {
             const now = yield* Clock.currentTimeMillis;
             const shown: InboxMessage[] = [];
             for (const id of unseen.slice(0, heldShown)) {
@@ -1692,13 +1694,14 @@ export const make = Effect.gen(function* () {
           const row = model.channel(channel);
           if (!row) return yield* Effect.fail(refused(t("server.channel.channelGone")));
           const target = targetOfChannel(row);
-          const limit = opt.limit ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
+          const limit = opt.limit != null && opt.limit !== 0 ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
           const cursor = (yield* one(qr.readCursor({ participant_id: who, channel_id: channel })))?.read_number ?? 0;
-          const rows = opt.unread
-            ? yield* db(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
-            : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before || 2147483647, n: limit })))].reverse();
+          const rows =
+            opt.unread === true
+              ? yield* db(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
+              : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].reverse();
           const newest = rows.at(-1);
-          if (newest && !opt.before) yield* readThrough(who, channel, newest.number);
+          if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
           lastRead.set(who, target);
           const older = rows.length > 0 && (yield* db(qm.messagesBefore({ channel_id: channel, number: rows[0]!.number, n: 1 }))).length > 0;
           return { target, messages: rows.map((m) => inboxOf(m, target)), older };

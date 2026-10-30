@@ -112,7 +112,7 @@ export function ProjectMap() {
       <div ref={(el) => (box = el)} class="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-line" style={{ background: parchment }}>
         <Grid />
         <Show when={atlas()}>{(a) => <Clouds atlas={a()} />}</Show>
-        <Show when={atlas()?.has("map-compass") && width() >= 700 ? atlas() : undefined}>
+        <Show when={atlas()?.has("map-compass") === true && width() >= 700 ? atlas() : undefined}>
           {(a) => <Art sp={a().get("map-compass")} scale={1.5} class="pointer-events-none absolute right-4 bottom-4 opacity-80" />}
         </Show>
         <div class="absolute inset-0 overflow-y-auto p-4">

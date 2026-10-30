@@ -262,7 +262,7 @@ function Frame(props: {
   children: JSX.Element;
 }) {
   return (
-    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues ? "pt-0.5" : "mt-3 pt-1"]}>
+    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues === true ? "pt-0.5" : "mt-3 pt-1"]}>
       {props.tools}
       <Show when={props.quote}>
         {(q) => (
@@ -273,7 +273,7 @@ function Frame(props: {
       </Show>
       <div class="flex gap-3">
         <div class="relative w-10 shrink-0">
-          <Show when={!props.continues}>
+          <Show when={props.continues !== true}>
             {props.face}
             <Show when={props.dot}>
               <span class="absolute top-[26px] left-[26px]">{props.dot}</span>
@@ -281,7 +281,7 @@ function Frame(props: {
           </Show>
         </div>
         <div class="min-w-0 flex-1 pb-0.5">
-          <Show when={!props.continues}>
+          <Show when={props.continues !== true}>
             <div class="flex items-baseline gap-2">
               <span class="text-sm font-semibold">{props.name}</span>
               <span class="truncate text-xs text-muted">{props.meta}</span>
@@ -397,7 +397,7 @@ export function MessageRow(props: {
             {t("web.channel.more.jump")}
           </button>
         ) : props.m.deleted === undefined && !props.where ? (
-          <MessageTools m={props.m} inChannel={!!props.inChannel} onEdit={() => setEditing(true)} />
+          <MessageTools m={props.m} inChannel={!(props.inChannel !== true)} onEdit={() => setEditing(true)} />
         ) : undefined
       }
     >

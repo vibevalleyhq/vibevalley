@@ -24,7 +24,7 @@ const said = (r: Rig) => r.agent.history().map((m) => m.role + ":" + messageText
 const shape = (r: Rig) =>
   r.events
     .map((e) => ("message" in e && e.type.startsWith("message_") ? `${e.type}:${e.message.role}` : "toolName" in e ? `${e.type}:${e.toolName}` : e.type))
-    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update")));
+    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update") === true));
 
 describe("a run's turns", () => {
   it("goes through its events in one order", async () => {

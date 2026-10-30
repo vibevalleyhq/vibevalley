@@ -50,7 +50,7 @@ function Root(props: SelectRootProps) {
   const ctx: Ctx = {
     ...f,
     setOpen: (open, why) => {
-      if (open && props.disabled) return;
+      if (open && props.disabled === true) return;
       f.setOpen(open, why);
       if (!open && why !== "outside") f.trigger()?.focus();
     },
@@ -180,7 +180,7 @@ function Item(props: SelectItemProps) {
       tabindex={-1}
       {...rest}
       aria-selected={selected() ? "true" : "false"}
-      aria-disabled={props.disabled ? "true" : undefined}
+      aria-disabled={props.disabled === true ? "true" : undefined}
       data-value={props.value}
       data-label={props.label}
       data-selected={flag(selected())}
@@ -196,7 +196,7 @@ function Item(props: SelectItemProps) {
       }}
       onPointerMove={(e) => {
         call(props.onPointerMove, e);
-        if (!props.disabled && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
+        if (props.disabled !== true && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
       }}
       onKeyDown={(e) => {
         call(props.onKeyDown, e);
@@ -205,7 +205,7 @@ function Item(props: SelectItemProps) {
         e.currentTarget.click();
       }}
       onClick={(e) => {
-        if (props.disabled) return;
+        if (props.disabled === true) return;
         call(props.onClick, e);
         if (e.defaultPrevented) return;
         c.select(props.value);

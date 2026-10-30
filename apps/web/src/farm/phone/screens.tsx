@@ -65,7 +65,7 @@ function CallerFace(props: { call: InboxItem; size: number }) {
 
 const BigFace = (props: { children: JSX.Element; shake?: boolean }) => (
   <span
-    class={["grid size-[72px] place-items-center", { "phone-shake": !!props.shake }]}
+    class={["grid size-[72px] place-items-center", { "phone-shake": !(props.shake !== true) }]}
     style={{ background: lcd.pale, "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}
   >
     {props.children}

@@ -366,7 +366,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
 
 /** The text is kept as typed, the number follows it (empty or 0 means none). */
 function NumberInput(props: { value?: number | undefined; onChange: (n: number | undefined) => void; placeholder: string; label: string; testid?: string }) {
-  const [text, setText] = createSignal(untrack(() => (props.value ? String(props.value) : "")));
+  const [text, setText] = createSignal(untrack(() => (props.value != null && props.value !== 0 ? String(props.value) : "")));
   return (
     <TextInput
       data-testid={props.testid}

@@ -383,7 +383,7 @@ function Opened(props: {
                   "relative flex shrink-0 self-stretch overflow-auto rounded-lg [contain:layout] border border-line p-6 pt-8 outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
                   props.entry.frame ?? "bg-page text-ink",
                   props.view.width === "full" && "min-w-0 flex-1 shrink",
-                  story.fill && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
+                  story.fill === true && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
                 ]}
               >
                 <span class="absolute top-2 left-3 flex items-center gap-1 rounded-xs bg-page px-1 font-mono text-2xs text-muted">
@@ -625,7 +625,7 @@ function ArgControl(props: {
                 <label for={id} class="font-mono text-xs">
                   {props.name}
                 </label>
-                {c.long ? (
+                {c.long === true ? (
                   <textarea
                     id={id}
                     rows={6}

@@ -21,7 +21,9 @@ export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
     tasks: [],
     ...graphView(),
   });
-  const steps = issues.filter((t) => t.parent === parent.id && t.task).sort((a, b) => or(compare(a.rank ?? 0, b.rank ?? 0), compareText(a.id, b.id)));
+  const steps = issues
+    .filter((t) => t.parent === parent.id && t.task !== undefined)
+    .sort((a, b) => or(compare(a.rank ?? 0, b.rank ?? 0), compareText(a.id, b.id)));
   for (const t of steps) {
     const s = t.task!;
     graph.tasks.push(
@@ -141,7 +143,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
 
 export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
   const issues = state.issues;
-  const item = issues.find((issue) => issue.id === id && issue.graph);
+  const item = issues.find((issue) => issue.id === id && issue.graph !== undefined);
   return item ? graphFrom(item, issues) : undefined;
 }
 

@@ -44,7 +44,7 @@ const lookFilled = (raw: unknown): unknown =>
   Predicate.isObject(raw) && Predicate.isObject(raw.look)
     ? {
         ...raw,
-        look: { ...raw.look, build: raw.look.build || "biped", head: raw.look.head || "rounded" },
+        look: { ...raw.look, build: raw.look.build ?? "biped", head: raw.look.head ?? "rounded" },
       }
     : raw;
 const readStored = (text: string): Stored => {

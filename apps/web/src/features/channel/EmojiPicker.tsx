@@ -31,7 +31,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
   onSettled(() => {
     const outside = (e: PointerEvent) => {
       const t = e.target as Node | null;
-      if (t && !box?.contains(t) && !untrack(() => props.anchor)?.contains(t)) close();
+      if (t && box?.contains(t) !== true && untrack(() => props.anchor)?.contains(t) !== true) close();
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;

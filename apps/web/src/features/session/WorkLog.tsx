@@ -74,7 +74,7 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
           <RoundView
             round={r()}
             last={i() === rounds().length - 1}
-            live={!!props.working && i() === rounds().length - 1}
+            live={!(props.working !== true) && i() === rounds().length - 1}
             now={props.now}
             label={roundLabel(r(), firstAsked(), props.asked)}
           />
@@ -167,10 +167,10 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   return (
     <div class="flex flex-col items-start">
       <div
-        class={["w-full overflow-hidden", { "text-base whitespace-pre-wrap": !props.markdown, "fold-fade": clamp() }]}
+        class={["w-full overflow-hidden", { "text-base whitespace-pre-wrap": props.markdown !== true, "fold-fade": clamp() }]}
         style={clamp() ? { "max-height": `${props.lines * 22}px` } : undefined}
       >
-        {props.markdown ? <Markdown text={props.text} /> : props.text}
+        {props.markdown === true ? <Markdown text={props.text} /> : props.text}
       </div>
       <Show when={long()}>
         <button type="button" onClick={() => setOpen(!open())} class="mt-1 cursor-pointer text-sm text-water hover:underline">
@@ -184,7 +184,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
 /** tint: the box's ground, a palette class (bg-wheat/14…), so it follows the theme. */
 function Box(props: { tint?: string; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
-    <div class={["rounded-md px-3 py-2", props.tint, { "border border-line": !!props.edge, italic: !!props.faint }]}>
+    <div class={["rounded-md px-3 py-2", props.tint, { "border border-line": !(props.edge !== true), italic: !(props.faint !== true) }]}>
       <div class="mb-1 flex items-center">
         <span class="text-xs font-semibold text-muted">{props.label}</span>
         <span class="flex-1" />
@@ -265,7 +265,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{farm() ?? props.step.text}</span>
         <span title={state()} class="shrink-0">
           <Show when={props.step.ok !== undefined} fallback={<span class="text-xs text-faint">…</span>}>
-            <Icon name={props.step.ok ? "check" : "cross"} size={12} label={state()} />
+            <Icon name={props.step.ok === true ? "check" : "cross"} size={12} label={state()} />
           </Show>
         </span>
         <When at={props.step.time} now={props.now} />

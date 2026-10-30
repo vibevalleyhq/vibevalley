@@ -49,7 +49,7 @@ const outputCap = 200_000;
  * killed, so a child left behind does not hold the output open. */
 export function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
   if (argv.length === 0) return Promise.reject(new Error(words.noCommand));
-  if (signal?.aborted) return Promise.reject(new Error(stopped));
+  if (signal?.aborted === true) return Promise.reject(new Error(stopped));
   return new Promise((resolve, reject) => {
     const child = spawn(argv[0]!, argv.slice(1), {
       cwd,
@@ -67,7 +67,7 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
     let killer: (() => void) | undefined;
     const kill = (sig: NodeJS.Signals) => {
       try {
-        if (child.pid) process.kill(-child.pid, sig);
+        if (child.pid != null && child.pid !== 0) process.kill(-child.pid, sig);
       } catch {
         // Gone already.
       }
@@ -179,14 +179,14 @@ export function codingTools(o: CodingOptions): Tool[] {
       if (p.old_text === "") throw new Error(words.emptyOldText);
       const count = text.split(p.old_text).length - 1;
       if (count === 0) throw new Error(words.oldTextNotFound(p.path));
-      if (count > 1 && !p.replace_all) throw new Error(words.oldTextNotUnique(p.path, count));
-      const next = p.replace_all ? text.split(p.old_text).join(p.new_text) : text.replace(p.old_text, () => p.new_text);
+      if (count > 1 && p.replace_all !== true) throw new Error(words.oldTextNotUnique(p.path, count));
+      const next = p.replace_all === true ? text.split(p.old_text).join(p.new_text) : text.replace(p.old_text, () => p.new_text);
       try {
         writeFileSync(file, next);
       } catch (e) {
         throw new Error(words.cannotWrite(p.path, why(e)), { cause: e });
       }
-      return words.edited(shown(file), p.replace_all ? count : 1);
+      return words.edited(shown(file), p.replace_all === true ? count : 1);
     },
   });
 
@@ -234,7 +234,7 @@ export function codingTools(o: CodingOptions): Tool[] {
         "--no-heading",
         "--color=never",
         "--max-count=50",
-        ...(p.ignore_case ? ["-i"] : []),
+        ...(p.ignore_case === true ? ["-i"] : []),
         ...(p.glob ? ["--glob", p.glob] : []),
         "--",
         p.pattern,
@@ -257,7 +257,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     description: words.bashDescription(formatSeconds(timeout)),
     parameters: Schema.Struct({ command: Schema.String, timeout_seconds: Schema.optionalKey(Schema.Finite) }),
     run: async (p, tc) => {
-      const limit = p.timeout_seconds ? p.timeout_seconds * 1000 : timeout;
+      const limit = p.timeout_seconds != null && p.timeout_seconds !== 0 ? p.timeout_seconds * 1000 : timeout;
       const ran = await runCommand(["/bin/bash", "-lc", p.command], cwd, limit, runEnv, tc.signal);
       const output = ran.output.trim() || words.noOutput;
       if (ran.timedOut) return output + words.timedOutNote;

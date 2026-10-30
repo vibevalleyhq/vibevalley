@@ -433,8 +433,8 @@ describe("issues", () => {
         ],
         { concurrency: "unbounded" },
       );
-      expect(got.filter((h) => h.session).length).toBe(1);
-      expect(got.every((h) => h.session || h.refused)).toBe(true);
+      expect(got.filter((h) => h.session !== undefined).length).toBe(1);
+      expect(got.every((h) => h.session !== undefined || h.refused !== undefined)).toBe(true);
       expect(core.state().sessions).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

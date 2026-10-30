@@ -120,12 +120,12 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   const send = async () => {
     if (disposed || sending) return;
     const asked = commandOf(text());
-    if (asked && !(ways.target().attachments?.length ?? 0)) return command(asked);
+    if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
-    if (!body.text && !(body.attachments?.length ?? 0)) return;
+    if (!body.text && !((body.attachments?.length ?? 0) !== 0)) return;
     if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
     const sent = attempt;
-    const shown = ways.echo ? channelOf(body.id) : undefined;
+    const shown = ways.echo === true ? channelOf(body.id) : undefined;
     if (shown) {
       setPendingLines((all) => [...all.filter((p) => p.key !== sent.key), { key: sent.key, channel: shown.id, text: body.text }]);
       // The box empties at once; a failure puts the line back, with its key, unless something was typed meanwhile.

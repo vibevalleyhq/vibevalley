@@ -5,6 +5,7 @@
 
 import type * as qc from "../../db/generated/channel.sql.ts";
 import type * as qp from "../../db/generated/channel_participant.sql.ts";
+import { compareText, or } from "@/base/order.ts";
 
 export type ChannelRow = qc.AllChannelsResult;
 export type ParticipantRow = qp.ParticipantsResult;
@@ -52,7 +53,7 @@ export class ChatModel {
   channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
     const all = [...this.byId.values()].filter((c) => c.type === type);
     const place = (c: ChannelRow) => c.position ?? Number.MAX_SAFE_INTEGER;
-    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : place(a) - place(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : or(place(a) - place(b), compareText(a.id, b.id))));
   }
 
   threadsOf(channel: string): ChannelRow[] {

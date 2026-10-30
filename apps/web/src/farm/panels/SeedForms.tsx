@@ -32,7 +32,7 @@ const byOrchestrator = "auto";
 function seedsOf(bag: ProjectTemplates | undefined) {
   return {
     recent: bag?.recent ?? [],
-    kinds: (bag?.kinds ?? []).flatMap((k) => (k.templates.length ? [{ kind: k, templates: k.templates }] : [])),
+    kinds: (bag?.kinds ?? []).flatMap((k) => (k.templates.length > 0 ? [{ kind: k, templates: k.templates }] : [])),
   };
 }
 

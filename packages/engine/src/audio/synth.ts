@@ -54,7 +54,8 @@ const BELL: readonly (readonly [number, number])[] = [
 
 /** Seeded so a recipe sounds the same each time; the seed changes per play to keep a little life in it. */
 function seeded(seed: number) {
-  let s = seed >>> 0 || 1;
+  let s = seed >>> 0;
+  if (s === 0) s = 1;
   return () => {
     s ^= s << 13;
     s ^= s >>> 17;
@@ -87,9 +88,9 @@ function makePen(ac: BaseAudioContext, out: AudioNode, now: number, noiseBuffer:
       const osc = ac.createOscillator();
       osc.type = type;
       osc.frequency.setValueAtTime(freq, t0);
-      if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + shape.dur);
+      if (to != null && to !== 0) osc.frequency.exponentialRampToValueAtTime(to, t0 + shape.dur);
       const g = envelope(t0, shape);
-      if (lowpass) {
+      if (lowpass != null && lowpass !== 0) {
         const f = ac.createBiquadFilter();
         f.type = "lowpass";
         f.frequency.value = lowpass;
@@ -105,7 +106,7 @@ function makePen(ac: BaseAudioContext, out: AudioNode, now: number, noiseBuffer:
       const f = ac.createBiquadFilter();
       f.type = filter;
       f.frequency.setValueAtTime(freq, t0);
-      if (to) f.frequency.exponentialRampToValueAtTime(to, t0 + shape.dur);
+      if (to != null && to !== 0) f.frequency.exponentialRampToValueAtTime(to, t0 + shape.dur);
       f.Q.value = q;
       src.connect(f).connect(envelope(t0, shape));
       // Start somewhere different in the buffer each time, so repeated bursts do not sound identical.

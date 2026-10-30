@@ -85,7 +85,7 @@ export function hotspots(changes: readonly Change[], sources: readonly Source[],
       const lines = lineCount(s.text);
       return [{ path: s.path, changes: n, before: earlier.get(s.path) ?? 0, lines, score: n * lines }];
     })
-    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+    .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)));
 }
 
 /** Where a check is turned off by hand. */

@@ -160,7 +160,9 @@ rl.on('line', (line) => {
     const { llm } = scriptedLLM();
     const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: standaloneOwner(), llm: () => llm });
     const models = await runtime.listModels();
-    expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default)).toBe(true);
+    expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
+      true,
+    );
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
     await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/);
     const keyless = vibevalleyRuntimeOf({

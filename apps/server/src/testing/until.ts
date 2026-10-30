@@ -14,11 +14,11 @@ export const whenState = <A>(pick: (state: WorkspaceState) => A | undefined | fa
       const core = yield* Core;
       const [now, changes] = yield* core.transitions;
       const first = pick(now);
-      if (first) return first;
+      if (first !== undefined && first !== false) return first;
       const found = Stream.runHead(
         Stream.filter(
           Stream.map(changes, (t) => pick(t.after)),
-          (a): a is A => !!a,
+          (a): a is A => a !== undefined && a !== false,
         ),
       );
       const late = Effect.as(

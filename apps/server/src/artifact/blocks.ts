@@ -178,7 +178,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
                   attrs: JSON.stringify(b.attrs),
                   spans: JSON.stringify(b.text),
                   rev: b.rev,
-                  deleted: !!b.deleted,
+                  deleted: !(b.deleted !== true),
                   updated_by: b.updatedBy,
                   updated_at: b.updated,
                 }),

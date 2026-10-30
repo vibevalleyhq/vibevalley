@@ -25,10 +25,10 @@ const files = sources(root);
 const escapes = escapesByArea(files, health);
 const kept: Record<string, Escapes> = existsSync(ratchetPath) ? (JSON.parse(readFileSync(ratchetPath, "utf8")) as Record<string, Escapes>) : {};
 
-if (values.write) {
+if (values.write === true) {
   writeFileSync(ratchetPath, JSON.stringify(escapes, null, 2) + "\n");
   console.log(`health: kept the escape counts of ${Object.keys(escapes).length} areas in ${health.ratchet}`);
-} else if (values.check) {
+} else if (values.check === true) {
   const off = drift(kept, escapes);
   const tracked = new Set(files.map((f) => f.path));
   const stale = Object.keys(health.hotByDesign).filter((p) => !tracked.has(p));
@@ -44,7 +44,7 @@ if (values.write) {
 } else {
   const hot = hotspots(underTodaysNames(commits(root, now - 2 * health.days * 86_400_000)), files, now, health.days, health.counted);
   console.log(
-    values.json
+    values.json === true
       ? JSON.stringify({ now, hotspots: hot, escapes, kept }, null, 2)
       : report({
           now,

@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
 import type { Pose } from "@/ui/cast";
+import { compareText, or } from "@/base/order";
 
 export type Spot = { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView } | { readonly kind: "open" } | { readonly kind: "shut" };
 
@@ -57,9 +58,7 @@ export function islandsOf({
     return { project: name, ...(summary ? { summary } : {}), spots, working, maxSessions, queued: queuedIn(issues, name) };
   });
   const quiet = (i: Island) => (i.spots.some((s) => s.kind === "taken") || i.queued.length > 0 ? 0 : 1);
-  return islands.sort(
-    (a, b) => quiet(a) - quiet(b) || (b.summary?.last ?? 0) - (a.summary?.last ?? 0) || (a.project < b.project ? -1 : a.project > b.project ? 1 : 0),
-  );
+  return islands.sort((a, b) => or(quiet(a) - quiet(b), (b.summary?.last ?? 0) - (a.summary?.last ?? 0), compareText(a.project, b.project)));
 }
 
 export const homeless = (sessions: readonly Session[]) => sessions.filter((h) => h.project === undefined);

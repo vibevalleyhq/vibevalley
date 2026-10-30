@@ -664,7 +664,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       fall(a.footing, { x: 0, y: 0 }, lean, a.node.alpha);
       const shine = night > lanternDark ? ((night - lanternDark) / (1 - lanternDark)) * a.node.alpha : 0;
       a.lantern.visible = shine > 0;
-      if (!shine) continue;
+      if (shine === 0) continue;
       const side = a.walker.facing === "left" ? -5 : 5;
       a.lantern.position.set(a.node.x + side - 1, a.node.y - 12);
       lights.push({ x: a.node.x + side, y: a.node.y - 11, z: 10, radius: 34, color: lanternColor, intensity: 0.6 * shine });
@@ -713,7 +713,9 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
 
 /** Lights a sprite up while the pointer is on what it opens; filters are only swapped when that changes. */
 function glow(sprite: Sprite, on: boolean) {
-  const lit = sprite.filters && (sprite.filters as readonly unknown[]).length > 0;
+  // Pixi gives null for a sprite that never had filters, whatever its type says.
+  const filters: readonly unknown[] | null = sprite.filters;
+  const lit = filters !== null && filters.length > 0;
   if (on !== lit) sprite.filters = on ? [brighter] : [];
 }
 
@@ -722,7 +724,7 @@ brighter.brightness(1.25, false);
 
 /** `rows` taller (shorter when negative) with its feet where they are: one row shows twice (or once less). */
 function rise(sprite: Sprite, rows: number) {
-  const h = sprite.texture.height || 1;
+  const h = sprite.texture.height > 0 ? sprite.texture.height : 1;
   sprite.scale.y = 1 + rows / h;
 }
 

@@ -1,4 +1,5 @@
 import { type ProjectSummary } from "@vibevalley/protocol";
+import { compareText, or } from "@/base/order";
 
 /** Only repository home URLs, never credentials, arbitrary git transports or command-line options. */
 export function githubRepository(input: string): { name: string; url: string } | undefined {
@@ -10,8 +11,7 @@ export function githubRepository(input: string): { name: string; url: string } |
 }
 
 /** Newest commit first, then by name. */
-export const sortProjects = (list: readonly ProjectSummary[]) =>
-  [...list].sort((a, b) => (b.last ?? 0) - (a.last ?? 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+export const sortProjects = (list: readonly ProjectSummary[]) => [...list].sort((a, b) => or((b.last ?? 0) - (a.last ?? 0), compareText(a.name, b.name)));
 
 /** As toLocaleString('zh-CN') writes it: 「12,345」. */
 export const number = (n: number) => (n < 0 ? "-" : "") + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");

@@ -32,7 +32,7 @@ export function report({ now, days, compared, hot, hotByDesign, escapes, kept }:
     ...head,
     ...looked.map(row),
     "",
-    ...(byDesign.length
+    ...(byDesign.length > 0
       ? ["Hot by design:", "", ...byDesign.map((h) => `- \`${h.path}\`: ${h.changes} changes, ${h.lines} lines. ${hotByDesign[h.path]}`), ""]
       : []),
     `## Escapes: ${escapeKinds.map((k) => `${total(k)} ${k}`).join(", ")}`,
@@ -41,6 +41,6 @@ export function report({ now, days, compared, hot, hotByDesign, escapes, kept }:
     "|---|" + escapeKinds.map(() => "---|").join(""),
     ...Object.entries(escapes).map(([area, e]) => `| ${area} | ${escapeKinds.map((k) => e[k]).join(" | ")} |`),
     "",
-    off.length ? `Off the ratchet: ${off.map((d) => `${d.area} ${d.kind} ${d.kept} → ${d.now}`).join("; ")}` : "On the ratchet.",
+    off.length > 0 ? `Off the ratchet: ${off.map((d) => `${d.area} ${d.kind} ${d.kept} → ${d.now}`).join("; ")}` : "On the ratchet.",
   ].join("\n");
 }

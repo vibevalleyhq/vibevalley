@@ -142,7 +142,7 @@ export class VillageWorld {
     if (place) {
       const n = a.crowd(a.place);
       if (place.facing === "left" || place.facing === "right") return this.besideIt(a.place, place.at, place.facing, n);
-      return { key: a.place, at: { x: place.at.x + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 12, y: place.at.y + (n % 3) }, facing: place.facing };
+      return { key: a.place, at: { x: place.at.x + (n % 2 !== 0 ? 1 : -1) * Math.ceil(n / 2) * 12, y: place.at.y + (n % 3) }, facing: place.facing };
     }
     const spot = a.stroll?.spot ?? "right";
     const rest = a.stroll?.rest ?? 0;
@@ -156,7 +156,7 @@ export class VillageWorld {
     const dir = facing === "right" ? 1 : -1;
     if (n === 0) return { key, at, facing };
     if (n === 1) return { key, at: { x: at.x + dir * reach * 2, y: at.y }, facing: facing === "right" ? "left" : "right" };
-    return { key, at: { x: at.x + dir * reach + (n % 2 ? -12 : 12) * Math.ceil((n - 1) / 2), y: at.y + 12 }, facing: "up" };
+    return { key, at: { x: at.x + dir * reach + (n % 2 !== 0 ? -12 : 12) * Math.ceil((n - 1) / 2), y: at.y + 12 }, facing: "up" };
   }
 }
 

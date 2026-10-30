@@ -105,7 +105,7 @@ export function QuotaPill(props: { height: number }) {
   const box = useClickAway(open, () => setOpen(false));
   const lowest = () => {
     const lefts = runtimes().flatMap((r) => (r.quota?.left === undefined ? [] : [r.quota.left]));
-    return lefts.length ? Math.min(...lefts) : undefined;
+    return lefts.length > 0 ? Math.min(...lefts) : undefined;
   };
   const shown = () => {
     const l = lowest();

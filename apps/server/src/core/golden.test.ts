@@ -173,7 +173,7 @@ describe("the golden files", () => {
             "acceptanceChecks",
             tasks.map((n) => acceptanceChecks(graph, n)),
           );
-          const changes = graphChanges(input.fresh ? undefined : graph, input.after as TaskGraph);
+          const changes = graphChanges(input.fresh === true ? undefined : graph, input.after as TaskGraph);
           same("changes", changes);
           const titles = new Map(tasks.map((n) => [n.id, "T" + n.title]));
           same(

@@ -470,7 +470,7 @@ function CursorTile(props: { name: string; hx: number; hy: number; ground: Groun
   return (
     <div data-testid="cursor" data-key={props.name} class="flex flex-col items-center gap-1 p-1">
       <span class="flex h-16 w-full items-center justify-center rounded-md" style={groundStyle(props.ground)}>
-        <span class="relative" style={{ height: `${height}px`, width: `${natural() && k() ? natural()!.w * k()! : height}px` }}>
+        <span class="relative" style={{ height: `${height}px`, width: `${natural() && k() != null && k() !== 0 ? natural()!.w * k()! : height}px` }}>
           <img
             src={`/cursors/${props.name}@2x.png`}
             alt=""

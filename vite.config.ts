@@ -113,6 +113,22 @@ export default defineConfig({
       "oxc/no-accumulating-spread": "error",
       "unicorn/prefer-set-has": "error",
       "unicorn/prefer-array-find": "error",
+      // A condition is a boolean or a string. "" is a string's none (docs/style/code.md, 没有值), so a string reads as
+      // "is there one"; a number's 0 is a value, not none; an object is always true; a nullable object is checked for
+      // being there.
+      "typescript/strict-boolean-expressions": [
+        "error",
+        {
+          allowString: true,
+          allowNullableString: true,
+          allowNumber: false,
+          allowNullableObject: true,
+          allowNullableBoolean: false,
+          allowNullableNumber: false,
+        },
+      ],
+      // x || d takes 0 and false for none; ?? takes only null and undefined. A string's "" is its none, so || stays for strings.
+      "typescript/prefer-nullish-coalescing": ["error", { ignorePrimitives: { string: true } }],
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

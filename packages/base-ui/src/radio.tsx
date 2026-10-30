@@ -40,7 +40,7 @@ export function RadioGroup(props: RadioGroupProps) {
   const ctx: GroupCtx = {
     value,
     check: (v) => {
-      if (!props.readOnly) setValue(v);
+      if (props.readOnly !== true) setValue(v);
     },
     disabled: () => Boolean(props.disabled),
     readOnly: () => Boolean(props.readOnly),
@@ -55,8 +55,8 @@ export function RadioGroup(props: RadioGroupProps) {
           root = el;
           queueMicrotask(() => setFirst(itemsIn(el, `${radio}:not([data-disabled])`)[0]?.dataset.value));
         })}
-        aria-disabled={props.disabled ? "true" : undefined}
-        aria-readonly={props.readOnly ? "true" : undefined}
+        aria-disabled={props.disabled === true ? "true" : undefined}
+        aria-readonly={props.readOnly === true ? "true" : undefined}
         data-disabled={flag(props.disabled)}
         onKeyDown={(e) => {
           call(props.onKeyDown, e);

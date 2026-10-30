@@ -116,7 +116,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
       memorySources: !sources().some((d) => d.changed)
         ? undefined
         : sources()
-            .filter((d) => d.url.trim() || d.enabled)
+            .filter((d) => d.url.trim() !== "" || d.enabled)
             .map((d) => ({
               kind: d.kind,
               url: d.url.trim(),

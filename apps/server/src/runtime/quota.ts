@@ -18,7 +18,7 @@ export function moneyStop(info: RuntimeInfo | undefined): string {
   if (u?.status === "ok") {
     for (const w of u.windows) {
       if (w.usedPercent < 100) continue;
-      const resets = w.resetsAt ? t("server.runtime.resets", { when: whenText(w.resetsAt) }) : "";
+      const resets = w.resetsAt != null && w.resetsAt !== 0 ? t("server.runtime.resets", { when: whenText(w.resetsAt) }) : "";
       return t("server.runtime.quotaGone", { runtime: runtimeLabel(info.id), window: w.label, resets });
     }
   } else if (u?.status === "balance" && u.balances.length > 0) {

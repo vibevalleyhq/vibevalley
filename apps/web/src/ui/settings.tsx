@@ -61,7 +61,7 @@ export function SettingRow(props: {
   const found = () => query() !== "" && matches(query(), [props.label, props.hint, props.tip]);
   return (
     <div
-      class={["flex gap-x-6 gap-y-2 px-4 py-3", props.wide ? "flex-col" : "flex-wrap items-center", { "bg-wheat/15": found() }]}
+      class={["flex gap-x-6 gap-y-2 px-4 py-3", props.wide === true ? "flex-col" : "flex-wrap items-center", { "bg-wheat/15": found() }]}
       data-found={found() ? "" : undefined}
       data-testid={props.testid}
     >
@@ -73,7 +73,7 @@ export function SettingRow(props: {
         <Show when={props.hint}>{(hint) => <span class="text-xs text-muted">{hint()}</span>}</Show>
       </div>
       <Show when={props.children}>
-        <div class={["flex max-w-full flex-wrap items-center gap-2", props.wide ? "w-full" : "shrink-0"]}>{props.children}</div>
+        <div class={["flex max-w-full flex-wrap items-center gap-2", props.wide === true ? "w-full" : "shrink-0"]}>{props.children}</div>
       </Show>
     </div>
   );

@@ -48,7 +48,7 @@ function Root(props: AccordionRootProps) {
   let root: HTMLDivElement | undefined;
   const ctx: RootCtx = {
     open: (v) => value().includes(v),
-    toggle: (v) => setValue(value().includes(v) ? value().filter((x) => x !== v) : props.multiple ? [...value(), v] : [v]),
+    toggle: (v) => setValue(value().includes(v) ? value().filter((x) => x !== v) : props.multiple === true ? [...value(), v] : [v]),
     disabled: () => Boolean(props.disabled),
     orientation: () => props.orientation ?? "vertical",
   };

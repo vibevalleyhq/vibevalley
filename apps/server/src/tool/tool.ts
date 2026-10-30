@@ -99,7 +99,7 @@ export class Tools extends Context.Service<
 const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
-  const fields = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+  const fields = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
   let about = "";
   for (const k of named) {
     const v = fields[k];
@@ -316,8 +316,8 @@ export const make = Effect.gen(function* () {
         return spokenText(
           yield* chat.speak(participant(c), p.text, {
             ...(p.id ? { target: p.id } : {}),
-            ...(p.anyway ? { anyway: true } : {}),
-            ...(p.confirm ? { confirm: true } : {}),
+            ...(p.anyway === true ? { anyway: true } : {}),
+            ...(p.confirm === true ? { confirm: true } : {}),
             ...(p.replyTo !== undefined ? { reply: p.replyTo } : {}),
           }),
         );
@@ -336,14 +336,14 @@ export const make = Effect.gen(function* () {
         const read = yield* Effect.result(
           chat.read(participant(c), {
             target: where,
-            ...(p.unread ? { unread: true } : {}),
-            ...(p.before ? { before: Math.trunc(p.before) } : {}),
-            ...(p.limit ? { limit: Math.trunc(p.limit) } : {}),
+            ...(p.unread === true ? { unread: true } : {}),
+            ...(p.before != null && p.before !== 0 ? { before: Math.trunc(p.before) } : {}),
+            ...(p.limit != null && p.limit !== 0 ? { limit: Math.trunc(p.limit) } : {}),
           }),
         );
         if (read._tag === "Failure") return answers.readChat.failed(said(read.failure));
         const r = read.success;
-        if (r.messages.length === 0) return p.unread ? answers.readChat.noUnread(r.target) : answers.readChat.empty(r.target);
+        if (r.messages.length === 0) return p.unread === true ? answers.readChat.noUnread(r.target) : answers.readChat.empty(r.target);
         const older = r.older ? answers.readChat.olderNote(r.messages[0]!.number) : "";
         return answers.readChat.head(r.target, older) + inboxLines(r.messages);
       }),
@@ -569,9 +569,9 @@ export const make = Effect.gen(function* () {
       if (p.status && !status) return noSuchStatus(p.status, IssueStatusValues);
       const { limit: _, status: __, ...rest } = p;
       const found = yield* issue.query({ ...rest, ...(status ? { status } : {}) });
-      if (found.length === 0) return p.wantsOwner ? answers.issues.noneWaiting : answers.issues.none;
+      if (found.length === 0) return p.wantsOwner === true ? answers.issues.noneWaiting : answers.issues.none;
       const now = clock.currentTimeMillisUnsafe();
-      const limit = p.limit && p.limit > 0 ? Math.trunc(p.limit) : 20;
+      const limit = p.limit != null && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? answers.issues.moreNote(found.length - limit) : "";
       return (
         found
@@ -588,7 +588,7 @@ export const make = Effect.gen(function* () {
       descriptions["issue.create"],
       Effect.fn("Tools.issueCreate")(function* (p: Orchestrator<"issue.create">) {
         const c = yield* callerOf(who);
-        if (p.draft && p.start) return answers.issueCreate.draftWithStartRefused;
+        if (p.draft === true && p.start === true) return answers.issueCreate.draftWithStartRefused;
         let channel: Info;
         if (p.channel) {
           const byName = yield* chat.channelByName(p.channel);
@@ -596,14 +596,14 @@ export const make = Effect.gen(function* () {
           channel = byName;
         } else channel = yield* chat.topOf(c.here);
         const project = (p.project ?? "").trim() || channel.project;
-        if (p.start && !project) return answers.issueCreate.noDefaultProject(channel.name);
+        if (p.start === true && !project) return answers.issueCreate.noDefaultProject(channel.name);
         const priority = p.priority ? priorityOf(p.priority) : undefined;
         if (p.priority && !priority) return noSuchPriority(p.priority);
         const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
         if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
         let assignee: string | undefined;
-        if (p.assignee || p.start) {
-          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.assignee ?? "", p.start ? c.picked : "");
+        if (p.assignee || p.start === true) {
+          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.assignee ?? "", p.start === true ? c.picked : "");
           if (typeof a === "string") return answers.issueCreate.notRecorded(a);
           assignee = a.id;
         }
@@ -620,7 +620,7 @@ export const make = Effect.gen(function* () {
         if (added._tag === "Failure") return answers.issueCreate.notRecordedFailed(said(added.failure));
         const item = added.success;
         const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
-        if (p.start) {
+        if (p.start === true) {
           // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
           const started = yield* Effect.result(issue.start(item.id, channel.id));
           if (started._tag === "Failure") return answers.issueCreate.queuedNoStart(noted, said(started.failure));
@@ -636,7 +636,7 @@ export const make = Effect.gen(function* () {
             branch,
           );
         }
-        if (!p.draft) return answers.issueCreate.inBacklog(noted, answers.issueCreate.notStartedNote);
+        if (p.draft !== true) return answers.issueCreate.inBacklog(noted, answers.issueCreate.notStartedNote);
         const refined = yield* issue.refine(item.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id).pipe(
           Effect.as(answers.issueCreate.draftingNote),
           Effect.catch((e) => Effect.succeed(answers.issueCreate.draftFailed(said(e)))),
@@ -884,7 +884,7 @@ export const make = Effect.gen(function* () {
           agent: item.agent ?? "",
           check: item.check ?? "",
           ...(item.scope ? { scope: item.scope } : {}),
-          ...(item.acceptance ? { acceptance: true } : {}),
+          ...(item.acceptance === true ? { acceptance: true } : {}),
         }));
         return yield* answered(tasks.splitIssue(c.session, p.title ?? "", steps));
       }),

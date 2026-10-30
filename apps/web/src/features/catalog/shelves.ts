@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { outfitLabel, speciesLabel } from "@/ui/cast";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import { compareText, or } from "@/base/order";
 
 export interface Picture {
   readonly name: string;
@@ -84,10 +85,10 @@ export function naturalCompare(a: string, b: string): number {
   for (let i = 0; i < pa.length && i < pb.length; i++) {
     const x = pa[i]!;
     const y = pb[i]!;
-    const c = /^\d+$/.test(x) && /^\d+$/.test(y) ? Number(x) - Number(y) : x < y ? -1 : x > y ? 1 : 0;
+    const c = /^\d+$/.test(x) && /^\d+$/.test(y) ? Number(x) - Number(y) : compareText(x, y);
     if (c !== 0) return c;
   }
-  return pa.length - pb.length || (a < b ? -1 : a > b ? 1 : 0);
+  return or(pa.length - pb.length, compareText(a, b));
 }
 
 export interface Group {

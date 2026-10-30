@@ -115,7 +115,7 @@ describe("lan access", () => {
       const probe = createServer();
       yield* Effect.promise(() => new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", () => resolve())));
       const address = probe.address();
-      const port = address && typeof address === "object" ? address.port : 0;
+      const port = typeof address === "object" && address !== null ? address.port : 0;
       yield* Effect.promise(() => new Promise<void>((resolve) => probe.close(() => resolve())));
       const lan = yield* farm(port);
       for (let i = 0; i < 3; i++) {

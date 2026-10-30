@@ -69,7 +69,7 @@ export async function runVerification(command: string[] = [], options: Verificat
   const work = join(evidence, "work");
   const binaries = join(evidence, "bin");
   for (const path of [home, work, binaries]) mkdirSync(path);
-  const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
+  const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper === true ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
   const serverDir = join(root, "apps", "server");
   // The command line from any folder: tsx is the server's own, and so is its tsconfig (tsx looks for one from the cwd,
   // and the server's @/ imports are its paths).
@@ -181,7 +181,8 @@ export async function runVerification(command: string[] = [], options: Verificat
     while (Date.now() < deadline) {
       if (interrupted) throw new Error("verification interrupted during startup");
       if (running.exitCode() !== null) throw new Error(`server exited ${running.exitCode()}; see ${log}`);
-      if (outputFailure) throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : inspect(outputFailure)}`);
+      if (outputFailure !== undefined)
+        throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : inspect(outputFailure)}`);
       if (address) {
         try {
           const response = await fetch(address + pathOf("server.health.get"), { method: "POST", signal: AbortSignal.timeout(1_000) });
@@ -199,7 +200,7 @@ export async function runVerification(command: string[] = [], options: Verificat
       await sleep(100);
     }
     if (!address || !existsSync(join(evidence, "health.json"))) throw new Error(`server did not become healthy; see ${log}`);
-    const run = command.length ? command : [cli, "server", "health"];
+    const run = command.length > 0 ? command : [cli, "server", "health"];
     const task = launch(run, root, "command", { ...env, VIBEVALLEY_SERVER: address, VIBEVALLEY_VERIFY_CLI: cli });
     code = await task.exited;
     if (interrupted) code = 130;
@@ -226,7 +227,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     if (failures.length === 0) for (const path of [home, work, binaries]) rmSync(path, { recursive: true, force: true });
     console.log(`verification evidence: ${evidence}`);
     // oxlint-disable-next-line no-unsafe-finally -- a cleanup failure outranks the run's own: its data is kept to look at.
-    if (failures.length) throw new AggregateError(failures, "verification cleanup failed; temporary data preserved");
+    if (failures.length > 0) throw new AggregateError(failures, "verification cleanup failed; temporary data preserved");
   }
 }
 

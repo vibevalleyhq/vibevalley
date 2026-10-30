@@ -60,9 +60,9 @@ export function Select<V extends string>(props: {
         class={[
           "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left text-sm outline-none disabled:cursor-default disabled:opacity-50",
           props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
-          props.quiet
+          props.quiet === true
             ? "border-transparent bg-transparent hover:border-line hover:bg-page data-popup-open:border-line data-popup-open:bg-page"
-            : props.filter && props.value !== ""
+            : props.filter === true && props.value !== ""
               ? "border-accent/40 bg-accent/8 hover:bg-accent/12"
               : "border-line bg-page hover:bg-hover data-popup-open:border-focus",
           props.class,

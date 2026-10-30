@@ -60,7 +60,7 @@ export function privateAddress(ip: string): boolean {
 /** The addresses a name has; none when it does not resolve. */
 export type Resolve = (host: string) => Effect.Effect<readonly string[]>;
 const resolveAll: Resolve = (host) =>
-  isIP(host)
+  isIP(host) !== 0
     ? Effect.succeed([host])
     : Effect.tryPromise(() => lookup(host, { all: true })).pipe(
         Effect.map((all) => all.map((a) => a.address)),

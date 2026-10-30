@@ -19,7 +19,7 @@ const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
   by: r.executor,
   state: r.state,
   ...(r.result ? { result: r.result } : {}),
-  ...(r.tries ? { tries: r.tries } : {}),
+  ...(r.tries !== 0 ? { tries: r.tries } : {}),
 });
 
 /** A finished graph stays, stamped finished_at: putting it away only empties the keeper's open graph. */

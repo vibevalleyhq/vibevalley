@@ -69,7 +69,7 @@ export class RunAccounting {
 
   partial(m: AssistantMessage) {
     if (!this.active()) this.begin();
-    this.pending = m.usage ? { ...m.usage, cost: { ...m.usage.cost } } : zeroUsage();
+    this.pending = { ...m.usage, cost: { ...m.usage.cost } };
     this.current = { ...this.current, contextTokens: contextOf(m) };
   }
 
@@ -111,4 +111,4 @@ export class RunAccounting {
   }
 }
 
-const contextOf = (m: AssistantMessage) => (m.usage ? m.usage.input + m.usage.cacheRead + m.usage.output : 0);
+const contextOf = (m: AssistantMessage) => m.usage.input + m.usage.cacheRead + m.usage.output;

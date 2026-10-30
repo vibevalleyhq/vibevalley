@@ -136,7 +136,7 @@ export const committed = join(import.meta.dirname, "testdata", "evals");
 /** Arguments as one string whatever order their keys came in. */
 const argsKey = (args: unknown): string =>
   JSON.stringify(args, (_, v: unknown) =>
-    v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v,
+    typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v,
   );
 
 /** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once,

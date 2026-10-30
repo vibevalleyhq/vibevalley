@@ -63,7 +63,14 @@ export function plotFx(world: Container, texture: (name: string) => Texture, plo
       case "water":
         // Drops fall from above the plot onto it.
         for (let i = 0; i < 14; i++)
-          add(dot(i % 3 ? 0x6fb3e0 : 0xc8e6f7), { x: c.x + rand(-12, 12), y: c.y - rand(14, 26), vx: 0, vy: rand(10, 30), fall: 160, life: rand(0.35, 0.6) });
+          add(dot(i % 3 !== 0 ? 0x6fb3e0 : 0xc8e6f7), {
+            x: c.x + rand(-12, 12),
+            y: c.y - rand(14, 26),
+            vx: 0,
+            vy: rand(10, 30),
+            fall: 160,
+            life: rand(0.35, 0.6),
+          });
         return;
       case "spray":
         for (let i = 0; i < 12; i++)
@@ -71,7 +78,14 @@ export function plotFx(world: Container, texture: (name: string) => Texture, plo
         return;
       case "shovel":
         for (let i = 0; i < 12; i++)
-          add(dot(i % 2 ? 0x8a6a45 : 0x5d4429, 2), { x: c.x + rand(-8, 8), y: c.y, vx: rand(-30, 30), vy: rand(-50, -20), fall: 140, life: rand(0.4, 0.7) });
+          add(dot(i % 2 !== 0 ? 0x8a6a45 : 0x5d4429, 2), {
+            x: c.x + rand(-8, 8),
+            y: c.y,
+            vx: rand(-30, 30),
+            vy: rand(-50, -20),
+            fall: 140,
+            life: rand(0.4, 0.7),
+          });
         return;
       case "harvest": {
         // The crop jumps out of the plot, with a few golden flecks.

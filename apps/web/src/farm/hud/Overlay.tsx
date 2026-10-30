@@ -296,7 +296,7 @@ function OrchestratorWords(props: { x: number; y: number; hidden: boolean; sessi
     const said = props.said;
     const at = doneAt();
     const fresh = said && (at === undefined || now() - at < speechMs);
-    return fresh ? plainText(said.text) : props.sessions === 0 ? t("web.farm.overlay.idle") : undefined;
+    return fresh === true ? plainText(said.text) : props.sessions === 0 ? t("web.farm.overlay.idle") : undefined;
   };
   return (
     <Show when={text()}>

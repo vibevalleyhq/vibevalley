@@ -330,7 +330,7 @@ const promiseBoundary = defineRule({
   },
   create(context) {
     const check = (node: Parameters<typeof inEffectPromise>[0] & { async?: boolean }) => {
-      if (node.async && !inEffectPromise(node)) context.report({ node: node as never, messageId: "async" });
+      if (node.async === true && !inEffectPromise(node)) context.report({ node: node as never, messageId: "async" });
     };
     return {
       FunctionDeclaration: check,

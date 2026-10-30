@@ -43,7 +43,7 @@ export function TreePage() {
   const asked = untrack(() => Number(search().get("stage")));
   const tree = mockTree(Date.now(), isOneOf(TreeStageValues, asked) ? asked : undefined);
   const [filter, setFilter] = createSignal<TreeFilter>(allOf);
-  const [sown, setSown] = createSignal<ReadonlySet<string>>(new Set(tree.items.filter((m) => m.sown).map((m) => m.id)));
+  const [sown, setSown] = createSignal<ReadonlySet<string>>(new Set(tree.items.filter((m) => m.sown === true).map((m) => m.id)));
   const [picked, setPicked] = createSignal<MemoryItem>();
   const [hover, setHover] = createSignal<SceneHover>();
   const [sky, setSky] = createSignal(false);

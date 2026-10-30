@@ -132,7 +132,7 @@ export const make = Effect.gen(function* () {
 
   return Game.of({
     achievements: achievementsInWords,
-    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier ? { tier } : {}) }),
+    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier != null && tier !== 0 ? { tier } : {}) }),
     want: (station) => {
       wanted = { station, until: clock.currentTimeMillisUnsafe() + wantStationForMs };
     },

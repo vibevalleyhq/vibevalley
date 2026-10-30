@@ -211,10 +211,10 @@ export class BlockEditor {
     const went = this.gone.get(b.id);
     if (went) {
       went.rev = b.rev;
-      if (b.deleted) this.gone.delete(b.id);
+      if (b.deleted === true) this.gone.delete(b.id);
       return;
     }
-    if (b.deleted) {
+    if (b.deleted === true) {
       this.byId.delete(b.id);
       return;
     }

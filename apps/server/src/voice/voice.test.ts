@@ -37,7 +37,7 @@ const pendingDictation = () => {
     seen = signal;
     entered();
     return new Promise<Response>((_, reject) => {
-      if (signal?.aborted) reject(signal.reason);
+      if (signal?.aborted === true) reject(signal.reason);
       else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
     });
   });
@@ -61,7 +61,7 @@ class Capture {
     const call = (init?.method ?? "GET") + " " + url;
     this.urls.push(call);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
-    this.requests.push(init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {});
+    this.requests.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
     await this.before?.(call);
     return new Response(this.body, {
       status: this.status,
@@ -680,7 +680,7 @@ describe("voice", () => {
         ),
       );
       const address = server.address();
-      const port = address && typeof address === "object" ? address.port : 0;
+      const port = typeof address === "object" && address !== null ? address.port : 0;
       yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: `http://127.0.0.1:${port}/v1`, model: "m" } }));
       const voice = yield* Voice;
       for (let i = 0; i < 2; i++) {

@@ -149,8 +149,8 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       const { title: _, ...untitled } = p;
       p = untitled;
       const tier = entry.tier;
-      const worn = entry.achievement && tier ? achievementOf(entry.achievement) : undefined;
-      if (worn && tier && isTitle(worn) && tierOf(p, worn.id) >= tier) p = { ...p, title: { id: worn.id, tier } };
+      const worn = entry.achievement && tier != null && tier !== 0 ? achievementOf(entry.achievement) : undefined;
+      if (worn && tier != null && tier !== 0 && isTitle(worn) && tierOf(p, worn.id) >= tier) p = { ...p, title: { id: worn.id, tier } };
       break;
     }
   }
@@ -220,7 +220,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
     case "left": {
       // Harvested: only when something went into the main branch, which is what earns.
       const h = sessionOf(before, fact.id);
-      if (h && fact.closed === "merged" && fact.merged && fact.merged > 0)
+      if (h && fact.closed === "merged" && fact.merged != null && fact.merged > 0)
         out.push({
           kind: "harvested",
           session: fact.id,

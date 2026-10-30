@@ -98,7 +98,7 @@ export function SokobanGame() {
         <button
           type="button"
           onClick={undo}
-          disabled={!g().history.length}
+          disabled={g().history.length === 0}
           class="cursor-pointer px-2 py-1 disabled:cursor-default disabled:opacity-40"
           style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >

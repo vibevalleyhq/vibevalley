@@ -164,9 +164,9 @@ export const make = Effect.gen(function* () {
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
         everything: m.everything ?? false,
-        enabled: !!m.enabled,
-        read: !!m.read,
-        write: !!m.write,
+        enabled: !(m.enabled !== true),
+        read: !(m.read !== true),
+        write: !(m.write !== true),
         key: secret(key, "settings"),
       })),
     };
@@ -191,7 +191,7 @@ export const make = Effect.gen(function* () {
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
-    if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
+    if (typeof next.voice === "object" && next.voice !== null && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
     yield* Effect.try({

@@ -53,5 +53,5 @@ test("Backspace at a block's start joins it to the one before", async ({ page, a
   await expect(doc).toHaveAttribute("data-state", "saved");
   await expect.poll(async () => (await api.artifact.list({})).some((a) => a.title === title)).toBe(true);
   const id = (await api.artifact.list({})).find((a) => a.title === title)!.id;
-  expect((await api.artifact.block.list({ id })).blocks.filter((b) => !b.deleted).map((b) => b.text.map((s) => s.t).join(""))).toEqual(["firstsecond"]);
+  expect((await api.artifact.block.list({ id })).blocks.filter((b) => b.deleted !== true).map((b) => b.text.map((s) => s.t).join(""))).toEqual(["firstsecond"]);
 });

@@ -20,7 +20,7 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
   }, [choice.link]);
 
   const scan = async () => {
-    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem(t("mobile.noCamera"));
+    if (permission?.granted !== true && !(await requestPermission()).granted) return setCameraProblem(t("mobile.noCamera"));
     setScanning(true);
   };
 

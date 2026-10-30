@@ -77,7 +77,7 @@ function generated(): string {
     const typeOf = (n: string, kind: string | undefined) =>
       kind === "plural" || kind === "selectordinal" ? "number" : kind === "select" && flag(n) ? "boolean" : "string | number";
     const names = [...kinds.keys()].sort();
-    lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
+    lines.push(`  ${quote(key)}: ${names.length > 0 ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
   }
   lines.push("}", "");
   return lines.join("\n");
@@ -177,7 +177,7 @@ function namespaceOf(file: string): string {
   if (rel.startsWith("packages/protocol/src/words")) return "shared";
   const m = /^apps\/([^/]+)\/src\/(.*?)\/?words\.ts$/.exec(rel);
   if (!m) throw new Error(`not a word table: ${rel}`);
-  const parts = m[2]!.split("/").filter((p) => p && p !== "features");
+  const parts = m[2]!.split("/").filter((p) => p !== "" && p !== "features");
   return [m[1]!, ...parts].join(".");
 }
 
@@ -293,7 +293,7 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
         // A list of sentences or names is kept by index: weekdays.0 … weekdays.6.
         zo[k] = Object.fromEntries(zv.map((x, i) => [String(i), x]));
         eo[k] = Object.fromEntries(ev.map((x, i) => [String(i), x as string]));
-      } else if (zv && typeof zv === "object" && !Array.isArray(zv)) {
+      } else if (typeof zv === "object" && zv !== null && !Array.isArray(zv)) {
         zo[k] = {};
         eo[k] = {};
         walk(zv, ev, at, zo[k], eo[k]);
@@ -444,14 +444,14 @@ async function migrate(file: string) {
         const kept = names
           .split(",")
           .map((n) => n.trim())
-          .filter((n) => n && n !== accessorName);
+          .filter((n) => n !== "" && n !== accessorName);
         return kept.length ===
           names
             .split(",")
             .map((n) => n.trim())
             .filter(Boolean).length
           ? whole
-          : kept.length
+          : kept.length > 0
             ? `import { ${kept.join(", ")} } from "${from}";`
             : "";
       });
@@ -474,8 +474,8 @@ switch (command) {
   case "check": {
     const problems = check();
     for (const p of problems) console.log(p);
-    console.log(problems.length ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
-    if (problems.length) process.exit(1);
+    console.log(problems.length > 0 ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
+    if (problems.length > 0) process.exit(1);
     break;
   }
   case "find":

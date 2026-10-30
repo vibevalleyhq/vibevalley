@@ -78,7 +78,7 @@ export function ToggleGroup(props: ToggleGroupProps) {
   const ctx: GroupCtx = {
     value,
     disabled: () => Boolean(props.disabled),
-    press: (v, on) => setValue(on ? (props.multiple ? [...value(), v] : [v]) : value().filter((x) => x !== v)),
+    press: (v, on) => setValue(on ? (props.multiple === true ? [...value(), v] : [v]) : value().filter((x) => x !== v)),
     tabStop: () => value().find(() => true) ?? first(),
   };
   return (

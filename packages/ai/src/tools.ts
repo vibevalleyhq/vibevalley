@@ -50,6 +50,9 @@ export function coerceArguments(args: unknown, schema: JsonSchema): unknown {
   return coerce(copy, schema);
 }
 
+/** A nested schema: an object, not a tuple's array of them. */
+const isSchema = (v: unknown): v is JsonSchema => typeof v === "object" && v !== null && !Array.isArray(v);
+
 const typesOf = (schema: JsonSchema): string[] =>
   typeof schema.type === "string" ? [schema.type] : Array.isArray(schema.type) ? schema.type.filter((t): t is string => typeof t === "string") : [];
 
@@ -133,8 +136,8 @@ function coerce(value: unknown, schema: JsonSchema): unknown {
     const object = next as Record<string, unknown>;
     for (const [key, p] of Object.entries((schema.properties ?? {}) as Record<string, JsonSchema>)) if (key in object) object[key] = coerce(object[key], p);
   }
-  if (types.includes("array") && Array.isArray(next) && schema.items && !Array.isArray(schema.items)) {
-    const items = schema.items as JsonSchema;
+  const items = schema.items;
+  if (types.includes("array") && Array.isArray(next) && isSchema(items)) {
     for (let i = 0; i < next.length; i++) next[i] = coerce(next[i], items);
   }
   return next;
@@ -158,13 +161,13 @@ function problemsOf(value: unknown, schema: JsonSchema, path: string): string[] 
   const types = typesOf(schema);
   if (types.length > 0 && !types.some((t) => matches(value, t))) return [`${path || "root"}: must be ${types.join(",")}`];
   if (Array.isArray(schema.enum) && !schema.enum.includes(value)) return [`${path || "root"}: must be equal to one of the allowed values`];
-  if (matches(value, "object") && schema.properties) {
+  if (matches(value, "object") && isSchema(schema.properties)) {
     const object = value as Record<string, unknown>;
     const missing = ((schema.required as string[] | undefined) ?? []).filter((k) => !(k in object));
     if (missing.length > 0) return [`${at(path, missing[0]!)}: must have required properties ${missing.join(", ")}`];
     return Object.entries(schema.properties as Record<string, JsonSchema>).flatMap(([k, p]) => (k in object ? problemsOf(object[k], p, at(path, k)) : []));
   }
-  if (Array.isArray(value) && schema.items && !Array.isArray(schema.items))
-    return value.flatMap((v, i) => problemsOf(v, schema.items as JsonSchema, at(path, i)));
+  const items = schema.items;
+  if (Array.isArray(value) && isSchema(items)) return value.flatMap((v, i) => problemsOf(v, items, at(path, i)));
   return [];
 }

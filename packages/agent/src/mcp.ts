@@ -63,7 +63,7 @@ export interface McpConnection {
 
 const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
   new Promise<A>((resolve, reject) => {
-    if (signal?.aborted) {
+    if (signal?.aborted === true) {
       reject(new Error("canceled"));
       return;
     }
@@ -85,7 +85,7 @@ const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
   });
 
 export async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpConnection> {
-  if (signal?.aborted) throw new Error("canceled");
+  if (signal?.aborted === true) throw new Error("canceled");
   let stderr = "";
   let transport: Transport;
   if (server.url) {
@@ -155,7 +155,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
       }
       let text = mcpContentText(Option.getOrElse(contentOf(r.content), () => []));
       if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : mcpWords.noContent;
-      if (r.isError) throw new Error(text);
+      if (r.isError === true) throw new Error(text);
       return text;
     },
   });
@@ -228,7 +228,7 @@ export function readMcpConfig(path: string): McpServer[] {
   const out: McpServer[] = [];
   for (const name of Object.keys(entries).sort()) {
     const e = entries[name]!;
-    if (e.disabled) continue;
+    if (e.disabled === true) continue;
     if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
     else if (e.command)
       out.push({

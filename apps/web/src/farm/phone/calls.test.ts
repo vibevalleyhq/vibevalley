@@ -44,7 +44,7 @@ function phone(open = false) {
       const next = timers.filter((t) => t.at <= until).sort((a, b) => a.at - b.at)[0];
       if (!next) break;
       now = next.at;
-      if (next.every) next.at += next.every;
+      if (next.every != null && next.every !== 0) next.at += next.every;
       else timers.splice(timers.indexOf(next), 1);
       next.f();
     }

@@ -41,14 +41,14 @@ export const run = (command: string, args: readonly string[], options: RunOption
     child.stderr.on("data", (b: Buffer) => err.push(b));
     const killGroup = () => {
       try {
-        if (child.pid) process.kill(-child.pid, "SIGKILL");
+        if (child.pid != null && child.pid !== 0) process.kill(-child.pid, "SIGKILL");
       } catch {
         // Already gone.
       }
     };
     let timedOut = false;
     const cancelTimer =
-      options.timeoutMs && options.timeoutMs > 0
+      options.timeoutMs != null && options.timeoutMs > 0
         ? afterRealTime(options.timeoutMs, () => {
             timedOut = true;
             killGroup();

@@ -131,7 +131,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           },
         });
         const text = ((res.content ?? []) as { type: string; text?: string }[]).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-        if (res.isError) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
+        if (res.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );
@@ -174,16 +174,16 @@ export function nowledge(c: MemorySourceConfig): Source {
     }),
     // Nothing to ask with, nothing asked: listing its newest would only be noise at the start of a run.
     prefetch: Effect.fnUntraced(function* (cue) {
-      if (!c.read || cue.text.trim() === "") return [];
-      const hits = yield* find(cue.agent, cue.text, recallCount, !!c.everything);
+      if (c.read !== true || cue.text.trim() === "") return [];
+      const hits = yield* find(cue.agent, cue.text, recallCount, !(c.everything !== true));
       return hits
-        .filter((h) => !cue.skip?.has(hitID(h)))
+        .filter((h) => cue.skip?.has(hitID(h)) !== true)
         .map((h) => ({ id: hitID(h), line: recallWords.sourceLine("Nowledge", clip(hitText(h), lineMost)), score: h.relevance_score ?? 0 }));
     }),
     // Its memories are notes; it has no jobs done.
     search: Effect.fnUntraced(function* (q) {
-      if (!c.read || q.kind === "issue") return { found: [] };
-      const hits = yield* find(q.agent, q.text, q.limit, !!c.everything);
+      if (c.read !== true || q.kind === "issue") return { found: [] };
+      const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));
       const selected = hits.slice(0, most);
       // MCP search omits labels; only its detail result can prove a project's scope. The caller's read budget covers both.
       const scopes = yield* Effect.forEach(
@@ -217,18 +217,18 @@ export function nowledge(c: MemorySourceConfig): Source {
     }),
     // The farm's own; Nowledge does not say which project each is for.
     list: Effect.fnUntraced(function* (agent) {
-      if (!c.read) return [];
+      if (c.read !== true) return [];
       const hits = yield* find(agent, "", most, false);
       return hits.map((h): Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
     }),
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: Effect.fnUntraced(function* (run) {
-      if (!c.write || run.outcome === "interrupted") return;
+      if (c.write !== true || run.outcome === "interrupted") return;
       for (const note of memoryNotesOf(run.said)) yield* add(run.agent, note.text, note.everywhere ? "" : run.project);
     }),
     sessionEnded: () => Effect.void,
     add: Effect.fnUntraced(function* (n) {
-      if (!c.write) return undefined;
+      if (c.write !== true) return undefined;
       const project = n.project.trim();
       const id = yield* add(n.agent, n.text, project);
       const at = yield* Clock.currentTimeMillis;

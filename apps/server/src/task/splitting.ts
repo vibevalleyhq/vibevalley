@@ -44,7 +44,7 @@ function splitProblem(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = [
     case "Pointer":
       return splitProblem(issue.issue, [...path, ...issue.path]);
     case "Composite":
-      return issue.issues[0] ? splitProblem(issue.issues[0], path) : t("server.task.parse.shape", { why: formatIssue(issue) });
+      return splitProblem(issue.issues[0], path);
     case "MissingKey":
       return t("server.task.parse.missing", { at });
     case "InvalidType":

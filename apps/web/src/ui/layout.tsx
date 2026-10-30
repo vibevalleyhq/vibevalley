@@ -42,10 +42,10 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
         href={props.to}
         data-testid="list-row"
         data-key={props.item}
-        aria-current={props.active ? "page" : undefined}
+        aria-current={props.active === true ? "page" : undefined}
         class={[
           "flex items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus",
-          { "bg-selected": !!props.active },
+          { "bg-selected": !(props.active !== true) },
         ]}
       >
         {props.leading}
@@ -94,7 +94,7 @@ export function Toggle(props: {
   testid?: string;
 }) {
   return (
-    <label class={["flex items-start gap-2", props.disabled ? "opacity-50" : "cursor-pointer"]}>
+    <label class={["flex items-start gap-2", props.disabled === true ? "opacity-50" : "cursor-pointer"]}>
       <Switch.Root
         data-testid={props.testid}
         checked={props.checked}
@@ -142,7 +142,7 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
 
 /** A quiet underlined word: a page to open in the browser, or onClick. */
 export function TextLink(props: { children: JSX.Element; href?: string; onClick?: () => void; danger?: boolean }) {
-  const look = () => ["cursor-pointer text-xs underline decoration-current/50 hover:text-ink", props.danger ? "text-berry" : "text-muted"];
+  const look = () => ["cursor-pointer text-xs underline decoration-current/50 hover:text-ink", props.danger === true ? "text-berry" : "text-muted"];
   return (
     <Show
       when={props.href}

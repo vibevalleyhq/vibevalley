@@ -4,6 +4,7 @@ import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/p
 import { channelLabel, channelName, topOf } from "./places";
 import { threadTitle } from "./threads";
 import { unreadIn, unreadUnder } from "./unread";
+import { compareText, or } from "@/base/order";
 
 export interface SwitchTarget {
   readonly kind: "channel" | "direct" | "thread" | "profile";
@@ -60,7 +61,5 @@ export function switchTargets(
     return target.label.toLowerCase().includes(words);
   });
   const starts = (target: SwitchTarget) => (words !== "" && target.label.toLowerCase().replace(/^[#@]/, "").startsWith(words) ? 0 : 1);
-  return kept.sort((a, b) => starts(a) - starts(b) || b.unread - a.unread || b.at - a.at || compareIds(a.id, b.id)).slice(0, switchMax);
+  return kept.sort((a, b) => or(starts(a) - starts(b), b.unread - a.unread, b.at - a.at, compareText(a.id, b.id))).slice(0, switchMax);
 }
-
-const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);

@@ -7,6 +7,7 @@ import { t } from "@vibevalley/i18n";
 import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
+import { numberIn } from "@/base/number.ts";
 
 const patchLines = 400;
 const patchesMax = 400_000;
@@ -65,7 +66,7 @@ export const repository = (path: string) => {
     /** Whether newer has older in it; false when git cannot say. */
     isAncestor: (older: string, newer: string) => gitOk(path, "merge-base", "--is-ancestor", older, newer),
     /** How many commits branch has that base has not. */
-    ahead: (base: string, branch: string) => Effect.map(git(path, "rev-list", "--count", `${base}..${branch}`), (n) => Number(n) || 0),
+    ahead: (base: string, branch: string) => Effect.map(git(path, "rev-list", "--count", `${base}..${branch}`), (n) => numberIn(n)),
     /** origin's URL, or "" when it has none. */
     origin: gitQuiet(path, "remote", "get-url", "origin"),
     /** "" when the worktree at cwd is gone; without force, one with changes stays. */
@@ -172,12 +173,12 @@ export const repository = (path: string) => {
         const parts = line.split("\t");
         changes.commits.push({
           hash: parts[0]!,
-          at: (Number(parts[1]) || 0) * 1000,
+          at: numberIn(parts[1]) * 1000,
           subject: parts.slice(2).join("\t"),
         });
       }
       changes.conflicts.push(...clashes);
-      changes.behind = Number(behind) || 0;
+      changes.behind = numberIn(behind);
       return changes;
     }),
   };

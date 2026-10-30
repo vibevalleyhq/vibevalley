@@ -42,7 +42,7 @@ export function PxButton(
       type={props.type ?? "button"}
       {...rest}
       onClick={(e) => props.onClick?.(e)}
-      disabled={props.disabled || !props.onClick}
+      disabled={props.disabled === true || props.onClick === undefined}
       aria-label={props.label}
       class={[
         pxText.sm,

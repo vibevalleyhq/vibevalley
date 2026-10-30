@@ -137,7 +137,7 @@ describe("the agent", () => {
       dir,
       [
         answer([thinking("先读文件"), toolCall("read_file", { path: "notes.txt" })]),
-        step((c) => answer(results(c)[0]?.text.includes("第二行") ? "读到了：两行" : "读到了：没读到")),
+        step((c) => answer(results(c)[0]?.text.includes("第二行") === true ? "读到了：两行" : "读到了：没读到")),
       ],
       async (r) => {
         expect(await r.ask("看看 notes.txt")).toBe("读到了：两行");

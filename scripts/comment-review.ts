@@ -65,7 +65,7 @@ export function commentsIn(file: string, src: string): Comment[] {
   for (const c of comments) {
     const last = runs.at(-1);
     const isDirective = directive.test(c.value);
-    if (last?.line && !last.directive && c.type === "Line" && !isDirective && /^[ \t]*\n[ \t]*$/.test(src.slice(last.end, c.start))) last.end = c.end;
+    if (last?.line === true && !last.directive && c.type === "Line" && !isDirective && /^[ \t]*\n[ \t]*$/.test(src.slice(last.end, c.start))) last.end = c.end;
     else runs.push({ start: c.start, end: c.end, line: c.type === "Line", directive: isDirective });
   }
   return runs

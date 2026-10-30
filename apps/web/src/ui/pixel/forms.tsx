@@ -21,7 +21,7 @@ export function PxChipsInput(props: {
     setDraft("");
   };
   return (
-    <div class={["flex min-h-9 flex-wrap items-center gap-1 bg-cream-100 p-1.5", pxRing, { "opacity-50": !!props.disabled }]}>
+    <div class={["flex min-h-9 flex-wrap items-center gap-1 bg-cream-100 p-1.5", pxRing, { "opacity-50": !(props.disabled !== true) }]}>
       <For each={props.value}>
         {(chip) => (
           <span class={[pxText.xs, "inline-flex items-center gap-1 bg-cream-300 py-0.5 pr-1 pl-2 text-bark-800"]}>

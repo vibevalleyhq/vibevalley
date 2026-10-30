@@ -133,7 +133,7 @@ function codeBlock(pre: HTMLElement, code: Element, lang: string, text: string, 
     });
     box.append(more);
   }
-  if (o.pixel || !lang) return;
+  if (o.pixel === true || !lang) return;
   void highlight(lines, lang).then((tokens) => {
     if (!tokens || !code.isConnected) return;
     code.replaceChildren(

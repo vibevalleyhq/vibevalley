@@ -27,7 +27,7 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
     <input
       ref={(el) => {
         props.ref?.(el);
-        if (props.autofocus) focus(el);
+        if (props.autofocus === true) focus(el);
       }}
       value={text()}
       onInput={(e) => setText(e.currentTarget.value)}

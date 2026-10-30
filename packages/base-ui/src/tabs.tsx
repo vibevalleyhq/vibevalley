@@ -88,7 +88,7 @@ function List(props: TabsListProps) {
         call(props.onKeyDown, e);
         if (!list || e.defaultPrevented) return;
         const to = roveFocus(e, list, "[role=tab]", { orientation: c.orientation(), loop: props.loop ?? true });
-        if (to && props.activateOnFocus && to.dataset.value !== undefined) c.select(to.dataset.value);
+        if (to && props.activateOnFocus === true && to.dataset.value !== undefined) c.select(to.dataset.value);
       }}
     />
   );

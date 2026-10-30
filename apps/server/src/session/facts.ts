@@ -114,7 +114,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
   };
 
   // Any word from it ends a quiet spell: the same doing again says so.
-  if (tracking.quiet && event.kind !== "usage") {
+  if (tracking.quiet === true && event.kind !== "usage") {
     next = { ...next, quiet: false };
     if (working) facts.push({ type: "doing", id, action: working.doing.action, label: working.doing.label });
   }
@@ -174,13 +174,13 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       break;
     case "retry": {
       const text =
-        (event.maxAttempts
+        (event.maxAttempts != null && event.maxAttempts !== 0
           ? t("server.session.log.retryOf", { attempt: event.attempt, of: event.maxAttempts })
           : t("server.session.log.retry", { attempt: event.attempt })) +
-        (event.delayMs ? t("server.session.log.retryIn", { s: Math.ceil(event.delayMs / 1000) }) : "") +
+        (event.delayMs != null && event.delayMs !== 0 ? t("server.session.log.retryIn", { s: Math.ceil(event.delayMs / 1000) }) : "") +
         (event.reason ? t("server.session.log.retryWhy", { reason: clip(event.reason, 160) }) : "");
       journal.push({ type: "note", kind: "llm/retry", text });
-      facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts ? { of: event.maxAttempts } : {}) });
+      facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts != null && event.maxAttempts !== 0 ? { of: event.maxAttempts } : {}) });
       break;
     }
     case "usage": {
@@ -200,7 +200,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       const before = session.spent ?? { tokens: 0 };
       const total = before.cny !== undefined || cny !== undefined ? (before.cny ?? 0) + (cny ?? 0) : undefined;
       facts.push({ type: "spent", id, spent: { tokens: before.tokens + delta.input + delta.output, ...(total !== undefined ? { cny: total } : {}) } });
-      if (cny) spentCny = cny;
+      if (cny != null && cny !== 0) spentCny = cny;
       break;
     }
     case "model":

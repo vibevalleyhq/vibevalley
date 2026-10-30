@@ -37,7 +37,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const own = () => ready(skills, []);
   const creating = () => props.id === "new";
   const shownInstalled = () =>
-    props.id?.startsWith(installedPrefix) ? installed().find((s) => s.name === props.id!.slice(installedPrefix.length)) : undefined;
+    props.id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === props.id!.slice(installedPrefix.length)) : undefined;
   const selected = () =>
     creating() || shownInstalled() ? undefined : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0]));
   const first = () => (props.id === undefined ? installed()[0] : undefined);
@@ -183,7 +183,7 @@ function SkillEditor(props: { skill?: Skill }) {
   const router = useRouter();
   const client = useQueryClient();
   const allAgents = useAgents();
-  const agents = () => ready(allAgents, []).filter((a) => skill && a.skills.includes(skill.id));
+  const agents = () => ready(allAgents, []).filter((a) => skill !== undefined && a.skills.includes(skill.id));
   const dirty = () => !skill || !same(skill, draft());
   const act = async (f: () => Promise<void>) => {
     setBusy(true);

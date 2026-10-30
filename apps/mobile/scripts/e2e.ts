@@ -15,7 +15,7 @@ import { VibeValleyApi } from "@vibevalley/protocol";
 
 const platform = process.argv[2] === "ios" ? "ios" : "android";
 const server = process.env.VIBEVALLEY_SERVER;
-if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
+if (server === undefined || server === "") throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
 const mobile = join(import.meta.dirname, "..");
 const out = join(mobile, ".screens");
 mkdirSync(out, { recursive: true });

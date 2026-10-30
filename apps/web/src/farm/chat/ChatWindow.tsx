@@ -163,7 +163,7 @@ export function ChatWindow() {
   const captions = createMemo(() => {
     const c = call();
     const here = shown();
-    if (c.phase !== "live" || !here?.default) return [];
+    if (c.phase !== "live" || here?.default !== true) return [];
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));

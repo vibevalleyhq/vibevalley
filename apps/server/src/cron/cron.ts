@@ -90,7 +90,7 @@ export const make = Effect.gen(function* () {
       tz: row.tz,
       enabled: row.enabled,
       created: row.created_at,
-      ...(row.last_run ? { lastRun: row.last_run } : {}),
+      ...(row.last_run != null && row.last_run !== 0 ? { lastRun: row.last_run } : {}),
       by: row.set_by,
       pending: row.pending,
     };

@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
 
 /** A state as a data attribute: present (empty) when on, absent when off. */
-export const flag = (on: boolean | undefined): "" | undefined => (on ? "" : undefined);
+export const flag = (on: boolean | undefined): "" | undefined => (on === true ? "" : undefined);
 
 /** Calls a handler given as a JSX prop: a function, or Solid's [handler, data] pair. */
 export function call(handler: unknown, event: Event) {

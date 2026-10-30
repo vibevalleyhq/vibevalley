@@ -23,7 +23,7 @@ export const untilGot = <A>(get: () => A | undefined | false | Promise<A | undef
   Effect.map(
     waitFor(
       Effect.promise(async () => get()),
-      (got) => !!got,
+      (got) => got !== undefined && got !== false,
       what,
       ms,
     ),

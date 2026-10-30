@@ -34,7 +34,7 @@ const lastUser = (r: Request) => words(r.messages.findLast((m) => m.role === "us
 const shape = (events: readonly AgentEvent<never>[]) =>
   events
     .map((e) => ("message" in e && e.type.startsWith("message_") ? `${e.type}:${e.message.role}` : "toolName" in e ? `${e.type}:${e.toolName}` : e.type))
-    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update")));
+    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update") === true));
 
 /** streaming is done once the answer's text is said. */
 const rig = (

@@ -121,7 +121,7 @@ export function refinement(d: RefinementDeps) {
 
   const handedBack = Effect.fn("Issues.handedBack")(function* (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) {
     const h = sessions.sessionOf(f.id);
-    if (!h?.refining || !h.issue) return;
+    if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
     const r = sessions.find(f.id);
     const said = r?.lastText ?? "";

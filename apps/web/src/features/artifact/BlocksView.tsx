@@ -108,8 +108,8 @@ export function BlocksView(props: { id: string; onEditor?: (editor: BlockEditor)
       class="flex min-h-0 flex-1 flex-col"
     >
       {/* Nothing written yet has nothing to report; the line comes with the first block. */}
-      <p role="status" class={["truncate pb-2 pl-[35px] text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
-        {(version(), editor.blocks.length > 0 || editor.busy || editor.error) ? status() : ""}
+      <p role="status" class={["truncate pb-2 pl-[35px] text-xs", (version(), editor.error !== undefined) ? "text-berry" : "text-muted"]}>
+        {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
       </p>
       <div class="min-h-0 flex-1 overflow-y-auto pr-3">
         <For each={rows()} keyed={(r) => r.block.id}>
@@ -148,7 +148,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           <Checkbox
             class="mt-1"
             checked={r().attrs.checked ?? false}
-            label={r().attrs.checked ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
+            label={r().attrs.checked === true ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
             onChange={() => props.editor.toggle(r().block)}
           />
         );
@@ -231,7 +231,7 @@ function typeStyle(r: Row) {
     case "quote":
       return "text-base leading-6 text-muted";
     default:
-      return r.type === "todo" && r.attrs.checked ? "text-base leading-6 text-muted line-through" : "text-base leading-6";
+      return r.type === "todo" && r.attrs.checked === true ? "text-base leading-6 text-muted line-through" : "text-base leading-6";
   }
 }
 
@@ -240,10 +240,10 @@ function Marked(props: { spans: readonly TextSpan[] }) {
     <For each={props.spans}>
       {(s) => {
         const cls = {
-          "font-semibold": !!s.marks.bold,
-          italic: !!s.marks.italic,
-          "rounded-xs bg-hover px-0.5 font-mono": !!s.marks.code,
-          "line-through": !!s.marks.strike,
+          "font-semibold": !(s.marks.bold !== true),
+          italic: !(s.marks.italic !== true),
+          "rounded-xs bg-hover px-0.5 font-mono": !(s.marks.code !== true),
+          "line-through": !(s.marks.strike !== true),
           "text-water underline": !!s.marks.link,
         };
         return (

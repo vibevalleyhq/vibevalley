@@ -9,11 +9,11 @@ export function pickIssues(all: readonly Issue[], f: IssueFilter, now: number): 
   const project = (f.project ?? "").trim();
   let found = all.filter(
     (item) =>
-      (f.status ? item.status === f.status : f.closed || (item.status !== "done" && item.status !== "canceled")) &&
-      (!f.wantsOwner || attentionWantsOwner(item.attention.state)) &&
+      (f.status ? item.status === f.status : f.closed === true || (item.status !== "done" && item.status !== "canceled")) &&
+      (f.wantsOwner !== true || attentionWantsOwner(item.attention.state)) &&
       (!project || item.project === project) &&
       words.every((w) => (item.title + "\n" + item.description).includes(w)),
   );
-  if (f.wantsOwner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
-  return f.limit && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
+  if (f.wantsOwner === true) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
+  return f.limit != null && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
 }

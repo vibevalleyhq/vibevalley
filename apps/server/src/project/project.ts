@@ -49,6 +49,8 @@ import {
   type WorkplaceRelease,
 } from "./shapes.ts";
 import { stackFiles, stackOf } from "./stack.ts";
+import { or } from "@/base/order.ts";
+import { numberIn } from "@/base/number.ts";
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 
@@ -163,7 +165,7 @@ export function countsOf(output: string): LanguageCount[] | undefined {
       blanks: Math.trunc(l.blanks),
     });
   }
-  return out.sort((a, b) => b.code + b.comments - (a.code + a.comments) || localeCompare(a.name, b.name));
+  return out.sort((a, b) => or(b.code + b.comments - (a.code + a.comments), localeCompare(a.name, b.name)));
 }
 
 /** The calendar day an instant falls on where the farm runs, as yyyy-mm-dd. */
@@ -183,7 +185,7 @@ export function activityOf(log: string, dayOf: (ms: number) => string = localDay
     byAuthor.set(name, (byAuthor.get(name) ?? 0) + 1);
   }
   const days = [...byDay].map(([day, commits]) => ({ day, commits })).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
-  const authors = [...byAuthor].map(([name, commits]) => ({ name, commits })).sort((a, b) => b.commits - a.commits || localeCompare(a.name, b.name));
+  const authors = [...byAuthor].map(([name, commits]) => ({ name, commits })).sort((a, b) => or(b.commits - a.commits, localeCompare(a.name, b.name)));
   return { days, authors };
 }
 
@@ -506,7 +508,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
                 const { url } = githubRepository(req.github)!;
-                const known = status?.checkedAt ? status : yield* probeGitHub(gh);
+                const known = status?.checkedAt != null && status?.checkedAt !== 0 ? status : yield* probeGitHub(gh);
                 if (known.loggedIn) {
                   if (!(yield* gh("repo", "clone", githubOrigin(url), path)).ok) return yield* fail(t("server.project.cloneFailedGh"));
                 } else {
@@ -565,7 +567,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         const total = yield* gitQuiet(p.path, "rev-list", "--all", "--no-merges", "--count");
         const roots = yield* gitQuiet(p.path, "log", "--all", "--max-parents=0", "--format=%at");
         const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
-        Object.assign(out, activityOf(log), { total: Number(total) || 0 });
+        Object.assign(out, activityOf(log), { total: numberIn(total) });
         const first = Math.min(
           ...roots
             .split("\n")
@@ -808,7 +810,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         }),
       houseRules: () => Effect.orElseSucceed(fs.readFileString(join(work, "AGENTS.md")), () => ""),
       githubStatus: () =>
-        status?.checkedAt
+        status?.checkedAt != null && status?.checkedAt !== 0
           ? status
           : ({
               checkedAt: 0,

@@ -45,7 +45,7 @@ export function parseCron(expr: string): Cron.Cron {
 export function nextRun(reminder: Reminder): Date | undefined {
   const from = parseDate(reminder.lastRun || reminder.created) ?? new Date(0);
   if (reminder.at) return reminder.lastRun ? undefined : parseDate(reminder.at);
-  if (reminder.everyMinutes) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
+  if (reminder.everyMinutes != null && reminder.everyMinutes !== 0) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
   if (reminder.cron) {
     try {
       // Effect's Cron starts at the second after from.
@@ -70,7 +70,7 @@ const localeTime = (t: Date) => `${t.getFullYear()}/${t.getMonth() + 1}/${t.getD
 export function describeReminder(j: Reminder): string {
   const when = j.at
     ? localeTime(parseDate(j.at) ?? new Date(0)) + reminderWords.onceNote
-    : j.everyMinutes
+    : j.everyMinutes != null && j.everyMinutes !== 0
       ? reminderWords.everyNote(j.everyMinutes)
       : "cron " + j.cron;
   const next = nextRun(j);

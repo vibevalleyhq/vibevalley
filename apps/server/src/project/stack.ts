@@ -62,7 +62,7 @@ export function stackOf(files: ReadonlyMap<string, string>): ProjectStack {
       name: "python",
       label: "Python",
       test: "pytest",
-      lint: pyproject?.includes("ruff") ? "ruff check ." : "",
+      lint: pyproject?.includes("ruff") === true ? "ruff check ." : "",
     });
   return empty;
 }

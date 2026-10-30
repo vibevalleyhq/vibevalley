@@ -8,7 +8,7 @@ import catalogEn from "./template_catalog.en.json";
 function shape(v: unknown): unknown {
   if (typeof v === "string") return [...v.matchAll(/\{\w+\}|〔/g)].map((m) => m[0]).join("");
   if (Array.isArray(v)) return v.map(shape);
-  if (v && typeof v === "object")
+  if (typeof v === "object" && v !== null)
     return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "id" || k === "runtime" || k === "model" ? x : shape(x)]));
   return v;
 }

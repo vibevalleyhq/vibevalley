@@ -10,7 +10,7 @@ const atRoot = (): Plugin => ({
   name: "vibevalley-stories-root",
   configureServer(server) {
     server.middlewares.use((req, _res, next) => {
-      if (req.url === "/" || req.url?.startsWith("/?")) req.url = `/stories.html${req.url.slice(1)}`;
+      if (req.url === "/" || req.url?.startsWith("/?") === true) req.url = `/stories.html${req.url.slice(1)}`;
       next();
     });
   },

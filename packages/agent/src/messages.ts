@@ -34,7 +34,7 @@ export const customMessage = (customType: string, content: UserContent, now: num
   role: "custom",
   customType,
   content,
-  display: !options.hidden,
+  display: options.hidden !== true,
   ...(options.details === undefined ? {} : { details: options.details }),
   timestamp: now,
 });

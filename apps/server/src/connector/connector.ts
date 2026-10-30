@@ -231,7 +231,7 @@ export const make = (options: ConnectorOptions = {}) =>
           ...(stopped ? { pausedUntil: a.pausedUntil } : {}),
           owner: shortId(a.owner),
           since: a.connectedAt,
-          ...(a.lastInbound ? { lastInbound: a.lastInbound } : {}),
+          ...(a.lastInbound !== 0 ? { lastInbound: a.lastInbound } : {}),
         };
       });
 
@@ -566,7 +566,7 @@ export const make = (options: ConnectorOptions = {}) =>
         login: Effect.fnUntraced(function* (input: ConnectorLogin) {
           const started = yield* commands.withPermits(1)(
             Effect.gen(function* () {
-              if (progress && !input.force) return attempt;
+              if (progress && input.force !== true) return attempt;
               yield* stopGeneration;
               attempt++;
               setErr("");

@@ -109,7 +109,7 @@ function assistantMessage(model: Model, m: AssistantMessage): Record<string, unk
     said.tool_calls = calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
   // DeepSeek wants it on every assistant message once thinking is in play.
   if (model.reasoning && said.reasoning_content === undefined) said.reasoning_content = "";
-  if ((said.content === null || said.content === "") && !said.tool_calls) return undefined;
+  if ((said.content === null || said.content === "") && said.tool_calls === undefined) return undefined;
   return said;
 }
 
@@ -209,7 +209,7 @@ function messageTokens(m: Message): number {
   return Math.ceil(chars / charsPerToken);
 }
 
-const usageTokens = (u: Usage) => u.totalTokens || u.input + u.output + u.cacheRead + u.cacheWrite;
+const usageTokens = (u: Usage) => (u.totalTokens > 0 ? u.totalTokens : u.input + u.output + u.cacheRead + u.cacheWrite);
 
 function estimateTokens(context: Context): number {
   // The system prompt leads at timestamp 0, as pi-ai's leading system message does.

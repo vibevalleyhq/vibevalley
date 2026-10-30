@@ -100,7 +100,7 @@ export async function pixelStage({
     height: h,
     background,
     antialias: false,
-    resolution: window.devicePixelRatio || 1,
+    resolution: window.devicePixelRatio > 0 ? window.devicePixelRatio : 1,
     autoDensity: true,
     roundPixels: true,
     preference: "webgl",
@@ -180,7 +180,7 @@ export async function pixelStage({
     offset: () => ({ ...offset }),
     onFit: (fn) => {
       listeners.add(fn);
-      if (scale) fn(scale);
+      if (scale !== 0) fn(scale);
       return () => listeners.delete(fn);
     },
     destroy: () => {
@@ -296,7 +296,7 @@ export class Walker {
   /** Moves on by `dt` seconds. */
   step(dt: number) {
     let left = this.speed * dt;
-    while (left > 0 && this.path.length) {
+    while (left > 0 && this.path.length > 0) {
       const next = this.path[0]!;
       const dx = next.x - this.x;
       const dy = next.y - this.y;

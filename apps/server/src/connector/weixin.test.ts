@@ -24,7 +24,7 @@ const serve = async (answer: (path: string) => string) => {
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("no test port");
+  if (address === null || typeof address === "string") throw new Error("no test port");
   return `http://127.0.0.1:${address.port}`;
 };
 

@@ -14,9 +14,7 @@ interface Ctx {
 
 const Context = createContext<Ctx>();
 const use = () => {
-  const c = useContext(Context);
-  if (!c) throw new Error("Collapsible parts belong inside Collapsible.Root");
-  return c;
+  return useContext(Context);
 };
 
 export interface CollapsibleRootProps extends DivProps {

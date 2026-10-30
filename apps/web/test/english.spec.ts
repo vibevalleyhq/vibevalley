@@ -47,7 +47,7 @@ test("no page of an English farm shows Chinese of its own", async ({ page, api }
   const keep = (v: unknown): void => {
     if (typeof v === "string") stored.push(v);
     else if (Array.isArray(v)) v.forEach(keep);
-    else if (v && typeof v === "object") Object.values(v).forEach(keep);
+    else if (typeof v === "object" && v !== null) Object.values(v).forEach(keep);
   };
   keep(agents);
   keep(await api.channel.list());

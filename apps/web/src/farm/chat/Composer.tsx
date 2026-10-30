@@ -25,7 +25,7 @@ function PickChip(props: { named: boolean }) {
   const pick = usePrefs((p) => p.pick);
   const agent = useAgent(pick);
   return (
-    <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
+    <Show when={pick() !== "auto" && agent()?.enabled === true ? agent() : undefined}>
       {(a) => (
         <span class="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={t("web.farm.chat.sendTo", { name: a().name })}>
           <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={26} />

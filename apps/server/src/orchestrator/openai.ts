@@ -97,7 +97,7 @@ export function chatCompletions(c: ChatCompletions) {
     const id = "chatcmpl-" + randomBytes(6).toString("hex");
     const created = Math.floor(asked / 1000);
     const firstWords = () => c.log?.(`vibevalley: ${model}'s first words ${c.now() - asked}ms after it was asked`);
-    if (!req.stream) {
+    if (req.stream !== true) {
       let all = "";
       for await (const w of words) {
         if (all === "") firstWords();

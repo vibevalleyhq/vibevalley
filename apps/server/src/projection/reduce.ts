@@ -41,7 +41,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return [chat === state.chat ? state : { ...state, ...(chat ? { chat } : {}) }, news];
     }
     case "channel":
-      if (state.chat?.channels.some((c) => c.id === f.channel.id && same(c, f.channel))) return [state, false];
+      if (state.chat?.channels.some((c) => c.id === f.channel.id && same(c, f.channel)) === true) return [state, false];
       return [{ ...state, chat: withChannel(state.chat, f.channel) }, true];
     case "channelGone": {
       const all = state.chat?.channels ?? [];
@@ -74,7 +74,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
     case "quiet":
       return whileWorking(state, f.id, (p) => ({ ...p, quietSince: f.since }));
     case "retry":
-      return whileWorking(state, f.id, (p) => ({ ...p, retry: f.of ? { attempt: f.attempt, of: f.of } : { attempt: f.attempt } }));
+      return whileWorking(state, f.id, (p) => ({ ...p, retry: f.of != null && f.of !== 0 ? { attempt: f.attempt, of: f.of } : { attempt: f.attempt } }));
     case "spent":
       return withSession(state, f.id, (h) => ({ ...h, spent: f.spent }));
     case "report":

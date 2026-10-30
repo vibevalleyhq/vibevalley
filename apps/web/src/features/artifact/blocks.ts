@@ -62,10 +62,10 @@ export function editSpans(old: readonly TextSpan[], text: string): TextSpan[] {
   const m = head.at(-1)?.marks;
   const marks: SpanMarks = m
     ? {
-        ...(m.bold ? { bold: m.bold } : {}),
-        ...(m.italic ? { italic: m.italic } : {}),
-        ...(m.code ? { code: m.code } : {}),
-        ...(m.strike ? { strike: m.strike } : {}),
+        ...(m.bold === true ? { bold: m.bold } : {}),
+        ...(m.italic === true ? { italic: m.italic } : {}),
+        ...(m.code === true ? { code: m.code } : {}),
+        ...(m.strike === true ? { strike: m.strike } : {}),
       }
     : {};
   return normalSpans([...head, { t: typed, marks }, ...tail]);

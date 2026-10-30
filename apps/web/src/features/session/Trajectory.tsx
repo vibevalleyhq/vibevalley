@@ -149,7 +149,7 @@ export function Trajectory(props: {
   const shown = createMemo(() => shownEvents(props.steps));
   const end = () => {
     const last = props.steps.at(-1)?.time ?? props.now;
-    return props.working && props.now > last ? props.now : last;
+    return props.working === true && props.now > last ? props.now : last;
   };
   const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
   const show = (seq: number) => {

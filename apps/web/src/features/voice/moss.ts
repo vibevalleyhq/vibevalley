@@ -119,7 +119,7 @@ export class Playback {
 
   private finished(run: string): PlaybackAction[] {
     const r = this.runs.get(run);
-    if (!r?.sent || this.playing.some((p) => p.run === run)) return [];
+    if (r?.sent !== true || this.playing.some((p) => p.run === run)) return [];
     this.runs.delete(run);
     return [{ action: "playback.completed", run_id: run, turn_id: r.turn }];
   }

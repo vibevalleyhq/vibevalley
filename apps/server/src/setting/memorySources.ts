@@ -39,7 +39,7 @@ export function memorySourcesOver(saved: readonly MemorySourceConfig[], given: r
       ...(m.enabled ? { enabled: true } : {}),
       ...(m.read ? { read: true } : {}),
       ...(m.write ? { write: true } : {}),
-      ...(m.everything ? { everything: true } : {}),
+      ...(m.everything === true ? { everything: true } : {}),
       ...(m.user?.trim() ? { user: m.user.trim() } : {}),
       ...(key ? { key } : {}),
     };

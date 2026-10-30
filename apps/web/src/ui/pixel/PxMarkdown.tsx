@@ -69,8 +69,8 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
  * a line; headings stay pixel, code stays mono. `class` carries the colour.
  */
 export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; class?: string }) {
-  const nodes = createMemo(() => render(props.mentions ? withMentions(props.text) : props.text, props.onOpenLink));
-  return <div class={[common, props.reading ? reading : said, props.class]}>{nodes()}</div>;
+  const nodes = createMemo(() => render(props.mentions === true ? withMentions(props.text) : props.text, props.onOpenLink));
+  return <div class={[common, props.reading === true ? reading : said, props.class]}>{nodes()}</div>;
 }
 
 /** Plain text to read, as PxMarkdown with `reading` draws it. */

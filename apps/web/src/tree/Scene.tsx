@@ -385,7 +385,7 @@ export function Scene(props: {
         }
         for (const p of tree.seeds) {
           const s = at(p);
-          if (!p.item.sown && Math.floor(t / 600 + hash01(p.item.id) * 4) % 3 === 0) {
+          if (p.item.sown !== true && Math.floor(t / 600 + hash01(p.item.id) * 4) % 3 === 0) {
             lc.fillStyle = "rgba(255,236,150,0.9)";
             lc.fillRect(Math.round(s.x), Math.round(s.y) - 8, 1, 1);
           }
@@ -473,11 +473,11 @@ export function Scene(props: {
           const b = pos.get(l.b);
           if (!a || !b || !kept(a.s.item, props.filter) || !kept(b.s.item, props.filter)) continue;
           const direct = l.a === hovered || l.b === hovered;
-          const mine = lit?.has(l.a) && lit.has(l.b) && (l.kind === "from" || direct);
+          const mine = lit?.has(l.a) === true && lit.has(l.b) && (l.kind === "from" || direct);
           const base = l.kind === "from" ? 0.16 : 0.1;
-          const alpha = (lit ? (mine ? (direct ? 0.9 : 0.55) : base * 0.4) : base) * k;
+          const alpha = (lit ? (mine === true ? (direct ? 0.9 : 0.55) : base * 0.4) : base) * k;
           lc.fillStyle = l.kind === "from" ? `rgba(255,214,130,${alpha})` : `rgba(160,190,255,${alpha})`;
-          line(lc, a.x, a.y, b.x, b.y, mine && direct ? 1 : 2);
+          line(lc, a.x, a.y, b.x, b.y, mine === true && direct ? 1 : 2);
         }
         for (const p of placed) {
           const { item, size } = p.s;
@@ -491,7 +491,7 @@ export function Scene(props: {
           if (size >= 3) {
             lc.fillRect(x - 1, y, 3, 1);
             lc.fillRect(x, y - 1, 1, 3);
-            if (flash || lit?.has(item.id)) {
+            if (flash || lit?.has(item.id) === true) {
               lc.fillRect(x - 2, y, 5, 1);
               lc.fillRect(x, y - 2, 1, 5);
             }
@@ -563,7 +563,7 @@ export function Scene(props: {
     const up = (e: PointerEvent) => {
       const moved = drag?.moved;
       drag = undefined;
-      if (moved) return;
+      if (moved === true) return;
       const best = hitAt(e);
       if (best) props.onPick(best.item);
     };

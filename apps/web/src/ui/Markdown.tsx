@@ -26,7 +26,7 @@ const withMentions = unified()
 export function Markdown(props: { text: string; class?: string; mentions?: boolean }) {
   const router = useRouter();
   const nodes = createMemo(() => {
-    const md = props.mentions ? withMentions : plain;
+    const md = props.mentions === true ? withMentions : plain;
     const tree = md.runSync(md.parse(props.text));
     const root = toDom(tree, { fragment: true }) as DocumentFragment;
     onCleanup(richen(root, { navigate: (to) => router.navigate(to) }));

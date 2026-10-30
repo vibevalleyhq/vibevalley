@@ -139,7 +139,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.default ? t("web.channel.defaultHint") : undefined}>
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
@@ -452,9 +452,9 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
 }
 
 function Section(props: { title: string; item: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
-  const [open, setOpen] = createSignal(untrack(() => !props.closed));
+  const [open, setOpen] = createSignal(untrack(() => props.closed !== true));
   return (
-    <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
+    <section class={props.nested === true ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
       <div class="flex items-center px-1 pb-1">
         <button
           type="button"
@@ -500,8 +500,8 @@ function ChannelRow(props: {
       data-notify={props.channel.notify ?? "all"}
       onClick={() => props.onClick?.()}
       aria-current={props.here ? "page" : undefined}
-      draggable={props.movable ? "true" : "false"}
-      title={props.movable ? t("web.channel.manage.drag") : undefined}
+      draggable={props.movable === true ? "true" : "false"}
+      title={props.movable === true ? t("web.channel.manage.drag") : undefined}
       onDragStart={(e) => {
         e.dataTransfer?.setData("text/plain", props.channel.id);
         untrack(() => props.onDragStart)?.();

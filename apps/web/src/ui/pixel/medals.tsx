@@ -6,7 +6,7 @@ const disc = { size: 0.44, centerY: 0.409 };
 /** `tier` 1 bronze, 2 silver, 3 or more gold; a one-off's medal is gold. The emblem falls back to the wreath. */
 export function EarnedMedal(props: { atlas: SpriteAtlas; achievement: string; tier: number; oneOff?: boolean; size?: number }) {
   const size = () => props.size ?? 48;
-  const t = () => (props.oneOff ? 3 : props.tier);
+  const t = () => (props.oneOff === true ? 3 : props.tier);
   const frame = () => props.atlas.get(t() === 1 ? "medal-bronze" : t() === 2 ? "medal-silver" : "medal-gold");
   const emblem = () => props.atlas.first([`emblem-${props.achievement}`, "emblem-wreath"]);
   const e = () => size() * disc.size;

@@ -59,7 +59,7 @@ function Root(props: SliderRootProps) {
   const [dragging, setDragging] = createSignal(false);
   const ctx: Ctx = {
     value,
-    share: () => (value() - min()) / (max() - min() || 1),
+    share: () => (value() - min()) / (max() === min() ? 1 : max() - min()),
     min,
     max,
     step,

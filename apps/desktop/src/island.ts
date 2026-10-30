@@ -53,7 +53,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? t(`shared.stuck.${stuck}`) : t(`shared.attention.${state}`);
     rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
   }
-  rows.sort((a, b) => Number(b.first) - Number(a.first) || a.number - b.number);
+  rows.sort((a, b) => (b.first !== a.first ? Number(b.first) - Number(a.first) : a.number - b.number));
   const working = rows.filter((r) => r.tone === "working").length;
   const waiting = rows.filter((r) => r.first).length;
   return {

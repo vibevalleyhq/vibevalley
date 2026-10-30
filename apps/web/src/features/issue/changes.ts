@@ -10,7 +10,7 @@ export const lineCounts = (c: Changes): [number, number] => [
 export function changesLine(c: Changes) {
   const [added, removed] = lineCounts(c);
   const counts = { branch: c.branch ?? "", base: c.base, commits: c.commits.length, added, removed };
-  return c.uncommitted.length
+  return c.uncommitted.length > 0
     ? t("web.issue.issue.changesUncommitted", { ...counts, uncommitted: c.uncommitted.length })
     : t("web.issue.issue.changes", counts);
 }

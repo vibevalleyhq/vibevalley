@@ -614,7 +614,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           endRun(h, report.outcome, report.summary, report.spent);
         } else apply(fact);
       }
-      if (reaction.spentCny) runtimes.spend(runtime, reaction.spentCny);
+      if (reaction.spentCny !== 0) runtimes.spend(runtime, reaction.spentCny);
       if (reaction.warn) notice("warn", reaction.warn);
       if (event.kind === "exited") closedLaunch(h);
     };
@@ -857,9 +857,9 @@ export const make = (options: SessionOptionsIn = {}) =>
         ...visible.map((s) => {
           const h = hands.get(s.id);
           const allocation = allocations.get(s.id);
-          const opening = allocation && (!allocation.attached || allocation.closing);
+          const opening = allocation !== undefined && (!allocation.attached || allocation.closing !== undefined);
           // A submitted turn owns its slot before oar opens it: its trigger is the reservation.
-          return (opening || (h && h.triggers.length > 0)) && !isBusy(s) ? { ...s, phase: reserved(clock.currentTimeMillisUnsafe()) } : s;
+          return (opening || (h !== undefined && h.triggers.length > 0)) && !isBusy(s) ? { ...s, phase: reserved(clock.currentTimeMillisUnsafe()) } : s;
         }),
         ...[...allocations.values()].filter((a) => !visible.some((s) => s.id === a.owner.id)).map((a) => a.owner),
       ];
@@ -1198,7 +1198,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             if (exit._tag === "Success" || committed || released) return Effect.void;
             return Effect.gen(function* () {
               const allocation = allocations.get(id);
-              if (allocation?.attached) return;
+              if (allocation?.attached === true) return;
               if (allocation) {
                 const stopped = yield* Effect.result(stopOar(allocation));
                 if (stopped._tag === "Failure") {

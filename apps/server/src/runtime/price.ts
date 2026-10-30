@@ -48,12 +48,15 @@ const priceOf = (cost: Price | undefined): Price | undefined =>
       }
     : undefined;
 
+// pi-ai types the lookup by its generated catalog; any name we hold is a string, and an unknown one gives undefined.
+const builtinCost = getBuiltinModel as unknown as (provider: string, model: string) => { readonly cost: Price } | undefined;
+
 function piPrice(model: string): Price | undefined {
   const slash = model.indexOf("/");
-  if (slash >= 0) return priceOf(getBuiltinModel(model.slice(0, slash) as never, model.slice(slash + 1) as never).cost);
+  if (slash >= 0) return priceOf(builtinCost(model.slice(0, slash), model.slice(slash + 1))?.cost);
   for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).sort()) {
-    const found = getBuiltinModel(provider as never, model as never);
-    if (found) return priceOf(found.cost);
+    const found = builtinCost(provider, model);
+    if (found !== undefined) return priceOf(found.cost);
   }
   return undefined;
 }

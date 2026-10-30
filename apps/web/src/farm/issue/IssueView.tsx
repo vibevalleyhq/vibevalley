@@ -81,7 +81,7 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
   const issue = () => core()?.issues.find((i) => i.id === id());
   const sessions = () => {
     const found = history.rows()?.find((h) => h.issue.id === id())?.sessions ?? [props.session];
-    return found.length ? found : [props.session];
+    return found.length > 0 ? found : [props.session];
   };
   const hasThread = () => issueThreadOf(core()?.chat, id()) !== undefined;
   return (
@@ -490,7 +490,7 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
   const kind = () => (prefix() ?? "bear-farmer").split("-");
   const crop = () => {
     const a = atlas();
-    return a?.has(`plot-${plot().crop}`) ? a.get(`plot-${plot().crop}`) : undefined;
+    return a?.has(`plot-${plot().crop}`) === true ? a.get(`plot-${plot().crop}`) : undefined;
   };
   const figure = () => {
     const a = atlas();

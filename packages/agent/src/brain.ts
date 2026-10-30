@@ -215,8 +215,8 @@ export class Brain {
     this.now = now;
     this.maxSteps = options.maxSteps ?? 40;
     const sessionName = options.session || options.name;
-    if (!options.noSession) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));
-    this.skillDirs = options.noSkills ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
+    if (options.noSession !== true) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));
+    this.skillDirs = options.noSkills === true ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
     const budget = options.contextTokens ?? 120_000;
     this.folding = {
       home: options.home,
@@ -229,8 +229,8 @@ export class Brain {
     };
 
     const hostTools = [...(options.tools ?? []), ...this.mcp.tools];
-    const own = selfTools({ now, home: options.home, skills: () => this.skills(), memory: !options.noMemory });
-    if (!options.noSubagents) {
+    const own = selfTools({ now, home: options.home, skills: () => this.skills(), memory: options.noMemory !== true });
+    if (options.noSubagents !== true) {
       const skills = this.skillDirs;
       this.subagent = (brief, label) =>
         Effect.scoped(
@@ -377,7 +377,7 @@ export class Brain {
   /** The parts of the system prompt, in order, named instructions, env, skills, memory; an empty one is left out. */
   private promptParts(): PromptPart[] {
     const found = this.skills();
-    const memory = this.options.noMemory ? "" : readMemory(this.options.home).prompt;
+    const memory = this.options.noMemory === true ? "" : readMemory(this.options.home).prompt;
     const parts: PromptPart[] = [
       { name: "instructions", text: this.options.instructions.trim() },
       { name: "env", text: words.envSection(this.options.cwd) },
@@ -395,7 +395,7 @@ export class Brain {
   private refreshPrefix() {
     this.parts = this.promptParts();
     this.prefix = joinParts(this.parts);
-    this.knownMemory = this.options.noMemory ? [] : memoryFileLines(this.options.home);
+    this.knownMemory = this.options.noMemory === true ? [] : memoryFileLines(this.options.home);
     this.sent = undefined;
   }
 
@@ -410,7 +410,7 @@ export class Brain {
   /** What MEMORY.md gained (+) and lost (−) since the model last knew it, as one block for the newest input; "" when
    * nothing. What it returns counts as known from then on. */
   memoryNews(): string {
-    if (this.options.noMemory) return "";
+    if (this.options.noMemory === true) return "";
     const now = memoryFileLines(this.options.home);
     const before = this.knownMemory;
     this.knownMemory = now;
@@ -668,7 +668,7 @@ export class Brain {
     const self = this;
     return Effect.gen(function* () {
       if (self.closed || !(yield* self.quiet())) return;
-      if (self.options.wakeSoon?.(self.idleAfter())) return;
+      if (self.options.wakeSoon?.(self.idleAfter()) === true) return;
       const before = self.history();
       const { result } = yield* self.fold(before, declared(self.toolset), { ...self.folding, budget: self.idleAt() }, "idle");
       if (!result) return;

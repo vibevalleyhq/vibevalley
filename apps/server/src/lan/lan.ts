@@ -113,7 +113,7 @@ export const pairLink = (url: string, code: string) => url + "/pair?c=" + encode
 
 const keyOf = (req: IncomingMessage) => {
   const auth = req.headers.authorization;
-  if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length);
+  if (auth?.startsWith("Bearer ") === true) return auth.slice("Bearer ".length);
   for (const part of (req.headers.cookie ?? "").split(";")) {
     const [name, ...value] = part.trim().split("=");
     if (name === lanKeyCookie) return decodeURIComponent(value.join("="));
@@ -323,7 +323,7 @@ export const make = (options: LanOptions = {}) =>
         problem = "";
         server = s;
         const a = s.address();
-        port = a && typeof a === "object" ? a.port : config.lan.port;
+        port = typeof a === "object" && a !== null ? a.port : config.lan.port;
         logs.info(`vibevalley: lan access is open on port ${port}`);
         resume(Effect.void);
       });

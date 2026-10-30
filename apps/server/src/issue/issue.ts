@@ -277,7 +277,7 @@ export const make = (options: IssueOptions = {}) =>
         ...(answer ? { answer } : {}),
         attention: { state: "draft", acts: [] },
       };
-      if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
+      if ((out.sessions.length === 0 || out.task) && row.rank !== 0) out.rank = row.rank;
       out.status = issueStatusOf(out, state);
       const refiner = issueRefiningOf(out, state);
       if (refiner) out.refining = refiner;
@@ -494,7 +494,7 @@ export const make = (options: IssueOptions = {}) =>
       if (prepared._tag === "Failure") return { refused: t("server.issue.notRecorded", { name: agent.name, why: reasonOf(prepared.failure) }) };
       const issue = prepared.success;
       // A draft's session is not one of the issue's sessions: the issue stays unsent.
-      const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
+      const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(opt.refining !== true ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
       if (!hired.session && !opt.issue && !hired.retainedWork) {
         yield* db(q.removeIssue({ id: issue.id }));
         yield* reloadSessions;
@@ -564,7 +564,7 @@ export const make = (options: IssueOptions = {}) =>
             }),
           );
           if (sent._tag === "Success") {
-            if (sent.success) yield* core.notice("info", t("server.issue.queuedStarted", { title, session: sent.success }));
+            if (sent.success !== "") yield* core.notice("info", t("server.issue.queuedStarted", { title, session: sent.success }));
             continue;
           }
           const why = reasonOf(sent.failure);
@@ -874,7 +874,7 @@ export const make = (options: IssueOptions = {}) =>
 
     /** Where a talk with a profile that has no folder of its own looks: the project worked in last, else the first one. */
     const lastProject = Effect.gen(function* () {
-      const worked = (yield* everyIssue).filter((i) => i.project && !i.talk).sort((a, b) => b.createdAt - a.createdAt)[0]?.project;
+      const worked = (yield* everyIssue).filter((i) => i.project !== undefined && !i.talk).sort((a, b) => b.createdAt - a.createdAt)[0]?.project;
       return worked ?? (yield* projects.list())[0]?.name ?? "";
     });
 

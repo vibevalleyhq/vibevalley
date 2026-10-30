@@ -44,7 +44,9 @@ const commits = "提交打卡页";
 const anotherRound = "发呆 then check it";
 
 const handedBack = (api: VibeValleyApi, id: string, timeout?: number) =>
-  expect.poll(async () => (await api.issue.get({ id })).attention.acts.map((a) => a.act), timeout ? { timeout } : {}).toContain("complete");
+  expect
+    .poll(async () => (await api.issue.get({ id })).attention.acts.map((a) => a.act), timeout != null && timeout !== 0 ? { timeout } : {})
+    .toContain("complete");
 
 async function bed(page: Page) {
   const canvas = page.getByTestId("village").locator("canvas");

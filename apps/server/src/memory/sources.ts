@@ -90,7 +90,7 @@ export function localSource(m: Memories, profiles: () => string[]): Source {
       said(
         Effect.gen(function* () {
           let picked: Memory[];
-          if (cue.peek) {
+          if (cue.peek === true) {
             if (cue.project === "") return [];
             const all = yield* m.list(cue.agent);
             picked = pick(all, { project: cue.project, text: cue.text, now: yield* Clock.currentTimeMillis, matches: yield* m.matches(cue.agent, cue.text) });
@@ -279,7 +279,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       for (const c of now) {
         const name = c.kind;
         const isOff = (why: string) => off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
-        if (!c.enabled) {
+        if (c.enabled !== true) {
           isOff(t("server.memory.off"));
           continue;
         }

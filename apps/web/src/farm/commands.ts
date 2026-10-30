@@ -158,7 +158,7 @@ export async function clickBed(commands: FarmCommands, bed: Bed): Promise<PlotAi
 
 /** A click on a yard place: its panel, the chat, or its workbench page through `go` (the router's navigate). */
 export function openPlace(place: YardPlace, go: (path: string) => void) {
-  if (place.chat) farm.chatOpen(true);
+  if (place.chat === true) farm.chatOpen(true);
   else if (place.panel) farm.panel(place.panel);
   else if (place.route && webRoutes.includes(place.route)) go(place.route);
 }

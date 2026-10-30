@@ -56,7 +56,7 @@ function blockLine(b: Block, number: number): string {
     case "numbered":
       return `${number}. ${text}`;
     case "todo":
-      return (b.attrs.checked ? "- [x] " : "- [ ] ") + text;
+      return (b.attrs.checked === true ? "- [x] " : "- [ ] ") + text;
     case "quote":
       return "> " + text.replaceAll("\n", "\n> ");
     case "code":
@@ -92,14 +92,14 @@ function inlineOf(spans: readonly TextSpan[]): string {
   const all = normal(spans);
   return all
     .map((s, i) => {
-      let t = s.marks.code ? codeSpan(s.t) : escape(s.t);
-      if (s.marks.italic) {
+      let t = s.marks.code === true ? codeSpan(s.t) : escape(s.t);
+      if (s.marks.italic === true) {
         // Against a letter or digit an underscore would read as part of a word: a star does not.
         const mark = (i > 0 && wordy(Array.from(all[i - 1]!.t).at(-1))) || (i + 1 < all.length && wordy(Array.from(all[i + 1]!.t)[0])) ? "*" : "_";
         t = mark + t + mark;
       }
-      if (s.marks.bold) t = "**" + t + "**";
-      if (s.marks.strike) t = "~~" + t + "~~";
+      if (s.marks.bold === true) t = "**" + t + "**";
+      if (s.marks.strike === true) t = "~~" + t + "~~";
       if (s.marks.link !== undefined) t = "[" + t + "](" + s.marks.link + ")";
       return t;
     })

@@ -100,7 +100,7 @@ export function LanPage() {
                   <span class="flex min-w-0 flex-1 flex-col">
                     <span class="truncate text-sm font-medium">{d.name}</span>
                     <span class="truncate text-xs text-muted">
-                      {d.lastSeen
+                      {d.lastSeen != null && d.lastSeen !== 0
                         ? t("web.lan.lan.paired", { at: momentText(d.pairedAt), seen: momentText(d.lastSeen) })
                         : t("web.lan.lan.pairedNever", { at: momentText(d.pairedAt) })}
                     </span>

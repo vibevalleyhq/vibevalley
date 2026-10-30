@@ -53,7 +53,6 @@ function Root(props: CheckboxRootProps) {
 
 function Indicator(props: SpanProps & { keepMounted?: boolean | undefined }) {
   const c = useContext(Context);
-  if (!c) throw new Error("Checkbox.Indicator belongs inside Checkbox.Root");
   const rest = omit(props, "keepMounted");
   return (
     <Show when={c.checked() || c.indeterminate() || props.keepMounted}>
