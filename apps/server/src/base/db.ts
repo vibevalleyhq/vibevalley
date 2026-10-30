@@ -148,16 +148,26 @@ export class Db extends Context.Service<
     Db,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      const attempt = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(query, SqlClient.SqlClient, sql);
-      const run = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(attempt(query));
+      // Every query passes through these: a span each would bury the traces, and the caller's span already says what it was for.
+      const attempt = Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E> {
+        return yield* Effect.provideService(query, SqlClient.SqlClient, sql);
+      });
+      const run = Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A> {
+        return yield* Effect.orDie(attempt(query));
+      });
       return Db.of({
         run,
         attempt,
-        one: (query) => Effect.map(run(Effect.catchNoSuchElement(query)), Option.getOrUndefined),
-        inTx: <A, E>(work: Effect.Effect<A, E>) =>
+        one: Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>): Effect.fn.Return<A | undefined> {
+          return Option.getOrUndefined(yield* run(Effect.catchNoSuchElement(query)));
+        }),
+        inTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E>): Effect.fn.Return<A, Exclude<E, { _tag: "SqlError" }>> {
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- catchTag takes SqlError out of E; TypeScript cannot work that out for a generic E
-          sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>,
-        attemptTx: (work) => attempt(sql.withTransaction(work)),
+          return yield* sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+        }),
+        attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E | SqlError.SqlError> {
+          return yield* attempt(sql.withTransaction(work));
+        }),
       });
     }),
   );

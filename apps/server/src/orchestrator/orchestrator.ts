@@ -452,16 +452,15 @@ const make = (options: OrchestratorOptions = {}) =>
           }),
         );
       }),
-      brief: (line) =>
-        Effect.suspend(() => {
-          const me = new Caller();
-          forkHere(take({ source: "issue", line, channel: chat.defaultChannel(), caller: me }));
-          // An interrupted brief ends its caller: its words stop being kept for nobody.
-          return Stream.mkString(me.words).pipe(
-            Effect.map((said) => said.trim()),
-            Effect.ensuring(Effect.sync(() => me.end())),
-          );
-        }),
+      brief: Effect.fn("Orchestrator.brief")(function* (line) {
+        const me = new Caller();
+        forkHere(take({ source: "issue", line, channel: chat.defaultChannel(), caller: me }));
+        // An interrupted brief ends its caller: its words stop being kept for nobody.
+        return yield* Stream.mkString(me.words).pipe(
+          Effect.map((said) => said.trim()),
+          Effect.ensuring(Effect.sync(() => me.end())),
+        );
+      }),
       answerer: (on) => (model) => {
         if (model !== orchestratorModel) return undefined;
         if (on === "api") return (text, signal) => answer(lineWords.owner(text), signal);
@@ -470,17 +469,20 @@ const make = (options: OrchestratorOptions = {}) =>
           return answer(voiceNote + "\n" + lineWords.owner(text), signal);
         };
       },
-      stop: (agent) => Effect.flatMap(target(agent), (me) => me.host.stop),
-      markWrong: (on, want, agent) =>
-        Effect.flatMap(target(agent), (me) =>
-          me.host.markWrong(
-            on,
-            want,
-            modelId(me.id),
-            [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
-              (item) => item.name,
-            ),
+      stop: Effect.fn("Orchestrator.stop")(function* (agent) {
+        const me = yield* target(agent);
+        return yield* me.host.stop;
+      }),
+      markWrong: Effect.fn("Orchestrator.markWrong")(function* (on, want, agent) {
+        const me = yield* target(agent);
+        return yield* me.host.markWrong(
+          on,
+          want,
+          modelId(me.id),
+          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
+            (item) => item.name,
           ),
-        ),
+        );
+      }),
     });
   });

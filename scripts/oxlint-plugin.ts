@@ -84,6 +84,16 @@
  *   no-object-guard: typeof x === "object" && x !== null (either order, in any && chain) is Effect's Predicate.isObject
  *   written again, and the start of a hand-written decoder; Predicate.isObject, Predicate.hasProperty or a Schema say
  *   it once. The rule compares the two operands' text, so x and (x) are different things to it.
+ *
+ *   service-method-names: a server service's method that returns an Effect is Effect.fn("X.m") (X the service, m the
+ *   member), so the OTLP traces show each call under the name it is called by, or Effect.fnUntraced on a hot path or a
+ *   thin accessor. Inside X.of({ … }), a member that is a function, written there or a const of the same file, is
+ *   reported when the syntax shows it returns an Effect: what it returns is a call of one of Effect's own functions, a
+ *   pipe through them, a semaphore's withPermits, a call of a local function that does, or a ?: or ?? with one of those
+ *   on a side. An Effect.fn whose name is not "X.m" is reported too. It cannot see past the file: a member that only
+ *   calls something destructured (const { run } = yield* Db) or imported, a member taken from another object
+ *   (blocks.markdown), and a name declared twice in the file are skipped, as are members that are an Effect or a Stream
+ *   themselves; a function that returns a Stream, a Promise or a plain value is never reported.
  */
 
 import { existsSync } from "node:fs";
@@ -744,6 +754,138 @@ const noObjectGuard = defineRule({
   },
 });
 
+type Node = ESTree.Node;
+
+/** Effect's own functions that return an Effect; the rest of the namespace (Effect.run*, Effect.is*, Effect.fn*) does not. */
+const effectMaker = (n: Node): boolean =>
+  n.type === "MemberExpression" &&
+  n.object.type === "Identifier" &&
+  n.object.name === "Effect" &&
+  n.property.type === "Identifier" &&
+  !/^(?:run|is|fn)/u.test(n.property.name);
+
+/** Effect.fn(…) called with its body: what it is named (undefined when it was given no name), or "untraced". */
+const tracedAs = (n: Node): { name: string | undefined; at: Node } | "untraced" | undefined => {
+  if (n.type !== "CallExpression") return undefined;
+  const c = n.callee;
+  if (c.type === "MemberExpression" && c.object.type === "Identifier" && c.object.name === "Effect" && c.property.type === "Identifier") {
+    if (c.property.name === "fnUntraced") return "untraced";
+    if (c.property.name === "fn") return { name: undefined, at: n };
+  }
+  if (c.type === "CallExpression" && c.callee.type === "MemberExpression" && c.callee.object.type === "Identifier" && c.callee.object.name === "Effect") {
+    const p = c.callee.property;
+    if (p.type === "Identifier" && p.name === "fn") {
+      const arg = c.arguments[0];
+      return { name: arg?.type === "Literal" && typeof arg.value === "string" ? arg.value : undefined, at: c };
+    }
+  }
+  return undefined;
+};
+
+const isFunction = (n: Node) => n.type === "ArrowFunctionExpression" || n.type === "FunctionExpression" || n.type === "FunctionDeclaration";
+
+const serviceMethodNames = defineRule({
+  meta: {
+    messages: {
+      unnamed: says(
+        "{{service}}.{{method}} returns an Effect but opens no span, so the OTLP traces cannot show the call",
+        '`{{method}}: Effect.fn("{{service}}.{{method}}")(function* (…) { … })`, with combinators passed after the generator rather than piped; `Effect.fnUntraced(function* (…) { … })` on a hot path or a thin accessor',
+        ".agents/skills/vv-effect/SKILL.md",
+      ),
+      name: says(
+        "{{service}}.{{method}}'s span is named {{given}}, so a trace shows a call other than the one made",
+        '`Effect.fn("{{service}}.{{method}}")(function* (…) { … })`',
+        ".agents/skills/vv-effect/SKILL.md",
+      ),
+    },
+  },
+  create(context) {
+    /** A name's const initialiser; a name declared twice in the file is left unresolved rather than guessed. */
+    const consts = new Map<string, Node | undefined>();
+    const returns = new Map<Node, Node[]>();
+    const services: { service: string; object: ESTree.ObjectExpression }[] = [];
+
+    const resolve = (n: Node): Node => (n.type === "Identifier" ? (consts.get(n.name) ?? n) : n);
+    const returnedBy = (fn: Node): Node[] => {
+      if (fn.type === "ArrowFunctionExpression" && fn.body.type !== "BlockStatement") return [fn.body];
+      return returns.get(fn) ?? [];
+    };
+    /** Whether the syntax shows an Effect: one of Effect's makers, a pipe through Effect's combinators, a semaphore's
+     * withPermits, a call of a local function that returns one, or a conditional or ?? with one on either side. */
+    const isEffect = (n: Node, seen: Set<Node>): boolean => {
+      if (n.type === "TSAsExpression" || n.type === "TSSatisfiesExpression" || n.type === "TSNonNullExpression" || n.type === "ParenthesizedExpression")
+        return isEffect(n.expression, seen);
+      if (n.type === "ConditionalExpression") return isEffect(n.consequent, seen) || isEffect(n.alternate, seen);
+      if (n.type === "LogicalExpression") return isEffect(n.left, seen) || isEffect(n.right, seen);
+      if (n.type !== "CallExpression") return false;
+      const c = n.callee;
+      if (effectMaker(c)) return true;
+      if (c.type === "MemberExpression" && c.property.type === "Identifier" && c.property.name === "pipe")
+        return isEffect(c.object, seen) || n.arguments.some((a) => effectMaker(a.type === "CallExpression" ? a.callee : a));
+      if (c.type === "Identifier") return returnsEffect(resolve(c), seen);
+      // A semaphore's withPermits(n)(effect).
+      return (
+        c.type === "CallExpression" &&
+        c.callee.type === "MemberExpression" &&
+        c.callee.property.type === "Identifier" &&
+        c.callee.property.name === "withPermits"
+      );
+    };
+    const returnsEffect = (fn: Node, seen: Set<Node>): boolean => {
+      if (seen.has(fn)) return false;
+      seen.add(fn);
+      if (tracedAs(fn) !== undefined) return true;
+      return isFunction(fn) && returnedBy(fn).some((r) => isEffect(r, seen));
+    };
+
+    return {
+      VariableDeclarator(node) {
+        if (node.id.type !== "Identifier" || node.parent.type !== "VariableDeclaration" || node.parent.kind !== "const") return;
+        consts.set(node.id.name, consts.has(node.id.name) ? undefined : (node.init ?? undefined));
+      },
+      FunctionDeclaration(node) {
+        if (node.id) consts.set(node.id.name, consts.has(node.id.name) ? undefined : node);
+      },
+      ReturnStatement(node) {
+        let at: Node = node.parent;
+        while (!isFunction(at) && at.type !== "Program") at = at.parent;
+        if (node.argument) returns.set(at, [...(returns.get(at) ?? []), node.argument]);
+      },
+      CallExpression(node) {
+        const c = node.callee;
+        const [object, ...rest] = node.arguments;
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          /^[A-Z]/u.test(c.object.name) &&
+          c.property.type === "Identifier" &&
+          c.property.name === "of" &&
+          object?.type === "ObjectExpression" &&
+          rest.length === 0
+        )
+          services.push({ service: c.object.name, object });
+      },
+      "Program:exit"() {
+        for (const { service, object } of services)
+          for (const p of object.properties) {
+            if (p.type !== "Property" || p.computed) continue;
+            const method = p.key.type === "Identifier" ? p.key.name : p.key.type === "Literal" ? String(p.key.value) : undefined;
+            if (method === undefined) continue;
+            const value = resolve(p.value);
+            const traced = tracedAs(value);
+            const data = { service, method };
+            if (traced === "untraced") continue;
+            if (traced !== undefined) {
+              const expected = `${service}.${method}`;
+              if (traced.name !== expected)
+                context.report({ node: traced.at, messageId: "name", data: { ...data, given: traced.name === undefined ? "nothing" : `"${traced.name}"` } });
+            } else if (isFunction(value) && returnsEffect(value, new Set())) context.report({ node: p, messageId: "unnamed", data });
+          }
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -764,5 +906,6 @@ export default definePlugin({
     "native-control": nativeControl,
     "no-instanceof-tagged": noInstanceofTagged,
     "no-object-guard": noObjectGuard,
+    "service-method-names": serviceMethodNames,
   },
 });

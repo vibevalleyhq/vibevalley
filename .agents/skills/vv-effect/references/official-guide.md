@@ -4,7 +4,7 @@
 
 | 指南的一节 | 在这里 |
 |---|---|
-| Writing `Effect` code（`Effect.gen`、`Effect.fn`、`Effect.fnUntraced`，不写只包一层 `Effect.gen` 的函数） | 照做。服务的方法用 `Effect.fn("X.m")`；还有服务没补齐名字，见[提案](.agents/notes/proposed/architecture/2026-10-31-effect-practices.md) |
+| Writing `Effect` code（`Effect.gen`、`Effect.fn`、`Effect.fnUntraced`，不写只包一层 `Effect.gen` 的函数） | 照做。服务的方法用 `Effect.fn("X.m")`，热路径和薄的取值用 `Effect.fnUntraced`；lint `vibevalley/service-method-names` 查 |
 | Defining schemas and domain models（一切校验用 `Schema`，不手写判断） | 照做。线上的形状在 `packages/protocol/src/schema.ts`，库里的 JSON 照 Schema 读（[地基](docs/subsystems/foundation.md)）；手写的解码还有两处，见提案 |
 | Writing Effect services（`Context.Service` 的类、`static layer`、`X.of`、`X["Service"]`） | 照做，24 个服务都是这个写法（`AGENTS.md`「服务端的服务」）；layer 按 `apps/server/src/services.ts` 的次序叠 |
 | Error handling（`Schema.TaggedError`，`catchTag`、`catchTags`、`catchReason`） | 照做，错误多数是 `Data.TaggedError`；按标签接，不用 `instanceof` |

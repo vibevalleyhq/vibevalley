@@ -72,21 +72,25 @@ const make = Effect.gen(function* () {
 
   // One entry at a time, so the order in the table is the order of the fold.
   const one = yield* Semaphore.make(1);
-  const record = (input: Entry) =>
-    one.withPermits(1)(
-      Effect.gen(function* () {
-        const at = yield* Clock.currentTimeMillis;
-        const entry = { ...input, at };
-        const { kind, at: _, ...payload } = entry;
-        yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
-        const [next, news] = progressStep(folded, entry);
-        folded = next;
-        yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
-      }).pipe(Effect.catchCause((cause) => Effect.logError(`vibevalley: a ledger entry (${input.kind}) was not kept`, cause))),
-    );
+  const record = Effect.fn("Game.record")(
+    function* (input: Entry) {
+      const at = yield* Clock.currentTimeMillis;
+      const entry = { ...input, at };
+      const { kind, at: _, ...payload } = entry;
+      yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
+      const [next, news] = progressStep(folded, entry);
+      folded = next;
+      yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
+    },
+    (effect, input) => Effect.catchCause(effect, (cause) => Effect.logError(`vibevalley: a ledger entry (${input.kind}) was not kept`, cause)),
+    one.withPermits(1),
+  );
 
   const extra = config.gitEmails.map((e) => e.trim().toLowerCase()).filter((e) => e !== "");
-  const count = () => Effect.map(projects.contributions(extra), (repos): CommitCount => ({ repos, total: repos.reduce((n, r) => n + r.commits, 0) }));
+  const count = Effect.fn("Game.count")(function* (): Effect.fn.Return<CommitCount> {
+    const repos = yield* projects.contributions(extra);
+    return { repos, total: repos.reduce((n, r) => n + r.commits, 0) };
+  });
   // The ticker and a run's end both count: one at a time, so an older count never lands after a newer one.
   const counting = yield* Semaphore.make(1);
   const refresh = counting.withPermits(1)(Effect.flatMap(count(), core.setCommits));
@@ -135,7 +139,9 @@ const make = Effect.gen(function* () {
 
   return Game.of({
     achievements: achievementsInWords,
-    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier != null && tier !== 0 ? { tier } : {}) }),
+    chooseTitle: Effect.fn("Game.chooseTitle")(function* (achievement, tier) {
+      return yield* record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier != null && tier !== 0 ? { tier } : {}) });
+    }),
     want: (station) => {
       wanted = { station, until: clock.currentTimeMillisUnsafe() + wantStationForMs };
     },

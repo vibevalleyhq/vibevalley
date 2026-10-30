@@ -97,7 +97,7 @@ export function refinement(d: RefinementDeps) {
     yield* publish(id);
   });
 
-  const draft = Effect.fn("Issues.draft")(
+  const draft = Effect.fn("Issues.refine")(
     function* (id: string, word: string, channel: string) {
       const item = yield* unsent(id);
       if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));

@@ -187,8 +187,9 @@ const make = Effect.gen(function* () {
     if (isFact(e)) PubSub.publishUnsafe(changes, undefined);
   };
 
-  const apply = (...facts: FactIn[]) =>
-    Effect.sync(() => {
+  // Every fact goes through here: a span each would bury the traces in folds.
+  const apply = Effect.fnUntraced(function* (...facts: FactIn[]) {
+    yield* Effect.sync(() => {
       let next = state;
       const done: Transition[] = [];
       const made: GameEffect[] = [];
@@ -211,6 +212,7 @@ const make = Effect.gen(function* () {
         PubSub.publishUnsafe(changes, e);
       }
     });
+  });
 
   const side = (e: SideEvent) => Effect.sync(() => publish(e));
 
@@ -234,13 +236,28 @@ const make = Effect.gen(function* () {
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
-    setOrchestrator: (agent, orchestrator, channel) => apply({ type: "orchestrator", agent, state: orchestrator, ...(channel ? { channel } : {}) }),
-    setCommits: (commits) => apply({ type: "commits", commits }),
-    open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live", reason: "" }))),
-    sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity })),
-    notice: (level, text) => Effect.suspend(() => side({ type: "notice", at: clock.currentTimeMillisUnsafe(), level, text })),
-    runtime: (info) => Effect.suspend(() => side({ type: "runtime", at: clock.currentTimeMillisUnsafe(), info })),
-    did: (d) => Effect.asVoid(PubSub.publish(owner, d)),
+    setOrchestrator: Effect.fn("Core.setOrchestrator")(function* (agent, orchestrator, channel) {
+      return yield* apply({ type: "orchestrator", agent, state: orchestrator, ...(channel ? { channel } : {}) });
+    }),
+    setCommits: Effect.fn("Core.setCommits")(function* (commits) {
+      return yield* apply({ type: "commits", commits });
+    }),
+    open: Effect.fn("Core.open")(function* () {
+      if (state.call !== "live") yield* apply({ type: "call", state: "live", reason: "" });
+    }),
+    // A session's every line of output comes through here: a span each would bury the traces.
+    sessionEvent: Effect.fnUntraced(function* (id, activity) {
+      return yield* side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity });
+    }),
+    notice: Effect.fn("Core.notice")(function* (level, text) {
+      return yield* side({ type: "notice", at: clock.currentTimeMillisUnsafe(), level, text });
+    }),
+    runtime: Effect.fn("Core.runtime")(function* (info) {
+      return yield* side({ type: "runtime", at: clock.currentTimeMillisUnsafe(), info });
+    }),
+    did: Effect.fn("Core.did")(function* (d) {
+      yield* PubSub.publish(owner, d);
+    }),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);
       return [state, Stream.fromSubscription(sub)] as const;

@@ -252,6 +252,37 @@ tester.run("no-object-guard", rule("no-object-guard"), {
   ],
 });
 
+tester.run("service-method-names", rule("service-method-names"), {
+  valid: [
+    'Issues.of({ create: Effect.fn("Issues.create")(function* (req) { return yield* add(req); }) })',
+    "Core.of({ apply: Effect.fnUntraced(function* (fact) { yield* fold(fact); }) })",
+    'const list = Effect.fn("Crons.list")(function* () { return []; });\nCrons.of({ list })',
+    "Core.of({ state: () => state, follow: (id) => Stream.fromPubSub(events), events: Stream.empty, owner: Effect.map(sub, f) })",
+    "Lan.of({ answer: (id) => lookup(id), me: () => Effect.runSync(read) })",
+    "GitError.of(code, stderr)",
+    "const call = (x) => x;\nGame.of({ want: (s) => call(s) })",
+  ],
+  invalid: [
+    { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
+    { code: "Game.of({ count: () => projects.contributions(e).pipe(Effect.map(total)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "Notices.of({ say(text) { if (!text) return Effect.void; return Effect.log(text); } })", errors: [{ messageId: "unnamed" }] },
+    {
+      code: "const apply = (f) => Effect.sync(() => f);\nCore.of({ apply, setCommits: (c) => apply(c) })",
+      errors: [{ messageId: "unnamed" }, { messageId: "unnamed" }],
+    },
+    {
+      code: 'const changesOf = Effect.fn("Sessions.changesOf")(function* (id) { return id; });\nSessions.of({ changes: changesOf })',
+      errors: [{ messageId: "name" }],
+    },
+    { code: "Connectors.of({ login: (id) => bridge(id)?.login() ?? Effect.succeed(off(id)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "const locked = (e) => lock.withPermits(1)(e);\nChannels.of({ pin: (id) => locked(pinning(id)) })", errors: [{ messageId: "unnamed" }] },
+    {
+      code: "Tasks.of({ act: Effect.fn(function* (id) { return id; }) })",
+      errors: [{ messageId: "name", data: { service: "Tasks", method: "act", given: "nothing" } }],
+    },
+  ],
+});
+
 const root = resolve(import.meta.dirname, "..");
 
 describe("what a rule says", () => {

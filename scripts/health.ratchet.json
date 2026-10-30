@@ -162,7 +162,7 @@
     "swallowed": 0
   },
   "server: Gateway": {
-    "nonNull": 7,
+    "nonNull": 6,
     "doubleCast": 0,
     "cast": 13,
     "lintOff": 6,

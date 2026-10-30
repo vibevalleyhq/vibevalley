@@ -466,6 +466,12 @@ export default defineConfig({
         rules: { "vibevalley/one-absent": "off" },
       },
       {
+        // A service's methods open a span named after them, so the traces show each call (scripts/oxlint-plugin.ts, service-method-names).
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/service-method-names": "error" },
+      },
+      {
         // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],

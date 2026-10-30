@@ -994,15 +994,18 @@ const make = (options: IssueOptions = {}) =>
 
     const shape = Issues.of({
       onBoard: () => core.state().issues,
-      list: () => Effect.map(everyIssue, (all) => all.filter((item) => !item.talk)),
-      query: (f) =>
-        Effect.gen(function* () {
-          const all = (yield* everyIssue).filter((item) => !item.talk);
-          return pickIssues(all, f, yield* Clock.currentTimeMillis);
-        }),
+      list: Effect.fn("Issues.list")(function* () {
+        return (yield* everyIssue).filter((item) => !item.talk);
+      }),
+      query: Effect.fn("Issues.query")(function* (f) {
+        const all = (yield* everyIssue).filter((item) => !item.talk);
+        return pickIssues(all, f, yield* Clock.currentTimeMillis);
+      }),
       get,
       timeline,
-      add: (req) => add(req),
+      add: Effect.fn("Issues.add")(function* (req) {
+        return yield* add(req);
+      }),
       /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
        * next round goes by them. */
       edit: Effect.fn("Issues.edit")(function* (id, upd, by) {
@@ -1050,9 +1053,16 @@ const make = (options: IssueOptions = {}) =>
         yield* reloadSessions;
         yield* core.apply({ type: "issueGone", id: issueId(id) });
       }),
-      queue: (id, queued) => queueRow(id, queued, chat.defaultChannel()),
-      start: (id, channel) => start(id, channel),
-      reopen: (id, text, channel) => reopen(id, text, channel),
+      queue: Effect.fn("Issues.queue")(function* (id, queued) {
+        return yield* queueRow(id, queued, chat.defaultChannel());
+      }),
+      // Untraced: they only drop the arguments the service does not take, and the call they make is named Issues.start / Issues.reopen.
+      start: Effect.fnUntraced(function* (id, channel) {
+        return yield* start(id, channel);
+      }),
+      reopen: Effect.fnUntraced(function* (id, text, channel) {
+        return yield* reopen(id, text, channel);
+      }),
       idOf,
       stop: Effect.fn("Issues.stop")(function* (id) {
         yield* sessions.stop(yield* liveSession(id));
@@ -1254,7 +1264,10 @@ const make = (options: IssueOptions = {}) =>
           ...updated.map((issue) => ({ type: "issue" as const, issue })),
         );
       }),
-      nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
+      nextTaskId: Effect.fn("Issues.nextTaskId")(function* () {
+        const rows = yield* db(q.graphIDs());
+        return nextTaskId(rows.map((r) => r.id));
+      }),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
       ofCron,
       refreshPullRequests,

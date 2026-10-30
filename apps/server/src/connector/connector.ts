@@ -681,10 +681,21 @@ const make = (options: ConnectorOptions = {}) =>
 
     const off = (id: ConnectorID): ConnectorStatus => ({ id, state: "off", pending: 0, error: "", qr: "", pairCode: "" });
     return Connectors.of({
-      list: () => Effect.forEach(bridges, (b) => b.status),
-      login: (id, input) => bridge(id)?.login(input) ?? Effect.succeed(off(id)),
-      verify: (id, code) => bridge(id)?.verify(code) ?? Effect.succeed(off(id)),
-      logout: (id) => bridge(id)?.logout ?? Effect.succeed(off(id)),
+      list: Effect.fn("Connectors.list")(function* () {
+        return yield* Effect.forEach(bridges, (b) => b.status);
+      }),
+      login: Effect.fn("Connectors.login")(function* (id, input) {
+        const b = bridge(id);
+        return b ? yield* b.login(input) : off(id);
+      }),
+      verify: Effect.fn("Connectors.verify")(function* (id, code) {
+        const b = bridge(id);
+        return b ? yield* b.verify(code) : off(id);
+      }),
+      logout: Effect.fn("Connectors.logout")(function* (id) {
+        const b = bridge(id);
+        return b ? yield* b.logout : off(id);
+      }),
       setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
         const b = bridge(id);
         if (!b)

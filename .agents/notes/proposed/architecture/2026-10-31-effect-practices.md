@@ -13,21 +13,19 @@ Status: proposed
 | 编号 | 问题 | 做法 | 什么时候做 |
 |---|---|---|---|
 | B1 | 错误通道里有 `unknown`：28 处源码、19 处测试，来自约 15 个类型声明（大头在 `session/host.ts` 的 `HostOptions`、`Caller`、`Build`、`submit`，`Orchestrator.brief`，voice 的 `tunnel` 和 `Run`） | 从这几个根上把错误类型写出来，再把 `anyUnknownInErrorContext` 在 `tsconfig.base.json` 里打开 | 改 `session/host.ts` 或管家的接口时一起做 |
-| B2 | 服务的方法缺名字：`Core` 0/11、`Channels` 8/47、`Artifacts` 3/15、`Runtimes` 1/8、`Notices` 0/5、`Game` 0/4，`packages/agent` 没有；OTLP 已经接上，没有名字的方法在追踪里看不见 | 方法用 `Effect.fn("X.m")`，热路径用 `Effect.fnUntraced`；之后加一条检查：`X.of({ … })` 的成员是 `Effect.fn` | 一个模块一个 PR，从 `Core` 开始 |
 | B7 | 手写的重试和轮询（`voice/voice.ts` 两处、connector 的收消息） | 换成 `Effect.retry`、`Effect.repeat` 和 `Schedule`，用 `TestClock` 测 | 和[扩展点只填空](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)的 connector 骨架一起 |
 | B9 | `packages/agent` 的测试是 Promise 写法（约 57 个 `it`） | 换成 `@effect/vitest` 的 `it.effect` | 改 `packages/agent` 的测试时 |
 | B10 | 25 个 `Data.TaggedError` 只有 `{ message: string }`，`extends Error` 的还有 8 处；`preferSchemaTaggedError`、`extendsNativeError` 因此没开 | 要跨线或要编码的错误换成 `Schema.TaggedError`，原因放进 `cause`；全换完再打开这两条 | 一个模块的错误要过线时 |
 
 ## Alternatives considered
 
-**一次全改完。** B1、B2 各要动好几个模块和测试，和别的工作冲突的面大；每一项挂在下一次改那块代码的时候做，改动和理由在一起。
+**一次全改完。** B1 要动好几个模块和测试，和别的工作冲突的面大；每一项挂在下一次改那块代码的时候做，改动和理由在一起。
 
 **写成文字规矩，不加检查。** agent 照已有的代码抄，存量不改、只写规矩，新代码还会照着旧的写；所以每一项都以「改完存量、再开检查」收尾。
 
 ## Acceptance criteria
 
 - B1 做完：`anyUnknownInErrorContext` 在 `tsconfig.base.json` 里开着，`effect:check` 为 0。
-- B2 做完：每个服务的 `X.of({ … })` 成员都有名字，检查守着。
 - 其余每项做完从本表删掉那一行；表空了删掉本篇。
 
 ## Risks

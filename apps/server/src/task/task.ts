@@ -203,10 +203,11 @@ export const make = (options: TaskOptions = {}) =>
     const candidates = usableAs ? Effect.sync(() => store.agents().map((agent) => ({ agent, usable: usableAs(agent) }))) : runtimes.candidates;
 
     const get = (id: string) => graphOf(core.state(), id);
-    const need = (id: string) => {
+    const need = Effect.fnUntraced(function* (id: string) {
       const g = get(id);
-      return g ? Effect.succeed(g) : Effect.fail(missing(t("server.task.noGraph", { id }), [lookIn.graph]));
-    };
+      if (!g) return yield* Effect.fail(missing(t("server.task.noGraph", { id }), [lookIn.graph]));
+      return g;
+    });
 
     /** The history must never stop the graph itself: what cannot be written is logged. */
     const record = (before: TaskGraph | undefined, after: TaskGraph, actor: ActorKind, why: string) =>
@@ -488,19 +489,18 @@ export const make = (options: TaskOptions = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
     const shape = Tasks.of({
-      splitIssueOf: (issue, title, steps) =>
-        Effect.suspend(() =>
-          shape.splitIssue(
-            String(
-              core
-                .state()
-                .issues.find((item) => item.id === issue)
-                ?.sessions.at(-1) ?? "",
-            ),
-            title,
-            steps,
+      splitIssueOf: Effect.fn("Tasks.splitIssueOf")(function* (issue, title, steps) {
+        return yield* shape.splitIssue(
+          String(
+            core
+              .state()
+              .issues.find((item) => item.id === issue)
+              ?.sessions.at(-1) ?? "",
           ),
-        ),
+          title,
+          steps,
+        );
+      }),
       graphs: () => graphsOf(core.state()),
       graph: need,
       comeBack,
@@ -688,8 +688,12 @@ export const make = (options: TaskOptions = {}) =>
           }
         }
       }, lock.withPermits(1)),
-      editTask: (id, task, edit, by) => edited(id, (g) => editTask(g, task, edit), by),
-      removeTask: (id, task, by) => edited(id, (g) => removeTask(g, task), by),
+      editTask: Effect.fn("Tasks.editTask")(function* (id, task, edit, by) {
+        return yield* edited(id, (g) => editTask(g, task, edit), by);
+      }),
+      removeTask: Effect.fn("Tasks.removeTask")(function* (id, task, by) {
+        return yield* edited(id, (g) => removeTask(g, task), by);
+      }),
       previewRemoveTask: Effect.fn("Tasks.previewRemoveTask")(function* (id, task) {
         const graph = yield* need(id);
         const result = removeTask(graph, task);

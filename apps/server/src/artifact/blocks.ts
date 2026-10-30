@@ -213,7 +213,9 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       );
     };
 
-    const submit = (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">) => lock.withPermits(1)(submitLocked(id, actor, body));
+    const submit = Effect.fn("Artifacts.submit")(function* (id: string, actor: string, body: Pick<BlockSubmit, "batchId" | "ops">) {
+      return yield* submitLocked(id, actor, body);
+    }, lock.withPermits(1));
 
     const keyOrRefuse = (a: string, b: string) => Effect.try({ try: () => keyBetween(a, b), catch: (e) => refused(messageOf(e)) });
 
@@ -233,7 +235,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       );
     }, lock.withPermits(1));
 
-    const appendBlock = Effect.fn("Blocks.appendBlock")(function* (artifact: string, actor: string, req: BlockCreate) {
+    const appendBlock = Effect.fn("Artifacts.appendBlock")(function* (artifact: string, actor: string, req: BlockCreate) {
       const type = (req.type ?? "").trim() || "paragraph";
       if (!isAppendType(type)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
       const level = req.level !== undefined && req.level >= 1 && req.level <= 3 ? Math.trunc(req.level) : 2;
@@ -242,7 +244,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       return r ?? (yield* Effect.fail(refused(t("server.artifact.notApplied"))));
     });
 
-    const updateBlock = Effect.fn("Blocks.updateBlock")(function* (artifact: string, actor: string, req: BlockUpdate) {
+    const updateBlock = Effect.fn("Artifacts.updateBlock")(function* (artifact: string, actor: string, req: BlockUpdate) {
       const [, r] = yield* updateText(artifact, actor, req.block.trim(), Math.trunc(req.baseRev), req.text);
       return r ?? (yield* Effect.fail(refused(t("server.artifact.notApplied"))));
     });
@@ -334,7 +336,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       (e) => e.pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false)))),
     );
 
-    const demo = Effect.fn("Blocks.demo")(function* (id: string, helpers: readonly Agent[]) {
+    const demo = Effect.fn("Artifacts.demo")(function* (id: string, helpers: readonly Agent[]) {
       yield* found(id);
       const enabled = helpers.filter((a) => a.enabled);
       const writers = demoSections.flatMap((section) => {
@@ -352,7 +354,9 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
       demoRunning: () => demoOn,
       blocks,
       fill,
-      markdown: (id) => Effect.map(blocks(id), markdownOf),
+      markdown: Effect.fn("Artifacts.markdown")(function* (id) {
+        return markdownOf(yield* blocks(id));
+      }),
       submit,
       append,
       updateText,

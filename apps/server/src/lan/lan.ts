@@ -396,27 +396,25 @@ const make = (options: LanOptions = {}) =>
         }
         return status();
       }, opening.withPermits(1)),
-      startPairing: () =>
-        Effect.suspend(() => {
-          if (!open || !server) return Effect.fail(refuse(t("server.lan.notOpen")));
-          if (!url()) return Effect.fail(refuse(t("server.lan.noAddress")));
-          dropPairing();
-          pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
-          return Effect.succeed(status());
-        }),
+      startPairing: Effect.fn("Lan.startPairing")(function* () {
+        if (!open || !server) return yield* Effect.fail(refuse(t("server.lan.notOpen")));
+        if (!url()) return yield* Effect.fail(refuse(t("server.lan.noAddress")));
+        dropPairing();
+        pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
+        return status();
+      }),
       stopPairing: () => {
         dropPairing();
         return status();
       },
-      answer: (allow) =>
-        Effect.suspend(() => {
-          const p = livePairing();
-          if (!p || !p.asking) return Effect.fail(refuse(t("server.lan.noneAsking")));
-          const answer = p.answer;
-          pairing = undefined;
-          answer?.(allow);
-          return Effect.succeed(status());
-        }),
+      answer: Effect.fn("Lan.answer")(function* (allow) {
+        const p = livePairing();
+        if (!p || !p.asking) return yield* Effect.fail(refuse(t("server.lan.noneAsking")));
+        const answer = p.answer;
+        pairing = undefined;
+        answer?.(allow);
+        return status();
+      }),
       pair: Effect.fn("Lan.pair")(function* (code, given) {
         const name = deviceName(given);
         const p = livePairing();
@@ -459,17 +457,17 @@ const make = (options: LanOptions = {}) =>
         conns.delete(id);
         return status();
       }),
-      previewForget: (id) =>
-        Effect.map(known(id), (d) => {
-          const open = conns.get(id)?.size ?? 0;
-          return { does: [t("server.lan.forget", { name: d.name }), ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
-        }),
-      me: (device) => {
+      previewForget: Effect.fn("Lan.previewForget")(function* (id) {
+        const d = yield* known(id);
+        const open = conns.get(id)?.size ?? 0;
+        return { does: [t("server.lan.forget", { name: d.name }), ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
+      }),
+      me: Effect.fn("Lan.me")(function* (device) {
         const d = device ? devices.get(device) : undefined;
-        if (!d) return Effect.fail(refuse(t("server.lan.local")));
+        if (!d) return yield* Effect.fail(refuse(t("server.lan.local")));
         const { keyHash: _, written: __, ...shown } = d;
-        return Effect.succeed(shown);
-      },
+        return shown;
+      }),
       setUpstream: (a) => {
         upstream = a;
       },

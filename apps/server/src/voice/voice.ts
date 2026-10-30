@@ -804,13 +804,13 @@ const make = (options: VoiceOptions = {}) =>
         calls.delete(agentId);
       }),
       heard,
-      heardCurrent: (text, picked, sendKey) =>
-        Effect.suspend(() => {
-          const live = [...calls].filter(([, c]) => !c.ending);
-          if (live.length > 1) return Effect.fail(failed(t("server.voice.manyCalls")));
-          if (live.length === 0) return Effect.fail(failed(t("server.voice.noCall")));
-          return heard(live[0]![0], text, picked, sendKey);
-        }),
+      heardCurrent: Effect.fn("Voice.heardCurrent")(function* (text, picked, sendKey) {
+        const live = [...calls].filter(([, c]) => !c.ending);
+        if (live.length > 1) return yield* Effect.fail(failed(t("server.voice.manyCalls")));
+        const [only] = live;
+        if (!only) return yield* Effect.fail(failed(t("server.voice.noCall")));
+        return yield* heard(only[0], text, picked, sendKey);
+      }),
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
@@ -838,7 +838,9 @@ const make = (options: VoiceOptions = {}) =>
         }
       }),
       mossProblem: () => (settings.mossKey() === "" ? t("server.voice.moss.noKey") : undefined),
-      mossLine: (page) => relay(page, settings.mossKey(), options.moss),
+      mossLine: Effect.fn("Voice.mossLine")(function* (page) {
+        return yield* relay(page, settings.mossKey(), options.moss);
+      }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
@@ -888,10 +890,9 @@ const make = (options: VoiceOptions = {}) =>
         return { text: (got.value.text ?? "").trim() };
       }),
       lines: () => keys.size,
-      speak: (text) =>
-        Effect.suspend(() => {
-          const on = liveCall();
-          return on ? speakOn(on, text) : Effect.succeed(false);
-        }),
+      speak: Effect.fn("Voice.speak")(function* (text) {
+        const on = liveCall();
+        return on ? yield* speakOn(on, text) : false;
+      }),
     });
   });

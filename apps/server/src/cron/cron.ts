@@ -193,10 +193,10 @@ const make = Effect.gen(function* () {
       yield* core.apply({ type: "cronGone", id });
       return was;
     }, lock.withPermits(1)),
-    previewRemove: (id) =>
-      Effect.map(find(id), (was) => ({
-        does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })],
-      })),
+    previewRemove: Effect.fn("Crons.previewRemove")(function* (id) {
+      const was = yield* find(id);
+      return { does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })] };
+    }),
     tick,
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),
   });

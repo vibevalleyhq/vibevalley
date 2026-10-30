@@ -977,7 +977,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     });
 
     /** The freshest word on conflicts is a preview of the branch; the session's state follows it. */
-    const changesOf = Effect.fn("Sessions.changesOf")(function* (id: string) {
+    const changesOf = Effect.fn("Sessions.changes")(function* (id: string) {
       const place = hands.get(id)?.place;
       if (!place) return undefined;
       const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
@@ -1218,21 +1218,21 @@ export const make = (options: SessionOptionsIn = {}) =>
         );
       }, admission.withPermits(1)),
       deliver,
-      tell: (id, text, by) =>
-        Effect.map(deliver(id, text, by), (d) => {
-          const name = core.session(id)?.name ?? id;
-          switch (d.kind) {
-            case "steered":
-              return t("server.session.life.steered", { name });
-            case "queued":
-              return t("server.session.life.queued", { name });
-            case "run":
-              return t("server.session.life.started", { name, woke: d.woke === true });
-            case "refused":
-              break;
-          }
-          return d.reason ?? "";
-        }),
+      tell: Effect.fn("Sessions.tell")(function* (id, text, by) {
+        const d = yield* deliver(id, text, by);
+        const name = core.session(id)?.name ?? id;
+        switch (d.kind) {
+          case "steered":
+            return t("server.session.life.steered", { name });
+          case "queued":
+            return t("server.session.life.queued", { name });
+          case "run":
+            return t("server.session.life.started", { name, woke: d.woke === true });
+          case "refused":
+            break;
+        }
+        return d.reason ?? "";
+      }),
       stop: Effect.fn("Sessions.stop")(function* (id) {
         const s = hands.get(id)?.sess;
         if (!s || core.session(id)?.phase._tag !== "working") return false;
@@ -1308,7 +1308,10 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (Option.isNone(r) || r.value.ended_at === null) return undefined;
         return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
       }),
-      runs: (issue) => Effect.map(db(qr.runsOfIssue({ issue_id: issue })), (rows) => rows.map(runOf)),
+      runs: Effect.fn("Sessions.runs")(function* (issue) {
+        const rows = yield* db(qr.runsOfIssue({ issue_id: issue }));
+        return rows.map(runOf);
+      }),
       events: (id, r) => trajectories.events(id, r),
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
@@ -1318,7 +1321,9 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: (o) => makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
+      host: Effect.fn("Sessions.host")(function* <R>(o: HostOptions<R>) {
+        return yield* makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore);
+      }),
       restore,
     });
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
