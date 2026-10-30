@@ -1,4 +1,5 @@
 import type { ActWords, WorkspaceState, Issue, IssueAct, IssueAction, IssueAttention, IssueStatus, Session } from "@vibevalley/protocol";
+
 import { sessionOf } from "@/session/roster.ts";
 const move = (act: IssueAct, status: IssueStatus, words: ActWords = "none"): IssueAction => ({ act, does: "move", status, words });
 const say = (act: IssueAct): IssueAction => ({ act, does: "say" });

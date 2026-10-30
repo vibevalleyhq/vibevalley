@@ -1,21 +1,25 @@
-import { describe, expect, it } from "@effect/vitest";
 import { rmSync } from "node:fs";
-import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
+
+import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Layer, Queue } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
+
+import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
+
 import { Channels } from "@/channel/chat.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { testConfig } from "@/testing/layers.ts";
+import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
+
+import * as accountQ from "../../db/generated/connector_account.sql.ts";
+import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
+import { AppFailed, failedWith } from "./adapter.ts";
 import { Connectors } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage } from "./qq.ts";
 import { type Message as WeixinMessage, type Updates, type WeixinApi, baseUrl } from "./weixin.ts";
-import { AppFailed, failedWith } from "./adapter.ts";
-import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";
-import * as accountQ from "../../db/generated/connector_account.sql.ts";
-import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 
 const owner = "o9cq80wkM5NnOwnerOfThisFarm@im.wechat";
 

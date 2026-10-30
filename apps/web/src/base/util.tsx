@@ -1,5 +1,5 @@
-import { type Accessor, createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { type Accessor, createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 
 /** A ref that focuses its element once it is on the page: what React's autoFocus does on mount. */
 export function autofocus() {

@@ -1,9 +1,10 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { setTimeout as sleep } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { inspect } from "node:util";
+
 import { pathOf } from "../packages/protocol/src/shapes.ts";
 
 export interface VerificationResult {

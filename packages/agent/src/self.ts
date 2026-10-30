@@ -1,12 +1,13 @@
 // The tools every agent has on itself. They touch only the agent's own folder; a subagent (spawn_agent) cannot send subagents.
 
-import type { Tool } from "./core/loop.ts";
-import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.ts";
-import { readSkill, type SkillInfo } from "./skills.ts";
-import { schemaEffectTool, schemaTool } from "./core/tool.ts";
 import { Effect, Schema } from "effect";
+
 import { ToolFailed } from "./core/errors.ts";
+import type { Tool } from "./core/loop.ts";
+import { schemaEffectTool, schemaTool } from "./core/tool.ts";
+import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.ts";
 import { self as selfWords } from "./prompts.ts";
+import { readSkill, type SkillInfo } from "./skills.ts";
 
 export interface SelfOptions {
   readonly home: string;

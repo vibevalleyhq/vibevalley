@@ -1,19 +1,21 @@
-import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
-import { whenTrue } from "@vibevalley/testkit/until";
-import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+
+import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
+import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
+import { objectSchema } from "@vibevalley/ai/tools";
+import { whenTrue } from "@vibevalley/testkit/until";
+
 import * as engine from "./agentTask.ts";
 import { memoryStore } from "./agentTaskStore.ts";
+import { makeTaskRunner } from "./agentTaskTools.ts";
 import { type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
+import { textTool } from "./core/tool.ts";
 import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
-import { makeTaskRunner } from "./agentTaskTools.ts";
 import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, withAgent } from "./testing.ts";
-import { textTool } from "./core/tool.ts";
-import { objectSchema } from "@vibevalley/ai/tools";
 
 const homes: (() => void)[] = [];
 const home = () => {

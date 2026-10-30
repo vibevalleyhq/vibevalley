@@ -2,6 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
+
 import { expect, test } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");

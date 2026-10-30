@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import type { Stories } from "./format";
 import { ancestors, compareTitles, entries, isOpen, treeOf, type Node } from "./tree";
 

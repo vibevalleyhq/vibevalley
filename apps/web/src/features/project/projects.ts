@@ -1,4 +1,5 @@
 import { type ProjectSummary } from "@vibevalley/protocol";
+
 import { compareText, or } from "@/base/order";
 
 /** Only repository home URLs, never credentials, arbitrary git transports or command-line options. */

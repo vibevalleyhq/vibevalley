@@ -1,21 +1,22 @@
+import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
 import { Slider } from "@vibevalley/base-ui";
-import { Tabs } from "@/ui/Tabs";
 import { t } from "@vibevalley/i18n";
 
-import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import type { JSX } from "@solidjs/web";
-
-import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "@/ui/pixel/sound";
-import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./shelves";
 import { numberText } from "@/base/format";
+import { ready, useQuery } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
-import { ready, useQuery } from "@/base/query";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
-import { Segmented } from "@/ui/Segmented";
 import { Card, Quiet, Toggle } from "@/ui/layout";
+import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "@/ui/pixel/sound";
+import { Segmented } from "@/ui/Segmented";
+import { Tabs } from "@/ui/Tabs";
+
+import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./shelves";
 
 type Ground = "check" | "grass" | "night";
 const grounds: { value: Ground; label: string }[] = [

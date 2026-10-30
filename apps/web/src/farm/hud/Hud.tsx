@@ -3,33 +3,35 @@
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
 
+import type { JSX } from "@solidjs/web";
+import { For, Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { For, Show } from "solid-js";
-import type { JSX } from "@solidjs/web";
-import { clockText, thousands } from "./readout";
-import { playSound } from "@/ui/pixel/sound";
+import { orchestratorLookOf } from "@/base/agents";
+import { useCore, useFrames } from "@/base/frame";
+import { ready, useAgents } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { aria } from "@/base/util";
+import { Phone } from "@/farm/phone/Phone";
+import { PhoneButton } from "@/farm/phone/PhoneButton";
 import { farm } from "@/farm/store";
 import { tools } from "@/farm/tools";
+import { timeOfDay, useFarm } from "@/farm/ui";
 import { webRoutes } from "@/farm/world/places";
 import { nextClearing } from "@/farm/world/plots";
 import { unreadTotal } from "@/features/channel";
-import { aria } from "@/base/util";
-import { useRouter } from "@/base/router";
-import { useCore, useFrames } from "@/base/frame";
 import { CardColors, PixelCard, SpriteIcon } from "@/ui/pixel";
-import { Phone } from "@/farm/phone/Phone";
-import { HudCard } from "./HudCard";
-import { PhoneButton } from "@/farm/phone/PhoneButton";
-import { timeOfDay, useFarm } from "@/farm/ui";
+import { playSound } from "@/ui/pixel/sound";
+import { titleBar } from "@/ui/TitleBar";
+
 import { Friends } from "./Friends";
 import { FxLayer } from "./FxLayer";
+import { HudCard } from "./HudCard";
 import { Overlay } from "./Overlay";
 import { ProjectSign } from "./ProjectSign";
 import { QuotaPill } from "./QuotaPill";
-import { titleBar } from "@/ui/TitleBar";
-import { orchestratorLookOf } from "@/base/agents";
-import { ready, useAgents } from "@/base/query";
+import { clockText, thousands } from "./readout";
 
 const edge = 8;
 const gap = 4;

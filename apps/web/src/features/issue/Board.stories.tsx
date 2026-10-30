@@ -1,6 +1,8 @@
 import { createSignal } from "solid-js";
+
 import type { Session } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import { IssueBoard } from "./Board";
 import type { BoardCard } from "./cards";
 import type { Ordering } from "./display";

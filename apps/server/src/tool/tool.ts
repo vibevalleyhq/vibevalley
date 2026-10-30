@@ -2,37 +2,40 @@
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
-import { maybe, t } from "@vibevalley/i18n";
-import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
-import { ToolFailed } from "@vibevalley/agent/core/errors";
-import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
-import { artifactMax } from "@/artifact/policy.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
-import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
-import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
-import { openFindings } from "@/issue/status.ts";
-import { isOpen, maxTasks } from "@/task/graph.ts";
-import { head } from "@/base/clip.ts";
-import { graphText } from "@/task/prompts.ts";
-import { inboxLines } from "@/channel/prompts.ts";
 import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
+
+import { ToolFailed } from "@vibevalley/agent/core/errors";
+import type { Tool } from "@vibevalley/agent/core/loop";
+import { effectTool } from "@vibevalley/agent/core/tool";
+import type { JsonSchema } from "@vibevalley/ai/tools";
+import { maybe, t } from "@vibevalley/i18n";
+import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
+
 import { Agents } from "@/agent/agent.ts";
 import { Artifacts } from "@/artifact/artifact.ts";
+import { artifactMax } from "@/artifact/policy.ts";
 import type { Actor } from "@/base/actor.ts";
-import { effectTool } from "@vibevalley/agent/core/tool";
-import type { Tool } from "@vibevalley/agent/core/loop";
-import type { JsonSchema } from "@vibevalley/ai/tools";
+import { head } from "@/base/clip.ts";
 import { Channels, type Info, type Spoken } from "@/channel/chat.ts";
+import { inboxLines } from "@/channel/prompts.ts";
+import { Crons } from "@/cron/cron.ts";
+import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
 import { Issues } from "@/issue/issue.ts";
+import { openFindings } from "@/issue/status.ts";
 import { foundText, Memories, type SearchQuery } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
-import { Crons } from "@/cron/cron.ts";
-import type { ToolStart } from "@/session/facts.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
+import type { ToolStart } from "@/session/facts.ts";
 import { type Roster, Sessions } from "@/session/session.ts";
+import { isOpen, maxTasks } from "@/task/graph.ts";
+import { graphText } from "@/task/prompts.ts";
 import { Tasks } from "@/task/task.ts";
+
 import {
   answers,
   blockLine,

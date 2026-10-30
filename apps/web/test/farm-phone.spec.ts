@@ -4,10 +4,12 @@
 // the page reconnects a second later to the next.
 
 import type { Page } from "@playwright/test";
+
 import type { InboxItem, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));

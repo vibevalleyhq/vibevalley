@@ -1,5 +1,7 @@
-import { Checkbox as Base } from "@vibevalley/base-ui";
 import { omit } from "solid-js";
+
+import { Checkbox as Base } from "@vibevalley/base-ui";
+
 import { Icon } from "./Icon";
 
 /** A box to tick (base-ui's Checkbox): the same box on every system and in both themes, ticked in the accent colour. */

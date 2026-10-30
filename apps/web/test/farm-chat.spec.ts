@@ -3,10 +3,12 @@
 // fixtures.ts); the plot's test serves a frame with a helper in place of the state stream.
 
 import type { Page } from "@playwright/test";
+
 import type { Agent, Issue, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
-import { buttons, composerOn, defaultChannel, expect, gate, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { buttons, composerOn, defaultChannel, expect, gate, test } from "./fixtures";
 
 test.use({ farm: "farm-chat" });
 

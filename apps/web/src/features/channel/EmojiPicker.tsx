@@ -1,7 +1,9 @@
+import { Portal } from "@solidjs/web";
+import { For, onSettled, untrack } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
-import { For, onSettled, untrack } from "solid-js";
-import { Portal } from "@solidjs/web";
+
 import { emojiGroups, quickReactions } from "./emoji";
 
 const width = 320;

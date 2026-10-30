@@ -4,7 +4,9 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
+
 import { describe, expect, it } from "vite-plus/test";
+
 import { moduleOf, modules, outside } from "./modules.ts";
 
 const src = import.meta.dirname;

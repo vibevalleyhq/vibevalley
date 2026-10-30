@@ -4,21 +4,23 @@ const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyTo
 // The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
-import { spentText } from "@/base/format";
-
-import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
-import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage } from "@/features/channel";
+
 import { api, reasonOf } from "@/base/api";
-import { toast } from "@/ui/toasts";
-import { aria, autofocus } from "@/base/util";
-import { farmClock, readsLong } from "./labels";
-import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
+import { spentText } from "@/base/format";
 import { useCore } from "@/base/frame";
-import { PxMarkdown, SpriteIcon } from "@/ui/pixel";
-import { A } from "@/ui/A";
+import { aria, autofocus } from "@/base/util";
 import { artifactHref } from "@/features/artifact";
+import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage } from "@/features/channel";
+import { A } from "@/ui/A";
+import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
+import { PxMarkdown, SpriteIcon } from "@/ui/pixel";
+import { toast } from "@/ui/toasts";
+
+import { farmClock, readsLong } from "./labels";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
@@ -28,7 +30,7 @@ export function ChatText(props: { text: string; link?: string }) {
   return (
     <Show when={readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
       <div class="flex flex-col items-start">
-        <div class={open() ? "" : "fold-fade max-h-[117px] overflow-hidden"}>
+        <div class={open() ? "" : "max-h-[117px] overflow-hidden fold-fade"}>
           <PxMarkdown text={props.text} mentions />
         </div>
         <button type="button" onClick={() => setOpen(!open())} class={["mt-1 cursor-pointer text-[12px] hover:underline", props.link ?? "text-leaf-700"]}>
@@ -276,7 +278,7 @@ function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
             done();
           }
         }}
-        class="min-w-48 resize-none bg-cream-50 px-1.5 py-1 font-pixel text-[12px] text-bark-900 outline-none [field-sizing:content] shadow-[inset_0_0_0_2px_var(--color-cream-300)]"
+        class="[field-sizing:content] min-w-48 resize-none bg-cream-50 px-1.5 py-1 font-pixel text-[12px] text-bark-900 shadow-[inset_0_0_0_2px_var(--color-cream-300)] outline-none"
       />
       <span class={small}>{t("web.farm.chat.actions.editHint")}</span>
     </div>

@@ -1,7 +1,9 @@
-import type { Handlers } from "@vibevalley/protocol/api";
-import { describe, expect, it } from "vite-plus/test";
 import { Effect } from "effect";
 import { HttpRouter } from "effect/http";
+import { describe, expect, it } from "vite-plus/test";
+
+import type { Handlers } from "@vibevalley/protocol/api";
+
 import { api } from "./api.ts";
 
 async function withRoutes(handlers: Partial<Handlers>, body: (handler: (request: Request) => Promise<Response>) => Promise<void>) {

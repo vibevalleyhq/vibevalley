@@ -1,14 +1,16 @@
-import { matches } from "@/base/search";
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph, SessionView, WorkspaceView } from "@vibevalley/protocol";
+import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
+
+import { ago, tookText } from "@/base/format";
+import { matches } from "@/base/search";
+
 import { type Ordering, orderRows, type RowFacts } from "./display";
 import { endedAt, issueSession, isForOrchestrator } from "./issue";
+import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
+import { attentionTone } from "./overview";
 import { issueTag, type IssueTag, tagText, tagOpen } from "./tags";
 import { issueTitle, taskLine } from "./titles";
-import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
-import { ago, tookText } from "@/base/format";
-import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
-import { attentionTone } from "./overview";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";

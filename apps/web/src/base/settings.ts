@@ -1,4 +1,5 @@
 import type { SettingsUpdate } from "@vibevalley/protocol";
+
 import { api } from "./api";
 import { queries } from "./query";
 

@@ -1,16 +1,20 @@
 import { existsSync } from "node:fs";
-import { owner } from "@/base/actor.ts";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { Issue } from "@vibevalley/protocol";
-import { Said } from "@/testing/said.ts";
 import { Effect } from "effect";
+
+import type { Issue } from "@vibevalley/protocol";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Sessions } from "@/session/session.ts";
-import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 import { releaseHeld } from "@/testing/helper.ts";
+import { Said } from "@/testing/said.ts";
+
+import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
 const drafting = (core: Core["Service"]) => core.state().sessions.some((h) => h.refining);
 

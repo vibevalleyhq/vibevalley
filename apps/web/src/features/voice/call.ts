@@ -4,15 +4,16 @@
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
 import { t } from "@vibevalley/i18n";
-
-import type { RtcLine } from "@vibevalley/protocol/host";
-import { currentHost } from "@/base/host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
+import type { RtcLine } from "@vibevalley/protocol/host";
+
 import { api, reasonOf } from "@/base/api";
+import { currentHost } from "@/base/host";
+import { prefsNow } from "@/base/prefs";
+
 import { webRtc } from "./agora";
 import { LiveCaptions } from "./captions";
-import { prefsNow } from "@/base/prefs";
 
 export type CallPhase = "idle" | "connecting" | "live" | "ending";
 

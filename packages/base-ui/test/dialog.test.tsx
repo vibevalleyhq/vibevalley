@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
+
 import { AlertDialog, Dialog, type DialogCloseReason } from "../src/index";
 import { $, mount, settle } from "./render";
 

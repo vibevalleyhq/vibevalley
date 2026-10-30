@@ -2,11 +2,11 @@
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
 
-import { t } from "@vibevalley/i18n";
-
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
+
+import { t } from "@vibevalley/i18n";
 import { type Attention, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
 import { attentionWantsOwner, phaseText } from "@vibevalley/protocol/rules";
 

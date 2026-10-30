@@ -1,8 +1,10 @@
-import { afterEach, expect, test, vi } from "vite-plus/test";
 import { createRoot, createSignal, flush } from "solid-js";
-import { api } from "@/base/api";
-import { createComposer, type ComposerWays } from "./composing";
 import type * as solid from "solid-js";
+import { afterEach, expect, test, vi } from "vite-plus/test";
+
+import { api } from "@/base/api";
+
+import { createComposer, type ComposerWays } from "./composing";
 
 vi.mock("solid-js", () => vi.importActual<typeof solid>("../../../node_modules/solid-js/dist/solid.js"));
 afterEach(() => vi.restoreAllMocks());

@@ -1,19 +1,22 @@
 // MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
 // sampling. A server that cannot be reached is left out and said why; the others still come.
 
-import { messageOf } from "./core/errors.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { Schema, Option } from "effect";
-import type { Tool } from "./core/loop.ts";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { Schema, Option } from "effect";
+
+import type { JsonSchema } from "@vibevalley/ai/tools";
+
+import { messageOf } from "./core/errors.ts";
+import type { Tool } from "./core/loop.ts";
 import { textTool } from "./core/tool.ts";
 import { asTransport } from "./mcpTransport.ts";
-import type { JsonSchema } from "@vibevalley/ai/tools";
-import { afterRealTime } from "./realTime.ts";
 import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
+import { afterRealTime } from "./realTime.ts";
 
 /** Also for connecting. */
 export const callTimeoutMs = 120_000;

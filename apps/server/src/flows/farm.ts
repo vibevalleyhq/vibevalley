@@ -3,18 +3,21 @@
 // runtime over real git repositories in temporary folders, doing what the words of their job say (testing/helper.ts).
 
 import { execFileSync } from "node:child_process";
+
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
-import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
-import { starter, testConfig } from "@/testing/layers.ts";
 import { Effect, Stream } from "effect";
+
+import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
+
 import type { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
-import { type Hired } from "@/session/session.ts";
 import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart } from "@/services.ts";
+import { type Hired } from "@/session/session.ts";
 import { helper } from "@/testing/helper.ts";
-import { world, type WorldOptions } from "@/testing/world.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
 import { until as untilHeld, waitFor } from "@/testing/until.ts";
+import { world, type WorldOptions } from "@/testing/world.ts";
 
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): Agent => ({ ...starter("lab"), effort: "" });

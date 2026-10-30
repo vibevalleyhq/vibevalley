@@ -2,9 +2,10 @@
 // (apps/server/src/http/api.ts, VibeValleyApi).
 
 import { type Effect, Predicate, Schema } from "effect";
+
+import * as S from "./schema";
 import type * as T from "./shapes";
 import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
-import * as S from "./schema";
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
 

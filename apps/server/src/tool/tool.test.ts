@@ -1,13 +1,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Spent } from "@vibevalley/protocol";
-import { setLocale } from "@vibevalley/i18n";
+
 import { describe, expect, it } from "vite-plus/test";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+
+import { setLocale } from "@vibevalley/i18n";
+import type { Spent } from "@vibevalley/protocol";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";
+
+import { checkCases, goldenCases } from "@/testing/golden.ts";
+
+import { spentText } from "./prompts.ts";
 import { agentOnly, type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";
 import { toolStart } from "./tool.ts";
-import { spentText } from "./prompts.ts";
 
 describe("the tools", () => {
   // The orchestrator's parameters are its prompt's prefix: the bytes in testdata/parameters.json must not drift.

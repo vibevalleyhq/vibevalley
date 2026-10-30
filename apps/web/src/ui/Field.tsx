@@ -1,6 +1,8 @@
-import { For, omit } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { For, omit } from "solid-js";
+
 import { Select as Base } from "@vibevalley/base-ui";
+
 import { Icon } from "./Icon";
 import { Hint } from "./Tip";
 

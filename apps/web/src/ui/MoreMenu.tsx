@@ -1,5 +1,7 @@
-import { Menu } from "@vibevalley/base-ui";
 import { type ComponentProps, For, Show } from "solid-js";
+
+import { Menu } from "@vibevalley/base-ui";
+
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 

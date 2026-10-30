@@ -1,9 +1,9 @@
 // The DeepSeek key (模型), the language (通用) and the memory sources (记性), a part at a time (setting.update); and what
 // the server found of gh (GitHub).
 
-import { t, currentLocale } from "@vibevalley/i18n";
-
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
+
+import { t, currentLocale } from "@vibevalley/i18n";
 import {
   type GitHubStatus,
   type Locale,
@@ -14,19 +14,20 @@ import {
   type SettingsStatus,
   type SettingsUpdate,
 } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { api, reasonOf } from "@/base/api";
-import { saveSettings } from "@/base/settings";
 import { ready, useQuery, useSettings } from "@/base/query";
+import { saveSettings } from "@/base/settings";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { IconButton } from "@/ui/IconButton";
 import { KeyField, SaveBar } from "@/ui/KeyField";
-import { KeyRow, SettingRow, SettingsGroup } from "@/ui/settings";
+import { Quiet, SecretInput, Toggle } from "@/ui/layout";
 import { Segmented } from "@/ui/Segmented";
+import { KeyRow, SettingRow, SettingsGroup } from "@/ui/settings";
 import { Hint, Tip } from "@/ui/Tip";
 import { toast } from "@/ui/toasts";
-import { Quiet, SecretInput, Toggle } from "@/ui/layout";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export type SettingsPart = "deepseek" | "memory";
 

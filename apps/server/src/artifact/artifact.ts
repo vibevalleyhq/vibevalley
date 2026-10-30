@@ -3,11 +3,13 @@
 // home directory's artifacts/. A hand-in is announced where it belongs by its maker, with its card; its comments are the
 // replies to that message, nothing of their own.
 
-import { t } from "@vibevalley/i18n";
-
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { Clock, Context, Effect, Layer, Semaphore } from "effect";
+
+import { t } from "@vibevalley/i18n";
 import {
   type Agent,
   type Artifact,
@@ -26,12 +28,13 @@ import {
   ownerId,
   type Preview,
 } from "@vibevalley/protocol";
-import { Clock, Context, Effect, Layer, Semaphore } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { Channels } from "@/channel/chat.ts";
 import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
+
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qv from "../../db/generated/artifact_version.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";

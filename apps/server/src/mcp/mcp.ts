@@ -3,18 +3,21 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
-import { messageOf } from "@/errors.ts";
-import { coerceArguments } from "@vibevalley/ai/tools";
-import { failedCall, noTool, unknownCaller } from "./prompts.ts";
-import { session } from "@/base/actor.ts";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Context, Effect, FiberSet, Layer } from "effect";
-import { ServerConfig } from "@/base/config.ts";
-import { Sessions } from "@/session/session.ts";
+
 import type { Tool } from "@vibevalley/agent/core/loop";
+import { coerceArguments } from "@vibevalley/ai/tools";
+
+import { session } from "@/base/actor.ts";
+import { ServerConfig } from "@/base/config.ts";
+import { messageOf } from "@/errors.ts";
+import { Sessions } from "@/session/session.ts";
 import { type Caller, Tools } from "@/tool/tool.ts";
+
+import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 
 export class Mcp extends Context.Service<
   Mcp,

@@ -1,6 +1,8 @@
 import { For } from "solid-js";
+
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import type { Tone } from "./cards";
 import { FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 

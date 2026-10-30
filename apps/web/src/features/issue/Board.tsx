@@ -1,16 +1,18 @@
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
-import type { Ordering } from "./display";
-import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
-import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
+
 import { autofocus } from "@/base/util";
-import { Hint } from "@/ui/Tip";
 import { Segmented } from "@/ui/Segmented";
-import { useGraphs, useNameOf } from "./queries";
+import { Hint } from "@/ui/Tip";
+
+import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
+import type { Ordering } from "./display";
+import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
+import { useGraphs, useNameOf } from "./queries";
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
 export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {

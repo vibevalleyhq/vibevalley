@@ -1,13 +1,14 @@
 // Small pieces the farm's panels share: tags, tints, an empty note, a said line and its clock, and a harvest's line
 // counts, file rows and patch.
 
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { ChangedFile } from "@vibevalley/protocol";
-import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
+
 import { aria } from "@/base/util";
+import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
 import { SpriteIcon } from "@/ui/pixel";
 
 /** A colour at `alpha` of its strength over cream. */

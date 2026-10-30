@@ -2,9 +2,9 @@
 // a browser). The phone's shell carries its own (@vibevalley/protocol/host's rtc), which goes on with the screen locked.
 
 import { t } from "@vibevalley/i18n";
+import type { Rtc } from "@vibevalley/protocol/host";
 
 import { messageOf } from "@/base/format";
-import type { Rtc } from "@vibevalley/protocol/host";
 
 export const webRtc: Rtc = async (grant, on) => {
   const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;

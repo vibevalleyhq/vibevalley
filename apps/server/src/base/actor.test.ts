@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { actsForOwner, type Actor, orchestrator, owner, session, system } from "./actor.ts";
 
 test("only the owner, or the orchestrator in a run the owner's words are in, acts on the owner's word", () => {

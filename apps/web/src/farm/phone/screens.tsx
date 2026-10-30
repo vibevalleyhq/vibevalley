@@ -1,24 +1,26 @@
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
 // the orchestrator's line. The web has no voice yet, so calling the orchestrator says so and points to 田头 instead of dialing.
 
-import { t } from "@vibevalley/i18n";
-
-import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
-import type { GlyphCell } from "@/ui/pixel/card";
-import { missedOf } from "./calls";
-import { phoneCells } from "./cells";
-import { lcd } from "./lcd";
-import { aria } from "@/base/util";
-import { AgentFace, OrchestratorFace } from "@/ui/Face";
-import { SpriteIcon } from "@/ui/pixel";
-import { phoneState } from "@/farm/support";
-import { type CallPhase, createCall, voiceCall } from "@/features/voice";
-import { BugSnakeIcon } from "./games/BugSnakeGame";
-import { MergeIcon } from "./games/MergeGame";
+
 import { useAgent } from "@/base/agents";
 import { useCore } from "@/base/frame";
+import { aria } from "@/base/util";
+import { phoneState } from "@/farm/support";
+import { type CallPhase, createCall, voiceCall } from "@/features/voice";
+import { AgentFace, OrchestratorFace } from "@/ui/Face";
+import { SpriteIcon } from "@/ui/pixel";
+import type { GlyphCell } from "@/ui/pixel/card";
+
+import { missedOf } from "./calls";
+import { phoneCells } from "./cells";
+import { BugSnakeIcon } from "./games/BugSnakeGame";
+import { MergeIcon } from "./games/MergeGame";
+import { lcd } from "./lcd";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 

@@ -2,20 +2,24 @@
 // An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
 // to the route of the input taken last, and the tools read that route too.
 
-import { t } from "@vibevalley/i18n";
-import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Usage } from "@vibevalley/ai/messages";
-import type { Tool } from "@vibevalley/agent/core/loop";
-import type { OrchestratorState } from "@vibevalley/protocol";
+
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, Queue, Scope, Semaphore, Stream } from "effect";
+
 import { Brain, type BrainEvent, sessionUnfinished } from "@vibevalley/agent/brain";
-import type { ModelClient } from "@vibevalley/ai/client";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, type CustomMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { readLines, replay } from "@vibevalley/agent/session";
+import type { ModelClient } from "@vibevalley/ai/client";
+import type { Usage } from "@vibevalley/ai/messages";
+import { t } from "@vibevalley/i18n";
+import type { OrchestratorState } from "@vibevalley/protocol";
+
 import { newId } from "@/base/ids.ts";
+import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
+
 import { AgentExecution, type RunInput } from "./execution.ts";
 import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";

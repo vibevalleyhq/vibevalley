@@ -1,17 +1,20 @@
 import type { Event } from "@botiverse/oar";
-import { recallHead } from "./prompts.ts";
-import type { Doing, Session } from "@vibevalley/protocol";
-import { clip } from "@/base/clip.ts";
 import { describe, expect, it } from "vite-plus/test";
-import { inCny } from "@/runtime/price.ts";
-import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { MergeFailure } from "@/project/shapes.ts";
-import { checksOf, parseAnswer, questionsOf, readReport, reportVerdict, summaryOf } from "./report.ts";
-import { conflictBrief, conflictOf, notTakenIn } from "./takeIn.ts";
-import { jobBreak, withRecall } from "./briefing.ts";
-import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
-import { shellCommand } from "./shell.ts";
+
+import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { clip } from "@/base/clip.ts";
+import { MergeFailure } from "@/project/shapes.ts";
+import { inCny } from "@/runtime/price.ts";
+
+import { jobBreak, withRecall } from "./briefing.ts";
+import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
+import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
+import { recallHead } from "./prompts.ts";
+import { checksOf, parseAnswer, questionsOf, readReport, reportVerdict, summaryOf } from "./report.ts";
+import { shellCommand } from "./shell.ts";
+import { conflictBrief, conflictOf, notTakenIn } from "./takeIn.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>

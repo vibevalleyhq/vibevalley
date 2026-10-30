@@ -3,6 +3,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
 
 const out = join(import.meta.dirname, "..", "docs/reference/capabilities.md");

@@ -1,22 +1,23 @@
 // 连接器: the chat apps the owner talks to the farm from. Polled while open: a scan on the
 // phone moves a login on without a reload.
 
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
-import { channelLabel, defaultOf, topsOf } from "@/features/channel";
 import { momentText, wallClockText } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { Keyed } from "@/base/util";
 import { useCore } from "@/base/frame";
+import { Keyed } from "@/base/util";
+import { channelLabel, defaultOf, topsOf } from "@/features/channel";
 import { Button } from "@/ui/Button";
 import { Field, Select, TextInput } from "@/ui/Field";
+import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "@/ui/layout";
 import { SpriteIcon } from "@/ui/pixel";
 import { Qr } from "@/ui/Qr";
-import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "@/ui/layout";
+import { toast } from "@/ui/toasts";
 
 export const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),

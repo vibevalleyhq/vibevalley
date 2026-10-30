@@ -1,19 +1,21 @@
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useOrchestrators } from "@/base/agents";
-import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
-import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
+import { createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
-import { closedShown, laneLabel, laneStatus } from "./lanes";
+
+import { useOrchestrators } from "@/base/agents";
 import { ago } from "@/base/format";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
-import { EmptyNote, OlderLink, QuickAdd } from "./Board";
 import { IconButton } from "@/ui/IconButton";
-import { useGraphs, useNameOf } from "./queries";
+
+import { EmptyNote, OlderLink, QuickAdd } from "./Board";
+import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
+import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
+import { closedShown, laneLabel, laneStatus } from "./lanes";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
+import { useGraphs, useNameOf } from "./queries";
 
 /** The quick add, with the group's project or helper when grouped by one. */
 export type ListAdd = (text: string, where: { project?: string; agent?: string }) => void;

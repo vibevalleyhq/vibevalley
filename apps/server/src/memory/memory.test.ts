@@ -1,19 +1,23 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { owner } from "@/base/actor.ts";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/memory.sql.ts";
-import { Agents } from "@/agent/agent.ts";
+import { TestClock } from "effect/testing";
+
 import { remember, rewriteMemory } from "@vibevalley/agent/memory";
+import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
+
+import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { agentHome, ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
+
+import * as q from "../../db/generated/memory.sql.ts";
 import { Memories, make } from "./memory.ts";
 import { memoryIsNewNote, memoryJobText, memoryNotesOf, recallChars } from "./recall.ts";
 

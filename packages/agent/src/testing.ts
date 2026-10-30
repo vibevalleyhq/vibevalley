@@ -1,12 +1,14 @@
-import { Effect } from "effect";
-import { tempDir } from "@vibevalley/testkit/temp";
 import { rmSync } from "node:fs";
 
+import { Effect } from "effect";
+
+import type { ModelClient } from "@vibevalley/ai/client";
 import type { Message } from "@vibevalley/ai/messages";
 import { type Reply, type Request, scriptedLlm, type Step, testModel } from "@vibevalley/ai/testing";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { type BrainEvent, type BrainHandle, type BrainOptions, type BrainOwner, openBrain, standaloneOwner } from "./brain.ts";
 import { codingTools } from "./coding.ts";
-import type { ModelClient } from "@vibevalley/ai/client";
 import { messageText, userMessage } from "./messages.ts";
 
 export type { Reply, Request, Step };

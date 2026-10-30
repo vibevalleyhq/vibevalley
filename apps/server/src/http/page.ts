@@ -4,8 +4,10 @@
 // takes its words from it before it draws (apps/web src/main.tsx).
 
 import { extname, join, normalize } from "node:path";
+
 import { Effect, FileSystem, Option } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+
 import { currentLocale } from "@vibevalley/i18n";
 
 const htmlLang = { zh: "zh-Hans", en: "en" } as const;

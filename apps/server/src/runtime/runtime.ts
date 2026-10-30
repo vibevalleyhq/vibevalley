@@ -4,31 +4,34 @@
 // every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
 // day's budget takes no work.
 
-import { currentLocale, type Locale, t } from "@vibevalley/i18n";
-
 import { join } from "node:path";
+
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
-import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@/agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
+
+import { Llm } from "@vibevalley/ai/llm";
+import { currentLocale, type Locale, t } from "@vibevalley/i18n";
+import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
+
 import { Agents } from "@/agent/agent.ts";
 import { modelClient } from "@/agent/model.ts";
-import { Llm } from "@vibevalley/ai/llm";
-import { vibevalleyRuntimeOf } from "./vibevalley.ts";
-import { dshRuntime } from "./dsh.ts";
-import { Setting } from "@/setting/setting.ts";
+import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@/agent/seed.ts";
 import { dbStores } from "@/agent/taskStore.ts";
 import { projectsDir, ServerConfig } from "@/base/config.ts";
 import { FileWriter } from "@/base/files.ts";
 import { jsonOrNone } from "@/base/json.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, refused } from "@/errors.ts";
-import { piBalance } from "./pi.ts";
-import { inCny, price, type Rate } from "./price.ts";
-import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
-import { moneyStop, quotaOf } from "./quota.ts";
 import { callbackLog } from "@/base/log.ts";
 import { timeHere, withinRealTime } from "@/base/time.ts";
+import { Core } from "@/core/core.ts";
+import { type ApiError, refused } from "@/errors.ts";
+import { Setting } from "@/setting/setting.ts";
+
+import { dshRuntime } from "./dsh.ts";
+import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
+import { piBalance } from "./pi.ts";
+import { inCny, price, type Rate } from "./price.ts";
+import { moneyStop, quotaOf } from "./quota.ts";
+import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;

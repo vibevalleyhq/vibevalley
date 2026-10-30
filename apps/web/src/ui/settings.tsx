@@ -1,11 +1,14 @@
 // 设置's parts: a page is groups of rows, a row a setting's name and a line on what it does on the left, its control on
 // the right. One shape for every section, so a section reads like the others and the search finds its rows.
 
-import { t } from "@vibevalley/i18n";
-import type { KeyStatus } from "@vibevalley/protocol";
 import type { JSX } from "@solidjs/web";
 import { createContext, Show, useContext, type Accessor } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import type { KeyStatus } from "@vibevalley/protocol";
+
 import { matches } from "@/base/search";
+
 import { IconButton, OutLink } from "./IconButton";
 import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";

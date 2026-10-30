@@ -2,11 +2,12 @@
 // turn, and the agent page shows the same pick ahead of time. Characters are UTF-16 units.
 
 import { maybe } from "@vibevalley/i18n";
+import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";
+
+import { compare, or } from "@/base/order.ts";
 
 import { recallWords } from "./prompts.ts";
-import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";
 import { termsInCommon, termsOf } from "./terms.ts";
-import { compare, or } from "@/base/order.ts";
 
 export const recallCount = 8;
 export const recallJobs = 3;

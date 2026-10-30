@@ -1,10 +1,11 @@
 // 产出 (docs/subsystems/artifact.md): every artifact on the left, newest change first, found by its title; the one open on
 // the right, written block by block or looked at as a page, with its versions and a reply that reaches its maker.
 
-import { t } from "@vibevalley/i18n";
-
-import { type Artifact, type ArtifactVersion, artifactPath } from "@vibevalley/protocol";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import { type Artifact, type ArtifactVersion, artifactPath } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
 import { useCore } from "@/base/frame";
@@ -19,9 +20,10 @@ import { Icon } from "@/ui/Icon";
 import { type MoreItem, MoreMenu } from "@/ui/MoreMenu";
 import { Tag } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
+
+import { bodyIcon, bodyLabel } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
-import { bodyIcon, bodyLabel } from "./ArtifactCard";
 import { artifactHref, useArtifact, useArtifacts } from "./queries";
 
 /** What a page in the frame may do: run its scripts and open links in a tab of their own. Never allow-same-origin: it
@@ -89,7 +91,7 @@ export function ArtifactsPage(props: { rest: string }) {
         <Show when={list().length > 0 && shown().length === 0}>
           <p class="px-2 text-xs text-muted">{t("web.artifact.page.nothingFound")}</p>
         </Show>
-        <ul class="scroll-fade-y -mx-2 flex min-h-0 flex-col gap-0.5 overflow-y-auto px-2">
+        <ul class="-mx-2 flex min-h-0 scroll-fade-y flex-col gap-0.5 overflow-y-auto px-2">
           <For each={shown()} keyed={(a) => a.id}>
             {(a) => (
               <li>

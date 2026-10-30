@@ -2,21 +2,23 @@
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
-import { t } from "@vibevalley/i18n";
-
-import { sessionId } from "@vibevalley/protocol/schema";
-import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
-import { fromOwner } from "./prompts.ts";
-import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
-import { Agents } from "@/agent/agent.ts";
+
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "@vibevalley/agent/memory";
+import { t } from "@vibevalley/i18n";
+import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
+import { Agents } from "@/agent/agent.ts";
 import { agentHome, ServerConfig } from "@/base/config.ts";
+import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
 import { Setting } from "@/setting/setting.ts";
+
 import { everos } from "./everos.ts";
 import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
 import { nowledge } from "./nowledge.ts";
+import { fromOwner } from "./prompts.ts";
 import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
 import { type EndedSession, interleave, localSource, makeSources, mergeRecalled, type Source } from "./sources.ts";
 

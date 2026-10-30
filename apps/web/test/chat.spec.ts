@@ -1,4 +1,5 @@
 import { defaultOrchestrator, type VibeValleyApi } from "@vibevalley/protocol";
+
 import { composerOn, expect, tab, test, defaultChannel } from "./fixtures";
 
 const newChannel = (api: VibeValleyApi, name: string) => api.channel.create({ name });

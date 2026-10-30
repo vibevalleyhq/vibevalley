@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Stream } from "effect";
 import type { HttpClient } from "effect/http";
+
 import { type LlmError, Llm, make } from "./llm.ts";
 import type { Context } from "./messages.ts";
 import { models } from "./models.ts";

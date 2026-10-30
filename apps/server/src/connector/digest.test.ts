@@ -1,7 +1,10 @@
-import type { ChatMessage, Channel } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+
+import type { ChatMessage, Channel } from "@vibevalley/protocol";
+
 import { forOwner } from "@/notice/away.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
+
 import { flushText, isPairing, ownerLine, plainText, shortId, splitText } from "./digest.ts";
 
 describe("the connector's words", () => {

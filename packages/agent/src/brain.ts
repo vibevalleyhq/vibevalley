@@ -4,28 +4,31 @@
 // agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
-import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/errors.ts";
-import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
 import { join } from "node:path";
+
+import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
+
+import type { ModelClient } from "@vibevalley/ai/client";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 import type { ThinkingLevel } from "@vibevalley/ai/models";
-import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
+
 import { finished, type AgentTask } from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
+import { type AgentTaskRunner, makeTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction, type Summarized } from "./compaction.ts";
-import type { ModelClient } from "@vibevalley/ai/client";
+import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/errors.ts";
+import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
+import { stopped } from "./core/tool.ts";
 import { type McpServer, connectAll, type McpConnections } from "./mcp.ts";
 import { memoryFileLines, readMemory } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, type CustomMessage, customMessage, messageText, requestContext, userMessage } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
-import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
+import { agent as words } from "./prompts.ts";
 import { Reminders } from "./reminders.ts";
+import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
 import { type Subagent, selfTools, subagentInstructions, subagentTool } from "./self.ts";
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
-import { type AgentTaskRunner, makeTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
-import { stopped } from "./core/tool.ts";
-import { agent as words } from "./prompts.ts";
 
 type Own = CustomMessage | CompactionSummaryMessage;
 

@@ -1,15 +1,18 @@
-import { t } from "@vibevalley/i18n";
-import { sampleAgent } from "@/testing/agents.ts";
 import { describe, expect, it } from "@effect/vitest";
-import type { BlockOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
-import { Database, Db } from "@/base/db.ts";
+
+import { t } from "@vibevalley/i18n";
+import type { BlockOp } from "@vibevalley/protocol";
+
 import { ServerConfig } from "@/base/config.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { waitFor, whenTrue } from "@/testing/until.ts";
+import { Database, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { orMissing } from "@/errors.ts";
+import { sampleAgent } from "@/testing/agents.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { waitFor, whenTrue } from "@/testing/until.ts";
+
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";

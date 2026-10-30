@@ -3,6 +3,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, test } from "vite-plus/test";
 
 const root = join(import.meta.dirname, "../../../..");

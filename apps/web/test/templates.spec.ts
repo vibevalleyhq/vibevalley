@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, test } from "./fixtures";
 
 // A server of its own: installing and adding templates changes the whole farm's profiles.

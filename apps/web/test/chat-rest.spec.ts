@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+
 import type { Agent, VibeValleyApi } from "@vibevalley/protocol";
+
 import { composerOn, expect, test } from "./fixtures";
 
 const side = (page: Page) => page.getByTestId("channels-side");

@@ -1,18 +1,20 @@
 // How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
 // runtime's machine, usage windows, today's spend and a stop it is under.
 
+import { createSignal, For, Match, Show, Switch } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
+import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
 import { yuan } from "@/base/format";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
-import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "@/features/runtime";
-import { aria, useClickAway } from "@/base/util";
 import { ready, useRuntimes } from "@/base/query";
-import { CardColors, PxButton, SpriteIcon } from "@/ui/pixel";
+import { aria, useClickAway } from "@/base/util";
 import { commands } from "@/farm/frames";
-import { HudCard } from "./HudCard";
+import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "@/features/runtime";
+import { CardColors, PxButton, SpriteIcon } from "@/ui/pixel";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+
+import { HudCard } from "./HudCard";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
 

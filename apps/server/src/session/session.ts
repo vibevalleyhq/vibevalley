@@ -5,37 +5,12 @@
 // trigger on the hand first and the turn takes the oldest. Admission serializes room and opening turns; each hand owns its
 // input, handover and departure, so one worktree's checks do not hold the other sessions.
 
-import { t } from "@vibevalley/i18n";
-
-import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { restartedNote, workplaceRules } from "./prompts.ts";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { join, resolve } from "node:path";
+
 import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
-import {
-  type Agent,
-  type Changes,
-  dayMs,
-  type Fact,
-  type SessionClose,
-  type Issue,
-  maxRunning,
-  type Outcome,
-  type Run,
-  type RunTrigger,
-  type Session,
-  type SessionEvent,
-  type SessionGraph,
-  type Spent,
-  type WorkspaceState,
-  type IssueId,
-  type SessionId,
-} from "@vibevalley/protocol";
-import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import {
   Cause,
   Clock,
@@ -57,34 +32,61 @@ import {
   Metric,
 } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
+import {
+  type Agent,
+  type Changes,
+  dayMs,
+  type Fact,
+  type SessionClose,
+  type Issue,
+  maxRunning,
+  type Outcome,
+  type Run,
+  type RunTrigger,
+  type Session,
+  type SessionEvent,
+  type SessionGraph,
+  type Spent,
+  type WorkspaceState,
+  type IssueId,
+  type SessionId,
+} from "@vibevalley/protocol";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
-import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 import { serverAddress, ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
+import { timeHere } from "@/base/time.ts";
+import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 import { Core, type FactIn } from "@/core/core.ts";
-import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { Memories } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
 import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
-import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
-import { type Journal, Trajectories } from "./journal.ts";
-import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
-import { conflictOf, notTakenIn, sameConflict, type Settle } from "./takeIn.ts";
+
 import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
+import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
+import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
+import { type Journal, Trajectories } from "./journal.ts";
+import { restartedNote, workplaceRules } from "./prompts.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
-import { timeHere } from "@/base/time.ts";
-
-import * as S from "@vibevalley/protocol/schema";
+import { conflictOf, notTakenIn, sameConflict, type Settle } from "./takeIn.ts";
 
 export type { SessionNews };
+import * as qs from "../../db/generated/session.sql.ts";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
-import * as qs from "../../db/generated/session.sql.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;

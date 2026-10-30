@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
+
 import { Tabs } from "../src/index";
 import { $, mount, settle } from "./render";
 

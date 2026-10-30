@@ -3,6 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { setLocale } from "@vibevalley/i18n";
 
 export function followSavedLocale(home: string) {

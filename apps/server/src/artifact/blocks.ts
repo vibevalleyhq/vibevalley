@@ -2,8 +2,10 @@
 // their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
 // its seq goes up in order. Part of Artifacts (artifact.ts), which owns the artifact's row.
 
-import { list, t } from "@vibevalley/i18n";
+import { Clock, Effect, Option, Schema, Semaphore } from "effect";
+import { SqlClient } from "effect/sql";
 
+import { list, t } from "@vibevalley/i18n";
 import type {
   Agent,
   Block,
@@ -17,22 +19,22 @@ import type {
   TextSpan,
   BlockSubmit,
 } from "@vibevalley/protocol";
-import { Clock, Effect, Option, Schema, Semaphore } from "effect";
-import { SqlClient } from "effect/sql";
+import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
+import { jsonOf } from "@/base/json.ts";
 import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
-import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
-import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
-import { ordered, Page, wire } from "./ops.ts";
-import { unmarked } from "./spans.ts";
-import { demoJitter, demoPieces } from "./demo.ts";
+
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qb from "../../db/generated/artifact_block.sql.ts";
 import * as qr from "../../db/generated/artifact_block_revision.sql.ts";
 import * as qc from "../../db/generated/artifact_change.sql.ts";
-import { jsonOf } from "@/base/json.ts";
-import * as S from "@vibevalley/protocol/schema";
+import { demoJitter, demoPieces } from "./demo.ts";
+import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
+import { ordered, Page, wire } from "./ops.ts";
+import { unmarked } from "./spans.ts";
 
 const attrsOf = jsonOf(S.BlockAttrs);
 const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.TextSpan))));

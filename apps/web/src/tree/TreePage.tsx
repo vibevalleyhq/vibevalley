@@ -4,21 +4,23 @@
 // looking up, the same memories as a sky; the panel to the right. The memories are made up (mock.ts) until the server
 // sums them up.
 
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
+import { createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import { isOneOf } from "@vibevalley/protocol/rules";
+
+import { ago } from "@/base/format";
 import { useRouter, useSearch } from "@/base/router";
 import { useNow, useViewport } from "@/base/util";
-import { ago } from "@/base/format";
+import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "@/ui/pixel";
+import { playSound } from "@/ui/pixel/sound";
 import { toast } from "@/ui/toasts";
-import { type MemoryItem, type MemoryKind, type MemoryTree, mockTree, TreeStageValues } from "./mock";
-import { isOneOf } from "@vibevalley/protocol/rules";
+
 import { allOf, counts, kept, newest, stageName, type TreeFilter } from "./memories";
-import { type Ties, tiesOf } from "./sky";
+import { type MemoryItem, type MemoryKind, type MemoryTree, mockTree, TreeStageValues } from "./mock";
 import { type SceneArea, type SceneHover, Scene } from "./Scene";
+import { type Ties, tiesOf } from "./sky";
 
 const kindIcon: Record<MemoryKind, string> = { leaf: "icon-leaf", fruit: "icon-fruit", seed: "icon-seed" };
 const kindName = (kind: MemoryKind) => t(`web.tree.kind.${kind}`);

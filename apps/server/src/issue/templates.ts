@@ -1,6 +1,8 @@
 import { maybe, t } from "@vibevalley/i18n";
-import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
 import type { Issue, IssueTemplate, ProjectStack, TemplateBlank, TemplateKind } from "@vibevalley/protocol";
+
+import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
+
 import { isForOrchestrator } from "./status.ts";
 const recentTitles = 5;
 

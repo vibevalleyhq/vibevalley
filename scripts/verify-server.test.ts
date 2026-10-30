@@ -1,8 +1,10 @@
-import { expect, test } from "vite-plus/test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { runVerification, readyAddress } from "./verify-server";
+
+import { expect, test } from "vite-plus/test";
+
 import { pathOf } from "../packages/protocol/src/shapes.ts";
+import { runVerification, readyAddress } from "./verify-server";
 
 test("only a machine receipt from the owned process announces readiness", () => {
   expect(readyAddress("listening on http://127.0.0.1:9999", 17)).toBeUndefined();

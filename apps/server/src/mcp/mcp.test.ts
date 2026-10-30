@@ -1,22 +1,26 @@
-import { scriptedRuntime } from "@botiverse/oar/testing";
-import { owner } from "@/base/actor.ts";
-import { describe, expect, it } from "@effect/vitest";
-import { type Agent, ownerId, type Session } from "@vibevalley/protocol";
-import { Said } from "@/testing/said.ts";
-import { starter } from "@/testing/layers.ts";
-import { Effect } from "effect";
-import { Channels } from "@/channel/chat.ts";
-import { Core } from "@/core/core.ts";
-import { Artifacts } from "@/artifact/artifact.ts";
-import { Sessions } from "@/session/session.ts";
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { scriptedRuntime } from "@botiverse/oar/testing";
+import { describe, expect, it } from "@effect/vitest";
+import { Effect } from "effect";
+
+import { type Agent, ownerId, type Session } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
+import { Artifacts } from "@/artifact/artifact.ts";
+import { owner } from "@/base/actor.ts";
+import { Channels } from "@/channel/chat.ts";
+import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Memories } from "@/memory/memory.ts";
-import { world } from "@/testing/world.ts";
-import { Mcp } from "./mcp.ts";
+import { Sessions } from "@/session/session.ts";
+import { starter } from "@/testing/layers.ts";
+import { Said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { world } from "@/testing/world.ts";
+
+import { Mcp } from "./mcp.ts";
 
 const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 

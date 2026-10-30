@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+
 import { expect, test } from "./fixtures";
 
 /** A new blocks artifact, started with 新建 on 产出 and named by typing over its title; its blocks once it is open. */

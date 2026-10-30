@@ -1,11 +1,13 @@
 // A file the server keeps (state.json…), saved whole or not at all and in order: each
 // write goes to a temporary file renamed over it, so a crash never leaves half a file; the last write asked for wins.
 
-import { messageOf } from "@/errors.ts";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+
 import { Clock, Effect } from "effect";
-import { randomUUID } from "node:crypto";
+
+import { messageOf } from "@/errors.ts";
 
 /**
  * An owner's file (config.json, settings.json, state.json) read by read. One that does not read (not JSON, or not the

@@ -3,7 +3,6 @@
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
 
 import { t } from "@vibevalley/i18n";
-
 import {
   type Block,
   type BlockAttrs,
@@ -17,7 +16,9 @@ import {
   type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
+
 import { reasonOf } from "@/base/api";
+
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
 /** Text edits wait this long after the last key, and no longer than maxWaitMs while typing goes on. */

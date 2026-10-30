@@ -2,7 +2,6 @@
 // the effects a fact sets off, and the achievements in words.
 
 import { t } from "@vibevalley/i18n";
-
 import type {
   Achievement,
   AchievementStanding,
@@ -21,10 +20,12 @@ import type {
   Session,
 } from "@vibevalley/protocol";
 import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
-import { playOf } from "./play.ts";
+
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
-import { sessionOf } from "@/session/roster.ts";
 import { openFindings } from "@/issue/status.ts";
+import { sessionOf } from "@/session/roster.ts";
+
+import { playOf } from "./play.ts";
 
 export const xpToNext = (level: number) => 10 * level;
 

@@ -3,9 +3,11 @@
 // looked at on the pixel page.
 
 import assert from "node:assert/strict";
+
 import { test } from "vite-plus/test";
-import { GROUND_NORMALS, mirrorNormals, normalsOf, SPRITE_NORMALS } from "../src/pixi/normals";
+
 import { materialOf } from "../src/pixi/material";
+import { GROUND_NORMALS, mirrorNormals, normalsOf, SPRITE_NORMALS } from "../src/pixi/normals";
 import { flatLight, skyAt } from "../src/pixi/sky";
 
 /** A w×h picture: `solid` says which pixels are painted (grey, opaque); the rest are clear. */

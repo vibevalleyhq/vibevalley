@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import type { Run, RunTrigger } from "@vibevalley/protocol";
 function runTriggerText(trigger: RunTrigger) {
   switch (trigger.kind) {

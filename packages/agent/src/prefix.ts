@@ -2,8 +2,9 @@
 // prompt's start (tools, then the system prompt) is hashed part by part on every request, so a change between two
 // compactions, which costs the whole conversation at full price, is told and can be traced to its part.
 
-import type { ToolDeclaration } from "@vibevalley/ai/messages";
 import { createHash } from "node:crypto";
+
+import type { ToolDeclaration } from "@vibevalley/ai/messages";
 
 export interface PromptPart {
   readonly name: string;

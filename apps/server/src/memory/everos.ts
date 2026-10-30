@@ -4,16 +4,19 @@
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
 
-import { t } from "@vibevalley/i18n";
+import { createHash } from "node:crypto";
 
-import { everosWords, recallWords } from "./prompts.ts";
-import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
-import { createHash } from "node:crypto";
+
+import { t } from "@vibevalley/i18n";
+import type { Memory, MemoryKind } from "@vibevalley/protocol";
+
 import { newId } from "@/base/ids.ts";
 import { redact } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+
+import { everosWords, recallWords } from "./prompts.ts";
 import { clip, recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 

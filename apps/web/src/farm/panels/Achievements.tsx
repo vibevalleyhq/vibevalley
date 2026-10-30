@@ -2,20 +2,21 @@
 // achievements with its medals and how far along it is, and the secrets found. The catalogue is the server's
 // (game.achievements), the standings come with the frame (view.achievements).
 
-import { t } from "@vibevalley/i18n";
-
 import { createSignal, For, Show } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
+
 import { api } from "@/base/api";
-import { fire } from "@/farm/commands";
-import { thousands } from "@/farm/hud/readout";
-import { beds } from "@/farm/world/plots";
-import { aria, useClickAway } from "@/base/util";
 import { useCore, useFrames } from "@/base/frame";
 import { ready, useQuery } from "@/base/query";
-import { numberText, SpriteIcon } from "@/ui/pixel";
+import { aria, useClickAway } from "@/base/util";
+import { fire } from "@/farm/commands";
 import { commands } from "@/farm/frames";
+import { thousands } from "@/farm/hud/readout";
+import { beds } from "@/farm/world/plots";
+import { numberText, SpriteIcon } from "@/ui/pixel";
+
 import { tint, Tinted } from "./bits";
 
 const walls: AchievementCategory[] = ["harvest", "craft", "thrift", "team"];
@@ -165,7 +166,7 @@ function Standing(props: { catalog: readonly Achievement[] }) {
   const need = () => Math.round(lv().need);
   return (
     <Tinted class="flex flex-wrap items-center gap-x-6 gap-y-3 p-3">
-      <div class="flex min-w-[160px] max-w-[280px] flex-col">
+      <div class="flex max-w-[280px] min-w-[160px] flex-col">
         <div class="flex flex-wrap items-end gap-2">
           <span class="text-[20px] text-leaf-700">Lv.{Math.round(lv().level)}</span>
           <span class="text-[12px] text-bark-600">

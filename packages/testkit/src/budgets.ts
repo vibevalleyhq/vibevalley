@@ -4,6 +4,7 @@
 // broken one.
 
 import type { Reporter, TestModule, Vitest } from "vite-plus/test/node";
+
 import { budgetMs, type Layer, layers, pyramid } from "./pyramid.ts";
 
 export default class Budgets implements Reporter {

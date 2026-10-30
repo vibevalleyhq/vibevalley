@@ -2,22 +2,24 @@
 // pointed at, a reward, a note, its badge, its project, the level that clears it), what each helper is doing over its
 // head, the orchestrator's last words, and the yard's signs, names and counts. Words let clicks through to the village.
 
-import { t } from "@vibevalley/i18n";
-
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
-import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
+
+import { useFrames } from "@/base/frame";
 import { farmState } from "@/farm/store";
+import { useVillage } from "@/farm/support";
 import { aimTool } from "@/farm/tools";
+import { useFarm } from "@/farm/ui";
+import type { Village } from "@/farm/world/load";
 import { yardPlaces } from "@/farm/world/places";
 import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "@/farm/world/plots";
-import type { Village } from "@/farm/world/load";
 import { plotH } from "@/farm/world/world";
-import { useFrames } from "@/base/frame";
 import { useFollowed, defaultOf } from "@/features/channel";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
-import { useVillage } from "@/farm/support";
+
+import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 
 /** Rows of art pixels above the plot's bottom where its rail is. */
 const rail = 5;

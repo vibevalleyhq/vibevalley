@@ -2,8 +2,8 @@
 // to what each app takes; a digest of what waited; the pairing words.
 
 import { t } from "@vibevalley/i18n";
-
 import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
+
 import { slice } from "@/base/clip.ts";
 
 /** In UTF-16 units; longer ones are cut. */

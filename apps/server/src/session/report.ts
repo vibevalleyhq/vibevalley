@@ -1,14 +1,14 @@
 // Lengths are UTF-16 units.
 
-import { maybe, t } from "@vibevalley/i18n";
-import { Predicate } from "effect";
-import { messageOf } from "@/errors.ts";
-
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
+import { Predicate } from "effect";
+
+import { maybe, t } from "@vibevalley/i18n";
 import type { Question, CheckResult, CriterionCheck, IssueAnswer, Outcome } from "@vibevalley/protocol";
 
 import { clip, slice } from "@/base/clip.ts";
+import { messageOf } from "@/errors.ts";
 
 const summaryMax = 160;
 

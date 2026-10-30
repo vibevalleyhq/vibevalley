@@ -6,11 +6,12 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Platform, Settings } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
 import { FarmConnection } from "./src/farm";
 import { FarmScreen } from "./src/FarmScreen";
-import { PairScreen } from "./src/PairScreen";
-import { deviceName } from "./src/pairing";
 import { followDevice } from "./src/locale";
+import { deviceName } from "./src/pairing";
+import { PairScreen } from "./src/PairScreen";
 
 followDevice();
 

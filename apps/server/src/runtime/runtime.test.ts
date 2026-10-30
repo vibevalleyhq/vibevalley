@@ -1,27 +1,30 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { sampleAgent } from "@/testing/agents.ts";
-import { tempDir } from "@vibevalley/testkit/temp";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-
 import { join } from "node:path";
+
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
-import { afterEach, describe, expect, it } from "@effect/vitest";
-import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
-import { factsOf, presetOf, runtimeIds } from "@/agent/seed.ts";
 import { NodeServices } from "@effect/platform-node";
+import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Stream } from "effect";
+import { TestClock } from "effect/testing";
+
+import { setLocale, t } from "@vibevalley/i18n";
+import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { Agents } from "@/agent/agent.ts";
+import { factsOf, presetOf, runtimeIds } from "@/agent/seed.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
 import { layer as projection } from "@/projection/projection.ts";
+import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { nextTurn, whenTrue } from "@/testing/until.ts";
+
 import { piBalance } from "./pi.ts";
 import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
-import { TestClock } from "effect/testing";
-import { setLocale, t } from "@vibevalley/i18n";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
   defineRuntime({

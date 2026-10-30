@@ -1,11 +1,13 @@
+import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
-import type { JSX } from "@solidjs/web";
-import { cx, pxRing, pxText } from "./style";
 import { aria } from "@/base/util";
+
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
+import { cx, pxRing, pxText } from "./style";
 
 /** `label` with a dotted underline that shows `tip` on hover; the bare label without one. */
 export function PxTip(props: { tip?: string | undefined; children: JSX.Element; class?: string }) {

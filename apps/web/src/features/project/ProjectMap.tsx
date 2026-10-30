@@ -2,17 +2,32 @@
 // worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
 // plot its issue, an empty plot a seed for the project.
 
-import { t } from "@vibevalley/i18n";
-
-import { variant, autofocus } from "@/base/util";
-import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
+
 import { api, newSendKey, reasonOf } from "@/base/api";
-import { badgeColors, CardColors } from "@/ui/pixel/card";
-import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
+import { useCore, useFrames } from "@/base/frame";
+import { ready, useAgents, useProjects } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { variant, autofocus } from "@/base/util";
+import { defaultOf } from "@/features/channel";
+import { writeIssue } from "@/features/issue";
+import { Button } from "@/ui/Button";
 import { castOf, castSprite, cropSprite } from "@/ui/cast";
+import { Dialog } from "@/ui/Dialog";
+import { AgentFace } from "@/ui/Face";
+import { TextArea } from "@/ui/Field";
+import { Card, Quiet } from "@/ui/layout";
+import { PixelCard, SpriteIcon } from "@/ui/pixel";
+import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
+import { badgeColors, CardColors } from "@/ui/pixel/card";
+import { PoseSprite } from "@/ui/PoseSprite";
+import { toast } from "@/ui/toasts";
+
 import { growthOf, since } from "./calendar";
 import {
   homeless,
@@ -29,19 +44,6 @@ import {
   sessionInPlot,
   spotText,
 } from "./islands";
-import { toast } from "@/ui/toasts";
-import { writeIssue } from "@/features/issue";
-import { useRouter } from "@/base/router";
-import { useCore, useFrames } from "@/base/frame";
-import { defaultOf } from "@/features/channel";
-import { ready, useAgents, useProjects } from "@/base/query";
-import { PixelCard, SpriteIcon } from "@/ui/pixel";
-import { Button } from "@/ui/Button";
-import { Dialog } from "@/ui/Dialog";
-import { AgentFace } from "@/ui/Face";
-import { TextArea } from "@/ui/Field";
-import { PoseSprite } from "@/ui/PoseSprite";
-import { Card, Quiet } from "@/ui/layout";
 
 const gap = 24;
 const parchment = "#ebd9ae";

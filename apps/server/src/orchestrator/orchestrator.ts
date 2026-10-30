@@ -1,41 +1,42 @@
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Scope, Semaphore, Stream } from "effect";
+
+import { selfTools } from "@vibevalley/agent/self";
+import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
+import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
-
-import { ownersLanguage } from "@/prompts.ts";
-
-import { agentPrompt, identityNote, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
-import { orchestrator } from "@/base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
-import { runtimeLabel } from "@/agent/seed.ts";
-import { nextRun } from "@/cron/when.ts";
-import { isOpen } from "@/task/graph.ts";
-import { graphText } from "@/task/prompts.ts";
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Scope, Semaphore, Stream } from "effect";
+
 import { Agents } from "@/agent/agent.ts";
-import { traitsOf } from "@/agent/prompts.ts";
-import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
-import { Llm } from "@vibevalley/ai/llm";
-import { localeMinute } from "@/base/time.ts";
-import { selfTools } from "@vibevalley/agent/self";
+import { traitsOf } from "@/agent/prompts.ts";
+import { runtimeLabel } from "@/agent/seed.ts";
+import { orchestrator } from "@/base/actor.ts";
 import { agentHome, projectsDir, ServerConfig } from "@/base/config.ts";
+import { localeMinute } from "@/base/time.ts";
 import { Channels, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
+import { Crons } from "@/cron/cron.ts";
+import { nextRun } from "@/cron/when.ts";
 import type { ApiError } from "@/errors.ts";
 import { Issues, type OrchestratorWork } from "@/issue/issue.ts";
 import { Notices, type Overdue } from "@/notice/notice.ts";
 import { Projects } from "@/project/project.ts";
+import { ownersLanguage } from "@/prompts.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
-import { Crons } from "@/cron/cron.ts";
-import type { Answer } from "./openai.ts";
 import { type AgentHost, Caller } from "@/session/host.ts";
 import { Sessions } from "@/session/session.ts";
 import { Setting } from "@/setting/setting.ts";
+import { isOpen } from "@/task/graph.ts";
+import { graphText } from "@/task/prompts.ts";
 import { Tasks } from "@/task/task.ts";
-import { Tools } from "@/tool/tool.ts";
 import { channelLine } from "@/tool/prompts.ts";
-import { deepseekModel, orchestratorModel } from "./model.ts";
+import { Tools } from "@/tool/tool.ts";
+
 import { intake, type Source } from "./intake.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import type { Answer } from "./openai.ts";
+import { agentPrompt, identityNote, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { orchestratorInboxLines, quotaText, situationDelta } from "./situation.ts";
 
 const keepEvents = 1000;

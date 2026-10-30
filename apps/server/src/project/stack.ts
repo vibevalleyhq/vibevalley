@@ -1,9 +1,9 @@
 // What a project is built with, from the markers at its root, first one wins.
 
-import { t } from "@vibevalley/i18n";
-
-import type { ProjectStack } from "@vibevalley/protocol";
 import { Option, Schema } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { ProjectStack } from "@vibevalley/protocol";
 
 const empty: ProjectStack = { name: "", label: "" };
 

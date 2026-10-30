@@ -1,9 +1,11 @@
 // The page's one WebSocket: the Subscriptions RPCs (packages/protocol/src/rpc.ts) at rpcPath, for the farm's own page.
 
-import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
 import { Effect, Layer } from "effect";
 import { type Headers, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
+
+import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
+
 import { Channels } from "@/channel/chat.ts";
 import { deviceHeader } from "@/lan/lan.ts";
 

@@ -2,11 +2,14 @@
 // fact. A delivery goes pending → announced → handed → seen; a session that closes or a turn that ends without a word puts
 // what it was handed back to pending: given twice rather than lost. Everything that changes the chat runs one at a time.
 
-import { list, t } from "@vibevalley/i18n";
+import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { HttpClient } from "effect/http";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { busyNotice, wakeInput } from "./prompts.ts";
+
+import { list, t } from "@vibevalley/i18n";
 import {
   type Chat,
   type ChatMessage,
@@ -37,42 +40,41 @@ import {
   type Embed,
   type Notify,
 } from "@vibevalley/protocol";
-import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { keepChannels, targetOf } from "./folded.ts";
-import { head } from "@/base/clip.ts";
-import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
-import { channelNameProblem, parseChatTarget } from "./targets.ts";
-import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
-import { mentionOf, mentionsIn } from "./mentions.ts";
-import { parseSearch } from "./search.ts";
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
-import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { sessionId, type Wire } from "@vibevalley/protocol/schema";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { head } from "@/base/clip.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
-import { WakeBreaker } from "./breaker.ts";
-import { linksIn, readEmbed } from "./embeds.ts";
-import { Deliveries, type DeliveryRow } from "./deliveries.ts";
-import { ChatModel, type ChannelRow } from "./model.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 
-import * as S from "@vibevalley/protocol/schema";
 import * as qc from "../../db/generated/channel.sql.ts";
+import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
 import * as qmn from "../../db/generated/channel_mention.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
-import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
+import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
+import { WakeBreaker } from "./breaker.ts";
+import { Deliveries, type DeliveryRow } from "./deliveries.ts";
+import { linksIn, readEmbed } from "./embeds.ts";
+import { keepChannels, targetOf } from "./folded.ts";
+import { mentionOf, mentionsIn } from "./mentions.ts";
+import { ChatModel, type ChannelRow } from "./model.ts";
+import { busyNotice, wakeInput } from "./prompts.ts";
+import { parseSearch } from "./search.ts";
+import { channelNameProblem, parseChatTarget } from "./targets.ts";
+import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
 
 /** The channel a new farm opens with. */
 const firstChannelName = "general";

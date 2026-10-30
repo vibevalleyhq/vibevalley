@@ -4,9 +4,10 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, omit, onCleanup, useContext } from "solid-js";
+
 import { createDismiss } from "./internal/dismiss";
-import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 import { buttonType, call, type DivProps, flag, type Render, refs } from "./internal/element";
+import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 
 export type TooltipOpenChangeReason = "hover" | "focus" | "press" | "escape" | "outside";
 

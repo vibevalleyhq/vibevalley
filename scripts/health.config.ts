@@ -4,6 +4,7 @@
  */
 
 import type { Health } from "@vibevalley/health/readings";
+
 import { moduleOf } from "../apps/server/src/modules.ts";
 
 const generated = ["apps/server/db/generated/", "packages/i18n/src/catalogs.ts", "packages/protocol/src/client.ts"];

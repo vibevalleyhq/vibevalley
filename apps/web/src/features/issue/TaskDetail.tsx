@@ -1,20 +1,22 @@
-import { list, t } from "@vibevalley/i18n";
 import { createSignal, For, Show } from "solid-js";
 
+import { list, t } from "@vibevalley/i18n";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
+
 import { reasonOf } from "@/base/api";
-import type { Tone } from "./cards";
-import { taskLine } from "./titles";
 import { wallClockText } from "@/base/format";
 import { ready } from "@/base/query";
+import { type Answer, graphs, useGraphChanges } from "@/features/task";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Icon } from "@/ui/Icon";
 import { Markdown } from "@/ui/Markdown";
+
+import type { Tone } from "./cards";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { useNameOf } from "./queries";
 import { Fold, IssueSheet, More, Note, Property } from "./Sheet";
-import { type Answer, graphs, useGraphChanges } from "@/features/task";
+import { taskLine } from "./titles";
 
 const spentText = (s: Spent) =>
   [s.cny !== undefined ? `¥${s.cny.toFixed(2)}` : undefined, s.tokens > 0 ? `${Math.round(s.tokens)} token` : undefined].filter(Boolean).join(" · ") || "—";

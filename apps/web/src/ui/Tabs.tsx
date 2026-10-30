@@ -1,5 +1,7 @@
-import { Tabs as Base } from "@vibevalley/base-ui";
 import { For, Show } from "solid-js";
+
+import { Tabs as Base } from "@vibevalley/base-ui";
+
 import { A } from "./A";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";

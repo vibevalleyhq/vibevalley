@@ -2,16 +2,18 @@
 // the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
 // reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
 
-import { t } from "@vibevalley/i18n";
-import { recallWords } from "./prompts.ts";
-
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { asTransport } from "@vibevalley/agent/mcpTransport";
-import type { Memory } from "@vibevalley/protocol";
 import { Clock, Effect, Option, Predicate, Schema } from "effect";
+
+import { asTransport } from "@vibevalley/agent/mcpTransport";
+import { t } from "@vibevalley/i18n";
+import type { Memory } from "@vibevalley/protocol";
+
 import { redact } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+
+import { recallWords } from "./prompts.ts";
 import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 

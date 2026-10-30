@@ -12,6 +12,7 @@
 // pictures make themselves, is light.ts.
 
 import { Application, Container, RenderTexture, Sprite, TextureStyle, UPDATE_PRIORITY } from "pixi.js";
+
 import type { Point } from "../nav";
 
 export type { Point } from "../nav";

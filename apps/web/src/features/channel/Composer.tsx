@@ -1,24 +1,26 @@
+import type { JSX } from "@solidjs/web";
+import { createSignal, flush, For, Show, untrack } from "solid-js";
+
 import { Progress } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
-import { useRouter } from "@/base/router";
 import { ownerId } from "@vibevalley/protocol";
+import type { Channel } from "@vibevalley/protocol";
+
+import { api, reasonOf } from "@/base/api";
+import { useCore } from "@/base/frame";
+import { useRouter } from "@/base/router";
+import { aria } from "@/base/util";
+import { DictationButton } from "@/features/voice";
+import { AttachmentTile } from "@/ui/AttachmentTile";
+import { OrchestratorFace } from "@/ui/Face";
+import { Icon } from "@/ui/Icon";
+import { toast } from "@/ui/toasts";
+
+import { HelperFace } from "./bits";
+import { createComposer } from "./composing";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
-
-import { createSignal, flush, For, Show, untrack } from "solid-js";
-import type { JSX } from "@solidjs/web";
-import type { Channel } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
-import { createComposer } from "./composing";
-import { toast } from "@/ui/toasts";
-import { aria } from "@/base/util";
-import { useCore } from "@/base/frame";
-import { OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import { AttachmentTile } from "@/ui/AttachmentTile";
-import { DictationButton } from "@/features/voice";
-import { HelperFace } from "./bits";
 
 /** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
 export function Composer(props: { channel: Channel | undefined; placeholder: string }) {
@@ -201,7 +203,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             e.preventDefault();
             attach(files);
           }}
-          class="block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none [field-sizing:content] placeholder:text-faint"
+          class="block [field-sizing:content] max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none placeholder:text-faint"
         />
         <div class="flex items-center gap-1 px-2 pb-2">
           <Show when={props.channel?.type !== "direct"}>

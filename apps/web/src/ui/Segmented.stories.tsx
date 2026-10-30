@@ -1,4 +1,5 @@
 import { stories, story } from "@vibevalley/stories";
+
 import { Segmented } from "./Segmented";
 
 type View = "list" | "board" | "farm";

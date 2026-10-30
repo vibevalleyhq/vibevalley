@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import type { Task, TaskEdit, TaskGraph } from "@vibevalley/protocol";
 
 import { canEditTask, canRemoveTask, graphProblems, taskOf, taskView, withTask } from "./graph.ts";

@@ -2,31 +2,33 @@
 // forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
 // (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
 
-import { t } from "@vibevalley/i18n";
-
-import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
-import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
-import { aria, Keyed } from "@/base/util";
+import { useQueryClient } from "@tanstack/solid-query";
+import { For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+
+import { orchestratorLookOf } from "@/base/agents";
+import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
-import { FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
+import { setPet, usePrefs } from "@/base/prefs";
+import { ready, useAgents } from "@/base/query";
+import { aria, Keyed } from "@/base/util";
+import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
 import { useVillage } from "@/farm/support";
+import { useFarm } from "@/farm/ui";
+import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
+import { FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
+import { toast } from "@/ui/toasts";
+
 import { Achievements } from "./Achievements";
+import { tint } from "./bits";
 import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
 import { TaskBoard } from "./TaskBoard";
-import { tint } from "./bits";
-import { setPet, usePrefs } from "@/base/prefs";
-import { useQueryClient } from "@tanstack/solid-query";
-import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
-import { orchestratorLookOf } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { ready, useAgents } from "@/base/query";
-import { toast } from "@/ui/toasts";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],

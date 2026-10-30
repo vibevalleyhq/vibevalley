@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { bodyProblems, branchProblems, messageProblems, subjectMax, subjectProblems } from "./commit-msg";
 
 test("a subject says what the code now does, in at most 100 characters", () => {

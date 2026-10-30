@@ -1,14 +1,14 @@
 // Kept on this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
 
-import { t } from "@vibevalley/i18n";
-
+import { Option, Schema } from "effect";
 import { createSignal } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import { reasonOf } from "@/base/api";
 import { recordOf } from "@/base/util";
-import { Option, Schema } from "effect";
-
-import * as S from "@vibevalley/protocol/schema";
 
 export interface Draft {
   readonly text?: string;

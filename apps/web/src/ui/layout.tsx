@@ -1,13 +1,15 @@
 // What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
 // and the few controls their forms use.
 
+import type { JSX } from "@solidjs/web";
+import { createSignal, omit, Show } from "solid-js";
+
 import { Switch } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { createSignal, omit, Show } from "solid-js";
-import type { JSX } from "@solidjs/web";
-import { A } from "./A";
 import { aria } from "@/base/util";
+
+import { A } from "./A";
 import { TextInput } from "./Field";
 import { Icon } from "./Icon";
 import { Hint } from "./Tip";

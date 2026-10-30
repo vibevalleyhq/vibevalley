@@ -1,12 +1,13 @@
 // Accordion (Base UI's): a stack of sections, each a header with a trigger and a panel it opens. One open at a time
 // unless `multiple`; the arrow keys, Home and End move among the triggers. The value is the list of open items.
 
-import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
+
 import type { Orientation } from "./internal/composite";
-import { roveFocus } from "./internal/roving";
-import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
 import { createControllable } from "./internal/controllable";
+import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
+import { roveFocus } from "./internal/roving";
 
 interface RootCtx {
   readonly open: (value: string) => boolean;

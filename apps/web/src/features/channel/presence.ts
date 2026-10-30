@@ -1,7 +1,7 @@
+import { type Phase, type SessionView } from "@vibevalley/protocol";
 import { spanText } from "@vibevalley/protocol/rules";
 
 import { actionIcon, type IconName } from "@/ui/icons";
-import { type Phase, type SessionView } from "@vibevalley/protocol";
 const span = spanText;
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */

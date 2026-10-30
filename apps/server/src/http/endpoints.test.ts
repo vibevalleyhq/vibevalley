@@ -1,8 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+
+import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
+
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
+
 import { app } from "./app.ts";
 
 const farm = Effect.gen(function* () {

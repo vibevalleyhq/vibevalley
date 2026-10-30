@@ -1,7 +1,9 @@
 // Waiting in a test for what the farm does: the core state's transitions here; the rest is @vibevalley/testkit's.
 
-import type { WorkspaceState } from "@vibevalley/protocol";
 import { Effect, Option, Stream } from "effect";
+
+import type { WorkspaceState } from "@vibevalley/protocol";
+
 import { Core } from "@/core/core.ts";
 
 export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";

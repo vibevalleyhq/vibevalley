@@ -2,10 +2,11 @@
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
-import { list, t } from "@vibevalley/i18n";
-
-import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { join } from "node:path";
+
+import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
+
+import { list, t } from "@vibevalley/i18n";
 import {
   type Agent,
   type AgentTemplate,
@@ -17,11 +18,13 @@ import {
   SpeciesValues,
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { defaultSettings } from "./seed.ts";
-import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
-import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+
+import { defaultSettings } from "./seed.ts";
+import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 
 interface Stored {
   readonly agents: readonly Agent[];

@@ -1,11 +1,13 @@
+import { onSettled } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { onSettled } from "solid-js";
 import { reducedMotion } from "@/ui/pixel";
+
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
+import { flashFor, kept, type TreeFilter } from "./memories";
 import type { MemoryItem, MemoryKind, MemoryTree } from "./mock";
 import { constellation, hash01, type Star, starsOf, tiesOf } from "./sky";
-import { flashFor, kept, type TreeFilter } from "./memories";
 
 export interface SceneHover {
   readonly item: MemoryItem;

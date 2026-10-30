@@ -58,6 +58,13 @@ export default defineConfig({
     printWidth: 160,
     // site/ is its own project; the rest are written by tools or are data, and docs keep their compact tables.
     ignorePatterns: ["site/**", "**/*.md", "apps/server/db/generated/**", "**/testdata/**", "apps/web/public/**", ".agents/**", "design/**"],
+    // Imports from farthest to nearest: Node, packages, the workspace's own, this app's @/, then the same folder.
+    sortImports: {
+      customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
+      groups: ["builtin", "external", "workspace", ["internal", "subpath"], ["parent", "sibling", "index"], "style", "unknown"],
+    },
+    // Tailwind's own class order, from the page's stylesheet; cx(…) holds classes too.
+    sortTailwindcss: { stylesheet: "./apps/web/src/style.css", functions: ["cx"] },
   },
   lint: {
     ignorePatterns: ["site/**", "apps/server/db/generated/**"],

@@ -2,26 +2,28 @@
 // worker's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
 // new worker, /agents/new?role=orchestrator a new orchestrator.
 
-import { t } from "@vibevalley/i18n";
-
-import { createMemo, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
+import { createMemo, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentTally, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
-import { hexColor } from "@/ui/cast";
-import { toast } from "@/ui/toasts";
-import { A } from "@/ui/A";
-import { Hint } from "@/ui/Tip";
+
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "@/base/agents";
+import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { ready, useRuntimes } from "@/base/query";
+import { orchestratorHref } from "@/features/orchestrator";
+import { useSkills } from "@/features/runtime";
+import { A } from "@/ui/A";
+import { hexColor } from "@/ui/cast";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
-import { useSkills } from "@/features/runtime";
+import { Hint } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
+
 import { AgentPage } from "./AgentPage";
 import { TemplatesPage } from "./TemplatesPage";
-import { orchestratorHref } from "@/features/orchestrator";
 
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {

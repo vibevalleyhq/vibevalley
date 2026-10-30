@@ -3,9 +3,10 @@
 // after, each update here doing what its query does (the comments name it); a transaction that fails reloads the model,
 // since the changes told inside it are gone from the database. Only the chat writes these tables, one change at a time.
 
+import { compareText, or } from "@/base/order.ts";
+
 import type * as qc from "../../db/generated/channel.sql.ts";
 import type * as qp from "../../db/generated/channel_participant.sql.ts";
-import { compareText, or } from "@/base/order.ts";
 
 export type ChannelRow = qc.AllChannelsResult;
 export type ParticipantRow = qp.ParticipantsResult;

@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
 import { skills as skillWords } from "./prompts.ts";
 
 export interface SkillInfo {

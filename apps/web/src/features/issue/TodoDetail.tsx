@@ -1,23 +1,25 @@
-import { t } from "@vibevalley/i18n";
-
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
-import { api } from "@/base/api";
-import { rememberPick } from "./write";
-import { isRefined } from "./issue";
-import { newIssueTitle } from "./titles";
-import { ago, wallClockText } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { autofocus } from "@/base/util";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { useWorkAgents } from "@/base/agents";
+import { api } from "@/base/api";
+import { ago, wallClockText } from "@/base/format";
 import { ready, queries, useProjects } from "@/base/query";
+import { autofocus } from "@/base/util";
+import { IssueArtifacts } from "@/features/artifact";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea, TextInput } from "@/ui/Field";
+import { toast } from "@/ui/toasts";
+
 import { run } from "./acts";
-import { IssueArtifacts } from "@/features/artifact";
+import { isRefined } from "./issue";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { newIssueTitle } from "./titles";
+import { rememberPick } from "./write";
 
 interface Draft {
   title: string;

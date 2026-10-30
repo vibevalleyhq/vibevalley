@@ -4,6 +4,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+
 import { chromium } from "@playwright/test";
 
 const server = process.env.VIBEVALLEY_SERVER;

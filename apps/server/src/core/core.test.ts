@@ -1,15 +1,19 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import { emptyProgress } from "@/game/progress.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { layer as projection } from "@/projection/projection.ts";
-import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
+
+import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { ServerConfig } from "@/base/config.ts";
+import { emptyProgress } from "@/game/progress.ts";
+import { layer as projection } from "@/projection/projection.ts";
+import { testConfig } from "@/testing/layers.ts";
+
+import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 
 const helper: Session = {
   id: sessionId("w1"),

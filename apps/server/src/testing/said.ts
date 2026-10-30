@@ -1,8 +1,10 @@
 // What is said in a test farm, from the farm's start: the core state keeps no messages (a page follows a channel's
 // room), and a test reads them as the message facts told them, by channel.
 
-import type { ChatMessage } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Stream } from "effect";
+
+import type { ChatMessage } from "@vibevalley/protocol";
+
 import { Core } from "@/core/core.ts";
 
 export class Said extends Context.Service<

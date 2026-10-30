@@ -5,6 +5,7 @@
 // live is the game's. Positions are whole pixels.
 
 import { Container, Sprite, Texture } from "pixi.js";
+
 import type { Point } from "../nav";
 import type { PointLight } from "./light";
 import { glyph } from "./particles";

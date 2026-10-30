@@ -2,16 +2,20 @@
 // still being written (the draft) is on disk only once it is sealed. A step that grows (text still streaming in, a tool that
 // has not returned) is pushed again under the same number.
 
-import { t } from "@vibevalley/i18n";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+
+import { Schema } from "effect";
+
+import { t } from "@vibevalley/i18n";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
-import { Schema } from "effect";
+
 import { cut } from "@/base/clip.ts";
 import { FileWriter } from "@/base/files.ts";
-import type { From, ToolStart } from "./facts.ts";
 import type { Time } from "@/base/time.ts";
+
+import type { From, ToolStart } from "./facts.ts";
 
 const keepEvents = 240;
 const textMax = 6000;

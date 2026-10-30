@@ -2,8 +2,8 @@
 // enough to fold.
 
 import { t } from "@vibevalley/i18n";
-
 import type { Channel } from "@vibevalley/protocol";
+
 import { channelLabel } from "@/features/channel";
 
 /** The farm calls the default channel by its words' chat.label (田头). */

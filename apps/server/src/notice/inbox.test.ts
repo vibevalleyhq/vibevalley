@@ -1,9 +1,12 @@
 // The inbox's kinds the golden files have no case of.
 
 import { expect, test } from "vite-plus/test";
+
 import type { WorkspaceState, Issue, Session } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
+
 import { emptyWorkspaceState } from "@/core/core.ts";
+
 import { inbox } from "./inbox.ts";
 
 test("a helper handed back with questions asks the owner to answer, not to complete it", () => {

@@ -3,17 +3,19 @@
 // show again on this machine. Without the orchestrator's key 开始游戏 says so in place: the workbench pages have no toasts to
 // carry it there.
 
+import { createSignal, For, onSettled, Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createSignal, For, onSettled, Show } from "solid-js";
 import { api } from "@/base/api";
-import { playSound } from "@/ui/pixel/sound";
-import { farm } from "@/farm/store";
-import { hasFarm, orchestratorReady } from "./ready";
-import { startScene } from "./scene";
-import { useRouter } from "@/base/router";
 import { useCore } from "@/base/frame";
 import { ready, useSettings } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { farm } from "@/farm/store";
+import { playSound } from "@/ui/pixel/sound";
+
+import { hasFarm, orchestratorReady } from "./ready";
+import { startScene } from "./scene";
 import { TitleStage } from "./TitleStage";
 
 type Item = "start" | "continue" | "settings";

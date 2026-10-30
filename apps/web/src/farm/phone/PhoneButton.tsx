@@ -2,19 +2,21 @@
 // ones, and says when 田头 has something new while the phone is not unfolded to it. The phone itself is Phone.tsx, over
 // the button.
 
+import { Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { Show } from "solid-js";
+import { useCore } from "@/base/frame";
+import { aria } from "@/base/util";
+import { farm } from "@/farm/store";
+import { phoneState } from "@/farm/support";
+import { useFarm } from "@/farm/ui";
+import { unreadTotal } from "@/features/channel";
+import { PixelCard } from "@/ui/pixel";
+import { playSound } from "@/ui/pixel/sound";
+
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
-import { playSound } from "@/ui/pixel/sound";
-import { farm } from "@/farm/store";
-import { aria } from "@/base/util";
-import { PixelCard } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
-import { phoneState } from "@/farm/support";
-import { useCore } from "@/base/frame";
-import { unreadTotal } from "@/features/channel";
 
 export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);

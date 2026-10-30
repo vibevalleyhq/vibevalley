@@ -1,13 +1,15 @@
-import { createMemo, onCleanup } from "solid-js";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
+import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
-import { markdownClass, remarkMentions } from "./mentions";
-import { fragmentOf, richen } from "./richText";
-import { remarkIssueRefs } from "./richRules";
+
 import { useRouter } from "@/base/router";
+
+import { markdownClass, remarkMentions } from "./mentions";
+import { remarkIssueRefs } from "./richRules";
+import { fragmentOf, richen } from "./richText";
 
 // Raw HTML in the text is dropped (remark-rehype's default); the tree becomes DOM nodes directly, without innerHTML.
 const plain = unified()

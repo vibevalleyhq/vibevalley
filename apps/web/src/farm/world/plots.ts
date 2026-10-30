@@ -2,7 +2,6 @@
 // only read it.
 
 import { t } from "@vibevalley/i18n";
-
 import type { Crop, FarmView, PlotView, Session } from "@vibevalley/protocol";
 
 export interface Bed {

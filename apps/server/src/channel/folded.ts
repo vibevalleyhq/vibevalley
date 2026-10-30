@@ -1,6 +1,7 @@
 // The chat in the core state.
 
 import { type Chat, type ChatMessage, type Channel, type OwnerMention, ownerId } from "@vibevalley/protocol";
+
 import { compareText, or } from "@/base/order.ts";
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
 export const keepChannels = 100;

@@ -5,11 +5,12 @@
 
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
+
+import { createControllable } from "./internal/controllable";
 import { createDismiss } from "./internal/dismiss";
+import { call, type DivProps, flag, refs } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 import { itemsIn } from "./internal/roving";
-import { call, type DivProps, flag, refs } from "./internal/element";
-import { createControllable } from "./internal/controllable";
 
 export type ComboboxOpenChangeReason = "input" | "item" | "escape" | "outside" | "tab";
 

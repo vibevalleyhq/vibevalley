@@ -1,8 +1,10 @@
 // A tool that fails throws (or fails, as an Effect): the model reads the error's message as a failed result.
 
-import { type ToolFailed, toolFailed } from "./errors.ts";
 import { Effect, Schema } from "effect";
+
 import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
+
+import { type ToolFailed, toolFailed } from "./errors.ts";
 import type { Tool } from "./loop.ts";
 import { toolResult } from "./prompts.ts";
 

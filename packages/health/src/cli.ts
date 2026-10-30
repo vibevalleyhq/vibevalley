@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
+
 import { commits, firstTime, headTime, sources } from "./collect.ts";
 import { drift, type Escapes, escapesByArea, type Health, hotspots, underTodaysNames } from "./readings.ts";
 import { report } from "./report.ts";

@@ -2,6 +2,7 @@
 
 import { clock, type VillageScreen } from "@/farm/store";
 import type { Village } from "@/farm/world/load";
+
 import type { Scene } from "./scene";
 
 export const background = "#2b3320";

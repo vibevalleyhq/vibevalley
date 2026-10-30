@@ -3,6 +3,7 @@
 
 import { list, t } from "@vibevalley/i18n";
 import type { GraphEventKind, Task, TaskFieldChange, TaskGraph, GraphEvent } from "@vibevalley/protocol";
+
 import { taskOf } from "./graph.ts";
 
 /** A graph event before it is stored: no id, actor or time yet. */

@@ -7,18 +7,20 @@
 //	node --import tsx src/cli.ts runtime chat claude
 //	node --import tsx src/cli.ts issue list
 
-import { t } from "@vibevalley/i18n";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
 
-import { messageOf } from "./errors.ts";
 import "./cli/locale.ts";
 
-import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
-import { NodeRuntime, NodeServices } from "@effect/platform-node";
+
+import { t } from "@vibevalley/i18n";
+
 import { DryRunFlag, eventsCommand, groupCommands, issueWorkCommand, ServerFlag, stateCommand } from "./cli/api.ts";
 import { ownChat, runtimeChat } from "./cli/chat.ts";
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
+import { messageOf } from "./errors.ts";
 
 const version = "0.1.0";
 

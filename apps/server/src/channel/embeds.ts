@@ -4,10 +4,12 @@
 // A name that resolves anew between that check and the request (DNS rebinding) is the gap left; nothing is sent with the
 // request but the address, and only a page's head is read back.
 
-import { Effect, Option, Stream } from "effect";
-import { FetchHttpClient, HttpClient } from "effect/http";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+
+import { Effect, Option, Stream } from "effect";
+import { FetchHttpClient, HttpClient } from "effect/http";
+
 import type { Embed } from "@vibevalley/protocol";
 /** At most this many links of a message get a preview. */
 export const embedMax = 3;

@@ -1,8 +1,9 @@
-import { defineConfig, lazyPlugins } from "vite-plus";
-import solid from "@solidjs/vite-plugin";
-import tailwindcss from "@tailwindcss/vite";
 import { renameSync } from "node:fs";
 import { join } from "node:path";
+
+import solid from "@solidjs/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
 // stories.html: served at / in dev and written as index.html in the build, so the folder serves like any site.

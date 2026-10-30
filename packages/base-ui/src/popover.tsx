@@ -3,9 +3,10 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, onSettled, useContext } from "solid-js";
+
 import { createDismiss } from "./internal/dismiss";
-import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner, tabbable } from "./internal/floating";
 import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type Renderable } from "./internal/element";
+import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner, tabbable } from "./internal/floating";
 
 export type PopoverOpenChangeReason = "trigger" | "escape" | "outside" | "close";
 

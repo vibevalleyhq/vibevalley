@@ -1,26 +1,30 @@
-import { describe, expect, it } from "@effect/vitest";
 import { readFileSync } from "node:fs";
-import { type ChatMessage, type Channel, defaultOrchestrator, type Session } from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
-import { channelOf, defaultOf } from "./folded.ts";
-import { Said, said } from "@/testing/said.ts";
-import { head } from "@/base/clip.ts";
-import { wakeBreaker } from "./audience.ts";
+
+import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+
+import { type ChatMessage, type Channel, defaultOrchestrator, type Session } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
+
+import { Agents } from "@/agent/agent.ts";
+import { head } from "@/base/clip.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
-import { Agents } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
-import { newsOf } from "@/session/session.ts";
-import { sessionOnIssue } from "@/session/roster.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/report.ts";
+import { sessionOnIssue } from "@/session/roster.ts";
+import { newsOf } from "@/session/session.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
-import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
+import { Said, said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
+
 import * as qm from "../../db/generated/channel_message.sql.ts";
+import { wakeBreaker } from "./audience.ts";
+import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
+import { channelOf, defaultOf } from "./folded.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
  * off), 「必败」 fails. */

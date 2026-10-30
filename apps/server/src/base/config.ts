@@ -2,13 +2,15 @@
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
 
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
+import { parse } from "yaml";
+
 import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
-import { parse } from "yaml";
 
 export class ServerConfig extends Context.Service<
   ServerConfig,

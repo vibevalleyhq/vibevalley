@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+
 import { expect, test } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");

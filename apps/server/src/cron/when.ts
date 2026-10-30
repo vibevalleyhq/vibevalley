@@ -2,9 +2,9 @@
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
-import { list, t } from "@vibevalley/i18n";
-
 import { Cron as EffectCron, DateTime, Option } from "effect";
+
+import { list, t } from "@vibevalley/i18n";
 import type { Cron, CronWhen } from "@vibevalley/protocol";
 
 /** A day of the week by its number, Sunday 0. */

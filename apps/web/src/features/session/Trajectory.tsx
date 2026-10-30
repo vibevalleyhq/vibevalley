@@ -2,13 +2,24 @@
 // row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
 
-import { t } from "@vibevalley/i18n";
-
-import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { api, reasonOf } from "@/base/api";
+import { ago } from "@/base/format";
+import { ready, useQuery } from "@/base/query";
+import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { Quiet } from "@/ui/layout";
+import { Markdown } from "@/ui/Markdown";
+import { toast } from "@/ui/toasts";
+
+import { createSessionEvents } from "./events";
 import {
   cacheHit,
   farmToolText,
@@ -26,16 +37,6 @@ import {
   type TrajectorySummary,
   waterfallOf,
 } from "./rounds";
-import { ago } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
-import { createSessionEvents } from "./events";
-import { ready, useQuery } from "@/base/query";
-import { TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Markdown } from "@/ui/Markdown";
-import { Quiet } from "@/ui/layout";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;

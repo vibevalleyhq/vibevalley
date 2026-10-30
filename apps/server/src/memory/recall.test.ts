@@ -1,9 +1,12 @@
-import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
+
+import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { checkCases, goldenCases } from "@/testing/golden.ts";
+
 import { lineOf, memoryNotesOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
 import { termsOf } from "./terms.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
 
 // Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds; V8's is fdlibm's.
 // They can differ in the last bit, so a relevance within 1e-12 of the Go's is the same one; the picks must agree exactly.

@@ -1,10 +1,12 @@
 // The command line run in a test: against the whole farm on a free port, with a Stdio of its own and no environment.
 
+import { NodeServices } from "@effect/platform-node";
 import { ConfigProvider, Effect, Layer, Sink, Stdio, Stream } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { NodeServices } from "@effect/platform-node";
+
 import { run } from "@/cli.ts";
 import { app } from "@/http/app.ts";
+
 import { testConfig } from "./layers.ts";
 import { quietApp } from "./world.ts";
 

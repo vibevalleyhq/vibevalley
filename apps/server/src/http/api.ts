@@ -1,11 +1,13 @@
 // The API over HTTP: every endpoint in @vibevalley/protocol/api is a POST at its op's path, routed to its handler. An input
 // that does not decode is a 400 with why (an empty body is {}); no answer is a 204; a refusal is its tagged JSON at its status.
 
-import { messageOf } from "@/errors.ts";
-import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
 import { Cause, Effect, Schema, Metric } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+
+import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
+
 import { wireOf } from "@/base/wire.ts";
+import { messageOf } from "@/errors.ts";
 
 // The same Schema the clients read it back with: a refusal that does not fit it is the server's bug, a 500.
 const isApiError = Schema.is(ApiError);

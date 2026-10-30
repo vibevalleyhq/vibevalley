@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
-import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
+
+import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { ordered, Page } from "./ops.ts";
 import { normal, plain, runeLen, sameText, splitAt } from "./spans.ts";
 import { bold, para, sample, span } from "./testing.ts";

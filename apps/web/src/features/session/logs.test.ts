@@ -1,5 +1,7 @@
-import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
+
+import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
+
 import { SessionLogs } from "./logs";
 import { stepLimit } from "./rounds";
 

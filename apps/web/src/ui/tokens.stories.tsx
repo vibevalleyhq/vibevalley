@@ -1,8 +1,10 @@
 // Whole class names, so Tailwind sees each one.
 
-import { createSignal, For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, onSettled, Show } from "solid-js";
+
 import { stories, story } from "@vibevalley/stories";
+
 import { Button } from "./Button";
 
 const colours: [string, string][] = [

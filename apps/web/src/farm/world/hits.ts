@@ -2,6 +2,7 @@
 // the dog, the yard's places, the plots (a little taller than their box).
 
 import type { SessionId } from "@vibevalley/protocol";
+
 import { type Box, inBox, type Point } from "./level";
 
 export type VillageHit =

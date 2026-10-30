@@ -1,25 +1,29 @@
 import { execFileSync } from "node:child_process";
-import { freshTask } from "@/task/editing.ts";
-import { graphView } from "@/task/graph.ts";
-import { owner } from "@/base/actor.ts";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
-import { starter, testConfig } from "@/testing/layers.ts";
 import { Cause, Effect } from "effect";
 import { SqlClient } from "effect/sql";
+
+import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { reasonOf } from "@/errors.ts";
 import { Crons } from "@/cron/cron.ts";
+import { reasonOf } from "@/errors.ts";
 import { Sessions } from "@/session/session.ts";
-import { world } from "@/testing/world.ts";
-import { Issues } from "./issue.ts";
+import { freshTask } from "@/task/editing.ts";
+import { graphView } from "@/task/graph.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { world } from "@/testing/world.ts";
+
+import { Issues } from "./issue.ts";
 const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())) });

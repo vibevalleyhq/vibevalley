@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vite-plus/test";
+
 import { IssueStatusValues, type Issue, type IssueStatus, type TaskGraph } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
+
 import { isRefined, issueInTask } from "./issue";
-import { issueTag } from "./tags";
-import { issueTitle } from "./titles";
 import { laneOf, lanes, laneStatus, moveOf, ownStatus } from "./lanes";
 import { stageOf } from "./stages";
+import { issueTag } from "./tags";
+import { issueTitle } from "./titles";
 const issue = (over: Partial<Issue>): Issue =>
   ({
     id: issueId("i1"),

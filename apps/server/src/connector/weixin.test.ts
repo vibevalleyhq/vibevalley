@@ -1,7 +1,9 @@
 import { createServer, type Server } from "node:http";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { Effect } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
+import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient } from "./weixin.ts";
 
 const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));

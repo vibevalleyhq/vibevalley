@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import { type Answer, chatChunk, chatCompletions, newestUserText } from "./openai.ts";
+
 import { wallTime } from "@/base/time.ts";
+
+import { type Answer, chatChunk, chatCompletions, newestUserText } from "./openai.ts";
 
 async function* said(...words: string[]) {
   for (const w of words) yield w;

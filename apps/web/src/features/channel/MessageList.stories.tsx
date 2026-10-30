@@ -1,6 +1,8 @@
 import { For } from "solid-js";
+
 import type { ChatMessage } from "@vibevalley/protocol";
 import { stories, story, type Story } from "@vibevalley/stories";
+
 import { MessageRow } from "./MessageList";
 
 const now = Date.now();

@@ -1,7 +1,8 @@
 // No line icons and no characters attention in for icons: the pixel font has no ✓, ✗ or ›.
 
-import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
+
 import type { Phase, SessionAction } from "@vibevalley/protocol";
 
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */

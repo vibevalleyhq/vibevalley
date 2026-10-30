@@ -1,12 +1,30 @@
-import { Tabs } from "@/ui/Tabs";
-import { t } from "@vibevalley/i18n";
-import { tookText } from "@/base/format";
-import { Splitter, usePaneWidth } from "@/ui/Splitter";
-import type { IconName } from "@/ui/icons";
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type SessionView } from "@vibevalley/protocol";
+
+import { useAgent, useOrchestrators } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
+import { tookText } from "@/base/format";
+import { orchestratorMood, useCore } from "@/base/frame";
+import { ready, useAgents } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { Dialog } from "@/ui/Dialog";
+import { OrchestratorFace } from "@/ui/Face";
+import { Select } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
+import { Splitter, usePaneWidth } from "@/ui/Splitter";
+import { Tabs } from "@/ui/Tabs";
+import { toast } from "@/ui/toasts";
+
+import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
+import { Composer, FileDrop } from "./Composer";
+import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
+import { workbenchClock } from "./feed";
+import { MessageList } from "./MessageList";
 import {
   archivedOf,
   groupsOf,
@@ -22,26 +40,11 @@ import {
   channelOf,
   defaultOf,
 } from "./places";
-import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
 import { phaseDot, phaseText } from "./presence";
-import { unreadIn, unreadUnder } from "./unread";
-import { workbenchClock } from "./feed";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
-import { useRouter } from "@/base/router";
-import { orchestratorMood, useCore } from "@/base/frame";
-import { OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
-import { Composer, FileDrop } from "./Composer";
 import { switcher } from "./QuickSwitcher";
-import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
-import { ready, useAgents } from "@/base/query";
-import { useAgent, useOrchestrators } from "@/base/agents";
-import { toast } from "@/ui/toasts";
-import { Dialog } from "@/ui/Dialog";
-import { Select } from "@/ui/Field";
-import { MessageList } from "./MessageList";
 import { Jobs, Crons } from "./Tabs";
+import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
+import { unreadIn, unreadUnder } from "./unread";
 
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
@@ -95,7 +98,7 @@ function Chat() {
       <Show when={thread()}>
         {(shown) => (
           <div
-            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 starting:translate-x-full lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0"
+            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0 starting:translate-x-full"
             style={{ "--pane-w": `${threadWidth()}px` }}
           >
             <div class="hidden lg:block">
@@ -323,7 +326,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           <Icon name="search" size={16} />
         </button>
       </div>
-      <div class="scroll-fade-y flex-1 overflow-y-auto p-3">
+      <div class="flex-1 scroll-fade-y overflow-y-auto p-3">
         <button
           type="button"
           data-testid="switcher-open"

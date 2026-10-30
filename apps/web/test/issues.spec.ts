@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+
 import type { VibeValleyApi } from "@vibevalley/protocol";
+
 import { expect, test, choose } from "./fixtures";
 
 const issue = (api: VibeValleyApi, title: string) => api.issue.create({ title });

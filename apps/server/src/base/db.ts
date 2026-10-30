@@ -3,14 +3,17 @@
 // edited in place: an old database is not upgraded, it is made again (AGENTS.md: no compatibility). The queries in
 // db/queries are compiled by effect-sqlc into db/generated (scripts/db-generate.ts).
 
-import { messageOf } from "@/errors.ts";
-import { PGlite } from "@electric-sql/pglite";
-import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
-import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";
-import { SqlClient } from "effect/sql";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+
+import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
+import { PGlite } from "@electric-sql/pglite";
+import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";
+import { SqlClient } from "effect/sql";
+
+import { messageOf } from "@/errors.ts";
+
 import { dbDir, ServerConfig } from "./config.ts";
 
 const baseline = resolve(import.meta.dirname, "../../db/migrations/0001_schema.up.sql");

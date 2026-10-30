@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueTimeline, Milestone, MilestoneKind, Run, RunTrigger, Spent } from "@vibevalley/protocol";
 import { closedText, plainText } from "@vibevalley/protocol/rules";
+
 import { or } from "@/base/order.ts";
 function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (trigger.kind) {

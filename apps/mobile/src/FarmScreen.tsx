@@ -5,7 +5,9 @@ import { type ComponentType, type Ref, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewProps } from "react-native-webview";
+
 import { type FromNative, fromNativeKey, type ToNative } from "@vibevalley/protocol/host";
+
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
 import { isPairPage, keyScript } from "./pairing";

@@ -3,8 +3,6 @@
 // block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
 
 import { t } from "@vibevalley/i18n";
-
-import { messageOf } from "@/errors.ts";
 import type {
   Block,
   BlockInput,
@@ -19,8 +17,11 @@ import type {
   TextSpan,
 } from "@vibevalley/protocol";
 import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
-import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./spans.ts";
+
 import { or } from "@/base/order.ts";
+import { messageOf } from "@/errors.ts";
+
+import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./spans.ts";
 
 const withText: Readonly<Record<string, boolean>> = {
   paragraph: true,

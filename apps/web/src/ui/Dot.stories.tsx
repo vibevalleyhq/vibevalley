@@ -1,5 +1,7 @@
 import { For } from "solid-js";
+
 import { stories, story } from "@vibevalley/stories";
+
 import { Dot, type DotTone } from "./Dot";
 
 const tones: DotTone[] = ["leaf", "wheat", "berry", "water", "idle", "faint", "muted"];

@@ -4,9 +4,11 @@
 // harvest flashes a warm light over its plot for a moment. The words that go with them (the note, "+12") are the
 // page's labels.
 
+import { Container, type Graphics, Sprite, type Texture } from "pixi.js";
+
 import { dot, particles, type PointLight } from "@vibevalley/engine/pixi";
 import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
-import { Container, type Graphics, Sprite, type Texture } from "pixi.js";
+
 import type { BedFx } from "@/farm/store";
 import type { BedFxKind } from "@/farm/tools";
 import type { Point } from "@/farm/world/level";

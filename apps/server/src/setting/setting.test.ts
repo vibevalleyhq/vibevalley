@@ -1,11 +1,14 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { ServerConfig } from "@/base/config.ts";
 import { Effect, Layer } from "effect";
-import { defaultVoice } from "./voice.ts";
+
+import { ServerConfig } from "@/base/config.ts";
 import { testConfig } from "@/testing/layers.ts";
+
 import { Setting } from "./setting.ts";
+import { defaultVoice } from "./voice.ts";
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
 

@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import type { Session } from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 

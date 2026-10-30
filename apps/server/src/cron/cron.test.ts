@@ -1,11 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { orchestrator, owner } from "@/base/actor.ts";
-import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
-import { CronWhenWeekly } from "@vibevalley/protocol/schema";
-import { nextText } from "./when.ts";
 import { Effect, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { test } from "vite-plus/test";
+
+import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
+import { CronWhenWeekly } from "@vibevalley/protocol/schema";
+
+import { orchestrator, owner } from "@/base/actor.ts";
 import { type ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
@@ -13,9 +14,11 @@ import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { aTurn } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
-import { afterRun, dueCrons, isMissed, needsOK } from "./due.ts";
-import { type Due, Crons } from "./cron.ts";
+
 import * as q from "../../db/generated/cron.sql.ts";
+import { type Due, Crons } from "./cron.ts";
+import { afterRun, dueCrons, isMissed, needsOK } from "./due.ts";
+import { nextText } from "./when.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("cron");

@@ -4,8 +4,9 @@
 import { t } from "@vibevalley/i18n";
 import { type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
-import type { Pose } from "@/ui/cast";
+
 import { compareText, or } from "@/base/order";
+import type { Pose } from "@/ui/cast";
 
 export type Spot = { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView } | { readonly kind: "open" } | { readonly kind: "shut" };
 

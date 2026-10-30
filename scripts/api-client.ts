@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
 
 const protocol = join(import.meta.dirname, "..", "packages/protocol/src");

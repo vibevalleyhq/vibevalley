@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { AgentBusy } from "./errors.ts";
 import { Deferred, Effect, Ref } from "effect";
-import type { Context, Message, ToolResultMessage, UserMessage } from "@vibevalley/ai/messages";
+
 import { make as llmOver } from "@vibevalley/ai/llm";
+import type { Context, Message, ToolResultMessage, UserMessage } from "@vibevalley/ai/messages";
 import { answer, chunk, http, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
+
+import { AgentBusy } from "./errors.ts";
 import { type AgentEvent, type AgentOptions, make, type Tool } from "./loop.ts";
 
 const user = (t: string): UserMessage => ({ role: "user", content: t, timestamp: 1 });

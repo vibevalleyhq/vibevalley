@@ -2,6 +2,7 @@
 // versions, a reply to one, and the issue it was made for.
 
 import AxeBuilder from "@axe-core/playwright";
+
 import { expect, test } from "./fixtures";
 
 /** A page that tries what an artifact must not do, and writes down what it managed. */

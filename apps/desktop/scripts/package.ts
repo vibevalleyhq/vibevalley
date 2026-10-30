@@ -3,10 +3,12 @@
 // release build, server/ is apps/server with its production dependencies installed as real copies. The server runs unbundled with tsx, as it does in the
 // repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
-import { build, Platform } from "electron-builder";
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+
+import { build, Platform } from "electron-builder";
+
 import { workspaceClosure } from "../src/workspace.ts";
 
 const desktop = join(import.meta.dirname, "..");

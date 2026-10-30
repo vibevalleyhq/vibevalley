@@ -3,8 +3,8 @@
 // characters left out; Latin words, numbers and code whole (a path or a version one word: db/migrations, v1.2.3). Stop
 // words are left out: they match everything.
 
-import stopwords from "./stopwords.json";
 import { cutAll, cutSearch, goLower } from "./gse.ts";
+import stopwords from "./stopwords.json";
 
 /** Raised when the cut or the dictionary changes: every memory's terms are then cut again (recutTerms). */
 export const termsVersion = 1;

@@ -2,15 +2,19 @@
 // the checks that catch the error, written by whoever fixes it. evals.test.ts holds the committed cases (testdata/evals) to
 // their checks; evals.live.test.ts replays them on the real model.
 
-import { ToolFailed } from "@vibevalley/agent/core/errors";
-import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { Effect } from "effect";
+
+import { ToolFailed } from "@vibevalley/agent/core/errors";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import { type BrainMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
+import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
+
 import { type Op, schemas, toolName } from "@/tool/schemas.ts";
-import type { Tool } from "@vibevalley/agent/core/loop";
-import { Effect } from "effect";
+
 import { noResult } from "./prompts.ts";
 
 /** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in

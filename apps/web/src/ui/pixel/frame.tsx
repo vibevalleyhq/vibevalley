@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+
 import { pxFrame } from "./style";
 
 /** `paper` is a bg-* class; the content sits 2 px in, clear of the rim. */

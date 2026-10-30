@@ -3,6 +3,7 @@
 
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { expect, test } from "./fixtures";
 
 type Counted = Window & { heard: number };

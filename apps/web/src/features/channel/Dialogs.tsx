@@ -1,21 +1,23 @@
 // A channel has no members to pick: helpers are in the channel their job was arranged in.
 
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { Channel, Notify } from "@vibevalley/protocol";
+
+import { useOrchestrators } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
-import { Segmented } from "@/ui/Segmented";
-import { createChannelForm } from "./channelForm";
-import { channelName } from "./places";
-import { autofocus } from "@/base/util";
 import { ready, useProjects } from "@/base/query";
+import { autofocus } from "@/base/util";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, Select, TextArea, TextInput } from "@/ui/Field";
-import { useOrchestrators } from "@/base/agents";
+import { Segmented } from "@/ui/Segmented";
+
+import { createChannelForm } from "./channelForm";
+import { channelName } from "./places";
 
 function ProjectInput(props: { value: string; onChange: (v: string) => void }) {
   const projects = useProjects();

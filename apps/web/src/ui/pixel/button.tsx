@@ -1,7 +1,8 @@
-import { omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { cx, pxDrop, pxFocus, pxText } from "./style";
+import { omit, Show } from "solid-js";
+
 import { SpriteIcon } from "./icons";
+import { cx, pxDrop, pxFocus, pxText } from "./style";
 
 export type PxTone = "plain" | "primary" | "danger" | "accent";
 export type PxSize = "md" | "sm" | "icon" | "custom";

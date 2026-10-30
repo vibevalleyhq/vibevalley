@@ -1,5 +1,4 @@
 import { currentLocale, t } from "@vibevalley/i18n";
-import { voiceOrchestratorPersona } from "./prompts.ts";
 import {
   type SettingsUpdateVoice,
   voiceIdleSecondsMax,
@@ -11,7 +10,9 @@ import {
   voiceSilenceMsMin,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
+
 import { voiceURL } from "./keys.ts";
+import { voiceOrchestratorPersona } from "./prompts.ts";
 const limits = {
   silenceMs: [voiceSilenceMsMin, voiceSilenceMsMax],
   interruptMs: [voiceInterruptMsMin, voiceInterruptMsMax],

@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { clockText, dayClock, duskOf, sunOf } from "../src/clock";
 
 test("a day of 60 seconds moves a quarter in 15 seconds, faster when sped up, not at all when paused", () => {

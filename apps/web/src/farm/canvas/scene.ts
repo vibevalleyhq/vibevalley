@@ -4,6 +4,8 @@
 // yard's own life (life.ts). What it shows comes from the server's folded state; the scene only adds what moves with
 // the clock, and keeps only that (walkers, animation clocks, particles) in its own objects.
 
+import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
+
 import {
   flatLight,
   frameAt,
@@ -21,11 +23,11 @@ import {
   type Sky,
 } from "@vibevalley/engine/pixi";
 import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
-import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
-import { castPrefix } from "@/ui/cast";
-import { playSound } from "@/ui/pixel/sound";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { orchestratorMood } from "@/base/frame";
+import { prefsNow } from "@/base/prefs";
 import { clock, farmState } from "@/farm/store";
-import { orchestratorSprite } from "@/features/orchestrator";
 import { frameVillage } from "@/farm/world/framing";
 import { villageHitAt, type VillageHit } from "@/farm/world/hits";
 import type { Box, Point } from "@/farm/world/level";
@@ -45,13 +47,14 @@ import {
   type Pose,
   type Stroll,
 } from "@/farm/world/world";
+import { orchestratorSprite } from "@/features/orchestrator";
+import { castPrefix } from "@/ui/cast";
+import { playSound } from "@/ui/pixel/sound";
+
 import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
-import { orchestratorMood } from "@/base/frame";
-import { prefsNow } from "@/base/prefs";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
 const walkSpeed = 42;

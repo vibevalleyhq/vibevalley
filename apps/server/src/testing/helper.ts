@@ -4,13 +4,17 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
+import { Effect } from "effect";
+
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
+
 import { factsOf, presetOf } from "@/agent/seed.ts";
 import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
 import { jobBreak } from "@/session/briefing.ts";
-import { Effect } from "effect";
+
 import { until } from "./until.ts";
 
 const sessionGit = (cwd: string, ...args: string[]) =>

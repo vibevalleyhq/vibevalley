@@ -1,7 +1,6 @@
 // How the tools word what they found.
 
 import { t } from "@vibevalley/i18n";
-
 import {
   type Artifact,
   type Block,
@@ -17,12 +16,13 @@ import {
   type Spent,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
-import { runtimeLabel } from "@/agent/seed.ts";
-import { nextText, whenText } from "@/cron/when.ts";
-import { head } from "@/base/clip.ts";
-import { yuan } from "@/runtime/money.ts";
 import type { Handlers } from "@vibevalley/protocol/api";
+import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+
+import { runtimeLabel } from "@/agent/seed.ts";
+import { head } from "@/base/clip.ts";
+import { nextText, whenText } from "@/cron/when.ts";
+import { yuan } from "@/runtime/money.ts";
 
 type Op = keyof Handlers;
 import type { Roster } from "@/session/session.ts";

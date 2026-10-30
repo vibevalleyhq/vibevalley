@@ -1,19 +1,22 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { it as effectIt } from "@effect/vitest";
 import { Effect, Exit, Fiber, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
+import { afterEach, describe, expect, it } from "vite-plus/test";
+
+import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
+import { objectSchema } from "@vibevalley/ai/tools";
+import { gate, nextTurn, whenTrue } from "@vibevalley/testkit/until";
+
 import { resumedUnknown, sessionUnfinished } from "./brain.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
+import { stopped, textTool } from "./core/tool.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, withAgent } from "./testing.ts";
-import { stopped, textTool } from "./core/tool.ts";
-import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
-import { objectSchema } from "@vibevalley/ai/tools";
-import { gate, nextTurn, whenTrue } from "@vibevalley/testkit/until";
 
 const homes: (() => void)[] = [];
 const home = () => {

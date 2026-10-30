@@ -1,30 +1,32 @@
 // 项目: the codebases in the work root; 全部 is the whole map, a project its island, its
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
-import { list, t } from "@vibevalley/i18n";
-
-import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
+import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
+import { list, t } from "@vibevalley/i18n";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
+
+import { useWorkAgents } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
-import { calendarOf, type CalendarDay, dateText, dayText, growthOf, since, streaksOf } from "./calendar";
-import { githubRepository, number, percent, sortProjects } from "./projects";
-import { islandLook } from "./islands";
-import { langIcon, languageShares } from "./languages";
-import { toast } from "@/ui/toasts";
+import { ready, useProjects, useQuery } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { autofocus, useNow } from "@/base/util";
-import { useWorkAgents } from "@/base/agents";
-import { ready, useProjects, useQuery } from "@/base/query";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { AgentFace } from "@/ui/Face";
 import { Field, TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
+import { Card, ListCard, ListRow, Quiet } from "@/ui/layout";
 import { SpriteIcon } from "@/ui/pixel";
 import { Segmented } from "@/ui/Segmented";
-import { Card, ListCard, ListRow, Quiet } from "@/ui/layout";
+import { toast } from "@/ui/toasts";
+
+import { calendarOf, type CalendarDay, dateText, dayText, growthOf, since, streaksOf } from "./calendar";
+import { islandLook } from "./islands";
+import { langIcon, languageShares } from "./languages";
 import { IslandDetail, ProjectMap, useIslands } from "./ProjectMap";
+import { githubRepository, number, percent, sortProjects } from "./projects";
 
 type Asked<A> = QueryObserverResult<A>;
 

@@ -7,9 +7,9 @@
 // and session/close, one prompt at a time, session/cancel, and session/set_config_option with a `model` select grouped
 // by provider and a `reasoning_effort` select in the thought_level category (off, low, high, max).
 
-import { jsonOrNone } from "@/base/json.ts";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+
 import {
   defineRuntime,
   type InstallationProbe,
@@ -20,6 +20,8 @@ import {
   type StartSession,
 } from "@botiverse/oar";
 import { Predicate, Schema } from "effect";
+
+import { jsonOrNone } from "@/base/json.ts";
 import { afterRealTime } from "@/base/time.ts";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));

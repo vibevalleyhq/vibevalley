@@ -3,11 +3,13 @@
 // so the helpers come from a frame the test serves in place of the state stream: the real server's first frame with
 // sessions added.
 
+import type { Page } from "@playwright/test";
+
 import type { StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
-import type { Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
+import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));

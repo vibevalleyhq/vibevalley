@@ -1,13 +1,16 @@
 // WeChat, written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
-import { t } from "@vibevalley/i18n";
-
 import { randomBytes, randomUUID } from "node:crypto";
+
 import { Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
-import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
+
+import { t } from "@vibevalley/i18n";
+
 import { numberIn } from "@/base/number.ts";
+
+import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";

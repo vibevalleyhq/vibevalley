@@ -2,7 +2,6 @@
 // one for a new profile, and the drawing for each pose.
 
 import { t } from "@vibevalley/i18n";
-
 import { BuildValues, type Crop, HeadValues, type Look, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
 
 export const speciesLabel: Record<Species, string> = {

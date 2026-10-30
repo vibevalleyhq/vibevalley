@@ -3,8 +3,9 @@
 // image's size in its title ("640x480"). Nesting is two spaces of indent per level. What the export writes, the import
 // reads back to the same blocks.
 
-import { issueId } from "@vibevalley/protocol/schema";
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
+
 import { ordered, textFor } from "./ops.ts";
 import { normal, plain, unmarked } from "./spans.ts";
 

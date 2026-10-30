@@ -4,9 +4,10 @@
 
 import type { InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
+
+import { farm, farmState } from "@/farm/store";
 import { voiceCall } from "@/features/voice";
 import { playSound } from "@/ui/pixel/sound";
-import { farm, farmState } from "@/farm/store";
 
 export interface PhoneLogEntry {
   readonly call: InboxItem;

@@ -1,13 +1,17 @@
 import { request } from "node:http";
+
 import { describe, expect, it } from "@effect/vitest";
-import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Fiber, Layer, Stream } from "effect";
 import { Headers } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
+
+import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
+
 import { Channels } from "@/channel/chat.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
+
 import { app } from "./app.ts";
 import { fromTheFarm } from "./rpc.ts";
 

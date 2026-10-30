@@ -1,12 +1,14 @@
 // A real server per worker (apps/server) on a free port with a temporary home and work root, serving
 // dist/ at /. Tests drive the page with `page` (its baseURL is the server) and set things up with `api`.
 
-import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
+
 import { type IssueAct, type IssueAction, readStream, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
 
 interface Server {

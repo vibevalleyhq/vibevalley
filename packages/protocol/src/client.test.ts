@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import { VibeValleyApi, VibeValleyApiError } from "./client";
 
 const client = (status: number, text: string) => new VibeValleyApi("http://farm", async () => new Response(text, { status }));

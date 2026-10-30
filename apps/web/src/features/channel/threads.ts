@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/protocol";
 const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
   if (!xs) return undefined;

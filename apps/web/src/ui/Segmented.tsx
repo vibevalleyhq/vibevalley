@@ -1,5 +1,6 @@
-import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 import { createEffect, createSignal, For, Show } from "solid-js";
+
+import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
 interface Place {
   readonly x: number;

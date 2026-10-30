@@ -1,22 +1,24 @@
 // An orchestrator's profile, made or edited: its name, what it does, its persona, its DeepSeek model and its look. It
 // runs on VibeValley's own agent only, so it has no machine to pick; its memory and rounds are on its orchestrator page.
 
+import { useQueryClient } from "@tanstack/solid-query";
+import { createSignal, For, Show, untrack } from "solid-js";
+
 import { Radio, RadioGroup } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Show, untrack } from "solid-js";
-import { useQueryClient } from "@tanstack/solid-query";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook, OrchestratorLookValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
+
 import { api, reasonOf } from "@/base/api";
 import { useRouter } from "@/base/router";
-import { toast } from "@/ui/toasts";
-import { ConfirmButton } from "@/ui/ConfirmButton";
+import { orchestratorHref, orchestratorLooks } from "@/features/orchestrator";
 import { A } from "@/ui/A";
 import { Button } from "@/ui/Button";
+import { ConfirmButton } from "@/ui/ConfirmButton";
 import { OrchestratorFace } from "@/ui/Face";
 import { Field, TextArea, TextInput } from "@/ui/Field";
-import { orchestratorHref, orchestratorLooks } from "@/features/orchestrator";
+import { toast } from "@/ui/toasts";
+
 import { FromTemplate } from "./FromTemplate";
 
 export function newOrchestrator(): Agent {

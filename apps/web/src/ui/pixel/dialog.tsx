@@ -1,12 +1,14 @@
+import type { JSX } from "@solidjs/web";
+import { Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { Show } from "solid-js";
-import type { JSX } from "@solidjs/web";
 import { createModal } from "@/ui/modal";
-import { pxFocus, pxText, pxWindow } from "./style";
+
 import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
+import { pxFocus, pxText, pxWindow } from "./style";
 
 function Modal(props: {
   open: boolean;
@@ -34,7 +36,7 @@ function Modal(props: {
       class={[
         "m-auto max-h-none max-w-none overflow-visible bg-cream-50 p-0 text-bark-900",
         pxWindow,
-        "transition-[opacity,scale] duration-150 starting:scale-95 starting:opacity-0 motion-reduce:transition-none",
+        "transition-[opacity,scale] duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0",
         props.backdrop,
         props.class,
       ]}

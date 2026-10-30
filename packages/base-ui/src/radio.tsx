@@ -2,9 +2,10 @@
 // first enabled); the arrow keys move to the next radio and check it, as a native radio group does.
 
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
-import { itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
+
 import { createControllable } from "./internal/controllable";
+import { type ButtonProps, call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
+import { itemsIn, roveFocus } from "./internal/roving";
 
 interface GroupCtx {
   readonly value: () => string | undefined;

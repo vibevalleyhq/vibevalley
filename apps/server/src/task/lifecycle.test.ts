@@ -1,19 +1,22 @@
 import { execFileSync } from "node:child_process";
-import { freshTask } from "./editing.ts";
-import { graphView } from "./graph.ts";
-import { owner } from "@/base/actor.ts";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber } from "effect";
+
 import { Agents } from "@/agent/agent.ts";
-import { starter, testConfig } from "@/testing/layers.ts";
+import { owner } from "@/base/actor.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Sessions } from "@/session/session.ts";
-import { world } from "@/testing/world.ts";
-import { Tasks } from "./task.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
+
+import { freshTask } from "./editing.ts";
+import { graphView } from "./graph.ts";
+import { Tasks } from "./task.ts";
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 
 describe("a task's workplace", () => {

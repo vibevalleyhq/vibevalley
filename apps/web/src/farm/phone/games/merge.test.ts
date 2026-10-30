@@ -1,5 +1,6 @@
 // The same seeds must replay the same games: the recorded ones are kept.
 import { describe, expect, test } from "vite-plus/test";
+
 import {
   canSlide,
   type Merge,

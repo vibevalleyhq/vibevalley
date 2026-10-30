@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+
 import type { MemoryItem, MemoryKind, TreeStage } from "./mock";
 /** Only the name: the stage itself comes with the data (MemoryTree.stage). */
 export const stageName = (stage: TreeStage) => t(`web.tree.stage.${stage}`);

@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
-import { mockTree } from "./mock";
+
 import { allOf, counts, kept } from "./memories";
+import { mockTree } from "./mock";
 import { constellation, starsOf, tiesOf } from "./sky";
 const now = Date.parse("2026-10-22T12:00:00+08:00");
 

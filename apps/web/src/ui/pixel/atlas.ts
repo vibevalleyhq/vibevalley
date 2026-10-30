@@ -3,6 +3,7 @@
 // manifest size over the density, which is the map's width over the level's (384).
 
 import { type Accessor, createSignal, onSettled } from "solid-js";
+
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Size {

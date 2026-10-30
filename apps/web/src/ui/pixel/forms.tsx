@@ -1,9 +1,10 @@
+import { createSignal, For } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createSignal, For } from "solid-js";
 import { splitChips } from "./chips";
-import { pxFocus, pxRing, pxText } from "./style";
 import { SpriteIcon } from "./icons";
+import { pxFocus, pxRing, pxText } from "./style";
 
 /** Enter or a comma adds what is typed, and so does leaving the box; Backspace in an empty box takes the last chip off. */
 export function PxChipsInput(props: {

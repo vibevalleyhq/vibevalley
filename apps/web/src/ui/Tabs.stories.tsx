@@ -1,4 +1,5 @@
 import { stories, story } from "@vibevalley/stories";
+
 import { Tabs, type TabsLook } from "./Tabs";
 
 type Tab = "chat" | "jobs" | "crons" | "files";

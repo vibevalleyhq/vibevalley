@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
-import seedsZh from "./seeds.json";
+
 import seedsEn from "./seeds.en.json";
-import catalogZh from "./template_catalog.json";
+import seedsZh from "./seeds.json";
 import catalogEn from "./template_catalog.en.json";
+import catalogZh from "./template_catalog.json";
 
 /** Every leaf but the words: the two languages must agree on ids, numbers, flags, commands and the template holes. */
 function shape(v: unknown): unknown {

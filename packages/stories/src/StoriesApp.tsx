@@ -1,7 +1,6 @@
 // Drawn with the host's token classes (bg-page, border-line…): the host's Tailwind scans this folder. Each frame contains
 // its layout, so a part fixed to the window (a toast) stays in its frame; a modal <dialog> still opens over everything.
 
-import { createMemo, createSignal, createStore, Errored, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import {
   Accessibility,
@@ -27,9 +26,11 @@ import {
   Tablet,
   type IconFunction,
 } from "reicon";
+import { createMemo, createSignal, createStore, Errored, For, Match, onSettled, Show, Switch } from "solid-js";
+
+import { A11yPanel, useAxe } from "./a11y";
 import type { Args, Axis, Control, Stories, Story } from "./format";
 import { forceStates, type PseudoState, pseudoStates, pseudoStyleId } from "./pseudo";
-import { A11yPanel, useAxe } from "./a11y";
 import { type Entry, entries, isOpen, type Node, search, treeOf } from "./tree";
 
 export type Theme = "light" | "dark" | "both";
@@ -383,7 +384,7 @@ function Opened(props: {
                 aria-label={theme}
                 style={{ width: frameWidth(props.view.width) }}
                 class={[
-                  "relative flex shrink-0 self-stretch overflow-auto rounded-lg [contain:layout] border border-line p-6 pt-8 outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
+                  "relative flex shrink-0 self-stretch overflow-auto rounded-lg border border-line p-6 pt-8 [contain:layout] outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
                   props.entry.frame ?? "bg-page text-ink",
                   props.view.width === "full" && "min-w-0 flex-1 shrink",
                   story.fill === true && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",

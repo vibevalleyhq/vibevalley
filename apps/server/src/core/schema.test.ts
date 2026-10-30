@@ -1,16 +1,20 @@
 // The protocol's schemas (packages/protocol/src/schema.ts) take every fact, state, view and inbox in the golden runs (testdata), and
 // the frames the rules make of them.
 
-import { expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
+
 import { Effect, Schema } from "effect";
-import { wireJson } from "@/base/wire.ts";
+import { expect, test } from "vite-plus/test";
+
 import type { WorkspaceState } from "@vibevalley/protocol";
-import { emptyWorkspaceState } from "./core.ts";
-import { reduce } from "@/projection/reduce.ts";
-import { frameOf } from "@/projection/frame.ts";
 import * as S from "@vibevalley/protocol/schema";
+
+import { wireJson } from "@/base/wire.ts";
+import { frameOf } from "@/projection/frame.ts";
+import { reduce } from "@/projection/reduce.ts";
+
+import { emptyWorkspaceState } from "./core.ts";
 
 const encodeFrame = wireJson(S.StateFrame);
 

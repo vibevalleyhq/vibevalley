@@ -3,14 +3,16 @@
 // (agent/brain/loop.test.ts holds the brain to that order), with Effect underneath: a run is a fiber of the agent's
 // scope, stopping it is a Deferred the model's stream and the tools race, a turn's tools are fibers side by side.
 
-import { AgentBusy, CannotContinue, type ToolFailed } from "./errors.ts";
 import { Clock, Deferred, Effect, FiberSet, Option, Ref, type Scope, Stream } from "effect";
+
 import { failedMessage, type LlmError, type Llm } from "@vibevalley/ai/llm";
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, ToolResultMessage } from "@vibevalley/ai/messages";
 import { zeroUsage } from "@vibevalley/ai/messages";
 import type { Model, ThinkingLevel } from "@vibevalley/ai/models";
 import type { AssistantMessageEvent } from "@vibevalley/ai/response";
 import { type JsonSchema, toolArguments } from "@vibevalley/ai/tools";
+
+import { AgentBusy, CannotContinue, type ToolFailed } from "./errors.ts";
 
 export interface ToolResult {
   readonly content: readonly (TextContent | ImageContent)[];

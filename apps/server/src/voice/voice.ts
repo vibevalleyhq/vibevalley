@@ -3,33 +3,35 @@
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { t } from "@vibevalley/i18n";
-
-import { messageOf, errnoOf } from "@/errors.ts";
-import { noticeLine, onCallLine } from "./prompts.ts";
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer } from "node:http";
+
 import { NodeHttpServer } from "@effect/platform-node";
-import { HttpEffect } from "effect/http";
-import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
-import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
-import type { Socket } from "effect/socket";
-import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
 import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
-import { chatCompletions } from "@/orchestrator/openai.ts";
+import { HttpEffect } from "effect/http";
+import type { Socket } from "effect/socket";
+
+import { t } from "@vibevalley/i18n";
+import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
+import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
+
 import { ServerConfig } from "@/base/config.ts";
-import { Channels } from "@/channel/chat.ts";
-import { Core } from "@/core/core.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { orchestratorModel } from "@/orchestrator/model.ts";
-import { Notices } from "@/notice/notice.ts";
-import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 import { callbackLog } from "@/base/log.ts";
 import { afterRealTime } from "@/base/time.ts";
+import { Channels } from "@/channel/chat.ts";
+import { Core } from "@/core/core.ts";
+import { messageOf, errnoOf } from "@/errors.ts";
+import { Notices } from "@/notice/notice.ts";
+import { orchestratorModel } from "@/orchestrator/model.ts";
+import { chatCompletions } from "@/orchestrator/openai.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
+
+import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
+import { noticeLine, onCallLine } from "./prompts.ts";
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>

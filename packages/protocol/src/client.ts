@@ -1,9 +1,10 @@
 // Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
+import { t } from "@vibevalley/i18n";
+
 import type { ApiError } from "./api";
 import { VoiceFixValues } from "./shapes";
 import type * as T from "./shapes";
-import { t } from "@vibevalley/i18n";
 
 /** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
 export class VibeValleyApiError extends Error {

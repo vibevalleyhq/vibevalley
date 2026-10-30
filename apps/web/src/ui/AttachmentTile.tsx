@@ -1,6 +1,8 @@
+import { Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath } from "@vibevalley/protocol";
-import { Show } from "solid-js";
+
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 

@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { languageOf } from "./languages";
 
 test("a file is coloured by its extension, a fence by its tag, and the rest stay plain", () => {

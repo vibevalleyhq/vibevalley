@@ -1,23 +1,26 @@
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
-import { t } from "@vibevalley/i18n";
-
-import { isOneOf } from "@vibevalley/protocol/rules";
-import { messageOf } from "@/errors.ts";
-import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
-import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { models } from "@vibevalley/ai/models";
+
+import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
+import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
+
 import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 import { type BrainEvent, type BrainOwner, openBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
-import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import type { McpServer } from "@vibevalley/agent/mcp";
 import { messageText, userMessage } from "@vibevalley/agent/messages";
-import { helperInstructions } from "./prompts.ts";
+import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
+import { models } from "@vibevalley/ai/models";
+import { t } from "@vibevalley/i18n";
+import { isOneOf } from "@vibevalley/protocol/rules";
+
 import type { Time } from "@/base/time.ts";
+import { messageOf } from "@/errors.ts";
+
+import { helperInstructions } from "./prompts.ts";
 
 export const vibevalleyRuntime = "vibevalley";
 

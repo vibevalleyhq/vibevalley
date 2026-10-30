@@ -1,9 +1,9 @@
 // Everything here runs one at a time.
 
-import { list, t } from "@vibevalley/i18n";
+import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
+import { SqlClient, SqlError } from "effect/sql";
 
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { commandOf } from "@vibevalley/protocol/api";
+import { list, t } from "@vibevalley/i18n";
 import type {
   Agent,
   Changes,
@@ -18,9 +18,31 @@ import type {
   TaskEdit,
   TaskGraph,
 } from "@vibevalley/protocol";
-import type { Wire } from "@vibevalley/protocol/schema";
+import { commandOf } from "@vibevalley/protocol/api";
 import { isBusy } from "@vibevalley/protocol/rules";
+import type { Wire } from "@vibevalley/protocol/schema";
+import * as S from "@vibevalley/protocol/schema";
+
+import { Agents } from "@/agent/agent.ts";
+import { actsForOwner, type Actor, session as sessionActor, system } from "@/base/actor.ts";
+import { clip } from "@/base/clip.ts";
+import { causeMessage, Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
+import { Core } from "@/core/core.ts";
+import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/errors.ts";
+import { Issues } from "@/issue/issue.ts";
+import { Projects } from "@/project/project.ts";
+import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
+import { chooseAgent } from "@/runtime/fit.ts";
+import { Runtimes } from "@/runtime/runtime.ts";
 import { sessionOf } from "@/session/roster.ts";
+import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
+
+import * as q from "../../db/generated/task_event.sql.ts";
+import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
+import { type EditResult, editTask, freshTask, removeTask, type StepDraft } from "./editing.ts";
 import {
   graphActions,
   graphProblems,
@@ -39,24 +61,6 @@ import {
   withTask,
 } from "./graph.ts";
 import { graphsOf, graphOf, taskIssueID } from "./issues.ts";
-import { clip } from "@/base/clip.ts";
-import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
-import { type EditResult, editTask, freshTask, removeTask, type StepDraft } from "./editing.ts";
-import { parseSplit } from "./splitting.ts";
-import { actsForOwner, type Actor, session as sessionActor, system } from "@/base/actor.ts";
-import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient, SqlError } from "effect/sql";
-import { Agents } from "@/agent/agent.ts";
-import { causeMessage, Db } from "@/base/db.ts";
-import { newId } from "@/base/ids.ts";
-import { jsonOrNone } from "@/base/json.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/errors.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Projects } from "@/project/project.ts";
-import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
-import { chooseAgent } from "@/runtime/fit.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
 import {
   acceptancePassedText,
   checkFailedText,
@@ -72,11 +76,7 @@ import {
   startNeedsOwner,
   taskBrief,
 } from "./prompts.ts";
-import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
-
-import * as S from "@vibevalley/protocol/schema";
-
-import * as q from "../../db/generated/task_event.sql.ts";
+import { parseSplit } from "./splitting.ts";
 
 const readLimit = 1000;
 /** What an event row keeps beside its kind: only what it has (an empty list is left out). */

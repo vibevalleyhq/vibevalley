@@ -3,12 +3,12 @@
 // It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists, PGlite's wasm and the
 // coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
 
-import { t } from "@vibevalley/i18n";
-
 import { execFile, spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createInterface } from "node:readline";
+
+import { t } from "@vibevalley/i18n";
 
 /** The first start builds the database. */
 const startTimeoutMs = 40_000;

@@ -1,11 +1,12 @@
 // A task graph is issues: the graph's own and one per step.
 
 import type { WorkspaceState, Issue, TaskGraph, GraphState, Task, IssueId } from "@vibevalley/protocol";
-import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
-import { compare, compareText, or } from "@/base/order.ts";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
 import { issueId } from "@vibevalley/protocol/schema";
+
+import { compare, compareText, or } from "@/base/order.ts";
+
+import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
 export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   const g = parent.graph!;
   const graph: TaskGraph = omitUndefined({

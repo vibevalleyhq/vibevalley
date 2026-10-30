@@ -1,7 +1,9 @@
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
 
-import { list, t } from "@vibevalley/i18n";
+import type { JSX } from "@solidjs/web";
+import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 
+import { list, t } from "@vibevalley/i18n";
 import {
   OutfitValues,
   SpeciesValues,
@@ -14,10 +16,22 @@ import {
   type Session,
 } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
-import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
-import type { JSX } from "@solidjs/web";
 
+import { useAgent } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
+import { tookText, wallClockText } from "@/base/format";
+import { useCore, useFrames } from "@/base/frame";
+import { ready } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { aria, useNow } from "@/base/util";
+import { commands } from "@/farm/frames";
+import { farmActWords } from "@/farm/labels";
+import { tint } from "@/farm/panels/bits";
+import { farm, overlayOf } from "@/farm/store";
+import { useVillage } from "@/farm/support";
+import { useFarm } from "@/farm/ui";
+import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
+import { issueThreadOf } from "@/features/channel";
 import {
   createIssueActs,
   changesLine,
@@ -31,23 +45,9 @@ import {
   useIssueRuns,
   useIssueTimeline,
 } from "@/features/issue";
-import { farm, overlayOf } from "@/farm/store";
-import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
-import { castPrefix, outfitLabel, speciesLabel } from "@/ui/cast";
-import { issueThreadOf } from "@/features/channel";
-import { tookText, wallClockText } from "@/base/format";
-import { aria, useNow } from "@/base/util";
-import { useRouter } from "@/base/router";
 import { createSessionEvents, WorkLog } from "@/features/session";
-import { useCore, useFrames } from "@/base/frame";
-import { ready } from "@/base/query";
+import { castPrefix, outfitLabel, speciesLabel } from "@/ui/cast";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
-import { farmActWords } from "@/farm/labels";
-import { tint } from "@/farm/panels/bits";
-import { commands } from "@/farm/frames";
-import { useFarm } from "@/farm/ui";
-import { useVillage } from "@/farm/support";
-import { useAgent } from "@/base/agents";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";
@@ -381,7 +381,7 @@ function IssueBody(props: {
             <div class="flex flex-col">
               <Show when={s().description}>
                 <Row label={t("web.farm.plot.job")}>
-                  <p class="whitespace-pre-wrap text-[13px] text-bark-800">{s().description}</p>
+                  <p class="text-[13px] whitespace-pre-wrap text-bark-800">{s().description}</p>
                 </Row>
               </Show>
               <Row label={t("web.farm.plot.who")}>
@@ -533,7 +533,7 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             fallback={
               <div class="flex items-start gap-2 py-0.5">
                 <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-                  {mark(r()) ?? <span class="h-2.5 w-2.5 border-2 border-bark-300" />}
+                  {mark(r()) ?? <span class="border-bark-300 h-2.5 w-2.5 border-2" />}
                 </span>
                 <span class="min-w-0 flex-1">
                   <span class={body}>{r().text}</span>

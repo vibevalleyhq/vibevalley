@@ -2,16 +2,19 @@
 // routes listen and say it their own way: on a call the orchestrator says the news (voice), the patrol's findings wake the
 // orchestrator, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
 
-import { scopedPubSub } from "@/base/pubsub.ts";
+import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
+
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
-import { inbox } from "./inbox.ts";
-import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
+
 import { forOwner } from "./away.ts";
+import { inbox } from "./inbox.ts";
+import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 
 /** What has waited too long in one channel. */
 export interface Overdue {

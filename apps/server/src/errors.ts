@@ -1,8 +1,8 @@
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
-import { t } from "@vibevalley/i18n";
-
 import { Data, Effect, Predicate } from "effect";
+
+import { t } from "@vibevalley/i18n";
 import { type ApiError, commandOf, type Next } from "@vibevalley/protocol/api";
 
 export type { ApiError, Next };

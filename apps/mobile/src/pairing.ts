@@ -2,7 +2,6 @@
 // page is told its key. The rest of the shell (App.tsx and its pieces) only wires these to the native modules.
 
 import { t } from "@vibevalley/i18n";
-
 import { lanKeyCookie } from "@vibevalley/protocol";
 
 /** A pairing: the farm's address on the network (scheme, host and port) and the one-time code. */

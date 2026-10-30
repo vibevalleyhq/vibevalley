@@ -1,12 +1,16 @@
-import { describe, expect, test } from "vite-plus/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { describe, expect, test } from "vite-plus/test";
+
 import { farmFraming } from "@vibevalley/protocol/host";
+
+import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
+
 import { frameVillage, villageCutAcross, villageCutDown } from "./framing";
 import { Level } from "./level";
-import { beds, cropOfBed } from "./plots";
 import { yardPlaces } from "./places";
-import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
+import { beds, cropOfBed } from "./plots";
 import { VillageWorld } from "./world";
 
 const assets = join(import.meta.dirname, "../../../public");

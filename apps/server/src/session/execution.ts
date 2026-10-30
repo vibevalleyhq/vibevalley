@@ -2,15 +2,18 @@
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
-import { t } from "@vibevalley/i18n";
-import { Inconsistent } from "@/errors.ts";
-import type { CoreEvent } from "@vibevalley/agent/brain";
-import { messageText } from "@vibevalley/agent/messages";
-import type { Outcome, RunTrigger } from "@vibevalley/protocol";
 import { Data, Effect } from "effect";
-import { newId } from "@/base/ids.ts";
-import type { ToolStart } from "./facts.ts";
+
+import type { CoreEvent } from "@vibevalley/agent/brain";
 import type { ToolResult } from "@vibevalley/agent/core/loop";
+import { messageText } from "@vibevalley/agent/messages";
+import { t } from "@vibevalley/i18n";
+import type { Outcome, RunTrigger } from "@vibevalley/protocol";
+
+import { newId } from "@/base/ids.ts";
+import { Inconsistent } from "@/errors.ts";
+
+import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
 import type { NotRecorded, RunStore } from "./session.ts";
 

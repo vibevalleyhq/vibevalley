@@ -1,11 +1,13 @@
 import type { Changes, Issue, SessionView } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 import { stories, story, type Story } from "@vibevalley/stories";
+
 import { answer } from "@/base/storyApi";
 import { ToastHost } from "@/ui/ToastHost";
+
+import { acts, min, now, sampleChanges, sampleIssue, sampleSession, working } from "./issue.samples";
 import { AnswerView, IssueDetail } from "./IssueDetail";
 import { TodoDetail } from "./TodoDetail";
-import { acts, min, now, sampleChanges, sampleIssue, sampleSession, working } from "./issue.samples";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const description = "过期的会话现在报错，页面一直转圈。\n\n要做的：过期就回到登录页，说清楚为什么。";
 const criteria = ["过期的会话回到登录页", "登录页说「登录过期了」", "补一条跨过期限的测试"];

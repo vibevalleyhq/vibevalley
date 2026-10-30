@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import { format, placeholderKinds, placeholders } from "../packages/i18n/src/format.ts";
 
 const root = join(import.meta.dirname, "..");

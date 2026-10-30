@@ -1,8 +1,10 @@
-import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import type { IRtcEngineEventHandler } from "react-native-agora";
-import { nativeRtc } from "./rtc";
+import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
+
 import { type FromNative, mobileHost, type RtcEvents } from "@vibevalley/protocol/host";
+
 import { nativeHost } from "./host";
+import { nativeRtc } from "./rtc";
 
 const sdk = vi.hoisted(() => ({
   request: vi.fn<() => Promise<string>>(),

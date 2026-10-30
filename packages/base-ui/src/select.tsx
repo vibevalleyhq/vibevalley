@@ -5,11 +5,12 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
+
+import { createControllable } from "./internal/controllable";
 import { createDismiss } from "./internal/dismiss";
+import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type SpanProps, type Renderable } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
 import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type SpanProps, type Renderable } from "./internal/element";
-import { createControllable } from "./internal/controllable";
 
 export type SelectOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 

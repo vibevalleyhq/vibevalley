@@ -1,18 +1,22 @@
 import { existsSync } from "node:fs";
-import { orchestrator, owner } from "@/base/actor.ts";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { Fact, Session } from "@vibevalley/protocol";
-import { needOf } from "@vibevalley/protocol/rules";
 import { Effect, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+
+import type { Fact, Session } from "@vibevalley/protocol";
+import { needOf } from "@vibevalley/protocol/rules";
+
 import { Agents } from "@/agent/agent.ts";
+import { orchestrator, owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Sessions, type SessionsInside } from "@/session/session.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 import { releaseHeld } from "@/testing/helper.ts";
+import { testConfig } from "@/testing/layers.ts";
+
+import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
 const lastText = (sessions: Sessions["Service"], id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
 

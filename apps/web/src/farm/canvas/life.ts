@@ -6,6 +6,8 @@
 // else takes it answers by what is painted there: dust from the soil, bits from the grass, a splash from the pond.
 // None of it is the farm's state: it is drawn from it, every frame.
 
+import { Container, Sprite, type Texture } from "pixi.js";
+
 import {
   blinkers,
   cadence,
@@ -23,7 +25,7 @@ import {
   type Point,
   type PointLight,
 } from "@vibevalley/engine/pixi";
-import { Container, Sprite, type Texture } from "pixi.js";
+
 import { playSound } from "@/ui/pixel/sound";
 
 /** x0, y0, x1, y1. */

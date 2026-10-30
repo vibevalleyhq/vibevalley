@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vite-plus/test";
+
 import type { IssueAttention, Session, IssueAct, IssueAction } from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { farmCues, type FarmSoundInput } from "./cues";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
+import { farmCues, type FarmSoundInput } from "./cues";
 const buttons = (...names: IssueAct[]): IssueAction[] =>
   names.map((act): IssueAction => {
     switch (act) {

@@ -2,14 +2,16 @@
 // persona.en.md, read in the farm's language. The built-in ones are templates/ beside this file, in the order of
 // templates/index.json; those added on this machine are copies in the home's agent-templates/.
 
-import { t, currentLocale } from "@vibevalley/i18n";
-
-import { messageOf } from "@/errors.ts";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+
+import { Schema } from "effect";
+
+import { t, currentLocale } from "@vibevalley/i18n";
 import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { Schema } from "effect";
+
+import { messageOf } from "@/errors.ts";
 
 export const builtInDir = join(import.meta.dirname, "templates");
 export const addedDir = (home: string) => join(home, "agent-templates");

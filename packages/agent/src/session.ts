@@ -3,6 +3,7 @@
 
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+
 import type { BrainMessage, CompactionSummaryMessage } from "./messages.ts";
 
 export function applySummary(messages: readonly BrainMessage[], summary: CompactionSummaryMessage): BrainMessage[] {

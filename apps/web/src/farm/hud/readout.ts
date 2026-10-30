@@ -2,7 +2,6 @@
 // orchestrator last said. The runtimes' quotas are features/runtime/quota.ts.
 
 import { t } from "@vibevalley/i18n";
-
 import type { ChatMessage, WorkspaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
 
 import { beds, cropLabel, type Bed } from "@/farm/world/plots";

@@ -1,33 +1,35 @@
-import { t } from "@vibevalley/i18n";
-import { plainText } from "@vibevalley/protocol/rules";
-import { tookText, spentText } from "@/base/format";
-import type { IconName } from "@/ui/icons";
-
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
+import { plainText } from "@vibevalley/protocol/rules";
+
+import { useAgent, useOrchestrators } from "@/base/agents";
 import { api } from "@/base/api";
-import { ArtifactCard } from "@/features/artifact";
-import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { channelOf, messagePath, chatPath, parentAt } from "./places";
-import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
-import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
-import { threadOwnerOf } from "./threads";
-import { unreadIn } from "./unread";
-import { aria, useNow } from "@/base/util";
-import { useRouter } from "@/base/router";
+import { tookText, spentText } from "@/base/format";
 import { useCore } from "@/base/frame";
+import { useRouter } from "@/base/router";
+import { aria, useNow } from "@/base/util";
+import { ArtifactCard } from "@/features/artifact";
+import { TurnSteps } from "@/features/session";
+import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
-import { A } from "@/ui/A";
+import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
-import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { Tag, type TagTone } from "@/ui/Tag";
-import { useMarkRead } from "./reading";
+
+import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { editingId, setEditingId } from "./draft";
+import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
 import { followed, useFollowed, useMessage } from "./follow";
-import { TurnSteps } from "@/features/session";
-import { useAgent, useOrchestrators } from "@/base/agents";
+import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
+import { channelOf, messagePath, chatPath, parentAt } from "./places";
+import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
+import { useMarkRead } from "./reading";
+import { threadOwnerOf } from "./threads";
+import { unreadIn } from "./unread";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },
@@ -135,7 +137,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       <div
         ref={(el) => (log = el)}
         onScroll={onScroll}
-        class="scroll-fade-y flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
+        class="flex min-h-0 flex-1 scroll-fade-y flex-col-reverse overflow-y-auto"
         role="log"
         aria-label={t("web.channel.messages.label")}
         data-testid="messages"

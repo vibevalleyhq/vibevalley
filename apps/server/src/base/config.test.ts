@@ -1,10 +1,12 @@
 import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { NodeServices } from "@effect/platform-node";
+import { expect, it } from "@effect/vitest";
+import { Effect } from "effect";
+
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { join } from "node:path";
-import { NodeServices } from "@effect/platform-node";
-import { Effect } from "effect";
-import { expect, it } from "@effect/vitest";
 import { type ServerConfig, dbDir, loadConfig, serverAddress } from "./config.ts";
 
 const temp = () => tempDir("vibevalley-config-");

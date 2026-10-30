@@ -1,5 +1,7 @@
 import { For, Show } from "solid-js";
+
 import { stories, story } from "@vibevalley/stories";
+
 import { useAtlas } from "./atlas";
 import { EarnedMedal } from "./medals";
 

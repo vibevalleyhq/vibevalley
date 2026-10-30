@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
-
 import { MemorySourceKindValues, type MemorySourceUpdate } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
+
 import { hasSpace, voiceURL } from "./keys.ts";
 /** A memory source as settings.json keeps it, with its key: read together, so an address is never paired with another one's key. */
 export interface MemorySourceConfig {

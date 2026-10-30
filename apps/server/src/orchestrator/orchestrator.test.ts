@@ -1,30 +1,34 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import type { EvalCase } from "./evals.ts";
-import { owner } from "@/base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
+import { Effect, Fiber, Layer } from "effect";
+
+import { messageText } from "@vibevalley/agent/messages";
+import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
 import type { Message } from "@vibevalley/ai/messages";
 import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
-import { Said } from "@/testing/said.ts";
-import { starter, testConfig } from "@/testing/layers.ts";
-import { Effect, Fiber, Layer } from "effect";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+
 import { Agents } from "@/agent/agent.ts";
-import { messageText } from "@vibevalley/agent/messages";
-import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
+import { owner } from "@/base/actor.ts";
 import type { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
 import { Crons } from "@/cron/cron.ts";
+import { Issues } from "@/issue/issue.ts";
 import { Notices } from "@/notice/notice.ts";
 import { Sessions } from "@/session/session.ts";
-import { world } from "@/testing/world.ts";
-import { Orchestrator } from "./orchestrator.ts";
-import { deepseekModel, orchestratorModel } from "./model.ts";
-import { intake } from "./intake.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
+import { Said } from "@/testing/said.ts";
 import { gate, untilGot as until, whenTrue, within } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
+
+import type { EvalCase } from "./evals.ts";
+import { intake } from "./intake.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import { Orchestrator } from "./orchestrator.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
 const onPhone = (o: Orchestrator["Service"], text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);

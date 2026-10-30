@@ -1,19 +1,20 @@
 // 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
-import { t } from "@vibevalley/i18n";
-
-import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
+import { For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
 import { momentText } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { useNow } from "@/base/util";
 import { ready, useQuery } from "@/base/query";
+import { useNow } from "@/base/util";
 import { Button } from "@/ui/Button";
-import { Qr } from "@/ui/Qr";
 import { Card, Quiet } from "@/ui/layout";
+import { Qr } from "@/ui/Qr";
+import { toast } from "@/ui/toasts";
 
 const notes = [0, 1, 2, 3] as const;
 

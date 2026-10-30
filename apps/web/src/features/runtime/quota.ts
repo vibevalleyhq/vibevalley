@@ -2,8 +2,8 @@
 // words, when it resets.
 
 import { t } from "@vibevalley/i18n";
-
 import type { RuntimeInfo } from "@vibevalley/protocol";
+
 import { numberText } from "@/base/format";
 
 /** A switched-off runtime's account is not the farm's business. */

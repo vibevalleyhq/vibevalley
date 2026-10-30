@@ -5,10 +5,11 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, useContext } from "solid-js";
+
 import { createDismiss } from "./internal/dismiss";
+import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type Renderable } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
 import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type Renderable } from "./internal/element";
 
 export type MenuOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 

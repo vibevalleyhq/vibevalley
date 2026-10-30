@@ -2,19 +2,21 @@
 // a plain field (marks are kept through the edit), and Enter splits it, Backspace at its start joins it to the one before,
 // Up and Down at its ends move between blocks.
 
-import { t } from "@vibevalley/i18n";
-
-import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Agent, ownerId, type TextSpan } from "@vibevalley/protocol";
+
 import { api } from "@/base/api";
-import { BlockEditor, type EditBlock } from "./editor";
-import { hexColor, swatches } from "@/ui/cast";
-import { knownTypes } from "./blocks";
 import { createExternal } from "@/base/external";
 import { ready, useAgents } from "@/base/query";
-import { AgentFace } from "@/ui/Face";
+import { hexColor, swatches } from "@/ui/cast";
 import { Checkbox } from "@/ui/Checkbox";
+import { AgentFace } from "@/ui/Face";
+
+import { knownTypes } from "./blocks";
+import { BlockEditor, type EditBlock } from "./editor";
 
 /** The owner's lines on the attribution bar. */
 const ownerColor = "#c8a46e";

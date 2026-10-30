@@ -1,13 +1,16 @@
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { tempDir } from "@vibevalley/testkit/temp";
 import { Cause, Effect, Exit, Layer } from "effect";
 import { SqlClient } from "effect/sql";
-import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
-import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 
-import { join } from "node:path";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { testDatabase } from "@/testing/layers.ts";
+
+import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
+import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
 import { Db, setAsideStale } from "./db.ts";
 
 describe("the database", () => {

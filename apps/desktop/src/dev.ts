@@ -5,6 +5,7 @@
 
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
+
 import { workspaceClosure } from "./workspace.ts";
 
 /** A build writes many files; one reload once they are all there. */

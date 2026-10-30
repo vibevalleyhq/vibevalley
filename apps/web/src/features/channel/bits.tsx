@@ -1,10 +1,13 @@
 import { For, Match, Show, Switch } from "solid-js";
+
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
-import { phaseIcon } from "./presence";
-import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
-import { Icon, type IconSize } from "@/ui/Icon";
+
 import { useAgent } from "@/base/agents";
 import { useCore } from "@/base/frame";
+import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
+import { Icon, type IconSize } from "@/ui/Icon";
+
+import { phaseIcon } from "./presence";
 
 export { Dot } from "@/ui/Dot";
 

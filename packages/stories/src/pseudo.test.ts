@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { forcedSelector, splitSelectors } from "./pseudo";
 
 test("a selector list splits at its own commas only", () => {

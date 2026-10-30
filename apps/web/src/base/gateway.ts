@@ -1,11 +1,12 @@
 // The page's one WebSocket to the farm (rpcPath): the Subscriptions RPCs (packages/protocol/src/rpc.ts), whose answers it
 // decodes by their Schema. Effect stays in this file; the rest of the page reads features/channel/follow.ts.
 
-import type { ChannelEvent } from "@vibevalley/protocol";
-import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Layer, ManagedRuntime, Stream } from "effect";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
+
+import type { ChannelEvent } from "@vibevalley/protocol";
+import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 
 const makeClient = RpcClient.make(Subscriptions);
 

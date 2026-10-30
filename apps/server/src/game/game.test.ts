@@ -1,20 +1,24 @@
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { Repo, Session } from "@vibevalley/protocol";
-import { sessionOf } from "@/session/roster.ts";
-import { playOf } from "./play.ts";
 import { Deferred, Effect, Layer } from "effect";
-import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
+
+import type { Repo, Session } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { Core } from "@/core/core.ts";
 import { Projects } from "@/project/project.ts";
+import { sessionOf } from "@/session/roster.ts";
 import { gitSync, repo } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
-import { Game, start as gameStart } from "./game.ts";
 import { waitFor as until } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
+
 import * as q from "../../db/generated/game_ledger.sql.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { Game, start as gameStart } from "./game.ts";
+import { playOf } from "./play.ts";
 
 const farm = (config = testConfig()) => Game.layer.pipe(Layer.provideMerge(world({ config })));
 

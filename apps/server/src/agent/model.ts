@@ -1,9 +1,8 @@
 // The model a farm agent talks to: agent/brain's deepseek, with a missing key said to the owner.
 
-import { t } from "@vibevalley/i18n";
-
-import type { Llm } from "@vibevalley/ai/llm";
 import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
+import type { Llm } from "@vibevalley/ai/llm";
+import { t } from "@vibevalley/i18n";
 
 /** Where to put a key, in the owner's words. */
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");

@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
+
 import { Collapsible } from "../src/index";
 import { $, mount, settle } from "./render";
 

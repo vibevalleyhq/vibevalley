@@ -2,6 +2,7 @@
 // (testdata/deepseek.jsonl.gz holds what pi-ai made of each stream), with pi-ai's events on the way.
 
 import { Predicate } from "effect";
+
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";

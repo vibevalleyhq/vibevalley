@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, PubSub, Stream } from "effect";
 import { TestClock } from "effect/testing";
+
 import { bounded } from "./bounded.ts";
 
 describe("bounded streams", () => {

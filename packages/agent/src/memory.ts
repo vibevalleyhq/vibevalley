@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+
 import { memory as memoryWords } from "./prompts.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */

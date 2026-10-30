@@ -5,6 +5,9 @@
 
 import { createEffect, createSignal, For, Show } from "solid-js";
 
+import { usePrefs } from "@/base/prefs";
+import { ready, useQuery } from "@/base/query";
+
 import {
   chimney,
   clouds,
@@ -23,9 +26,6 @@ import {
   type TitleSprites,
 } from "./layers";
 import { motesOf, type TitleScene, titleBackground } from "./scene";
-import { ready, useQuery } from "@/base/query";
-
-import { usePrefs } from "@/base/prefs";
 
 const pct = (n: number) => `${(n * 100).toFixed(3)}%`;
 

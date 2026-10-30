@@ -2,24 +2,24 @@
 // the farm, stop or dismiss a helper, harvest) and the page's own clock and effects (which earn nothing), plays each
 // sound, and keeps the frames and side events it saw, to copy as JSON lines.
 
-import { t } from "@vibevalley/i18n";
-
-import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
-import type { Session, StateFrame } from "@vibevalley/protocol";
 import { clockText } from "@vibevalley/engine/clock";
+import { t } from "@vibevalley/i18n";
+import type { Session, StateFrame } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
-import { subscribeLive } from "@/base/live";
-import { localEffects } from "@/farm/effects";
-import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
-import { clock, farm } from "@/farm/store";
-import { typing } from "@/farm/tools";
-import { aria } from "@/base/util";
 import { createExternal } from "@/base/external";
 import { orchestratorMood, useCore, useFrames, rawFrame } from "@/base/frame";
+import { subscribeLive } from "@/base/live";
 import { ready, useQuery } from "@/base/query";
+import { aria } from "@/base/util";
+import { localEffects } from "@/farm/effects";
+import { clock, farm } from "@/farm/store";
+import { typing } from "@/farm/tools";
 import { toasts, ToastType } from "@/ui/pixel";
+import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
 
 const keep = 2000;
 

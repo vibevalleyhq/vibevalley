@@ -1,6 +1,7 @@
 import { createSignal, For } from "solid-js";
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
+
 import { Combobox } from "../src/index";
 import { $, expectAccessible, mount, settle } from "./render";
 

@@ -7,8 +7,6 @@
 // speaks plain HTTP: a key can be overheard on the network it is open on. What it lets through it hands to the loopback
 // server, saying which device asks.
 
-import { t } from "@vibevalley/i18n";
-
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
@@ -16,6 +14,10 @@ import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+
+import { t } from "@vibevalley/i18n";
 import {
   artifactPrefix,
   attachmentPath,
@@ -30,12 +32,13 @@ import {
 } from "@vibevalley/protocol";
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
-import { missing, lookIn } from "@/errors.ts";
 import { callbackLog } from "@/base/log.ts";
+import { missing, lookIn } from "@/errors.ts";
+
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
 

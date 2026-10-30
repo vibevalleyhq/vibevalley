@@ -1,16 +1,18 @@
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
 
-import { t } from "@vibevalley/i18n";
-
-import { messageOf } from "@/errors.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
+
 import { Schema } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
+
 import { jsonOf } from "@/base/json.ts";
 import { numberIn } from "@/base/number.ts";
+import { messageOf } from "@/errors.ts";
 
 /** Past this a read of pi's balance counts as unknown. */
 const readTimeoutMs = 10_000;

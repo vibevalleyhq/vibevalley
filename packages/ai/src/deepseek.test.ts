@@ -1,6 +1,9 @@
-import { expect, it } from "@effect/vitest";
 import { join } from "node:path";
+
+import { expect, it } from "@effect/vitest";
+
 import { checkCases, goldenCasesAt } from "@vibevalley/testkit/golden";
+
 import type { Context, Message, ToolDeclaration } from "./messages.ts";
 import { models, type ThinkingLevel } from "./models.ts";
 import { requestBody } from "./request.ts";

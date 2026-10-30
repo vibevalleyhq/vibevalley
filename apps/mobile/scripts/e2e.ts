@@ -6,11 +6,12 @@
 //	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android
 //	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts ios
 
-import { setTimeout as sleep } from "node:timers/promises";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { VibeValleyApi } from "@vibevalley/protocol";
 
 const platform = process.argv[2] === "ios" ? "ios" : "android";

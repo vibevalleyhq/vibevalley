@@ -3,6 +3,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { type Plugin, unified } from "unified";
 import { describe, expect, it } from "vite-plus/test";
+
 import { remarkIssueRefs, safeHref } from "./richRules";
 
 interface Hast {

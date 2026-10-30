@@ -2,22 +2,24 @@
 // back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
 // head with the place's name and whether the farm is open.
 
+import type { JSX } from "@solidjs/web";
+import { For, onSettled, Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { For, onSettled, Show } from "solid-js";
-import type { JSX } from "@solidjs/web";
-import { type Place, placeOf, places, settingsPlace } from "./places";
 import { useCore, useFrames } from "@/base/frame";
+import { useRouter } from "@/base/router";
+import { pressed } from "@/base/shortcuts";
+import { QuickSwitcher, switcher } from "@/features/channel";
+import { waitingOnOwner } from "@/features/notice";
+import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
-import { Hint } from "@/ui/Tip";
-import { A } from "@/ui/A";
-import { useRouter } from "@/base/router";
-import { titleBar } from "@/ui/TitleBar";
-import { QuickSwitcher, switcher } from "@/features/channel";
-import { pressed } from "@/base/shortcuts";
-import { waitingOnOwner } from "@/features/notice";
 import { ShortcutSheet } from "@/ui/ShortcutSheet";
+import { Hint } from "@/ui/Tip";
+import { titleBar } from "@/ui/TitleBar";
+
+import { type Place, placeOf, places, settingsPlace } from "./places";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -37,7 +39,7 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
       aria-label={props.label}
       aria-current={props.current === true ? "page" : undefined}
       data-badge={props.badge !== undefined && props.badge > 0 ? props.badge : undefined}
-      class="relative flex h-11 w-11 items-center justify-center rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail aria-[current=page]:text-on-rail focus-visible:outline-2 focus-visible:outline-focus"
+      class="relative flex h-11 w-11 items-center justify-center rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:text-on-rail"
       style={props.current === true ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
     >
       {props.children}

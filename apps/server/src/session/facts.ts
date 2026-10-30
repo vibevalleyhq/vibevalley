@@ -1,15 +1,19 @@
-import { t } from "@vibevalley/i18n";
 import { relative } from "node:path";
+
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
-import type { FactIn } from "@/core/core.ts";
+
+import { t } from "@vibevalley/i18n";
 import type { Session, SessionAction, SessionEventType, Spent, ToolAction, SessionId } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { doingOf } from "./roster.ts";
-import { failureText } from "./report.ts";
-import { jobBreak, recalledIn } from "./briefing.ts";
+
 import { clip } from "@/base/clip.ts";
+import type { FactIn } from "@/core/core.ts";
 import type { Rate } from "@/runtime/price.ts";
+
+import { jobBreak, recalledIn } from "./briefing.ts";
+import { failureText } from "./report.ts";
+import { doingOf } from "./roster.ts";
 import { shellCommand } from "./shell.ts";
 
 /** The bubble over a session's head holds about this much. */

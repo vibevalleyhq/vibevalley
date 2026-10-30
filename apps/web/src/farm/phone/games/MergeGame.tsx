@@ -2,13 +2,15 @@
 // 12×12 picture. The field is kept while the phone is away or a call comes in. Arrows (or a swipe on the field) slide,
 // B takes one slide back, A starts, goes on after 丰收, and asks before starting over.
 
+import { createSignal, For, Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createSignal, For, Show } from "solid-js";
-import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 import { lcd } from "@/farm/phone/lcd";
-import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad } from "@/farm/support";
+import { playSound } from "@/ui/pixel/sound";
+
+import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 
 const game = kept<Merge | undefined>(undefined);
 const best = kept(0);

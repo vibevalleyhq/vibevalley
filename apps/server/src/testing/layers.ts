@@ -1,11 +1,13 @@
 // What tests run the services on: a configuration in a temporary home and an in-memory database.
 
-import { tempDir } from "@vibevalley/testkit/temp";
-
 import { join } from "node:path";
-import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
+
 import { Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
+
+import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { withCast } from "@/agent/agent.ts";
 import { builtInDir, builtInIds, profileOf, readTemplate } from "@/agent/template.ts";
 import { defaults, ServerConfig } from "@/base/config.ts";

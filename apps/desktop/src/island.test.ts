@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
+
 import type { Issue, Session, StateFrame } from "@vibevalley/protocol";
+
 import { glanceOf } from "./island";
 
 const issue = (number: number, state: Issue["attention"]["state"], more: Partial<Issue["attention"]> = {}, sessions: string[] = []) =>

@@ -1,8 +1,9 @@
-import { expect, test } from "vite-plus/test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
+import { expect, test } from "vite-plus/test";
 
 function checkDocs(files: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), "vibevalley-doc-links-"));

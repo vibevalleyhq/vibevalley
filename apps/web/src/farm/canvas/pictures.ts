@@ -2,10 +2,12 @@
 // rest stand up), and the map's own pixels, for what is painted where (life.ts). Poses change every frame, so all of
 // them are loaded before the village is drawn.
 
-import { GROUND_NORMALS, LOW_NORMALS, normalTexture, pixelsOf, SPRITE_NORMALS, type Normals } from "@vibevalley/engine/pixi";
 import type { Texture } from "pixi.js";
-import type { SpriteAtlas } from "@/ui/pixel/atlas";
+
+import { GROUND_NORMALS, LOW_NORMALS, normalTexture, pixelsOf, SPRITE_NORMALS, type Normals } from "@vibevalley/engine/pixi";
+
 import { loadTextures, texture } from "@/farm/world/textures";
+import type { SpriteAtlas } from "@/ui/pixel/atlas";
 
 export interface Pictures {
   readonly has: (name: string) => boolean;

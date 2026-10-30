@@ -1,15 +1,19 @@
-import type { Event, Session } from "@botiverse/oar";
-import { whenTrue } from "@vibevalley/testkit/until";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import type { Event, Session } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
-import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
+
 import { standaloneOwner } from "@vibevalley/agent/brain";
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
+import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
+import { whenTrue } from "@vibevalley/testkit/until";
+
 import { wallTime } from "@/base/time.ts";
+
+import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {

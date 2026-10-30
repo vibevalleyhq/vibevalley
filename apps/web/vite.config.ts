@@ -1,8 +1,9 @@
-import { defineConfig, lazyPlugins } from "vite-plus";
-import solid from "@solidjs/vite-plugin";
-import tailwindcss from "@tailwindcss/vite";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import solid from "@solidjs/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
 // The bar's words in every language, from the catalogs: the bar shows before any script of the page, so it cannot call

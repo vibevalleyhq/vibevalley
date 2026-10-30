@@ -3,10 +3,12 @@
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
+
+import { tookText, spanText } from "@/base/format";
+
+import type { Tone } from "./cards";
 import { endedAt, issueInTask } from "./issue";
 import { issueTitle } from "./titles";
-import { tookText, spanText } from "@/base/format";
-import type { Tone } from "./cards";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

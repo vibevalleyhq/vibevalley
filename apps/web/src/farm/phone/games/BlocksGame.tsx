@@ -1,13 +1,15 @@
 // 方块 on the phone: the rules are farm/phone/games/blocks.ts; here the clock, the pad and the drawing.
 // Leaving the game (or putting the phone away) pauses it where it is.
 
+import { createEffect, createSignal, For, Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createEffect, createSignal, For, Show } from "solid-js";
-import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 import { lcd } from "@/farm/phone/lcd";
-import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad, useTicks } from "@/farm/support";
+import { playSound } from "@/ui/pixel/sound";
+
+import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 
 const game = kept<Blocks | undefined>(undefined);
 const best = kept(0);

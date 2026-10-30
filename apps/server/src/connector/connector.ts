@@ -8,30 +8,33 @@
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
-import { t } from "@vibevalley/i18n";
-
-import { HttpClient } from "effect/http";
 import { createHash, randomInt } from "node:crypto";
+
+import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
+import { HttpClient } from "effect/http";
+import { SqlClient } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
+
+import { causeMessage, Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { Channels } from "@/channel/chat.ts";
 import { channelOf, defaultOf } from "@/channel/folded.ts";
-import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
+import { Core } from "@/core/core.ts";
+import { reasonOf } from "@/errors.ts";
+import { Notices } from "@/notice/notice.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
-import { newId } from "@/base/ids.ts";
-import { causeMessage, Db } from "@/base/db.ts";
-import { reasonOf } from "@/errors.ts";
-import { Channels } from "@/channel/chat.ts";
-import { Core } from "@/core/core.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { type Adapter, AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
+import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
-import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type WeixinApi, WeixinClient, weixinAdapter } from "./weixin.ts";
-import { Notices } from "@/notice/notice.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;

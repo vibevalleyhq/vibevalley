@@ -1,6 +1,7 @@
 // The host interface for the page (@vibevalley/protocol/host), over IPC to the main process.
 
 import { contextBridge, ipcRenderer } from "electron";
+
 import { type Host, hostKey } from "@vibevalley/protocol/host";
 
 /** The main process registers it (main.ts voiceShortcut). */

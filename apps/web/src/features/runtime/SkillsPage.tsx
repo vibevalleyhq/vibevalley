@@ -1,27 +1,29 @@
 // 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
 
-import { list as listed, t } from "@vibevalley/i18n";
-
-import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
+import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
+import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
-import { matches } from "@/base/search";
-import { type InstalledSkill, installedSkills } from "./skills";
-import { runtimeName } from "@/ui/runtimes";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { toast } from "@/ui/toasts";
-import { A } from "@/ui/A";
-import { useRouter } from "@/base/router";
-import { Keyed } from "@/base/util";
 import { ready, useAgents, useQuery, useRuntimes } from "@/base/query";
-import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { useRouter } from "@/base/router";
+import { matches } from "@/base/search";
+import { Keyed } from "@/base/util";
+import { A } from "@/ui/A";
 import { Button } from "@/ui/Button";
+import { ConfirmButton } from "@/ui/ConfirmButton";
+import { Empty } from "@/ui/Empty";
 import { AgentFace } from "@/ui/Face";
 import { Field, TextArea, TextInput } from "@/ui/Field";
 import { Card } from "@/ui/layout";
-import { Empty } from "@/ui/Empty";
+import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { runtimeName } from "@/ui/runtimes";
+import { toast } from "@/ui/toasts";
+
+import { type InstalledSkill, installedSkills } from "./skills";
 
 const installedPrefix = "installed:";
 export const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);

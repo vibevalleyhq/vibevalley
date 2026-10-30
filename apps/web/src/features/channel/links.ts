@@ -1,4 +1,5 @@
 import { type Chat } from "@vibevalley/protocol";
+
 import { channelOf, defaultOf } from "./places";
 export interface LinkedMessage {
   readonly channel: string;

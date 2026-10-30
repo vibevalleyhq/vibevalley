@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { isMuted, playSound, SOUND_GROUPS, SOUND_LABEL, SOUNDS } from "./sound";
 
 test("every sound has a label and a group", () => {

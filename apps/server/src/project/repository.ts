@@ -3,12 +3,14 @@
 // branch, clear a worktree away). The git spelling is here; what is done with the answers (the merge rules, pull
 // requests, the project's check, what a release keeps) stays in project.ts.
 
-import { t } from "@vibevalley/i18n";
-
-import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
 import { Effect } from "effect";
-import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
+
+import { t } from "@vibevalley/i18n";
+import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
+
 import { numberIn } from "@/base/number.ts";
+
+import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
 
 const patchLines = 400;
 const patchesMax = 400_000;

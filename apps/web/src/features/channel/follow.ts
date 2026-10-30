@@ -2,12 +2,15 @@
 // followed from the newest revision it has (base/gateway.ts), older pages on asking. A channel stays read after nobody shows
 // it, and its follower comes back from where it left off. The farm's reports are a feed of their own.
 
-import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
 import { type Accessor, createEffect, createSignal } from "solid-js";
-import { chatPage } from "./feed";
+
+import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { api } from "@/base/api";
 import { followReports, followChannel } from "@/base/gateway";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { chatPage } from "./feed";
 export interface Followed {
   /** By number, oldest first. */
   readonly messages: readonly ChatMessage[];

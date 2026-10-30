@@ -1,5 +1,6 @@
-import { Dialog as Base } from "@vibevalley/base-ui";
 import type { JSX } from "@solidjs/web";
+
+import { Dialog as Base } from "@vibevalley/base-ui";
 
 /** A modal over the page (the native <dialog>: focus trap, Escape closes). Open while `open`. */
 export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {

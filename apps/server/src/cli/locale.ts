@@ -3,6 +3,7 @@
 // (VIBEVALLEY_HOME, else the default's).
 
 import { setLocale } from "@vibevalley/i18n";
+
 import { defaults } from "@/base/config.ts";
 import { savedLocale } from "@/setting/setting.ts";
 

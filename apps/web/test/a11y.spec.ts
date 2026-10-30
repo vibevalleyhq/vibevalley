@@ -3,6 +3,7 @@
 // tests.
 
 import AxeBuilder from "@axe-core/playwright";
+
 import { expect, test } from "./fixtures";
 
 const sections = ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];

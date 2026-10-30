@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import type { Fact, Issue, IssueStatus, Session } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { emptyWorkspaceState } from "@/core/core.ts";
+import { reduce } from "@/projection/reduce.ts";
+
 import { attentionOf } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { reduce } from "@/projection/reduce.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
 describe("status moves", () => {
   const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
     ({ status, sessions: sent ? ["w1"] : [], attention: { state: "reviewing", acts: [] }, ...more }) as Issue;

@@ -2,10 +2,12 @@
 // state stream brings an issue made through the API to the board without a reload, and a notice the page sends through
 // the host interface reaches the main process. Which calls ring is apps/web/src/features/notice/tray.ts's (its own tests).
 
-import { _electron as electron, expect, test } from "@playwright/test";
 import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { _electron as electron, expect, test } from "@playwright/test";
+
 import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
 import type { Notice } from "@vibevalley/protocol/host";
 

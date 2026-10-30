@@ -1,12 +1,14 @@
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
-import { t } from "@vibevalley/i18n";
-
 import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
-import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
+
+import { t } from "@vibevalley/i18n";
+
 import { numberIn } from "@/base/number.ts";
+
+import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";

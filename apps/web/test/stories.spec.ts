@@ -1,10 +1,12 @@
 // The stories' page is static, served from the run's build: no farm server is started.
 
-import AxeBuilder from "@axe-core/playwright";
 import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize } from "node:path";
+
+import AxeBuilder from "@axe-core/playwright";
+
 import { expect, test as base } from "./fixtures";
 
 const types: Record<string, string> = {

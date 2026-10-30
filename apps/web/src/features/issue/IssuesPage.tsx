@@ -1,31 +1,34 @@
-import { list, t } from "@vibevalley/i18n";
-import { variant } from "@/base/util";
-import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
+
+import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
-import { writeIssue } from "./write";
-import { type BoardLook, boardViews, defaultLook, lookFromList, lookToList, viewLabel } from "./display";
-import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
-import { issueIs } from "./issue";
-import { type Lane } from "./lanes";
-import { toast } from "@/ui/toasts";
-import { useRouter } from "@/base/router";
-import { Select } from "@/ui/Field";
-import { useCore } from "@/base/frame";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { useOrchestrators } from "@/base/agents";
-import { useIssueHistory, useGraphs, useNameOf } from "./queries";
+import { api, reasonOf } from "@/base/api";
+import { useCore } from "@/base/frame";
+import { useRouter } from "@/base/router";
+import { variant } from "@/base/util";
+import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { Segmented } from "@/ui/Segmented";
-import { IssueBoard } from "./Board";
-import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
-import { DisplayMenu } from "./DisplayMenu";
+import { toast } from "@/ui/toasts";
+
 import { run } from "./acts";
+import { IssueBoard } from "./Board";
+import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
+import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
+import { type BoardLook, boardViews, defaultLook, lookFromList, lookToList, viewLabel } from "./display";
+import { DisplayMenu } from "./DisplayMenu";
+import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
+import { type Lane } from "./lanes";
+import { useIssueHistory, useGraphs, useNameOf } from "./queries";
 import { TaskDetail } from "./TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { writeIssue } from "./write";
 
 const lookKey = "vibevalley.board.look";
 

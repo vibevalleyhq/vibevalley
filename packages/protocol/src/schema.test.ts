@@ -3,7 +3,9 @@
 // drops the field from every frame and every state.json read.
 
 import { readFileSync } from "node:fs";
+
 import { expect, test } from "vite-plus/test";
+
 import * as S from "./schema";
 
 /** Each exported interface's own keys (two-space indented members), and the interface it extends, if any. */

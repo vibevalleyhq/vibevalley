@@ -1,14 +1,16 @@
 // The seeds (seeds.json, template_catalog.json): the achievements, the runtimes' presets and settings, and the issue
 // templates, in the farm's language (a profile's templates are folders, template.ts). The .en files say the same as the Chinese but for their words (seed.test.ts).
 
-import * as S from "@vibevalley/protocol/schema";
-import type { RuntimeFacts, RuntimePreset, RuntimeSettings } from "@vibevalley/protocol";
-import { currentLocale } from "@vibevalley/i18n";
 import { Schema } from "effect";
-import seedsZh from "./seeds.json";
+
+import { currentLocale } from "@vibevalley/i18n";
+import type { RuntimeFacts, RuntimePreset, RuntimeSettings } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import seedsEn from "./seeds.en.json";
-import catalogZh from "./template_catalog.json";
+import seedsZh from "./seeds.json";
 import catalogEn from "./template_catalog.en.json";
+import catalogZh from "./template_catalog.json";
 
 /** An achievement as seeds.json defines it; the game says it in the owner's words (game/view.ts). */
 const AchievementDef = Schema.Struct({

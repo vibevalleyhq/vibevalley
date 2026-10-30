@@ -3,16 +3,18 @@
 // is sent. Nothing here knows an endpoint by name but the composite commands, which call them by op; a new endpoint is a
 // new command with its help.
 
-import { t } from "@vibevalley/i18n";
-
 import { Config, Effect, FileSystem, Option, Predicate, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
 import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/protocol";
 import { ApiError, type Endpoint, endpoints, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
+
 import { announced, homeOf } from "@/base/lease.ts";
+
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";
 
 const fallbackServer = "http://127.0.0.1:8787";

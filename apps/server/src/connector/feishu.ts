@@ -3,12 +3,14 @@
 // registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
 // API to the owner's open_id, with no reply window.
 
-import { t } from "@vibevalley/i18n";
-
+import * as Lark from "@larksuiteoapi/node-sdk";
 import { Effect, FiberSet, Predicate, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
+
 import { jsonOrNone } from "@/base/json.ts";
-import * as Lark from "@larksuiteoapi/node-sdk";
+
 import { type Adapter, AppFailed, failedOf, failedWith } from "./adapter.ts";
 
 /** A text message's content: {"text": …}. */

@@ -2,6 +2,7 @@
 // (farm/panels/TaskBoard.tsx). Each answers in words, done or why not, and the issues are read again after either.
 
 import type { GraphAction, GraphSplitRequest, TaskAction, TaskEdit } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
 import { queries, useQuery } from "@/base/query";
 

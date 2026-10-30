@@ -2,22 +2,24 @@
 // at each use, so it takes effect at once; keys are never logged, and a page sees only where each comes from and its last
 // characters.
 
-import { t, setLocale } from "@vibevalley/i18n";
-
-import { messageOf } from "@/errors.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
-import { keyHint } from "./keys.ts";
-import { memorySourcesOver } from "./memorySources.ts";
-import { settingsProblem } from "./saving.ts";
+
 import { Context, Data, Effect, Layer, Schema } from "effect";
+
+import { t, setLocale } from "@vibevalley/i18n";
+import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { messageOf } from "@/errors.ts";
 
-import * as S from "@vibevalley/protocol/schema";
+import { keyHint } from "./keys.ts";
+import { memorySourcesOver } from "./memorySources.ts";
+import { settingsProblem } from "./saving.ts";
+import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 const MemorySourceConfig = Schema.Struct({
   kind: S.MemorySourceKind,

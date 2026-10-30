@@ -1,5 +1,6 @@
-import { artifactMax, artifactHeaders, artifactProblem, htmlPolicy } from "./policy.ts";
 import { describe, expect, it } from "vite-plus/test";
+
+import { artifactMax, artifactHeaders, artifactProblem, htmlPolicy } from "./policy.ts";
 
 describe("what an artifact may be", () => {
   it("takes a title, a kind it knows and a size within bounds; a version alone is judged by its size", () => {

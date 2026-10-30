@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+
 import { attachmentPath, type VibeValleyApi } from "@vibevalley/protocol";
+
 import { composerOn, expect, test } from "./fixtures";
 
 // The smallest PNG there is: one transparent pixel.

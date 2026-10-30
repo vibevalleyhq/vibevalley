@@ -3,6 +3,7 @@
 // "nobody", and the server has no model key.
 
 import type { Page } from "@playwright/test";
+
 import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {

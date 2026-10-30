@@ -1,7 +1,9 @@
 import { t } from "@vibevalley/i18n";
 import type { Priority } from "@vibevalley/protocol";
-import { type Lane, lanes } from "./lanes";
+
 import { compareText, or } from "@/base/order";
+
+import { type Lane, lanes } from "./lanes";
 
 export type BoardView = "board" | "list";
 export const boardViews: BoardView[] = ["board", "list"];

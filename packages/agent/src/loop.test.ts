@@ -1,13 +1,15 @@
 // How a run goes, turn by turn, as the brain's loop has gone: the spec the loop is held to when it changes
 // (.agents/notes/proposed/architecture/2026-10-27-pi-in-effect.md, step 3).
 
-import { whenTrue, gate } from "@vibevalley/testkit/until";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
+import { whenTrue, gate } from "@vibevalley/testkit/until";
+
+import { textTool } from "./core/tool.ts";
 import { messageText, userMessage } from "./messages.ts";
 import { type Rig, results, tempHome, withAgent } from "./testing.ts";
-import { textTool } from "./core/tool.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {

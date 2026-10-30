@@ -1,5 +1,5 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
 import type { AxeResults, Result } from "axe-core";
+import { createEffect, createSignal, For, Show } from "solid-js";
 
 export interface Axe {
   /** What axe found; undefined while it looks. */

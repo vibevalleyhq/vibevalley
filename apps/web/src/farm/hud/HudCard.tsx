@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+
 import { CardColors } from "@/ui/pixel";
 
 /** A wooden card the height of the HUD's row, an icon and words. */

@@ -1,24 +1,28 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { owner } from "@/base/actor.ts";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
-import { openFindings } from "@/issue/status.ts";
-import { Said } from "@/testing/said.ts";
-import { viewOf } from "@/game/view.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
+
+import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
 import { Crons } from "@/cron/cron.ts";
+import { viewOf } from "@/game/view.ts";
+import { Issues } from "@/issue/issue.ts";
+import { openFindings } from "@/issue/status.ts";
+import { Runtimes } from "@/runtime/runtime.ts";
 import { Sessions, type SessionsInside } from "@/session/session.ts";
 import { write } from "@/testing/git.ts";
+import { Said } from "@/testing/said.ts";
+
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
 
 const refusedWith = (e: unknown, words = "") => {
   const tagged = e as { _tag?: string; reason?: string };

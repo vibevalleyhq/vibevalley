@@ -1,14 +1,16 @@
+import { createMemo, createSignal, For, Show, untrack } from "solid-js";
+
 import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { useWorkAgents } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { useRouter } from "@/base/router";
-import { useWorkAgents } from "@/base/agents";
 import { autofocus } from "@/base/util";
 import { Dialog } from "@/ui/Dialog";
 import { toast } from "@/ui/toasts";
+
 import { Count } from "./bits";
 import { channelOf, chatPath } from "./places";
 import { type SwitchTarget, switchTargets } from "./switcher";

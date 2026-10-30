@@ -2,9 +2,10 @@
 
 import { navMap, type NavMap } from "@vibevalley/engine/nav";
 import type { Crop, Session, SessionAction } from "@vibevalley/protocol";
+
 import { add, type Box, inBox, type Level, type Point } from "./level";
-import { bedOfStation, isRipe } from "./plots";
 import { yardPlaces } from "./places";
+import { bedOfStation, isRipe } from "./plots";
 
 export const plotW = 34;
 export const plotH = 26;

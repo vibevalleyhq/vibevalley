@@ -1,10 +1,6 @@
-import { Checkbox } from "@/ui/Checkbox";
-import { list, t } from "@vibevalley/i18n";
-import { plainText, closedText } from "@vibevalley/protocol/rules";
-import { Dot } from "@/ui/Dot";
-import type { IconName } from "@/ui/icons";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
+import { list, t } from "@vibevalley/i18n";
 import {
   DeliverableValues,
   type Question,
@@ -17,26 +13,32 @@ import {
   type SessionEvent,
   type SessionView,
 } from "@vibevalley/protocol";
+import { plainText, closedText } from "@vibevalley/protocol/rules";
+
+import { useAgent } from "@/base/agents";
 import { api } from "@/base/api";
-import { createIssueActs, perform, run } from "./acts";
-import { issueTag, tagOpen, tagText } from "./tags";
-import { runText } from "./runs";
-import { changesLine } from "./changes";
-import { type CriterionRow, issueState, noStepsText, attentionTone } from "./overview";
 import { tookText, wallClockText } from "@/base/format";
-import { toast } from "@/ui/toasts";
 import { ready } from "@/base/query";
 import { useNow } from "@/base/util";
+import { IssueArtifacts } from "@/features/artifact";
+import { createSessionEvents } from "@/features/session";
 import { Button } from "@/ui/Button";
+import { Checkbox } from "@/ui/Checkbox";
+import { Dot } from "@/ui/Dot";
 import { TextArea } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
+import { toast } from "@/ui/toasts";
+
+import { createIssueActs, perform, run } from "./acts";
+import { changesLine } from "./changes";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
+import { type CriterionRow, issueState, noStepsText, attentionTone } from "./overview";
 import { useGraphs, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
-import { IssueArtifacts } from "@/features/artifact";
+import { runText } from "./runs";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { useAgent } from "@/base/agents";
-import { createSessionEvents } from "@/features/session";
+import { issueTag, tagOpen, tagText } from "./tags";
 
 /** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
  * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the

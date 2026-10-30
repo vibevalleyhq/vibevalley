@@ -4,8 +4,10 @@
 // know (parseOptions) says so in the JSON Schema too (additionalProperties false).
 
 import { Schema, Predicate } from "effect";
-import type { Handlers } from "@vibevalley/protocol/api";
+
 import type { JsonSchema } from "@vibevalley/ai/tools";
+import type { Handlers } from "@vibevalley/protocol/api";
+
 import { params } from "./prompts.ts";
 
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */

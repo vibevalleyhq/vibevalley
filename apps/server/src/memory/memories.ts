@@ -2,19 +2,21 @@
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
-import { t } from "@vibevalley/i18n";
-
-import { sessionId } from "@vibevalley/protocol/schema";
-import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
-import type { Actor } from "@/base/actor.ts";
 import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
+import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
+
+import type { Actor } from "@/base/actor.ts";
 import { Db } from "@/base/db.ts";
-import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "@/base/ids.ts";
+
+import * as q from "../../db/generated/memory.sql.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {

@@ -2,6 +2,7 @@
 // Reading, comparing and updating them is @vibevalley/testkit's.
 
 import { resolve } from "node:path";
+
 import { goldenCasesAt } from "@vibevalley/testkit/golden";
 
 export { type Case, checkCases, jsonDiff } from "@vibevalley/testkit/golden";

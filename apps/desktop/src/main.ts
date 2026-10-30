@@ -1,18 +1,20 @@
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
 // through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
-import { t, currentLocale, setLocale } from "@vibevalley/i18n";
-
-import { followSavedLocale } from "./locale";
-import { setAppMenu } from "./menu";
-import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
+
+import { filledNear } from "@vibevalley/engine/framing";
+import { t, currentLocale, setLocale } from "@vibevalley/i18n";
 import { VibeValleyApi } from "@vibevalley/protocol";
 import { farmFraming, type Notice, type TraySummary } from "@vibevalley/protocol/host";
-import { filledNear } from "@vibevalley/engine/framing";
+
 import { watchForDev } from "./dev";
 import { startIsland } from "./island";
+import { followSavedLocale } from "./locale";
+import { setAppMenu } from "./menu";
 import { loginShellPath, type RunningServer, startServer } from "./server";
 
 // In the repository the server is apps/server, the page apps/web/dist and the island apps/island's release build

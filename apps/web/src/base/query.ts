@@ -2,6 +2,7 @@
 // the state stream's updates while a REST read is in flight.
 import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, type QueryObserverResult } from "@tanstack/solid-query";
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
+
 import { api } from "./api";
 
 /** REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. */

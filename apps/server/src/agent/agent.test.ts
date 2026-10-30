@@ -1,10 +1,14 @@
 import { chmodSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { Cause, Effect, Exit, Layer } from "effect";
+
+import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
+
 import { ServerConfig } from "@/base/config.ts";
 import { testConfig, starter } from "@/testing/layers.ts";
+
 import { Agents, withCast } from "./agent.ts";
 import { defaultSettings } from "./seed.ts";
 

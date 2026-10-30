@@ -1,9 +1,16 @@
-import { t } from "@vibevalley/i18n";
-import { actionIcon, type IconName } from "@/ui/icons";
-
-import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { SessionEvent } from "@vibevalley/protocol";
+
+import { ago, tookText } from "@/base/format";
+import { aria, useNow } from "@/base/util";
+import { Icon } from "@/ui/Icon";
+import { actionIcon, type IconName } from "@/ui/icons";
+import { Markdown } from "@/ui/Markdown";
+
+import { createSessionEvents } from "./events";
 import {
   answerOf,
   farmToolText,
@@ -20,11 +27,6 @@ import {
   spansOf,
   turnLabel,
 } from "./rounds";
-import { ago, tookText } from "@/base/format";
-import { aria, useNow } from "@/base/util";
-import { Icon } from "@/ui/Icon";
-import { Markdown } from "@/ui/Markdown";
-import { createSessionEvents } from "./events";
 
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
 export function TurnSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
