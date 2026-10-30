@@ -10,8 +10,6 @@ const contract = {
   ticked: push(Schema.Struct({ n: Schema.Finite })),
 };
 
-const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-
 test("a call is answered by its handler, typed both ways", async () => {
   const [near, far] = linkPair();
   serve(contract, far, { add: ({ a, b }) => a + b, say: () => undefined });
@@ -30,11 +28,11 @@ test("an input that does not decode is refused on the answering side, and the ha
     },
     say: () => undefined,
   });
+  const answers: unknown[] = [];
+  const both = new Promise<void>((resolve) => near.receive((m) => answers.push(m) === 2 && resolve()));
   near.send({ id: 1, call: "add", input: { a: "2", b: 3 } });
   near.send({ id: 2, call: "nothing", input: 1 });
-  const answers: unknown[] = [];
-  near.receive((m) => answers.push(m));
-  await settle();
+  await both;
   expect(ran).toEqual([]);
   expect(answers).toEqual([
     { id: 1, ok: false, error: expect.stringContaining("Expected number") },
@@ -63,10 +61,8 @@ test("pushes reach their listeners until they stop, and a payload that does not 
   const stop = client.on("ticked", ({ n }) => heard.push(n));
   server.push("ticked", { n: 1 });
   far.send({ push: "ticked", payload: { n: "two" } });
-  await settle();
   stop();
   server.push("ticked", { n: 3 });
-  await settle();
   expect(heard).toEqual([1]);
 });
 

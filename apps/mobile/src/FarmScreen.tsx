@@ -1,12 +1,13 @@
-// The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/protocol/host's mobile
-// bridge): the page posts what it asks, the shell answers by id and sends the call's events back.
+// The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/protocol/host's
+// mobileBridge): the page posts what it asks as text, and the shell answers and pushes by calling fromNativeKey in it.
 
 import { type ComponentType, type Ref, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewProps } from "react-native-webview";
 
-import { type FromNative, fromNativeKey, type ToNative } from "@vibevalley/protocol/host";
+import type { Link } from "@vibevalley/bridge";
+import { fromNativeKey } from "@vibevalley/protocol/host";
 
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
@@ -18,20 +19,26 @@ const Web = WebView as unknown as ComponentType<WebViewProps & { ref?: Ref<WebVi
 
 export function FarmScreen({ farm, forgotten }: { farm: Farm; forgotten: () => void }) {
   const view = useRef<WebView<object>>(null);
-  const send = (m: FromNative) => view.current?.injectJavaScript(`window.${fromNativeKey}?.(${JSON.stringify(m)}); true;`);
+  const ears = useRef(new Set<(m: unknown) => void>());
+  const link = useRef<Link>({
+    send: (m) => view.current?.injectJavaScript(`window.${fromNativeKey}?.(${JSON.stringify(m)}); true;`),
+    receive: (fn) => {
+      ears.current.add(fn);
+      return () => void ears.current.delete(fn);
+    },
+  });
   const bridge = useRef<ReturnType<typeof nativeHost> | null>(null);
-  bridge.current ??= nativeHost(send);
+  bridge.current ??= nativeHost(link.current);
   useEffect(() => () => bridge.current?.close(), []);
 
   const onMessage = (e: WebViewMessageEvent) => {
-    let m: ToNative;
+    let m: unknown;
     try {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page's bridge (protocol host.ts) posts only ToNative
-      m = JSON.parse(e.nativeEvent.data) as ToNative;
+      m = JSON.parse(e.nativeEvent.data);
     } catch {
       return;
     }
-    void bridge.current?.receive(m);
+    for (const fn of ears.current) fn(m);
   };
 
   return (
@@ -48,7 +55,7 @@ export function FarmScreen({ farm, forgotten }: { farm: Farm; forgotten: () => v
         mediaPlaybackRequiresUserAction={false}
         onLoadStart={() => {
           bridge.current?.close();
-          bridge.current = nativeHost(send);
+          bridge.current = nativeHost(link.current);
         }}
         onMessage={onMessage}
         // The page sends a phone whose key the farm no longer knows to its own pairing: pair again here instead.

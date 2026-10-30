@@ -415,6 +415,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@vibevalley/bridge':
+        specifier: workspace:*
+        version: link:../../packages/bridge
       '@vibevalley/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -552,6 +555,9 @@ importers:
       '@vibevalley/base-ui':
         specifier: workspace:*
         version: link:../../packages/base-ui
+      '@vibevalley/bridge':
+        specifier: workspace:*
+        version: link:../../packages/bridge
       '@vibevalley/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -748,6 +754,9 @@ importers:
 
   packages/protocol:
     dependencies:
+      '@vibevalley/bridge':
+        specifier: workspace:*
+        version: link:../bridge
       '@vibevalley/i18n':
         specifier: workspace:*
         version: link:../i18n

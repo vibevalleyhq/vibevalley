@@ -12,6 +12,7 @@
     "@solidjs/web": "catalog:",
     "@tanstack/solid-query": "catalog:",
     "@vibevalley/base-ui": "workspace:*",
+    "@vibevalley/bridge": "workspace:*",
     "@vibevalley/engine": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",

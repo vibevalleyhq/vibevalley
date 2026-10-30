@@ -1,94 +1,92 @@
 import { expect, test } from "vite-plus/test";
 
-import { type ToNative, mobileHost } from "./host";
+import type { BridgeMessage } from "@vibevalley/bridge";
+import { linkPair } from "@vibevalley/bridge/testing";
+
+import { mobileHost, type RtcEvents } from "./host";
+
+const grant = (channel: string) => ({ appId: "a", channel, uid: "7", token: "t" });
+
+/** The page's host, and the shell's end as a test drives it: what was asked, and the answers and pushes sent back. */
+function phone() {
+  const [page, shell] = linkPair();
+  const asked: BridgeMessage[] = [];
+  shell.receive((m) => asked.push(m as BridgeMessage));
+  return {
+    host: mobileHost(page),
+    asked,
+    answer: (id: number, error?: string) => shell.send(error === undefined ? { id, ok: true } : { id, ok: false, error }),
+    push: (name: string, payload: object) => shell.send({ push: name, payload }),
+  };
+}
+
+const streamTo = (heard: string[]): RtcEvents => ({
+  joined: () => heard.push("joined"),
+  left: () => heard.push("left"),
+  stream: (t) => heard.push(t),
+  levels: (a, b) => heard.push(`${a}/${b}`),
+  problem: (t) => heard.push("!" + t),
+  expiring: () => heard.push("expiring"),
+});
 
 test("a call goes out by id, and its answer settles it", async () => {
-  const sent: ToNative[] = [];
-  const { host, receive } = mobileHost((m) => sent.push(m));
-  const told = host.notify!({ title: "做完了", body: "收菜" });
-  expect(sent).toEqual([{ id: 1, call: "notify", notice: { title: "做完了", body: "收菜" } }]);
-  receive({ id: 1, ok: true });
+  const p = phone();
+  const told = p.host.notify!({ title: "做完了", body: "收菜" });
+  expect(p.asked).toEqual([{ id: 1, call: "notify", input: { title: "做完了", body: "收菜" } }]);
+  p.answer(1);
   await told;
-  const refused = host.notify!({ title: "a", body: "b" });
-  receive({ id: 2, ok: false, error: "没有通知权限" });
+  const refused = p.host.notify!({ title: "a", body: "b" });
+  p.answer(2, "没有通知权限");
   await expect(refused).rejects.toThrow("没有通知权限");
 });
 
 test("a call's events reach its listener until it leaves", async () => {
-  const sent: ToNative[] = [];
-  const { host, receive } = mobileHost((m) => sent.push(m));
+  const p = phone();
   const heard: string[] = [];
-  const joining = host.rtc!(
-    { appId: "a", channel: "c", uid: "7", token: "t" },
-    {
-      joined: () => heard.push("joined"),
-      left: () => heard.push("left"),
-      stream: (t) => heard.push(t),
-      levels: (a, b) => heard.push(`${a}/${b}`),
-      problem: (t) => heard.push("!" + t),
-      expiring: () => heard.push("expiring"),
-    },
-  );
-  expect(sent[0]).toEqual({ id: 1, call: "rtc.join", line: 1, grant: { appId: "a", channel: "c", uid: "7", token: "t" } });
-  receive({ id: 1, ok: true });
+  const joining = p.host.rtc!(grant("c"), streamTo(heard));
+  expect(p.asked[0]).toEqual({ id: 1, call: "rtcJoin", input: { line: 1, grant: grant("c") } });
+  p.answer(1);
   const line = await joining;
-  receive({ line: 1, event: "rtc.joined" });
-  receive({ line: 1, event: "rtc.stream", text: "{}" });
-  receive({ line: 1, event: "rtc.levels", mine: 10, theirs: 40 });
-  receive({ line: 1, event: "rtc.expiring" });
+  p.push("rtcJoined", { line: 1 });
+  p.push("rtcStream", { line: 1, text: "{}" });
+  p.push("rtcLevels", { line: 1, mine: 10, theirs: 40 });
+  p.push("rtcExpiring", { line: 1 });
   const leaving = line.leave();
-  receive({ id: 2, ok: true });
+  p.answer(2);
   await leaving;
-  receive({ line: 1, event: "rtc.left" });
+  p.push("rtcLeft", { line: 1 });
   expect(heard).toEqual(["joined", "{}", "10/40", "expiring"]);
-  expect(host.tray).toBeUndefined();
+  expect(p.host.tray).toBeUndefined();
 });
 
 test("a cancelled join's late cleanup does not detach the next call", async () => {
-  const sent: ToNative[] = [];
-  const { host, receive } = mobileHost((m) => sent.push(m));
+  const p = phone();
   const heard: string[] = [];
-  const events = {
-    joined: () => undefined,
-    left: () => undefined,
-    stream: (text: string) => heard.push(text),
-    levels: () => undefined,
-    problem: () => undefined,
-    expiring: () => undefined,
-  };
-  const cancelled = host.rtc!({ appId: "a", channel: "old", uid: "7", token: "t" }, events);
-  const current = host.rtc!({ appId: "a", channel: "new", uid: "7", token: "t" }, events);
-  receive({ id: 2, ok: true });
+  const cancelled = p.host.rtc!(grant("old"), streamTo(heard));
+  const current = p.host.rtc!(grant("new"), streamTo(heard));
+  p.answer(2);
   await current;
-  receive({ id: 1, ok: true });
+  p.answer(1);
   const old = await cancelled;
   const cleaning = old.leave();
-  expect(sent[2]).toEqual({ id: 3, call: "rtc.leave", line: 1 });
-  receive({ id: 3, ok: true });
+  expect(p.asked[2]).toEqual({ id: 3, call: "rtcLeave", input: { line: 1 } });
+  p.answer(3);
   await cleaning;
-  receive({ line: 1, event: "rtc.stream", text: "old call" });
-  receive({ line: 2, event: "rtc.stream", text: "still here" });
+  p.push("rtcStream", { line: 1, text: "old call" });
+  p.push("rtcStream", { line: 2, text: "still here" });
   expect(heard).toEqual(["still here"]);
 });
 
 test("a superseded join's rejection does not detach the next call", async () => {
-  const { host, receive } = mobileHost(() => undefined);
+  const p = phone();
   const heard: string[] = [];
-  const events = {
-    joined: () => undefined,
-    left: () => undefined,
-    stream: (text: string) => heard.push(text),
-    levels: () => undefined,
-    problem: () => undefined,
-    expiring: () => undefined,
-  };
-  const old = host.rtc!({ appId: "a", channel: "old", uid: "7", token: "t" }, events);
+  const old = p.host.rtc!(grant("old"), streamTo(heard));
   const refused = expect(old).rejects.toThrow("ended");
-  const current = host.rtc!({ appId: "a", channel: "new", uid: "7", token: "t" }, events);
-  receive({ id: 2, ok: true });
+  const current = p.host.rtc!(grant("new"), streamTo(heard));
+  p.answer(2);
   await current;
-  receive({ id: 1, ok: false, error: "ended" });
+  p.answer(1, "ended");
   await refused;
-  receive({ line: 2, event: "rtc.stream", text: "still here" });
+  p.push("rtcStream", { line: 2, text: "still here" });
   expect(heard).toEqual(["still here"]);
 });
