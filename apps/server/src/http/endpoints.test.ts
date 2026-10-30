@@ -1,8 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+
+import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
+
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
+
 import { app } from "./app.ts";
 
 const farm = Effect.gen(function* () {
@@ -30,7 +33,7 @@ describe("the endpoints the agents' tools stand on", () => {
 
       const open = yield* call(() => api.issue.create({ title: "修登录", project: "app" }));
       yield* call(() => api.issue.create({ title: "加打卡" }));
-      expect((yield* call(() => api.issue.list({}))).map((t) => t.title).sort()).toEqual(["修登录", "加打卡"]);
+      expect((yield* call(() => api.issue.list({}))).map((t) => t.title).toSorted()).toEqual(["修登录", "加打卡"]);
       expect((yield* call(() => api.issue.list({ project: "app" }))).map((t) => t.title)).toEqual(["修登录"]);
       expect(yield* call(() => api.issue.list({ status: "done" }))).toEqual([]);
       // Nothing was handed back to review, and no session works it to split it.

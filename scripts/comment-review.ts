@@ -15,6 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { parseSync } from "vite";
 
 const root = resolve(import.meta.dirname, "..");
@@ -45,16 +46,16 @@ export function addedLines(diff: string): Map<string, Set<number>> {
   const added = new Map<string, Set<number>>();
   let lines: Set<number> | undefined;
   for (const l of diff.split("\n")) {
-    const file = /^\+\+\+ b\/(.+)$/.exec(l);
+    const file = /^\+\+\+ b\/(.+)$/u.exec(l);
     if (file) added.set(file[1]!, (lines = new Set()));
-    const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(l);
+    const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/u.exec(l);
     if (hunk && lines) for (let n = Number(hunk[1]), end = n + Number(hunk[2] ?? 1); n < end; n++) lines.add(n);
   }
   return added;
 }
 
 /** What the comment tells a tool, not a reader. */
-const directive = /^[*\s]*(@ts-|eslint-|oxlint-|prettier-|@vite-ignore|[#@]__PURE__|@internal\s*$|c8 |v8 |istanbul )/;
+const directive = /^[*\s]*(@ts-|eslint-|oxlint-|prettier-|@vite-ignore|[#@]__PURE__|@internal\s*$|c8 |v8 |istanbul )/u;
 
 /** Its comments, a run of `//` on the lines one after another as one. */
 export function commentsIn(file: string, src: string): Comment[] {
@@ -65,7 +66,7 @@ export function commentsIn(file: string, src: string): Comment[] {
   for (const c of comments) {
     const last = runs.at(-1);
     const isDirective = directive.test(c.value);
-    if (last?.line && !last.directive && c.type === "Line" && !isDirective && /^[ \t]*\n[ \t]*$/.test(src.slice(last.end, c.start))) last.end = c.end;
+    if (last?.line === true && !last.directive && c.type === "Line" && !isDirective && /^[ \t]*\n[ \t]*$/u.test(src.slice(last.end, c.start))) last.end = c.end;
     else runs.push({ start: c.start, end: c.end, line: c.type === "Line", directive: isDirective });
   }
   return runs
@@ -119,27 +120,29 @@ Answer with a JSON object only: {"verdicts":[{"id":<number>,"verdict":"keep"|"de
   ];
 }
 
-const verdicts = new Set<string>(["keep", "delete", "rewrite"]);
+const verdicts = ["keep", "delete", "rewrite"] as const;
 
 /** The model's answer for these comments; a missing or malformed verdict is an error, never a keep. */
 export function readVerdicts(answer: string, comments: readonly Comment[]): Finding[] {
-  const parsed = JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/g, "")) as { verdicts?: unknown };
-  if (!Array.isArray(parsed.verdicts)) throw new Error("the answer has no verdicts array");
-  const byId = new Map<number, Record<string, unknown>>();
-  for (const v of parsed.verdicts as Record<string, unknown>[]) byId.set(Number(v.id), v);
+  const parsed: unknown = JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/gu, ""));
+  const all: unknown = typeof parsed === "object" && parsed !== null && "verdicts" in parsed ? parsed.verdicts : undefined;
+  if (!Array.isArray(all)) throw new Error("the answer has no verdicts array");
+  const byId = new Map<number, Readonly<Record<string, unknown>>>();
+  for (const v of all as unknown[]) if (typeof v === "object" && v !== null) byId.set(Number(Reflect.get(v, "id")), Object.fromEntries(Object.entries(v)));
   return comments.flatMap((comment, id) => {
     const v = byId.get(id);
     if (!v) throw new Error(`no verdict for ${comment.file}:${comment.line}`);
-    if (typeof v.verdict !== "string" || !verdicts.has(v.verdict)) throw new Error(`${comment.file}:${comment.line}: verdict ${JSON.stringify(v.verdict)}`);
-    if (v.verdict === "keep") return [];
+    const verdict = verdicts.find((x) => x === v.verdict);
+    if (verdict === undefined) throw new Error(`${comment.file}:${comment.line}: verdict ${JSON.stringify(v.verdict)}`);
+    if (verdict === "keep") return [];
     const text = (k: string) => (typeof v[k] === "string" ? v[k] : "");
     return [
       {
         comment,
-        verdict: v.verdict as Finding["verdict"],
+        verdict,
         rule: text("rule"),
         reason: text("reason"),
-        rewrite: v.verdict === "rewrite" ? text("rewrite") : "",
+        rewrite: verdict === "rewrite" ? text("rewrite") : "",
       },
     ];
   });
@@ -155,6 +158,7 @@ export async function review(rule: string, comments: readonly Comment[], ask: As
   const found: Finding[][] = [];
   let next = 0;
   const worker = async () => {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- a worker of a pool: each takes the next batch when it is done with one
     for (let i = next++; i < batches.length; i = next++) found[i] = readVerdicts(await ask(prompt(rule, batches[i]!)), batches[i]!);
   };
   await Promise.all(Array.from({ length: Math.min(parallel, batches.length) }, worker));
@@ -173,6 +177,7 @@ const deepseek =
       body: JSON.stringify({ model, messages, response_format: { type: "json_object" } }),
     });
     if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${await res.text()}`);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- DeepSeek's chat completion; a missing field reads as no answer below
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content;
     if (!content) throw new Error("DeepSeek answered nothing");
@@ -182,7 +187,7 @@ const deepseek =
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
 
 /** Where the files are reviewed: lint's, without what tools write. */
-const reviewed = (path: string) => /^(apps|packages|scripts)\/.*\.(ts|tsx|mts)$/.test(path) && !/\.d\.ts$|\/db\/generated\/|\/testdata\//.test(path);
+const reviewed = (path: string) => /^(apps|packages|scripts)\/.*\.(ts|tsx|mts)$/u.test(path) && !/\.d\.ts$|\/db\/generated\/|\/testdata\//u.test(path);
 
 if (import.meta.main) {
   const args = process.argv.slice(2);

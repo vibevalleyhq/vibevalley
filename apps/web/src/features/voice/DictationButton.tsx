@@ -1,13 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // The dictation button every input row has.
 
-import type { IconName } from "@/ui/icons";
-
 import { onSettled } from "solid-js";
-import { dictation, type DictationPhase, insertDictated } from "./dictation";
+
+import { t } from "@vibevalley/i18n";
+
 import { createExternal } from "@/base/external";
 import { ready, useSettings } from "@/base/query";
 import { Icon, type IconSize } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
+
+import { dictation, type DictationPhase, insertDictated } from "./dictation";
 
 /** Tap to start talking, tap again to stop: the words go into the field at its caret, for the owner to read before sending. */
 export function DictationButton(props: {

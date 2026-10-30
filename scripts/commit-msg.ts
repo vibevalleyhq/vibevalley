@@ -15,10 +15,10 @@ import { readFileSync } from "node:fs";
 export const subjectMax = 100;
 
 // Git writes these itself; their subjects are not ours to shorten.
-const generated = /^(Merge |Revert "|fixup! |squash! |amend! )/;
+const generated = /^(Merge |Revert "|fixup! |squash! |amend! )/u;
 // An agent's byline, in a trailer or a footer line.
 const byline =
-  /^(co-authored-by:.*\b(claude|anthropic|codex|openai|copilot|cursor|gemini)\b|.*generated (with|by) .*\b(claude|codex|copilot|cursor|gemini)\b)/i;
+  /^(co-authored-by:.*\b(claude|anthropic|codex|openai|copilot|cursor|gemini)\b|.*generated (with|by) .*\b(claude|codex|copilot|cursor|gemini)\b)/iu;
 
 /** The kinds a branch's name starts with: <kind>/<topic>. */
 export const branchKinds = ["feat", "fix", "docs", "chore", "refactor", "test"] as const;
@@ -27,7 +27,7 @@ export const branchKinds = ["feat", "fix", "docs", "chore", "refactor", "test"] 
 export const bodySections = ["## What changed", "## Checks", "## Not verified"] as const;
 
 // Chinese is quoted, not written: the interface's own words in 「」, “” or "", and code, logs and paths in backticks.
-const quoted = /```[\s\S]*?```|`[^`\n]*`|「[^」]*」|“[^”]*”|"[^"\n]*"|<!--[\s\S]*?-->/g;
+const quoted = /```[\s\S]*?```|`[^`\n]*`|「[^」]*」|“[^”]*”|"[^"\n]*"|<!--[\s\S]*?-->/gu;
 /** The first run of Chinese written outside quotes and code, or undefined. */
 function chineseIn(text: string): string | undefined {
   return /\p{Script=Han}[\p{Script=Han}\u3000-\u303f\uff00-\uffef]*/u.exec(text.replace(quoted, " "))?.[0];
@@ -62,7 +62,7 @@ export function subjectProblems(subject: string): string[] {
   if (length > subjectMax)
     problems.push(`the subject is ${length} characters, at most ${subjectMax}: say what it now does in one sentence, the rest goes in the body`);
   if (subject !== subject.trim()) problems.push("the subject starts or ends with spaces");
-  if (/[.。]$/.test(subject)) problems.push("drop the full stop at the end of the subject");
+  if (/[.。]$/u.test(subject)) problems.push("drop the full stop at the end of the subject");
   const chinese = chineseIn(subject);
   if (chinese !== undefined) problems.push(`write the subject in English, quoting the interface's words in 「」: "${chinese}"`);
   return problems;
@@ -71,8 +71,8 @@ export function subjectProblems(subject: string): string[] {
 /** What is wrong with a pull request's body: the template's sections, written in English. */
 export function bodyProblems(body: string): string[] {
   const problems: string[] = [];
-  const headings = body.split(/\r?\n/).map((line) => line.trim());
-  for (const section of bodySections) if (!headings.includes(section)) problems.push(`the body has no "${section}" section`);
+  const headings = new Set(body.split(/\r?\n/u).map((line) => line.trim()));
+  for (const section of bodySections) if (!headings.has(section)) problems.push(`the body has no "${section}" section`);
   const chinese = chineseIn(body);
   if (chinese !== undefined) problems.push(`write the body in English, quoting the interface's words in 「」 and logs in backticks: "${chinese}"`);
   return problems;
@@ -80,7 +80,7 @@ export function bodyProblems(body: string): string[] {
 
 /** What is wrong with a branch's name: <kind>/<topic>, the topic in lowercase English words joined by hyphens. */
 export function branchProblems(branch: string): string[] {
-  const at = /^([^/]+)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(branch);
+  const at = /^([^/]+)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/u.exec(branch);
   if (!at) return [`name the branch <kind>/<topic>, the topic lowercase words joined by hyphens: "${branch}"`];
   if (!(branchKinds as readonly string[]).includes(at[1]!)) return [`a branch's kind is one of ${branchKinds.join(", ")}: "${at[1]}"`];
   return [];

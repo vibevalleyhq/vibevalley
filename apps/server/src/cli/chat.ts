@@ -1,35 +1,37 @@
-import { t } from "@vibevalley/i18n";
 // The conversations in a terminal: VibeValley's own agent (DeepSeek, with the coding tools, skills, memory, sessions,
 // reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
-import { standaloneLlm } from "./llm.ts";
-
-import { instructions } from "./prompts.ts";
-import { currentLocale } from "@vibevalley/i18n";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
+import { NodeServices } from "@effect/platform-node";
+import { Clock, Data, Effect, FiberHandle, Option, Queue, Stream } from "effect";
+
+import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { Brain, type BrainEvent, standaloneOwner } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
-import { modelClient } from "@/agent/model.ts";
 import { userMessage } from "@vibevalley/agent/messages";
-import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
-import { NodeServices } from "@effect/platform-node";
-import { Clock, Data, Effect, FiberHandle, Option, Queue, Stream } from "effect";
+import { t, currentLocale } from "@vibevalley/i18n";
+
+import { modelClient } from "@/agent/model.ts";
 import { loadConfig } from "@/base/config.ts";
+import { wallTime } from "@/base/time.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
-import { memoryStore } from "@vibevalley/agent/agentTaskStore";
-import { wallTime } from "@/base/time.ts";
+import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
+
+import { standaloneLlm } from "./llm.ts";
+import { instructions } from "./prompts.ts";
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {
   const r = [...s];
-  return (r.length > 120 ? r.slice(0, 120).join("") + "…" : s).split(/\s+/).filter(Boolean).join(" ");
+  return (r.length > 120 ? r.slice(0, 120).join("") + "…" : s).split(/\s+/u).filter(Boolean).join(" ");
 };
 const write = (s: string) => process.stdout.write(s);
 
@@ -234,8 +236,9 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
           { cursor: { sessionId: session.id, afterSeq: -1 } },
         );
         const said = (r: unknown, words: "rejected" | "notSent") => {
-          const refused = r as { kind?: string; reason?: string };
-          if (refused.kind === "rejected") console.log(dim(t(`server.cli.chat.${words}`, { why: String(refused.reason ?? "") })));
+          const refused = typeof r === "object" && r !== null ? r : {};
+          const why = "reason" in refused && typeof refused.reason === "string" ? refused.reason : "";
+          if ("kind" in refused && refused.kind === "rejected") console.log(dim(t(`server.cli.chat.${words}`, { why })));
         };
         // One turn at a time: a line typed while it runs is steered into it or queued after it. Interrupting the turn's
         // fiber aborts the prompt (its signal).
@@ -245,7 +248,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
             Effect.ensuring(Effect.sync(() => write("› "))),
           );
         if (values.p !== undefined) return yield* turnOf(values.p);
-        const turns = yield* FiberHandle.make<void, unknown>();
+        const turns = yield* FiberHandle.make<void>();
         write("› ");
         yield* typed((typedIn) =>
           Effect.gen(function* () {

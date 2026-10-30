@@ -1,5 +1,7 @@
 import { expect, test } from "vite-plus/test";
+
 import { lanKeyCookie } from "@vibevalley/protocol";
+
 import { deviceName, isPairPage, keyScript, level, parsePairLink } from "./pairing";
 
 test("a pairing link, from the QR code or the app's own scheme", () => {

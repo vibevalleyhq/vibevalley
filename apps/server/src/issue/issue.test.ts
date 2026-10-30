@@ -1,25 +1,29 @@
 import { execFileSync } from "node:child_process";
-import { freshTask } from "@/task/editing.ts";
-import { graphView } from "@/task/graph.ts";
-import { owner } from "@/base/actor.ts";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
-import { starter, testConfig } from "@/testing/layers.ts";
 import { Cause, Effect } from "effect";
 import { SqlClient } from "effect/sql";
+
+import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { reasonOf } from "@/errors.ts";
 import { Crons } from "@/cron/cron.ts";
+import { reasonOf } from "@/errors.ts";
 import { Sessions } from "@/session/session.ts";
-import { world } from "@/testing/world.ts";
-import { Issues } from "./issue.ts";
+import { freshTask } from "@/task/editing.ts";
+import { graphView } from "@/task/graph.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { world } from "@/testing/world.ts";
+
+import { Issues } from "./issue.ts";
 const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())) });
@@ -101,7 +105,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       yield* Effect.addFinalizer(() =>
         Effect.promise(async () => {
-          for (const cleanup of cleanups) await cleanup();
+          await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
       const issues = yield* Issues;
@@ -159,7 +163,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       yield* Effect.addFinalizer(() =>
         Effect.promise(async () => {
-          for (const cleanup of cleanups) await cleanup();
+          await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
       const issues = yield* Issues;
@@ -341,7 +345,7 @@ describe("issues", () => {
     });
     const f = farm([worker]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       yield* (yield* Agents).save(lab());
@@ -433,8 +437,8 @@ describe("issues", () => {
         ],
         { concurrency: "unbounded" },
       );
-      expect(got.filter((h) => h.session).length).toBe(1);
-      expect(got.every((h) => h.session || h.refused)).toBe(true);
+      expect(got.filter((h) => h.session !== undefined).length).toBe(1);
+      expect(got.every((h) => h.session !== undefined || h.refused !== undefined)).toBe(true);
       expect(core.state().sessions).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -529,7 +533,7 @@ describe("issues", () => {
   it.live("a queued issue keeps the channel it was first sent from", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
@@ -560,7 +564,7 @@ describe("issues", () => {
     const clock = { now: 1_800_000_000_000 };
     const c = config();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const core = yield* Core;
       const chat = yield* Channels;
@@ -605,7 +609,7 @@ describe("issues", () => {
   it.live("an issue handed over goes on in the same issue with another profile", () => {
     const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const chat = yield* Channels;
@@ -628,7 +632,7 @@ describe("issues", () => {
       expect(sessions.find(first!)).toBeUndefined();
       const second = (yield* sessions.get(handed.sessions[1]!))!;
       expect(second.agent).toBe("lab2");
-      expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /);
+      expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /u);
       yield* inReview(2);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -636,7 +640,7 @@ describe("issues", () => {
   it.live("an issue still being worked is not handed over", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const chat = yield* Channels;
       const agents = yield* Agents;

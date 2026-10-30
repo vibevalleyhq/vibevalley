@@ -2,9 +2,11 @@
 // attention, so the farm never says what the issue page does not.
 
 import { describe, expect, it } from "vite-plus/test";
+
 import type { Issue, IssueAttention, Session } from "@vibevalley/protocol";
-import { plotOf } from "./view.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
+import { plotOf } from "./view.ts";
 
 const session = (phase: Session["phase"]): Session => ({
   id: sessionId("w1"),

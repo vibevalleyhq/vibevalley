@@ -2,10 +2,10 @@ export const pseudoStates = ["rest", "hover", "focus", "active"] as const;
 export type PseudoState = (typeof pseudoStates)[number];
 
 const tokens: Record<Exclude<PseudoState, "rest">, RegExp> = {
-  hover: /:hover(?![-\w])/g,
+  hover: /:hover(?![-\w])/gu,
   // :focus-within is a parent's state, not the part's own.
-  focus: /:focus-visible(?![-\w])|:focus(?![-\w])/g,
-  active: /:active(?![-\w])/g,
+  focus: /:focus-visible(?![-\w])|:focus(?![-\w])/gu,
+  active: /:active(?![-\w])/gu,
 };
 
 /** What a rule left with no selector of its own (a bare :focus-visible) applies to: what can take the focus. */
@@ -44,7 +44,7 @@ export function forcedSelector(list: string, state: Exclude<PseudoState, "rest">
 }
 
 /** A media query that only asks whether the device can hover: dropped, as the state is forced anyway. */
-const onlyHover = (condition: string) => /^\(\s*hover\s*:\s*hover\s*\)$/.test(condition.trim());
+const onlyHover = (condition: string) => /^\(\s*hover\s*:\s*hover\s*\)$/u.test(condition.trim());
 
 interface Wrap {
   readonly open: string;

@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
 import { skills as skillWords } from "./prompts.ts";
 
 export interface SkillInfo {
@@ -14,18 +15,18 @@ export interface SkillInfo {
 
 export const defaultSkillDirs = (cwd: string) => [join(homedir(), ".agents", "skills"), join(homedir(), ".claude", "skills"), join(cwd, ".agents", "skills")];
 
-const frontMatterBlock = /^---\r?\n([\s\S]*?)\r?\n---/;
-const frontMatterKey = /^([A-Za-z_][\w-]*):\s*(.*)$/;
-const indentedLine = /^\s+\S/;
-const quotedValue = /^(['"])([\s\S]*)(['"])$/;
-const frontMatterHead = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
+const frontMatterBlock = /^---\r?\n([\s\S]*?)\r?\n---/u;
+const frontMatterKey = /^([A-Za-z_][\w-]*):\s*(.*)$/u;
+const indentedLine = /^\s+\S/u;
+const quotedValue = /^(['"])([\s\S]*)(['"])$/u;
+const frontMatterHead = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u;
 
 /** YAML's simple `key: value` lines only (quotes and folded `>` allowed). */
 export function frontMatter(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   const m = frontMatterBlock.exec(text);
   if (!m || !m[1]) return out;
-  const lines = m[1].split(/\r?\n/);
+  const lines = m[1].split(/\r?\n/u);
   for (let i = 0; i < lines.length; i++) {
     const kv = frontMatterKey.exec(lines[i]!);
     if (!kv) continue;
@@ -77,7 +78,7 @@ export function scanSkills(dirs: readonly string[]): SkillInfo[] {
     }
   }
   // localeCompare: case folded first.
-  return [...found.values()].sort((a, b) => {
+  return [...found.values()].toSorted((a, b) => {
     const la = a.name.toLowerCase();
     const lb = b.name.toLowerCase();
     return la !== lb ? (la < lb ? -1 : 1) : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;

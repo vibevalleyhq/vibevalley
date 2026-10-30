@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
+import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
+
 import { slice } from "@/base/clip.ts";
 
 /** In UTF-16 units; longer ones are cut. */
@@ -12,15 +13,15 @@ export const digestOver = 3;
 
 export function plainText(markdown: string): string {
   return markdown
-    .replace(/```[^\n]*\n([\s\S]*?)```/g, (_, code: string) => code.trimEnd())
-    .replace(/`([^`\n]+)`/g, "$1")
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "[$1] $2")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_, a?: string, b?: string) => (a ?? "") + (b ?? ""))
-    .replace(/(^|[^*])\*([^*\s][^*\n]*?)\*/g, "$1$2")
-    .replace(/^\s*[-*+]\s+/gm, "· ")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/```[^\n]*\n([\s\S]*?)```/gu, (_, code: string) => code.trimEnd())
+    .replace(/`([^`\n]+)`/gu, "$1")
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/gu, "[$1] $2")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/gu, "$1 ($2)")
+    .replace(/^#{1,6}\s+/gmu, "")
+    .replace(/\*\*(.+?)\*\*|__(.+?)__/gu, (_, a?: string, b?: string) => (a ?? "") + (b ?? ""))
+    .replace(/(^|[^*])\*([^*\s][^*\n]*?)\*/gu, "$1$2")
+    .replace(/^\s*[-*+]\s+/gmu, "· ")
+    .replace(/\n{3,}/gu, "\n\n")
     .trim();
 }
 
@@ -63,8 +64,8 @@ export function flushText(lines: readonly string[]): string[] {
 
 /** Spaces and the pairing word in front (配对, or pair) allowed, whatever the locale. */
 export const isPairing = (text: string, code: string) => {
-  const flat = text.replace(/\s+/g, "");
-  const word = /^(?:配对|pair)/i.exec(flat)?.[0] ?? "";
+  const flat = text.replace(/\s+/gu, "");
+  const word = /^(?:配对|pair)/iu.exec(flat)?.[0] ?? "";
   return flat.slice(word.length) === code;
 };
 

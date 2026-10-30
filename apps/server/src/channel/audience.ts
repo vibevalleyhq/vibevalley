@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
-import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 // Kept in memory beside the chat's model (model.ts): the chat tells it each follow and delivery as it writes them, and
 // reloads it with the model when a transaction fails.
+
+import { t } from "@vibevalley/i18n";
+import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 const agentLike = (kind: string) => kind === "session" || kind === "orchestrator";
 
@@ -36,7 +37,7 @@ export class Audience {
 
   /** By id. */
   followers(channel: string): string[] {
-    return [...(this.follows.get(channel) ?? [])].sort();
+    return [...(this.follows.get(channel) ?? [])].toSorted();
   }
 
   /** The owner's words start the count of agents waking agents there again: only what is said
@@ -103,7 +104,7 @@ export interface AudienceInput {
  * who is named first (the strongest reason wins), then the thread's owner and followers, or the channel's. */
 export function chatAudience(i: AudienceInput): Delivery[] {
   const out: Delivery[] = [];
-  if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken) return out;
+  if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken === true) return out;
   const byAgent = i.fromKind === "session" || i.fromKind === "orchestrator";
   const present = i.present ?? i.sessions;
   let hops = i.hops;
@@ -127,7 +128,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     return out;
   }
   if (i.kind === "report") {
-    if (!i.forTask) add(i.orchestrator, "addressed", i.outcome === "failed");
+    if (i.forTask !== true) add(i.orchestrator, "addressed", i.outcome === "failed");
     return out;
   }
   const mentions = i.mentions;

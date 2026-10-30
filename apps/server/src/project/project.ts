@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // The projects under the work root and their git: making and listing them, a session's
 // worktree on its own branch, what a branch changed, merging it into the main branch, a graph's branch, the project's
 // own check (.vibevalley/check), GitHub pull requests through gh, and what the code is written in.
@@ -8,9 +7,12 @@ import { t } from "@vibevalley/i18n";
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { messageOf } from "@/errors.ts";
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+
+import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
+
+import { t } from "@vibevalley/i18n";
 import {
   type Changes,
   type Validation,
@@ -31,10 +33,14 @@ import {
   type PullRequestState,
   type Repo,
 } from "@vibevalley/protocol";
+
 import { slice } from "@/base/clip.ts";
-import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
-import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { ServerConfig } from "@/base/config.ts";
+import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { numberIn } from "@/base/number.ts";
+import { or } from "@/base/order.ts";
+import { messageOf } from "@/errors.ts";
+
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import {
@@ -57,14 +63,14 @@ const runTimeoutMs = 10 * 60_000;
 const runOutput = 3000;
 const cloneTimeoutMs = 3 * 60_000;
 
-const projectName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
-const githubURL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/;
+const projectName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/u;
+const githubURL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/u;
 
 /** Only repository home URLs: never credentials, other git transports or command-line options. */
 export function githubRepository(input: string): { name: string; url: string } | undefined {
   const m = githubURL.exec(input.trim());
   if (!m) return undefined;
-  const name = m[2]!.replace(/\.git$/, "");
+  const name = m[2]!.replace(/\.git$/u, "");
   if (name === "" || name === "." || name === "..") return undefined;
   return { name, url: `https://github.com/${m[1]}/${name}.git` };
 }
@@ -163,7 +169,7 @@ export function countsOf(output: string): LanguageCount[] | undefined {
       blanks: Math.trunc(l.blanks),
     });
   }
-  return out.sort((a, b) => b.code + b.comments - (a.code + a.comments) || localeCompare(a.name, b.name));
+  return out.toSorted((a, b) => or(b.code + b.comments - (a.code + a.comments), localeCompare(a.name, b.name)));
 }
 
 /** The calendar day an instant falls on where the farm runs, as yyyy-mm-dd. */
@@ -182,8 +188,8 @@ export function activityOf(log: string, dayOf: (ms: number) => string = localDay
     const name = line.slice(tab + 1).trim() || t("server.project.noName");
     byAuthor.set(name, (byAuthor.get(name) ?? 0) + 1);
   }
-  const days = [...byDay].map(([day, commits]) => ({ day, commits })).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
-  const authors = [...byAuthor].map(([name, commits]) => ({ name, commits })).sort((a, b) => b.commits - a.commits || localeCompare(a.name, b.name));
+  const days = [...byDay].map(([day, commits]) => ({ day, commits })).toSorted((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  const authors = [...byAuthor].map(([name, commits]) => ({ name, commits })).toSorted((a, b) => or(b.commits - a.commits, localeCompare(a.name, b.name)));
   return { days, authors };
 }
 
@@ -192,14 +198,14 @@ const secondsOf = (text: string) => {
   return text.trim() === "" || !Number.isFinite(n) || n <= 0 ? 0 : Math.trunc(n * 1000);
 };
 
-const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/m;
-const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/;
-const ghOrigin = /^(?:https:\/\/github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/;
+const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/mu;
+const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/u;
+const ghOrigin = /^(?:https:\/\/github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/u;
 
 export function githubOrigin(origin: string): string {
   const m = ghOrigin.exec(origin.trim());
   if (!m) return "";
-  const repo = m[2]!.replace(/\.git$/, "");
+  const repo = m[2]!.replace(/\.git$/u, "");
   return repo === "" || repo === "." || repo === ".." ? "" : `${m[1]}/${repo}`;
 }
 
@@ -289,7 +295,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const perProject = config.project.maxSessions;
     const checkTimeoutMs = config.project.checkTimeoutSeconds * 1000;
     const tokei = config.tokei || "tokei";
-    const prProjects = [...config.github.prProjects];
+    const prProjects = new Set([...config.github.prProjects]);
     const gh = hooks.gh ?? runGitHub;
 
     const queues = new Map<string, Semaphore.Semaphore>();
@@ -383,7 +389,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const syncMain = Effect.fn("Projects.syncMain")(function* (name: string) {
       const path = join(root, name);
       const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
-      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* repository(path).mainOrNone;
+      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//u, "") : yield* repository(path).mainOrNone;
       const kept = Effect.as(Effect.logWarning(`project ${name}: could not fast-forward main from origin, keeping the local main`), main);
       if (main === "") return yield* kept;
       const fetched = hooks.fetch
@@ -403,7 +409,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       return moved.code === 0 ? main : yield* kept;
     });
 
-    const usesPullRequests = (name: string) => prProjects.includes(name) && capability(name).available;
+    const usesPullRequests = (name: string) => prProjects.has(name) && capability(name).available;
 
     const describe = (project: string, cwd: string, branch: string | undefined) =>
       repository(join(root, project))
@@ -506,7 +512,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
                 const { url } = githubRepository(req.github)!;
-                const known = status?.checkedAt ? status : yield* probeGitHub(gh);
+                const known = status?.checkedAt != null && status?.checkedAt !== 0 ? status : yield* probeGitHub(gh);
                 if (known.loggedIn) {
                   if (!(yield* gh("repo", "clone", githubOrigin(url), path)).ok) return yield* fail(t("server.project.cloneFailedGh"));
                 } else {
@@ -565,7 +571,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         const total = yield* gitQuiet(p.path, "rev-list", "--all", "--no-merges", "--count");
         const roots = yield* gitQuiet(p.path, "log", "--all", "--max-parents=0", "--format=%at");
         const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
-        Object.assign(out, activityOf(log), { total: Number(total) || 0 });
+        Object.assign(out, activityOf(log), { total: numberIn(total) });
         const first = Math.min(
           ...roots
             .split("\n")
@@ -637,7 +643,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           const fork = yield* git(cwd, "merge-base", baseBranch, "HEAD");
           const changed = yield* git(cwd, "diff", "--name-only", "--no-renames", fork);
           const added = yield* git(cwd, "ls-files", "--others", "--exclude-standard");
-          return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].sort();
+          return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].toSorted();
         },
         Effect.mapError((e) => new ProjectError({ message: reason(e) })),
       ),
@@ -808,7 +814,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         }),
       houseRules: () => Effect.orElseSucceed(fs.readFileString(join(work, "AGENTS.md")), () => ""),
       githubStatus: () =>
-        status?.checkedAt
+        status?.checkedAt != null && status?.checkedAt !== 0
           ? status
           : ({
               checkedAt: 0,

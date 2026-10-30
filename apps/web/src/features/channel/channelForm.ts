@@ -3,9 +3,11 @@
 // window only draws them and says what happens once it went through.
 
 import { createSignal, untrack } from "solid-js";
+
 import { type Channel, defaultOrchestrator, type Notify } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { api, reasonOf } from "@/base/api";
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Channel) {
   const was = untrack(() => ({

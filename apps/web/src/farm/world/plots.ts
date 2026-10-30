@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The beds (the village's plots), what grows in them and what a tool does on them: the server folds the state, these
 // only read it.
 
+import { t } from "@vibevalley/i18n";
 import type { Crop, FarmView, PlotView, Session } from "@vibevalley/protocol";
 
 export interface Bed {

@@ -4,19 +4,23 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
+import { Effect } from "effect";
+
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
+
 import { factsOf, presetOf } from "@/agent/seed.ts";
 import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
 import { jobBreak } from "@/session/briefing.ts";
-import { Effect } from "effect";
+
 import { until } from "./until.ts";
 
 const sessionGit = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-c", "user.name=session", "-c", "user.email=session@vibevalley.test", ...args], { cwd, stdio: "ignore" });
 
-const version = /写版本(\w)/;
+const version = /写版本(\w)/u;
 
 /** Turns held by 慢慢 or 发呆 until the test lets them go on (releaseHeld), 1.5 s pass, or they are stopped: a test acts
  * while a session is busy, then says when it may finish, instead of waiting out a timer. */
@@ -153,7 +157,7 @@ export const helper = (turns: ScriptedTurn[] = []): Runtime =>
         ? input
             .slice(input.indexOf(criteriaHead))
             .split("\n")
-            .filter((l) => /^\d+\. /.test(l))
+            .filter((l) => /^\d+\. /u.test(l))
         : [];
       if (criteria.length > 0) notes += "\n\n" + criteria.map((_, i) => `标准 ${i + 1}：做到了 —— 跑了 echo hi`).join("\n");
       turn.say("做完了：" + input + "｜人设：" + (turn.options.appendSystemPrompt ?? "无") + notes);

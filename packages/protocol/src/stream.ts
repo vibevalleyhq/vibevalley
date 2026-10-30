@@ -19,12 +19,13 @@ export async function readStream<P extends keyof Streams>(
   signal: AbortSignal,
   fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
 ): Promise<never> {
-  const url = base.replace(/\/$/, "") + path;
+  const url = base.replace(/\/$/u, "") + path;
   const res = await fetcher(url, { headers: { Accept: "text/event-stream" }, signal });
   if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
   for (;;) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- a stream is read a chunk at a time
     const { value, done } = await reader.read();
     if (done) throw new Error(`${url}: ended`);
     buffer += value;
@@ -37,6 +38,7 @@ export async function readStream<P extends keyof Streams>(
         .map((line) => line.slice(6))
         .join("\n");
       buffer = buffer.slice(end + 2);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server writes each stream's frames in the shape Streams gives its path
       if (data) onEvent(JSON.parse(data) as Streams[P]);
     }
   }

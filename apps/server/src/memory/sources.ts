@@ -1,17 +1,20 @@
-import { t } from "@vibevalley/i18n";
 // Where memories live: this farm's database, always there and
 // first, and a memory service outside it (Nowledge Mem, EverOS), modeled on Hermes's MemoryProvider. Every read asks them
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
-import { messageOf } from "@/errors.ts";
-import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { messageOf } from "@/errors.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
 import { termsOf } from "./terms.ts";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
 export interface RecalledLine {
@@ -90,7 +93,7 @@ export function localSource(m: Memories, profiles: () => string[]): Source {
       said(
         Effect.gen(function* () {
           let picked: Memory[];
-          if (cue.peek) {
+          if (cue.peek === true) {
             if (cue.project === "") return [];
             const all = yield* m.list(cue.agent);
             picked = pick(all, { project: cue.project, text: cue.text, now: yield* Clock.currentTimeMillis, matches: yield* m.matches(cue.agent, cue.text) });
@@ -195,7 +198,7 @@ interface Generation {
   readonly all: Source[];
   readonly off: MemorySourceInfo[];
   readonly scope: Scope.Closeable;
-  readonly operations: FiberSet.FiberSet<unknown, unknown>;
+  readonly operations: FiberSet.FiberSet;
   /** Background writes, in order, taken by the writer. */
   readonly writes: Queue.Queue<Effect.Effect<void>, Cause.Done>;
   readonly writer: Fiber.Fiber<void>;
@@ -232,8 +235,8 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const timeoutMs = options.timeoutMs ?? prefetchTimeoutMs;
     // Generations are made and retired from synchronous calls (the settings changed under info): with the service's
     // services (its logger, its Clock), on its fibers.
-    const forkHere = yield* FiberSet.makeRuntime<never>();
-    const runHere = Effect.runSyncWith(yield* Effect.context<never>());
+    const forkHere = yield* FiberSet.makeRuntime();
+    const runHere = Effect.runSyncWith(yield* Effect.context());
     const generations = new Set<Generation>();
     let current: Generation | undefined;
     let built: string | undefined;
@@ -279,7 +282,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       for (const c of now) {
         const name = c.kind;
         const isOff = (why: string) => off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
-        if (!c.enabled) {
+        if (c.enabled !== true) {
           isOff(t("server.memory.off"));
           continue;
         }

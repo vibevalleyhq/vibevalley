@@ -1,10 +1,12 @@
 // Running git and other tools: the output, the exit code and stderr; a tool
 // that is not there is code -1.
 
-import { messageOf } from "@/errors.ts";
 import { spawn } from "node:child_process";
+
 import { Data, Effect } from "effect";
+
 import { afterRealTime } from "@/base/time.ts";
+import { messageOf } from "@/errors.ts";
 
 export interface Ran {
   readonly stdout: string;
@@ -41,14 +43,14 @@ export const run = (command: string, args: readonly string[], options: RunOption
     child.stderr.on("data", (b: Buffer) => err.push(b));
     const killGroup = () => {
       try {
-        if (child.pid) process.kill(-child.pid, "SIGKILL");
+        if (child.pid != null && child.pid !== 0) process.kill(-child.pid, "SIGKILL");
       } catch {
         // Already gone.
       }
     };
     let timedOut = false;
     const cancelTimer =
-      options.timeoutMs && options.timeoutMs > 0
+      options.timeoutMs != null && options.timeoutMs > 0
         ? afterRealTime(options.timeoutMs, () => {
             timedOut = true;
             killGroup();

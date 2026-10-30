@@ -1,11 +1,12 @@
 // Toolbar (Base UI's): a row of controls that is one tab stop; the arrow keys, Home and End move among its buttons,
 // links and inputs, and Tab leaves it. The tab stop stays on the item focused last.
 
-import { createContext, createSignal, omit, useContext } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createContext, createSignal, omit, useContext } from "solid-js";
+
 import type { Orientation } from "./internal/composite";
-import { itemsIn, roveFocus } from "./internal/roving";
 import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
+import { itemsIn, roveFocus } from "./internal/roving";
 
 interface Ctx {
   readonly orientation: () => Orientation;

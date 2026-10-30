@@ -1,10 +1,12 @@
 import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { NodeServices } from "@effect/platform-node";
+import { expect, it } from "@effect/vitest";
+import { Effect } from "effect";
+
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { join } from "node:path";
-import { NodeServices } from "@effect/platform-node";
-import { Effect } from "effect";
-import { expect, it } from "@effect/vitest";
 import { type ServerConfig, dbDir, loadConfig, serverAddress } from "./config.ts";
 
 const temp = () => tempDir("vibevalley-config-");
@@ -46,7 +48,7 @@ it.effect("the defaults, then the file, then the environment", () =>
 it.effect("what it cannot read is refused", () =>
   Effect.gen(function* () {
     expect(yield* refused(join(temp(), "missing.yaml"), { VIBEVALLEY_HOME: temp() })).toContain("没有这个文件");
-    expect(yield* refused("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_PORT: "eighty" })).toMatch(/port/);
+    expect(yield* refused("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_PORT: "eighty" })).toMatch(/port/u);
     expect(yield* refused("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_LAN_PORT: "70000" })).toContain("lan.port 不是端口");
   }).pipe(Effect.provide(NodeServices.layer)),
 );

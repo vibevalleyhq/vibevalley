@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { expect, test } from "./fixtures";
 
 // A server of its own: installing and adding templates changes the whole farm's profiles.
@@ -8,7 +9,7 @@ test.use({ farm: "templates" });
 test("a template is looked at, installed again, added from a folder, and its newer version taken when asked", async ({ page, api, server }) => {
   await page.goto("/agents");
   await page.getByTestId("open-templates").click();
-  await expect(page).toHaveURL(/\/agents\/templates$/);
+  await expect(page).toHaveURL(/\/agents\/templates$/u);
 
   // The test farm starts with every built-in template installed once.
   const backend = page.locator('[data-testid="template"][data-key="backend"]');
@@ -16,7 +17,7 @@ test("a template is looked at, installed again, added from a folder, and its new
   await backend.getByTestId("template-look").click();
   await expect(backend.getByTestId("template-persona")).not.toBeEmpty();
   await backend.getByTestId("template-install").click();
-  await expect(page).toHaveURL(/\/agents\/backend-2$/);
+  await expect(page).toHaveURL(/\/agents\/backend-2$/u);
   const from = page.getByTestId("from-template");
   await expect(from).toHaveAttribute("data-key", "backend");
   await expect(from).toHaveAttribute("data-version", "1");
@@ -32,7 +33,7 @@ test("a template is looked at, installed again, added from a folder, and its new
   const lead = page.locator('[data-testid="template"][data-key="lead"]');
   await expect(lead).toHaveAttribute("data-source", "added");
   await lead.getByTestId("template-install").click();
-  await expect(page).toHaveURL(/\/agents\/lead$/);
+  await expect(page).toHaveURL(/\/agents\/lead$/u);
   expect((await api.agent.list()).find((a) => a.id === "lead")?.role).toBe("orchestrator");
 
   // The template moves on: the profile says so, and only taking it changes the profile.

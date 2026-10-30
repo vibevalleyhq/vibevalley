@@ -1,18 +1,22 @@
-import { t } from "@vibevalley/i18n";
 // EverOS (github.com/EverMind-AI/EverOS) over its HTTP API, /api/v2. It is given whole
 // runs and extracts memories itself with a model: memory/add takes a session's messages, memory/flush makes it extract
 // them (here when the session leaves the farm), memory/search reads back. What a helper says is the agent's (agent_id,
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
 
-import { everosWords, recallWords } from "./prompts.ts";
-import type { Memory, MemoryKind } from "@vibevalley/protocol";
+import { createHash } from "node:crypto";
+
 import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
-import { createHash } from "node:crypto";
+
+import { t } from "@vibevalley/i18n";
+import type { Memory, MemoryKind } from "@vibevalley/protocol";
+
 import { newId } from "@/base/ids.ts";
 import { redact } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+
+import { everosWords, recallWords } from "./prompts.ts";
 import { clip, recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
@@ -84,7 +88,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
 
   /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
   const post = (path: string, body: unknown, closing = false) => {
-    const request = HttpClientRequest.post(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`).pipe(
+    const request = HttpClientRequest.post(`${c.url.replace(/\/+$/u, "")}/api/v2/memory/${path}`).pipe(
       HttpClientRequest.bodyJsonUnsafe(body),
       c.key ? HttpClientRequest.bearerToken(c.key) : (r) => r,
     );
@@ -141,7 +145,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   const find = (agent: string, query: string, limit: number, kind: MemoryKind, project: string) =>
     Effect.map(
       Effect.forEach(project ? [project, ""] : [""], (p) => findIn(agent, query, limit, kind, p), { concurrency: "unbounded" }),
-      (all) => all.flat().sort((a, b) => b.score - a.score),
+      (all) => all.flat().toSorted((a, b) => b.score - a.score),
     );
 
   return {
@@ -158,16 +162,16 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       );
     }),
     prefetch: Effect.fnUntraced(function* (cue) {
-      if (!c.read || cue.text.trim() === "") return [];
+      if (c.read !== true || cue.text.trim() === "") return [];
       const hits = yield* find(cue.agent, cue.text, recallCount, "note", cue.project);
       return hits
-        .filter((h) => !cue.skip?.has(h.id) && h.text !== "" && h.scope.kind !== "unknown")
+        .filter((h) => cue.skip?.has(h.id) !== true && h.text !== "" && h.scope.kind !== "unknown")
         .slice(0, recallCount)
         .map((h) => ({ id: h.id, line: recallWords.sourceLine("EverOS", clip(h.text, lineMost)), score: h.score }));
     }),
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {
-      if (!c.read || q.text.trim() === "") return { found: [] };
+      if (c.read !== true || q.text.trim() === "") return { found: [] };
       if (q.project === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };
       if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: t("server.memory.coverage.everosAgent") };
       const kind: MemoryKind = q.kind || "note";
@@ -181,7 +185,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
     // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
     syncTurn: Effect.fnUntraced(function* (run) {
-      if (!c.write || run.outcome === "interrupted") return;
+      if (c.write !== true || run.outcome === "interrupted") return;
       const at = yield* Clock.currentTimeMillis;
       const messages: Message[] = [];
       if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.job });
@@ -201,7 +205,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     }),
     // A note written outside a run is a conversation of its own, extracted at once.
     add: Effect.fnUntraced(function* (n) {
-      if (!c.write) return undefined;
+      if (c.write !== true) return undefined;
       const session = `vibevalley-note-${n.agent}-${newId()}`;
       const project = n.project.trim();
       const at = yield* Clock.currentTimeMillis;

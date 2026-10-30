@@ -1,8 +1,10 @@
-import { expect, it } from "vite-plus/test";
 import { Layer } from "effect";
 import { HttpRouter } from "effect/http";
+import { expect, it } from "vite-plus/test";
+
 import { Mcp } from "@/mcp/mcp.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+
 import { mcpRoute } from "./mcp.ts";
 
 it("forwards a disconnect to the Web handler", async () => {

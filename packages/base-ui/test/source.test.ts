@@ -6,7 +6,7 @@ const sources = import.meta.glob<string>("../src/**/*.tsx", { query: "?raw", imp
 
 test("no element spreads a call's result: next to {...rest} it re-reads children and rebuilds them, losing the focus", () => {
   const found = Object.entries(sources).flatMap(([file, text]) =>
-    [...text.matchAll(/\{\.\.\.(?!omit\()[\w.]+\(.*?\)\}/g)].map((m) => `${file.replace("../src/", "")}: ${m[0]}`),
+    [...text.matchAll(/\{\.\.\.(?!omit\()[\w.]+\(.*?\)\}/gu)].map((m) => `${file.replace("../src/", "")}: ${m[0]}`),
   );
   expect(found).toEqual([]);
 });

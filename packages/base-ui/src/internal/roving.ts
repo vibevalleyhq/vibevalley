@@ -5,12 +5,12 @@ import { moveIndex, type Orientation, typeahead, typeaheadMs } from "./composite
 
 export const itemsIn = (root: HTMLElement, item: string) => [...root.querySelectorAll<HTMLElement>(item)];
 
-export const disabled = (el: HTMLElement) => el.hasAttribute("data-disabled") || (el as HTMLButtonElement).disabled === true;
+export const disabled = (el: HTMLElement) => el.hasAttribute("data-disabled") || ("disabled" in el && el.disabled === true);
 
 /** Moves the focus for a key, and says to which item; undefined when the key is not a move. */
 export function roveFocus(e: KeyboardEvent, root: HTMLElement, item: string, o: { orientation: Orientation | "both"; loop: boolean }): HTMLElement | undefined {
   const items = itemsIn(root, item);
-  const current = items.indexOf(document.activeElement as HTMLElement);
+  const current = items.findIndex((el) => el === document.activeElement);
   const at = moveIndex(e.key, current, items.length, { ...o, enabled: (i) => !disabled(items[i]!) });
   if (at === undefined) return undefined;
   e.preventDefault();
@@ -32,7 +32,7 @@ export function createTypeahead() {
     const items = itemsIn(root, item);
     const at = typeahead(
       items.map((el) => el.dataset.label ?? el.textContent),
-      items.indexOf(document.activeElement as HTMLElement),
+      items.findIndex((el) => el === document.activeElement),
       typed,
       (i) => !disabled(items[i]!),
     );

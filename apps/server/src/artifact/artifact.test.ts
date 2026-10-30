@@ -1,13 +1,17 @@
-import { describe, expect, it } from "@effect/vitest";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { ownerId } from "@vibevalley/protocol";
-import { artifactMax } from "./policy.ts";
+
+import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+
+import { ownerId } from "@vibevalley/protocol";
+
 import { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { worldBelowTasks } from "@/testing/world.ts";
+
 import { Artifacts } from "./artifact.ts";
+import { artifactMax } from "./policy.ts";
 
 const owner = { from: ownerId, by: ownerId };
 const page = (words: string) => `<!doctype html><title>${words}</title><p>${words}</p>`;

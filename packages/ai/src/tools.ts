@@ -18,18 +18,26 @@ export function parametersOf(parameters: Schema.Struct<Schema.Struct.Fields>): J
   return Object.keys(parameters.fields).length === 0 ? objectSchema() : shaped(Schema.toJsonSchemaDocument(parameters).schema);
 }
 
+/** A nested schema: an object, not a tuple's array of them. */
+const isSchema = (v: unknown): v is JsonSchema => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** A JSON object whose fields can be set: an argument being coerced. */
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const propertiesOf = (schema: JsonSchema): Record<string, JsonSchema> =>
+  isSchema(schema.properties) ? Object.fromEntries(Object.entries(schema.properties).filter((e): e is [string, JsonSchema] => isSchema(e[1]))) : {};
+const requiredOf = (schema: JsonSchema): string[] => (Array.isArray(schema.required) ? schema.required.filter((k): k is string => typeof k === "string") : []);
+
 function shaped(node: JsonSchema): JsonSchema {
   if (Array.isArray(node.anyOf) && node.anyOf.some((n: JsonSchema) => n.type === "number")) return { type: "number" };
   // One literal comes as a union of one.
-  if (Array.isArray(node.anyOf) && node.anyOf.length === 1) return shaped(node.anyOf[0] as JsonSchema);
+  if (Array.isArray(node.anyOf) && node.anyOf.length === 1 && isSchema(node.anyOf[0])) return shaped(node.anyOf[0]);
   switch (node.type) {
     case "object": {
-      const properties = (node.properties ?? {}) as Record<string, JsonSchema>;
-      const out = Object.fromEntries(Object.entries(properties).map(([name, p]) => [name, shaped(p)]));
-      return objectSchema(out, ...((node.required as string[] | undefined) ?? []));
+      const out = Object.fromEntries(Object.entries(propertiesOf(node)).map(([name, p]) => [name, shaped(p)]));
+      return objectSchema(out, ...requiredOf(node));
     }
     case "array":
-      return { type: "array", items: shaped(node.items as JsonSchema) };
+      return { type: "array", items: shaped(isSchema(node.items) ? node.items : {}) };
     case "string":
       return Array.isArray(node.enum) ? { type: "string", enum: node.enum } : { type: "string" };
     case "integer":
@@ -55,15 +63,14 @@ const typesOf = (schema: JsonSchema): string[] =>
 
 function dropOptionalNulls(value: unknown, schema: JsonSchema): void {
   if (Array.isArray(value)) {
-    const items = schema.items as JsonSchema | undefined;
-    if (items && !Array.isArray(items)) for (const v of value) dropOptionalNulls(v, items);
+    const items = schema.items;
+    if (isSchema(items)) for (const v of value) dropOptionalNulls(v, items);
     return;
   }
-  const properties = schema.properties as Record<string, JsonSchema> | undefined;
-  if (typeof value !== "object" || value === null || !properties) return;
-  const object = value as Record<string, unknown>;
-  const required = new Set((schema.required as string[] | undefined) ?? []);
-  for (const [key, p] of Object.entries(properties)) {
+  if (!isObject(value) || !isSchema(schema.properties)) return;
+  const object = value;
+  const required = new Set(requiredOf(schema));
+  for (const [key, p] of Object.entries(propertiesOf(schema))) {
     if (!(key in object)) continue;
     if (object[key] === null && !required.has(key) && !typesOf(p).includes("null")) delete object[key];
     else dropOptionalNulls(object[key], p);
@@ -129,12 +136,12 @@ function coerce(value: unknown, schema: JsonSchema): unknown {
         break;
       }
     }
-  if (types.includes("object") && matches(next, "object")) {
-    const object = next as Record<string, unknown>;
-    for (const [key, p] of Object.entries((schema.properties ?? {}) as Record<string, JsonSchema>)) if (key in object) object[key] = coerce(object[key], p);
+  if (types.includes("object") && matches(next, "object") && isObject(next)) {
+    const object = next;
+    for (const [key, p] of Object.entries(propertiesOf(schema))) if (key in object) object[key] = coerce(object[key], p);
   }
-  if (types.includes("array") && Array.isArray(next) && schema.items && !Array.isArray(schema.items)) {
-    const items = schema.items as JsonSchema;
+  const items = schema.items;
+  if (types.includes("array") && Array.isArray(next) && isSchema(items)) {
     for (let i = 0; i < next.length; i++) next[i] = coerce(next[i], items);
   }
   return next;
@@ -158,13 +165,13 @@ function problemsOf(value: unknown, schema: JsonSchema, path: string): string[] 
   const types = typesOf(schema);
   if (types.length > 0 && !types.some((t) => matches(value, t))) return [`${path || "root"}: must be ${types.join(",")}`];
   if (Array.isArray(schema.enum) && !schema.enum.includes(value)) return [`${path || "root"}: must be equal to one of the allowed values`];
-  if (matches(value, "object") && schema.properties) {
-    const object = value as Record<string, unknown>;
-    const missing = ((schema.required as string[] | undefined) ?? []).filter((k) => !(k in object));
+  if (matches(value, "object") && isObject(value) && isSchema(schema.properties)) {
+    const object = value;
+    const missing = requiredOf(schema).filter((k) => !(k in object));
     if (missing.length > 0) return [`${at(path, missing[0]!)}: must have required properties ${missing.join(", ")}`];
-    return Object.entries(schema.properties as Record<string, JsonSchema>).flatMap(([k, p]) => (k in object ? problemsOf(object[k], p, at(path, k)) : []));
+    return Object.entries(propertiesOf(schema)).flatMap(([k, p]) => (k in object ? problemsOf(object[k], p, at(path, k)) : []));
   }
-  if (Array.isArray(value) && schema.items && !Array.isArray(schema.items))
-    return value.flatMap((v, i) => problemsOf(v, schema.items as JsonSchema, at(path, i)));
+  const items = schema.items;
+  if (Array.isArray(value) && isSchema(items)) return value.flatMap((v, i) => problemsOf(v, items, at(path, i)));
   return [];
 }

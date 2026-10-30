@@ -1,7 +1,9 @@
 import { t } from "@vibevalley/i18n";
-import { reportVerdict } from "@/session/report.ts";
 import type { Deliverable, Issue } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
+
+import { reportVerdict } from "@/session/report.ts";
+
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 /** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's brief ends with the block parseAnswer reads. */
 export function issueBrief(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {

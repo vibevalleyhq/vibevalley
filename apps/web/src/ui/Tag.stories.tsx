@@ -1,6 +1,7 @@
 import { stories, story } from "@vibevalley/stories";
-import { Tag, type TagTone } from "./Tag";
+
 import { icons, type IconName } from "./icons";
+import { Tag, type TagTone } from "./Tag";
 
 export default stories({
   title: "组件/工作台/Tag",

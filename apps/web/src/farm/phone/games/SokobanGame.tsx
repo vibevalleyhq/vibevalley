@@ -1,12 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // 推箱子 on the phone: the rules are farm/phone/games/sokoban.ts; the warehouse is kept while the phone is away or a
 // call comes in.
 
 import { For, Show } from "solid-js";
-import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
+
+import { t } from "@vibevalley/i18n";
+
 import { lcd } from "@/farm/phone/lcd";
-import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad } from "@/farm/support";
+import { playSound } from "@/ui/pixel/sound";
+
+import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
 
 const warehouse = kept(newWarehouse());
 
@@ -98,7 +101,7 @@ export function SokobanGame() {
         <button
           type="button"
           onClick={undo}
-          disabled={!g().history.length}
+          disabled={g().history.length === 0}
           class="cursor-pointer px-2 py-1 disabled:cursor-default disabled:opacity-40"
           style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >

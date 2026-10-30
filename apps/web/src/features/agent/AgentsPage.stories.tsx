@@ -1,5 +1,6 @@
 import type { Agent, AgentTally, Installation, Look, RuntimeInfo } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import { AgentCard } from "./AgentsPage";
 
 const look: Look = { species: "bear", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" };

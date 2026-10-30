@@ -1,10 +1,12 @@
-import { t } from "@vibevalley/i18n";
 // 图鉴's shelves: every drawing in sprites.json on a shelf by its name, a
 // helper's by animal and outfit; which ones are a walk's frames; how one is drawn again.
 
+import { t } from "@vibevalley/i18n";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
-import { outfitLabel, speciesLabel } from "@/ui/cast";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { compareText, or } from "@/base/order";
+import { outfitLabel, speciesLabel } from "@/ui/cast";
 
 export interface Picture {
   readonly name: string;
@@ -21,7 +23,8 @@ export interface Picture {
 
 /** The manifest in art pixels: its sizes over the map's density against the level's width (384). */
 export function picturesOf(manifest: Record<string, Record<string, unknown>>): Picture[] {
-  const density = (manifest.map?.w as number) / 384;
+  const w = manifest.map?.w;
+  const density = (typeof w === "number" ? w : Number.NaN) / 384;
   const art = (v: unknown) => (typeof v === "number" ? v / density : undefined);
   return Object.entries(manifest).map(([name, m]) =>
     omitUndefined({
@@ -55,9 +58,9 @@ export const shelves: readonly Shelf[] = [
     id: "yard",
     label: t("web.catalog.shelf.yard.label"),
     hint: t("web.catalog.shelf.yard.hint"),
-    match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/.test(n),
+    match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/u.test(n),
   },
-  { id: "map", label: t("web.catalog.shelf.map.label"), hint: t("web.catalog.shelf.map.hint"), match: (n) => /^(island|map)-/.test(n) },
+  { id: "map", label: t("web.catalog.shelf.map.label"), hint: t("web.catalog.shelf.map.hint"), match: (n) => /^(island|map)-/u.test(n) },
   { id: "machines", label: t("web.catalog.shelf.machines.label"), hint: t("web.catalog.shelf.machines.hint"), match: (n) => n.startsWith("machine-") },
   { id: "icons", label: t("web.catalog.shelf.icons.label"), hint: t("web.catalog.shelf.icons.hint"), match: (n) => n.startsWith("icon-") },
   { id: "acts", label: t("web.catalog.shelf.acts.label"), hint: t("web.catalog.shelf.acts.hint"), match: (n) => n.startsWith("act-") },
@@ -65,11 +68,11 @@ export const shelves: readonly Shelf[] = [
     id: "medals",
     label: t("web.catalog.shelf.medals.label"),
     hint: t("web.catalog.shelf.medals.hint"),
-    match: (n) => /^(medal|emblem|stamp|coins|banner)-/.test(n),
+    match: (n) => /^(medal|emblem|stamp|coins|banner)-/u.test(n),
   },
-  { id: "logos", label: "Logo", hint: t("web.catalog.shelf.logos.hint"), match: (n) => /^(logo|connector|app)-/.test(n) },
+  { id: "logos", label: "Logo", hint: t("web.catalog.shelf.logos.hint"), match: (n) => /^(logo|connector|app)-/u.test(n) },
   { id: "langs", label: t("web.catalog.shelf.langs.label"), hint: t("web.catalog.shelf.langs.hint"), match: (n) => n.startsWith("lang-") },
-  { id: "ui", label: t("web.catalog.shelf.ui.label"), hint: t("web.catalog.shelf.ui.hint"), match: (n) => /^(button|energy|day)-/.test(n) },
+  { id: "ui", label: t("web.catalog.shelf.ui.label"), hint: t("web.catalog.shelf.ui.hint"), match: (n) => /^(button|energy|day)-/u.test(n) },
   { id: "other", label: t("web.catalog.shelf.other.label"), hint: t("web.catalog.shelf.other.hint"), match: () => true },
 ];
 
@@ -78,16 +81,16 @@ export const shelfOf = (name: string) => shelves.find((s) => s.match(name))?.id 
 
 /** Case-insensitive, runs of digits by their value. */
 export function naturalCompare(a: string, b: string): number {
-  const parts = (s: string) => s.toLowerCase().match(/\d+|\D+/g) ?? [];
+  const parts = (s: string) => s.toLowerCase().match(/\d+|\D+/gu) ?? [];
   const pa = parts(a);
   const pb = parts(b);
   for (let i = 0; i < pa.length && i < pb.length; i++) {
     const x = pa[i]!;
     const y = pb[i]!;
-    const c = /^\d+$/.test(x) && /^\d+$/.test(y) ? Number(x) - Number(y) : x < y ? -1 : x > y ? 1 : 0;
+    const c = /^\d+$/u.test(x) && /^\d+$/u.test(y) ? Number(x) - Number(y) : compareText(x, y);
     if (c !== 0) return c;
   }
-  return pa.length - pb.length || (a < b ? -1 : a > b ? 1 : 0);
+  return or(pa.length - pb.length, compareText(a, b));
 }
 
 export interface Group {
@@ -98,7 +101,7 @@ export interface Group {
 
 /** A shelf's pictures in natural order; the helpers' grouped by animal and outfit. */
 export function groupsOf(shelf: string, pictures: readonly Picture[]): Group[] {
-  const sorted = [...pictures].sort((a, b) => naturalCompare(a.name, b.name));
+  const sorted = [...pictures].toSorted((a, b) => naturalCompare(a.name, b.name));
   if (shelf !== "helpers") return sorted.length === 0 ? [] : [{ key: shelf, label: "", pictures: sorted }];
   return SpeciesValues.flatMap((species) =>
     OutfitValues.flatMap((outfit) => {
@@ -110,7 +113,7 @@ export function groupsOf(shelf: string, pictures: readonly Picture[]): Group[] {
 
 /** The frames a picture moves through, or undefined: the pixel walk has two steps around a attention frame (x-1, x, x-2, x). */
 export function framesOf(name: string, has: (n: string) => boolean): string[] | undefined {
-  const base = /^(.*)-(\d+)$/.exec(name)?.[1] ?? name;
+  const base = /^(.*)-(\d+)$/u.exec(name)?.[1] ?? name;
   const numbered: string[] = [];
   for (let n = 1; has(`${base}-${n}`); n++) numbered.push(`${base}-${n}`);
   if (numbered.length < 2) return undefined;
@@ -121,7 +124,7 @@ export function framesOf(name: string, has: (n: string) => boolean): string[] | 
 /** The commands that draw its sheet again and cut it. */
 export function remakeOf(p: Picture): { draw: string; cut: string } | undefined {
   if (!p.sheet) return undefined;
-  const stem = p.sheet.slice(p.sheet.lastIndexOf("/") + 1).replace(/\.png$/, "");
+  const stem = p.sheet.slice(p.sheet.lastIndexOf("/") + 1).replace(/\.png$/u, "");
   return { draw: `design/pixel/gen.sh ${stem}`, cut: `python3 design/pixel/process.py ${stem}` };
 }
 

@@ -3,14 +3,16 @@
 // (agent/brain/loop.test.ts holds the brain to that order), with Effect underneath: a run is a fiber of the agent's
 // scope, stopping it is a Deferred the model's stream and the tools race, a turn's tools are fibers side by side.
 
-import { AgentBusy, CannotContinue, type ToolFailed } from "./errors.ts";
 import { Clock, Deferred, Effect, FiberSet, Option, Ref, type Scope, Stream } from "effect";
+
 import { failedMessage, type LlmError, type Llm } from "@vibevalley/ai/llm";
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, ToolResultMessage } from "@vibevalley/ai/messages";
 import { zeroUsage } from "@vibevalley/ai/messages";
 import type { Model, ThinkingLevel } from "@vibevalley/ai/models";
 import type { AssistantMessageEvent } from "@vibevalley/ai/response";
 import { type JsonSchema, toolArguments } from "@vibevalley/ai/tools";
+
+import { AgentBusy, CannotContinue, type ToolFailed } from "./errors.ts";
 
 export interface ToolResult {
   readonly content: readonly (TextContent | ImageContent)[];
@@ -237,7 +239,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             if (yield* Deferred.isDone(stop)) break;
             continue;
           }
-          const args = (read as { ok: unknown }).ok;
+          const args = read && "ok" in read ? read.ok : undefined;
           entries.push(
             Effect.gen(function* () {
               if (yield* Deferred.isDone(stop)) {
@@ -297,6 +299,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         let continuing = false;
         outer: while (true) {
           let more = true;
+          // asked grows by new arrays, not pushes: each version is handed out (prepareRequest, answer, finishTurn), and one
+          // already handed out must not change under its holder.
+          // oxlint-disable-next-line oxc/no-accumulating-spread -- see above.
           while (more || pending.length > 0) {
             if (!first) {
               if (pending.length === 0) pending = yield* takeOne(steering);
@@ -306,9 +311,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             for (const m of pending) {
               yield* options.onEvent({ type: "message_start", message: m });
               yield* emit({ type: "message_end", message: m });
-              asked = [...asked, m];
               fresh.push(m);
             }
+            asked = [...asked, ...pending];
             pending = [];
             const prepared = options.prepareRequest
               ? yield* Effect.raceFirst(options.prepareRequest(asked, yield* Deferred.isDone(stop)), Effect.as(Deferred.await(stop), undefined))
@@ -406,9 +411,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       prompt: (m) => start(m),
       continue: Effect.gen(function* () {
         const all = yield* Ref.get(messages);
-        const last = all.at(-1) as { role?: string } | undefined;
-        if (!last) return yield* new CannotContinue({ message: "No messages to continue from" });
-        if (last.role === "assistant") {
+        const last: unknown = all.at(-1);
+        if (last === undefined) return yield* new CannotContinue({ message: "No messages to continue from" });
+        if (typeof last === "object" && last !== null && "role" in last && last.role === "assistant") {
           const steered = yield* takeOne(steering);
           if (steered.length > 0) return yield* start(steered, true);
           const later = yield* takeOne(followUps);

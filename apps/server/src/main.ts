@@ -8,11 +8,14 @@
 // The configuration is loadConfig's: the YAML file, then VIBEVALLEY_* in the environment.
 
 import { parseArgs } from "node:util";
+
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import type { ServerReady } from "@vibevalley/protocol";
 import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Otlp, OtlpSerialization } from "effect/observability";
+
+import type { ServerReady } from "@vibevalley/protocol";
+
 import { loadConfig, projectsDir } from "./base/config.ts";
 import { announce, leaseHome } from "./base/lease.ts";
 import { redactOutput } from "./base/redact.ts";

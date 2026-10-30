@@ -2,12 +2,14 @@
 // message begins, so a tool call and its result stay together.
 
 import { Effect } from "effect";
-import type { ToolDeclaration, Usage } from "@vibevalley/ai/messages";
+
 import { complete, type ModelClient } from "@vibevalley/ai/client";
+import type { ToolDeclaration, Usage } from "@vibevalley/ai/messages";
+
 import { archive } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, requestContext, transcript } from "./messages.ts";
-import { applySummary } from "./session.ts";
 import { compaction as compactionWords } from "./prompts.ts";
+import { applySummary } from "./session.ts";
 
 /** Characters over three: close enough for mixed Chinese and code. */
 export const estimateTokens = (messages: readonly BrainMessage[]) => Math.ceil(JSON.stringify(messages).length / 3);

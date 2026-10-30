@@ -20,7 +20,7 @@ export const plainLog: CallbackLog = {
 
 /** Made in a service's make: the lines it writes end with the service and keep its logger. */
 export const callbackLog: Effect.Effect<CallbackLog, never, Scope.Scope> = Effect.gen(function* () {
-  const fork = yield* FiberSet.makeRuntime<never>();
+  const fork = yield* FiberSet.makeRuntime();
   return {
     info: (...m) => void fork(Effect.log(...m)),
     warn: (...m) => void fork(Effect.logWarning(...m)),

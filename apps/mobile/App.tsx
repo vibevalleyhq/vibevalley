@@ -6,18 +6,20 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Platform, Settings } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
 import { FarmConnection } from "./src/farm";
 import { FarmScreen } from "./src/FarmScreen";
-import { PairScreen } from "./src/PairScreen";
-import { deviceName } from "./src/pairing";
 import { followDevice } from "./src/locale";
+import { deviceName } from "./src/pairing";
+import { PairScreen } from "./src/PairScreen";
 
 followDevice();
 
 // An end-to-end run on the iOS simulator hands the pair link as a launch argument (-vibevalleyPair <link>, read back from
 // NSUserDefaults): simctl's openurl stops at the system's "Open in VibeValley?", which nothing can press.
+const stringOr = (v: unknown) => (typeof v === "string" ? v : undefined);
 const launchLink: string | undefined =
-  process.env.EXPO_PUBLIC_VIBEVALLEY_E2E === "1" && Platform.OS === "ios" ? (Settings.get("vibevalleyPair") as string | undefined) : undefined;
+  process.env.EXPO_PUBLIC_VIBEVALLEY_E2E === "1" && Platform.OS === "ios" ? stringOr(Settings.get("vibevalleyPair")) : undefined;
 
 export default function App() {
   const [connection] = useState(() => new FarmConnection(deviceName(Platform.OS, undefined)));

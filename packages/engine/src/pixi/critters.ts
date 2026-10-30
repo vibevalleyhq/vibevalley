@@ -5,6 +5,7 @@
 // live is the game's. Positions are whole pixels.
 
 import { Container, Sprite, Texture } from "pixi.js";
+
 import type { Point } from "../nav";
 import type { PointLight } from "./light";
 import { glyph } from "./particles";
@@ -116,7 +117,7 @@ export function flocks(layer: Container, o: FlockOptions): Flocks {
         layer.addChild(shadow, f.node);
         // A loose V behind the first.
         const back = Math.ceil(i / 2) * 9;
-        const side = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 5;
+        const side = (i % 2 !== 0 ? 1 : -1) * Math.ceil(i / 2) * 5;
         birds.push({ ...f, shadow, x: leftward ? o.width + 10 + back : -10 - back, y: y + side, speed: leftward ? -speed : speed, phase: Math.random() * 6 });
       }
     },

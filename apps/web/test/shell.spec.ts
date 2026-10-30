@@ -11,7 +11,7 @@ test("the rail lists every place, the farm at the top, and marks where you are",
   await expect(rail.locator('[data-place="issues"]')).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("desk")).toHaveAttribute("data-place", "issues");
   // The server is the worker's: an earlier test may have left the orchestrator at work.
-  await expect(page.getByTestId("desk-status")).toHaveAttribute("data-state", /^(live|off)$/);
+  await expect(page.getByTestId("desk-status")).toHaveAttribute("data-state", /^(live|off)$/u);
 });
 
 test("every place opens under its own head, and the chat has none", async ({ page }) => {
@@ -19,7 +19,7 @@ test("every place opens under its own head, and the chat has none", async ({ pag
   const rail = page.getByTestId("rail");
   for (const place of ["artifacts", "agents", "runtimes", "projects", "catalog"]) {
     await rail.locator(`[data-place="${place}"]`).click();
-    await expect(page).toHaveURL(new RegExp(`/${place}$`));
+    await expect(page).toHaveURL(new RegExp(`/${place}$`, "u"));
     await expect(page.getByTestId("desk")).toHaveAttribute("data-place", place);
   }
   await rail.locator('[data-place="chat"]').click();

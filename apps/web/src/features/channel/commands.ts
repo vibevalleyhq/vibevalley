@@ -4,7 +4,9 @@
 
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
+
 import { api } from "@/base/api";
+
 import type { Nameable } from "./mentions";
 export const CommandNames = ["issue", "remember", "stop", "dm"] as const;
 export type CommandName = (typeof CommandNames)[number];
@@ -45,12 +47,12 @@ export const commandNameables = (): Nameable[] =>
 export function typedCommand(text: string, caret: number) {
   if (!text.startsWith("/") || caret < 1) return undefined;
   const word = text.slice(1, caret);
-  return /^[a-z]*$/.test(word) ? { start: 0, query: word } : undefined;
+  return /^[a-z]*$/u.test(word) ? { start: 0, query: word } : undefined;
 }
 
 /** A line that is a command, with the words after it; any other line, /usr/bin too, is said as it is. */
 export function commandOf(line: string): { readonly name: CommandName; readonly text: string } | undefined {
-  const m = /^\/([a-z]+)(?:\s+([\s\S]*))?$/.exec(line.trim());
+  const m = /^\/([a-z]+)(?:\s+([\s\S]*))?$/u.exec(line.trim());
   const name = CommandNames.find((n) => n === m?.[1]);
   return name ? { name, text: (m?.[2] ?? "").trim() } : undefined;
 }

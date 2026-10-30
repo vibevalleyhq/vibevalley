@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // A helper's look: the words for its animal and clothes, a random
 // one for a new profile, and the drawing for each pose.
 
+import { t } from "@vibevalley/i18n";
 import { BuildValues, type Crop, HeadValues, type Look, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
 
 export const speciesLabel: Record<Species, string> = {
@@ -94,4 +94,4 @@ export const stagePoses: readonly { pose: Pose; label: string; crop: Crop }[] = 
 ];
 
 /** A swatch, or the parchment colour for one that is not #rrggbb. */
-export const hexColor = (hex: string) => (/^#[0-9a-f]{6}$/i.test(hex) ? hex : "#f1e8d8");
+export const hexColor = (hex: string) => (/^#[0-9a-f]{6}$/iu.test(hex) ? hex : "#f1e8d8");

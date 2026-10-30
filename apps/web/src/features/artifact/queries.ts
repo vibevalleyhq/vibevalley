@@ -2,6 +2,7 @@
 // seconds while shown, so a new version a helper hands in comes up on its own.
 
 import type { ArtifactListRequest } from "@vibevalley/protocol";
+
 import { api } from "@/base/api";
 import { useQuery } from "@/base/query";
 
@@ -14,4 +15,4 @@ export const useArtifacts = (q: () => ArtifactListRequest) =>
   useQuery(() => ({ queryKey: ["artifacts", "list", q()], queryFn: () => api.artifact.list(q()), refetchInterval: fresh }));
 
 /** Where an artifact is looked at; a version other than the latest is in the query string. */
-export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version ? `?v=${version}` : ""}`;
+export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version != null && version !== 0 ? `?v=${version}` : ""}`;

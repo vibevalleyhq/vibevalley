@@ -4,6 +4,7 @@
 
 import type { JSX } from "@solidjs/web";
 import { createContext, createUniqueId, omit, onSettled, createSignal, Show, useContext } from "solid-js";
+
 import { type DivProps, flag, type SpanProps } from "./internal/element";
 
 interface Ctx {
@@ -37,7 +38,7 @@ const makeRoot = (role: "progressbar" | "meter") =>
     const [labelled, setLabelled] = createSignal(false);
     const min = () => props.min ?? 0;
     const max = () => props.max ?? 100;
-    const share = () => (props.value === null ? 0 : Math.min(1, Math.max(0, (props.value - min()) / (max() - min() || 1))));
+    const share = () => (props.value === null ? 0 : Math.min(1, Math.max(0, (props.value - min()) / (max() === min() ? 1 : max() - min()))));
     const text = () => props.getValueText?.(props.value, share()) ?? (props.value === null ? "" : `${Math.round(share() * 100)}%`);
     // Only a progress bar says how far along it is; a meter is a level, not a task.
     const indeterminate = () => role === "progressbar" && props.value === null;

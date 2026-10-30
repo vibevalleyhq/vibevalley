@@ -1,8 +1,10 @@
-import { afterEach, expect, test, vi } from "vite-plus/test";
 import { createRoot, createSignal, flush } from "solid-js";
-import { api } from "@/base/api";
-import { createComposer, type ComposerWays } from "./composing";
 import type * as solid from "solid-js";
+import { afterEach, expect, test, vi } from "vite-plus/test";
+
+import { api } from "@/base/api";
+
+import { createComposer, type ComposerWays } from "./composing";
 
 vi.mock("solid-js", () => vi.importActual<typeof solid>("../../../node_modules/solid-js/dist/solid.js"));
 afterEach(() => vi.restoreAllMocks());
@@ -51,8 +53,10 @@ test("every routing field participates in a send identity, while unchanged retri
       { id: "thread", agent: "a", project: "p", station: 1 },
     ]) {
       s.target(target);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each target is set, then sent twice, in turn
       await s.box.send();
       const first = send.mock.calls.at(-1)![0];
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each target is set, then sent twice, in turn
       await s.box.send();
       expect(send.mock.calls.at(-1)![0]).toEqual(first);
     }

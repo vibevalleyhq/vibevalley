@@ -67,7 +67,7 @@ export async function walkAgentNoteTree(): Promise<{ notes: AgentNote[]; errors:
     const paths = globSync(`${lifecycle}/**/*`, { cwd: agentNoteRoot, withFileTypes: true })
       .filter((d) => d.isFile())
       .map((d) => relative(agentNoteRoot, join(d.parentPath, d.name)).replaceAll("\\", "/"))
-      .sort();
+      .toSorted();
     for (const rel of paths) {
       const segs = rel.split("/");
       const [, cls, base] = segs;
@@ -80,7 +80,7 @@ export async function walkAgentNoteTree(): Promise<{ notes: AgentNote[]; errors:
         errors.push(`${rel}: unknown class folder "${cls}" (allowed: ${AGENT_NOTE_CLASSES.join(", ")})`);
         continue;
       }
-      if (!/^\d{4}-\d{2}-\d{2}-[a-z0-9]+(-[a-z0-9]+)*\.md$/.test(base)) {
+      if (!/^\d{4}-\d{2}-\d{2}-[a-z0-9]+(-[a-z0-9]+)*\.md$/u.test(base)) {
         errors.push(`${rel}: the name must be yyyy-mm-dd-topic-title.md (lowercase words joined by -)`);
         continue;
       }
@@ -96,10 +96,10 @@ export function checkAgentNote(note: AgentNote): string[] {
   const { lines } = note;
   const at = (msg: string) => errors.push(`${note.rel}: ${msg}`);
 
-  if (!/^# Agent Note: \S/.test(lines[0] ?? "")) at('line 1 must be "# Agent Note: <title>"');
+  if (!/^# Agent Note: \S/u.test(lines[0] ?? "")) at('line 1 must be "# Agent Note: <title>"');
   if (lines[1] !== "") at("line 2 must be blank");
   const status = lines[2] ?? "";
-  const statusOk = note.lifecycle === "rejected" ? /^Status: rejected — \S/.test(status) : status === `Status: ${note.lifecycle}`;
+  const statusOk = note.lifecycle === "rejected" ? /^Status: rejected — \S/u.test(status) : status === `Status: ${note.lifecycle}`;
   if (!statusOk)
     at(
       note.lifecycle === "rejected"
@@ -124,7 +124,7 @@ export function checkAgentNote(note: AgentNote): string[] {
 
 /** CATALOG.md: every note's date and title, by lifecycle and class, newest first; a rejected one with its reason. */
 export function catalogOf(notes: readonly AgentNote[]): string {
-  const title = (n: AgentNote) => (n.lines[0] ?? "").replace(/^# Agent Note:\s*/, "").trim() || n.rel;
+  const title = (n: AgentNote) => (n.lines[0] ?? "").replace(/^# Agent Note:\s*/u, "").trim() || n.rel;
   const out = [
     "# Agent Notes 目录",
     "",
@@ -135,13 +135,13 @@ export function catalogOf(notes: readonly AgentNote[]): string {
     if (here.length === 0) continue;
     out.push("", `## ${lifecycle}（${here.length} 篇）`);
     for (const cls of AGENT_NOTE_CLASSES) {
-      const these = here.filter((n) => n.cls === cls).sort((a, b) => b.rel.localeCompare(a.rel));
+      const these = here.filter((n) => n.cls === cls).toSorted((a, b) => b.rel.localeCompare(a.rel));
       if (these.length === 0) continue;
       out.push("", `### ${cls}`, "");
       for (const n of these) {
         const name = n.rel.split("/").at(-1) ?? "";
-        const why = lifecycle === "rejected" ? (n.lines[2] ?? "").replace(/^Status: rejected/, "") : "";
-        out.push(`- ${name.slice(0, 10)} [${title(n).replace(/[[\]]/g, "\\$&")}](.agents/notes/${n.rel})${why}`);
+        const why = lifecycle === "rejected" ? (n.lines[2] ?? "").replace(/^Status: rejected/u, "") : "";
+        out.push(`- ${name.slice(0, 10)} [${title(n).replace(/[[\]]/gu, "\\$&")}](.agents/notes/${n.rel})${why}`);
       }
     }
   }

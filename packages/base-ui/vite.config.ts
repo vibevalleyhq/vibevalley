@@ -1,6 +1,6 @@
+import solid from "@solidjs/vite-plugin";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
-import solid from "@solidjs/vite-plugin";
 
 // The components' tests run in headless Chromium: a real <dialog> top layer, focus, keyboard and layout, which a fake
 // DOM does not have. Behaviour, focus and ARIA are tested here; how it looks is the app's.

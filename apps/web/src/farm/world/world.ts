@@ -2,9 +2,10 @@
 
 import { navMap, type NavMap } from "@vibevalley/engine/nav";
 import type { Crop, Session, SessionAction } from "@vibevalley/protocol";
+
 import { add, type Box, inBox, type Level, type Point } from "./level";
-import { bedOfStation, isRipe } from "./plots";
 import { yardPlaces } from "./places";
+import { bedOfStation, isRipe } from "./plots";
 
 export const plotW = 34;
 export const plotH = 26;
@@ -57,13 +58,15 @@ export class VillageWorld {
   readonly places: ReadonlyMap<string, { readonly at: Point; readonly facing: Facing }>;
   private navMap: NavMap | undefined;
 
-  constructor(readonly level: Level) {
+  readonly level: Level;
+  constructor(level: Level) {
+    this.level = level;
     this.plots = new Map(level.thingsOf("Plot").map((t) => [Number(t.field("index")), t.at]));
     this.gate = level.theThing("Gate").at;
     this.queue = level.theThing("Queue").at;
     this.orchestrator = level.theThing("Manager").at;
     this.dog = level.theThing("Dog").at;
-    this.lawn = [...level.thingsOf("Rest")].sort((a, b) => Number(a.field("n")) - Number(b.field("n"))).map((t) => t.at);
+    this.lawn = [...level.thingsOf("Rest")].toSorted((a, b) => Number(a.field("n")) - Number(b.field("n"))).map((t) => t.at);
     this.lights = level.thingsOf("Light").map((t) => ({ at: t.at, r: Number(t.field("r")) }));
     this.props = level.thingsOf("Prop").map((t) => ({ spot: String(t.field("spot")), sprite: String(t.field("sprite")), at: t.at, box: t.box }));
     const fxOf = (kind: FxKind) =>
@@ -140,7 +143,7 @@ export class VillageWorld {
     if (place) {
       const n = a.crowd(a.place);
       if (place.facing === "left" || place.facing === "right") return this.besideIt(a.place, place.at, place.facing, n);
-      return { key: a.place, at: { x: place.at.x + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 12, y: place.at.y + (n % 3) }, facing: place.facing };
+      return { key: a.place, at: { x: place.at.x + (n % 2 !== 0 ? 1 : -1) * Math.ceil(n / 2) * 12, y: place.at.y + (n % 3) }, facing: place.facing };
     }
     const spot = a.stroll?.spot ?? "right";
     const rest = a.stroll?.rest ?? 0;
@@ -154,7 +157,7 @@ export class VillageWorld {
     const dir = facing === "right" ? 1 : -1;
     if (n === 0) return { key, at, facing };
     if (n === 1) return { key, at: { x: at.x + dir * reach * 2, y: at.y }, facing: facing === "right" ? "left" : "right" };
-    return { key, at: { x: at.x + dir * reach + (n % 2 ? -12 : 12) * Math.ceil((n - 1) / 2), y: at.y + 12 }, facing: "up" };
+    return { key, at: { x: at.x + dir * reach + (n % 2 !== 0 ? -12 : 12) * Math.ceil((n - 1) / 2), y: at.y + 12 }, facing: "up" };
   }
 }
 
@@ -211,12 +214,16 @@ export class Whereabouts {
   static readonly settle = 1.2;
   static readonly dwell = 2;
 
-  constructor(
-    public place: string,
-    public since: number,
-    public want: string,
-    public wantSince: number,
-  ) {}
+  place: string;
+  since: number;
+  want: string;
+  wantSince: number;
+  constructor(place: string, since: number, want: string, wantSince: number) {
+    this.place = place;
+    this.since = since;
+    this.want = want;
+    this.wantSince = wantSince;
+  }
 
   moveOn(to: string, now: number, urgent = false) {
     if (to !== this.want) {

@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What the farm draws of the core state: levels, plots,
 // the effects a fact sets off, and the achievements in words.
 
+import { t } from "@vibevalley/i18n";
 import type {
   Achievement,
   AchievementStanding,
@@ -20,10 +20,12 @@ import type {
   Session,
 } from "@vibevalley/protocol";
 import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
-import { playOf } from "./play.ts";
+
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
-import { sessionOf } from "@/session/roster.ts";
 import { openFindings } from "@/issue/status.ts";
+import { sessionOf } from "@/session/roster.ts";
+
+import { playOf } from "./play.ts";
 
 export const xpToNext = (level: number) => 10 * level;
 
@@ -159,7 +161,8 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
       const news = fact.news;
       if (!news) return [];
       const out: GameEffect[] = [];
-      if (news.coins) out.push({ kind: "reward", ...(news.session ? { sessionId: news.session } : {}), coins: news.coins, streak: fact.progress.streak });
+      if (news.coins != null && news.coins !== 0)
+        out.push({ kind: "reward", ...(news.session ? { sessionId: news.session } : {}), coins: news.coins, streak: fact.progress.streak });
       for (const u of news.unlocked) out.push(achievementEffect(u.id, u.tier));
       return out;
     }

@@ -4,29 +4,31 @@
 // agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
-import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/errors.ts";
-import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
 import { join } from "node:path";
+
+import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Scope } from "effect";
+
+import type { ModelClient } from "@vibevalley/ai/client";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 import type { ThinkingLevel } from "@vibevalley/ai/models";
-import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
+
 import { finished, type AgentTask } from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
+import { type AgentTaskRunner, makeTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction, type Summarized } from "./compaction.ts";
-import type { ModelClient } from "@vibevalley/ai/client";
-import type { McpServer } from "./mcp.ts";
-import { connectAll, type McpConnections } from "./mcp.ts";
+import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/errors.ts";
+import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
+import { stopped } from "./core/tool.ts";
+import { type McpServer, connectAll, type McpConnections } from "./mcp.ts";
 import { memoryFileLines, readMemory } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, type CustomMessage, customMessage, messageText, requestContext, userMessage } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
-import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
+import { agent as words } from "./prompts.ts";
 import { Reminders } from "./reminders.ts";
+import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
 import { type Subagent, selfTools, subagentInstructions, subagentTool } from "./self.ts";
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
-import { type AgentTaskRunner, makeTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
-import { stopped } from "./core/tool.ts";
-import { agent as words } from "./prompts.ts";
 
 type Own = CustomMessage | CompactionSummaryMessage;
 
@@ -206,16 +208,18 @@ export class Brain {
     });
   }
 
-  private constructor(
-    private readonly options: BrainOptions,
-    private readonly mcp: McpConnections,
-    /** The Clock of the scope it was made in. */
-    private readonly now: () => number,
-  ) {
+  private readonly options: BrainOptions;
+  private readonly mcp: McpConnections;
+  /** The Clock of the scope it was made in. */
+  private readonly now: () => number;
+  private constructor(options: BrainOptions, mcp: McpConnections, now: () => number) {
+    this.options = options;
+    this.mcp = mcp;
+    this.now = now;
     this.maxSteps = options.maxSteps ?? 40;
     const sessionName = options.session || options.name;
-    if (!options.noSession) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));
-    this.skillDirs = options.noSkills ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
+    if (options.noSession !== true) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));
+    this.skillDirs = options.noSkills === true ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
     const budget = options.contextTokens ?? 120_000;
     this.folding = {
       home: options.home,
@@ -228,8 +232,8 @@ export class Brain {
     };
 
     const hostTools = [...(options.tools ?? []), ...this.mcp.tools];
-    const own = selfTools({ now, home: options.home, skills: () => this.skills(), memory: !options.noMemory });
-    if (!options.noSubagents) {
+    const own = selfTools({ now, home: options.home, skills: () => this.skills(), memory: options.noMemory !== true });
+    if (options.noSubagents !== true) {
       const skills = this.skillDirs;
       this.subagent = (brief, label) =>
         Effect.scoped(
@@ -376,7 +380,7 @@ export class Brain {
   /** The parts of the system prompt, in order, named instructions, env, skills, memory; an empty one is left out. */
   private promptParts(): PromptPart[] {
     const found = this.skills();
-    const memory = this.options.noMemory ? "" : readMemory(this.options.home).prompt;
+    const memory = this.options.noMemory === true ? "" : readMemory(this.options.home).prompt;
     const parts: PromptPart[] = [
       { name: "instructions", text: this.options.instructions.trim() },
       { name: "env", text: words.envSection(this.options.cwd) },
@@ -394,7 +398,7 @@ export class Brain {
   private refreshPrefix() {
     this.parts = this.promptParts();
     this.prefix = joinParts(this.parts);
-    this.knownMemory = this.options.noMemory ? [] : memoryFileLines(this.options.home);
+    this.knownMemory = this.options.noMemory === true ? [] : memoryFileLines(this.options.home);
     this.sent = undefined;
   }
 
@@ -409,7 +413,7 @@ export class Brain {
   /** What MEMORY.md gained (+) and lost (−) since the model last knew it, as one block for the newest input; "" when
    * nothing. What it returns counts as known from then on. */
   memoryNews(): string {
-    if (this.options.noMemory) return "";
+    if (this.options.noMemory === true) return "";
     const now = memoryFileLines(this.options.home);
     const before = this.knownMemory;
     this.knownMemory = now;
@@ -667,7 +671,7 @@ export class Brain {
     const self = this;
     return Effect.gen(function* () {
       if (self.closed || !(yield* self.quiet())) return;
-      if (self.options.wakeSoon?.(self.idleAfter())) return;
+      if (self.options.wakeSoon?.(self.idleAfter()) === true) return;
       const before = self.history();
       const { result } = yield* self.fold(before, declared(self.toolset), { ...self.folding, budget: self.idleAt() }, "idle");
       if (!result) return;

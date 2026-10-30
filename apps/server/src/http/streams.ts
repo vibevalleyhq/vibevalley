@@ -1,12 +1,14 @@
 // The long-lived event streams: the frames for the page, the side events and the live
 // events, as server-sent events with a ping every 20 s so a proxy does not close a quiet one.
 
-import { eventsPath, livePath, statePath, type Streams } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 import { Effect, Metric, Schedule, type Schema, Stream } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
-import { bounded } from "@/core/bounded.ts";
+
+import { eventsPath, livePath, statePath, type Streams } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import { wireJson } from "@/base/wire.ts";
+import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
 
 const heartbeatMs = 20_000;

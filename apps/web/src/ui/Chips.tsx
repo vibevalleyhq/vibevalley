@@ -1,6 +1,6 @@
-import { t } from "@vibevalley/i18n";
-
 import { createSignal, For } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 
 const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";
 
@@ -13,7 +13,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
     setText("");
   };
   return (
-    <div class={[box, { "opacity-50": !!props.disabled }]}>
+    <div class={[box, { "opacity-50": !(props.disabled !== true) }]}>
       <For each={props.value}>
         {(v) => (
           <span class="flex items-center gap-0.5 rounded bg-hover py-px pr-0.5 pl-1.5 text-xs">
@@ -57,7 +57,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
   const rows = () => Object.entries(props.value);
   const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2 font-mono text-sm outline-none placeholder:text-faint focus:border-focus";
   return (
-    <div class={["flex flex-col gap-1.5", { "opacity-50": !!props.disabled }]}>
+    <div class={["flex flex-col gap-1.5", { "opacity-50": !(props.disabled !== true) }]}>
       {/* By name: a keystroke makes new pairs, and a row made again would lose its input's focus. */}
       <For each={rows()} keyed={([k]) => k}>
         {(row) => {
@@ -118,7 +118,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         <button
           type="submit"
           data-testid="new-pair-add"
-          disabled={props.disabled || !key().trim()}
+          disabled={props.disabled === true || key().trim() === ""}
           class="h-7 cursor-pointer rounded-md border border-line px-2.5 text-sm hover:bg-hover disabled:opacity-50"
         >
           {t("web.base.chips.add")}

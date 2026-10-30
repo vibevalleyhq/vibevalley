@@ -2,6 +2,7 @@
 // same; the model reads both as a user's words.
 
 import type { Context, ImageContent, Message, TextContent, ToolDeclaration, UserMessage } from "@vibevalley/ai/messages";
+
 import type { AgentMessage } from "./core/loop.ts";
 import { imagePlaceholder, summary as summaryWords, transcript as transcriptWords } from "./prompts.ts";
 
@@ -34,7 +35,7 @@ export const customMessage = (customType: string, content: UserContent, now: num
   role: "custom",
   customType,
   content,
-  display: !options.hidden,
+  display: options.hidden !== true,
   ...(options.details === undefined ? {} : { details: options.details }),
   timestamp: now,
 });

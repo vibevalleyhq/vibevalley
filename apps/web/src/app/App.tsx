@@ -1,32 +1,34 @@
 // The page's routes. The farm is full-bleed, outside the workbench's shell; the shell links back to it. Each workbench
 // place gets the rest of the path after its own (/issues/<id> → "<id>").
 
-import { Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { ChatPage } from "@/features/channel";
+import { Match, Show, Switch, untrack } from "solid-js";
+
+import { prefsNow } from "@/base/prefs";
+import { ready, useProjects } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { Keyed } from "@/base/util";
 import { FarmPage } from "@/farm/FarmPage";
-import { TreePage } from "@/tree/TreePage";
+import { farmState } from "@/farm/store";
 import { AgentsRoute } from "@/features/agent";
-import { CatalogPage } from "@/features/catalog";
 import { ArtifactsPage } from "@/features/artifact";
+import { CatalogPage } from "@/features/catalog";
+import { ChatPage } from "@/features/channel";
 import { IssuesPage } from "@/features/issue";
-import { OrchestratorPage } from "@/features/orchestrator";
 import { PairPage } from "@/features/lan";
+import { Follow } from "@/features/notice";
+import { OrchestratorPage } from "@/features/orchestrator";
 import { ProjectsPage, sortProjects } from "@/features/project";
 import { RuntimesPage } from "@/features/runtime";
 import { SettingsPage } from "@/features/setting";
-import { ToastHost } from "@/ui/ToastHost";
+import { TreePage } from "@/tree/TreePage";
 import { Navigate } from "@/ui/A";
-import { Follow } from "@/features/notice";
-import { Root } from "./Root";
-import { Keyed } from "@/base/util";
-import { ready, useProjects } from "@/base/query";
-import { farmState } from "@/farm/store";
-import { useRouter } from "@/base/router";
-import { Shell } from "./Shell";
-import { places as placeList } from "./places";
-import { prefsNow } from "@/base/prefs";
 import { WindowStrip } from "@/ui/TitleBar";
+import { ToastHost } from "@/ui/ToastHost";
+
+import { places as placeList } from "./places";
+import { Root } from "./Root";
+import { Shell } from "./Shell";
 
 type Rest = () => string;
 

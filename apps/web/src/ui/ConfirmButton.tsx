@@ -1,5 +1,7 @@
 import { createSignal, Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
+
 import { Button } from "./Button";
 import type { IconName } from "./icons";
 
@@ -35,7 +37,7 @@ export function ConfirmButton(props: {
         class="flex animate-fade-in flex-wrap items-center gap-2"
         onKeyDown={(e) => e.key === "Escape" && setArmed(false)}
         // Leaving the group takes the question back; moving between its buttons does not.
-        onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setArmed(false)}
+        onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null) && setArmed(false)}
       >
         <Show when={props.question}>
           <span class="text-sm text-muted">{props.question}</span>

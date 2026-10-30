@@ -1,19 +1,21 @@
-import { t } from "@vibevalley/i18n";
-
 import { createEffect, createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
-import { chatPath } from "./places";
-import { jobThreadOf } from "./threads";
-import { phaseText } from "./presence";
-import { toast } from "@/ui/toasts";
-import { aria, useNow } from "@/base/util";
-import { useRouter } from "@/base/router";
 import { useCore } from "@/base/frame";
+import { useRouter } from "@/base/router";
+import { aria, useNow } from "@/base/util";
 import { Button } from "@/ui/Button";
-import { Icon } from "@/ui/Icon";
-import { HelperFace, PhaseGlyph } from "./bits";
 import { Empty } from "@/ui/Empty";
+import { Icon } from "@/ui/Icon";
+import { toast } from "@/ui/toasts";
+
+import { HelperFace, PhaseGlyph } from "./bits";
+import { chatPath } from "./places";
+import { phaseText } from "./presence";
+import { jobThreadOf } from "./threads";
 
 const card = "rounded-lg border border-line bg-page p-3";
 
@@ -22,7 +24,7 @@ export function Jobs(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
-  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : !!props.channel.default));
+  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.default));
   return (
     <Show
       when={sessions().length > 0}

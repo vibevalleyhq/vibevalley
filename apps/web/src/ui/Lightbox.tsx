@@ -1,8 +1,10 @@
-import { t } from "@vibevalley/i18n";
 import { Show } from "solid-js";
-import { createModal } from "./modal";
-import { IconButton } from "./IconButton";
+
+import { t } from "@vibevalley/i18n";
+
 import { Icon } from "./Icon";
+import { IconButton } from "./IconButton";
+import { createModal } from "./modal";
 
 export interface Picture {
   readonly src: string;

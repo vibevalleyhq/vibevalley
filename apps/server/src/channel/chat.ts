@@ -1,11 +1,15 @@
-import { list, t } from "@vibevalley/i18n";
 // Every message is written to the database first, in one transaction with who it goes to; only then does it become a
 // fact. A delivery goes pending → announced → handed → seen; a session that closes or a turn that ends without a word puts
 // what it was handed back to pending: given twice rather than lost. Everything that changes the chat runs one at a time.
 
+import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { HttpClient } from "effect/http";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { busyNotice, wakeInput } from "./prompts.ts";
+
+import { list, t } from "@vibevalley/i18n";
 import {
   type Chat,
   type ChatMessage,
@@ -36,42 +40,41 @@ import {
   type Embed,
   type Notify,
 } from "@vibevalley/protocol";
-import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { keepChannels, targetOf } from "./folded.ts";
-import { head } from "@/base/clip.ts";
-import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
-import { channelNameProblem, parseChatTarget } from "./targets.ts";
-import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
-import { mentionOf, mentionsIn } from "./mentions.ts";
-import { parseSearch } from "./search.ts";
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
-import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { sessionId, type Wire } from "@vibevalley/protocol/schema";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { head } from "@/base/clip.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
-import { WakeBreaker } from "./breaker.ts";
-import { linksIn, readEmbed } from "./embeds.ts";
-import { Deliveries, type DeliveryRow } from "./deliveries.ts";
-import { ChatModel, type ChannelRow } from "./model.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 
-import * as S from "@vibevalley/protocol/schema";
 import * as qc from "../../db/generated/channel.sql.ts";
+import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
 import * as qmn from "../../db/generated/channel_mention.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
-import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
+import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
+import { WakeBreaker } from "./breaker.ts";
+import { Deliveries, type DeliveryRow } from "./deliveries.ts";
+import { linksIn, readEmbed } from "./embeds.ts";
+import { keepChannels, targetOf } from "./folded.ts";
+import { mentionOf, mentionsIn } from "./mentions.ts";
+import { ChatModel, type ChannelRow } from "./model.ts";
+import { busyNotice, wakeInput } from "./prompts.ts";
+import { parseSearch } from "./search.ts";
+import { channelNameProblem, parseChatTarget } from "./targets.ts";
+import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
 
 /** The channel a new farm opens with. */
 const firstChannelName = "general";
@@ -92,7 +95,7 @@ export const logKeep = 80;
 const threadTitleMax = 24;
 /** How much of a channel's newest message a list shows. */
 const lastMax = 80;
-const oneLine = (text: string, n: number) => head(text.replace(/\s+/g, " ").trim(), n);
+const oneLine = (text: string, n: number) => head(text.replace(/\s+/gu, " ").trim(), n);
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
@@ -247,10 +250,12 @@ const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: nu
   const files = meta.attachments ?? [];
   return {
     ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
-    ...(row.edited_at ? { edited: true } : {}),
-    ...(row.deleted_at ? { deleted: true } : {}),
+    ...(row.edited_at != null && row.edited_at !== 0 ? { edited: true } : {}),
+    ...(row.deleted_at != null && row.deleted_at !== 0 ? { deleted: true } : {}),
     ...(files.length > 0 ? { attachments: files.map((f) => ({ name: f.name, path: filesAt(f.id) })) } : {}),
-    ...(meta.artifact && !row.deleted_at ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } } : {}),
+    ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
+      ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
+      : {}),
   };
 };
 
@@ -504,7 +509,7 @@ export const make = Effect.gen(function* () {
   const lastRead = new Map<string, string>();
   let closed = false;
   // Work set off by a timer belongs to this service: it ends with it and keeps its services.
-  const forkHere = yield* FiberSet.makeRuntime<never>();
+  const forkHere = yield* FiberSet.makeRuntime();
 
   /** Runs fn under the lock a little later, unless the chat has stopped. */
   /** What goes wrong in the background is logged, and the chat goes on with the next thing. */
@@ -515,7 +520,7 @@ export const make = Effect.gen(function* () {
   // The waits are keyed fibers of this service's, so one can be called off (a notice gathering, when its session leaves);
   // once a wait is over, what it runs is handed to forkHere, and calling the wait off no longer cuts it short.
   const waits = yield* FiberMap.make<string>();
-  const wait = yield* FiberMap.runtime(waits)<never>();
+  const wait = yield* FiberMap.runtime(waits)();
   const later = (key: string, ms: number, fn: () => Effect.Effect<void>) =>
     void wait(
       key,
@@ -577,7 +582,7 @@ export const make = Effect.gen(function* () {
     model
       .channels()
       .flatMap((c) => (c.name !== null ? [c] : []))
-      .sort((a, b) => (a.id < b.id ? -1 : 1))
+      .toSorted((a, b) => (a.id < b.id ? -1 : 1))
       .map((c) => "#" + c.name);
   const channelOfSession = (h: Session) => (h.channel && channelName(h.channel) !== undefined ? h.channel : defaultId);
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? row.parent_id! : row.id);
@@ -608,7 +613,7 @@ export const make = Effect.gen(function* () {
     return {
       id: row.id,
       type: channelType(row.type),
-      default: !!row.is_default,
+      default: row.is_default,
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
       orchestrator: orchestratorOfRow(row),
       category: row.category ?? "",
@@ -650,7 +655,7 @@ export const make = Effect.gen(function* () {
     else if (row.type === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
     // Any other thread (one opened under a message, with no session of its own) by the message it hangs under.
     if (!title && row.type === "thread" && row.root_id) title = oneLine((yield* one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
-    const last = row.last_number ? yield* one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
+    const last = row.last_number != null && row.last_number !== 0 ? yield* one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
     return toChannel(row, n ?? 0, title, last);
   });
 
@@ -820,8 +825,8 @@ export const make = Effect.gen(function* () {
       cooling,
       broken: breaker.tripped(),
       ...(meta.outcome ? { outcome: meta.outcome } : {}),
-      forTask: !!meta.forTask,
-      spoken: !!meta.spoken,
+      forTask: !(meta.forTask !== true),
+      spoken: !(meta.spoken !== true),
     });
     for (const d of deliveries) {
       yield* db(
@@ -970,7 +975,7 @@ export const make = Effect.gen(function* () {
     yield* publishMessage(written.row, answers);
     embedLater(written.row);
     yield* publishChannel(channel);
-    if (written.ownerMentionsChanged) yield* publishOwnerMentions;
+    if (written.ownerMentionsChanged === true) yield* publishOwnerMentions;
     if (written.thread) yield* publishChannel(written.thread);
     if (written.held) yield* write({ channel, from: "system", kind: "notice", text: hopLimitText(hopLimit), meta: { code: "hop_limit" } });
     for (const r of written.recipients) yield* kick(r);
@@ -1010,7 +1015,7 @@ export const make = Effect.gen(function* () {
       out.push({
         target: targetOfRow(r.type, r.root_number, null, null, r.channel_name || null),
         unread: r.unread ?? 0,
-        mentionsYou: !!r.mentions_you,
+        mentionsYou: !(r.mentions_you !== true),
         ...(latest ? { latest: latest.sender_name } : {}),
       });
     }
@@ -1155,7 +1160,7 @@ export const make = Effect.gen(function* () {
         ? t("server.channel.dispatch.split", { graph: h.graph.id })
         : h.refining
           ? t("server.channel.dispatch.draft")
-          : head(h.brief.replace(/\s+/g, " "), 80);
+          : head(h.brief.replace(/\s+/gu, " "), 80);
     // The dispatch note is the farm's, under the name of the orchestrator that looks after the channel.
     const by = orchestratorOfRow(model.channel(channel));
     yield* seat(by);
@@ -1227,7 +1232,7 @@ export const make = Effect.gen(function* () {
       yield* db(qd.rollbackAll());
       open.load(yield* db(qd.allOpenDeliveries()));
       const recent = yield* db(qc.recentChannels({ n: keepChannels }));
-      for (const c of [...recent].reverse()) yield* core.apply({ type: "channel", channel: yield* counted(c) });
+      for (const c of [...recent].toReversed()) yield* core.apply({ type: "channel", channel: yield* counted(c) });
       yield* publishOwnerMentions;
     }),
   );
@@ -1280,7 +1285,7 @@ export const make = Effect.gen(function* () {
       return direct.id;
     }
     let channel = defaultId;
-    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
+    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/u, "").split(":")[0]!;
     if (name) {
       const found = model.channelByName(name);
       if (!found) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]));
@@ -1371,10 +1376,10 @@ export const make = Effect.gen(function* () {
       return yield* Effect.fail(refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") })));
     const used = yield* db(qc.channelInUse({ id }));
     const why = [
-      used.crons ? t("server.channel.cronsThere", { n: used.crons }) : "",
-      used.connectors ? t("server.channel.connectorsThere") : "",
-      used.queued ? t("server.channel.queuedThere", { n: used.queued }) : "",
-      used.issue_threads ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
+      used.crons != null && used.crons !== 0 ? t("server.channel.cronsThere", { n: used.crons }) : "",
+      used.connectors != null && used.connectors !== 0 ? t("server.channel.connectorsThere") : "",
+      used.queued != null && used.queued !== 0 ? t("server.channel.queuedThere", { n: used.queued }) : "",
+      used.issue_threads != null && used.issue_threads !== 0 ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
     ].filter(Boolean);
     if (why.length > 0) return yield* Effect.fail(refused(t("server.channel.inUse", { why: list(why) })));
     const threads = model.threadsOf(id);
@@ -1403,7 +1408,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const live = yield* PubSub.subscribe(said);
           const missed =
-            after === undefined ? [...(yield* db(qm.recentReports({ n: logKeep })))].reverse() : yield* db(qm.reportsAfter({ after, n: catchUpMax + 1 }));
+            after === undefined ? [...(yield* db(qm.recentReports({ n: logKeep })))].toReversed() : yield* db(qm.reportsAfter({ after, n: catchUpMax + 1 }));
           if (missed.length > catchUpMax) return Stream.succeed<ChannelEvent>({ _tag: "Reset" });
           const upto = missed.at(-1)?.id ?? after ?? "";
           const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.kind === "report" && m.id > upto)), "chat.reports");
@@ -1567,7 +1572,7 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!helpers?.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
+            if (helpers?.present(session) !== true) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
             yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
@@ -1603,10 +1608,10 @@ export const make = Effect.gen(function* () {
           }
           // Posting on a channel right after reading a thread: confirm once.
           const last = lastRead.get(from) ?? "";
-          if (row.type !== "thread" && !opt.confirm && last && last !== target) return { kind: "confirm", target, lastRead: last };
+          if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
           // Newer messages it has not seen: show them instead of sending.
           const unseen = (yield* db(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
-          if (unseen.length > 0 && !opt.anyway) {
+          if (unseen.length > 0 && opt.anyway !== true) {
             const now = yield* Clock.currentTimeMillis;
             const shown: InboxMessage[] = [];
             for (const id of unseen.slice(0, heldShown)) {
@@ -1619,7 +1624,7 @@ export const make = Effect.gen(function* () {
             }
             const newest = shown.at(-1);
             if (newest && shown.length === unseen.length) yield* setRead(from, channel, newest.number, now);
-            return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length };
+            return { kind: "held", target, shown: shown.toReversed(), more: unseen.length - shown.length };
           }
           // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
           const caller = !agents.isOrchestrator(from) ? (yield* one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
@@ -1692,13 +1697,14 @@ export const make = Effect.gen(function* () {
           const row = model.channel(channel);
           if (!row) return yield* Effect.fail(refused(t("server.channel.channelGone")));
           const target = targetOfChannel(row);
-          const limit = opt.limit ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
+          const limit = opt.limit != null && opt.limit !== 0 ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
           const cursor = (yield* one(qr.readCursor({ participant_id: who, channel_id: channel })))?.read_number ?? 0;
-          const rows = opt.unread
-            ? yield* db(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
-            : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before || 2147483647, n: limit })))].reverse();
+          const rows =
+            opt.unread === true
+              ? yield* db(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
+              : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].toReversed();
           const newest = rows.at(-1);
-          if (newest && !opt.before) yield* readThrough(who, channel, newest.number);
+          if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
           lastRead.set(who, target);
           const older = rows.length > 0 && (yield* db(qm.messagesBefore({ channel_id: channel, number: rows[0]!.number, n: 1 }))).length > 0;
           return { target, messages: rows.map((m) => inboxOf(m, target)), older };
@@ -1714,7 +1720,7 @@ export const make = Effect.gen(function* () {
     list: () => Effect.forEach([...model.channels("channel"), ...model.channels("direct")], counted),
     history: (channel, before, limit) =>
       Effect.map(db(qm.messagesBefore({ channel_id: channel, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) })), (rows) =>
-        [...rows].reverse().map(toMessage),
+        [...rows].toReversed().map(toMessage),
       ),
     markRead: (channel, seq) =>
       locked(
@@ -1747,7 +1753,7 @@ export const make = Effect.gen(function* () {
     openChannel: (name, description, project) =>
       locked(
         Effect.gen(function* () {
-          const clean = name.trim().replace(/^#/, "");
+          const clean = name.trim().replace(/^#/u, "");
           const rows = model.channels();
           const problem = channelNameProblem(
             clean,
@@ -1800,7 +1806,7 @@ export const make = Effect.gen(function* () {
           if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(t("server.channel.threadOnlyTitle")));
           let name = row.name;
           if (upd.name !== undefined) {
-            const clean = upd.name.trim().replace(/^#/, "");
+            const clean = upd.name.trim().replace(/^#/u, "");
             if (row.type === "thread") name = clean ? head(clean, threadTitleMax * 2) : null;
             else {
               const problem = channelNameProblem(
@@ -1932,7 +1938,7 @@ export const make = Effect.gen(function* () {
         const row = model.channel(channel);
         if (!row) return [];
         const target = targetOfChannel(row);
-        return [...(yield* db(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].reverse().map((m) => inboxOf(m, target));
+        return [...(yield* db(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => inboxOf(m, target));
       }),
     notifyOf: (id) => {
       const c = model.channel(id);
@@ -1981,7 +1987,7 @@ export const make = Effect.gen(function* () {
       }),
     channelByName: (name) =>
       Effect.sync(() => {
-        const found = model.channelByName(name.trim().replace(/^#/, ""));
+        const found = model.channelByName(name.trim().replace(/^#/u, ""));
         return found ? infoOf(found) : undefined;
       }),
     useHelpers: (h) => void (helpers = h),

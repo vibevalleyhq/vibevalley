@@ -1,30 +1,32 @@
-import { t } from "@vibevalley/i18n";
 // Each handler only forwards to the service that owns the rule.
 
+import { Effect, Option } from "effect";
+import { HttpServerRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
+
 import { Agents } from "./agent/agent.ts";
-import { missing, lookIn, reasonOf, refused, orMissing } from "./errors.ts";
-import { Projects } from "./project/project.ts";
-import { Effect, Option } from "effect";
-import { ServerConfig } from "./base/config.ts";
-import { Core } from "./core/core.ts";
 import { Artifacts } from "./artifact/artifact.ts";
+import { owner } from "./base/actor.ts";
+import { ServerConfig } from "./base/config.ts";
 import { Channels } from "./channel/chat.ts";
-import { Issues } from "./issue/issue.ts";
-import { Memories } from "./memory/memory.ts";
-import { Runtimes } from "./runtime/runtime.ts";
+import { Connectors } from "./connector/connector.ts";
+import { Core } from "./core/core.ts";
 import { Crons } from "./cron/cron.ts";
+import { missing, lookIn, reasonOf, refused, orMissing } from "./errors.ts";
+import { Game } from "./game/game.ts";
+import { Issues } from "./issue/issue.ts";
+import { deviceHeader, Lan } from "./lan/lan.ts";
+import { Memories } from "./memory/memory.ts";
+import { Orchestrator } from "./orchestrator/orchestrator.ts";
+import { Projects } from "./project/project.ts";
+import { Runtimes } from "./runtime/runtime.ts";
 import { Sessions } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
 import { Tasks } from "./task/task.ts";
-import { Orchestrator } from "./orchestrator/orchestrator.ts";
-import { Game } from "./game/game.ts";
-import { deviceHeader, Lan } from "./lan/lan.ts";
 import { Voice } from "./voice/voice.ts";
-import { Connectors } from "./connector/connector.ts";
-import { HttpServerRequest } from "effect/http";
-import { owner } from "./base/actor.ts";
 
 export const handlers = Effect.gen(function* () {
   const config = yield* ServerConfig;

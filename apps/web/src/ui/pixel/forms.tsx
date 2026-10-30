@@ -1,9 +1,10 @@
+import { createSignal, For } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createSignal, For } from "solid-js";
 import { splitChips } from "./chips";
-import { pxFocus, pxRing, pxText } from "./style";
 import { SpriteIcon } from "./icons";
+import { pxFocus, pxRing, pxText } from "./style";
 
 /** Enter or a comma adds what is typed, and so does leaving the box; Backspace in an empty box takes the last chip off. */
 export function PxChipsInput(props: {
@@ -21,7 +22,7 @@ export function PxChipsInput(props: {
     setDraft("");
   };
   return (
-    <div class={["flex min-h-9 flex-wrap items-center gap-1 bg-cream-100 p-1.5", pxRing, { "opacity-50": !!props.disabled }]}>
+    <div class={["flex min-h-9 flex-wrap items-center gap-1 bg-cream-100 p-1.5", pxRing, { "opacity-50": !(props.disabled !== true) }]}>
       <For each={props.value}>
         {(chip) => (
           <span class={[pxText.xs, "inline-flex items-center gap-1 bg-cream-300 py-0.5 pr-1 pl-2 text-bark-800"]}>

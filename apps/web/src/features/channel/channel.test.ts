@@ -1,8 +1,10 @@
 import { expect, test } from "vite-plus/test";
+
 import type { Channel, OrchestratorState, WorkspaceState } from "@vibevalley/protocol";
-import { archivedOf, groupsOf, messagePath, pointedAt, threadsIn, topsOf } from "./places";
-import { linkedMessages } from "./links";
+
 import { orchestratorTyping } from "./feed";
+import { linkedMessages } from "./links";
+import { archivedOf, groupsOf, messagePath, pointedAt, threadsIn, topsOf } from "./places";
 import { switchTargets } from "./switcher";
 const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
 const state = (orchestrator: OrchestratorState, where?: string): WorkspaceState => ({

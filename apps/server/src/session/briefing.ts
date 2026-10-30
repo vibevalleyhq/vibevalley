@@ -1,7 +1,8 @@
-import { recallHead, recallIntro } from "./prompts.ts";
 import type { McpServer } from "@botiverse/oar";
 
 import type { Agent, MCPServer, Skill } from "@vibevalley/protocol";
+
+import { recallHead, recallIntro } from "./prompts.ts";
 
 /** What the detail panel shows starts after it. */
 export const jobBreak = "\n\n---\n\n";

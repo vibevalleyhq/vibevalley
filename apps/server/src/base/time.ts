@@ -15,7 +15,7 @@ export interface Time {
 
 /** The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context. */
 export const timeHere: Effect.Effect<Time> = Effect.gen(function* () {
-  const context = yield* Effect.context<never>();
+  const context = yield* Effect.context();
   const clock = yield* Clock.Clock;
   const run = Effect.runPromiseWith(context);
   const fork = Effect.runForkWith(context);
@@ -34,7 +34,7 @@ export const wallTime: Time = {
   now: () => Date.now(),
   sleep: (ms, signal) =>
     new Promise<void>((resolve, reject) => {
-      if (signal?.aborted) return reject(signal.reason);
+      if (signal?.aborted === true) return reject(signal.reason);
       const timer = setTimeout(done, Math.max(0, ms));
       function done() {
         signal?.removeEventListener("abort", abort);
@@ -63,7 +63,7 @@ export const withinRealTime = <A>(p: Promise<A>, ms: number, fallback: A): Promi
  * the Clock says. unref: it does not keep the process alive. Returns what cancels it. */
 export const afterRealTime = (ms: number, f: () => void, options: { readonly unref?: boolean } = {}): (() => void) => {
   const timer = setTimeout(f, Math.max(0, ms));
-  if (options.unref) timer.unref();
+  if (options.unref === true) timer.unref();
   return () => clearTimeout(timer);
 };
 

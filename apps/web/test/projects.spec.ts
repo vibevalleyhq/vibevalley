@@ -12,14 +12,14 @@ test("a new plot is opened, shows on the map and opens its own farm", async ({ p
   await expect(dialog.getByRole("alert")).not.toBeEmpty();
   await dialog.getByTestId("project-name").fill(name);
   await dialog.getByTestId("submit").click();
-  await expect(page).toHaveURL(new RegExp(`/projects/${name}$`));
+  await expect(page).toHaveURL(new RegExp(`/projects/${name}$`, "u"));
   await expect(page.getByTestId("project")).toHaveAttribute("data-key", name);
 
   await page.getByTestId("projects").locator('[data-testid="list-row"][data-key=""]').click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/projects$/u);
   await expect(page.locator(`[data-testid="island"][data-key="${name}"]`)).toBeVisible();
   await page.locator(`[data-testid="enter-island"][data-key="${name}"]`).click();
-  await expect(page).toHaveURL(new RegExp(`/farm/${name}$`));
+  await expect(page).toHaveURL(new RegExp(`/farm/${name}$`, "u"));
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect(page.getByTestId("project-sign")).toHaveAttribute("data-key", name);
 });

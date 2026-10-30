@@ -1,17 +1,21 @@
-import { t } from "@vibevalley/i18n";
-import { Inconsistent } from "@/errors.ts";
-import type { CoreEvent } from "@vibevalley/agent/brain";
-import { messageText } from "@vibevalley/agent/messages";
-import type { Outcome, RunTrigger } from "@vibevalley/protocol";
-import { Data, Effect } from "effect";
-import { newId } from "@/base/ids.ts";
-import type { ToolStart } from "./facts.ts";
-import type { ToolResult } from "@vibevalley/agent/core/loop";
-import type { Journal } from "./journal.ts";
-import type { NotRecorded, RunStore } from "./session.ts";
 // One agent loop (agent_start to agent_end) is one run: it starts when the loop takes its first input and ends with the loop; a loop
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
+
+import { Data, Effect } from "effect";
+
+import type { CoreEvent } from "@vibevalley/agent/brain";
+import type { ToolResult } from "@vibevalley/agent/core/loop";
+import { messageText } from "@vibevalley/agent/messages";
+import { t } from "@vibevalley/i18n";
+import type { Outcome, RunTrigger } from "@vibevalley/protocol";
+
+import { newId } from "@/base/ids.ts";
+import { Inconsistent } from "@/errors.ts";
+
+import type { ToolStart } from "./facts.ts";
+import type { Journal } from "./journal.ts";
+import type { NotRecorded, RunStore } from "./session.ts";
 
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
 
@@ -40,12 +44,15 @@ export class AgentExecution {
   /** The end could not be written: retried before anything else, and the run takes no more inputs. */
   private ending = false;
 
-  constructor(
-    private readonly session: string,
-    private readonly journal: Journal,
-    private readonly toolStart: (tool: string, args: unknown) => ToolStart,
-    private readonly store: RunStore,
-  ) {
+  private readonly session: string;
+  private readonly journal: Journal;
+  private readonly toolStart: (tool: string, args: unknown) => ToolStart;
+  private readonly store: RunStore;
+  constructor(session: string, journal: Journal, toolStart: (tool: string, args: unknown) => ToolStart, store: RunStore) {
+    this.session = session;
+    this.journal = journal;
+    this.toolStart = toolStart;
+    this.store = store;
     store.register(session, () => this.currentRun());
   }
 

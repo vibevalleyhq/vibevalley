@@ -1,31 +1,31 @@
-import { t } from "@vibevalley/i18n";
 // The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
 // sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
 // the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
-import { useRouter } from "@/base/router";
-import { toasts } from "@/ui/pixel/toasts";
 import { For, Show } from "solid-js";
-import type { Channel } from "@vibevalley/protocol";
-import { api } from "@/base/api";
-import { createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
 
-import { aria } from "@/base/util";
-import { useCore } from "@/base/frame";
-import { AgentFace } from "@/ui/Face";
-import { DictationButton } from "@/features/voice";
-import { SpriteIcon } from "@/ui/pixel";
+import { t } from "@vibevalley/i18n";
+import type { Channel } from "@vibevalley/protocol";
 
 import { useAgent } from "@/base/agents";
+import { api } from "@/base/api";
+import { useCore } from "@/base/frame";
 import { setPick, usePrefs } from "@/base/prefs";
+import { useRouter } from "@/base/router";
+import { aria } from "@/base/util";
+import { createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
+import { DictationButton } from "@/features/voice";
+import { AgentFace } from "@/ui/Face";
+import { SpriteIcon } from "@/ui/pixel";
+import { toasts } from "@/ui/pixel/toasts";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {
   const pick = usePrefs((p) => p.pick);
   const agent = useAgent(pick);
   return (
-    <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
+    <Show when={pick() !== "auto" && agent()?.enabled === true ? agent() : undefined}>
       {(a) => (
         <span class="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={t("web.farm.chat.sendTo", { name: a().name })}>
           <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={26} />

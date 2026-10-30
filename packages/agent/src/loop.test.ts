@@ -1,14 +1,15 @@
 // How a run goes, turn by turn, as the brain's loop has gone: the spec the loop is held to when it changes
 // (.agents/notes/proposed/architecture/2026-10-27-pi-in-effect.md, step 3).
 
-import { whenTrue } from "@vibevalley/testkit/until";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { gate } from "@vibevalley/testkit/until";
+import { whenTrue, gate } from "@vibevalley/testkit/until";
+
+import { textTool } from "./core/tool.ts";
 import { messageText, userMessage } from "./messages.ts";
 import { type Rig, results, tempHome, withAgent } from "./testing.ts";
-import { textTool } from "./core/tool.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -25,7 +26,7 @@ const said = (r: Rig) => r.agent.history().map((m) => m.role + ":" + messageText
 const shape = (r: Rig) =>
   r.events
     .map((e) => ("message" in e && e.type.startsWith("message_") ? `${e.type}:${e.message.role}` : "toolName" in e ? `${e.type}:${e.toolName}` : e.type))
-    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update")));
+    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update") === true));
 
 describe("a run's turns", () => {
   it("goes through its events in one order", async () => {

@@ -1,4 +1,5 @@
 import { defaultOrchestrator } from "@vibevalley/protocol";
+
 import { expect, tab, test } from "./fixtures";
 
 test("a helper is made, edited, turned off and deleted", async ({ page, api }) => {
@@ -7,7 +8,7 @@ test("a helper is made, edited, turned off and deleted", async ({ page, api }) =
   await page.goto("/agents");
   await expect(page.locator(`[data-testid="agent-card"][data-key="${defaultOrchestrator}"]`)).toBeVisible();
   await page.getByTestId("new-agent").click();
-  await expect(page).toHaveURL(/\/agents\/new$/);
+  await expect(page).toHaveURL(/\/agents\/new$/u);
   const bar = page.getByTestId("profile-bar");
   await expect(bar).toHaveAttribute("data-state", "new");
   await page.getByTestId("agent-name").fill(name);
@@ -26,7 +27,7 @@ test("a helper is made, edited, turned off and deleted", async ({ page, api }) =
   await expect(ci).toHaveValue("123");
   await ci.fill("1");
   await bar.getByTestId("save").click();
-  await expect(page).toHaveURL(/\/agents\/(?!new).+/);
+  await expect(page).toHaveURL(/\/agents\/(?!new).+/u);
   await expect(bar).toHaveAttribute("data-state", "saved");
   const id = decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1)!);
   const made = (await api.agent.list()).find((a) => a.id === id)!;
@@ -47,7 +48,7 @@ test("a helper is made, edited, turned off and deleted", async ({ page, api }) =
   await card.getByRole("link").click();
   await bar.getByTestId("delete").click();
   await bar.getByTestId("delete-sure").click();
-  await expect(page).toHaveURL(/\/agents$/);
+  await expect(page).toHaveURL(/\/agents$/u);
   await expect(card).toHaveCount(0);
 });
 

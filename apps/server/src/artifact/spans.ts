@@ -12,16 +12,20 @@ export const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n 
 /** The marks as the wire has them: only those set. */
 export function marksOf(m: SpanMarks | undefined): SpanMarks {
   const out: SpanMarks = {};
-  if (m?.bold) out.bold = true;
-  if (m?.italic) out.italic = true;
-  if (m?.code) out.code = true;
-  if (m?.strike) out.strike = true;
+  if (m?.bold === true) out.bold = true;
+  if (m?.italic === true) out.italic = true;
+  if (m?.code === true) out.code = true;
+  if (m?.strike === true) out.strike = true;
   if (m?.link !== undefined) out.link = m.link;
   return out;
 }
 
 export const sameMarks = (a: SpanMarks, b: SpanMarks) =>
-  !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.code === !!b.code && !!a.strike === !!b.strike && a.link === b.link;
+  !(a.bold !== true) === !(b.bold !== true) &&
+  !(a.italic !== true) === !(b.italic !== true) &&
+  !(a.code !== true) === !(b.code !== true) &&
+  !(a.strike !== true) === !(b.strike !== true) &&
+  a.link === b.link;
 
 /** Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. */
 export function normal(spans: readonly TextSpan[] | undefined): TextSpan[] {

@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+
 import { type Agent, pathOf, type VibeValleyApi } from "@vibevalley/protocol";
+
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "farm-actions" });
@@ -44,7 +46,9 @@ const commits = "提交打卡页";
 const anotherRound = "发呆 then check it";
 
 const handedBack = (api: VibeValleyApi, id: string, timeout?: number) =>
-  expect.poll(async () => (await api.issue.get({ id })).attention.acts.map((a) => a.act), timeout ? { timeout } : {}).toContain("complete");
+  expect
+    .poll(async () => (await api.issue.get({ id })).attention.acts.map((a) => a.act), timeout != null && timeout !== 0 ? { timeout } : {})
+    .toContain("complete");
 
 async function bed(page: Page) {
   const canvas = page.getByTestId("village").locator("canvas");
@@ -61,7 +65,7 @@ test("the harvest tool and its open confirmation follow the latest issue", async
   const soil = await bed(page);
   await page.keyboard.press("5");
   await page.mouse.move(soil.x, soil.y);
-  await expect(village).toHaveCSS("cursor", /harvest-ok/);
+  await expect(village).toHaveCSS("cursor", /harvest-ok/u);
   await page.mouse.click(soil.x, soil.y);
   const review = page.getByTestId("harvest");
   const take = review.locator('[data-act="complete"]');

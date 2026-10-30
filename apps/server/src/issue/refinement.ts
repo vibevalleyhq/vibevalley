@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
-import { draftMatch, refinementBrief } from "./prompts.ts";
-import type { Agent, Question, Issue } from "@vibevalley/protocol";
 import { Effect, Semaphore, Predicate } from "effect";
 import type { SqlClient } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
+import type { Agent, Question, Issue } from "@vibevalley/protocol";
+
 import type { Agents } from "@/agent/agent.ts";
 import { cut, clip } from "@/base/clip.ts";
 import type { Channels } from "@/channel/chat.ts";
@@ -12,12 +13,13 @@ import type { WorkplaceRelease } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import type { Runtimes } from "@/runtime/runtime.ts";
 import type { Hired, HireOptions, Sessions } from "@/session/session.ts";
-import { isForOrchestrator } from "./status.ts";
-import { jsonOrNull, nullText } from "./stored.ts";
-import { splitBrief } from "./brief.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
+import { splitBrief } from "./brief.ts";
+import { draftMatch, refinementBrief } from "./prompts.ts";
+import { isForOrchestrator } from "./status.ts";
+import { jsonOrNull, nullText } from "./stored.ts";
 
 export interface RefinementDeps {
   readonly core: Core["Service"];
@@ -121,7 +123,7 @@ export function refinement(d: RefinementDeps) {
 
   const handedBack = Effect.fn("Issues.handedBack")(function* (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) {
     const h = sessions.sessionOf(f.id);
-    if (!h?.refining || !h.issue) return;
+    if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
     const r = sessions.find(f.id);
     const said = r?.lastText ?? "";
@@ -176,7 +178,7 @@ function textOf(v: unknown, field: string): string {
   throw new Error(t("server.issue.refinement.text", { field }));
 }
 
-const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
 
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {

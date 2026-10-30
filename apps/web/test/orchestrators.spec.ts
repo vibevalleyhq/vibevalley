@@ -6,13 +6,13 @@ test.use({ farm: "orchestrators" });
 test("a second orchestrator: made on the profiles page, answers in its own direct channel, and looks after a channel", async ({ page, api }) => {
   await page.goto("/agents");
   await page.getByTestId("new-orchestrator").click();
-  await expect(page).toHaveURL(/\/agents\/new\?role=orchestrator$/);
+  await expect(page).toHaveURL(/\/agents\/new\?role=orchestrator$/u);
   await page.getByTestId("agent-name").fill("Teal");
   await page.getByTestId("agent-duty").fill("looks after notes");
   await page.locator('[role="radio"][data-key="gardener"]').click();
   const bar = page.getByTestId("profile-bar");
   await bar.getByTestId("save").click();
-  await expect(page).toHaveURL(/\/agents\/(?!new).+/);
+  await expect(page).toHaveURL(/\/agents\/(?!new).+/u);
   await expect(bar).toHaveAttribute("data-state", "saved");
   const id = decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1)!);
   const made = (await api.agent.list()).find((a) => a.id === id)!;
@@ -20,7 +20,7 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
 
   // Without a model key it says it cannot start, as itself, in its own direct channel.
   await bar.getByTestId("talk").click();
-  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/u);
   const box = await composerOn(page, decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1)!));
   await box.fill("there?");
   await box.press("Enter");
@@ -39,7 +39,7 @@ test("a second orchestrator: made on the profiles page, answers in its own direc
 
   await page.goto("/agents");
   await page.locator(`[data-testid="agent-card"][data-key="${id}"]`).getByRole("link").click();
-  await expect(page).toHaveURL(new RegExp(`/orchestrator/${id}/memory$`));
+  await expect(page).toHaveURL(new RegExp(`/orchestrator/${id}/memory$`, "u"));
   await expect(tab(page, "trajectory")).toBeVisible();
   // The phone is the default orchestrator's: another has no voice.
   await expect(tab(page, "voice")).toHaveCount(0);

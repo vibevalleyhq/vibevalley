@@ -4,11 +4,12 @@
 
 import { dayClock } from "@vibevalley/engine/clock";
 import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import type { BedFxKind, Tool } from "./tools";
+import type { Rect } from "./world/framing";
 import type { Point } from "./world/level";
 import type { FarmPanel } from "./world/places";
-import type { Rect } from "./world/framing";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 export type { FarmPanel } from "./world/places";
 
 /**
@@ -123,7 +124,7 @@ const listeners = new Set<() => void>();
 
 const set = (patch: Partial<FarmUi> | ((s: FarmUi) => Partial<FarmUi>)) => {
   const next = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
-  if (Object.keys(next).every((k) => next[k as keyof FarmUi] === state[k as keyof FarmUi])) return;
+  if (Object.entries(next).every(([k, v]) => v === Reflect.get(state, k))) return;
   state = next;
   for (const l of listeners) l();
 };
@@ -137,7 +138,7 @@ export const subscribeFarm = (l: () => void) => {
 
 const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | undefined) =>
   set((s) => ({
-    overlays: [...s.overlays.filter((o) => o.kind !== kind), ...(next ? [next] : [])].sort((a, b) => overlayOrder[a.kind] - overlayOrder[b.kind]),
+    overlays: [...s.overlays.filter((o) => o.kind !== kind), ...(next ? [next] : [])].toSorted((a, b) => overlayOrder[a.kind] - overlayOrder[b.kind]),
   }));
 
 export const overlayOf = <K extends FarmOverlay["kind"]>(s: FarmUi, kind: K) => s.overlays.find((o): o is Extract<FarmOverlay, { kind: K }> => o.kind === kind);

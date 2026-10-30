@@ -1,14 +1,18 @@
-import { t } from "@vibevalley/i18n";
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
 
-import { messageOf } from "@/errors.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
+
 import { Schema } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
+
 import { jsonOf } from "@/base/json.ts";
+import { numberIn } from "@/base/number.ts";
+import { messageOf } from "@/errors.ts";
 
 /** Past this a read of pi's balance counts as unknown. */
 const readTimeoutMs = 10_000;
@@ -62,7 +66,7 @@ function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): string {
   return provider || piSettings().provider;
 }
 
-const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/;
+const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
 
 /**
  * A value from pi's config as pi reads it: the environment variable it names when one is set (DEEPSEEK_API_KEY,
@@ -84,7 +88,7 @@ export function piDeepseek(): { key: string; base: string } {
   const p = readJson("models.json", ModelsFile)?.providers?.deepseek;
   if (!key && p?.apiKey) key = piValue(p.apiKey);
   if (p?.baseUrl) base = p.baseUrl;
-  base = base.replace(/\/$/, "").replace(/\/v1$/, "").replace(/\/$/, "");
+  base = base.replace(/\/$/u, "").replace(/\/v1$/u, "").replace(/\/$/u, "");
   return { key, base };
 }
 
@@ -118,7 +122,7 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
     available: b.is_available ?? true,
     balances: (b.balance_infos ?? []).map((x) => ({
       currency: x.currency,
-      amount: Number.parseFloat(x.total_balance) || 0,
+      amount: numberIn(x.total_balance),
     })),
   };
 }

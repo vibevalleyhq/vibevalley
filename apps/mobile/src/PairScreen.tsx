@@ -1,10 +1,12 @@
-import { t } from "@vibevalley/i18n";
 // Pairing: the camera reads the QR code the farm's 连接到本机 shows (or the link is pasted, or arrives as a
 // vibevalley:// link); the phone names itself and waits for the owner to nod on that computer.
 
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+import { t } from "@vibevalley/i18n";
+
 import type { FarmConnection, Pairing } from "./farm";
 import { parsePairLink } from "./pairing";
 import { colors } from "./style";
@@ -20,7 +22,7 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
   }, [choice.link]);
 
   const scan = async () => {
-    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem(t("mobile.noCamera"));
+    if (permission?.granted !== true && !(await requestPermission()).granted) return setCameraProblem(t("mobile.noCamera"));
     setScanning(true);
   };
 

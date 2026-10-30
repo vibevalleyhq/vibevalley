@@ -1,12 +1,14 @@
 // A real server per worker (apps/server) on a free port with a temporary home and work root, serving
 // dist/ at /. Tests drive the page with `page` (its baseURL is the server) and set things up with `api`.
 
-import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
+
 import { type IssueAct, type IssueAction, readStream, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
 
 interface Server {
@@ -19,7 +21,7 @@ interface Server {
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
 // own logins (~/.pi, ~/.claude, …) stay out of reach.
 // GIT_CONFIG_* go together: GIT_CONFIG_COUNT without its GIT_CONFIG_KEY_n stops every git command.
-const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/;
+const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
 /** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm

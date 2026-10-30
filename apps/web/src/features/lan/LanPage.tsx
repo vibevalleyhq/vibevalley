@@ -1,18 +1,20 @@
-import { t } from "@vibevalley/i18n";
 // 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
-import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
+import { For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
 import { momentText } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { useNow } from "@/base/util";
 import { ready, useQuery } from "@/base/query";
+import { useNow } from "@/base/util";
 import { Button } from "@/ui/Button";
-import { Qr } from "@/ui/Qr";
 import { Card, Quiet } from "@/ui/layout";
+import { Qr } from "@/ui/Qr";
+import { toast } from "@/ui/toasts";
 
 const notes = [0, 1, 2, 3] as const;
 
@@ -100,7 +102,7 @@ export function LanPage() {
                   <span class="flex min-w-0 flex-1 flex-col">
                     <span class="truncate text-sm font-medium">{d.name}</span>
                     <span class="truncate text-xs text-muted">
-                      {d.lastSeen
+                      {d.lastSeen != null && d.lastSeen !== 0
                         ? t("web.lan.lan.paired", { at: momentText(d.pairedAt), seen: momentText(d.lastSeen) })
                         : t("web.lan.lan.pairedNever", { at: momentText(d.pairedAt) })}
                     </span>

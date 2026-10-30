@@ -1,21 +1,25 @@
 import { readFileSync } from "node:fs";
-import { onCallLine } from "./prompts.ts";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
-import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice } from "@/setting/voice.ts";
 import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { TestClock } from "effect/testing";
+
+import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
+import { sessionId, issueId } from "@vibevalley/protocol/schema";
+
+import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { notificationsStart } from "@/services.ts";
 import { Setting } from "@/setting/setting.ts";
+import { defaultVoice } from "@/setting/voice.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
-import { notificationsStart } from "@/services.ts";
-import { Core } from "@/core/core.ts";
+
+import { onCallLine } from "./prompts.ts";
 import { Voice, agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, vendorsFor, voiceAgentUid, voiceUnknown } from "./voice.ts";
-import { sessionId, issueId } from "@vibevalley/protocol/schema";
-import { TestClock } from "effect/testing";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -37,7 +41,7 @@ const pendingDictation = () => {
     seen = signal;
     entered();
     return new Promise<Response>((_, reject) => {
-      if (signal?.aborted) reject(signal.reason);
+      if (signal?.aborted === true) reject(signal.reason);
       else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
     });
   });
@@ -61,7 +65,7 @@ class Capture {
     const call = (init?.method ?? "GET") + " " + url;
     this.urls.push(call);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
-    this.requests.push(init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {});
+    this.requests.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
     await this.before?.(call);
     return new Response(this.body, {
       status: this.status,
@@ -251,7 +255,7 @@ describe("voice", () => {
   // Agora's retries, on the service's Clock (voice.ts retrying): moved through, not waited for.
   it.effect("retries 408, 429 and 5xx twice on the Clock, as Agora's SDK would, and nothing else", () =>
     Effect.gen(function* () {
-      const run = Effect.runPromiseWith(yield* Effect.context<never>());
+      const run = Effect.runPromiseWith(yield* Effect.context());
       // A retry's sleep is taken after the answer comes back: let it be taken, then move the clock.
       const step = (ms: number) =>
         Effect.andThen(
@@ -419,7 +423,7 @@ describe("voice", () => {
       const spoken = capture.requests[at]!;
       expect(spoken).toMatchObject({ priority: "APPEND", interruptable: true });
       // Agora answers 401 to a speak without the session's ConvoAI token: it once went out bare and was never heard.
-      expect(capture.auths[at]).toMatch(/^agora token=\S+/);
+      expect(capture.auths[at]).toMatch(/^agora token=\S+/u);
       expect(String(spoken.text)).not.toBe("");
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
@@ -680,7 +684,7 @@ describe("voice", () => {
         ),
       );
       const address = server.address();
-      const port = address && typeof address === "object" ? address.port : 0;
+      const port = typeof address === "object" && address !== null ? address.port : 0;
       yield* Effect.orDie((yield* Setting).save({ dictation: { via: "own", url: `http://127.0.0.1:${port}/v1`, model: "m" } }));
       const voice = yield* Voice;
       for (let i = 0; i < 2; i++) {

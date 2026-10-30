@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { expect, test } from "vite-plus/test";
+
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { join } from "node:path";
-import { expect, test } from "vite-plus/test";
 import { FileWriter } from "./files.ts";
 import { newId } from "./ids.ts";
 import { announce, announced, HomeTaken, leaseHome } from "./lease.ts";
@@ -11,8 +13,8 @@ import { redact, redactOutput } from "./redact.ts";
 test("ids are uuidv7, unique, and sort in the order they were made", () => {
   const ids = Array.from({ length: 1000 }, () => newId());
   expect(new Set(ids).size).toBe(1000);
-  for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-  expect([...ids].sort()).toEqual(ids);
+  for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+  expect([...ids].toSorted()).toEqual(ids);
 });
 
 test("secrets are taken out of text, and the rest is left", () => {

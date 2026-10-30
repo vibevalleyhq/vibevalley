@@ -4,9 +4,10 @@
 // plain HTTPS, where a refused key answers 401 or 403. A relay is a page's own line to MOSS: the page speaks MOSS's
 // protocol (JSON actions, and binary frames tagged 0x00 for audio), the server only adds the key.
 
-import { jsonOrNone } from "@/base/json.ts";
 import { Effect, Queue, type Scope, Schema } from "effect";
 import { Socket } from "effect/socket";
+
+import { jsonOrNone } from "@/base/json.ts";
 import { afterRealTime } from "@/base/time.ts";
 
 export const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
@@ -60,7 +61,7 @@ export const nodeTransport: MossTransport = {
     return { send: (text) => ws.send(text), close: () => ws.close() };
   },
   status: (key) =>
-    fetch(mossUrl.replace(/^wss:/, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
+    fetch(mossUrl.replace(/^wss:/u, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
       r.text().then((body) => ({ code: r.status, body })),
     ),
 };

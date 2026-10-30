@@ -4,22 +4,25 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
+
 import { describe, expect, test } from "vite-plus/test";
+
+import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, TaskGraph } from "@vibevalley/protocol";
 import { phaseText, attentionWantsOwner } from "@vibevalley/protocol/rules";
-import { emptyWorkspaceState } from "./core.ts";
+
 import { targetOf } from "@/channel/folded.ts";
+import { cronProblem } from "@/cron/due.ts";
 import { nextRun, nextText, whenText } from "@/cron/when.ts";
-import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf } from "@/task/graph.ts";
-import { attentionOf } from "@/issue/attention.ts";
 import { effectsOf, viewOf } from "@/game/view.ts";
+import { attentionOf } from "@/issue/attention.ts";
 import { inbox } from "@/notice/inbox.ts";
 import { reduce } from "@/projection/reduce.ts";
-import { acceptanceChecks, readyTasks } from "@/task/graph.ts";
-import { graphText } from "@/task/prompts.ts";
-import { cronProblem } from "@/cron/due.ts";
 import { yuan } from "@/runtime/money.ts";
 import { graphChanges, graphEventText } from "@/task/changes.ts";
-import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, TaskGraph } from "@vibevalley/protocol";
+import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf, acceptanceChecks, readyTasks } from "@/task/graph.ts";
+import { graphText } from "@/task/prompts.ts";
+
+import { emptyWorkspaceState } from "./core.ts";
 
 const testdata = new URL("./testdata/", import.meta.url);
 
@@ -174,7 +177,7 @@ describe("the golden files", () => {
             "acceptanceChecks",
             tasks.map((n) => acceptanceChecks(graph, n)),
           );
-          const changes = graphChanges(input.fresh ? undefined : graph, input.after as TaskGraph);
+          const changes = graphChanges(input.fresh === true ? undefined : graph, input.after as TaskGraph);
           same("changes", changes);
           const titles = new Map(tasks.map((n) => [n.id, "T" + n.title]));
           same(

@@ -1,20 +1,23 @@
-import { Tabs } from "@/ui/Tabs";
-import { t } from "@vibevalley/i18n";
 // 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
 // folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
 // the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
 
 import { Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
-import { api } from "@/base/api";
+
 import { useAgent } from "@/base/agents";
-import { orchestratorLooks } from "./looks";
-import { A } from "@/ui/A";
+import { api } from "@/base/api";
 import { useRouter } from "@/base/router";
-import { OrchestratorFace } from "@/ui/Face";
 import { ArchivePanel, OrchestratorMemoryPanel } from "@/features/memory";
-import { VoiceForm } from "@/features/voice";
 import { TrajectoryLog } from "@/features/session";
+import { VoiceForm } from "@/features/voice";
+import { A } from "@/ui/A";
+import { OrchestratorFace } from "@/ui/Face";
+import { Tabs } from "@/ui/Tabs";
+
+import { orchestratorLooks } from "./looks";
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },

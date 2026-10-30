@@ -1,11 +1,14 @@
 // 设置's parts: a page is groups of rows, a row a setting's name and a line on what it does on the left, its control on
 // the right. One shape for every section, so a section reads like the others and the search finds its rows.
 
-import { t } from "@vibevalley/i18n";
-import type { KeyStatus } from "@vibevalley/protocol";
 import type { JSX } from "@solidjs/web";
 import { createContext, Show, useContext, type Accessor } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import type { KeyStatus } from "@vibevalley/protocol";
+
 import { matches } from "@/base/search";
+
 import { IconButton, OutLink } from "./IconButton";
 import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";
@@ -61,7 +64,7 @@ export function SettingRow(props: {
   const found = () => query() !== "" && matches(query(), [props.label, props.hint, props.tip]);
   return (
     <div
-      class={["flex gap-x-6 gap-y-2 px-4 py-3", props.wide ? "flex-col" : "flex-wrap items-center", { "bg-wheat/15": found() }]}
+      class={["flex gap-x-6 gap-y-2 px-4 py-3", props.wide === true ? "flex-col" : "flex-wrap items-center", { "bg-wheat/15": found() }]}
       data-found={found() ? "" : undefined}
       data-testid={props.testid}
     >
@@ -73,7 +76,7 @@ export function SettingRow(props: {
         <Show when={props.hint}>{(hint) => <span class="text-xs text-muted">{hint()}</span>}</Show>
       </div>
       <Show when={props.children}>
-        <div class={["flex max-w-full flex-wrap items-center gap-2", props.wide ? "w-full" : "shrink-0"]}>{props.children}</div>
+        <div class={["flex max-w-full flex-wrap items-center gap-2", props.wide === true ? "w-full" : "shrink-0"]}>{props.children}</div>
       </Show>
     </div>
   );

@@ -1,29 +1,32 @@
 import { describe, expect, it } from "@effect/vitest";
-import { sampleAgent } from "@/testing/agents.ts";
-import { freshTask } from "./editing.ts";
-import { graphView, blockedBy, isAcceptance, taskOf } from "./graph.ts";
-import { orchestrator, owner } from "@/base/actor.ts";
-import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
-import { inbox } from "@/notice/inbox.ts";
-import { clip } from "@/base/clip.ts";
-import { graphOf, taskIssueID } from "./issues.ts";
-import { parseSplit } from "./splitting.ts";
-import { taskBrief, splitBrief } from "./prompts.ts";
 import { Effect, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+
+import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { orchestrator, owner } from "@/base/actor.ts";
+import { clip } from "@/base/clip.ts";
 import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
+import { inbox } from "@/notice/inbox.ts";
+import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import { type Hired, type HireOptions, type Roster, NotTakenIn, type Sessions } from "@/session/session.ts";
-import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { notTakenIn } from "@/session/takeIn.ts";
+import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { worldBelowTasks } from "@/testing/world.ts";
-import { make, type TaskGit, type TaskWork } from "./task.ts";
 import { nextTurn, untilGot, whenTrue } from "@/testing/until.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { worldBelowTasks } from "@/testing/world.ts";
+
 import * as q from "../../db/generated/task_event.sql.ts";
+import { freshTask } from "./editing.ts";
+import { graphView, blockedBy, isAcceptance, taskOf } from "./graph.ts";
+import { graphOf, taskIssueID } from "./issues.ts";
+import { taskBrief, splitBrief } from "./prompts.ts";
+import { parseSplit } from "./splitting.ts";
+import { make, type TaskGit, type TaskWork } from "./task.ts";
 
 const step = (id: string, ...needs: string[]) => ({
   id,
@@ -63,14 +66,16 @@ class FakeWork implements TaskWork {
   release!: () => void;
   released = new Promise<void>((r) => (this.release = r));
 
-  constructor(
-    readonly core: Core["Service"],
-    readonly issues: Issues["Service"],
-  ) {}
+  readonly core: Core["Service"];
+  readonly issues: Issues["Service"];
+  constructor(core: Core["Service"], issues: Issues["Service"]) {
+    this.core = core;
+    this.issues = issues;
+  }
 
   private async work(h: Session, input: string): Promise<[string, string]> {
     if (!h.graph?.task) {
-      const graph = input.includes("计划有问题") ? { title: "改好了", tasks: [step("fixed")] } : graphs[/要做的事：(\S+)/.exec(input)?.[1] ?? ""];
+      const graph = input.includes("计划有问题") ? { title: "改好了", tasks: [step("fixed")] } : graphs[/要做的事：(\S+)/u.exec(input)?.[1] ?? ""];
       return ["completed", "读完了。\n\n```json\n" + JSON.stringify(graph, null, 2) + "\n```\n\n结论：拆好了。"];
     }
     const id = h.graph.task;
@@ -173,16 +178,19 @@ class FakeWork implements TaskWork {
 class FakeGit implements TaskGit {
   branches: string[] = [];
   from = new Map<string, string>();
-  constructor(readonly work: FakeWork) {}
+  readonly work: FakeWork;
+  constructor(work: FakeWork) {
+    this.work = work;
+  }
   run = (_cwd: string, command: string) =>
     Effect.sync(() => {
-      for (const m of command.matchAll(/steps\/(\w+)\.txt/g))
+      for (const m of command.matchAll(/steps\/(\w+)\.txt/gu))
         if (!this.work.written.has(m[1]!)) return { ok: false, output: "steps/" + m[1] + ".txt: no such file" };
       return { ok: true, output: "" };
     });
   changedFiles = (cwd: string) =>
     Effect.sync(() => {
-      const h = this.work.core.session(cwd.replace(/^\/wt\//, ""));
+      const h = this.work.core.session(cwd.replace(/^\/wt\//u, ""));
       return h?.graph?.task ? [...(this.work.touched.get(h.graph.task) ?? [])] : [];
     });
   openBranch = (_project: string, branch: string, from = "") =>
@@ -191,7 +199,7 @@ class FakeGit implements TaskGit {
       this.from.set(branch, from);
     });
   mergeBranch = (project: string) => Effect.succeed("合进了 " + project + " 的 main");
-  mergeInto = (place: Workplace) => Effect.succeed({ text: "", commits: 1, hashes: ["c0ffee-" + place.cwd.replace(/^\/wt\//, "")] });
+  mergeInto = (place: Workplace) => Effect.succeed({ text: "", commits: 1, hashes: ["c0ffee-" + place.cwd.replace(/^\/wt\//u, "")] });
   branchChanges = (project: string, branch: string) => Effect.succeed({ project, base: "main", branch } as unknown as Changes);
 }
 
@@ -227,7 +235,7 @@ const farm = Effect.gen(function* () {
       () => `task ${id} to get there: ${JSON.stringify(graphOf(core.state(), id))}`,
       8_000,
     );
-  const split = (goal: string, project: string) => Effect.map(tasks.split(goal, project, "", owner), (said) => /（(p\d+)）/.exec(said)![1]!);
+  const split = (goal: string, project: string) => Effect.map(tasks.split(goal, project, "", owner), (said) => /（(p\d+)）/u.exec(said)![1]!);
   return { core, issues, tasks, work, git, states, news, until, split };
 });
 
@@ -270,7 +278,7 @@ describe("task graphs", () => {
           ["c", "a"],
           ["d", "b,c"],
         ]);
-        expect(f.news[0]).toMatch(new RegExp("^【计划】" + id + " 拆好了"));
+        expect(f.news[0]).toMatch(new RegExp("^【计划】" + id + " 拆好了", "u"));
         // A step's removal, tried: what goes and who stops waiting for it, and the graph as it was.
         const preview = yield* f.tasks.previewRemoveTask(id, "b");
         expect(preview.does).toEqual([`从计划「${draft.title}」删掉「${taskOf(draft, "b")!.title}」这一步`, `「${taskOf(draft, "d")!.title}」不再等它`]);
@@ -302,7 +310,7 @@ describe("task graphs", () => {
         ).toBe("splitting/owner drafted/system started/owner ready/system merged/owner");
         const edit = history.find((e) => e.kind === "task_edited")!;
         expect([edit.task, edit.actor, edit.actorText, edit.changes.length, edit.changes[0]?.field]).toEqual(["d", "orchestrator", "管家", 1, "检查"]);
-        expect(edit.text).toMatch(/^改了「.+」的检查$/);
+        expect(edit.text).toMatch(/^改了「.+」的检查$/u);
         for (const s of ["a", "b", "c", "d"])
           expect(
             history
@@ -460,7 +468,7 @@ describe("task graphs", () => {
   it.live("a graph is a parent issue, its steps the issues under it", () =>
     run((f) =>
       Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         const id = yield* f.split("菱形", "diamond");
         yield* f.until(id, (g) => g.state === "draft");
         const parent = yield* f.issues.get(id);
@@ -508,7 +516,7 @@ describe("task graphs", () => {
           { id: "b", brief: "列表", check: "true" },
           { id: "c", brief: "合起来", needs: ["a", "b"] },
         ];
-        expect(yield* f.tasks.splitIssue("h1", "", steps)).toMatch(/3 张子工单/);
+        expect(yield* f.tasks.splitIssue("h1", "", steps)).toMatch(/3 张子工单/u);
         const graph = yield* f.until(issue.id, (g) => state(g, "a") !== "waiting" && state(g, "b") !== "waiting");
         expect([graph.title, graph.goal, graph.project]).toEqual(["整个看板重做", "像 Linear 那样", "board"]);
         expect(f.git.from.get(graph.branch!)).toBe("vibevalley/issue-1");

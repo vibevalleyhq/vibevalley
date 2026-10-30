@@ -19,5 +19,5 @@ export function installedSkills(runtimes: readonly RuntimeInfo[]): InstalledSkil
       if (!got.description && s.description) got.description = s.description;
       got.runtimes.push({ runtime: r.id, ...(s.source ? { source: s.source } : {}) });
     }
-  return [...byName].map(([name, v]) => ({ name, ...v })).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return [...byName].map(([name, v]) => ({ name, ...v })).toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }

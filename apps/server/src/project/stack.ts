@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // What a project is built with, from the markers at its root, first one wins.
 
-import type { ProjectStack } from "@vibevalley/protocol";
 import { Option, Schema } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { ProjectStack } from "@vibevalley/protocol";
 
 const empty: ProjectStack = { name: "", label: "" };
 
@@ -62,7 +63,7 @@ export function stackOf(files: ReadonlyMap<string, string>): ProjectStack {
       name: "python",
       label: "Python",
       test: "pytest",
-      lint: pyproject?.includes("ruff") ? "ruff check ." : "",
+      lint: pyproject?.includes("ruff") === true ? "ruff check ." : "",
     });
   return empty;
 }

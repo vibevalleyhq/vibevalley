@@ -2,8 +2,9 @@
 // Its popup, items and keys are the Menu's; it closes the same ways and gives the focus back to the area.
 
 import { createContext, createSignal, omit, useContext } from "solid-js";
-import { makePortal, makePositioner } from "./internal/floating";
+
 import { call, type DivProps, flag, refs } from "./internal/element";
+import { makePortal, makePositioner } from "./internal/floating";
 import { createMenu, Menu, MenuContext, type MenuRootProps } from "./menu";
 
 const use = () => useContext(MenuContext);

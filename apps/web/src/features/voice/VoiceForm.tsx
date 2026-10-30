@@ -1,15 +1,13 @@
-import { t } from "@vibevalley/i18n";
 // 声音: the line's settings in 设置 › 语音 (/settings/call: credentials, how it listens, who answers; /settings/moss:
 // MOSS Live's key; /settings/dictation) and the orchestrator's voice
 // on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
-import { variant, aria, createSettled, Keyed } from "@/base/util";
-import { saveSettings } from "@/base/settings";
-
-import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { keepPreviousData } from "@tanstack/solid-query";
+import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import {
   AreaValues,
   type Dictation,
@@ -24,7 +22,23 @@ import {
   VoiceTTSMinimaxModelValues,
   VoiceValues,
 } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
+import { ready, useQuery, useSettings } from "@/base/query";
+import { saveSettings } from "@/base/settings";
+import { variant, aria, createSettled, Keyed } from "@/base/util";
+import { A } from "@/ui/A";
+import { Button } from "@/ui/Button";
+import { Select, TextArea, TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { IconLink, OutLink } from "@/ui/IconButton";
+import { KeyField, SaveBar } from "@/ui/KeyField";
+import { Card, Quiet, SecretInput } from "@/ui/layout";
+import { Segmented } from "@/ui/Segmented";
+import { KeyRow, SettingsGroup } from "@/ui/settings";
+import { Hint } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
+
 import {
   answerLabel,
   answerStart,
@@ -44,25 +58,15 @@ import {
   voiceSample,
   withPart,
 } from "./choices";
-import { A } from "@/ui/A";
-import { ready, useQuery, useSettings } from "@/base/query";
-import { Button } from "@/ui/Button";
-import { Select, TextArea, TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Segmented } from "@/ui/Segmented";
-import { Card, Quiet, SecretInput } from "@/ui/layout";
-import { IconLink, OutLink } from "@/ui/IconButton";
-import { KeyField, SaveBar } from "@/ui/KeyField";
-import { Hint } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
 import { MossVerify } from "./MossVerify";
-import { KeyRow, SettingsGroup } from "@/ui/settings";
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey" | "mossKey";
 
 const keyFrom: Record<KeySource, string> = { settings: t("web.base.form.from.settings"), config: t("web.base.form.from.config") };
 
-const options = <T extends string>(labels: Record<T, string>) => (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
+const options = <T extends string>(labels: Record<T, string>) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- labels is written out as a literal, one key per T and no more
+  (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
 
 /** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or
@@ -171,7 +175,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
         class="font-mono"
         inputmode="numeric"
         value={String(draft()[k])}
-        onInput={(e) => set({ ...draft(), [k]: Number(e.currentTarget.value.replace(/\D/g, "")) || 0 })}
+        onInput={(e) => set({ ...draft(), [k]: Number(e.currentTarget.value.replace(/\D/gu, "")) })}
       />
     </Labeled>
   );

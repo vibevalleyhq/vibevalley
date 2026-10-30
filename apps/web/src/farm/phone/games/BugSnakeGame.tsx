@@ -1,8 +1,14 @@
-import { t } from "@vibevalley/i18n";
 // 贪吃虫 on the phone: the rules are farm/phone/games/bugSnake.ts; here the clock, the pad and the drawing, each cell
 // six of the game's pixels, zoomed whole. Leaving the game (or putting the phone away) pauses it.
 
 import { createEffect, createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+
+import { drawPattern, lcd } from "@/farm/phone/lcd";
+import { kept, usePad, useTicks } from "@/farm/support";
+import { playSound } from "@/ui/pixel/sound";
+
 import {
   type BugSnake,
   type BugSnakeEnd,
@@ -14,9 +20,6 @@ import {
   type SnakeHeading,
   steerBugSnake,
 } from "./bugSnake";
-import { drawPattern, lcd } from "@/farm/phone/lcd";
-import { playSound } from "@/ui/pixel/sound";
-import { kept, usePad, useTicks } from "@/farm/support";
 
 const game = kept<BugSnake | undefined>(undefined);
 const best = kept(0);
@@ -46,7 +49,7 @@ const turned = (rows: readonly string[]) =>
   rows.map((_, y) =>
     rows
       .map((row) => row[y])
-      .reverse()
+      .toReversed()
       .join(""),
   );
 const heads: Record<SnakeHeading, readonly string[]> = { right: head, down: turned(head), left: turned(turned(head)), up: turned(turned(turned(head))) };

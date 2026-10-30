@@ -1,24 +1,26 @@
-import { t } from "@vibevalley/i18n";
 // One project's farm (/farm/<project>): the village canvas full-bleed, the DOM over it, outside the workbench's shell.
 // Each layer is its own folder's; this page only stacks them, gives the ones that draw the beds this project's part of the
 // frame (scope.ts), and owns the keys, the sounds and the phone's calls. The chat and the title are the whole farm's.
 
-import { type FarmSoundInput } from "./cues";
-
 import { createEffect, Show } from "solid-js";
-import { farm } from "./store";
+
+import { t } from "@vibevalley/i18n";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { FramesContext, useFrames } from "@/base/frame";
+import { createCall } from "@/features/voice";
+
 import { VillageCanvas } from "./canvas/VillageCanvas";
+import { type FarmSoundInput } from "./cues";
 import { DebugPanel } from "./debug/DebugPanel";
+import { createFarmFrames, rawFarmFrame } from "./frames";
 import { Hud } from "./hud/Hud";
 import { IssueView } from "./issue/IssueView";
 import { Panels } from "./panels/Panels";
-import { createFarmFrames, rawFarmFrame } from "./frames";
-import { useFarm } from "./ui";
+import { farm } from "./store";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
-import { createCall } from "@/features/voice";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { useFarm } from "./ui";
 
 /** `project`: whose farm ("" for the sessions without a project). */
 export function FarmPage(props: { project: string }) {

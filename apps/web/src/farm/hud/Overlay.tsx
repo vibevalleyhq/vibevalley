@@ -1,22 +1,25 @@
-import { t } from "@vibevalley/i18n";
 // The words over the village, at screen pixels so they stay sharp: each plot's card (what a click would do while
 // pointed at, a reward, a note, its badge, its project, the level that clears it), what each helper is doing over its
 // head, the orchestrator's last words, and the yard's signs, names and counts. Words let clicks through to the village.
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
-import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
+
+import { useFrames } from "@/base/frame";
 import { farmState } from "@/farm/store";
+import { useVillage } from "@/farm/support";
 import { aimTool } from "@/farm/tools";
+import { useFarm } from "@/farm/ui";
+import type { Village } from "@/farm/world/load";
 import { yardPlaces } from "@/farm/world/places";
 import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "@/farm/world/plots";
-import type { Village } from "@/farm/world/load";
 import { plotH } from "@/farm/world/world";
-import { useFrames } from "@/base/frame";
 import { useFollowed, defaultOf } from "@/features/channel";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
-import { useVillage } from "@/farm/support";
+
+import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 
 /** Rows of art pixels above the plot's bottom where its rail is. */
 const rail = 5;
@@ -119,14 +122,8 @@ export function Overlay() {
       let card: Card | undefined;
       let where: "above" | "rail" | "middle" = "rail";
       const reward =
-        bed.station < 0
-          ? undefined
-          : rewards()
-              .filter((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station))
-              .at(-1);
-      const note = bedFx()
-        .filter((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"))
-        .at(-1);
+        bed.station < 0 ? undefined : rewards().findLast((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station));
+      const note = bedFx().findLast((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"));
       if (hoverBed() === bed.index) {
         const issue = session ? state.issues.find((i) => i.id === issueOf(session)) : undefined;
         const aim = aimTool(tool(), bed, session, plot, level, issue);
@@ -302,7 +299,7 @@ function OrchestratorWords(props: { x: number; y: number; hidden: boolean; sessi
     const said = props.said;
     const at = doneAt();
     const fresh = said && (at === undefined || now() - at < speechMs);
-    return fresh ? plainText(said.text) : props.sessions === 0 ? t("web.farm.overlay.idle") : undefined;
+    return fresh === true ? plainText(said.text) : props.sessions === 0 ? t("web.farm.overlay.idle") : undefined;
   };
   return (
     <Show when={text()}>

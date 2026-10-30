@@ -2,8 +2,9 @@
 // and which panel it controls; the panel is unmounted while closed unless keepMounted, then only hidden.
 
 import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
-import { type ButtonProps, call, type DivProps, flag } from "./internal/element";
+
 import { createControllable } from "./internal/controllable";
+import { type ButtonProps, call, type DivProps, flag } from "./internal/element";
 
 interface Ctx {
   readonly open: () => boolean;
@@ -14,9 +15,7 @@ interface Ctx {
 
 const Context = createContext<Ctx>();
 const use = () => {
-  const c = useContext(Context);
-  if (!c) throw new Error("Collapsible parts belong inside Collapsible.Root");
-  return c;
+  return useContext(Context);
 };
 
 export interface CollapsibleRootProps extends DivProps {

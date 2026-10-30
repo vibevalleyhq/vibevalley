@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
+
 import { endpoints, fieldsOf, pathOf } from "./api";
 
 // What a word may end in: s is a plural, the words that end so in the singular aside (status, and MOSS Live's name).
@@ -10,7 +11,7 @@ describe("the endpoint table", () => {
       .map((e) => e.op)
       .filter((op) => {
         const words = op.split(".");
-        const shaped = words.length >= 2 && words.length <= 3 && words.every((w) => /^[a-z][A-Za-z]*$/.test(w));
+        const shaped = words.length >= 2 && words.length <= 3 && words.every((w) => /^[a-z][A-Za-z]*$/u.test(w));
         return !shaped || !words.slice(0, -1).every(singular);
       });
     expect(off).toEqual([]);

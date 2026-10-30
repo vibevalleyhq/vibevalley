@@ -1,14 +1,17 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vite-plus/test";
-import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
+
 import { setLocale } from "@vibevalley/i18n";
+import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
+
 import { builtInDir, builtInIds, builtInTemplates, readTemplate } from "./template.ts";
 
 describe("the built-in templates", () => {
   it("are every folder, listed once, each under its own id", () => {
     const folders = readdirSync(builtInDir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? [d.name] : []));
-    expect([...builtInIds()].sort()).toEqual(folders.sort());
+    expect([...builtInIds()].toSorted()).toEqual(folders.toSorted());
     expect(new Set(builtInIds()).size).toBe(builtInIds().length);
     for (const t of builtInTemplates()) expect(t.id).toBe(readTemplate(join(builtInDir, t.id), "builtIn").id);
   });

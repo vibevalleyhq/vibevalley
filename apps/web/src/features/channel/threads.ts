@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/protocol";
 const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
   if (!xs) return undefined;
@@ -30,7 +29,7 @@ export function threadOwnerOf<S extends Session>(thread: Channel, sessions: read
 }
 
 const head = (text: string) => {
-  const flat = text.replace(/\s+/g, " ");
+  const flat = text.replace(/\s+/gu, " ");
   return flat.length > 24 ? flat.slice(0, 24) : flat;
 };
 

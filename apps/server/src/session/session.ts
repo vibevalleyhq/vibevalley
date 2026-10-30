@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // oar runs sessions without permission prompts or a sandbox: the only fence is where a session starts, inside the work root in
 // its own worktree. Each farm session owns its subagents; what only it takes (the farm's MCP server, its prompt, its refused
 // tools) goes in through a copy of its runtime, so the shared registry is never changed. A run starts when the runtime opens a
@@ -6,35 +5,12 @@ import { t } from "@vibevalley/i18n";
 // trigger on the hand first and the turn takes the oldest. Admission serializes room and opening turns; each hand owns its
 // input, handover and departure, so one worktree's checks do not hold the other sessions.
 
-import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { restartedNote, workplaceRules } from "./prompts.ts";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { join, resolve } from "node:path";
+
 import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
-import {
-  type Agent,
-  type Changes,
-  dayMs,
-  type Fact,
-  type SessionClose,
-  type Issue,
-  maxRunning,
-  type Outcome,
-  type Run,
-  type RunTrigger,
-  type Session,
-  type SessionEvent,
-  type SessionGraph,
-  type Spent,
-  type WorkspaceState,
-  type IssueId,
-  type SessionId,
-} from "@vibevalley/protocol";
-import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import {
   Cause,
   Clock,
@@ -56,34 +32,61 @@ import {
   Metric,
 } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
+import {
+  type Agent,
+  type Changes,
+  dayMs,
+  type Fact,
+  type SessionClose,
+  type Issue,
+  maxRunning,
+  type Outcome,
+  type Run,
+  type RunTrigger,
+  type Session,
+  type SessionEvent,
+  type SessionGraph,
+  type Spent,
+  type WorkspaceState,
+  type IssueId,
+  type SessionId,
+} from "@vibevalley/protocol";
+import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
-import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 import { serverAddress, ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
+import { timeHere } from "@/base/time.ts";
+import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 import { Core, type FactIn } from "@/core/core.ts";
-import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
+import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { Memories } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
 import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
-import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
-import { type Journal, Trajectories } from "./journal.ts";
-import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
-import { conflictOf, notTakenIn, sameConflict, type Settle } from "./takeIn.ts";
+
 import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
+import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
+import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
+import { type Journal, Trajectories } from "./journal.ts";
+import { restartedNote, workplaceRules } from "./prompts.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
-import { timeHere } from "@/base/time.ts";
-
-import * as S from "@vibevalley/protocol/schema";
+import { conflictOf, notTakenIn, sameConflict, type Settle } from "./takeIn.ts";
 
 export type { SessionNews };
+import * as qs from "../../db/generated/session.sql.ts";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
-import * as qs from "../../db/generated/session.sql.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -389,7 +392,7 @@ export function watchStalls(
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
-    const runSync = Effect.runSyncWith(yield* Effect.context<never>());
+    const runSync = Effect.runSyncWith(yield* Effect.context());
     const config = yield* ServerConfig;
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
@@ -407,8 +410,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         Effect.catch((err) => Effect.logWarning(`vibevalley: ${what}: ${String(err)}`)),
       );
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const run = yield* FiberSet.makeRuntimePromise<never>();
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const run = yield* FiberSet.makeRuntimePromise();
+    const forkHere = yield* FiberSet.makeRuntime();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
@@ -416,7 +419,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
     const timers = yield* FiberMap.make<string>();
-    const later = yield* FiberMap.runtime(timers)<never>();
+    const later = yield* FiberMap.runtime(timers)();
     // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
     // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
     const apply = (...facts: FactIn[]) => runSync(core.apply(...facts));
@@ -478,7 +481,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         place: JSON.stringify(h.place),
         oar_session: oar || null,
         last_text: h.lastText || null,
-        recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].sort()) : null,
+        recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].toSorted()) : null,
       };
     };
     const keepHands = Effect.suspend(() =>
@@ -614,7 +617,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           endRun(h, report.outcome, report.summary, report.spent);
         } else apply(fact);
       }
-      if (reaction.spentCny) runtimes.spend(runtime, reaction.spentCny);
+      if (reaction.spentCny !== 0) runtimes.spend(runtime, reaction.spentCny);
       if (reaction.warn) notice("warn", reaction.warn);
       if (event.kind === "exited") closedLaunch(h);
     };
@@ -857,9 +860,9 @@ export const make = (options: SessionOptionsIn = {}) =>
         ...visible.map((s) => {
           const h = hands.get(s.id);
           const allocation = allocations.get(s.id);
-          const opening = allocation && (!allocation.attached || allocation.closing);
+          const opening = allocation !== undefined && (!allocation.attached || allocation.closing !== undefined);
           // A submitted turn owns its slot before oar opens it: its trigger is the reservation.
-          return (opening || (h && h.triggers.length > 0)) && !isBusy(s) ? { ...s, phase: reserved(clock.currentTimeMillisUnsafe()) } : s;
+          return (opening || (h !== undefined && h.triggers.length > 0)) && !isBusy(s) ? { ...s, phase: reserved(clock.currentTimeMillisUnsafe()) } : s;
         }),
         ...[...allocations.values()].filter((a) => !visible.some((s) => s.id === a.owner.id)).map((a) => a.owner),
       ];
@@ -1007,7 +1010,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       hired = Math.max(
         0,
         ...[...(yield* db(qs.sessionIDs())).map((r) => r.id), ...core.state().sessions.map((s) => s.id)]
-          .map((id) => Number.parseInt(id.replace(/^w/, ""), 10))
+          .map((id) => Number.parseInt(id.replace(/^w/u, ""), 10))
           .filter((n) => Number.isFinite(n)),
       );
       for (const session of core.state().sessions) {
@@ -1198,7 +1201,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             if (exit._tag === "Success" || committed || released) return Effect.void;
             return Effect.gen(function* () {
               const allocation = allocations.get(id);
-              if (allocation?.attached) return;
+              if (allocation?.attached === true) return;
               if (allocation) {
                 const stopped = yield* Effect.result(stopOar(allocation));
                 if (stopped._tag === "Failure") {
@@ -1278,7 +1281,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       }, admission.withPermits(1)),
       roster: () =>
         [...hands.values()]
-          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+          .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
           .flatMap((h) => {
             const r = view(h);
             return r ? [r] : [];
@@ -1295,7 +1298,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const runs = yield* db(qr.runsOfEndedSessions());
         const bySession = Map.groupBy(runs, (r) => r.session);
         for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
-        return out.sort((a, b) => b.hiredAt - a.hiredAt);
+        return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
       }),
       get: Effect.fn("Sessions.get")(function* (id) {
         const live = core.session(id);

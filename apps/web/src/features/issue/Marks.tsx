@@ -1,11 +1,13 @@
-import { t } from "@vibevalley/i18n";
-
 import { For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { IssueStatus, Priority } from "@vibevalley/protocol";
+
+import { useAgent } from "@/base/agents";
+import { AgentFace, OrchestratorFace } from "@/ui/Face";
+
 import type { BoardCard, Tone } from "./cards";
 import { cardAgent } from "./cards";
-import { AgentFace, OrchestratorFace } from "@/ui/Face";
-import { useAgent } from "@/base/agents";
 
 export const toneVar = (tone: Tone) => `var(--color-${tone})`;
 

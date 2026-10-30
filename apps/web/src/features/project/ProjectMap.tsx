@@ -1,17 +1,33 @@
-import { t } from "@vibevalley/i18n";
 // The map: every project an island on parchment, its plots its helpers'
 // worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
 // plot its issue, an empty plot a seed for the project.
 
-import { variant, autofocus } from "@/base/util";
-import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
+
 import { api, newSendKey, reasonOf } from "@/base/api";
-import { badgeColors, CardColors } from "@/ui/pixel/card";
-import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
+import { useCore, useFrames } from "@/base/frame";
+import { ready, useAgents, useProjects } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { variant, autofocus } from "@/base/util";
+import { defaultOf } from "@/features/channel";
+import { writeIssue } from "@/features/issue";
+import { Button } from "@/ui/Button";
 import { castOf, castSprite, cropSprite } from "@/ui/cast";
+import { Dialog } from "@/ui/Dialog";
+import { AgentFace } from "@/ui/Face";
+import { TextArea } from "@/ui/Field";
+import { Card, Quiet } from "@/ui/layout";
+import { PixelCard, SpriteIcon } from "@/ui/pixel";
+import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
+import { badgeColors, CardColors } from "@/ui/pixel/card";
+import { PoseSprite } from "@/ui/PoseSprite";
+import { toast } from "@/ui/toasts";
+
 import { growthOf, since } from "./calendar";
 import {
   homeless,
@@ -28,20 +44,6 @@ import {
   sessionInPlot,
   spotText,
 } from "./islands";
-import { toast } from "@/ui/toasts";
-import { writeIssue } from "@/features/issue";
-import { useRouter } from "@/base/router";
-import { useCore, useFrames } from "@/base/frame";
-import { defaultOf } from "@/features/channel";
-import { ready, useAgents, useProjects } from "@/base/query";
-import { PixelCard } from "@/ui/pixel";
-import { Button } from "@/ui/Button";
-import { Dialog } from "@/ui/Dialog";
-import { AgentFace } from "@/ui/Face";
-import { TextArea } from "@/ui/Field";
-import { SpriteIcon } from "@/ui/pixel";
-import { PoseSprite } from "@/ui/PoseSprite";
-import { Card, Quiet } from "@/ui/layout";
 
 const gap = 24;
 const parchment = "#ebd9ae";
@@ -113,7 +115,7 @@ export function ProjectMap() {
       <div ref={(el) => (box = el)} class="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-line" style={{ background: parchment }}>
         <Grid />
         <Show when={atlas()}>{(a) => <Clouds atlas={a()} />}</Show>
-        <Show when={atlas()?.has("map-compass") && width() >= 700 ? atlas() : undefined}>
+        <Show when={atlas()?.has("map-compass") === true && width() >= 700 ? atlas() : undefined}>
           {(a) => <Art sp={a().get("map-compass")} scale={1.5} class="pointer-events-none absolute right-4 bottom-4 opacity-80" />}
         </Show>
         <div class="absolute inset-0 overflow-y-auto p-4">

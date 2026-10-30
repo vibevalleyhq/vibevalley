@@ -1,11 +1,14 @@
-import { t } from "@vibevalley/i18n";
 // Faces cut from the pixel drawings (public/pixel/sprites.json).
 
 import { Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { Look } from "@vibevalley/protocol";
-import { castPrefix } from "./cast";
+
 import { orchestratorLookOf } from "@/base/agents";
 import { ready, useAgents, useSprites } from "@/base/query";
+
+import { castPrefix } from "./cast";
 import { RuntimeBadge } from "./RuntimeBadge";
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */
@@ -24,7 +27,10 @@ export function AgentFace(props: { agentId: string; runtime?: string | undefined
   };
   return (
     <span class="relative inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }}>
-      <span class={["relative block h-full w-full overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !!props.muted }]} aria-hidden="true">
+      <span
+        class={["relative block h-full w-full overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !(props.muted !== true) }]}
+        aria-hidden="true"
+      >
         <Show when={cut()}>
           {(c) => (
             <img

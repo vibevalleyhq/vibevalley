@@ -1,34 +1,35 @@
-import { t } from "@vibevalley/i18n";
-import { plainText } from "@vibevalley/protocol/rules";
-import { tookText } from "@/base/format";
-import type { IconName } from "@/ui/icons";
-import { spentText } from "@/base/format";
-
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
+import { plainText } from "@vibevalley/protocol/rules";
+
+import { useAgent, useOrchestrators } from "@/base/agents";
 import { api } from "@/base/api";
-import { ArtifactCard } from "@/features/artifact";
-import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { channelOf, messagePath, chatPath, parentAt } from "./places";
-import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
-import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
-import { threadOwnerOf } from "./threads";
-import { unreadIn } from "./unread";
-import { aria, useNow } from "@/base/util";
-import { useRouter } from "@/base/router";
+import { tookText, spentText } from "@/base/format";
 import { useCore } from "@/base/frame";
+import { useRouter } from "@/base/router";
+import { aria, useNow } from "@/base/util";
+import { ArtifactCard } from "@/features/artifact";
+import { TurnSteps } from "@/features/session";
+import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
-import { A } from "@/ui/A";
+import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
-import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { Tag, type TagTone } from "@/ui/Tag";
-import { useMarkRead } from "./reading";
+
+import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { editingId, setEditingId } from "./draft";
+import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
 import { followed, useFollowed, useMessage } from "./follow";
-import { TurnSteps } from "@/features/session";
-import { useAgent, useOrchestrators } from "@/base/agents";
+import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
+import { channelOf, messagePath, chatPath, parentAt } from "./places";
+import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
+import { useMarkRead } from "./reading";
+import { threadOwnerOf } from "./threads";
+import { unreadIn } from "./unread";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },
@@ -59,7 +60,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     },
     (step) => {
       if (!step) return;
-      const [what, at, n] = step.split(":") as [string, string, string];
+      const [what = "", at = "", n = ""] = step.split(":");
       if (what === "older") return void followed.loadOlder(at);
       requestAnimationFrame(() => log?.querySelector(`[data-number="${n}"]`)?.scrollIntoView({ block: "center" }));
       setLit(Number(n));
@@ -88,7 +89,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     searching()
       ? feedOf(
           core()?.chat,
-          [...(hits() ?? [])].reverse().map((h) => h.message),
+          [...(hits() ?? [])].toReversed().map((h) => h.message),
         )
       : feedOf(core()?.chat, said().messages),
   );
@@ -136,7 +137,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       <div
         ref={(el) => (log = el)}
         onScroll={onScroll}
-        class="scroll-fade-y flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
+        class="flex min-h-0 flex-1 scroll-fade-y flex-col-reverse overflow-y-auto"
         role="log"
         aria-label={t("web.channel.messages.label")}
         data-testid="messages"
@@ -263,7 +264,7 @@ function Frame(props: {
   children: JSX.Element;
 }) {
   return (
-    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues ? "pt-0.5" : "mt-3 pt-1"]}>
+    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues === true ? "pt-0.5" : "mt-3 pt-1"]}>
       {props.tools}
       <Show when={props.quote}>
         {(q) => (
@@ -274,7 +275,7 @@ function Frame(props: {
       </Show>
       <div class="flex gap-3">
         <div class="relative w-10 shrink-0">
-          <Show when={!props.continues}>
+          <Show when={props.continues !== true}>
             {props.face}
             <Show when={props.dot}>
               <span class="absolute top-[26px] left-[26px]">{props.dot}</span>
@@ -282,7 +283,7 @@ function Frame(props: {
           </Show>
         </div>
         <div class="min-w-0 flex-1 pb-0.5">
-          <Show when={!props.continues}>
+          <Show when={props.continues !== true}>
             <div class="flex items-baseline gap-2">
               <span class="text-sm font-semibold">{props.name}</span>
               <span class="truncate text-xs text-muted">{props.meta}</span>
@@ -398,7 +399,7 @@ export function MessageRow(props: {
             {t("web.channel.more.jump")}
           </button>
         ) : props.m.deleted === undefined && !props.where ? (
-          <MessageTools m={props.m} inChannel={!!props.inChannel} onEdit={() => setEditing(true)} />
+          <MessageTools m={props.m} inChannel={!(props.inChannel !== true)} onEdit={() => setEditing(true)} />
         ) : undefined
       }
     >

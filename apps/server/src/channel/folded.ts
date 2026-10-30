@@ -1,7 +1,8 @@
 // The chat in the core state.
 
 import { type Chat, type ChatMessage, type Channel, type OwnerMention, ownerId } from "@vibevalley/protocol";
-import { compareText } from "@/base/order.ts";
+
+import { compareText, or } from "@/base/order.ts";
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
 export const keepChannels = 100;
 
@@ -27,11 +28,11 @@ export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   let all = base.channels.filter((x) => x.id !== c.id);
   all.push(c);
   const byID = (a: Channel, b: Channel) => compareText(a.id, b.id);
-  if (all.length <= keepChannels) return { ...base, channels: all.sort(byID) };
+  if (all.length <= keepChannels) return { ...base, channels: all.toSorted(byID) };
   const top = (x: Channel) => (isTop(x) ? 1 : 0);
-  const ranked = [...all].sort((a, b) => top(b) - top(a) || (b.lastNumber ?? 0) - (a.lastNumber ?? 0));
+  const ranked = [...all].toSorted((a, b) => or(top(b) - top(a), (b.lastNumber ?? 0) - (a.lastNumber ?? 0)));
   const keep = new Set(ranked.slice(0, keepChannels).map((x) => x.id));
-  all = all.filter((x) => keep.has(x.id)).sort(byID);
+  all = all.filter((x) => keep.has(x.id)).toSorted(byID);
   return { ...base, channels: all };
 }
 

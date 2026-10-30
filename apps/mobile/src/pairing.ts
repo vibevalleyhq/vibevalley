@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What the phone works out with no device in the way: where a pairing link points, what to call this phone, how the
 // page is told its key. The rest of the shell (App.tsx and its pieces) only wires these to the native modules.
 
+import { t } from "@vibevalley/i18n";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
 /** A pairing: the farm's address on the network (scheme, host and port) and the one-time code. */
@@ -23,7 +23,7 @@ export function parsePairLink(text: string): PairLink | undefined {
   if (!code) return undefined;
   if (u.protocol === "vibevalley:") {
     const farm = parseFarm(u.searchParams.get("u") ?? "");
-    return farm && (u.host === "pair" || u.pathname.replace(/^\/+/, "") === "pair") ? { url: farm, code } : undefined;
+    return farm && (u.host === "pair" || u.pathname.replace(/^\/+/u, "") === "pair") ? { url: farm, code } : undefined;
   }
   if ((u.protocol === "http:" || u.protocol === "https:") && u.pathname === "/pair") return { url: u.origin, code };
   return undefined;

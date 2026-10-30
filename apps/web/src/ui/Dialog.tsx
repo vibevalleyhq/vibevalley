@@ -1,5 +1,6 @@
-import { Dialog as Base } from "@vibevalley/base-ui";
 import type { JSX } from "@solidjs/web";
+
+import { Dialog as Base } from "@vibevalley/base-ui";
 
 /** A modal over the page (the native <dialog>: focus trap, Escape closes). Open while `open`. */
 export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {
@@ -9,7 +10,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
         data-testid={props.testid}
         class={[
           "m-auto animate-pop-in rounded-lg border border-line bg-page p-0 text-ink shadow-float backdrop:animate-fade-in backdrop:bg-scrim",
-          props.wide ? "w-[min(1080px,94vw)]" : "w-[min(480px,92vw)]",
+          props.wide === true ? "w-[min(1080px,94vw)]" : "w-[min(480px,92vw)]",
         ]}
       >
         <div class="flex max-h-[86vh] flex-col">

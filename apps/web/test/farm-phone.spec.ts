@@ -4,10 +4,12 @@
 // the page reconnects a second later to the next.
 
 import type { Page } from "@playwright/test";
+
 import type { InboxItem, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
@@ -142,5 +144,5 @@ test("calling the orchestrator on the phone is the chat's call: one call, the sa
   await expect(line).toHaveAttribute("data-problem", "");
   // The chat says why too, with the way to the setting that fixes it.
   await chat.getByTestId("call-problem").getByTestId("call-problem-fix").click();
-  await expect(page).toHaveURL(/\/settings\/call$/);
+  await expect(page).toHaveURL(/\/settings\/call$/u);
 });

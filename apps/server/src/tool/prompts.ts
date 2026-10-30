@@ -1,6 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // How the tools word what they found.
 
+import { t } from "@vibevalley/i18n";
 import {
   type Artifact,
   type Block,
@@ -16,12 +16,13 @@ import {
   type Spent,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
-import { runtimeLabel } from "@/agent/seed.ts";
-import { nextText, whenText } from "@/cron/when.ts";
-import { head } from "@/base/clip.ts";
-import { yuan } from "@/runtime/money.ts";
 import type { Handlers } from "@vibevalley/protocol/api";
+import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+
+import { runtimeLabel } from "@/agent/seed.ts";
+import { head } from "@/base/clip.ts";
+import { nextText, whenText } from "@/cron/when.ts";
+import { yuan } from "@/runtime/money.ts";
 
 type Op = keyof Handlers;
 import type { Roster } from "@/session/session.ts";
@@ -105,7 +106,7 @@ export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) =>
 export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => t(`shared.priority.${p}`)).join("、");
 
 export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly project?: string }) =>
-  "#" + c.name + (c.default ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
+  "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
 
 /** How long, in round words. */
 export function spanWords(ms: number): string {

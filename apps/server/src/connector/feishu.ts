@@ -1,13 +1,16 @@
-import { t } from "@vibevalley/i18n";
 // Feishu and Lark. Logging in is Feishu's scan-to-create flow: Feishu creates a personal bot app for
 // the owner and hands back its app id and secret (the device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/
 // registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
 // API to the owner's open_id, with no reply window.
 
+import * as Lark from "@larksuiteoapi/node-sdk";
 import { Effect, FiberSet, Predicate, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
+
 import { jsonOrNone } from "@/base/json.ts";
-import * as Lark from "@larksuiteoapi/node-sdk";
+
 import { type Adapter, AppFailed, failedOf, failedWith } from "./adapter.ts";
 
 /** A text message's content: {"text": …}. */
@@ -65,7 +68,10 @@ type Polled =
   | { readonly status: "pending"; readonly domain: Domain };
 
 export class FeishuClient implements FeishuApi {
-  constructor(private readonly http: HttpClient.HttpClient) {}
+  private readonly http: HttpClient.HttpClient;
+  constructor(http: HttpClient.HttpClient) {
+    this.http = http;
+  }
 
   private form(domain: Domain, fields: Record<string, string>) {
     return this.http.execute(HttpClientRequest.bodyUrlParams(HttpClientRequest.post(accounts[domain] + "/oauth/v1/app/registration"), fields)).pipe(
@@ -140,7 +146,7 @@ export class FeishuClient implements FeishuApi {
     return Effect.scoped(
       Effect.gen(function* () {
         // The SDK calls back outside any fiber: each message is taken on this listen's fibers, ended with it.
-        const take = yield* FiberSet.makeRuntimePromise<never>();
+        const take = yield* FiberSet.makeRuntimePromise();
         return yield* Effect.callback<void, AppFailed>((resume) => {
           const client = new Lark.WSClient({
             appId: app.appId,

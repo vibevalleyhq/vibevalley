@@ -1,13 +1,16 @@
 import { chmodSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { Cause, Effect, Exit, Layer } from "effect";
+
+import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
+
 import { ServerConfig } from "@/base/config.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { testConfig, starter } from "@/testing/layers.ts";
+
 import { Agents, withCast } from "./agent.ts";
 import { defaultSettings } from "./seed.ts";
-import { starter } from "@/testing/layers.ts";
 
 const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(Agents.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config))))));
@@ -246,11 +249,11 @@ describe("profiles", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/) });
+        expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/u) });
         expect((yield* Effect.flip(s.addTemplate(join(config.home, "nowhere"))))._tag).toBe("Refused");
         const added = yield* s.addTemplate(folder);
         expect([added.source, added.runtime, added.persona]).toEqual(["added", orchestratorRuntime, "你专管前端的工单。"]);
-        expect(readdirSync(join(config.home, "agent-templates", "lead")).sort()).toEqual(["agent.json", "persona.md"]);
+        expect(readdirSync(join(config.home, "agent-templates", "lead")).toSorted()).toEqual(["agent.json", "persona.md"]);
         expect((yield* Effect.flip(s.addTemplate(folder)))._tag).toBe("Refused");
         const lead = yield* s.installTemplate("lead");
         expect([lead.role, s.isOrchestrator(lead.id)]).toEqual(["orchestrator", true]);

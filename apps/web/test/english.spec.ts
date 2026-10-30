@@ -12,12 +12,12 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
 
   const nav = page.getByRole("navigation", { name: "Workbench" });
   for (const label of ["Chat", "Tickets", "Artifacts", "Profiles", "Machines", "Projects", "Catalog", "Settings"])
-    await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `) })).toBeVisible();
+    await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `, "u") })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(language.locator('[data-key="en"]')).toHaveAttribute("aria-pressed", "true");
 
   // The board's lanes are the page's words; a card's status is the server's, in the same language.
-  await nav.getByRole("link", { name: /^Tickets · / }).click();
+  await nav.getByRole("link", { name: /^Tickets · /u }).click();
   await expect(page.getByText("Add paging to clock-in")).toBeVisible();
   for (const lane of ["To do", "In progress", "For you to see", "Closed"]) await expect(page.getByText(lane, { exact: true }).first()).toBeVisible();
 
@@ -25,9 +25,9 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   const settings = await api.setting.get();
   expect(settings.locale).toBe("en");
   expect(settings.voiceDefaults.greeting).toBe("Hey there! What shall we grow today?");
-  await nav.getByRole("link", { name: /^Chat · / }).click();
+  await nav.getByRole("link", { name: /^Chat · /u }).click();
   await expect(page.getByRole("heading", { name: "general" })).toBeVisible();
-  await nav.getByRole("link", { name: /^Machines · / }).click();
+  await nav.getByRole("link", { name: /^Machines · /u }).click();
   await expect(page.getByRole("region", { name: "Machines" })).toBeVisible();
 
   await page.goto("/settings/general");
@@ -47,7 +47,7 @@ test("no page of an English farm shows Chinese of its own", async ({ page, api }
   const keep = (v: unknown): void => {
     if (typeof v === "string") stored.push(v);
     else if (Array.isArray(v)) v.forEach(keep);
-    else if (v && typeof v === "object") Object.values(v).forEach(keep);
+    else if (typeof v === "object" && v !== null) Object.values(v).forEach(keep);
   };
   keep(agents);
   keep(await api.channel.list());
@@ -83,7 +83,7 @@ test("no page of an English farm shows Chinese of its own", async ({ page, api }
           return said;
         })
       )
-        .flatMap((text) => text.split(/\n+/))
+        .flatMap((text) => text.split(/\n+/u))
         .filter((line) => (line.match(chinese) ?? []).some((run) => !stored.some((text) => text.includes(run))))
         .map((line) => `${path}: ${line.trim()}`);
     await expect.poll(left).toEqual([]);

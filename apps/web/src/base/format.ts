@@ -1,7 +1,7 @@
+// Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
+
 import { currentLocale, t } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
-
-// Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
 
 export function ago(at: number, now: number) {
   const s = Math.max(0, Math.round((now - at) / 1000));

@@ -1,16 +1,19 @@
-import { t } from "@vibevalley/i18n";
-import { recallWords } from "./prompts.ts";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes. It is the owner's own knowledge, and the farm only adds to it. What
 // the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
 // reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Clock, Effect, Option, Predicate, Schema } from "effect";
+
 import { asTransport } from "@vibevalley/agent/mcpTransport";
+import { t } from "@vibevalley/i18n";
 import type { Memory } from "@vibevalley/protocol";
-import { Clock, Effect, Option, Schema } from "effect";
+
 import { redact } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+
+import { recallWords } from "./prompts.ts";
 import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
@@ -32,7 +35,7 @@ const head = (s: string, n: number) => {
 };
 
 /** Its labels are words without spaces or commas (the list is comma-separated). */
-const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/g, "-")}`;
+const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/gu, "-")}`;
 
 const projectLabel = `${app}-scope-project-`;
 const globalLabel = `${app}-scope-global`;
@@ -46,7 +49,7 @@ const scopeOf = (labels: unknown): MemoryScope => {
   const only = scopes[0]!;
   if (only === globalLabel) return { kind: "global" };
   const encoded = only.slice(projectLabel.length);
-  if (!/^(?:[0-9a-f]{2})+$/.test(encoded)) return { kind: "unknown" };
+  if (!/^(?:[0-9a-f]{2})+$/u.test(encoded)) return { kind: "unknown" };
   const project = Buffer.from(encoded, "hex").toString("utf8");
   return Buffer.from(project, "utf8").toString("hex") === encoded ? { kind: "project", project } : { kind: "unknown" };
 };
@@ -130,8 +133,10 @@ export function nowledge(c: MemorySourceConfig): Source {
             return sourceError(e);
           },
         });
-        const text = ((res.content ?? []) as { type: string; text?: string }[]).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-        if (res.isError) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
+        const text = (Array.isArray(res.content) ? res.content : [])
+          .map((x: unknown) => (Predicate.isObject(x) && "type" in x && x.type === "text" && "text" in x && typeof x.text === "string" ? x.text : ""))
+          .join("");
+        if (res.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );
@@ -174,16 +179,16 @@ export function nowledge(c: MemorySourceConfig): Source {
     }),
     // Nothing to ask with, nothing asked: listing its newest would only be noise at the start of a run.
     prefetch: Effect.fnUntraced(function* (cue) {
-      if (!c.read || cue.text.trim() === "") return [];
-      const hits = yield* find(cue.agent, cue.text, recallCount, !!c.everything);
+      if (c.read !== true || cue.text.trim() === "") return [];
+      const hits = yield* find(cue.agent, cue.text, recallCount, !(c.everything !== true));
       return hits
-        .filter((h) => !cue.skip?.has(hitID(h)))
+        .filter((h) => cue.skip?.has(hitID(h)) !== true)
         .map((h) => ({ id: hitID(h), line: recallWords.sourceLine("Nowledge", clip(hitText(h), lineMost)), score: h.relevance_score ?? 0 }));
     }),
     // Its memories are notes; it has no jobs done.
     search: Effect.fnUntraced(function* (q) {
-      if (!c.read || q.kind === "issue") return { found: [] };
-      const hits = yield* find(q.agent, q.text, q.limit, !!c.everything);
+      if (c.read !== true || q.kind === "issue") return { found: [] };
+      const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));
       const selected = hits.slice(0, most);
       // MCP search omits labels; only its detail result can prove a project's scope. The caller's read budget covers both.
       const scopes = yield* Effect.forEach(
@@ -217,18 +222,18 @@ export function nowledge(c: MemorySourceConfig): Source {
     }),
     // The farm's own; Nowledge does not say which project each is for.
     list: Effect.fnUntraced(function* (agent) {
-      if (!c.read) return [];
+      if (c.read !== true) return [];
       const hits = yield* find(agent, "", most, false);
       return hits.map((h): Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
     }),
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: Effect.fnUntraced(function* (run) {
-      if (!c.write || run.outcome === "interrupted") return;
+      if (c.write !== true || run.outcome === "interrupted") return;
       for (const note of memoryNotesOf(run.said)) yield* add(run.agent, note.text, note.everywhere ? "" : run.project);
     }),
     sessionEnded: () => Effect.void,
     add: Effect.fnUntraced(function* (n) {
-      if (!c.write) return undefined;
+      if (c.write !== true) return undefined;
       const project = n.project.trim();
       const id = yield* add(n.agent, n.text, project);
       const at = yield* Clock.currentTimeMillis;

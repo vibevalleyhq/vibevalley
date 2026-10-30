@@ -2,10 +2,13 @@
 // profile's), and how the workbench looks and where the page opens. A phone and a desktop may want them apart, so they are
 // kept in localStorage, not settings.json; without storage they last until the page closes.
 
-import { recordOf } from "@/base/util";
-import { isOneOf } from "@vibevalley/protocol/rules";
-import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 import type { Accessor } from "solid-js";
+
+import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
+import { isOneOf } from "@vibevalley/protocol/rules";
+
+import { recordOf } from "@/base/util";
+
 import { createExternal } from "./external";
 
 /** The workbench's size, in percent; the farm keeps its own whole-number scaling. */
@@ -67,7 +70,7 @@ export const subscribePrefs = (l: () => void) => {
 
 function set(patch: Partial<Prefs>) {
   const next = { ...prefs, ...patch };
-  if ((Object.keys(next) as (keyof Prefs)[]).every((k) => next[k] === prefs[k])) return;
+  if (Object.entries(next).every(([k, v]) => v === Reflect.get(prefs, k))) return;
   prefs = next;
   try {
     localStorage.setItem(key, JSON.stringify(prefs));

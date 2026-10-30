@@ -1,9 +1,11 @@
-import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Show, untrack } from "solid-js";
+
+import { createExternal } from "@/base/external";
+
+import { SpriteIcon } from "./icons";
 import { pxDrop, pxText } from "./style";
 import { type ToastData, type ToastStore, toasts } from "./toasts";
-import { createExternal } from "@/base/external";
-import { SpriteIcon } from "./icons";
 
 const tone: Record<string, string> = { warn: "bg-peach/30", error: "bg-berry/15" };
 
@@ -59,9 +61,9 @@ function ToastCard(props: { toast: ToastData; index: number; hidden: boolean; le
         transform: `translate(${drag().x}px, ${props.index * 9.6 + drag().y}px) scale(${1 - props.index * 0.05})`,
       }}
       class={[
-        "flex origin-center items-center gap-3 self-start bg-cream-50 p-3 text-bark-900 touch-none",
+        "flex origin-center touch-none items-center gap-3 self-start bg-cream-50 p-3 text-bark-900",
         pxDrop,
-        "transition-[translate,transform,opacity] duration-300 ease-out starting:-translate-y-[120%] motion-reduce:transition-none",
+        "transition-[translate,transform,opacity] duration-300 ease-out motion-reduce:transition-none starting:-translate-y-[120%]",
         { "transition-none": drag().x > 0 || drag().y > 0 },
         props.hidden ? "opacity-0" : "opacity-100",
         front() ? "pointer-events-auto" : "pointer-events-none",

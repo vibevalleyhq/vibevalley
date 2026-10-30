@@ -3,6 +3,7 @@
 // "nobody", and the server has no model key.
 
 import type { Page } from "@playwright/test";
+
 import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
@@ -73,28 +74,28 @@ test("a project's farm names it on the sign; an empty plot sows in it, and a dra
   await words.fill("add a night mode to the clock-in page");
   await expect(sow.getByTestId("sow-start")).toBeEnabled();
   await sow.getByTestId("sow-draft").click();
-  await expect(page).toHaveURL(/\/issues\/.+/);
+  await expect(page).toHaveURL(/\/issues\/.+/u);
   const made = (await api.issue.list({})).find((i) => i.title.includes("night mode"));
   expect([made?.project, made?.status]).toEqual(["farm-hud", "backlog"]);
   await page.goto("/farm/farm-hud");
   await page.getByTestId("project-sign").click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/projects$/u);
 });
 
 test("/farm opens the farm entered last, and a farm with no project sends sowing to the map", async ({ page, api }) => {
   await api.project.create({ name: "farm-home" });
   // A device that never entered a farm still lands on one: going back to the farm never strands it on the map.
   await page.goto("/farm");
-  await expect(page).toHaveURL(/\/farm\/.+/);
+  await expect(page).toHaveURL(/\/farm\/.+/u);
   await openFarm(page, "farm-home");
   await page.goto("/farm");
-  await expect(page).toHaveURL(/\/farm\/farm-home$/);
+  await expect(page).toHaveURL(/\/farm\/farm-home$/u);
   await openFarm(page);
   await clickFirstPlot(page);
   const sow = page.getByTestId("sow");
   await expect(sow.getByTestId("sow-homeless")).toBeVisible();
   await sow.getByTestId("sow-to-map").click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/projects$/u);
 });
 
 test("the helpers open, and a click elsewhere folds them and a helper's card", async ({ page }) => {

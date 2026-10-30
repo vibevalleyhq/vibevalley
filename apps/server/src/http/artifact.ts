@@ -1,8 +1,10 @@
 // A GET since an <iframe src> can only GET; a version never changes once made, so it is cached for good. Its headers keep an HTML page from running as one of the farm's (artifact/policy.ts).
 
 import { Effect } from "effect";
-import { artifactPrefix as prefix } from "@vibevalley/protocol";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+
+import { artifactPrefix as prefix } from "@vibevalley/protocol";
+
 import { Artifacts } from "@/artifact/artifact.ts";
 import { artifactHeaders } from "@/artifact/policy.ts";
 
@@ -15,7 +17,7 @@ export const artifactContent = HttpRouter.add(
     const artifacts = yield* Artifacts;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const [id = "", version = ""] = new URL(request.url, "http://farm").pathname.slice(prefix.length).split("/");
-    if (!/^[0-9a-f-]{36}$/.test(id) || !/^[1-9]\d*$/.test(version)) return notFound();
+    if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();
     const path = yield* artifacts.file(id, Number(version));
     if (!path) return notFound();
     return yield* HttpServerResponse.file(path, { contentType: artifactHeaders["content-type"]!, headers: artifactHeaders });

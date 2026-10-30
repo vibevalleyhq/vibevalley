@@ -1,7 +1,9 @@
+import { Portal } from "@solidjs/web";
+import { For, onSettled, untrack } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
-import { For, onSettled, untrack } from "solid-js";
-import { Portal } from "@solidjs/web";
+
 import { emojiGroups, quickReactions } from "./emoji";
 
 const width = 320;
@@ -30,8 +32,8 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
   const close = () => untrack(() => props.onClose)();
   onSettled(() => {
     const outside = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (t && !box?.contains(t) && !untrack(() => props.anchor)?.contains(t)) close();
+      const t = e.target instanceof Node ? e.target : null;
+      if (t && box?.contains(t) !== true && untrack(() => props.anchor)?.contains(t) !== true) close();
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;

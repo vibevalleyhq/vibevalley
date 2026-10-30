@@ -1,5 +1,3 @@
-import { t } from "@vibevalley/i18n";
-
 // The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
 // when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
 // It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists, PGlite's wasm and the
@@ -9,6 +7,8 @@ import { execFile, spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createInterface } from "node:readline";
+
+import { t } from "@vibevalley/i18n";
 
 /** The first start builds the database. */
 const startTimeoutMs = 40_000;
@@ -25,7 +25,7 @@ export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefin
   return new Promise((resolve) => {
     // The markers keep out what a profile prints on its own.
     execFile(sh, ["-ilc", 'printf "__VV_PATH__%s__VV_PATH__" "$PATH"'], { timeout: shellPathTimeoutMs, env }, (error, stdout) => {
-      const found = /__VV_PATH__(.*?)__VV_PATH__/s.exec(stdout)?.[1];
+      const found = /__VV_PATH__(.*?)__VV_PATH__/su.exec(stdout)?.[1];
       resolve(error || !found ? env.PATH : found);
     });
   });

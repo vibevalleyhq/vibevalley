@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { navMap, type Point } from "../src/nav";
 
 // A 40x20 field with a wall at x 18..22 from the top down to y 14: the way round is under it.

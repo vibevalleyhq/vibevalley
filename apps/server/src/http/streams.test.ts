@@ -1,11 +1,14 @@
-import type { LiveEvent, SideEvent, StateFrame } from "@vibevalley/protocol";
-import { describe, expect, it } from "vite-plus/test";
 import { Effect, Layer, Stream } from "effect";
 import { HttpRouter } from "effect/http";
+import { describe, expect, it } from "vite-plus/test";
+
+import type { LiveEvent, SideEvent, StateFrame } from "@vibevalley/protocol";
+
 import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { testConfig } from "@/testing/layers.ts";
+
 import { streams } from "./streams.ts";
 
 const appFor = (change: (core: Core["Service"]) => Core["Service"]) => {
@@ -26,7 +29,7 @@ async function withRoutes(change: (core: Core["Service"]) => Core["Service"], bo
 const firstChunk = async (res: Response) => {
   const reader = res.body!.getReader();
   const first = await reader.read();
-  if (first.done || !first.value) throw new Error("the stream had no first frame");
+  if (first.done === true || first.value === undefined) throw new Error("the stream had no first frame");
   const text = new TextDecoder().decode(first.value);
   await reader.cancel();
   return text;

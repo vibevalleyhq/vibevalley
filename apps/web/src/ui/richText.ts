@@ -1,11 +1,14 @@
-import { t } from "@vibevalley/i18n";
 // What rendered Markdown becomes after its DOM is made, for both renderers (ui/Markdown.tsx, ui/pixel/PxMarkdown.tsx):
 // links made safe and kept in the app, fenced code with its language, a copy button, colours and a fold, Mermaid drawn
 // by Pele, task lists that read as lists. Messages, reports, descriptions and artifacts are agents' words: nothing here
 // may let them run as the farm's page.
 
-import { messageOf } from "@/base/format";
 import type { MountOptions, Mounted } from "pele/lazy";
+
+import { t } from "@vibevalley/i18n";
+
+import { messageOf } from "@/base/format";
+
 import { highlight } from "./code/highlight";
 import { icons } from "./icons";
 import { foldLines, safeHref } from "./richRules";
@@ -24,7 +27,11 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 };
 
-const iconOf = (name: "copy" | "expand" | "check", size = 14) => icons[name === "check" ? "check" : name]({ size }) as unknown as Node;
+const iconOf = (name: "copy" | "expand" | "check", size = 14): Node => {
+  const icon: unknown = icons[name === "check" ? "check" : name]({ size });
+  if (!(icon instanceof Node)) throw new TypeError("an icon renders to one element");
+  return icon;
+};
 
 /** An SVG string as nodes, with nothing that could run or reach out: no scripts, no foreign HTML, no event handlers, no
  * links but in-page ones. Pele escapes and filters too (links and images off); this is the page's own guarantee. */
@@ -39,13 +46,21 @@ export function cleanSvg(svg: string): Node {
       const name = a.name.toLowerCase();
       if (name.startsWith("on")) e.removeAttribute(a.name);
       else if ((name === "href" || name === "xlink:href") && !a.value.startsWith("#")) e.removeAttribute(a.name);
-      else if (name === "style" && /url\(|expression|@import/i.test(a.value)) e.removeAttribute(a.name);
+      else if (name === "style" && /url\(|expression|@import/iu.test(a.value)) e.removeAttribute(a.name);
     }
   return document.importNode(root, true);
 }
 
 /** The work richen starts that outlives it: diagrams' observers, unmounted with the nodes. */
 export type Undo = () => void;
+
+/** toDom's answer as a fragment: it gives one for { fragment: true }, typed as any node. */
+export function fragmentOf(node: Node): DocumentFragment {
+  if (node instanceof DocumentFragment) return node;
+  const f = document.createDocumentFragment();
+  f.append(node);
+  return f;
+}
 
 /** Rewrites rendered Markdown in place. Returns what to undo when the nodes go. */
 export function richen(root: ParentNode, o: RichOptions = {}): Undo {
@@ -59,7 +74,7 @@ export function richen(root: ParentNode, o: RichOptions = {}): Undo {
   for (const code of [...root.querySelectorAll("pre > code")]) {
     const pre = code.parentElement!;
     const lang = [...code.classList].find((c) => c.startsWith("language-"))?.slice("language-".length) ?? "";
-    const text = code.textContent.replace(/\n$/, "");
+    const text = code.textContent.replace(/\n$/u, "");
     if (lang === "mermaid") undo.push(diagram(pre, text));
     else codeBlock(pre, code, lang, text, o);
   }
@@ -83,7 +98,7 @@ function links(root: ParentNode, o: RichOptions) {
         e.preventDefault();
         go(href);
       });
-    } else if (/^https?:/i.test(href)) {
+    } else if (/^https?:/iu.test(href)) {
       a.target = "_blank";
       a.rel = "noreferrer noopener";
     }
@@ -133,7 +148,7 @@ function codeBlock(pre: HTMLElement, code: Element, lang: string, text: string, 
     });
     box.append(more);
   }
-  if (o.pixel || !lang) return;
+  if (o.pixel === true || !lang) return;
   void highlight(lines, lang).then((tokens) => {
     if (!tokens || !code.isConnected) return;
     code.replaceChildren(

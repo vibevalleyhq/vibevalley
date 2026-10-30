@@ -1,10 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import * as q from "../../db/generated/agent_task.sql.ts";
-import { Db } from "@/base/db.ts";
-import { testDatabase } from "@/testing/layers.ts";
+
 import { add, finished, AgentTaskError, update } from "@vibevalley/agent/agentTask";
 import { memoryStore } from "@vibevalley/agent/agentTaskStore";
+
+import { Db } from "@/base/db.ts";
+import { testDatabase } from "@/testing/layers.ts";
+
+import * as q from "../../db/generated/agent_task.sql.ts";
 import { dbStores } from "./taskStore.ts";
 
 describe("an agent's own tasks, kept", () => {

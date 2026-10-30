@@ -1,11 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // A git repository as the projects use it: what it can say (its main branch, whether a branch is there and where it
 // points, how far one is ahead) and what it does (commit what a session left, merge without checking out, describe a
 // branch, clear a worktree away). The git spelling is here; what is done with the answers (the merge rules, pull
 // requests, the project's check, what a release keeps) stays in project.ts.
 
-import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
 import { Effect } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
+
+import { numberIn } from "@/base/number.ts";
+
 import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
 
 const patchLines = 400;
@@ -65,7 +69,7 @@ export const repository = (path: string) => {
     /** Whether newer has older in it; false when git cannot say. */
     isAncestor: (older: string, newer: string) => gitOk(path, "merge-base", "--is-ancestor", older, newer),
     /** How many commits branch has that base has not. */
-    ahead: (base: string, branch: string) => Effect.map(git(path, "rev-list", "--count", `${base}..${branch}`), (n) => Number(n) || 0),
+    ahead: (base: string, branch: string) => Effect.map(git(path, "rev-list", "--count", `${base}..${branch}`), (n) => numberIn(n)),
     /** origin's URL, or "" when it has none. */
     origin: gitQuiet(path, "remote", "get-url", "origin"),
     /** "" when the worktree at cwd is gone; without force, one with changes stays. */
@@ -94,7 +98,7 @@ export const repository = (path: string) => {
       const uncommitted: UncommittedItem[] = [];
       if (cwd !== "") {
         const status = yield* gitRun(cwd, "status", "--porcelain=v1", "-uall");
-        for (const line of status.stdout.replace(/\n+$/, "").split("\n")) {
+        for (const line of status.stdout.replace(/\n+$/u, "").split("\n")) {
           if (line.length < 4) continue;
           const code = line.slice(0, 2).trim();
           uncommitted.push({
@@ -172,12 +176,12 @@ export const repository = (path: string) => {
         const parts = line.split("\t");
         changes.commits.push({
           hash: parts[0]!,
-          at: (Number(parts[1]) || 0) * 1000,
+          at: numberIn(parts[1]) * 1000,
           subject: parts.slice(2).join("\t"),
         });
       }
       changes.conflicts.push(...clashes);
-      changes.behind = Number(behind) || 0;
+      changes.behind = numberIn(behind);
       return changes;
     }),
   };

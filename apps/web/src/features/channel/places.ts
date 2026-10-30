@@ -15,10 +15,10 @@ const bySidebar = (a: Channel, b: Channel) => {
 };
 
 export const topsOf = (chat: Chat | undefined): Channel[] =>
-  (chat?.channels.filter((c) => c.type === "channel" && c.archived === undefined) ?? []).sort(bySidebar);
+  (chat?.channels.filter((c) => c.type === "channel" && c.archived === undefined) ?? []).toSorted(bySidebar);
 
 export const archivedOf = (chat: Chat | undefined): Channel[] =>
-  (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).sort((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
+  (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).toSorted((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
 
 export interface ChannelGroup {
   /** None for the channels in no group, which come first. */
@@ -36,12 +36,12 @@ export function groupsOf(channels: readonly Channel[]): ChannelGroup[] {
 
 /** A channel's threads, newest message first; archived ones only when asked. */
 export const threadsIn = (chat: Chat | undefined, channel: Channel, archived = false): Channel[] =>
-  (chat?.channels.filter((c) => c.type === "thread" && c.parent === channel.id && (c.archived !== undefined) === archived) ?? []).sort(
+  (chat?.channels.filter((c) => c.type === "thread" && c.parent === channel.id && (c.archived !== undefined) === archived) ?? []).toSorted(
     (a, b) => (b.last?.at ?? b.at) - (a.last?.at ?? a.at),
   );
 
 export function pointedAt(path: string): number | undefined {
-  const m = /[?&]m=(\d+)/.exec(path);
+  const m = /[?&]m=(\d+)/u.exec(path);
   return m ? Number(m[1]) : undefined;
 }
 
@@ -53,7 +53,7 @@ export function topOf(chat: Chat | undefined, c: Channel | undefined) {
 }
 
 export const directsOf = (chat: Chat | undefined): Channel[] =>
-  (chat?.channels.filter((c) => c.type === "direct") ?? []).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  (chat?.channels.filter((c) => c.type === "direct") ?? []).toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 /** A direct channel is named by its peer, which the server puts in its title. */
 export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? c.title : (c?.name ?? ""));

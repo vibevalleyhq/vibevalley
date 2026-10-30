@@ -1,12 +1,14 @@
-import { t } from "@vibevalley/i18n";
 // Small pieces the farm's panels share: tags, tints, an empty note, a said line and its clock, and a harvest's line
 // counts, file rows and patch.
 
-import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { ChangedFile } from "@vibevalley/protocol";
-import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
+
 import { aria } from "@/base/util";
+import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
 import { SpriteIcon } from "@/ui/pixel";
 
 /** A colour at `alpha` of its strength over cream. */
@@ -41,7 +43,7 @@ export function FarmEmpty(props: { text: string }) {
 
 /** What the server answered, under the button that asked. */
 export function Said(props: { answer?: { ok: boolean | undefined; text: string } | undefined }) {
-  return <Show when={props.answer}>{(a) => <p class={["mt-2 text-[12px]", a().ok ? "text-leaf-700" : "text-berry"]}>{a().text}</p>}</Show>;
+  return <Show when={props.answer}>{(a) => <p class={["mt-2 text-[12px]", a().ok === true ? "text-leaf-700" : "text-berry"]}>{a().text}</p>}</Show>;
 }
 
 /** Hours and minutes of a time. */

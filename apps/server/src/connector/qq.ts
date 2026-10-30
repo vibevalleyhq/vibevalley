@@ -1,9 +1,13 @@
-import { t } from "@vibevalley/i18n";
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
 import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
+
+import { numberIn } from "@/base/number.ts";
+
 import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 
 const apiBase = "https://api.sgroup.qq.com";
@@ -71,11 +75,14 @@ export class QQClient implements QQApi {
   /** QQ refuses the same (msg_id, msg_seq) twice. */
   private readonly replySeq = new Map<string, number>();
 
-  constructor(
-    private readonly http: HttpClient.HttpClient,
-    private readonly api = apiBase,
-    private readonly tokenAt = tokenUrl,
-  ) {}
+  private readonly http: HttpClient.HttpClient;
+  private readonly api: string;
+  private readonly tokenAt: string;
+  constructor(http: HttpClient.HttpClient, api: string = apiBase, tokenAt: string = tokenUrl) {
+    this.http = http;
+    this.api = api;
+    this.tokenAt = tokenAt;
+  }
 
   private token(app: App) {
     return Effect.gen({ self: this }, function* () {
@@ -95,7 +102,7 @@ export class QQClient implements QQApi {
         Effect.mapError((e) => (e instanceof AppFailed ? e : failedWith(t("server.connector.qq.auth", { why: e.message })))),
       );
       if (!body.access_token) return yield* failedWith(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
-      const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(String(body.expires_in ?? "")) || 7200;
+      const seconds = typeof body.expires_in === "number" ? body.expires_in : numberIn(body.expires_in, 7200);
       this.tokens.set(key, { token: body.access_token, until: now + (seconds - 60) * 1000 });
       return body.access_token;
     });

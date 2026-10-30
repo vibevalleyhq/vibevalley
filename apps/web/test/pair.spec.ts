@@ -8,7 +8,7 @@ test("a device names itself, asks, and is told why not", async ({ page }) => {
   await page.getByTestId("pair-name").fill("test phone");
   await page.getByTestId("pair-ask").click();
   await expect(page.getByRole("alert")).not.toBeEmpty();
-  await expect(page).toHaveURL(/\/pair/);
+  await expect(page).toHaveURL(/\/pair/u);
 });
 
 test("a device the owner lets in opens the farm through the lan listener", async ({ browser, api }) => {
@@ -20,7 +20,7 @@ test("a device the owner lets in opens the farm through the lan listener", async
     const page = await phone.newPage();
     // Not paired yet: wherever it opens, it is sent to pair first.
     await page.goto(url + "/issues");
-    await expect(page).toHaveURL(/\/pair$/);
+    await expect(page).toHaveURL(/\/pair$/u);
     // Without a code there is nothing to ask with.
     await expect(page.getByTestId("pair-ask")).toBeDisabled();
     await page.goto(pairing!.link);

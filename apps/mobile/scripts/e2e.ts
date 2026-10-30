@@ -6,23 +6,26 @@
 //	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android
 //	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts ios
 
-import { setTimeout as sleep } from "node:timers/promises";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { VibeValleyApi } from "@vibevalley/protocol";
 
 const platform = process.argv[2] === "ios" ? "ios" : "android";
 const server = process.env.VIBEVALLEY_SERVER;
-if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
+if (server === undefined || server === "") throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
 const mobile = join(import.meta.dirname, "..");
 const out = join(mobile, ".screens");
 mkdirSync(out, { recursive: true });
 const run = (cmd: string, ...args: string[]) => execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
 const until = async <T>(get: () => Promise<T | undefined> | T | undefined, what: string, ms = 120_000): Promise<T> => {
+  /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
   for (const end = Date.now() + ms; Date.now() < end; await sleep(500)) {
     const got = await get();
+    /* oxlint-enable eslint/no-await-in-loop */
     if (got !== undefined) return got;
   }
   throw new Error("waited for " + what);
@@ -64,8 +67,9 @@ function android(): Device {
       let page: { url: string; webSocketDebuggerUrl: string } | undefined;
       // A port each: a kept-alive connection to one port would still reach the socket it was forwarded to before.
       let port = 9333;
-      for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/g) ?? [])) {
+      for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/gu) ?? [])) {
         adb("forward", `tcp:${++port}`, "localabstract:" + socket);
+        // oxlint-disable-next-line eslint/no-await-in-loop, typescript/no-unsafe-type-assertion -- each socket is forwarded to the next port before it is asked; Chrome's DevTools list
         const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).catch(() => undefined))?.json().catch(() => [])) as
           | { url: string; webSocketDebuggerUrl: string }[]
           | undefined;
@@ -77,6 +81,7 @@ function android(): Device {
       await new Promise((r) => ws.addEventListener("open", r, { once: true }));
       const answer = new Promise<unknown>((resolve) =>
         ws.addEventListener("message", (e) => {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the DevTools protocol's answer
           const m = JSON.parse(String(e.data)) as { id?: number; result?: { result?: { value?: unknown } } };
           if (m.id === 1) resolve(m.result?.result?.value);
         }),
@@ -184,6 +189,6 @@ try {
   if ((await api.lan.get()).pairing) throw new Error("it asked to pair again");
   console.log("back after a restart");
 } finally {
-  for (const d of (await api.lan.get()).devices) await api.lan.device.delete({ id: d.id });
+  await Promise.all((await api.lan.get()).devices.map((d) => api.lan.device.delete({ id: d.id })));
   await api.lan.update({ open: false });
 }

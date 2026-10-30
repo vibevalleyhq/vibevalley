@@ -1,4 +1,5 @@
 import { t } from "@vibevalley/i18n";
+
 import type { MemoryItem, MemoryKind, TreeStage } from "./mock";
 /** Only the name: the stage itself comes with the data (MemoryTree.stage). */
 export const stageName = (stage: TreeStage) => t(`web.tree.stage.${stage}`);
@@ -26,7 +27,7 @@ export function counts(items: readonly MemoryItem[]): Record<MemoryKind | "fadin
 }
 
 export function newest(items: readonly MemoryItem[], limit: number): MemoryItem[] {
-  return [...items].sort((a, b) => b.at - a.at).slice(0, limit);
+  return [...items].toSorted((a, b) => b.at - a.at).slice(0, limit);
 }
 
 export function lastRecalled(items: readonly MemoryItem[]): MemoryItem | undefined {

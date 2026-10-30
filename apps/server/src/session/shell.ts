@@ -1,7 +1,7 @@
 // codex runs every command as `/bin/zsh -lc '<command>'`; the label shows the
 // command, not the shell around it.
 
-const shellWrap = /^(?:\S*\/)?(?:zsh|bash|sh) -l?c (.+)$/s;
+const shellWrap = /^(?:\S*\/)?(?:zsh|bash|sh) -l?c (.+)$/su;
 
 /** The command inside a shell's -c, read as the one shell word the shell would see; anything else comes back as it is. */
 export function shellCommand(command: string): string {

@@ -53,11 +53,18 @@ export default defineConfig({
   // scripts/'s own tests; each package has its vite.config.ts with its own.
   test: { include: ["scripts/**/*.test.ts"] },
   // The pre-commit hook (.vite-hooks/pre-commit) runs these on the staged files.
-  staged: { "*": "vp check --fix" },
+  staged: { "*": "vp check --fix --deny-warnings" },
   fmt: {
     printWidth: 160,
     // site/ is its own project; the rest are written by tools or are data, and docs keep their compact tables.
     ignorePatterns: ["site/**", "**/*.md", "apps/server/db/generated/**", "**/testdata/**", "apps/web/public/**", ".agents/**", "design/**"],
+    // Imports from farthest to nearest: Node, packages, the workspace's own, this app's @/, then the same folder.
+    sortImports: {
+      customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
+      groups: ["builtin", "external", "workspace", ["internal", "subpath"], ["parent", "sibling", "index"], "style", "unknown"],
+    },
+    // Tailwind's own class order, from the page's stylesheet; cx(…) holds classes too.
+    sortTailwindcss: { stylesheet: "./apps/web/src/style.css", functions: ["cx"] },
   },
   lint: {
     ignorePatterns: ["site/**", "apps/server/db/generated/**"],
@@ -103,6 +110,42 @@ export default defineConfig({
       "eslint/no-fallthrough": "error",
       // A deprecated API is moved off when it is met; one kept on purpose says why at the call.
       "typescript/no-deprecated": "error",
+      // A module imported twice says two things about one dependency.
+      "import/no-duplicates": "error",
+      // Type arguments, conversions and type parameters that change nothing are noise a reader has to see through.
+      "typescript/no-unnecessary-type-arguments": "error",
+      "typescript/no-unnecessary-type-conversion": "error",
+      "typescript/no-unnecessary-type-parameters": "error",
+      // A spread inside a reduce copies everything so far on every step: quadratic.
+      "oxc/no-accumulating-spread": "error",
+      "unicorn/prefer-set-has": "error",
+      "unicorn/prefer-array-find": "error",
+      // A condition is a boolean or a string. "" is a string's none (docs/style/code.md, 没有值), so a string reads as
+      // "is there one"; a number's 0 is a value, not none; an object is always true; a nullable object is checked for
+      // being there.
+      "typescript/strict-boolean-expressions": [
+        "error",
+        {
+          allowString: true,
+          allowNullableString: true,
+          allowNumber: false,
+          allowNullableObject: true,
+          allowNullableBoolean: false,
+          allowNullableNumber: false,
+        },
+      ],
+      // x || d takes 0 and false for none; ?? takes only null and undefined. A string's "" is its none, so || stays for strings.
+      "typescript/prefer-nullish-coalescing": ["error", { ignorePrimitives: { string: true } }],
+      // A cast that narrows is a claim nothing checks: read it with a Schema or a guard, or say at the cast why it holds.
+      "typescript/no-unsafe-type-assertion": "error",
+      // Without u a pattern matches UTF-16 units: an emoji or a rare Han character is two of them, and . or [^x] splits it.
+      "eslint/require-unicode-regexp": "error",
+      // Frames and the core state are shared: sorting or reversing one in place changes it for everyone holding it.
+      "unicorn/no-array-sort": "error",
+      "unicorn/no-array-reverse": "error",
+      // Awaits one after another in a loop: either the steps depend on each other, which the code says where it does it,
+      // or they could run together.
+      "eslint/no-await-in-loop": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -149,6 +192,27 @@ export default defineConfig({
           "typescript/no-unsafe-member-access": "off",
           "typescript/no-unsafe-return": "off",
         },
+      },
+      {
+        // A test's cast is checked by the test: a wrong claim fails the expectation that reads it. Stories and samples are
+        // looked at.
+        files: [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "**/*.stories.tsx",
+          "**/*.samples.ts",
+          "apps/*/test/**",
+          "packages/*/test/**",
+          "apps/server/src/testing/**",
+          "packages/*/src/testing.ts",
+          "packages/testkit/src/**",
+        ],
+        rules: { "typescript/no-unsafe-type-assertion": "off" },
+      },
+      {
+        // Playwright drives one page: its steps cannot run together.
+        files: ["apps/*/test/**/*.spec.ts", "apps/*/test/fixtures.ts"],
+        rules: { "eslint/no-await-in-loop": "off" },
       },
       {
         // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; so does

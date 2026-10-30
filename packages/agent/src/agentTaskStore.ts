@@ -1,9 +1,10 @@
 // Where an agent keeps its own tasks (agentTask.ts). change answers the graph as kept, then puts a finished one away:
 // the caller can still say how it ended. The farm keeps them in its database (apps/server, agent/taskStore.ts).
 
-import { type ToolFailed, toolFailed } from "./core/errors.ts";
 import { Effect } from "effect";
+
 import { finished, type AgentTask } from "./agentTask.ts";
+import { type ToolFailed, toolFailed } from "./core/errors.ts";
 
 export interface AgentTaskStore {
   readonly load: Effect.Effect<AgentTask[]>;

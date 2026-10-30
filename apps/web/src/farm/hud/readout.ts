@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // Words the HUD shows, from the frame: the clock, the warehouse, what a helper is doing, a plot's title and what the
 // orchestrator last said. The runtimes' quotas are features/runtime/quota.ts.
 
+import { t } from "@vibevalley/i18n";
 import type { ChatMessage, WorkspaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
 
 import { beds, cropLabel, type Bed } from "@/farm/world/plots";
@@ -13,11 +13,11 @@ export function clockText(tod: number) {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(m - (m % 5)).padStart(2, "0")}`;
 }
 
-export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
 
 /** The issues harvested into their main branch (merged here, or by a pull request), newest first: the warehouse. */
 export const harvestedOf = (s: WorkspaceState | undefined): Issue[] =>
-  (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
+  (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").toSorted((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
 
 const nothing: DoingView = { action: "none", label: "", actionText: "" };
 
@@ -34,6 +34,6 @@ export function plotTitle(bed: Bed, session: Session | undefined, crop: Crop) {
 
 /** The orchestrator's last typed line among the general channel's messages (voice lines are not on the web yet). */
 export function lastOrchestratorSaid(general: readonly ChatMessage[]) {
-  const typed = general.filter((m) => m.fromKind === "orchestrator" && m.kind === "chat").at(-1);
+  const typed = general.findLast((m) => m.fromKind === "orchestrator" && m.kind === "chat");
   return typed && { key: `m${typed.id}`, text: typed.text, at: typed.at };
 }

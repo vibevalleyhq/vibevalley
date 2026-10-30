@@ -1,8 +1,10 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { describe, expect, it } from "vite-plus/test";
+
 import { Effect } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
+import { describe, expect, it } from "vite-plus/test";
+
 import { decodeGatewayEvent, QQClient } from "./qq.ts";
 
 const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));

@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import type { IssueStatus } from "@vibevalley/protocol";
 export type Stage = "talk" | "work" | "finish";
 

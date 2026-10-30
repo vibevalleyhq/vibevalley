@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
 
 const protocol = join(import.meta.dirname, "..", "packages/protocol/src");
@@ -28,7 +29,7 @@ function handlers(source: string) {
     }
     member += (member ? " " : "") + t;
     if (!member.endsWith("ApiError, R>;")) continue;
-    const m = /^readonly "([\w.]+)": \((.*)\) => Effect\.Effect<(.+), ApiError, R>;$/.exec(member);
+    const m = /^readonly "([\w.]+)": \((.*)\) => Effect\.Effect<(.+), ApiError, R>;$/u.exec(member);
     if (!m) throw new Error(`api-client: cannot read the Handlers member: ${member}`);
     found.set(m[1]!, { args: m[2]!, result: m[3]!, doc });
     member = "";
@@ -53,7 +54,7 @@ function method(e: (typeof endpoints)[number], indent: string): string {
       indent
     : "";
   const input = e.input === undefined ? "undefined" : "a";
-  return `${indent}${doc}${name}: (${args}): Promise<${sig.result}> => this.call(${JSON.stringify(pathOf(e.op))}, ${input}) as Promise<${sig.result}>,`;
+  return `${indent}${doc}${name}: (${args}): Promise<${sig.result}> => this.call<${sig.result}>(${JSON.stringify(pathOf(e.op))}, ${input}),`;
 }
 
 // module → its own ops and its nouns' (issue.create, issue.status.update).
@@ -79,16 +80,21 @@ import { t } from "@vibevalley/i18n";
 
 /** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
 export class VibeValleyApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly tag: string | undefined,
-    readonly reason: string,
-    /** The error as the server wrote it, for what it carries besides the reason. */
-    readonly error?: ApiError,
-    /** The response exactly as received, including plain text that was not JSON. */
-    readonly body?: string,
-  ) {
+  readonly status: number;
+  readonly tag: string | undefined;
+  readonly reason: string;
+  /** The error as the server wrote it, for what it carries besides the reason. */
+  readonly error: ApiError | undefined;
+  /** The response exactly as received, including plain text that was not JSON. */
+  readonly body: string | undefined;
+
+  constructor(status: number, tag: string | undefined, reason: string, error?: ApiError, body?: string) {
     super(reason);
+    this.status = status;
+    this.tag = tag;
+    this.reason = reason;
+    this.error = error;
+    this.body = body;
   }
 }
 
@@ -102,33 +108,42 @@ const validReason = (value: unknown): boolean => record(value) && typeof value.r
 // Kept dependency-free: the page does not load the endpoint Schemas just to read an error.
 function apiErrorOf(value: unknown): ApiError | undefined {
   if (!record(value) || typeof value._tag !== "string") return undefined;
+  let valid: boolean;
   switch (value._tag) {
     case "Refused":
     case "ConnectorRefused":
     case "LanRefused":
-      return validReason(value) && validNext(value.next) ? (value as unknown as ApiError) : undefined;
+      valid = validReason(value) && validNext(value.next);
+      break;
     case "Missing":
-      return typeof value.what === "string" && validNext(value.next) ? (value as unknown as ApiError) : undefined;
+      valid = typeof value.what === "string" && validNext(value.next);
+      break;
     case "VoiceUnavailable":
-      return validReason(value) && (value.settings === undefined || (VoiceFixValues as readonly unknown[]).includes(value.settings))
-        ? (value as unknown as ApiError)
-        : undefined;
+      valid = validReason(value) && (value.settings === undefined || VoiceFixValues.some((fix) => fix === value.settings));
+      break;
     case "VoiceCallFailed":
-      return validReason(value) ? (value as unknown as ApiError) : undefined;
+      valid = validReason(value);
+      break;
     default:
-      return undefined;
+      valid = false;
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every field the page reads is checked above; it reads them, not the class's methods
+  return valid ? (value as unknown as ApiError) : undefined;
 }
 
 /** The server's HTTP API, one object per module and noun, a method per op: \`api.issue.status.update({ id, status })\`. */
 export class VibeValleyApi {
-  /** base: the server's address; empty is the page's own origin, which serves it. */
-  constructor(
-    readonly base = "",
-    private readonly fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
-  ) {}
+  /** The server's address; empty is the page's own origin, which serves it. */
+  readonly base: string;
+  private readonly fetcher: (url: string, init: RequestInit) => Promise<Response>;
+
+  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)) {
+    this.base = base;
+    this.fetcher = fetcher;
+  }
 ${[...groups].map(groupText).join("")}
-  private async call(path: string, input: unknown): Promise<unknown> {
+  /** R is the answer api.ts gives the path; each method above names it. */
+  private async call<R>(path: string, input: unknown): Promise<R> {
     const res = await this.fetcher(
       this.base + path,
       input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) },
@@ -154,7 +169,8 @@ ${[...groups].map(groupText).join("")}
             : text.trim() || t("shared.serverAnswered", { status: res.status });
       throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason, error, text);
     }
-    return text === "" ? undefined : JSON.parse(text);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server answers each path with what api.ts says (its handlers are typed by the same Handlers); the page trusts its own server rather than load every Schema
+    return (text === "" ? undefined : JSON.parse(text)) as R;
   }
 }
 `;

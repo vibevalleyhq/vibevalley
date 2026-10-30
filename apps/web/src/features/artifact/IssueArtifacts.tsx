@@ -1,7 +1,10 @@
-import { t } from "@vibevalley/i18n";
-import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+
 import { ready } from "@/base/query";
+
 import { ArtifactCard } from "./ArtifactCard";
 import { useArtifacts } from "./queries";
 

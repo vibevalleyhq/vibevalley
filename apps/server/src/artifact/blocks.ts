@@ -1,8 +1,11 @@
-import { list, t } from "@vibevalley/i18n";
 // A blocks artifact's blocks, changed only by batches of ops (ops.ts), from the owner over HTTP and from helpers through
 // their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
 // its seq goes up in order. Part of Artifacts (artifact.ts), which owns the artifact's row.
 
+import { Clock, Effect, Option, Schema, Semaphore } from "effect";
+import { SqlClient } from "effect/sql";
+
+import { list, t } from "@vibevalley/i18n";
 import type {
   Agent,
   Block,
@@ -16,22 +19,22 @@ import type {
   TextSpan,
   BlockSubmit,
 } from "@vibevalley/protocol";
-import { Clock, Effect, Option, Schema, Semaphore } from "effect";
-import { SqlClient } from "effect/sql";
+import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
+import { jsonOf } from "@/base/json.ts";
 import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
-import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
-import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
-import { ordered, Page, wire } from "./ops.ts";
-import { unmarked } from "./spans.ts";
-import { demoJitter, demoPieces } from "./demo.ts";
+
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qb from "../../db/generated/artifact_block.sql.ts";
 import * as qr from "../../db/generated/artifact_block_revision.sql.ts";
 import * as qc from "../../db/generated/artifact_change.sql.ts";
-import { jsonOf } from "@/base/json.ts";
-import * as S from "@vibevalley/protocol/schema";
+import { demoJitter, demoPieces } from "./demo.ts";
+import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
+import { ordered, Page, wire } from "./ops.ts";
+import { unmarked } from "./spans.ts";
 
 const attrsOf = jsonOf(S.BlockAttrs);
 const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.TextSpan))));
@@ -41,7 +44,7 @@ const resultsOf = jsonOf(Schema.mutable(Schema.Array(S.BlockOpResult)));
 /** The demo's three sections, each a heading and three paragraphs in the catalog. */
 const demoSections = [0, 1, 2] as const;
 type DemoSection = (typeof demoSections)[number];
-const demoParagraphs = (section: number) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section as DemoSection}.paragraphs.${p}`));
+const demoParagraphs = (section: DemoSection) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section}.paragraphs.${p}`));
 export interface Blocks {
   /** Every live block (no tombstones), in order. */
   readonly blocks: (id: string) => Effect.Effect<Block[], ApiError>;
@@ -178,7 +181,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
                   attrs: JSON.stringify(b.attrs),
                   spans: JSON.stringify(b.text),
                   rev: b.rev,
-                  deleted: !!b.deleted,
+                  deleted: !(b.deleted !== true),
                   updated_by: b.updatedBy,
                   updated_at: b.updated,
                 }),
@@ -297,7 +300,7 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
     }, lock.withPermits(1));
 
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
-    const demoWrite = Effect.fn("Blocks.demoWrite")(function* (artifact: string, writer: string, headings: string[], section: number) {
+    const demoWrite = Effect.fn("Blocks.demoWrite")(function* (artifact: string, writer: string, headings: string[], section: DemoSection) {
       for (const text of demoParagraphs(section)) {
         const b: Omit<BlockInput, "orderKey"> = { id: newId(), type: "paragraph", attrs: {}, text: [] };
         let rev = yield* demoInsert(artifact, writer, b, { headings, section });
@@ -314,30 +317,34 @@ export const makeBlocks = (found: (id: string) => Effect.Effect<qa.ArtifactResul
     });
 
     const runDemo = Effect.fn("Blocks.runDemo")(
-      function* (artifact: string, writers: string[]) {
+      function* (artifact: string, writers: readonly { readonly writer: string; readonly section: DemoSection }[]) {
         const headings: string[] = [];
-        for (const [i, w] of writers.entries()) {
+        for (const { writer: w, section } of writers) {
           const b: Omit<BlockInput, "orderKey"> = {
             id: newId(),
             type: "heading",
             attrs: { level: 2 },
-            text: spansOf("heading", t(`server.artifact.demo.${i as DemoSection}.heading`)),
+            text: spansOf("heading", t(`server.artifact.demo.${section}.heading`)),
           };
           yield* demoInsert(artifact, w, b);
           headings.push(b.id);
           yield* wait(0.5);
         }
-        yield* Effect.forEach(writers, (w, i) => Effect.andThen(wait(i / 3), demoWrite(artifact, w, headings, i)), { concurrency: "unbounded", discard: true });
+        yield* Effect.forEach(writers, ({ writer, section }) => Effect.andThen(wait(section / 3), demoWrite(artifact, writer, headings, section)), {
+          concurrency: "unbounded",
+          discard: true,
+        });
       },
       (e) => e.pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false)))),
     );
 
     const demo = Effect.fn("Blocks.demo")(function* (id: string, helpers: readonly Agent[]) {
       yield* found(id);
-      const writers = helpers
-        .filter((a) => a.enabled)
-        .slice(0, demoSections.length)
-        .map((a) => a.id);
+      const enabled = helpers.filter((a) => a.enabled);
+      const writers = demoSections.flatMap((section) => {
+        const writer = enabled[section]?.id;
+        return writer === undefined ? [] : [{ writer, section }];
+      });
       if (writers.length === 0) return yield* Effect.fail(refused(t("server.artifact.noWriter"), [lookIn.agent]));
       if (demoOn) return yield* Effect.fail(refused(t("server.artifact.demoRunning")));
       demoOn = true;

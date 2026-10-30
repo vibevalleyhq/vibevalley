@@ -1,7 +1,8 @@
-import type { BadgeTone } from "@vibevalley/protocol";
-import type { SpriteAtlas, SpriteInfo } from "./atlas";
-
 // At screen pixels, so the words stay sharp at any scale.
+
+import type { BadgeTone } from "@vibevalley/protocol";
+
+import type { SpriteAtlas, SpriteInfo } from "./atlas";
 
 export const CardColors = {
   ink: "#3a2a18",

@@ -12,6 +12,7 @@
 // pictures make themselves, is light.ts.
 
 import { Application, Container, RenderTexture, Sprite, TextureStyle, UPDATE_PRIORITY } from "pixi.js";
+
 import type { Point } from "../nav";
 
 export type { Point } from "../nav";
@@ -100,7 +101,7 @@ export async function pixelStage({
     height: h,
     background,
     antialias: false,
-    resolution: window.devicePixelRatio || 1,
+    resolution: window.devicePixelRatio > 0 ? window.devicePixelRatio : 1,
     autoDensity: true,
     roundPixels: true,
     preference: "webgl",
@@ -180,7 +181,7 @@ export async function pixelStage({
     offset: () => ({ ...offset }),
     onFit: (fn) => {
       listeners.add(fn);
-      if (scale) fn(scale);
+      if (scale !== 0) fn(scale);
       return () => listeners.delete(fn);
     },
     destroy: () => {
@@ -273,11 +274,11 @@ export class Walker {
   private path: Point[] = [];
   private target: Point;
 
-  constructor(
-    from: Point,
-    private readonly speed: number,
-    private readonly route: (from: Point, to: Point) => Point[],
-  ) {
+  private readonly speed: number;
+  private readonly route: (from: Point, to: Point) => Point[];
+  constructor(from: Point, speed: number, route: (from: Point, to: Point) => Point[]) {
+    this.speed = speed;
+    this.route = route;
     this.x = from.x;
     this.y = from.y;
     this.target = from;
@@ -296,7 +297,7 @@ export class Walker {
   /** Moves on by `dt` seconds. */
   step(dt: number) {
     let left = this.speed * dt;
-    while (left > 0 && this.path.length) {
+    while (left > 0 && this.path.length > 0) {
       const next = this.path[0]!;
       const dx = next.x - this.x;
       const dy = next.y - this.y;

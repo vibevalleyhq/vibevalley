@@ -3,6 +3,8 @@
 // after, each update here doing what its query does (the comments name it); a transaction that fails reloads the model,
 // since the changes told inside it are gone from the database. Only the chat writes these tables, one change at a time.
 
+import { compareText, or } from "@/base/order.ts";
+
 import type * as qc from "../../db/generated/channel.sql.ts";
 import type * as qp from "../../db/generated/channel_participant.sql.ts";
 
@@ -52,7 +54,7 @@ export class ChatModel {
   channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
     const all = [...this.byId.values()].filter((c) => c.type === type);
     const place = (c: ChannelRow) => c.position ?? Number.MAX_SAFE_INTEGER;
-    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : place(a) - place(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+    return all.toSorted((a, b) => (a.is_default ? -1 : b.is_default ? 1 : or(place(a) - place(b), compareText(a.id, b.id))));
   }
 
   threadsOf(channel: string): ChannelRow[] {

@@ -1,27 +1,30 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { sampleAgent } from "@/testing/agents.ts";
-import { tempDir } from "@vibevalley/testkit/temp";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-
 import { join } from "node:path";
+
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
-import { afterEach, describe, expect, it } from "@effect/vitest";
-import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
-import { factsOf, presetOf, runtimeIds } from "@/agent/seed.ts";
 import { NodeServices } from "@effect/platform-node";
+import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Stream } from "effect";
+import { TestClock } from "effect/testing";
+
+import { setLocale, t } from "@vibevalley/i18n";
+import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { Agents } from "@/agent/agent.ts";
+import { factsOf, presetOf, runtimeIds } from "@/agent/seed.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
 import { layer as projection } from "@/projection/projection.ts";
+import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { nextTurn, whenTrue } from "@/testing/until.ts";
+
 import { piBalance } from "./pi.ts";
 import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
-import { TestClock } from "effect/testing";
-import { setLocale, t } from "@vibevalley/i18n";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
   defineRuntime({
@@ -117,7 +120,7 @@ describe("runtime", () => {
       }),
     ]);
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       let used = "";
       const options: RuntimeOptions = { registry, background: false, usageOf: async () => null };
       const r = yield* make(options);
@@ -144,7 +147,7 @@ describe("runtime", () => {
       const fullGate = new Promise<void>((resolve) => (releaseFull = resolve));
       const usageGate = new Promise<void>((resolve) => (releaseUsage = resolve));
       return Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         let full = 0;
         let usageCalls = 0;
         const changed: AccountUsage = { status: "ok", subscription: "pro", windows: [] };
@@ -274,7 +277,7 @@ describe("runtime", () => {
     const latest = deferred<RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const r = yield* runtimes({
         probe: (id) => {
           if (id !== "pi") return notFound(id);
@@ -416,7 +419,7 @@ describe("runtime", () => {
     let release!: () => void;
     const held = new Promise<void>((done) => (release = done));
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       let probes = 0;
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("pi")]),
@@ -521,8 +524,8 @@ describe("runtime", () => {
       expect(byId.claude!.installation.status).toBe("unsupported");
       expect(byId.claude!.preset.label).toBe("Claude Code");
       expect(byId.claude!.facts.capabilities).toEqual(factsOf("claude").capabilities);
-      expect(JSON.stringify(byId.claude)).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/);
-      expect(JSON.stringify(byId.claude)).toMatch(/"facts":\{"steer":true,"refused":\{\}/);
+      expect(JSON.stringify(byId.claude)).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/u);
+      expect(JSON.stringify(byId.claude)).toMatch(/"facts":\{"steer":true,"refused":\{\}/u);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -574,7 +577,7 @@ describe("runtime", () => {
       r.spend("pi", 3);
       expect((yield* r.info("pi"))!.spentToday).toBe(3);
       r.spend("pi", 9);
-      expect((yield* r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/);
+      expect((yield* r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 

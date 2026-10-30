@@ -1,14 +1,17 @@
-import { t } from "@vibevalley/i18n";
 // 设置 › MOSS Live: talk to MOSS Live on its own, to hear how it answers. What was said, and every action and event
 // on the line, are shown as they come; nothing goes to the farm's chat.
 
 import { createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+
 import { createExternal } from "@/base/external";
 import { Button } from "@/ui/Button";
 import { TextArea } from "@/ui/Field";
 import { IconButton } from "@/ui/IconButton";
 import { Card } from "@/ui/layout";
 import { Hint, Tip } from "@/ui/Tip";
+
 import { type MossLine, mossLine, type MossSetup } from "./mossLine";
 
 function Level(props: { value: number; label: string }) {
@@ -28,7 +31,7 @@ function Stat(props: { label: string; value: string; tip: string; bad?: boolean 
     <Tip text={props.tip}>
       <span class="flex flex-col rounded-md border border-line px-2.5 py-1.5" tabindex={0}>
         <span class="text-xs text-muted">{props.label}</span>
-        <span class={["font-mono text-sm tabular-nums", props.bad ? "text-berry" : "text-ink"]}>{props.value}</span>
+        <span class={["font-mono text-sm tabular-nums", props.bad === true ? "text-berry" : "text-ink"]}>{props.value}</span>
       </span>
     </Tip>
   );

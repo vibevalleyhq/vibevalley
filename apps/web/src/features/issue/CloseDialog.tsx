@@ -1,23 +1,23 @@
-import { t } from "@vibevalley/i18n";
-
-import { highlight, type Tokens } from "@/ui/code/highlight";
 import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
-import { actionOf, perform } from "./acts";
-import { issueTitle } from "./titles";
-import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
 import { ago } from "@/base/format";
-import { aria, autofocus } from "@/base/util";
+import { useCore } from "@/base/frame";
 import { ready } from "@/base/query";
+import { aria, autofocus } from "@/base/util";
 import { Button } from "@/ui/Button";
+import { highlight, type Tokens } from "@/ui/code/highlight";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea } from "@/ui/Field";
-import { run } from "./acts";
-import { Note } from "./Sheet";
+
+import { actionOf, perform, run } from "./acts";
+import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
 import { useIssueChanges } from "./queries";
-import { useCore } from "@/base/frame";
+import { Note } from "./Sheet";
+import { issueTitle } from "./titles";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {

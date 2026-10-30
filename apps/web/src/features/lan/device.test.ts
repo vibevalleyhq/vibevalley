@@ -1,5 +1,7 @@
 import { expect, test } from "vite-plus/test";
+
 import { lanKeyCookie } from "@vibevalley/protocol";
+
 import { deviceGuess, isPaired, isRemote, keyCookie } from "./device";
 
 test("only this computer's own addresses are not remote", () => {

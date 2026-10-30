@@ -1,18 +1,20 @@
-import { t } from "@vibevalley/i18n";
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
 // through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
-import { currentLocale, setLocale } from "@vibevalley/i18n";
-import { followSavedLocale } from "./locale";
-import { setAppMenu } from "./menu";
-import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
+
+import { filledNear } from "@vibevalley/engine/framing";
+import { t, currentLocale, setLocale } from "@vibevalley/i18n";
 import { VibeValleyApi } from "@vibevalley/protocol";
 import { farmFraming, type Notice, type TraySummary } from "@vibevalley/protocol/host";
-import { filledNear } from "@vibevalley/engine/framing";
+
 import { watchForDev } from "./dev";
 import { startIsland } from "./island";
+import { followSavedLocale } from "./locale";
+import { setAppMenu } from "./menu";
 import { loginShellPath, type RunningServer, startServer } from "./server";
 
 // In the repository the server is apps/server, the page apps/web/dist and the island apps/island's release build
@@ -32,7 +34,7 @@ const files = () => {
 
 // What the page asked to show, newest last; the Playwright test reads it (apps/desktop/test).
 const notices: Notice[] = [];
-(globalThis as { vibevalleyNotices?: Notice[] }).vibevalleyNotices = notices;
+Object.assign(globalThis, { vibevalleyNotices: notices });
 
 /** Where macOS's window buttons sit: centred in the page's 28 px drag strip (preload titleBar). */
 const trafficLights = { x: 12, y: 8 };
@@ -97,7 +99,7 @@ function windowNow(): BrowserWindow {
 /** A load the next one replaced fails with ERR_ABORTED (-3): that is no failure. Any other is logged. */
 const loaded = (load: Promise<void>) =>
   load.catch((e: unknown) => {
-    if ((e as { errno?: number }).errno !== -3) console.error("vibevalley: the window could not load its page:", e);
+    if (!(typeof e === "object" && e !== null && "errno" in e && e.errno === -3)) console.error("vibevalley: the window could not load its page:", e);
   });
 
 /** The bar's load. Why the server did not come up waits for it: a load that cuts off the window's first one can leave
@@ -117,7 +119,7 @@ function open(url: string) {
 /** Brings the window up on an issue: what a click on the island's row asks. */
 function openIssue(issue: string) {
   if (!server) return;
-  open(server.url.replace(/\/$/, "") + "/issues/" + encodeURIComponent(issue));
+  open(server.url.replace(/\/$/u, "") + "/issues/" + encodeURIComponent(issue));
   const w = windowNow();
   if (w.isMinimized()) w.restore();
   w.show();
@@ -149,7 +151,7 @@ ipcMain.handle("host:locale", (_event, locale: string) => {
 // The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
 let tray: Tray | undefined;
 ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
-  (globalThis as { vibevalleyTray?: TraySummary }).vibevalleyTray = summary;
+  Object.assign(globalThis, { vibevalleyTray: summary });
   if (!tray) {
     const icon = nativeImage.createFromPath(join(files().web, "pixel", "app-sprout.png")).resize({ width: 16, height: 16 });
     tray = new Tray(icon);
@@ -157,7 +159,7 @@ ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
   }
   if (process.platform === "darwin") tray.setTitle(summary.title);
   const show = () => {
-    if (window?.isMinimized()) window.restore();
+    if (window?.isMinimized() === true) window.restore();
     window?.show();
     window?.focus();
   };
@@ -180,7 +182,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (window?.isMinimized()) window.restore();
+    if (window?.isMinimized() === true) window.restore();
     window?.focus();
   });
   app.setName("VibeValley");
@@ -228,7 +230,7 @@ if (!app.requestSingleInstanceLock()) {
         working: async () => {
           if (!server) return 0;
           try {
-            const sessions = await new VibeValleyApi(server.url.replace(/\/$/, "")).session.list({});
+            const sessions = await new VibeValleyApi(server.url.replace(/\/$/u, "")).session.list({});
             return sessions.filter((s) => s.phase._tag === "working").length;
           } catch {
             return 0;
@@ -242,7 +244,7 @@ if (!app.requestSingleInstanceLock()) {
           console.log("vibevalley dev: the server's code changed, starting it again");
           await was.stop();
           server = await startServer(files(), env, Number(url.port));
-          void window?.loadURL(server.url.replace(/\/$/, "") + (at ? at.pathname + at.search : "/"));
+          void window?.loadURL(server.url.replace(/\/$/u, "") + (at ? at.pathname + at.search : "/"));
         },
       });
       app.on("will-quit", stopWatching);

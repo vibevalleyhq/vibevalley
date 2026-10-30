@@ -37,7 +37,7 @@ test("a message's code, diagrams, links and lists", async ({ page, api }) => {
   await expect(page.locator("li.task")).toHaveCount(2);
 
   await page.locator(`a[href="/issues/${issue.number}"]`).click();
-  await expect(page).toHaveURL(new RegExp(`/issues/${issue.number}$`));
+  await expect(page).toHaveURL(new RegExp(`/issues/${issue.number}$`, "u"));
   await expect(page.getByTestId("desk")).toHaveAttribute("data-place", "issues");
 });
 

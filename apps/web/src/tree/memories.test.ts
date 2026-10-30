@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
-import { mockTree } from "./mock";
+
 import { allOf, counts, kept } from "./memories";
+import { mockTree } from "./mock";
 import { constellation, starsOf, tiesOf } from "./sky";
 const now = Date.parse("2026-10-22T12:00:00+08:00");
 
@@ -42,7 +43,7 @@ test("memories recalled together are tied both ways, the most often first", () =
   expect(tiesOf(tree.links, pair.a).together.map((t) => t.id)).toContain(pair.b);
   expect(tiesOf(tree.links, pair.b).together.map((t) => t.id)).toContain(pair.a);
   const times = tiesOf(tree.links, pair.a).together.map((t) => t.times);
-  expect(times).toEqual([...times].sort((x, y) => y - x));
+  expect(times).toEqual([...times].toSorted((x, y) => y - x));
 });
 
 test("a constellation runs straight up and down: another seed from the same fruit stays out", () => {

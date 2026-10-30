@@ -1,6 +1,7 @@
-import { patrolAgo } from "./prompts.ts";
 import { type InboxKind, type WorkspaceState } from "@vibevalley/protocol";
+
 import { inboxEntries } from "./inbox.ts";
+import { patrolAgo } from "./prompts.ts";
 
 /** In ms. Kinds not here the orchestrator does not hear of from the patrol: a failed run reaches it as it happens, a task
  * waiting is the person's to look at. */

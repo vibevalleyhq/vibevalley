@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // The island at the notch (apps/island): a native helper this process starts and feeds. The farm at a glance comes from
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
@@ -6,6 +5,8 @@ import { t } from "@vibevalley/i18n";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
+
+import { t } from "@vibevalley/i18n";
 import { type Attention, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
 import { attentionWantsOwner, phaseText } from "@vibevalley/protocol/rules";
 
@@ -53,7 +54,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? t(`shared.stuck.${stuck}`) : t(`shared.attention.${state}`);
     rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
   }
-  rows.sort((a, b) => Number(b.first) - Number(a.first) || a.number - b.number);
+  rows.sort((a, b) => (b.first !== a.first ? Number(b.first) - Number(a.first) : a.number - b.number));
   const working = rows.filter((r) => r.tone === "working").length;
   const waiting = rows.filter((r) => r.first).length;
   return {
@@ -87,7 +88,7 @@ export function startIsland(o: IslandOptions): { stop: () => void } {
   let helper: ChildProcess | undefined;
   let last = "";
   const probe: IslandProbe = { glance: undefined, helper: false, open: o.open };
-  (globalThis as { vibevalleyIsland?: IslandProbe }).vibevalleyIsland = probe;
+  Object.assign(globalThis, { vibevalleyIsland: probe });
 
   const send = (glance: Glance) => {
     probe.glance = glance;
@@ -110,7 +111,8 @@ export function startIsland(o: IslandOptions): { stop: () => void } {
     });
     createInterface({ input: child.stdout }).on("line", (line) => {
       try {
-        const { open } = JSON.parse(line) as { open?: unknown };
+        const said: unknown = JSON.parse(line);
+        const open = typeof said === "object" && said !== null && "open" in said ? said.open : undefined;
         if (typeof open === "string") o.open(open);
       } catch {
         // Not a line it means for us.

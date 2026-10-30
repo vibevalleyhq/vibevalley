@@ -32,6 +32,7 @@ export function createAnchored(anchor: () => Element | undefined, floating: () =
           placement: placementOf(side, align),
           middleware: [offset(sideOffset), flip({ padding: collisionPadding }), shift({ padding: collisionPadding })],
         }).then((p) => {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- floating-ui's Placement is a Side, or a Side and start or end
           const [s, al = "center"] = p.placement.split("-") as [Side, Align?];
           setAt({ x: p.x, y: p.y, side: s, align: al, placed: true, anchorWidth: a.getBoundingClientRect().width });
         });

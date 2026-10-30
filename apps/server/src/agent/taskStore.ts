@@ -2,13 +2,16 @@
 // (a session of the vibevalley runtime).
 
 import { Clock, Effect, Schema } from "effect";
-import * as q from "../../db/generated/agent_task.sql.ts";
-import { Db } from "@/base/db.ts";
-import { newId } from "@/base/ids.ts";
-import { jsonOrNone } from "@/base/json.ts";
+
 import { finished, type AgentTask } from "@vibevalley/agent/agentTask";
 import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 import { toolFailed } from "@vibevalley/agent/core/errors";
+
+import { Db } from "@/base/db.ts";
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
+
+import * as q from "../../db/generated/agent_task.sql.ts";
 
 const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
 const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
@@ -19,7 +22,7 @@ const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
   by: r.executor,
   state: r.state,
   ...(r.result ? { result: r.result } : {}),
-  ...(r.tries ? { tries: r.tries } : {}),
+  ...(r.tries !== 0 ? { tries: r.tries } : {}),
 });
 
 /** A finished graph stays, stamped finished_at: putting it away only empties the keeper's open graph. */

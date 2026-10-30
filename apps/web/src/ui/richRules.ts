@@ -5,7 +5,7 @@ export const foldLines = 16;
 
 /** A link may go only here: another site over http(s), mail, or a place of the app. javascript:, data: and the like
  * would run as the farm's page, or show what is not there. */
-export const safeHref = (href: string) => /^(https?:|mailto:)/i.test(href) || (href.startsWith("/") && !href.startsWith("//")) || href.startsWith("#");
+export const safeHref = (href: string) => /^(https?:|mailto:)/iu.test(href) || (href.startsWith("/") && !href.startsWith("//")) || href.startsWith("#");
 
 /** `#12` outside code and links: a link to issue 12. A remark plugin, for both renderers. */
 interface MdNode {
@@ -30,7 +30,7 @@ export const remarkIssueRefs = () => (tree: MdNode) => {
   };
   const walk = (node: MdNode) => {
     if (!node.children || node.type === "link" || node.type === "linkReference") return;
-    node.children = node.children.flatMap((c) => (c.type === "text" && c.value?.includes("#") ? split(c.value) : (walk(c), [c])));
+    node.children = node.children.flatMap((c) => (c.type === "text" && c.value?.includes("#") === true ? split(c.value) : (walk(c), [c])));
   };
   walk(tree);
 };

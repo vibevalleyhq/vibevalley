@@ -1,8 +1,9 @@
-import { defineConfig, lazyPlugins } from "vite-plus";
-import solid from "@solidjs/vite-plugin";
-import tailwindcss from "@tailwindcss/vite";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import solid from "@solidjs/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
 // The bar's words in every language, from the catalogs: the bar shows before any script of the page, so it cannot call
@@ -12,6 +13,7 @@ const openingWords = () => {
   const locales = join(import.meta.dirname, "../../packages/i18n/locales");
   const words: Record<string, Record<string, string>> = {};
   for (const locale of readdirSync(locales)) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by scripts/i18n.ts
     const catalog = JSON.parse(readFileSync(join(locales, locale, "web.json"), "utf8")) as { opening: Record<string, string> };
     words[locale] = Object.fromEntries(Object.entries(openingKeys).map(([name, key]) => [name, catalog.opening[key.slice("web.opening.".length)]!]));
   }
@@ -29,7 +31,7 @@ const opening = (): Plugin => ({
   name: "vibevalley-opening",
   transformIndexHtml(html) {
     const source = readFileSync(join(import.meta.dirname, "public/opening.html"), "utf8");
-    const part = /<!-- opening -->([\s\S]*?)<!-- \/opening -->/.exec(source)?.[1];
+    const part = /<!-- opening -->([\s\S]*?)<!-- \/opening -->/u.exec(source)?.[1];
     if (part === undefined || !html.includes("<!-- opening -->")) throw new Error("opening: public/opening.html and index.html each need the opening marker");
     return html.replace("<!-- opening -->", withOpeningWords(part.trim()));
   },

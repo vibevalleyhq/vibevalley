@@ -1,10 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // WeChat, written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
 import { randomBytes, randomUUID } from "node:crypto";
+
 import { Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
+
+import { numberIn } from "@/base/number.ts";
+
 import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 
 /** A confirmed login may name another host for its account. */
@@ -124,7 +129,7 @@ export interface WeixinApi {
 export const failed = (ret?: number, errcode?: number) => (ret !== undefined && ret !== 0 ? ret : errcode !== undefined && errcode !== 0 ? errcode : undefined);
 
 const clientVersion = (v: string) => {
-  const [a = 0, b = 0, c = 0] = v.split(".").map((x) => Number.parseInt(x, 10) || 0);
+  const [a = 0, b = 0, c = 0] = v.split(".").map((x) => numberIn(x));
   return ((a & 0xff) << 16) | ((b & 0xff) << 8) | (c & 0xff);
 };
 
@@ -147,17 +152,19 @@ function headers(token: string, auth: boolean): Record<string, string> {
 const endpoint = (base: string, path: string) => (base.endsWith("/") ? base : base + "/") + path;
 
 /** Message ids are 64-bit numbers: kept as text before they are decoded. */
-const lossless = /"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)/g;
+const lossless = /"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)/gu;
 
 /** A refused send, by WeChat's code: a stale token or a closed reply window. */
 const sendFailure = (code: number, message: string) =>
   new AppFailed({ kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed", message });
 
 export class WeixinClient implements WeixinApi {
-  constructor(
-    private readonly http: HttpClient.HttpClient,
-    private readonly base = baseUrl,
-  ) {}
+  private readonly http: HttpClient.HttpClient;
+  private readonly base: string;
+  constructor(http: HttpClient.HttpClient, base: string = baseUrl) {
+    this.http = http;
+    this.base = base;
+  }
 
   private request<T>(label: string, request: HttpClientRequest.HttpClientRequest, token: string, auth: boolean, schema: Schema.Codec<T>) {
     return Effect.gen({ self: this }, function* () {
@@ -325,7 +332,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
           const code = failed(updates.ret, updates.errcode);
           if (code === staleToken) return yield* new AppFailed({ kind: "stale", message: t("server.connector.staleLogin") });
           if (code !== undefined) return yield* failedWith("getupdates: " + (updates.errmsg || String(code)));
-          if (updates.longpolling_timeout_ms && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
+          if (updates.longpolling_timeout_ms != null && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
           // Its own messages echo back; groups are not for the farm.
           const messages = (updates.msgs ?? []).flatMap((m) =>
             m.message_type !== 2 && !m.group_id && m.from_user_id

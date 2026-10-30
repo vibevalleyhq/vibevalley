@@ -1,10 +1,11 @@
 // Each endpoint is a POST at its op's path (pathOf); the server routes and the clients call by this list
 // (apps/server/src/http/api.ts, VibeValleyApi).
 
-import { type Effect, Schema } from "effect";
+import { type Effect, Predicate, Schema } from "effect";
+
+import * as S from "./schema";
 import type * as T from "./shapes";
 import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
-import * as S from "./schema";
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
 
@@ -330,7 +331,7 @@ export interface Endpoint {
 export { pathOf };
 
 /** How the command line writes a word of an op: previewDelete is preview-delete. */
-export const kebab = (word: string) => word.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
+export const kebab = (word: string) => word.replace(/[A-Z]/gu, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
 
 export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: unknown): string[] => [
   ...op.split(".").map(kebab),
@@ -339,12 +340,16 @@ export const commandOf = (op: keyof Handlers, about: readonly string[] = [], inp
 ];
 
 /** Only get, list, check, recall and preview read; every other verb may change something. */
-export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/.test(op.split(".").at(-1) ?? "");
+export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/u.test(op.split(".").at(-1) ?? "");
 
 /** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
-export const fieldsOf = (e: Endpoint): readonly string[] => Object.keys((e.input as unknown as { fields?: object } | undefined)?.fields ?? {});
+export const fieldsOf = (e: Endpoint): readonly string[] => {
+  const s: unknown = e.input;
+  return Predicate.hasProperty(s, "fields") && Predicate.isObject(s.fields) ? Object.keys(s.fields) : [];
+};
 
 const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.Codec<unknown> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every body is a Struct in schema.ts, typed Codec<T.X> there to tie it to its shape
   Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
 
 /** The inputs an op and its dry run share: the dry run takes exactly what the op takes. */

@@ -1,19 +1,22 @@
 // MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
 // sampling. A server that cannot be reached is left out and said why; the others still come.
 
-import { messageOf } from "./core/errors.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { Schema, Option } from "effect";
-import type { Tool } from "./core/loop.ts";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { Schema, Option } from "effect";
+
+import type { JsonSchema } from "@vibevalley/ai/tools";
+
+import { messageOf } from "./core/errors.ts";
+import type { Tool } from "./core/loop.ts";
 import { textTool } from "./core/tool.ts";
 import { asTransport } from "./mcpTransport.ts";
-import type { JsonSchema } from "@vibevalley/ai/tools";
-import { afterRealTime } from "./realTime.ts";
 import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
+import { afterRealTime } from "./realTime.ts";
 
 /** Also for connecting. */
 export const callTimeoutMs = 120_000;
@@ -54,7 +57,7 @@ export function mcpContentText(content: readonly Block[]): string {
 }
 
 /** The server's name first, only the characters function names allow. */
-export const mcpToolName = (server: string, tool: string) => (server + "__" + tool).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
+export const mcpToolName = (server: string, tool: string) => (server + "__" + tool).replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64);
 
 export interface McpConnection {
   readonly tools: Tool[];
@@ -63,7 +66,7 @@ export interface McpConnection {
 
 const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
   new Promise<A>((resolve, reject) => {
-    if (signal?.aborted) {
+    if (signal?.aborted === true) {
       reject(new Error("canceled"));
       return;
     }
@@ -85,7 +88,7 @@ const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
   });
 
 export async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpConnection> {
-  if (signal?.aborted) throw new Error("canceled");
+  if (signal?.aborted === true) throw new Error("canceled");
   let stderr = "";
   let transport: Transport;
   if (server.url) {
@@ -126,6 +129,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
     const tools: Tool[] = [];
     let cursor: string | undefined;
     do {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each page's cursor comes with the page before
       const page = await timeout(client.listTools(cursor ? { cursor } : {}), callTimeoutMs, signal);
       for (const t of page.tools) tools.push(mcpTool(client, server.name, t));
       cursor = page.nextCursor;
@@ -155,7 +159,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
       }
       let text = mcpContentText(Option.getOrElse(contentOf(r.content), () => []));
       if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : mcpWords.noContent;
-      if (r.isError) throw new Error(text);
+      if (r.isError === true) throw new Error(text);
       return text;
     },
   });
@@ -226,9 +230,9 @@ export function readMcpConfig(path: string): McpServer[] {
   }
   const entries = config.mcpServers ?? {};
   const out: McpServer[] = [];
-  for (const name of Object.keys(entries).sort()) {
+  for (const name of Object.keys(entries).toSorted()) {
     const e = entries[name]!;
-    if (e.disabled) continue;
+    if (e.disabled === true) continue;
     if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
     else if (e.command)
       out.push({

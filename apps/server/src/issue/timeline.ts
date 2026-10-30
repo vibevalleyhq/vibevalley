@@ -1,6 +1,8 @@
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueTimeline, Milestone, MilestoneKind, Run, RunTrigger, Spent } from "@vibevalley/protocol";
 import { closedText, plainText } from "@vibevalley/protocol/rules";
+
+import { or } from "@/base/order.ts";
 function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (trigger.kind) {
     case "refine":
@@ -65,7 +67,7 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
     .map((m, i) => [m, i] as const)
-    .sort((a, b) => b[0].at - a[0].at || b[1] - a[1])
+    .toSorted((a, b) => or(b[0].at - a[0].at, b[1] - a[1]))
     .map(([m]) => m);
   const spent = runs.reduce<Spent | undefined>((sum, r) => {
     if (!r.spent) return sum;

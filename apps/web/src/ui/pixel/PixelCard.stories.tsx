@@ -1,6 +1,8 @@
 import { For, Show } from "solid-js";
+
 import { SpeciesValues } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import { useAtlas } from "./atlas";
 import { CardColors, badgeColors } from "./card";
 import { AnimalFace, PixelCard } from "./PixelCard";

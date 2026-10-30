@@ -1,26 +1,29 @@
-import { t } from "@vibevalley/i18n";
 // 档案: every profile as a card, the orchestrators first and then the workers; an orchestrator's card opens its page, a
 // worker's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
 // new worker, /agents/new?role=orchestrator a new orchestrator.
 
-import { createMemo, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
+import { createMemo, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentTally, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
-import { hexColor } from "@/ui/cast";
-import { toast } from "@/ui/toasts";
-import { A } from "@/ui/A";
-import { Hint } from "@/ui/Tip";
+
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "@/base/agents";
+import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { ready, useRuntimes } from "@/base/query";
+import { orchestratorHref } from "@/features/orchestrator";
+import { useSkills } from "@/features/runtime";
+import { A } from "@/ui/A";
+import { hexColor } from "@/ui/cast";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
-import { useSkills } from "@/features/runtime";
+import { Hint } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
+
 import { AgentPage } from "./AgentPage";
 import { TemplatesPage } from "./TemplatesPage";
-import { orchestratorHref } from "@/features/orchestrator";
 
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {
@@ -118,14 +121,20 @@ function AgentsPage() {
 
 function CardShell(props: { agent: Agent; to: string; label: string; muted?: boolean; corner?: JSX.Element; children: JSX.Element }) {
   return (
-    <div data-testid="agent-card" data-key={props.agent.id} data-role={props.agent.role} data-muted={props.muted ? "" : undefined} class="group relative">
+    <div
+      data-testid="agent-card"
+      data-key={props.agent.id}
+      data-role={props.agent.role}
+      data-muted={props.muted === true ? "" : undefined}
+      class="group relative"
+    >
       <A
         href={props.to}
         aria-label={props.label}
         class={[
           "flex h-full flex-col rounded-lg border border-line bg-page p-4 transition-colors hover:border-ink/20 hover:bg-page focus-visible:outline-2 focus-visible:outline-focus",
           // Off, it says so by its dashed edge and greyed face, not by fading its words below what can be read.
-          { "border-dashed": !!props.muted },
+          { "border-dashed": !(props.muted !== true) },
         ]}
       >
         {props.children}

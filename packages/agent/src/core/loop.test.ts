@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { AgentBusy } from "./errors.ts";
 import { Deferred, Effect, Ref } from "effect";
-import type { Context, Message, ToolResultMessage, UserMessage } from "@vibevalley/ai/messages";
+
 import { make as llmOver } from "@vibevalley/ai/llm";
+import type { Context, Message, ToolResultMessage, UserMessage } from "@vibevalley/ai/messages";
 import { answer, chunk, http, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
+
+import { AgentBusy } from "./errors.ts";
 import { type AgentEvent, type AgentOptions, make, type Tool } from "./loop.ts";
 
 const user = (t: string): UserMessage => ({ role: "user", content: t, timestamp: 1 });
@@ -34,7 +36,7 @@ const lastUser = (r: Request) => words(r.messages.findLast((m) => m.role === "us
 const shape = (events: readonly AgentEvent<never>[]) =>
   events
     .map((e) => ("message" in e && e.type.startsWith("message_") ? `${e.type}:${e.message.role}` : "toolName" in e ? `${e.type}:${e.toolName}` : e.type))
-    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update")));
+    .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update") === true));
 
 /** streaming is done once the answer's text is said. */
 const rig = (

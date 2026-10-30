@@ -1,21 +1,23 @@
-import { t } from "@vibevalley/i18n";
-
-import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
-import type { Ordering } from "./display";
-import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
-import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
+
 import { autofocus } from "@/base/util";
-import { Hint } from "@/ui/Tip";
 import { Segmented } from "@/ui/Segmented";
-import { useGraphs, useNameOf } from "./queries";
+import { Hint } from "@/ui/Tip";
+
+import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
+import type { Ordering } from "./display";
+import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
+import { useGraphs, useNameOf } from "./queries";
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
 export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {
   const [text, setText] = createSignal("");
-  const focus = autofocus<HTMLInputElement>();
+  const focus = autofocus();
   const submit = (e: KeyboardEvent) => {
     if (e.key !== "Enter" || e.isComposing) return;
     const t = text().trim();
@@ -27,7 +29,7 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
     <input
       ref={(el) => {
         props.ref?.(el);
-        if (props.autofocus) focus(el);
+        if (props.autofocus === true) focus(el);
       }}
       value={text()}
       onInput={(e) => setText(e.currentTarget.value)}
@@ -139,7 +141,7 @@ function LaneView(props: {
         setOver(true);
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+        if (!e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null)) setOver(false);
       }}
       onDrop={(e) => {
         e.preventDefault();

@@ -1,5 +1,4 @@
 import { list, t } from "@vibevalley/i18n";
-
 import type { Conflict } from "@vibevalley/protocol";
 
 import type { MergeFailure } from "@/project/shapes.ts";

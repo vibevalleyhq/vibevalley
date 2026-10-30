@@ -1,15 +1,19 @@
-import { t } from "@vibevalley/i18n";
 import { relative } from "node:path";
+
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
-import type { FactIn } from "@/core/core.ts";
+
+import { t } from "@vibevalley/i18n";
 import type { Session, SessionAction, SessionEventType, Spent, ToolAction, SessionId } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { doingOf } from "./roster.ts";
-import { failureText } from "./report.ts";
-import { jobBreak, recalledIn } from "./briefing.ts";
+
 import { clip } from "@/base/clip.ts";
+import type { FactIn } from "@/core/core.ts";
 import type { Rate } from "@/runtime/price.ts";
+
+import { jobBreak, recalledIn } from "./briefing.ts";
+import { failureText } from "./report.ts";
+import { doingOf } from "./roster.ts";
 import { shellCommand } from "./shell.ts";
 
 /** The bubble over a session's head holds about this much. */
@@ -76,7 +80,7 @@ export function since(now: Spent, from: Spent | undefined): Spent | undefined {
   return { tokens: now.tokens - from.tokens, ...(now.cny !== undefined ? { cny: now.cny - (from.cny ?? 0) } : {}) };
 }
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 /** The bubble has no room for the rest: `cd <worktree> && pnpm test` is shown as what it runs. */
 export function near(cwd: string, detail: string): string {
@@ -84,7 +88,7 @@ export function near(cwd: string, detail: string): string {
     const rel = relative(cwd, detail);
     return rel.startsWith("..") ? detail : rel || ".";
   }
-  return detail.replace(new RegExp(`^cd ${escape(cwd)}/? *(&&|;) *`), "").replaceAll(cwd + "/", "");
+  return detail.replace(new RegExp(`^cd ${escape(cwd)}/? *(&&|;) *`, "u"), "").replaceAll(cwd + "/", "");
 }
 
 const toolOutput = (content: readonly ToolOutputPart[] = []) =>
@@ -114,7 +118,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
   };
 
   // Any word from it ends a quiet spell: the same doing again says so.
-  if (tracking.quiet && event.kind !== "usage") {
+  if (tracking.quiet === true && event.kind !== "usage") {
     next = { ...next, quiet: false };
     if (working) facts.push({ type: "doing", id, action: working.doing.action, label: working.doing.label });
   }
@@ -174,13 +178,13 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       break;
     case "retry": {
       const text =
-        (event.maxAttempts
+        (event.maxAttempts != null && event.maxAttempts !== 0
           ? t("server.session.log.retryOf", { attempt: event.attempt, of: event.maxAttempts })
           : t("server.session.log.retry", { attempt: event.attempt })) +
-        (event.delayMs ? t("server.session.log.retryIn", { s: Math.ceil(event.delayMs / 1000) }) : "") +
+        (event.delayMs != null && event.delayMs !== 0 ? t("server.session.log.retryIn", { s: Math.ceil(event.delayMs / 1000) }) : "") +
         (event.reason ? t("server.session.log.retryWhy", { reason: clip(event.reason, 160) }) : "");
       journal.push({ type: "note", kind: "llm/retry", text });
-      facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts ? { of: event.maxAttempts } : {}) });
+      facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts != null && event.maxAttempts !== 0 ? { of: event.maxAttempts } : {}) });
       break;
     }
     case "usage": {
@@ -200,7 +204,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       const before = session.spent ?? { tokens: 0 };
       const total = before.cny !== undefined || cny !== undefined ? (before.cny ?? 0) + (cny ?? 0) : undefined;
       facts.push({ type: "spent", id, spent: { tokens: before.tokens + delta.input + delta.output, ...(total !== undefined ? { cny: total } : {}) } });
-      if (cny) spentCny = cny;
+      if (cny != null && cny !== 0) spentCny = cny;
       break;
     }
     case "model":

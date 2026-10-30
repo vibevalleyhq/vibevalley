@@ -1,5 +1,8 @@
 import { t } from "@vibevalley/i18n";
 import type { Priority } from "@vibevalley/protocol";
+
+import { compareText, or } from "@/base/order";
+
 import { type Lane, lanes } from "./lanes";
 
 export type BoardView = "board" | "list";
@@ -75,7 +78,7 @@ export function orderRows<T>(rows: T[], ordering: Ordering, facts: (row: T) => R
   };
   return rows
     .map((row, i) => ({ row, i, f: facts(row) }))
-    .sort((a, b) => key(a.f, b.f) || a.i - b.i)
+    .toSorted((a, b) => or(key(a.f, b.f), a.i - b.i))
     .map((e) => e.row);
 }
 
@@ -102,7 +105,7 @@ export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => R
         const k = (grouping === "project" ? f.project : f.agent) ?? "";
         by.set(k, [...(by.get(k) ?? []), r]);
       }
-      return [...by].sort(([a], [b]) => (a === "" ? 1 : 0) - (b === "" ? 1 : 0) || (a < b ? -1 : a > b ? 1 : 0)).map(([key, rows]) => ({ key, rows }));
+      return [...by].toSorted(([a], [b]) => or(Number(a === "") - Number(b === ""), compareText(a, b))).map(([key, rows]) => ({ key, rows }));
     }
   }
 }

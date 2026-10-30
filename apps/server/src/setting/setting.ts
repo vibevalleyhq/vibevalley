@@ -1,22 +1,25 @@
-import { t, setLocale } from "@vibevalley/i18n";
 // settings.json in the home, readable by the owner only (0600). A key saved here wins over the configuration's and is read
 // at each use, so it takes effect at once; keys are never logged, and a page sees only where each comes from and its last
 // characters.
 
-import { messageOf } from "@/errors.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
-import { keyHint } from "./keys.ts";
-import { memorySourcesOver } from "./memorySources.ts";
-import { settingsProblem } from "./saving.ts";
+
 import { Context, Data, Effect, Layer, Schema } from "effect";
+
+import { t, setLocale } from "@vibevalley/i18n";
+import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { messageOf } from "@/errors.ts";
 
-import * as S from "@vibevalley/protocol/schema";
+import { keyHint } from "./keys.ts";
+import { memorySourcesOver } from "./memorySources.ts";
+import { settingsProblem } from "./saving.ts";
+import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 const MemorySourceConfig = Schema.Struct({
   kind: S.MemorySourceKind,
@@ -164,9 +167,9 @@ export const make = Effect.gen(function* () {
       memorySources: (s.memorySources ?? []).map(({ key, ...m }) => ({
         ...m,
         everything: m.everything ?? false,
-        enabled: !!m.enabled,
-        read: !!m.read,
-        write: !!m.write,
+        enabled: !(m.enabled !== true),
+        read: !(m.read !== true),
+        write: !(m.write !== true),
         key: secret(key, "settings"),
       })),
     };
@@ -184,14 +187,14 @@ export const make = Effect.gen(function* () {
     if (u.dictation) {
       const d = {
         ...(u.dictation.via === "own" ? { via: "own" as const } : {}),
-        url: u.dictation.url.trim().replace(/\/+$/, ""),
+        url: u.dictation.url.trim().replace(/\/+$/u, ""),
         model: u.dictation.model.trim(),
       };
       next.dictation = !d.via && d.url === "" && d.model === "" ? undefined : d;
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
-    if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
+    if (typeof next.voice === "object" && next.voice !== null && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
     yield* Effect.try({

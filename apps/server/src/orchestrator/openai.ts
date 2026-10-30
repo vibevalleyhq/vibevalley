@@ -3,9 +3,11 @@
 // system messages and tools in the request are not. Only the agent's words come back, without usage. Who may ask (paths,
 // keys) is the mounting side's business.
 
-import { messageOf } from "@/errors.ts";
 import { randomBytes } from "node:crypto";
+
 import { Schema } from "effect";
+
+import { messageOf } from "@/errors.ts";
 
 /** One turn's words as they come; done when the turn is over. */
 export type Answer = (text: string, signal: AbortSignal) => AsyncIterable<string>;
@@ -97,7 +99,7 @@ export function chatCompletions(c: ChatCompletions) {
     const id = "chatcmpl-" + randomBytes(6).toString("hex");
     const created = Math.floor(asked / 1000);
     const firstWords = () => c.log?.(`vibevalley: ${model}'s first words ${c.now() - asked}ms after it was asked`);
-    if (!req.stream) {
+    if (req.stream !== true) {
       let all = "";
       for await (const w of words) {
         if (all === "") firstWords();

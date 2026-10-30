@@ -2,8 +2,9 @@
 // indicator is shown only while checked or indeterminate, unless keepMounted.
 
 import { createContext, omit, Show, useContext } from "solid-js";
-import { type ButtonProps, call, flag, type SpanProps } from "./internal/element";
+
 import { createControllable } from "./internal/controllable";
+import { type ButtonProps, call, flag, type SpanProps } from "./internal/element";
 
 interface Ctx {
   readonly checked: () => boolean;
@@ -53,7 +54,6 @@ function Root(props: CheckboxRootProps) {
 
 function Indicator(props: SpanProps & { keepMounted?: boolean | undefined }) {
   const c = useContext(Context);
-  if (!c) throw new Error("Checkbox.Indicator belongs inside Checkbox.Root");
   const rest = omit(props, "keepMounted");
   return (
     <Show when={c.checked() || c.indeterminate() || props.keepMounted}>

@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import type { Issue, TaskGraph } from "@vibevalley/protocol";
 export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
   const job = issue.title.trim();

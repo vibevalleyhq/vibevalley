@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+
 import type { VibeValleyApi } from "@vibevalley/protocol";
+
 import { expect, test, choose } from "./fixtures";
 
 const issue = (api: VibeValleyApi, title: string) => api.issue.create({ title });
@@ -18,13 +20,13 @@ test("a quick add shows the new issue in todo without a reload", async ({ page, 
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
   // With no helper and no project the server refuses the draft, after asking the runtimes (a few seconds); the board stays.
   await expect(page.getByTestId("toast").first()).toBeVisible({ timeout: 20_000 });
-  await expect(page).toHaveURL(/\/issues$/);
+  await expect(page).toHaveURL(/\/issues$/u);
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
   // Its own page, and Escape back to the board.
   await card(lane(page, "todo"), made.id).click();
-  await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`, "u"));
   await page.keyboard.press("Escape");
-  await expect(page).toHaveURL(/\/issues$/);
+  await expect(page).toHaveURL(/\/issues$/u);
 });
 
 test("the list view and its grouping are kept across a reload", async ({ page, api }) => {
@@ -49,7 +51,7 @@ test("an issue opens at its own address and its edits are saved", async ({ page,
   const made = await issue(api, "before the title changes");
   await page.goto("/issues");
   await card(lane(page, "todo"), made.id).click();
-  await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`, "u"));
   const detail = page.getByTestId("issue");
   // A new draft starts from one sentence to draft from; the description is written by asking for it.
   await expect(detail.getByTestId("issue-description")).toHaveCount(0);
@@ -71,7 +73,7 @@ test("starting an issue with no helper asks for one", async ({ page, api }) => {
   await page.goto("/issues");
   await card(lane(page, "todo"), made.id).dragTo(lane(page, "working"));
   await expect(page.getByTestId("toast").first()).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`, "u"));
   await expect(page.getByTestId("issue").getByTestId("issue-start")).toBeDisabled();
   expect((await api.issue.get({ id: made.id })).status).toBe("backlog");
 });

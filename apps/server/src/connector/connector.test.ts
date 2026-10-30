@@ -1,21 +1,25 @@
-import { describe, expect, it } from "@effect/vitest";
 import { rmSync } from "node:fs";
-import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
+
+import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Layer, Queue } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
+
+import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
+
 import { Channels } from "@/channel/chat.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { testConfig } from "@/testing/layers.ts";
+import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
+
+import * as accountQ from "../../db/generated/connector_account.sql.ts";
+import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
+import { AppFailed, failedWith } from "./adapter.ts";
 import { Connectors } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage } from "./qq.ts";
 import { type Message as WeixinMessage, type Updates, type WeixinApi, baseUrl } from "./weixin.ts";
-import { AppFailed, failedWith } from "./adapter.ts";
-import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";
-import * as accountQ from "../../db/generated/connector_account.sql.ts";
-import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 
 const owner = "o9cq80wkM5NnOwnerOfThisFarm@im.wechat";
 
@@ -146,7 +150,7 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
 
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {
-    const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     const c = yield* Connectors;
     return () => runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
   });
@@ -353,7 +357,7 @@ describe("the chat apps", () => {
       expect(refused.error).toContain("不对");
       yield* c.login("qq", { appId: "102", secret: "right" });
       const pairing = yield* reaches("qq", "pairing");
-      expect(pairing.pairCode).toMatch(/^\d{6}$/);
+      expect(pairing.pairCode).toMatch(/^\d{6}$/u);
       script.qqIn.push(qqMsg("someone", "你好"));
       script.qqIn.push(qqMsg("owner-openid", "配对 " + pairing.pairCode));
       const paired = yield* reaches("qq", "connected");
@@ -470,7 +474,7 @@ describe("the chat apps", () => {
       yield* Effect.scoped(Effect.provide(weixinConnected(before), farm(before, config)));
       const script = new Script();
       yield* Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         const chat = yield* Channels;
         expect((yield* Effect.promise(yield* statusOf("weixin"))).state).toBe("connected");
         script.weixinIn.push(wx(owner, "又见面了"));
@@ -616,7 +620,7 @@ describe("the chat apps", () => {
   it.live("keep the account when retiring what waited fails", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const c = yield* Connectors;
       const chat = yield* Channels;
       const sql = yield* SqlClient.SqlClient;

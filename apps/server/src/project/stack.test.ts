@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { stackOf } from "./stack.ts";
 
 const scripts = `{"scripts":{"test":"vitest run","build":"vite build"}}`;

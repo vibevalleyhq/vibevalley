@@ -1,5 +1,6 @@
-import { omit } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { omit } from "solid-js";
+
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 

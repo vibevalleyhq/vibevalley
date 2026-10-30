@@ -112,9 +112,9 @@ export function particles(): Particles {
         b.vy += b.fall * dt;
         b.x += (b.vx + wind * b.drift * WIND) * dt;
         b.y += b.vy * dt;
-        const swing = b.sway ? Math.sin(b.age * 3 + b.phase) * b.sway : 0;
+        const swing = b.sway !== 0 ? Math.sin(b.age * 3 + b.phase) * b.sway : 0;
         b.node.position.set(Math.round(b.x + swing), Math.round(b.y));
-        if (b.grow) b.node.scale.set(1 + b.grow * b.age);
+        if (b.grow !== 0) b.node.scale.set(1 + b.grow * b.age);
         b.node.alpha = b.alpha * (Math.ceil((1 - b.age / b.life) * STEPS) / STEPS);
       }
       for (let i = rings.length - 1; i >= 0; i--) {

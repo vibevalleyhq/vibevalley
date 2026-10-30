@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+
 import { verifyMoss, type MossEvents, type MossTransport } from "./moss.ts";
 
 /** A MOSS that answers the way script says, after the socket opens; status is what plain HTTPS answers. */

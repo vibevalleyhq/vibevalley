@@ -12,8 +12,10 @@ let phone: Host | undefined;
 
 export function currentHost(): Host {
   const g = globalThis as Record<string, unknown>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the desktop shell's preload puts a Host here (this file is the contract)
   const given = g[hostKey] as Host | undefined;
   if (given) return given;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- React Native's WebView puts its bridge here
   const native = g.ReactNativeWebView as { postMessage(text: string): void } | undefined;
   if (!native) return browserHost;
   if (!phone) {

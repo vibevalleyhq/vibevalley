@@ -1,5 +1,6 @@
 // 推箱子, 方块 and 小恐龙: the recorded deals and runs must replay as they were.
 import { describe, expect, test } from "vite-plus/test";
+
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 import { type Dino, dinoGround, dinoScore, duck, jump, newDino, type Obstacle, run } from "./dino";
 import { moveWarehouse, newWarehouse, undoWarehouse, type WarehouseDirection, type WarehouseGame, warehouseDone, warehouses } from "./sokoban";
@@ -60,7 +61,7 @@ describe("推箱子", () => {
       expect(rows.join("").split("@").length - 1).toBe(1);
       const g = newWarehouse(level);
       expect(g.boxes.length).toBe(rows.join("").split(".").length - 1);
-      const key = (s: WarehouseGame) => `${s.player}:${[...s.boxes].sort((a, b) => a - b).join(",")}`;
+      const key = (s: WarehouseGame) => `${s.player}:${[...s.boxes].toSorted((a, b) => a - b).join(",")}`;
       const queue = [g];
       const seen = new Set([key(g)]);
       let solved = false;

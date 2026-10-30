@@ -1,13 +1,14 @@
-import { t } from "@vibevalley/i18n";
 // Kept on this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
 
+import { Option, Schema } from "effect";
 import { createSignal } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import { reasonOf } from "@/base/api";
 import { recordOf } from "@/base/util";
-import { Option, Schema } from "effect";
-
-import * as S from "@vibevalley/protocol/schema";
 
 export interface Draft {
   readonly text?: string;
@@ -88,7 +89,9 @@ const sending =
       xhr.onload = () =>
         resolve(new Response(xhr.responseText, { status: xhr.status, headers: { "content-type": xhr.getResponseHeader("content-type") ?? "" } }));
       xhr.onerror = () => reject(new Error(t("web.base.unreachable")));
-      xhr.send(init?.body as XMLHttpRequestBodyInit | null | undefined);
+      const body = init?.body;
+      if (body instanceof ReadableStream) throw new TypeError("a streamed body has no upload progress");
+      xhr.send(body);
     });
 
 /** A file uploaded for a message; progress is told in whole percents as it goes up. */
@@ -122,6 +125,7 @@ export async function attachFiles(channel: string, files: readonly File[], faile
     const key = ++lastUpload;
     setUploads((u) => [...u, { key, channel, name: file.name || "file", percent: 0 }]);
     try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one upload at a time, in the order picked: the drafts keep the files' order
       drafts.add(channel, await upload(file, (percent) => setUploads((u) => u.map((x) => (x.key === key ? { ...x, percent } : x)))));
     } catch (e) {
       failed(reasonOf(e));

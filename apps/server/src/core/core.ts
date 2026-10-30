@@ -4,8 +4,10 @@
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
-import { scopedPubSub } from "@/base/pubsub.ts";
 import { join } from "node:path";
+
+import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+
 import type {
   CommitCount,
   WorkspaceState,
@@ -22,10 +24,11 @@ import type {
   SessionId,
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 
 export const emptyWorkspaceState = (): WorkspaceState => ({
   call: "idle",
@@ -152,7 +155,7 @@ export const make = Effect.gen(function* () {
   // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
   // it rather than putting it off. The wait is a fiber of this service's, ended with it.
   const saves = yield* FiberMap.make<"save">();
-  const later = yield* FiberMap.runtime(saves)<never>();
+  const later = yield* FiberMap.runtime(saves)();
   const save = () => {
     if (!closed)
       later(

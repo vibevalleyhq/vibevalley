@@ -1,15 +1,19 @@
 import { execFileSync } from "node:child_process";
-import { owner } from "@/base/actor.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { Issue } from "@vibevalley/protocol";
 import { Effect } from "effect";
+
+import type { Issue } from "@vibevalley/protocol";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Projects } from "@/project/project.ts";
 import { Sessions, type SessionsInside } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
+
 import { farm, git, lab, watch } from "./farm.ts";
 
 const quiet = (cwd: string, ...args: string[]) => {

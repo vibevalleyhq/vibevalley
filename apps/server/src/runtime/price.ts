@@ -3,7 +3,9 @@
 // built-in list, which is pi's own. No other runtime is priced.
 
 import { getBuiltinModel, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
+
 import { getModel } from "@vibevalley/ai/models";
+
 import { piSettings } from "./pi.ts";
 
 export interface Price {
@@ -48,12 +50,15 @@ const priceOf = (cost: Price | undefined): Price | undefined =>
       }
     : undefined;
 
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pi-ai types the lookup by its generated catalog; our names are strings, and an unknown one gives undefined
+const builtinCost = getBuiltinModel as unknown as (provider: string, model: string) => { readonly cost: Price } | undefined;
+
 function piPrice(model: string): Price | undefined {
   const slash = model.indexOf("/");
-  if (slash >= 0) return priceOf(getBuiltinModel(model.slice(0, slash) as never, model.slice(slash + 1) as never).cost);
-  for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).sort()) {
-    const found = getBuiltinModel(provider as never, model as never);
-    if (found) return priceOf(found.cost);
+  if (slash >= 0) return priceOf(builtinCost(model.slice(0, slash), model.slice(slash + 1))?.cost);
+  for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).toSorted()) {
+    const found = builtinCost(provider, model);
+    if (found !== undefined) return priceOf(found.cost);
   }
   return undefined;
 }

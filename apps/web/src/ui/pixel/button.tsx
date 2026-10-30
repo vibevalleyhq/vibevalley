@@ -1,7 +1,8 @@
-import { omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { cx, pxDrop, pxFocus, pxText } from "./style";
+import { omit, Show } from "solid-js";
+
 import { SpriteIcon } from "./icons";
+import { cx, pxDrop, pxFocus, pxText } from "./style";
 
 export type PxTone = "plain" | "primary" | "danger" | "accent";
 export type PxSize = "md" | "sm" | "icon" | "custom";
@@ -42,7 +43,7 @@ export function PxButton(
       type={props.type ?? "button"}
       {...rest}
       onClick={(e) => props.onClick?.(e)}
-      disabled={props.disabled || !props.onClick}
+      disabled={props.disabled === true || props.onClick === undefined}
       aria-label={props.label}
       class={[
         pxText.sm,

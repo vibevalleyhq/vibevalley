@@ -1,4 +1,5 @@
 import { stories, story } from "@vibevalley/stories";
+
 import { Splitter, usePaneWidth } from "./Splitter";
 
 export default stories({

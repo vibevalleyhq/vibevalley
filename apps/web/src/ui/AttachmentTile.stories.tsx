@@ -1,6 +1,8 @@
 import { For } from "solid-js";
+
 import type { Attachment } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import { AttachmentTile } from "./AttachmentTile";
 
 // A picture's thumbnail is read from the server, which the stories do not have: the kinds drawn here are the others.

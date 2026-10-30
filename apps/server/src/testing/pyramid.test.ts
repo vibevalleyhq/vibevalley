@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
+
 import { describe, expect, it } from "vite-plus/test";
+
 import { importsOf, pyramid } from "@vibevalley/testkit/pyramid";
 
 const root = join(import.meta.dirname, "../..");
@@ -42,7 +44,7 @@ describe("the test pyramid", () => {
   });
 
   it("follows imports into the workspace's packages", () => {
-    expect(reach("src/cli/chat.ts")).toEqual(["src/cli/chat.ts", "../../packages/agent/src/coding.ts", "node:child_process"]);
+    expect(reach("src/runtime/vibevalley.ts")).toEqual(["src/runtime/vibevalley.ts", "../../packages/agent/src/coding.ts", "node:child_process"]);
   });
 
   it("has a layer for every test file", () => {
@@ -50,6 +52,6 @@ describe("the test pyramid", () => {
       all.filter((f) => f.endsWith(".test.ts")),
       (f) => layerOf(f),
     );
-    expect(Object.keys(shape).sort()).toEqual(["flow", "module", "rule"]);
+    expect(Object.keys(shape).toSorted()).toEqual(["flow", "module", "rule"]);
   });
 });

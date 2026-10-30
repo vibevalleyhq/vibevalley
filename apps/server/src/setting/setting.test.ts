@@ -1,11 +1,14 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { ServerConfig } from "@/base/config.ts";
 import { Effect, Layer } from "effect";
-import { defaultVoice } from "./voice.ts";
+
+import { ServerConfig } from "@/base/config.ts";
 import { testConfig } from "@/testing/layers.ts";
+
 import { Setting } from "./setting.ts";
+import { defaultVoice } from "./voice.ts";
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
 
@@ -52,7 +55,7 @@ describe("settings", () => {
       Effect.gen(function* () {
         const s = yield* Setting;
         const refused = yield* s.save({ agoraAppId: "not-an-app-id" }).pipe(Effect.flip);
-        expect(refused.message).toMatch(/App ID/);
+        expect(refused.message).toMatch(/App ID/u);
         expect(s.agora()).toBeUndefined();
       }),
     ),
@@ -82,7 +85,7 @@ describe("settings", () => {
         const reset = yield* s.save({ voice: {} });
         expect(reset.voice).toEqual(reset.voiceDefaults);
         expect(file(config)).not.toHaveProperty("voice");
-        expect((yield* s.save({ voice: { silenceMs: 50 } }).pipe(Effect.flip)).message).toMatch(/200 到 2000/);
+        expect((yield* s.save({ voice: { silenceMs: 50 } }).pipe(Effect.flip)).message).toMatch(/200 到 2000/u);
       }),
     );
   });

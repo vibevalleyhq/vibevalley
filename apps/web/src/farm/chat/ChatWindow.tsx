@@ -1,14 +1,21 @@
-import { t } from "@vibevalley/i18n";
 // The farm's chat, 田头: the right screen of the farm phone when it is unfolded (Phone.tsx), filling it: a head (the channel
 // menu and what the orchestrator is doing, or a thread's title and its helper), the messages newest at the bottom with the
 // lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
 // the phone large.
 
-import { messageOf } from "@/base/format";
-import { farmChannelLabel } from "./labels";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
+
 import { newSendKey } from "@/base/api";
+import { messageOf } from "@/base/format";
+import { orchestratorMood, useCore } from "@/base/frame";
+import { ready, useAgents } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { useNow } from "@/base/util";
+import { farm } from "@/farm/store";
+import { useFarm } from "@/farm/ui";
 import {
   arrived,
   pending,
@@ -28,19 +35,15 @@ import {
   useMessage,
   useFollowed,
 } from "@/features/channel";
-import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
-import { playSound } from "@/ui/pixel/sound";
-import { farm } from "@/farm/store";
-import { useRouter } from "@/base/router";
-import { useNow } from "@/base/util";
 import { TurnSteps } from "@/features/session";
-import { orchestratorMood, useCore } from "@/base/frame";
-import { ready, useAgents } from "@/base/query";
+import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
 import { OrchestratorFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
+import { playSound } from "@/ui/pixel/sound";
+
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
+import { farmChannelLabel } from "./labels";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
 const suggestions = ([0, 1, 2, 3] as const).map((i) => t(`web.farm.chat.suggestions.${i}`));
@@ -163,7 +166,7 @@ export function ChatWindow() {
   const captions = createMemo(() => {
     const c = call();
     const here = shown();
-    if (c.phase !== "live" || !here?.default) return [];
+    if (c.phase !== "live" || here?.default !== true) return [];
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
@@ -296,7 +299,7 @@ export function ChatWindow() {
           </p>
         </Show>
         <Show when={showSuggestions()}>
-          <div class="flex shrink-0 gap-1.5 scroll-fade-x overflow-x-auto px-3 pb-2">
+          <div class="flex shrink-0 scroll-fade-x gap-1.5 overflow-x-auto px-3 pb-2">
             <For each={suggestions}>
               {(line) => (
                 <button

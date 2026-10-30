@@ -4,13 +4,16 @@
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
+
 import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceView } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
-import { insertName, type Nameable, nameables, offeredFor, typedName } from "./mentions";
-import { api, newSendKey, reasonOf } from "@/base/api";
-import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
-import { orchestratorMood } from "@/base/frame";
+
 import { useOrchestrators } from "@/base/agents";
+import { api, newSendKey, reasonOf } from "@/base/api";
+import { orchestratorMood } from "@/base/frame";
+
+import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
+import { insertName, type Nameable, nameables, offeredFor, typedName } from "./mentions";
 export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
   await api.channel.message.send(omitUndefined({ id: channel.id, text, agent, sendKey }));
 }
@@ -120,12 +123,12 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   const send = async () => {
     if (disposed || sending) return;
     const asked = commandOf(text());
-    if (asked && !(ways.target().attachments?.length ?? 0)) return command(asked);
+    if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
-    if (!body.text && !(body.attachments?.length ?? 0)) return;
+    if (!body.text && !((body.attachments?.length ?? 0) !== 0)) return;
     if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
     const sent = attempt;
-    const shown = ways.echo ? channelOf(body.id) : undefined;
+    const shown = ways.echo === true ? channelOf(body.id) : undefined;
     if (shown) {
       setPendingLines((all) => [...all.filter((p) => p.key !== sent.key), { key: sent.key, channel: shown.id, text: body.text }]);
       // The box empties at once; a failure puts the line back, with its key, unless something was typed meanwhile.
@@ -194,7 +197,7 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
     send,
     onKey,
     /** The caret moves without typing too (arrow keys, a click): the @ menu follows it. */
-    follow: (e: Event) => setCaret((e.currentTarget as HTMLTextAreaElement).selectionStart),
+    follow: (e: Event) => e.currentTarget instanceof HTMLTextAreaElement && setCaret(e.currentTarget.selectionStart),
     /** The menu closes when the box loses the focus and comes back with it. */
     blur: () => setClosed(true),
     focus: () => setClosed(false),

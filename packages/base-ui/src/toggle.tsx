@@ -3,9 +3,10 @@
 // several be pressed at once, else pressing one releases the others.
 
 import { createContext, createSignal, omit, useContext } from "solid-js";
-import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
-import { createControllable } from "./internal/controllable";
+
 import type { Orientation } from "./internal/composite";
+import { createControllable } from "./internal/controllable";
+import { type ButtonProps, call, type DivProps, flag, refs } from "./internal/element";
 import { itemsIn, roveFocus } from "./internal/roving";
 
 interface GroupCtx {
@@ -78,7 +79,7 @@ export function ToggleGroup(props: ToggleGroupProps) {
   const ctx: GroupCtx = {
     value,
     disabled: () => Boolean(props.disabled),
-    press: (v, on) => setValue(on ? (props.multiple ? [...value(), v] : [v]) : value().filter((x) => x !== v)),
+    press: (v, on) => setValue(on ? (props.multiple === true ? [...value(), v] : [v]) : value().filter((x) => x !== v)),
     tabStop: () => value().find(() => true) ?? first(),
   };
   return (

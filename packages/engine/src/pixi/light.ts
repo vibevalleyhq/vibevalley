@@ -9,6 +9,7 @@
 // one, and anything that is not a sprite (shapes, particles), is lit as the ground behind it.
 
 import { type Container, defaultFilterVert, Filter, GlProgram, Rectangle, RenderTexture, Sprite, Texture, UniformGroup, ViewContainer } from "pixi.js";
+
 import type { PixelStage } from "./index";
 import { mirrorNormals, normalsOf, type NormalOptions } from "./normals";
 import type { Sky } from "./sky";
@@ -45,12 +46,15 @@ export interface LightingOptions {
 }
 
 /** A loaded texture's picture as RGBA, its own pixels (at its resolution), read through a canvas: call once, when it loads. */
+const isDrawable = (r: unknown): r is CanvasImageSource =>
+  r instanceof HTMLImageElement || r instanceof HTMLCanvasElement || r instanceof ImageBitmap || r instanceof OffscreenCanvas || r instanceof HTMLVideoElement;
+
 export function pixelsOf(texture: Texture): { readonly rgba: Uint8ClampedArray; readonly w: number; readonly h: number } | undefined {
   const res = texture.source.resolution;
   const w = Math.round(texture.frame.width * res);
   const h = Math.round(texture.frame.height * res);
-  const resource = texture.source.resource as CanvasImageSource | undefined;
-  if (!resource || w === 0 || h === 0) return undefined;
+  const resource: unknown = texture.source.resource;
+  if (!isDrawable(resource) || w === 0 || h === 0) return undefined;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -164,8 +168,9 @@ export function pixelLighting(stage: PixelStage, { normalsOf }: LightingOptions)
     const undo: (() => void)[] = [];
     const visit = (node: Container, mirrored: boolean) => {
       const flipped = node.scale.x < 0 ? !mirrored : mirrored;
-      const filters = node.filters;
-      if (filters && filters.length > 0) {
+      // Pixi gives undefined for a node that never had filters, whatever its type says.
+      const filters: Container["filters"] | undefined = node.filters;
+      if (filters !== undefined && filters.length > 0) {
         const kept = [...filters];
         node.filters = [];
         undo.push(() => (node.filters = kept));
@@ -221,7 +226,7 @@ export function pixelLighting(stage: PixelStage, { normalsOf }: LightingOptions)
       u.uTime = time;
       const shown = lights
         .filter((l) => l.intensity > 0.01 && l.radius > 0)
-        .sort((a, b) => b.intensity * b.radius - a.intensity * a.radius)
+        .toSorted((a, b) => b.intensity * b.radius - a.intensity * a.radius)
         .slice(0, MAX_LIGHTS);
       // Lights are in the world; the filter works on the canvas, where the camera has moved the world.
       shown.forEach((l, i) => {

@@ -3,17 +3,20 @@
 // what the owner does that is no fact (a review, a call, a title) where it happens. The ledger never stops the farm: an
 // entry that cannot be written is logged, and the farm goes on.
 
+import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream, Option } from "effect";
+
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
-import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream, Option } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { Core } from "@/core/core.ts";
 import { Projects } from "@/project/project.ts";
+
 import * as q from "../../db/generated/game_ledger.sql.ts";
+import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 
 /** The person plants on an empty plot and then says what to do; the orchestrator hires a session for it some seconds later. */
 const wantStationForMs = 10_000;
@@ -132,7 +135,7 @@ export const make = Effect.gen(function* () {
 
   return Game.of({
     achievements: achievementsInWords,
-    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier ? { tier } : {}) }),
+    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier != null && tier !== 0 ? { tier } : {}) }),
     want: (station) => {
       wanted = { station, until: clock.currentTimeMillisUnsafe() + wantStationForMs };
     },

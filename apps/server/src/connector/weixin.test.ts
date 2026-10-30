@@ -1,7 +1,9 @@
 import { createServer, type Server } from "node:http";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { Effect } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
+import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient } from "./weixin.ts";
 
 const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
@@ -24,7 +26,7 @@ const serve = async (answer: (path: string) => string) => {
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("no test port");
+  if (address === null || typeof address === "string") throw new Error("no test port");
   return `http://127.0.0.1:${address.port}`;
 };
 
@@ -87,7 +89,7 @@ describe("WeChat HTTP responses", () => {
   it("rejects a QR response with the wrong shape", async () => {
     const base = await serve(() => `{"qrcode":42,"qrcode_img_content":"https://qr.example"}`);
     const client = new WeixinClient(http, base);
-    expect((await refusal(client.login(() => Effect.void, Effect.succeed("")))).message).toMatch(/拿不到登录二维码/);
+    expect((await refusal(client.login(() => Effect.void, Effect.succeed("")))).message).toMatch(/拿不到登录二维码/u);
   });
 
   it("keeps a 64-bit sent message id and rejects a wrong id shape", async () => {

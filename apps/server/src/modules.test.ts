@@ -4,7 +4,9 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
+
 import { describe, expect, it } from "vite-plus/test";
+
 import { moduleOf, modules, outside } from "./modules.ts";
 
 const src = import.meta.dirname;
@@ -48,7 +50,7 @@ describe("the modules", () => {
     for (const file of files(src)) {
       const from = rel(file);
       if (from.endsWith(".test.ts") || outside.includes(from.split("/")[0]!)) continue;
-      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"((?:\.{1,2}|@)\/[^"]+)"/g)) {
+      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"((?:\.{1,2}|@)\/[^"]+)"/gu)) {
         const spec = m[1]!;
         const to = spec.startsWith("@/") ? normalize(spec.slice(2)) : rel(normalize(join(dirname(file), spec)));
         if (moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)) found.push(`${from} -> ${to}`);
@@ -65,8 +67,8 @@ describe("the modules", () => {
       const top = from.split("/")[0]!;
       if (from.endsWith(".test.ts") || outside.includes(top) || top === "core" || top === "projection") continue;
       const text = readFileSync(file, "utf8");
-      const parts = [...text.matchAll(/core\.state\(\)\??\.(\w+)/g)].map((m) => m[1]!);
-      if (/core\.session\(/.test(text)) parts.push("sessions");
+      const parts = [...text.matchAll(/core\.state\(\)\??\.(\w+)/gu)].map((m) => m[1]!);
+      if (/core\.session\(/u.test(text)) parts.push("sessions");
       for (const part of new Set(parts)) {
         const owner = owners[part];
         if (owner && owner !== moduleOf(from)?.name) found.push(`${from} -> ${part}`);

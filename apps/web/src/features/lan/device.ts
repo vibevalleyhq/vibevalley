@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The page opened from another device, through the farm's lan listener (连接到本机): it pairs once on /pair and keeps
 // its key in a cookie the listener reads (lanKeyCookie); on the farm's own computer it needs none.
 
+import { t } from "@vibevalley/i18n";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
 const loopback = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
@@ -17,10 +17,10 @@ export const keyCookie = (key: string) => `${lanKeyCookie}=${encodeURIComponent(
 
 /** What the device is called on the owner's list, until they rename it there: a guess from the browser. */
 export function deviceGuess(userAgent: string): string {
-  if (/iPhone/.test(userAgent)) return "iPhone";
-  if (/iPad/.test(userAgent)) return "iPad";
-  if (/Android/.test(userAgent)) return t("web.lan.devices.android");
-  if (/Macintosh/.test(userAgent)) return "Mac";
-  if (/Windows/.test(userAgent)) return t("web.lan.devices.windows");
+  if (/iPhone/u.test(userAgent)) return "iPhone";
+  if (/iPad/u.test(userAgent)) return "iPad";
+  if (/Android/u.test(userAgent)) return t("web.lan.devices.android");
+  if (/Macintosh/u.test(userAgent)) return "Mac";
+  if (/Windows/u.test(userAgent)) return t("web.lan.devices.windows");
   return t("web.lan.devices.device");
 }

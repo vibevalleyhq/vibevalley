@@ -4,9 +4,10 @@
 
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
+
 import type { Orientation } from "./internal/composite";
-import { call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
 import { createControllable } from "./internal/controllable";
+import { call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
 
 interface Ctx {
   readonly value: () => number;
@@ -59,7 +60,7 @@ function Root(props: SliderRootProps) {
   const [dragging, setDragging] = createSignal(false);
   const ctx: Ctx = {
     value,
-    share: () => (value() - min()) / (max() - min() || 1),
+    share: () => (value() - min()) / (max() === min() ? 1 : max() - min()),
     min,
     max,
     step,

@@ -1,7 +1,8 @@
 import { type Accessor, createContext, createMemo, useContext } from "solid-js";
 
-import { clock, type FarmUi, farmState, subscribeFarm } from "./store";
 import { createExternal } from "@/base/external";
+
+import { clock, type FarmUi, farmState, subscribeFarm } from "./store";
 export const FarmUiContext = createContext<Accessor<FarmUi>>();
 
 /** One subscription to the farm's store for the page; useFarm reads slices of it. */

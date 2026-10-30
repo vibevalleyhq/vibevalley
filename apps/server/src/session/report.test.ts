@@ -1,17 +1,20 @@
 import type { Event } from "@botiverse/oar";
-import { recallHead } from "./prompts.ts";
-import type { Doing, Session } from "@vibevalley/protocol";
-import { clip } from "@/base/clip.ts";
 import { describe, expect, it } from "vite-plus/test";
-import { inCny } from "@/runtime/price.ts";
-import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { MergeFailure } from "@/project/shapes.ts";
-import { checksOf, parseAnswer, questionsOf, readReport, reportVerdict, summaryOf } from "./report.ts";
-import { conflictBrief, conflictOf, notTakenIn } from "./takeIn.ts";
-import { jobBreak, withRecall } from "./briefing.ts";
-import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
-import { shellCommand } from "./shell.ts";
+
+import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { clip } from "@/base/clip.ts";
+import { MergeFailure } from "@/project/shapes.ts";
+import { inCny } from "@/runtime/price.ts";
+
+import { jobBreak, withRecall } from "./briefing.ts";
+import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
+import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
+import { recallHead } from "./prompts.ts";
+import { checksOf, parseAnswer, questionsOf, readReport, reportVerdict, summaryOf } from "./report.ts";
+import { shellCommand } from "./shell.ts";
+import { conflictBrief, conflictOf, notTakenIn } from "./takeIn.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>
@@ -164,7 +167,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(failed.journal[0]!.type).toBe("note");
-    expect((failed.journal[0] as { text: string }).text).toMatch(/^余额不够了：Insufficient Balance/);
+    expect((failed.journal[0] as { text: string }).text).toMatch(/^余额不够了：Insufficient Balance/u);
     const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
     expect(exited.facts).toEqual([{ type: "report", questions: [], checks: [], id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
@@ -187,7 +190,7 @@ describe("a run's report", () => {
     );
     expect(summaryOf(text)).toBe("两个路由，POST /api/clock-in 和 POST /api/clock-out。");
     expect(summaryOf("前面的话\n\n- 结论：做完了，commit abc123")).toBe("做完了，commit abc123");
-    expect(summaryOf("开头在看代码。\n\n最后：一切正常，测试 28 个都过了。")).toMatch(/测试 28 个都过了/);
+    expect(summaryOf("开头在看代码。\n\n最后：一切正常，测试 28 个都过了。")).toMatch(/测试 28 个都过了/u);
   });
 
   it("a completed run is read", () => {
@@ -208,7 +211,7 @@ describe("a run's report", () => {
   it("a failed run leads with why", () => {
     const billing = readReport({ kind: "failed", failure: "billing", reason: "Insufficient Balance", status: 402 }, "先看了看代码");
     expect([billing.outcome, billing.needsYou]).toEqual(["failed", true]);
-    expect(billing.failure).toMatch(/^余额不够了（HTTP 402）：Insufficient Balance/);
+    expect(billing.failure).toMatch(/^余额不够了（HTTP 402）：Insufficient Balance/u);
     expect(billing.summary).toBe(clip(billing.failure, 160));
     expect(billing.text).toBe(billing.failure + "\n\n先看了看代码");
     expect(readReport({ kind: "failed", failure: "overloaded", reason: "" }, "").needsYou).toBe(false);
@@ -265,9 +268,11 @@ describe("room and names", () => {
 
   it("room in the workspace", () => {
     expect(noRoom([], "pi", "a", limits)).toBe("");
-    expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)], "pi", "a", limits)).toMatch(/已经有 3 个帮工在干活了/);
-    expect(noRoom([h("w1", "pi", "a", true), h("w2", "pi", "b", true)], "pi", "c", limits)).toMatch(/最多同时 2 个（在 Runtime 页面可以改）/);
-    expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "a", true)], "codex", "a", limits)).toMatch(/项目 a 里已经有 2 个帮工在干活/);
+    expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)], "pi", "a", limits)).toMatch(
+      /已经有 3 个帮工在干活了/u,
+    );
+    expect(noRoom([h("w1", "pi", "a", true), h("w2", "pi", "b", true)], "pi", "c", limits)).toMatch(/最多同时 2 个（在 Runtime 页面可以改）/u);
+    expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "a", true)], "codex", "a", limits)).toMatch(/项目 a 里已经有 2 个帮工在干活/u);
     const two = [h("w1", "pi", "a", true), h("w2", "pi", "a", true)];
     expect(noRoom([h("w1", "pi", "a", false), h("w2", "pi", "a", false)], "pi", "a", limits)).toBe("");
     expect(noRoom(two, "pi", "a", limits)).not.toBe("");

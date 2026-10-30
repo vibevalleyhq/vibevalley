@@ -5,7 +5,7 @@ test("the runtimes list what oar found, and a runtime's settings are saved and p
   const list = page.getByTestId("runtimes");
   await expect(list.getByTestId("list-row").first()).toBeVisible();
   await list.locator('[data-testid="list-row"][data-key="pi"]').click();
-  await expect(page).toHaveURL(/\/runtimes\/pi$/);
+  await expect(page).toHaveURL(/\/runtimes\/pi$/u);
   const most = page.getByTestId("max-working");
   await most.fill("2");
   await page.getByTestId("save").click();
@@ -16,6 +16,6 @@ test("the runtimes list what oar found, and a runtime's settings are saved and p
   await page.getByTestId("save").click();
   await expect(page.getByTestId("discard")).toBeHidden();
   await page.getByTestId("new-agent").click();
-  await expect(page).toHaveURL(/\/agents\/new\?runtime=pi$/);
+  await expect(page).toHaveURL(/\/agents\/new\?runtime=pi$/u);
   await expect(page.getByTestId("agent-name")).not.toHaveValue("");
 });

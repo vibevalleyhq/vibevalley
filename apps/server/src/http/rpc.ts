@@ -1,13 +1,15 @@
 // The page's one WebSocket: the Subscriptions RPCs (packages/protocol/src/rpc.ts) at rpcPath, for the farm's own page.
 
-import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
 import { Effect, Layer } from "effect";
 import { type Headers, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
+
+import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
+
 import { Channels } from "@/channel/chat.ts";
 import { deviceHeader } from "@/lan/lan.ts";
 
-const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
+const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/u;
 
 /** A WebSocket is not held back by CORS: any page the owner opens could connect, so only the farm's own page may. The
  * host must be a loopback name too, or a page whose name is made to resolve here (DNS rebinding) would be its own origin.

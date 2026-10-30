@@ -1,9 +1,11 @@
-import { lineWords, quotaWords, situationWords } from "./prompts.ts";
 import { ownerId, type RuntimeInfo } from "@vibevalley/protocol";
+
 import { head } from "@/base/clip.ts";
-import { type InboxMessage } from "@/channel/wake.ts";
 import { messageLine } from "@/channel/prompts.ts";
+import { type InboxMessage } from "@/channel/wake.ts";
 import { quotaLow, yuan } from "@/runtime/money.ts";
+
+import { lineWords, quotaWords, situationWords } from "./prompts.ts";
 
 export function quotaText(info: RuntimeInfo | undefined): string {
   const budget = info?.settings.dailyBudget ?? 0;

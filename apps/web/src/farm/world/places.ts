@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
-
 // What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields;
 // a place opens a farm panel, a workbench page, or the chat (the phone unfolded to 田头).
+
+import { t } from "@vibevalley/i18n";
 
 export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator" | "taskBoard";
 

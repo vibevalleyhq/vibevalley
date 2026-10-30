@@ -1,34 +1,37 @@
-import { t } from "@vibevalley/i18n";
 // The owner's calls: Agora RTC grants, the voice agent Agora runs for a call, the voice line the
 // orchestrator answers it on, and dictation. A grant is signed for one channel and uid and lives as long as its token, or the
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { messageOf, errnoOf } from "@/errors.ts";
-import { noticeLine, onCallLine } from "./prompts.ts";
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer } from "node:http";
+
 import { NodeHttpServer } from "@effect/platform-node";
-import { HttpEffect } from "effect/http";
-import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
-import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
-import type { Socket } from "effect/socket";
-import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Schema, type Scope, Semaphore, Stream } from "effect";
-import { chatCompletions } from "@/orchestrator/openai.ts";
+import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
+import { HttpEffect } from "effect/http";
+import type { Socket } from "effect/socket";
+
+import { t } from "@vibevalley/i18n";
+import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
+import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
+
 import { ServerConfig } from "@/base/config.ts";
-import { Channels } from "@/channel/chat.ts";
-import { Core } from "@/core/core.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { orchestratorModel } from "@/orchestrator/model.ts";
-import { Notices } from "@/notice/notice.ts";
-import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 import { callbackLog } from "@/base/log.ts";
 import { afterRealTime } from "@/base/time.ts";
+import { Channels } from "@/channel/chat.ts";
+import { Core } from "@/core/core.ts";
+import { messageOf, errnoOf } from "@/errors.ts";
+import { Notices } from "@/notice/notice.ts";
+import { orchestratorModel } from "@/orchestrator/model.ts";
+import { chatCompletions } from "@/orchestrator/openai.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
+
+import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
+import { noticeLine, onCallLine } from "./prompts.ts";
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
@@ -239,13 +242,11 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
 
 /** Already left or leaving counts as success, as the quickstart treats it. */
 function alreadyStopping(e: unknown): boolean {
-  const err = e as {
-    statusCode?: number;
-    body?: { detail?: string; reason?: string };
-    message?: string;
-  } | null;
-  if (err?.statusCode === 404) return true;
-  return [err?.body?.detail, err?.body?.reason, err?.message].join(" ").toLowerCase().includes("already in the process of shutting down");
+  if (!Predicate.isObject(e)) return false;
+  if ("statusCode" in e && e.statusCode === 404) return true;
+  const body = "body" in e && Predicate.isObject(e.body) ? e.body : {};
+  const said = [Reflect.get(body, "detail"), Reflect.get(body, "reason"), "message" in e ? e.message : undefined];
+  return said.some((s) => typeof s === "string" && s.toLowerCase().includes("already in the process of shutting down"));
 }
 
 const sign = (c: AgoraCredentials, channel: string, uid: string): AgoraGrant => ({
@@ -326,7 +327,7 @@ export function speakPieces(text: string, max = 480): string[] {
     let used = 0;
     while (fit < chars.length && used + bytes(chars[fit]!) <= max) used += bytes(chars[fit++]!);
     const head = chars.slice(0, fit).join("");
-    const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/g)].map((m) => m.index));
+    const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/gu)].map((m) => m.index));
     const cut = end > 0 ? [...head.slice(0, end + 1)].length : fit;
     out.push(chars.slice(0, cut).join("").trim());
     rest = chars.slice(cut).join("").trim();
@@ -345,7 +346,7 @@ export interface VoiceOptions {
   readonly moss?: MossTransport;
 }
 
-const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
 
 /** A tunnel's public address and how to close it. */
 export interface Tunnel {
@@ -422,8 +423,8 @@ export const make = (options: VoiceOptions = {}) =>
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     // Fibers started from callbacks belong to this service: they end with it, and sleep on its Clock.
-    const forkHere = yield* FiberSet.makeRuntime<never>();
-    const runHere: Run = yield* FiberSet.makeRuntimePromise<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
+    const runHere: Run = yield* FiberSet.makeRuntimePromise();
     const now = () => clock.currentTimeMillisUnsafe();
 
     const grants = new Map<string, Grant>();
@@ -456,7 +457,7 @@ export const make = (options: VoiceOptions = {}) =>
       log: (l) => logs.info(l),
       now: () => clock.currentTimeMillisUnsafe(),
     });
-    const route = /^\/llm\/([\w-]+)\/chat\/completions$/;
+    const route = /^\/llm\/([\w-]+)\/chat\/completions$/u;
     // A call's own key on its own path; anything else is not there or not let in.
     const lineHandler = (request: Request): Promise<Response> => {
       const m = route.exec(new URL(request.url).pathname);
@@ -504,7 +505,7 @@ export const make = (options: VoiceOptions = {}) =>
     const opening = yield* Semaphore.make(1);
     const lineClosed = () => new LineFailed({ message: t("server.voice.lineClosed") });
     const base = Effect.suspend(() => {
-      if (config.voice.line.url) return Effect.succeed(config.voice.line.url.replace(/\/+$/, ""));
+      if (config.voice.line.url) return Effect.succeed(config.voice.line.url.replace(/\/+$/u, ""));
       closing?.();
       closing = undefined;
       return opening.withPermits(1)(
@@ -836,7 +837,7 @@ export const make = (options: VoiceOptions = {}) =>
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
         if (d.via === "moss" && d.key === "") return yield* Effect.fail(unavailable(t("server.voice.dictation.noMossKey"), "dictation"));
         const { url, model } = d.via === "moss" ? mossTranscription : d;
-        const format = given.trim().replace(/^\./, "").toLowerCase();
+        const format = given.trim().replace(/^\./u, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
           return yield* Effect.fail<ApiError>({
@@ -844,7 +845,7 @@ export const make = (options: VoiceOptions = {}) =>
             reason: t("server.voice.dictation.format", { format: JSON.stringify(format) }),
           });
         const audio = Buffer.from(audio64, "base64");
-        if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
+        if (audio.length === 0 || audio.toString("base64").replace(/=+$/u, "") !== audio64.replace(/=+$/u, "").replace(/\s/gu, ""))
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
             reason: t("server.voice.dictation.empty"),

@@ -1,25 +1,30 @@
-import { t } from "@vibevalley/i18n";
-import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
+// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words go.
+// An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
+// to the route of the input taken last, and the tools read that route too.
+
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Usage } from "@vibevalley/ai/messages";
-import type { Tool } from "@vibevalley/agent/core/loop";
-import type { OrchestratorState } from "@vibevalley/protocol";
+
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, Queue, Scope, Semaphore, Stream } from "effect";
+
 import { Brain, type BrainEvent, sessionUnfinished } from "@vibevalley/agent/brain";
-import type { ModelClient } from "@vibevalley/ai/client";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, type CustomMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { readLines, replay } from "@vibevalley/agent/session";
+import type { ModelClient } from "@vibevalley/ai/client";
+import type { Usage } from "@vibevalley/ai/messages";
+import { t } from "@vibevalley/i18n";
+import type { OrchestratorState } from "@vibevalley/protocol";
+
 import { newId } from "@/base/ids.ts";
+import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
+
 import { AgentExecution, type RunInput } from "./execution.ts";
 import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
-// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words go.
-// An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
-// to the route of the input taken last, and the tools read that route too.
 
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before.
  * Its words are read once: what came before the reader is kept for it. */
@@ -152,6 +157,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
       const messages = brain?.brain.history() ?? [];
       for (let i = messages.length - 1; i >= 0; i--) {
         const m = messages[i]!;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
         if (isHosted(m, o.inputType)) return local.get(m) ?? { route: m.details as R, run: { by: { kind: "" } } };
       }
       return input;
@@ -225,6 +231,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         switch (e.type) {
           case "message_start":
             if (isHosted(e.message, o.inputType)) {
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
               const next = local.get(e.message) ?? { route: e.message.details as R, run: { by: { kind: "" } } };
               // An input that joins the run takes the words from here on: the one before has what it got, and ends now, or a
               // caller waiting on it (a brief, a call's line) would wait for the run's end with no words.

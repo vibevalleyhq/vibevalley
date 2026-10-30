@@ -5,25 +5,28 @@ import { type ComponentType, type Ref, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewProps } from "react-native-webview";
+
 import { type FromNative, fromNativeKey, type ToNative } from "@vibevalley/protocol/host";
+
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
 import { isPairPage, keyScript } from "./pairing";
 import { colors } from "./style";
 
-// The package types its props as WebViewProps & P with P = undefined, which is never: the props it takes, as they are.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the package types its props as WebViewProps & P with P = undefined, which is never: the props it takes, as they are
 const Web = WebView as unknown as ComponentType<WebViewProps & { ref?: Ref<WebView<object>> }>;
 
 export function FarmScreen({ farm, forgotten }: { farm: Farm; forgotten: () => void }) {
   const view = useRef<WebView<object>>(null);
   const send = (m: FromNative) => view.current?.injectJavaScript(`window.${fromNativeKey}?.(${JSON.stringify(m)}); true;`);
   const bridge = useRef<ReturnType<typeof nativeHost> | null>(null);
-  if (!bridge.current) bridge.current = nativeHost(send);
+  bridge.current ??= nativeHost(send);
   useEffect(() => () => bridge.current?.close(), []);
 
   const onMessage = (e: WebViewMessageEvent) => {
     let m: ToNative;
     try {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page's bridge (protocol host.ts) posts only ToNative
       m = JSON.parse(e.nativeEvent.data) as ToNative;
     } catch {
       return;

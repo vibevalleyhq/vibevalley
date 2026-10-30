@@ -4,6 +4,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+
 import { chromium } from "@playwright/test";
 
 const server = process.env.VIBEVALLEY_SERVER;
@@ -20,14 +21,16 @@ page.on("pageerror", (e) => errors.push(e.message));
 // The title screen comes once a machine: seen, so the farm itself is drawn.
 await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 for (const path of pages) {
+  /* oxlint-disable eslint/no-await-in-loop -- one page, shown one path at a time */
   await page.goto(server + path);
   // The state stream stays open, so the network is never idle: give the first frame and the pictures a moment.
   await page.waitForLoadState("load");
   if (path === "/") await page.locator("canvas").first().waitFor();
   await page.waitForTimeout(3000);
-  const name = path === "/" ? "farm" : path.replace(/^\//, "").replace(/[/?=&]/g, "-");
+  const name = path === "/" ? "farm" : path.replace(/^\//u, "").replace(/[/?=&]/gu, "-");
   const file = join(out, `${name}-${width}x${height}.png`);
   await page.screenshot({ path: file });
+  /* oxlint-enable eslint/no-await-in-loop */
   console.log(file);
 }
 await browser.close();

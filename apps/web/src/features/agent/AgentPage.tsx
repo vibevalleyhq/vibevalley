@@ -1,12 +1,12 @@
-import { Tabs } from "@/ui/Tabs";
-import { t } from "@vibevalley/i18n";
 // One profile, made or edited: its
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
 // orchestrator from sending it, the server's answer (agent.validate), under them.
 
-import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
+import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import {
   type Agent,
   type AgentProblem,
@@ -25,31 +25,34 @@ import {
   SpeciesValues,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
+
+import { useAgentProblems } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
-import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "@/ui/cast";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { runtimeName } from "@/ui/runtimes";
-import { toast } from "@/ui/toasts";
-import { A } from "@/ui/A";
+import { ready, useAgents, useRuntimes, useSprites } from "@/base/query";
 import { useRouter, useSearch } from "@/base/router";
 import { aria } from "@/base/util";
-import { useAgentProblems } from "@/base/agents";
-import { ready, useAgents, useRuntimes, useSprites } from "@/base/query";
-import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
-import { Button } from "@/ui/Button";
-import { ChipsInput, KeyValueEditor } from "@/ui/Chips";
-import { AgentFace } from "@/ui/Face";
-import { Select, TextArea, TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { PoseSprite } from "@/ui/PoseSprite";
-import { Segmented } from "@/ui/Segmented";
-import { Toggle } from "@/ui/layout";
 import { MemoryPanel } from "@/features/memory";
 import { useSkills } from "@/features/runtime";
 import { TrajectoryList } from "@/features/session";
-import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
-import { FromTemplate } from "./FromTemplate";
+import { A } from "@/ui/A";
+import { Button } from "@/ui/Button";
+import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "@/ui/cast";
+import { ChipsInput, KeyValueEditor } from "@/ui/Chips";
+import { ConfirmButton } from "@/ui/ConfirmButton";
+import { AgentFace } from "@/ui/Face";
+import { Select, TextArea, TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { Toggle } from "@/ui/layout";
+import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { PoseSprite } from "@/ui/PoseSprite";
+import { runtimeName } from "@/ui/runtimes";
+import { Segmented } from "@/ui/Segmented";
+import { Tabs } from "@/ui/Tabs";
 import { Hint } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
+
+import { FromTemplate } from "./FromTemplate";
+import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;
@@ -773,7 +776,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
     const n = name().trim();
     const wanted = target().trim();
     if (!n || !wanted) return;
-    const words = wanted.split(/\s+/);
+    const words = wanted.split(/\s+/u);
     const server: MCPServer =
       type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: wanted, headers: {} };
     props.patch({ ...props.draft, mcpServers: [...props.draft.mcpServers.filter((s) => s.name !== n), server] });

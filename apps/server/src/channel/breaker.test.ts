@@ -1,4 +1,5 @@
 import { expect, it } from "vite-plus/test";
+
 import { WakeBreaker } from "./breaker.ts";
 it("trips once after the limit, stays tripped through a word, and opens again when reset", () => {
   const b = new WakeBreaker(2);

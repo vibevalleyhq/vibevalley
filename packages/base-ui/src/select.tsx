@@ -5,11 +5,12 @@
 
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
+
+import { createControllable } from "./internal/controllable";
 import { createDismiss } from "./internal/dismiss";
+import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type SpanProps, type Renderable } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
 import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type SpanProps, type Renderable } from "./internal/element";
-import { createControllable } from "./internal/controllable";
 
 export type SelectOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 
@@ -24,6 +25,9 @@ interface Ctx extends Floating<SelectOpenChangeReason> {
   readonly start: () => "chosen" | "last";
   readonly setStart: (start: "chosen" | "last") => void;
 }
+
+type Items = NonNullable<SelectRootProps["items"]>;
+const isList = (items: Items): items is Extract<Items, readonly unknown[]> => Array.isArray(items);
 
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
@@ -50,7 +54,7 @@ function Root(props: SelectRootProps) {
   const ctx: Ctx = {
     ...f,
     setOpen: (open, why) => {
-      if (open && props.disabled) return;
+      if (open && props.disabled === true) return;
       f.setOpen(open, why);
       if (!open && why !== "outside") f.trigger()?.focus();
     },
@@ -59,8 +63,8 @@ function Root(props: SelectRootProps) {
     labelOf: (v) => {
       const items = props.items;
       if (!items) return undefined;
-      if (Array.isArray(items)) return (items as readonly { value: string; label: string }[]).find((i) => i.value === v)?.label;
-      return (items as Readonly<Record<string, string>>)[v];
+      if (isList(items)) return items.find((i) => i.value === v)?.label;
+      return items[v];
     },
     disabled: () => props.disabled ?? false,
     start,
@@ -180,7 +184,7 @@ function Item(props: SelectItemProps) {
       tabindex={-1}
       {...rest}
       aria-selected={selected() ? "true" : "false"}
-      aria-disabled={props.disabled ? "true" : undefined}
+      aria-disabled={props.disabled === true ? "true" : undefined}
       data-value={props.value}
       data-label={props.label}
       data-selected={flag(selected())}
@@ -196,7 +200,7 @@ function Item(props: SelectItemProps) {
       }}
       onPointerMove={(e) => {
         call(props.onPointerMove, e);
-        if (!props.disabled && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
+        if (props.disabled !== true && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
       }}
       onKeyDown={(e) => {
         call(props.onKeyDown, e);
@@ -205,7 +209,7 @@ function Item(props: SelectItemProps) {
         e.currentTarget.click();
       }}
       onClick={(e) => {
-        if (props.disabled) return;
+        if (props.disabled === true) return;
         call(props.onClick, e);
         if (e.defaultPrevented) return;
         c.select(props.value);

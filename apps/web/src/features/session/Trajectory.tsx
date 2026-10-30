@@ -1,13 +1,25 @@
-import { t } from "@vibevalley/i18n";
 // A trajectory a row per step: the round in the gutter, what kind of step in the tag, its text cut to a line until the
 // row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
 
-import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
 import { api, reasonOf } from "@/base/api";
+import { ago } from "@/base/format";
+import { ready, useQuery } from "@/base/query";
+import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { TextInput } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import { Quiet } from "@/ui/layout";
+import { Markdown } from "@/ui/Markdown";
+import { toast } from "@/ui/toasts";
+
+import { createSessionEvents } from "./events";
 import {
   cacheHit,
   farmToolText,
@@ -25,16 +37,6 @@ import {
   type TrajectorySummary,
   waterfallOf,
 } from "./rounds";
-import { ago } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
-import { createSessionEvents } from "./events";
-import { ready, useQuery } from "@/base/query";
-import { TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Markdown } from "@/ui/Markdown";
-import { Quiet } from "@/ui/layout";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
@@ -52,16 +54,16 @@ const lightInk = "#fffaf0";
 const darkInk = "#2f1f13";
 
 const luminance = (hex: string) => {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex);
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/iu.exec(hex);
   if (!m) return 1;
-  const [r, g, b] = m.slice(1).map((h) => parseInt(h, 16) / 255) as [number, number, number];
+  const [r = 0, g = 0, b = 0] = m.slice(1).map((h) => parseInt(h, 16) / 255);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 };
 
 /** The words on a fill: whichever ink stands out more from it (WCAG's ratio), so a mid-tone fill gets the readable one. */
 function inkOn(fill: string) {
-  if (!/^#[0-9a-f]{6}$/i.test(fill)) return "var(--wb-ink)";
+  if (!/^#[0-9a-f]{6}$/iu.test(fill)) return "var(--wb-ink)";
   const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   const l = luminance(fill);
   return ratio(l, luminance(lightInk)) >= ratio(l, luminance(darkInk)) ? lightInk : darkInk;
@@ -149,7 +151,7 @@ export function Trajectory(props: {
   const shown = createMemo(() => shownEvents(props.steps));
   const end = () => {
     const last = props.steps.at(-1)?.time ?? props.now;
-    return props.working && props.now > last ? props.now : last;
+    return props.working === true && props.now > last ? props.now : last;
   };
   const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
   const show = (seq: number) => {
@@ -534,7 +536,10 @@ export function TrajectoryList(props: { agent: string }) {
             <ul aria-label={t("web.session.trajectory.sent")} class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
-                  const ended = () => (h().phase._tag === "closed" ? (h().phase as { at: number }).at : undefined);
+                  const ended = () => {
+                    const phase = h().phase;
+                    return phase._tag === "closed" ? phase.at : undefined;
+                  };
                   return (
                     <li>
                       <button

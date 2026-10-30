@@ -1,8 +1,10 @@
-import { expect, test } from "vite-plus/test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { runVerification, readyAddress } from "./verify-server";
+
+import { expect, test } from "vite-plus/test";
+
 import { pathOf } from "../packages/protocol/src/shapes.ts";
+import { runVerification, readyAddress } from "./verify-server";
 
 test("only a machine receipt from the owned process announces readiness", () => {
   expect(readyAddress("listening on http://127.0.0.1:9999", 17)).toBeUndefined();
@@ -35,7 +37,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
   ]);
   try {
     expect(result.code).toBe(23);
-    expect(result.address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(result.address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u);
     expect(JSON.parse(readFileSync(join(result.evidence, "health.json"), "utf8")).ok).toBe(true);
     const ready = JSON.parse(readFileSync(join(result.evidence, "ready.json"), "utf8"));
     expect(ready.url).toBe(result.address);

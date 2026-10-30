@@ -1,9 +1,12 @@
-import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
+
+import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { checkCases, goldenCases } from "@/testing/golden.ts";
+
 import { lineOf, memoryNotesOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
 import { termsOf } from "./terms.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
 
 // Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds; V8's is fdlibm's.
 // They can differ in the last bit, so a relevance within 1e-12 of the Go's is the same one; the picks must agree exactly.
@@ -16,7 +19,7 @@ test("the recorded recalls: the terms, each memory's relevance, the pick", () =>
     const cue: PickCue = { ...input.cue, skip: new Set(input.cue.skip ?? []) };
     const terms = termsOf(cue.text);
     return {
-      terms: [...terms].sort(),
+      terms: [...terms].toSorted(),
       relevance: input.memories.map((m, i) => {
         const got = relevance(m, cue, terms) ?? null;
         return near(got, want[i] ?? null) ? (want[i] ?? null) : got;
@@ -42,7 +45,7 @@ const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session
 const ids = (ms: readonly Memory[]) => ms.map((m) => m.id);
 
 test("terms leave out the too common", () => {
-  expect([...termsOf("用 pnpm test 跑测试")].sort()).toEqual(["pnpm", "test", "测试"].sort());
+  expect([...termsOf("用 pnpm test 跑测试")].toSorted()).toEqual(["pnpm", "test", "测试"].toSorted());
   expect(termsOf("我们需要一个接口").has("一个")).toBe(false);
 });
 

@@ -1,6 +1,7 @@
 import { For, Match, Switch } from "solid-js";
-import { CardColors, type Piece } from "./card";
+
 import type { SpriteAtlas } from "./atlas";
+import { CardColors, type Piece } from "./card";
 
 /** A helper's head, cut from its attention drawing (`<look>-down`, else the bear farmer's), on a leaf green ground. */
 export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: number }) {
@@ -119,7 +120,7 @@ export function PixelCard(props: {
   maxWidth?: number | undefined;
   maxLines?: number | undefined;
 }) {
-  const centred = () => !!props.center || props.width !== undefined || props.height !== undefined;
+  const centred = () => !(props.center !== true) || props.width !== undefined || props.height !== undefined;
   return (
     <div class="inline-block pr-0.5 pb-0.5">
       <div
@@ -132,13 +133,19 @@ export function PixelCard(props: {
           "min-height": props.height !== undefined ? `${props.height}px` : undefined,
         }}
       >
-        <div class={["flex flex-col", props.center ? "items-center" : "items-start"]}>
+        <div class={["flex flex-col", props.center === true ? "items-center" : "items-start"]}>
           <For each={props.rows} keyed={false}>
             {(row) => (
               <div class="flex items-center gap-[3px]">
                 <For each={row()} keyed={false}>
                   {(p) => (
-                    <PieceView piece={p()} ink={props.ink ?? CardColors.ink} maxWidth={props.maxWidth} maxLines={props.maxLines} center={!!props.center} />
+                    <PieceView
+                      piece={p()}
+                      ink={props.ink ?? CardColors.ink}
+                      maxWidth={props.maxWidth}
+                      maxLines={props.maxLines}
+                      center={!(props.center !== true)}
+                    />
                   )}
                 </For>
               </div>

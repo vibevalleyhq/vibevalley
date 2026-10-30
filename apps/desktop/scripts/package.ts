@@ -3,10 +3,12 @@
 // release build, server/ is apps/server with its production dependencies installed as real copies. The server runs unbundled with tsx, as it does in the
 // repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
-import { build, Platform } from "electron-builder";
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+
+import { build, Platform } from "electron-builder";
+
 import { workspaceClosure } from "../src/workspace.ts";
 
 const desktop = join(import.meta.dirname, "..");
@@ -25,7 +27,7 @@ const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--sh
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(server, { recursive: true });
-const skip = (path: string) => !/\.test\.ts$|\/testdata(\/|$)|\/testing(\/|$)/.test(path);
+const skip = (path: string) => !/\.test\.ts$|\/testdata(\/|$)|\/testing(\/|$)/u.test(path);
 for (const dir of ["src", "db"]) cpSync(join(repo, "apps/server", dir), join(server, dir), { recursive: true, filter: skip });
 // Each workspace package the server runs on sits beside it as stage/<folder>, its src only: the code runs from source.
 const packages = workspaceClosure(repo, join(repo, "apps/server"));
@@ -33,6 +35,7 @@ for (const dir of packages.values()) cpSync(join(dir, "src"), join(stage, basena
 
 // npm does not read pnpm's catalog: each "catalog:" becomes the version pnpm installed for the package, as the lockfile has it.
 const installed = (dir: string): Record<string, string> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pnpm list --json's shape
   const [listed] = JSON.parse(execFileSync("pnpm", ["list", "--prod", "--depth", "0", "--json"], { cwd: dir, encoding: "utf8" })) as {
     dependencies?: Record<string, { version: string }>;
   }[];
@@ -57,6 +60,7 @@ const local = (dependencies: Record<string, string>) =>
     Object.entries(dependencies).map(([name, spec]) => [name, spec.startsWith("workspace:") ? `file:../${basename(packages.get(name)!)}` : spec]),
   );
 const stageManifest = (dir: string, to: string) => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a workspace package's own package.json
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
   const dependencies = local(staged(dir, pkg.dependencies ?? {}));
   writeFileSync(join(to, "package.json"), JSON.stringify({ ...pkg, dependencies, scripts: undefined, devDependencies: undefined }, null, 2));
@@ -85,13 +89,13 @@ writeFileSync(
 );
 sh(server, "npm", "install", "--omit=dev", "--install-links", "--no-audit", "--no-fund", "--no-package-lock");
 
-const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/, "");
+const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/u, "");
 await build({
   targets: Platform.MAC.createTarget(["dmg"]),
   config: {
     appId: "dev.vibevalley.app",
     productName: "VibeValley",
-    extraMetadata: { version: /^\d+\.\d+\.\d+/.test(version) ? version : "0.0.0" },
+    extraMetadata: { version: /^\d+\.\d+\.\d+/u.test(version) ? version : "0.0.0" },
     directories: { output: join(desktop, "dist"), buildResources: join(desktop, "resources") },
     files: ["build/**", "package.json"],
     extraResources: [

@@ -1,19 +1,23 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { owner } from "@/base/actor.ts";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/memory.sql.ts";
-import { Agents } from "@/agent/agent.ts";
+import { TestClock } from "effect/testing";
+
 import { remember, rewriteMemory } from "@vibevalley/agent/memory";
+import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
+
+import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { agentHome, ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
+
+import * as q from "../../db/generated/memory.sql.ts";
 import { Memories, make } from "./memory.ts";
 import { memoryIsNewNote, memoryJobText, memoryNotesOf, recallChars } from "./recall.ts";
 
@@ -83,7 +87,7 @@ describe("memory", () => {
       });
       yield* m.keep({ agent: "lab", session: "w2", project: "clock", job: "不算", outcome: "interrupted", said: "记住：停下的不算", summary: "" });
       const all = yield* m.list("lab");
-      expect(all.map((x) => `${x.kind}:${x.text}`).sort()).toEqual([
+      expect(all.map((x) => `${x.kind}:${x.text}`).toSorted()).toEqual([
         "issue:加分页 → 没做成：测试没过",
         "note:提交信息写中文",
         "note:这个项目用 pnpm test 跑测试",
@@ -132,7 +136,7 @@ describe("memory", () => {
       expect(carried > 0 && carried < 100).toBe(true);
       rewriteMemory(folder, "# header\n- first\n* second\nplain third\n");
       expect((yield* m.memoriesOf("orchestrator")).carried).toBe(3);
-      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/) });
+      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/u) });
     }).pipe(Effect.provide(world(config)));
   });
 

@@ -1,14 +1,15 @@
-import { t } from "@vibevalley/i18n";
 import { Result, Schema, SchemaIssue } from "effect";
-import { messageOf } from "@/errors.ts";
+
+import { t } from "@vibevalley/i18n";
 import type { Task } from "@vibevalley/protocol";
 
-import { graphProblems } from "./graph.ts";
+import { messageOf } from "@/errors.ts";
 
 import { type StepDraft, freshTask } from "./editing.ts";
+import { graphProblems } from "./graph.ts";
 export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly tasks: Task[] } | { readonly ok: false; readonly problems: string[] };
 
-const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
 
 /** JSON as Go's decoder reads it; the words for one that does not read say what Go's would where they are the same failure. */
 function parseJson(body: string): unknown {
@@ -16,7 +17,7 @@ function parseJson(body: string): unknown {
     return JSON.parse(body);
   } catch (e) {
     const message = messageOf(e);
-    throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message, { cause: e });
+    throw new Error(body.trim() === "" || /end of JSON input/iu.test(message) ? "unexpected end of JSON input" : message, { cause: e });
   }
 }
 
@@ -44,7 +45,7 @@ function splitProblem(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = [
     case "Pointer":
       return splitProblem(issue.issue, [...path, ...issue.path]);
     case "Composite":
-      return issue.issues[0] ? splitProblem(issue.issues[0], path) : t("server.task.parse.shape", { why: formatIssue(issue) });
+      return splitProblem(issue.issues[0], path);
     case "MissingKey":
       return t("server.task.parse.missing", { at });
     case "InvalidType":

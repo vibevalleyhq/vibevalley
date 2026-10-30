@@ -1,9 +1,8 @@
 import { t } from "@vibevalley/i18n";
-
 import { type SettingsUpdate } from "@vibevalley/protocol";
 
-import { memorySourcesProblem } from "./memorySources.ts";
 import { agoraID, hasSpace, voiceURL } from "./keys.ts";
+import { memorySourcesProblem } from "./memorySources.ts";
 import { voiceProblem } from "./voice.ts";
 /** Empty strings clear and are always fine. */
 export function settingsProblem(u: SettingsUpdate): string {

@@ -1,8 +1,10 @@
 // Whole class names, so Tailwind sees each one.
 
-import { createSignal, For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, onSettled, Show } from "solid-js";
+
 import { stories, story } from "@vibevalley/stories";
+
 import { Button } from "./Button";
 
 const colours: [string, string][] = [
@@ -79,7 +81,7 @@ function Grid(props: { children: JSX.Element }) {
 
 /** cubic-bezier(a, b, c, d) as its four numbers. */
 const bezier = (v: string) => {
-  const n = v.match(/-?[\d.]+/g)?.map(Number) ?? [];
+  const n = v.match(/-?[\d.]+/gu)?.map(Number) ?? [];
   return n.length === 4 ? (n as [number, number, number, number]) : undefined;
 };
 

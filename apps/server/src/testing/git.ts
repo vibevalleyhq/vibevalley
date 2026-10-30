@@ -1,10 +1,10 @@
 // Real git repositories for tests.
 
-import { tempDir } from "@vibevalley/testkit/temp";
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, writeFileSync } from "node:fs";
-
 import { join } from "node:path";
+
+import { tempDir } from "@vibevalley/testkit/temp";
 
 /** Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. */
 export const gitSync = (dir: string, ...args: string[]) =>

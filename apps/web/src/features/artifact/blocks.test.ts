@@ -1,6 +1,8 @@
 import { expect, test } from "vite-plus/test";
+
 import { type TextSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
+
 import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "./blocks";
 
 const span = (t: string, bold = false): TextSpan => ({ t, marks: bold ? { bold: true } : {} });
@@ -15,13 +17,13 @@ test("keys between, as the server makes them", () => {
   expect(keyBetween("0V", "1")).toBe("0l");
   expect(() => keyBetween("b", "a")).toThrow();
   expect(() => keyBetween("a0", "")).toThrow();
-  let keys: string[] = [];
+  const keys: string[] = [];
   for (let i = 0; i < 300; i++) {
-    keys = [...keys, keyBetween(keys.at(-1) ?? "", "")];
-    keys = [keyBetween("", keys[0]!), ...keys];
-    keys = [keys[0]!, keyBetween(keys[0]!, keys[1]!), ...keys.slice(1)];
+    keys.push(keyBetween(keys.at(-1) ?? "", ""));
+    keys.unshift(keyBetween("", keys[0]!));
+    keys.splice(1, 0, keyBetween(keys[0]!, keys[1]!));
   }
-  expect([...keys].sort()).toEqual(keys);
+  expect([...keys].toSorted()).toEqual(keys);
   expect(keys.every(validKey)).toBe(true);
 });
 

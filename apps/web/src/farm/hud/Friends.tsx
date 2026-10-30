@@ -1,23 +1,26 @@
-import { t } from "@vibevalley/i18n";
 // The helpers at the HUD's bottom left: a button with the first three faces and how many are at work; open, every
 // profile with how its plots are doing and its runtime's stamina, and for each a card to send it the next job or open
 // its profile.
 
 import { createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
-import { bottleSprite, quotaOf } from "@/features/runtime";
-import { statusOf, type FriendStatus } from "./friendStatus";
-import { farm } from "@/farm/store";
-import { webRoutes } from "@/farm/world/places";
-import { aria, useClickAway } from "@/base/util";
-import { useRouter } from "@/base/router";
+
 import { useCore, useFrames } from "@/base/frame";
+import { setPick, usePrefs } from "@/base/prefs";
 import { ready, useAgents, useRuntimes } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { aria, useClickAway } from "@/base/util";
+import { farm } from "@/farm/store";
+import { useFarm } from "@/farm/ui";
+import { webRoutes } from "@/farm/world/places";
+import { bottleSprite, quotaOf } from "@/features/runtime";
 import { AgentFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
+
+import { statusOf, type FriendStatus } from "./friendStatus";
 import { HudCard } from "./HudCard";
-import { setPick, usePrefs } from "@/base/prefs";
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {
   bug: { dot: "#c84a3a", label: t("web.farm.friends.status.bug") },

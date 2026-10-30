@@ -1,4 +1,3 @@
-import type { SessionAction } from "@vibevalley/protocol";
 import {
   Add,
   AngleDown,
@@ -67,6 +66,8 @@ import {
   XCircle,
   type IconFunction,
 } from "reicon";
+
+import type { SessionAction } from "@vibevalley/protocol";
 
 // The workbench's icons, one picture to a meaning: name an icon by what it means where it is used, so that one meaning
 // looks the same on every page. The pixel skins (farm, tree, ui/pixel) draw theirs with SpriteIcon.

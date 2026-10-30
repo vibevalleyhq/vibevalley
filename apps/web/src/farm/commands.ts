@@ -1,14 +1,17 @@
-import { t } from "@vibevalley/i18n";
-import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
-import { api, newSendKey } from "@/base/api";
-import { actionOf, perform } from "@/features/issue";
-import { farm, farmState } from "./store";
-import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
-import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
-import { webRoutes, type YardPlace } from "./world/places";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 // Each calls the server, then plays the bed's effect; a refusal is the server's to tell (a notice), so most callers fire
 // and forget (`fire`).
+
+import { t } from "@vibevalley/i18n";
+import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { api, newSendKey } from "@/base/api";
+import { actionOf, perform } from "@/features/issue";
+
+import { farm, farmState } from "./store";
+import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
+import { webRoutes, type YardPlace } from "./world/places";
+import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 
 /** A refusal is the server's to tell (a notice). */
 export const fire = (command: Promise<unknown>) => void command.catch(() => {});
@@ -158,7 +161,7 @@ export async function clickBed(commands: FarmCommands, bed: Bed): Promise<PlotAi
 
 /** A click on a yard place: its panel, the chat, or its workbench page through `go` (the router's navigate). */
 export function openPlace(place: YardPlace, go: (path: string) => void) {
-  if (place.chat) farm.chatOpen(true);
+  if (place.chat === true) farm.chatOpen(true);
   else if (place.panel) farm.panel(place.panel);
   else if (place.route && webRoutes.includes(place.route)) go(place.route);
 }

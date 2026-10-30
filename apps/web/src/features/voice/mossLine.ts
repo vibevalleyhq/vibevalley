@@ -1,12 +1,14 @@
-import { t } from "@vibevalley/i18n";
 // A line to MOSS Live for the playground: the server relays it (mossLinePath) and adds the key; this side speaks MOSS's
 // protocol. Up: JSON actions, and the microphone as 20 ms frames of 16 kHz mono PCM, each behind a 0x00 byte. Down: JSON
 // events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
 // and the playback's account are moss.ts's; this wires them to the socket and the audio.
 
-import { recordOf } from "@/base/util";
-import { messageOf } from "@/base/format";
+import { t } from "@vibevalley/i18n";
 import { mossLinePath } from "@vibevalley/protocol";
+
+import { messageOf } from "@/base/format";
+import { recordOf } from "@/base/util";
+
 import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackAction, type Queued } from "./moss";
 
 export type { MossTurn } from "./moss";
@@ -157,7 +159,7 @@ export class MossLine {
       if (this.ws !== ws) return;
       // Refused before it opened (no key, not the farm's page): the server said why over plain HTTP.
       if (!opened)
-        void fetch(url.href.replace(/^ws/, "http"))
+        void fetch(url.href.replace(/^ws/u, "http"))
           .then((r) => r.text())
           .then(
             (why) => this.stop(why || t("web.voice.moss.closed")),
@@ -216,8 +218,8 @@ export class MossLine {
         this.cut(str(d.run_id), str(d.turn_id));
         break;
       case "error": {
-        const e = d.error as { message?: unknown } | undefined;
-        this.problem = typeof e?.message === "string" ? e.message : data;
+        const e: unknown = d.error;
+        this.problem = typeof e === "object" && e !== null && "message" in e && typeof e.message === "string" ? e.message : data;
         break;
       }
       default:

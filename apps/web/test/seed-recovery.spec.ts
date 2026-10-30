@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+
 import { pathOf } from "@vibevalley/protocol";
+
 import { expect, test } from "./fixtures";
 
 const draft = "keep the idea I just wrote";

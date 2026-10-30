@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The voice form's choices: what each stage offers, the limits on the numbers
 // and what 恢复默认 on one part touches. Why settings cannot be saved is the server's answer (setting.validate).
 
+import { t } from "@vibevalley/i18n";
 import {
   type Area,
   type Language,
@@ -92,7 +92,7 @@ export const microsoftVoices = [
 ];
 
 /** A MiniMax voice's sample in the repository (public/voice-samples): anything but letters, digits, _ and - is _. */
-export const voiceSample = (id: string) => (minimaxVoices.some((v) => v.id === id) ? `/voice-samples/${id.replace(/[^\w-]/g, "_")}.mp3` : undefined);
+export const voiceSample = (id: string) => (minimaxVoices.some((v) => v.id === id) ? `/voice-samples/${id.replace(/[^\w-]/gu, "_")}.mp3` : undefined);
 
 export type VoiceNumber = "silenceMs" | "interruptMs" | "idleSeconds";
 

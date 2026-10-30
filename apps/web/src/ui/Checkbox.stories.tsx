@@ -1,4 +1,5 @@
 import { stories, story } from "@vibevalley/stories";
+
 import { Checkbox } from "./Checkbox";
 
 export default stories({

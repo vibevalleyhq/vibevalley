@@ -1,28 +1,30 @@
-import { list, t } from "@vibevalley/i18n";
 // 种植计划: the task graphs, a new one split by a helper, and the one shown: its state and actions, its steps in batches
 // (each with who does it, what it waits on, what it concluded, and retry, skip, edit, remove, its history), its
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
-import { spentText } from "@/base/format";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
+import { list, t } from "@vibevalley/i18n";
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { useAgent, useWorkAgents } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
-import { doingOf } from "@/farm/hud/readout";
-import { farm } from "@/farm/store";
-import { stationOfSession } from "@/farm/world/plots";
-import { lineCounts } from "@/features/issue";
-import { aria, Keyed } from "@/base/util";
+import { spentText } from "@/base/format";
 import { useCore, useFrames } from "@/base/frame";
 import { ready, useProjects, useQuery } from "@/base/query";
+import { aria, Keyed } from "@/base/util";
+import { doingOf } from "@/farm/hud/readout";
+import { farm } from "@/farm/store";
+import { useFarm } from "@/farm/ui";
+import { stationOfSession } from "@/farm/world/plots";
+import { lineCounts } from "@/features/issue";
+import { type Answer, graphs, useGraphChanges } from "@/features/task";
 import { AgentFace } from "@/ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "@/ui/pixel";
-import { useFarm } from "@/farm/ui";
+
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
-import { type Answer, graphs, useGraphChanges } from "@/features/task";
-import { useAgent, useWorkAgents } from "@/base/agents";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   splitting: ["#d5dcd7", "#46301d"],
@@ -44,7 +46,7 @@ export function TaskBoard() {
   const frames = useFrames();
   const shown = useFarm((s) => s.graphShown);
   const [creating, setCreating] = createSignal(false);
-  const list = () => [...(frames.frame?.graphs ?? [])].reverse();
+  const list = () => [...(frames.frame?.graphs ?? [])].toReversed();
   const current = createMemo(() => list().find((g) => g.id === shown()) ?? list().find(isOpen) ?? list()[0]);
   return (
     <Show
@@ -118,7 +120,7 @@ function NewTask(props: { onCancel?: (() => void) | undefined; onSplit: (id: str
     setBusy(true);
     const answer = await graphs.split(omitUndefined({ goal: goal(), project: where(), agent: splitter() === "auto" ? undefined : splitter() }));
     setBusy(false);
-    const id = /（(p\d+)）/.exec(answer.text)?.[1];
+    const id = /（(p\d+)）/u.exec(answer.text)?.[1];
     if (answer.ok && id) props.onSplit(id);
     else setSaid(answer);
   };
@@ -348,7 +350,7 @@ function SmallBtn(props: { label: string; onClick?: (() => void) | undefined; pr
       onClick={() => props.onClick?.()}
       class={[
         "px-2.5 py-0.5 text-[12px] enabled:cursor-pointer disabled:opacity-40",
-        props.primary ? "bg-leaf-500 text-bark-900 enabled:hover:bg-leaf-hover" : "bg-cream-50 text-bark-800 enabled:hover:bg-cream-200",
+        props.primary === true ? "bg-leaf-500 text-bark-900 enabled:hover:bg-leaf-hover" : "bg-cream-50 text-bark-800 enabled:hover:bg-cream-200",
       ]}
     >
       {props.label}
@@ -443,7 +445,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.title}
         </span>
         <Show when={props.node.acceptance}>
-          <span title={props.node.frozen.length ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
+          <span title={props.node.frozen.length > 0 ? t("web.farm.graph.frozen", { files: list(props.node.frozen) }) : t("web.farm.graph.acceptanceHint")}>
             <FarmTag text={t("web.farm.plot.review")} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
@@ -466,7 +468,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
       </div>
       <Show when={props.node.needs.length > 0}>
         <p class="mt-1 text-[12px] text-bark-600">
-          {waits().length
+          {waits().length > 0
             ? t("web.farm.graph.waits", { titles: list(waits().map(titleOf)) })
             : t("web.farm.graph.after", { titles: list(props.node.needs.map(titleOf)) })}
         </p>
@@ -596,7 +598,7 @@ function TaskLog(props: { graph: TaskGraph; only?: string | undefined; onAll: ()
   const shown = () =>
     ready(events, [] as GraphEvent[])
       .filter((e) => !props.only || e.task === props.only)
-      .reverse();
+      .toReversed();
   return (
     <FarmSection title={props.only ? t("web.farm.graph.storyOf", { title: titleOf(props.only) }) : t("web.farm.graph.story")}>
       <Show when={props.only}>

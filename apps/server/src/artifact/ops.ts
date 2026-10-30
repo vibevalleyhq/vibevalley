@@ -1,9 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The op rules, over one artifact held in memory: Submit loads the page in a transaction,
 // applies a batch's ops in order and writes back what changed. A stale update (baseRev behind) is taken only when the
 // block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
 
-import { messageOf } from "@/errors.ts";
+import { t } from "@vibevalley/i18n";
 import type {
   Block,
   BlockInput,
@@ -18,6 +17,10 @@ import type {
   TextSpan,
 } from "@vibevalley/protocol";
 import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
+
+import { or } from "@/base/order.ts";
+import { messageOf } from "@/errors.ts";
+
 import { joined, normal, runeLen, sameText, splitAt, unmarked } from "./spans.ts";
 
 const withText: Readonly<Record<string, boolean>> = {
@@ -50,7 +53,7 @@ export function result(
   rev = 0,
   more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {},
 ): BlockOpResult {
-  return { status, blockId, ...(rev ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
+  return { status, blockId, ...(rev !== 0 ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
 }
 
 const applied = (b: Block) => result("applied", b.id, b.rev);
@@ -60,7 +63,7 @@ const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: t("server.a
 export const parentOf = (b: Block) => b.parentId ?? "";
 
 export function textFor(type: string, spans: readonly TextSpan[] | undefined): TextSpan[] {
-  if (!withText[type]) return [];
+  if (withText[type] !== true) return [];
   if (type === "code") return unmarked(spans ?? []);
   return normal(spans);
 }
@@ -86,7 +89,7 @@ const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 /** A block as the wire has it: no parent, and not deleted, are left out. */
 export function wire(b: Block): Block {
   const { parentId, deleted, ...rest } = b;
-  return { ...rest, ...(parentId !== undefined ? { parentId } : {}), ...(deleted ? { deleted: true } : {}) };
+  return { ...rest, ...(parentId !== undefined ? { parentId } : {}), ...(deleted === true ? { deleted: true } : {}) };
 }
 
 export class Page {
@@ -98,12 +101,13 @@ export class Page {
   /** A block id another artifact has. */
   taken: (id: string) => boolean = () => false;
 
-  constructor(
-    readonly artifact: string,
-    readonly actor: string,
-    readonly now: number,
-    blocks: readonly Block[],
-  ) {
+  readonly artifact: string;
+  readonly actor: string;
+  readonly now: number;
+  constructor(artifact: string, actor: string, now: number, blocks: readonly Block[]) {
+    this.artifact = artifact;
+    this.actor = actor;
+    this.now = now;
     for (const b of blocks) this.blocks.set(b.id, { ...b });
   }
 
@@ -130,7 +134,7 @@ export class Page {
 
   /** The children of parent ("" is the top), tombstones included, in order. */
   children(parent: string): Block[] {
-    return [...this.blocks.values()].filter((b) => parentOf(b) === parent).sort((a, b) => compare(a.orderKey, b.orderKey) || compare(a.id, b.id));
+    return [...this.blocks.values()].filter((b) => parentOf(b) === parent).toSorted((a, b) => or(compare(a.orderKey, b.orderKey), compare(a.id, b.id)));
   }
 
   /** Where a block goes under parent: a deleted parent hands it to the level that parent was at. */
@@ -138,7 +142,7 @@ export class Page {
     while (parent !== "") {
       const b = this.find(parent);
       if (!b) throw new Error(t("server.artifact.op.noBlock", { id: parent }));
-      if (!b.deleted) return b.id;
+      if (b.deleted !== true) return b.id;
       parent = parentOf(b);
     }
     return undefined;
@@ -191,7 +195,7 @@ export class Page {
       case "set_attrs": {
         const b = this.find(op.blockId);
         if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
-        if (b.deleted) return gone(b);
+        if (b.deleted === true) return gone(b);
         try {
           b.attrs = patched(b.attrs, op.attrs, op.unset);
         } catch (e) {
@@ -203,7 +207,7 @@ export class Page {
       case "set_type": {
         const b = this.find(op.blockId);
         if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
-        if (b.deleted) return gone(b);
+        if (b.deleted === true) return gone(b);
         if (!knownType(op.type)) return rejected(b.id, t("server.artifact.op.unknownType", { type: op.type }));
         b.type = op.type;
         b.attrs = attrsOf(op.attrs);
@@ -216,14 +220,14 @@ export class Page {
       case "delete_block": {
         const b = this.find(op.blockId);
         if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
-        if (b.deleted) return result("noop", b.id, b.rev);
+        if (b.deleted === true) return result("noop", b.id, b.rev);
         this.setDeleted(b, true);
         return applied(b);
       }
       case "restore_block": {
         const b = this.find(op.blockId);
         if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
-        if (!b.deleted) return result("noop", b.id, b.rev);
+        if (b.deleted !== true) return result("noop", b.id, b.rev);
         try {
           const parent = this.liveParent(parentOf(b));
           if (parent === undefined) delete b.parentId;
@@ -239,16 +243,15 @@ export class Page {
       case "merge_blocks":
         return this.merge(op);
     }
-    return rejected("", t("server.artifact.op.unknownOp", { op: (op as { op: string }).op }));
   }
 
   private updateText(o: BlockOpUpdateText): BlockOpResult {
     const b = this.find(o.blockId);
     if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
-    if (!withText[b.type]) return rejected(b.id, t("server.artifact.op.noText"));
+    if (withText[b.type] !== true) return rejected(b.id, t("server.artifact.op.noText"));
     if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.artifact.op.noRev", { rev: o.baseRev }));
     const yours = textFor(b.type, o.text);
-    if (b.deleted) {
+    if (b.deleted === true) {
       this.lost(b, yours);
       return gone(b);
     }
@@ -270,13 +273,13 @@ export class Page {
   private setDeleted(b: Block, deleted: boolean) {
     b.deleted = deleted;
     this.touch(b);
-    for (const c of this.children(b.id)) if (!!c.deleted !== deleted) this.setDeleted(c, deleted);
+    for (const c of this.children(b.id)) if (!(c.deleted !== true) !== deleted) this.setDeleted(c, deleted);
   }
 
   private move(o: BlockOpMoveBlock): BlockOpResult {
     const b = this.find(o.blockId);
     if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
-    if (b.deleted) return gone(b);
+    if (b.deleted === true) return gone(b);
     if (!validKey(o.orderKey)) return rejected(b.id, t("server.artifact.op.badKey", { key: o.orderKey }));
     let parent: string | undefined;
     try {
@@ -299,9 +302,9 @@ export class Page {
   private split(o: BlockOpSplitBlock): BlockOpResult {
     const b = this.find(o.blockId);
     if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
-    if (!withText[b.type]) return rejected(b.id, t("server.artifact.op.noText"));
+    if (withText[b.type] !== true) return rejected(b.id, t("server.artifact.op.noText"));
     if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.artifact.op.noRev", { rev: o.baseRev }));
-    if (b.deleted) return gone(b);
+    if (b.deleted === true) return gone(b);
     const nb = this.fresh(o.newBlock);
     if (typeof nb === "string") return rejected(b.id, nb);
     let status: BlockOpStatus = "applied";
@@ -328,9 +331,9 @@ export class Page {
     if (!target) return rejected(o.targetId, t("server.artifact.op.missing"));
     if (!source) return rejected(o.sourceId, t("server.artifact.op.missing"));
     if (target.id === source.id) return rejected(target.id, t("server.artifact.op.intoSelf"));
-    if (source.deleted) return result("noop", target.id, target.rev);
-    if (target.deleted) return gone(target);
-    if (!withText[target.type]) return rejected(target.id, t("server.artifact.op.noText"));
+    if (source.deleted === true) return result("noop", target.id, target.rev);
+    if (target.deleted === true) return gone(target);
+    if (withText[target.type] !== true) return rejected(target.id, t("server.artifact.op.noText"));
     // Both texts as they are now: there is nothing stale to conflict with.
     target.text = textFor(target.type, joined(target.text, source.text));
     let last = this.children(target.id).at(-1)?.orderKey ?? "";
@@ -359,13 +362,13 @@ export function ordered(blocks: readonly Block[]): Block[] {
   const out: Block[] = [];
   const walk = (parent: string) => {
     for (const b of p.children(parent)) {
-      if (b.deleted) continue;
+      if (b.deleted === true) continue;
       out.push(b);
       walk(b.id);
     }
   };
   walk("");
   // A live block under a missing parent still shows, at the end.
-  for (const b of blocks) if (!b.deleted && b.parentId !== undefined && !p.find(b.parentId)) out.push(b);
+  for (const b of blocks) if (b.deleted !== true && b.parentId !== undefined && !p.find(b.parentId)) out.push(b);
   return out.map(wire);
 }

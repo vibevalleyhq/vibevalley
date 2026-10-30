@@ -3,6 +3,7 @@
 // manifest size over the density, which is the map's width over the level's (384).
 
 import { type Accessor, createSignal, onSettled } from "solid-js";
+
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 export interface Size {
@@ -36,12 +37,15 @@ interface Raw {
 }
 
 export class SpriteAtlas {
-  private constructor(
-    private readonly sprites: ReadonlyMap<string, SpriteInfo>,
-    readonly density: number,
-  ) {}
+  private readonly sprites: ReadonlyMap<string, SpriteInfo>;
+  readonly density: number;
+  private constructor(sprites: ReadonlyMap<string, SpriteInfo>, density: number) {
+    this.sprites = sprites;
+    this.density = density;
+  }
 
   static parse(text: string): SpriteAtlas {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     const raw = JSON.parse(text) as Record<string, Raw>;
     const map = raw.map;
     if (!map) throw new Error("sprites.json: no map");

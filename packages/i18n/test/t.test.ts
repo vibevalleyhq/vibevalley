@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { format, list, placeholders, setLocale, t } from "../src";
 
 test("a message is said in the language in use, its placeholders filled", () => {

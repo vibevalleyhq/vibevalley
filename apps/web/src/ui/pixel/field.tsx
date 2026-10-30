@@ -1,11 +1,13 @@
+import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 
-import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
-import type { JSX } from "@solidjs/web";
-import { cx, pxRing, pxText } from "./style";
 import { aria } from "@/base/util";
+
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
+import { cx, pxRing, pxText } from "./style";
 
 /** `label` with a dotted underline that shows `tip` on hover; the bare label without one. */
 export function PxTip(props: { tip?: string | undefined; children: JSX.Element; class?: string }) {
@@ -101,17 +103,17 @@ export function PxTextInput(props: {
     setOpen(false);
     setHighlight(-1);
   };
-  const font = () => (props.mono ? pxText.mono : pxText.sm);
+  const font = () => (props.mono === true ? pxText.mono : pxText.sm);
   let input: HTMLInputElement | undefined;
   onSettled(() => {
-    if (props.autoFocus) input?.focus();
+    if (props.autoFocus === true) input?.focus();
   });
   return (
     <div
       class={[
         "relative flex h-9 items-center gap-2 px-3 text-bark-900",
-        props.well ? cx("bg-cream-100", pxRing) : inputBox,
-        { "opacity-50": !!props.disabled },
+        props.well === true ? cx("bg-cream-100", pxRing) : inputBox,
+        { "opacity-50": !(props.disabled !== true) },
         props.class,
       ]}
     >
@@ -214,10 +216,10 @@ export function PxTextArea(props: {
     },
   );
   onSettled(() => {
-    if (props.autoFocus) area?.focus();
+    if (props.autoFocus === true) area?.focus();
   });
   return (
-    <div class={["flex px-3 py-2", inputBox, { "opacity-50": !!props.disabled }, props.class]}>
+    <div class={["flex px-3 py-2", inputBox, { "opacity-50": !(props.disabled !== true) }, props.class]}>
       <textarea
         ref={(t) => {
           area = t;
@@ -235,7 +237,7 @@ export function PxTextArea(props: {
           props.onChange(e.currentTarget.value);
         }}
         class={[
-          props.reading ? pxText.read : cx(props.mono ? pxText.mono : pxText.sm, "leading-[1.625]"),
+          props.reading === true ? pxText.read : cx(props.mono === true ? pxText.mono : pxText.sm, "leading-[1.625]"),
           "min-w-0 flex-1 resize-none bg-transparent text-bark-900 caret-bark-900 outline-none placeholder:text-bark-500",
         ]}
       />

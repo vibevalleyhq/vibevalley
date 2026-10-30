@@ -7,7 +7,10 @@ export class WakeBreaker {
   private readonly failures = new Map<string, number>();
   private readonly open = new Set<string>();
 
-  constructor(private readonly limit = wakeBreaker) {}
+  private readonly limit: number;
+  constructor(limit: number = wakeBreaker) {
+    this.limit = limit;
+  }
 
   /** A launch ended without a word. The count, and whether this one tripped the breaker. */
   failed(id: string): { readonly count: number; readonly tripped: boolean } {
@@ -35,6 +38,6 @@ export class WakeBreaker {
 
   /** Every tripped one, for the audience. */
   tripped(): string[] {
-    return [...this.open].sort();
+    return [...this.open].toSorted();
   }
 }

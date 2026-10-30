@@ -1,16 +1,16 @@
-import { type GraphAction } from "@vibevalley/protocol";
-import { t } from "@vibevalley/i18n";
 // What the client gets. The words for people (a session's phaseText, a cron's
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
-import type { Doing, DoingView, GameEffect, StateFrame, WorkspaceState, WorkspaceView } from "@vibevalley/protocol";
-import { inbox } from "@/notice/inbox.ts";
+import { t } from "@vibevalley/i18n";
+import { type GraphAction, type Doing, type DoingView, type GameEffect, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
 import { phaseWords } from "@vibevalley/protocol/rules";
+
 import { nextText, whenText } from "@/cron/when.ts";
-import { graphsOf } from "@/task/issues.ts";
-import { canEditTask, canRemoveTask, graphActions, taskActions } from "@/task/graph.ts";
 import { viewOf } from "@/game/view.ts";
+import { inbox } from "@/notice/inbox.ts";
+import { canEditTask, canRemoveTask, graphActions, taskActions } from "@/task/graph.ts";
+import { graphsOf } from "@/task/issues.ts";
 
 /** Every graph action in words, for the page to say any of them. */
 const graphActionText = (): Record<GraphAction, string> => ({

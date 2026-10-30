@@ -1,15 +1,17 @@
-import { t } from "@vibevalley/i18n";
 // A profile's template: a folder of agent.json (what it is), agent.en.json (its words in English), persona.md and
 // persona.en.md, read in the farm's language. The built-in ones are templates/ beside this file, in the order of
 // templates/index.json; those added on this machine are copies in the home's agent-templates/.
 
-import { messageOf } from "@/errors.ts";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+
+import { Schema } from "effect";
+
+import { t, currentLocale } from "@vibevalley/i18n";
 import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { currentLocale } from "@vibevalley/i18n";
-import { Schema } from "effect";
+
+import { messageOf } from "@/errors.ts";
 
 export const builtInDir = join(import.meta.dirname, "templates");
 export const addedDir = (home: string) => join(home, "agent-templates");
@@ -18,7 +20,7 @@ export const addedDir = (home: string) => join(home, "agent-templates");
 const files = ["agent.json", "agent.en.json", "persona.md", "persona.en.md"] as const;
 
 /** Lowercase letters, digits and -, as a profile's id is written in a path and after an @. */
-const idPattern = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const idPattern = /^[a-z0-9][a-z0-9-]{0,31}$/u;
 
 const LookFile = Schema.Struct({
   species: Schema.optionalKey(S.Species),
@@ -124,7 +126,7 @@ export function addedTemplates(home: string): { readonly templates: AgentTemplat
   if (!existsSync(root)) return { templates: [], problems: [] };
   const templates: AgentTemplate[] = [];
   const problems: string[] = [];
-  for (const name of readdirSync(root).sort()) {
+  for (const name of readdirSync(root).toSorted()) {
     try {
       templates.push(readTemplate(join(root, name), "added"));
     } catch (e) {

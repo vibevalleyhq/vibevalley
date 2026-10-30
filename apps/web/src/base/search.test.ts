@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { matches } from "./search";
 
 test("every word of the query is somewhere in the texts, ignoring case", () => {

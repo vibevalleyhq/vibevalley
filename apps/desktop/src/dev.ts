@@ -5,6 +5,7 @@
 
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
+
 import { workspaceClosure } from "./workspace.ts";
 
 /** A build writes many files; one reload once they are all there. */
@@ -34,10 +35,12 @@ export interface DevHooks {
 /** Restarts the server once no helper is working, asking again every busyPollMs. */
 export async function restartWhenIdle(h: Pick<DevHooks, "working" | "restartServer">, sleep: (ms: number) => Promise<void>): Promise<void> {
   let said = false;
+  /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
   for (let n = await h.working(); n > 0; n = await h.working()) {
     if (!said) console.log(`vibevalley dev: the server's code changed; restarting once ${n} working helper(s) are done`);
     said = true;
     await sleep(busyPollMs);
+    /* oxlint-enable eslint/no-await-in-loop */
   }
   await h.restartServer();
 }

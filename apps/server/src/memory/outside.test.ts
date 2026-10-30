@@ -1,24 +1,28 @@
 import { createHash } from "node:crypto";
-import { owner, session } from "@/base/actor.ts";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
+import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { asTransport } from "@vibevalley/agent/mcpTransport";
-import { afterEach, describe, expect, it } from "@effect/vitest";
-import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
+
+import { asTransport } from "@vibevalley/agent/mcpTransport";
+import type { MemorySourceUpdate } from "@vibevalley/protocol";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner, session } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { foundText, Memories, make } from "./memory.ts";
-import { localName } from "./recall.ts";
-import { nowledge, nowledgeLabels } from "./nowledge.ts";
 import { until } from "@/testing/until.ts";
+
+import { foundText, Memories, make } from "./memory.ts";
+import { nowledge, nowledgeLabels } from "./nowledge.ts";
+import { localName } from "./recall.ts";
 
 /** How EverOS names a farm project's scope (everos.ts): ASCII, and never the same as global. */
 const everosProject = (project: string) => "project-" + createHash("sha256").update(project).digest("hex");
@@ -90,7 +94,7 @@ class FakeNowledge {
           const query = (a.query as string) ?? "";
           const label = (a.filter_labels as string) ?? "";
           const results = [...this.memories]
-            .reverse()
+            .toReversed()
             .filter(
               (m) => (label === "" || m.labels.includes(label)) && query !== "" && (query === "*" || m.content.includes(query) || m.title.includes(query)),
             )
@@ -218,7 +222,7 @@ describe("Nowledge Mem", () => {
       expect(text).not.toContain("测试 project-b");
       expect(text).not.toContain("测试 unknown");
       expect(text).toContain("范围");
-      expect(fake.details.sort()).toEqual(["a", "b", "g", "u"]);
+      expect(fake.details.toSorted()).toEqual(["a", "b", "g", "u"]);
       const all = { ...q, project: "" };
       expect(foundText(yield* m.search(all), all)).toContain("测试 unknown");
     }).pipe(Effect.provide(world())),
@@ -343,7 +347,7 @@ describe("EverOS", () => {
         fake
           .seen("search")
           .map((r): [string, string] => [String(r.body.app_id), String(r.body.project_id)])
-          .sort(([, a], [, b]) => a.localeCompare(b)),
+          .toSorted(([, a], [, b]) => a.localeCompare(b)),
       ).toEqual([
         ["vibevalley", "global"],
         ["vibevalley", everosProject("demo")],

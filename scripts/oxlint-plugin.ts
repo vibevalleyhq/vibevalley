@@ -55,6 +55,7 @@
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
+
 import { hexClass, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
 
 const message = "time comes from Effect's Clock, or the Time a class was handed (apps/server/src/base/time.ts), so tests can move it";
@@ -111,7 +112,7 @@ const noCommentDivider = defineRule({
     return {
       Program() {
         for (const comment of context.sourceCode.getAllComments())
-          if (/[─━═]{2}/.test(comment.value) || /^[-=*#~_/\s]{4,}$/.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
+          if (/[─━═]{2}/u.test(comment.value) || /^[-=*#~_/\s]{4,}$/u.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
       },
     };
   },
@@ -144,8 +145,10 @@ const noCopySelector = defineRule({
         const c = node.callee;
         if (c.type !== "MemberExpression" || c.property.type !== "Identifier") return;
         const name = c.property.name;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
         const [first] = node.arguments as unknown as Parameters<typeof chineseLiteral>[0][];
         if (textArg.has(name) && chineseLiteral(first)) context.report({ node, messageId: "copy" });
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
         for (const arg of node.arguments as unknown as { type: string; properties?: ObjectProperty[] }[])
           if (arg.type === "ObjectExpression")
             for (const p of arg.properties ?? [])
@@ -177,6 +180,7 @@ const noHexColor = defineRule({
 const designTokens = defineRule({
   meta: {
     messages: Object.fromEntries(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tokenAdvice has one key per TokenKind and no more
       (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [kind, `off the workbench's ${kind} ladder (docs/style/design.md): use ${tokenAdvice[kind]}`]),
     ),
   },
@@ -304,6 +308,7 @@ const pageLayersRule = defineRule({
 /** Effect.tryPromise(async …), Effect.tryPromise({ try: async … }) and Effect.promise(async …): the one place an async body is the boundary. */
 function inEffectPromise(node: { parent?: unknown }): boolean {
   const isWrapper = (n: unknown): boolean => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
     const call = n as { type?: string; callee?: { type?: string; object?: { type?: string; name?: string }; property?: { type?: string; name?: string } } };
     const c = call.callee;
     return (
@@ -315,6 +320,7 @@ function inEffectPromise(node: { parent?: unknown }): boolean {
       (c.property.name === "tryPromise" || c.property.name === "promise")
     );
   };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
   const parent = node.parent as { type?: string; key?: { type?: string; name?: string }; parent?: { parent?: unknown } } | undefined;
   if (isWrapper(parent)) return true;
   return parent?.type === "Property" && parent.key?.type === "Identifier" && parent.key.name === "try" && isWrapper(parent.parent?.parent);
@@ -330,7 +336,8 @@ const promiseBoundary = defineRule({
   },
   create(context) {
     const check = (node: Parameters<typeof inEffectPromise>[0] & { async?: boolean }) => {
-      if (node.async && !inEffectPromise(node)) context.report({ node: node as never, messageId: "async" });
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
+      if (node.async === true && !inEffectPromise(node)) context.report({ node: node as never, messageId: "async" });
     };
     return {
       FunctionDeclaration: check,
@@ -348,8 +355,8 @@ const oneAbsent = defineRule({
   create(context) {
     return {
       TSUnionType(node) {
-        const kinds = node.types.map((t) => t.type);
-        if (kinds.includes("TSNullKeyword") && kinds.includes("TSUndefinedKeyword")) context.report({ node, messageId: "both" });
+        const kinds = new Set(node.types.map((t) => t.type));
+        if (kinds.has("TSNullKeyword") && kinds.has("TSUndefinedKeyword")) context.report({ node, messageId: "both" });
       },
     };
   },
@@ -360,7 +367,7 @@ const parentImportRule = defineRule({
     messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
   },
   create(context) {
-    const [, app, at] = /\/apps\/(web|server)\/src\/(.+)$/.exec(context.filename.replaceAll("\\", "/")) ?? [];
+    const [, app, at] = /\/apps\/(web|server)\/src\/(.+)$/u.exec(context.filename.replaceAll("\\", "/")) ?? [];
     if (app === undefined || at === undefined) return {};
     const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
       if (typeof spec !== "string" || !spec.startsWith("../")) return;

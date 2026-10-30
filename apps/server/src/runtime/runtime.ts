@@ -1,4 +1,3 @@
-import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 // The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
 // Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
 // tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
@@ -6,28 +5,33 @@ import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 // day's budget takes no work.
 
 import { join } from "node:path";
+
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
-import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@/agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
+
+import { Llm } from "@vibevalley/ai/llm";
+import { currentLocale, type Locale, t } from "@vibevalley/i18n";
+import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
+
 import { Agents } from "@/agent/agent.ts";
 import { modelClient } from "@/agent/model.ts";
-import { Llm } from "@vibevalley/ai/llm";
-import { vibevalleyRuntimeOf } from "./vibevalley.ts";
-import { dshRuntime } from "./dsh.ts";
-import { Setting } from "@/setting/setting.ts";
+import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@/agent/seed.ts";
 import { dbStores } from "@/agent/taskStore.ts";
 import { projectsDir, ServerConfig } from "@/base/config.ts";
 import { FileWriter } from "@/base/files.ts";
 import { jsonOrNone } from "@/base/json.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, refused } from "@/errors.ts";
-import { piBalance } from "./pi.ts";
-import { inCny, price, type Rate } from "./price.ts";
-import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
-import { moneyStop, quotaOf } from "./quota.ts";
 import { callbackLog } from "@/base/log.ts";
 import { timeHere, withinRealTime } from "@/base/time.ts";
+import { Core } from "@/core/core.ts";
+import { type ApiError, refused } from "@/errors.ts";
+import { Setting } from "@/setting/setting.ts";
+
+import { dshRuntime } from "./dsh.ts";
+import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
+import { piBalance } from "./pi.ts";
+import { inCny, price, type Rate } from "./price.ts";
+import { moneyStop, quotaOf } from "./quota.ts";
+import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;
@@ -97,7 +101,7 @@ export class Runtimes extends Context.Service<
           home: () => config.home,
           llm: (model) => modelClient(model, keys.deepseekApiKey, service),
           time,
-          owner: { run: yield* FiberSet.makeRuntimePromise<never>(), scope: yield* Effect.scope },
+          owner: { run: yield* FiberSet.makeRuntimePromise(), scope: yield* Effect.scope },
           tasks: yield* dbStores,
         });
         return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
@@ -219,7 +223,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const store = yield* Agents;
     const registry = options.registry ?? registryOf();
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
     const usageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) =>
@@ -241,7 +245,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const usageTaken = new Map<string, number>();
     // The waits started from spend and usageSoon: one fiber per key, all ended with the service.
     const timers = yield* FiberMap.make<string>();
-    const later = yield* FiberMap.runtime(timers)<never>();
+    const later = yield* FiberMap.runtime(timers)();
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");

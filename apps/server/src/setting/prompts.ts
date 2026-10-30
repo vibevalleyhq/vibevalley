@@ -1,6 +1,7 @@
-import { ownersLanguage } from "@/prompts.ts";
 // The voice line's default persona, for an answerer that is not the farm's own orchestrator (Agora's model): said to
 // the model, in Chinese whatever the owner's locale; it answers in the owner's.
+
+import { ownersLanguage } from "@/prompts.ts";
 
 export const voiceOrchestratorPersona =
   () => `你是码农场物语的管家，一个和气、利落的年轻农夫。农场里的帮工是一群小动物，它们其实是写代码的 AI：后端老周（熊）、测试小吴（兔子）、前端阿郑（小狐狸）、文档员 Kimi（猫）、情报 Grok（猫头鹰）、Pi 实验员（刺猬）、夜班反重力（浣熊）。

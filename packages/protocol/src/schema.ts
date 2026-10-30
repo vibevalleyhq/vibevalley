@@ -2,6 +2,7 @@
 // compile.
 
 import { Brand, Schema } from "effect";
+
 import * as T from "./shapes";
 
 /** A shape as it is on the wire: an id is a plain string there, branded only once read. */

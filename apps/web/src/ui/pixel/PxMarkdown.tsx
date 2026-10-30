@@ -1,11 +1,13 @@
-import { createMemo, onCleanup } from "solid-js";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
+import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
-import { richen } from "@/ui/richText";
+
 import { remarkIssueRefs } from "@/ui/richRules";
+import { fragmentOf, richen } from "@/ui/richText";
+
 import { mentionHref, withMentions } from "./markdown";
 import { cx, pxText } from "./style";
 
@@ -16,25 +18,26 @@ const common =
 
 const said = cx(
   pxText.sm,
-  "[&_code]:font-mono [&_h1]:text-[1.05em] [&_h2]:text-[1.05em] [&_h3]:text-[1.05em] [&_h4]:text-[1.05em] [&_h1,&_h2,&_h3,&_h4]:leading-[1.35] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-1.5 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal",
+  "[&_code]:font-mono [&_h1]:text-[1.05em] [&_h1,&_h2,&_h3,&_h4]:leading-[1.35] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-1.5 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal [&_h2]:text-[1.05em] [&_h3]:text-[1.05em] [&_h4]:text-[1.05em]",
 );
 
 // Reading, a heading is the pixel font at a size it is sharp at: 24 for a title, 12 for a section, as the labels around it.
 const reading = cx(
   pxText.read,
-  "max-w-[560px] [&_code]:font-mono [&_code]:text-[0.9em] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-2 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-pixel [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal [&_h1]:text-[24px] [&_h1]:leading-[1.3333] [&_h2,&_h3,&_h4,&_h5,&_h6]:text-[12px] [&_h2,&_h3,&_h4,&_h5,&_h6]:leading-[1.5]",
+  "max-w-[560px] [&_code]:font-mono [&_code]:text-[0.9em] [&_h1]:text-[24px] [&_h1]:leading-[1.3333] [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:my-2 [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-pixel [&_h1,&_h2,&_h3,&_h4,&_h5,&_h6]:font-normal [&_h2,&_h3,&_h4,&_h5,&_h6]:text-[12px] [&_h2,&_h3,&_h4,&_h5,&_h6]:leading-[1.5]",
 );
 
 // Raw HTML in the text is dropped (remark-rehype's default).
 const md = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- MdNode types only the mdast fields the plugin reads and writes
   .use(remarkIssueRefs as unknown as Plugin)
   .use(remarkRehype);
 
 /** The tree as DOM: a mention link becomes its tag, a link opens through `open` or a new tab, a rule becomes the dashed line. */
 function render(text: string, open: ((url: string) => void) | undefined): Node[] {
-  const root = toDom(md.runSync(md.parse(text)), { fragment: true }) as DocumentFragment;
+  const root = fragmentOf(toDom(md.runSync(md.parse(text)), { fragment: true }));
   // Made safe, its code and diagrams drawn, before the links below are given their pixel look.
   onCleanup(richen(root, { pixel: true }));
   for (const a of [...root.querySelectorAll("a")]) {
@@ -69,8 +72,8 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
  * a line; headings stay pixel, code stays mono. `class` carries the colour.
  */
 export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; class?: string }) {
-  const nodes = createMemo(() => render(props.mentions ? withMentions(props.text) : props.text, props.onOpenLink));
-  return <div class={[common, props.reading ? reading : said, props.class]}>{nodes()}</div>;
+  const nodes = createMemo(() => render(props.mentions === true ? withMentions(props.text) : props.text, props.onOpenLink));
+  return <div class={[common, props.reading === true ? reading : said, props.class]}>{nodes()}</div>;
 }
 
 /** Plain text to read, as PxMarkdown with `reading` draws it. */

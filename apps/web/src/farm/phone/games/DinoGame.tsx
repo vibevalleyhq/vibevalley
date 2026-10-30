@@ -1,12 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // 小恐龙 on the phone: the rules are farm/phone/games/dino.ts; here the clock, the pad and the drawing, zoomed whole.
 // A or up jumps, down or B ducks; leaving the game ends the run.
 
 import { createEffect, createSignal, Show } from "solid-js";
-import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
+
+import { t } from "@vibevalley/i18n";
+
 import { drawPattern, lcd } from "@/farm/phone/lcd";
-import { playSound } from "@/ui/pixel/sound";
 import { kept, usePad, useTicks } from "@/farm/support";
+import { playSound } from "@/ui/pixel/sound";
+
+import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 
 const best = kept(0);
 
@@ -90,7 +93,7 @@ const picture = (o: Obstacle, t: number): readonly string[] => (o.kind === "bird
 const five = (n: number) => String(n).padStart(5, "0");
 
 export function DinoGame(props: { big?: boolean }) {
-  const zoom = () => (props.big ? 3 : 2);
+  const zoom = () => (props.big === true ? 3 : 2);
   const [d, setD] = createSignal<Dino>();
   const [top, setTop] = best.use();
   let canvas: HTMLCanvasElement | undefined;
@@ -169,8 +172,10 @@ export function DinoGame(props: { big?: boolean }) {
         <Show when={!playing()}>
           <div class="absolute inset-0 grid place-items-center text-center">
             <span class="px-2" style={{ background: lcd.paper }}>
-              {d()?.over ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
-              <span class="phone-blink">{t("web.farm.phone.pressA", { what: d()?.over ? t("web.farm.phone.again") : t("web.farm.phone.start") })}</span>
+              {d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
+              <span class="phone-blink">
+                {t("web.farm.phone.pressA", { what: d()?.over === true ? t("web.farm.phone.again") : t("web.farm.phone.start") })}
+              </span>
             </span>
           </div>
         </Show>

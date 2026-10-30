@@ -1,19 +1,22 @@
 import { writeFileSync } from "node:fs";
-import { tempDir } from "@vibevalley/testkit/temp";
-import { pathOf } from "@vibevalley/protocol/api";
 import { createServer, request as httpRequest } from "node:http";
 import type { Socket } from "node:net";
-
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { attachmentPath, lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
-import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Layer } from "effect";
+
+import { attachmentPath, lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
+import { pathOf } from "@vibevalley/protocol/api";
+import { rpcPath } from "@vibevalley/protocol/rpc";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { app } from "@/http/app.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { Lan, remoteMay } from "./lan.ts";
 import { until } from "@/testing/until.ts";
 import { quietApp } from "@/testing/world.ts";
+
+import { Lan, remoteMay } from "./lan.ts";
 
 const web = tempDir("vv-lan-web-");
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");
@@ -115,7 +118,7 @@ describe("lan access", () => {
       const probe = createServer();
       yield* Effect.promise(() => new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", () => resolve())));
       const address = probe.address();
-      const port = address && typeof address === "object" ? address.port : 0;
+      const port = typeof address === "object" && address !== null ? address.port : 0;
       yield* Effect.promise(() => new Promise<void>((resolve) => probe.close(() => resolve())));
       const lan = yield* farm(port);
       for (let i = 0; i < 3; i++) {

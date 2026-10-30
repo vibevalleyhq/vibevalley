@@ -44,7 +44,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
 
   // How many cells to the nearest blocked one (a two-pass chamfer distance), for keeping off the edges.
   const far = new Float32Array(n);
-  for (let i = 0; i < n; i++) far[i] = free[i] ? 1e9 : 0;
+  for (let i = 0; i < n; i++) far[i] = free[i] === 1 ? 1e9 : 0;
   const relax = (i: number, j: number, d: number) => {
     if (far[j]! + d < far[i]!) far[i] = far[j]! + d;
   };
@@ -81,7 +81,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
 
   /** The nearest walkable cell, searching outwards ring by ring. */
   const nearestFree = (i: number): number => {
-    if (free[i]) return i;
+    if (free[i] === 1) return i;
     const c0 = i % cols;
     const r0 = Math.floor(i / cols);
     for (let ring = 1; ring < Math.max(cols, rows); ring++) {
@@ -93,7 +93,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
           if (Math.max(Math.abs(r - r0), Math.abs(c - c0)) !== ring) continue;
           const j = r * cols + c;
           const d = (r - r0) ** 2 + (c - c0) ** 2;
-          if (free[j] && d < bestD) {
+          if (free[j] === 1 && d < bestD) {
             best = j;
             bestD = d;
           }
@@ -128,23 +128,23 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
       if (i === goal) {
         const cells = [i];
         for (let k = came[i]!; k >= 0; k = came[k]!) cells.push(k);
-        return cells.reverse();
+        return cells.toReversed();
       }
-      if (closed[i]) continue;
+      if (closed[i] === 1) continue;
       closed[i] = 1;
       const c = i % cols;
       const r = Math.floor(i / cols);
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
-          if (!dr && !dc) continue;
+          if (dr === 0 && dc === 0) continue;
           const nc = c + dc;
           const nr = r + dr;
           if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
           const j = nr * cols + nc;
-          if (!free[j] || closed[j]) continue;
+          if (free[j] !== 1 || closed[j] === 1) continue;
           // No squeezing diagonally between two blocked cells.
-          if (dr && dc && (!free[r * cols + nc] || !free[nr * cols + c])) continue;
-          const step = (dr && dc ? SQRT2 : 1) * (weight[i]! + weight[j]!) * 0.5;
+          if (dr !== 0 && dc !== 0 && (free[r * cols + nc] !== 1 || free[nr * cols + c] !== 1)) continue;
+          const step = (dr !== 0 && dc !== 0 ? SQRT2 : 1) * (weight[i]! + weight[j]!) * 0.5;
           const tentative = g[i]! + step;
           if (tentative < g[j]!) {
             g[j] = tentative;
@@ -164,7 +164,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
     let sum = 0;
     for (let s = 0; s <= steps; s++) {
       const i = index({ x: a.x + ((b.x - a.x) * s) / steps, y: a.y + ((b.y - a.y) * s) / steps });
-      if (!free[i]) return Infinity;
+      if (free[i] !== 1) return Infinity;
       sum += weight[i]!;
     }
     return (sum / (steps + 1)) * (length / cell);

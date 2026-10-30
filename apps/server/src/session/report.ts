@@ -1,14 +1,14 @@
 // Lengths are UTF-16 units.
 
-import { maybe, t } from "@vibevalley/i18n";
-import { Predicate } from "effect";
-import { messageOf } from "@/errors.ts";
-
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
+import { Predicate } from "effect";
+
+import { maybe, t } from "@vibevalley/i18n";
 import type { Question, CheckResult, CriterionCheck, IssueAnswer, Outcome } from "@vibevalley/protocol";
 
 import { clip, slice } from "@/base/clip.ts";
+import { messageOf } from "@/errors.ts";
 
 const summaryMax = 160;
 
@@ -21,7 +21,7 @@ export function failureText(f: FailedTurn): string {
       : advice.retry === "later"
         ? t("server.session.failureNext.later")
         : "";
-  const reason = slice(f.reason.replace(/\s+/g, " ").trim(), 0, 200);
+  const reason = slice(f.reason.replace(/\s+/gu, " ").trim(), 0, 200);
   let out = maybe(`server.session.failure.${f.failure}`) ?? t("server.session.failure.unknown");
   if (f.status !== undefined) out += t("server.session.failureStatus", { status: f.status });
   if (reason) out += t("server.session.failureReason", { reason });
@@ -31,10 +31,10 @@ export function failureText(f: FailedTurn): string {
 
 /** The line the farm rules ask every report to end on: 「结论：…」, perhaps bold or in a list. The markers are asked for in
  * Chinese whatever the owner's language; a model writing English may put them in English, which counts too. */
-const verdict = /(?:^|\n)[\s>*#_-]*(?:\*\*)?(?:结论|Conclusion)(?:\*\*)?\s*[:：]\s*(?:\*\*)?/gi;
+const verdict = /(?:^|\n)[\s>*#_-]*(?:\*\*)?(?:结论|Conclusion)(?:\*\*)?\s*[:：]\s*(?:\*\*)?/giu;
 
 function conclusion(text: string, min: number): string {
-  const blocks = text.trim().split(/\n{2,}/);
+  const blocks = text.trim().split(/\n{2,}/u);
   let tail = "";
   for (let i = blocks.length - 1; i >= 0 && tail.length < min; i--) tail = tail ? blocks[i] + "\n\n" + tail : blocks[i]!;
   return tail;
@@ -50,7 +50,7 @@ export function reportVerdict(text: string): string {
     .slice(last.index + last[0].length)
     .replaceAll("**", "")
     .trim();
-  return rest.split(/\n\s*\n/, 1)[0]!.trim();
+  return rest.split(/\n\s*\n/u, 1)[0]!.trim();
 }
 
 /** What a report says in short: its verdict, else its last paragraphs. */
@@ -78,7 +78,7 @@ export interface SessionRead {
 }
 
 /** A json block in what a session said: the last one wins. */
-const jsonBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const jsonBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
 
 const answerLines = (v: unknown, field: string): string[] => {
   if (v === undefined || v === null) return [];
@@ -115,22 +115,22 @@ export function parseAnswer(text: string): { answer?: IssueAnswer; problem: stri
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
-const questionLine = /^[\s>*#_-]*(?:\*\*)?(?:要问主人|Ask the owner|Question for the owner)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/i;
+const questionLine = /^[\s>*#_-]*(?:\*\*)?(?:要问主人|Ask the owner|Question for the owner)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/iu;
 
 /** The answers it thought of, at the end of the question: 「（选项：A｜B）」. */
-const optionsTail = /\s*[（(]\s*(?:选项|Options)\s*[:：]\s*(.+?)\s*[)）]\s*$/i;
+const optionsTail = /\s*[（(]\s*(?:选项|Options)\s*[:：]\s*(.+?)\s*[)）]\s*$/iu;
 
 export function questionsOf(said: string): Question[] {
   return said
     .split("\n")
     .map((line) => questionLine.exec(line)?.[1])
     .filter((q): q is string => q !== undefined)
-    .map((q) => q.trim().replace(/\*\*$/, "").trim())
+    .map((q) => q.trim().replace(/\*\*$/u, "").trim())
     .flatMap((q): Question[] => {
       const tail = optionsTail.exec(q);
       const question = tail ? q.slice(0, tail.index).trim() : q;
       const options = (tail?.[1] ?? "")
-        .split(/[｜|]/)
+        .split(/[｜|]/u)
         .map((o) => o.trim())
         .filter(Boolean);
       if (!question) return [];
@@ -140,7 +140,7 @@ export function questionsOf(said: string): Question[] {
 
 /** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
 const checkLine =
-  /^[\s>*#_-]*(?:\*\*)?(?:标准|Criterion)\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定|not met|unmet|unsure|met)(?![a-z])(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/i;
+  /^[\s>*#_-]*(?:\*\*)?(?:标准|Criterion)\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定|not met|unmet|unsure|met)(?![a-z])(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/iu;
 
 const checkWords: Record<string, CheckResult> = {
   做到了: "met",
@@ -160,10 +160,10 @@ export function checksOf(said: string): CriterionCheck[] {
     if (!m) continue;
     const criterion = Number(m[1]) - 1;
     if (criterion < 0) continue;
-    const proof = m[3]!.trim().replace(/\*\*$/, "").trim();
+    const proof = m[3]!.trim().replace(/\*\*$/u, "").trim();
     out.set(criterion, { criterion, result: checkWords[m[2]!.toLowerCase()]!, proof: proof });
   }
-  return [...out.values()].sort((a, b) => a.criterion - b.criterion);
+  return [...out.values()].toSorted((a, b) => a.criterion - b.criterion);
 }
 
 export function readReport(outcome: TurnOutcome, said: string): SessionRead {

@@ -1,15 +1,19 @@
-import type { Event, Session } from "@botiverse/oar";
-import { whenTrue } from "@vibevalley/testkit/until";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import type { Event, Session } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
-import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
+
 import { standaloneOwner } from "@vibevalley/agent/brain";
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
+import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
+import { whenTrue } from "@vibevalley/testkit/until";
+
 import { wallTime } from "@/base/time.ts";
+
+import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -19,7 +23,7 @@ const home = () => {
 };
 const sessions: Session[] = [];
 afterEach(async () => {
-  for (const s of sessions.splice(0)) await s.dispose();
+  await Promise.all(sessions.splice(0).map((s) => s.dispose()));
   for (const done of homes.splice(0)) done();
 });
 
@@ -160,9 +164,11 @@ rl.on('line', (line) => {
     const { llm } = scriptedLLM();
     const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: standaloneOwner(), llm: () => llm });
     const models = await runtime.listModels();
-    expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default)).toBe(true);
+    expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
+      true,
+    );
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
-    await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/);
+    await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     const keyless = vibevalleyRuntimeOf({
       time: wallTime,
       owner: standaloneOwner(),

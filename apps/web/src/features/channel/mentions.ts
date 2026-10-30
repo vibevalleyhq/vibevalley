@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
-
 import { type Agent, everyone, defaultOrchestrator, ownerId, type Session, type SessionView } from "@vibevalley/protocol";
+
 import { phaseText } from "./presence";
 export const mentionOf: Record<string, string> = {
   [defaultOrchestrator]: t("web.channel.names.mention.orchestrator"),

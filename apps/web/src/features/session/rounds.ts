@@ -1,10 +1,11 @@
-import { t } from "@vibevalley/i18n";
 // A session's log by round (shownEvents, roundsOf, spansOf, roundMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
+import { t } from "@vibevalley/i18n";
 import type { SessionEvent } from "@vibevalley/protocol";
-import { big, tookText } from "@/base/format";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { big, tookText } from "@/base/format";
 
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;
@@ -16,7 +17,7 @@ export function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]) {
     const before = bySeq.get(s.seq);
     if (!before || s.revision > before.revision) bySeq.set(s.seq, s);
   }
-  const all = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
+  const all = [...bySeq.values()].toSorted((a, b) => a.seq - b.seq);
   return all.length > stepLimit ? all.slice(all.length - stepLimit) : all;
 }
 
@@ -56,12 +57,12 @@ export function roundsOf(steps: SessionEvent[]): Round[] {
   let current: SessionEvent[] = [];
   for (const s of steps) {
     if (s.type === "user/message" && s.under === undefined) {
-      if (asked || current.length) rounds.push(omitUndefined({ asked, steps: current }));
+      if (asked || current.length > 0) rounds.push(omitUndefined({ asked, steps: current }));
       asked = s;
       current = [];
     } else current.push(s);
   }
-  if (asked || current.length) rounds.push(omitUndefined({ asked, steps: current }));
+  if (asked || current.length > 0) rounds.push(omitUndefined({ asked, steps: current }));
   return rounds;
 }
 
@@ -84,7 +85,7 @@ export function roundMs(r: Round, end: number) {
 export const lastTime = (r: Round) => allOf(r).at(-1)?.time;
 
 export function farmToolText(text: string) {
-  const m = /^vibevalley__(channel_message_send|channel_message_list|channel_unread_list|session_list)/.exec(text.trim())?.[1];
+  const m = /^vibevalley__(channel_message_send|channel_message_list|channel_unread_list|session_list)/u.exec(text.trim())?.[1];
   switch (m) {
     case undefined:
       return undefined;
@@ -172,7 +173,7 @@ export function readableInput(step: SessionEvent) {
   if (!raw) return "";
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
+    if (typeof parsed === "object" && parsed !== null) {
       const command = (parsed as { command?: unknown }).command;
       if (!Array.isArray(parsed) && typeof command === "string") return `$ ${command}`;
       return JSON.stringify(parsed, null, 2);
@@ -375,4 +376,4 @@ export function tagOf(step: SessionEvent, asked?: string, job = false): string {
   }
 }
 
-export const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+export const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();

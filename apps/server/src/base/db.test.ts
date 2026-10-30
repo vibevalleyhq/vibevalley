@@ -1,13 +1,16 @@
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import { tempDir } from "@vibevalley/testkit/temp";
 import { Cause, Effect, Exit, Layer } from "effect";
 import { SqlClient } from "effect/sql";
-import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
-import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 
-import { join } from "node:path";
+import { tempDir } from "@vibevalley/testkit/temp";
+
 import { testDatabase } from "@/testing/layers.ts";
+
+import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
+import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
 import { Db, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
@@ -84,7 +87,7 @@ describe("the database", () => {
     expect(setAsideStale(db, "new", 7)).toBeUndefined();
     writeFileSync(db + ".schema", "old\n");
     expect(setAsideStale(db, "new", 7)).toBe(db + ".old-7");
-    expect(readdirSync(home).sort()).toEqual(["db.old-7", "db.old-7.schema"]);
+    expect(readdirSync(home).toSorted()).toEqual(["db.old-7", "db.old-7.schema"]);
     expect(setAsideStale(db, "new", 8)).toBeUndefined();
   });
 });
@@ -100,8 +103,8 @@ it("attempt is used only where a failed query is told or retried, each with its 
   const src = join(import.meta.dirname, "..");
   const using = readdirSync(src, { recursive: true, encoding: "utf8" })
     .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-    .filter((f) => /\{[^}]*\battempt\b[^}]*\}\s*=\s*yield\*\s*Db\b|\bDb\b[^;]*\.attempt\(/.test(readFileSync(join(src, f), "utf8")))
+    .filter((f) => /\{[^}]*\battempt\b[^}]*\}\s*=\s*yield\*\s*Db\b|\bDb\b[^;]*\.attempt\(/u.test(readFileSync(join(src, f), "utf8")))
     .map((f) => f.split("\\").join("/"))
-    .sort();
-  expect(using).toEqual(Object.keys(attempting).sort());
+    .toSorted();
+  expect(using).toEqual(Object.keys(attempting).toSorted());
 });

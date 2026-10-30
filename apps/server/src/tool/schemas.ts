@@ -4,8 +4,10 @@
 // know (parseOptions) says so in the JSON Schema too (additionalProperties false).
 
 import { Schema, Predicate } from "effect";
-import type { Handlers } from "@vibevalley/protocol/api";
+
 import type { JsonSchema } from "@vibevalley/ai/tools";
+import type { Handlers } from "@vibevalley/protocol/api";
+
 import { params } from "./prompts.ts";
 
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */
@@ -15,7 +17,7 @@ export type Op = keyof Handlers;
 export const toolName = (op: Op) =>
   op
     .split(".")
-    .map((w) => w.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase()))
+    .map((w) => w.replace(/[A-Z]/gu, (c) => "_" + c.toLowerCase()))
     .join("_");
 
 /** Fields a tool takes that its endpoint does not, which only a model has a use for; tool.test.ts lets these through. */
@@ -273,13 +275,14 @@ const safe = Number.MAX_SAFE_INTEGER;
 const written = (node: unknown): unknown => {
   if (Array.isArray(node)) return node.map(written);
   if (typeof node !== "object" || node === null) return node;
-  let o = { ...(node as Record<string, unknown>) };
+  let o: Record<string, unknown> = Object.fromEntries(Object.entries(node));
   const choices = o.anyOf;
   if (Array.isArray(choices) && choices.length === 2) {
-    const [value, none] = choices as Record<string, unknown>[];
-    if (none?.type === "null" && value) {
+    const value: unknown = choices[0];
+    const none: unknown = choices[1];
+    if (Predicate.isObject(none) && "type" in none && none.type === "null" && Predicate.isObject(value)) {
       const { anyOf: _, ...rest } = o;
-      o = { ...value, ...rest, type: ["null", value.type] };
+      o = { ...value, ...rest, type: ["null", "type" in value ? value.type : undefined] };
     }
   }
   if (o.type === "integer" && o.minimum === -safe && o.maximum === safe) {
@@ -291,12 +294,13 @@ const written = (node: unknown): unknown => {
     delete o.requiredOrder;
   }
   if (o.parseOptions !== undefined) {
-    if ((o.parseOptions as { onExcessProperty?: string }).onExcessProperty === "error") o.additionalProperties = false;
+    if (Predicate.isObject(o.parseOptions) && "onExcessProperty" in o.parseOptions && o.parseOptions.onExcessProperty === "error")
+      o.additionalProperties = false;
     delete o.parseOptions;
   }
   if (Array.isArray(o.required) && o.required.length === 0) delete o.required;
   const out: Record<string, unknown> = {};
-  for (const key of Object.keys(o).sort()) {
+  for (const key of Object.keys(o).toSorted()) {
     const value = o[key];
     out[key] =
       key === "properties" && Predicate.isObject(value) ? Object.fromEntries(Object.entries(value).map(([name, p]) => [name, written(p)])) : written(value);
@@ -304,14 +308,14 @@ const written = (node: unknown): unknown => {
   return out;
 };
 
-export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema =>
-  Object.keys(parameters.fields).length === 0
-    ? { additionalProperties: true, properties: {}, type: "object" }
-    : (written(
-        Schema.toJsonSchemaDocument(parameters, { includeAnnotationKey: (key) => key === "requiredOrder" || key === "parseOptions" }).schema,
-      ) as JsonSchema);
+export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
+  if (Object.keys(parameters.fields).length === 0) return { additionalProperties: true, properties: {}, type: "object" };
+  const shaped = written(Schema.toJsonSchemaDocument(parameters, { includeAnnotationKey: (key) => key === "requiredOrder" || key === "parseOptions" }).schema);
+  return Predicate.isObject(shaped) ? Object.fromEntries(Object.entries(shaped)) : {};
+};
 
 const shown = <A extends Record<string, Schema.Struct<Schema.Struct.Fields>>>(all: A): Record<keyof A & string, JsonSchema> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one entry for each key of all
   Object.fromEntries(Object.entries(all).map(([op, p]) => [op, toolParameters(p)])) as Record<keyof A & string, JsonSchema>;
 
 /** As the model is shown them, by endpoint. */

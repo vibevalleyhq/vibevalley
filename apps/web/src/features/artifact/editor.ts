@@ -1,8 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The blocks artifact being edited: blocks in order, the owner's edits as ops
 // waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
 
+import { t } from "@vibevalley/i18n";
 import {
   type Block,
   type BlockAttrs,
@@ -16,7 +16,9 @@ import {
   type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
+
 import { reasonOf } from "@/base/api";
+
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
 /** Text edits wait this long after the last key, and no longer than maxWaitMs while typing goes on. */
@@ -111,10 +113,12 @@ export class BlockEditor {
   /** Bumped on every change: what useSyncExternalStore reads. */
   version = 0;
 
-  constructor(
-    private readonly api: VibeValleyApi,
-    readonly artifactId: string,
-  ) {}
+  private readonly api: VibeValleyApi;
+  readonly artifactId: string;
+  constructor(api: VibeValleyApi, artifactId: string) {
+    this.api = api;
+    this.artifactId = artifactId;
+  }
 
   subscribe = (f: () => void) => {
     this.listeners.add(f);
@@ -209,10 +213,10 @@ export class BlockEditor {
     const went = this.gone.get(b.id);
     if (went) {
       went.rev = b.rev;
-      if (b.deleted) this.gone.delete(b.id);
+      if (b.deleted === true) this.gone.delete(b.id);
       return;
     }
-    if (b.deleted) {
+    if (b.deleted === true) {
       this.byId.delete(b.id);
       return;
     }
@@ -419,7 +423,7 @@ export class BlockEditor {
 
   /** A new paragraph at the end, focused: what a click below the last block does. */
   append() {
-    const last = this.blocks.filter((b) => b.parentId === undefined).at(-1);
+    const last = this.blocks.findLast((b) => b.parentId === undefined);
     const nb: BlockInput = {
       id: newBlockId(),
       orderKey: keyBetween(last?.orderKey ?? "", ""),
@@ -509,6 +513,7 @@ export class BlockEditor {
         }
         let ack;
         try {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- one batch in flight at a time: the next is built on this one's ack
           ack = await this.api.artifact.submit({ id: this.artifactId, batchId: batch.id, lastSeq: this.seq, ops: batch.ops });
         } catch (e) {
           // Kept with its batch id, so sending it again cannot take it twice.

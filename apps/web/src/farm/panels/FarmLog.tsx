@@ -1,14 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // The farm's log: what you and the orchestrator said in the general channel and every helper's turn report, newest first.
 // Voice captions carry no times, so the log keeps to the typed lines.
 
-import { spentText } from "@/base/format";
-
 import { For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { defaultOf, useFollowed, useReports } from "@/features/channel";
-import { useCore } from "@/base/frame";
+
 import { useAgent } from "@/base/agents";
+import { spentText } from "@/base/format";
+import { useCore } from "@/base/frame";
+import { defaultOf, useFollowed, useReports } from "@/features/channel";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { DashedLine, PxMarkdown } from "@/ui/pixel";
 
@@ -35,7 +36,7 @@ export function FarmLog() {
         .messages.filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromKind === "orchestrator"))
         .map((message) => ({ kind: "said" as const, message })),
       ...reports().map((message) => ({ kind: "report" as const, message })),
-    ].sort((a, b) => b.message.at - a.message.at);
+    ].toSorted((a, b) => b.message.at - a.message.at);
   return (
     <Show when={rows().length > 0} fallback={<FarmEmpty text={t("web.farm.log.empty")} />}>
       <div class="flex flex-col">

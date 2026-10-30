@@ -1,5 +1,6 @@
-import { list, t } from "@vibevalley/i18n";
 // What a session is doing and what it waits on.
+
+import { list, t } from "@vibevalley/i18n";
 
 import type { Conflict, Retry, Session } from "../shapes";
 
@@ -72,7 +73,7 @@ export function phaseWords(h: Session): string {
       const what = p.doing.label !== "" ? t("shared.phase.workingOn", { action, label: p.doing.label }) : t("shared.phase.working", { action });
       if (need?.kind === "quiet") return t("shared.phase.quiet", { what, span: phaseSpan });
       if (need?.kind === "retrying")
-        return need.retry.of
+        return need.retry.of != null && need.retry.of !== 0
           ? t("shared.phase.retryingOf", { what, attempt: need.retry.attempt, of: need.retry.of })
           : t("shared.phase.retrying", { what, attempt: need.retry.attempt });
       return what;

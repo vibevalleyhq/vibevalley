@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
 
 import { ready, useRuntimes, useSprites } from "@/base/query";
+
 import { runtimeName } from "./runtimes";
 
 /** The execution tool named by a profile or session, using the server's catalog label. */
@@ -14,7 +15,7 @@ export function RuntimeBadge(props: { runtime: string; size: number }) {
   };
   return (
     <span
-      class="absolute -right-0.5 -bottom-0.5 z-10 inline-flex items-center justify-center rounded-xs bg-cream-50 ring-1 ring-bark-300/70"
+      class="ring-bark-300/70 absolute -right-0.5 -bottom-0.5 z-10 inline-flex items-center justify-center rounded-xs bg-cream-50 ring-1"
       style={{ width: `${props.size}px`, height: `${props.size}px` }}
       role="img"
       aria-label={label()}

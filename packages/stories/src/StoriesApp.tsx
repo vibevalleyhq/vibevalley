@@ -1,7 +1,6 @@
 // Drawn with the host's token classes (bg-page, border-line…): the host's Tailwind scans this folder. Each frame contains
 // its layout, so a part fixed to the window (a toast) stays in its frame; a modal <dialog> still opens over everything.
 
-import { createMemo, createSignal, createStore, Errored, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import {
   Accessibility,
@@ -27,9 +26,11 @@ import {
   Tablet,
   type IconFunction,
 } from "reicon";
+import { createMemo, createSignal, createStore, Errored, For, Match, onSettled, Show, Switch } from "solid-js";
+
+import { A11yPanel, useAxe } from "./a11y";
 import type { Args, Axis, Control, Stories, Story } from "./format";
 import { forceStates, type PseudoState, pseudoStates, pseudoStyleId } from "./pseudo";
-import { A11yPanel, useAxe } from "./a11y";
 import { type Entry, entries, isOpen, type Node, search, treeOf } from "./tree";
 
 export type Theme = "light" | "dark" | "both";
@@ -106,7 +107,10 @@ const writeView = (v: View) => {
 const toggledKey = "stories.toggled";
 const readToggled = () => {
   try {
-    return new Map<string, boolean>(JSON.parse(localStorage.getItem(toggledKey) ?? "[]") as [string, boolean][]);
+    const stored: unknown = JSON.parse(localStorage.getItem(toggledKey) ?? "[]");
+    return new Map(
+      Array.isArray(stored) ? stored.filter((e): e is [string, boolean] => Array.isArray(e) && typeof e[0] === "string" && typeof e[1] === "boolean") : [],
+    );
   } catch {
     return new Map<string, boolean>();
   }
@@ -380,10 +384,10 @@ function Opened(props: {
                 aria-label={theme}
                 style={{ width: frameWidth(props.view.width) }}
                 class={[
-                  "relative flex shrink-0 self-stretch overflow-auto rounded-lg [contain:layout] border border-line p-6 pt-8 outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
+                  "relative flex shrink-0 self-stretch overflow-auto rounded-lg border border-line p-6 pt-8 [contain:layout] outline-none focus-visible:outline-2 focus-visible:outline-focus xl:self-auto",
                   props.entry.frame ?? "bg-page text-ink",
                   props.view.width === "full" && "min-w-0 flex-1 shrink",
-                  story.fill && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
+                  story.fill === true && mode() === "single" ? "h-[36rem] flex-col *:min-h-0 *:flex-1" : "min-h-40 items-center justify-center",
                 ]}
               >
                 <span class="absolute top-2 left-3 flex items-center gap-1 rounded-xs bg-page px-1 font-mono text-2xs text-muted">
@@ -519,7 +523,7 @@ function Pick<T extends string>(props: {
             aria-checked={props.value === o ? "true" : "false"}
             aria-label={props.looks[o].label}
             title={props.looks[o].label}
-            data-value={String(o)}
+            data-value={o}
             onClick={() => props.onChange(o)}
             class="flex h-7 min-w-7 items-center justify-center rounded-sm px-1 text-muted hover:text-ink aria-checked:bg-selected aria-checked:text-ink"
           >
@@ -625,7 +629,7 @@ function ArgControl(props: {
                 <label for={id} class="font-mono text-xs">
                   {props.name}
                 </label>
-                {c.long ? (
+                {c.long === true ? (
                   <textarea
                     id={id}
                     rows={6}

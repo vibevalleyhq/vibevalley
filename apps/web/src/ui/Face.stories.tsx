@@ -1,6 +1,8 @@
 import { For } from "solid-js";
+
 import { type Look, type Species, SpeciesValues } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import { AgentFace, OrchestratorFace, OwnerFace } from "./Face";
 
 const runtimes = ["claude", "codex", "pi", "cursor", "opencode", "kimi", "grok", "antigravity", "dsh"];

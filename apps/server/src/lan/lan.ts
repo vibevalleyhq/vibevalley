@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // Lan access (连接到本机). The main server listens on loopback alone; lan access is a second listener
 // on every interface, shut until the owner opens it. Through it go the endpoints marked remote and the state and side-event
 // streams, never /mcp, and only with a paired device's key (a Bearer header, or the cookie a paired browser keeps):
@@ -15,6 +14,10 @@ import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+
+import { t } from "@vibevalley/i18n";
 import {
   artifactPrefix,
   attachmentPath,
@@ -29,12 +32,13 @@ import {
 } from "@vibevalley/protocol";
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
-import { missing, lookIn } from "@/errors.ts";
 import { callbackLog } from "@/base/log.ts";
+import { missing, lookIn } from "@/errors.ts";
+
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
 
@@ -88,7 +92,7 @@ export class Lan extends Context.Service<
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-export const hostName = () => hostname().replace(/\.local$/, "") || "vibevalley";
+export const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
 export function lanAddress(): string {
@@ -97,7 +101,7 @@ export function lanAddress(): string {
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
     const r = ["en", "eth", "wlan", "wl"].some((p) => name.startsWith(p)) ? 1 : 2;
     if (r >= rank) continue;
-    const found = (addrs ?? []).find((a) => a.family === "IPv4" && !a.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address));
+    const found = (addrs ?? []).find((a) => a.family === "IPv4" && !a.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/u.test(a.address));
     if (found) {
       best = found.address;
       rank = r;
@@ -106,14 +110,14 @@ export function lanAddress(): string {
   return best;
 }
 
-const deviceName = (name: string) => [...name.split(/\s+/).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
+const deviceName = (name: string) => [...name.split(/\s+/u).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
 
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
 export const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
 
 const keyOf = (req: IncomingMessage) => {
   const auth = req.headers.authorization;
-  if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length);
+  if (auth?.startsWith("Bearer ") === true) return auth.slice("Bearer ".length);
   for (const part of (req.headers.cookie ?? "").split(";")) {
     const [name, ...value] = part.trim().split("=");
     if (name === lanKeyCookie) return decodeURIComponent(value.join("="));
@@ -143,7 +147,7 @@ export const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
     const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;
@@ -237,6 +241,7 @@ export const make = (options: LanOptions = {}) =>
         res.writeHead(answer.status, Object.fromEntries(answer.headers));
         const streamed = answer.body;
         if (!streamed) return void res.end();
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same web stream: the DOM's and Node's types name it apart
         yield* Effect.tryPromise((signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }));
       });
 
@@ -323,7 +328,7 @@ export const make = (options: LanOptions = {}) =>
         problem = "";
         server = s;
         const a = s.address();
-        port = a && typeof a === "object" ? a.port : config.lan.port;
+        port = typeof a === "object" && a !== null ? a.port : config.lan.port;
         logs.info(`vibevalley: lan access is open on port ${port}`);
         resume(Effect.void);
       });
@@ -351,7 +356,7 @@ export const make = (options: LanOptions = {}) =>
       }
       const p = livePairing();
       if (p && addr) s.pairing = { code: p.code, link: pairLink(addr, p.code), expiresAt: p.expires, ...(p.asking ? { asking: p.asking } : {}) };
-      s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).sort((a, b) => a.pairedAt - b.pairedAt);
+      s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).toSorted((a, b) => a.pairedAt - b.pairedAt);
       return s;
     };
 

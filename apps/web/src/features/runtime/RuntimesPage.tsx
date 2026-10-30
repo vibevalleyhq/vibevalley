@@ -1,12 +1,12 @@
-import { Meter } from "@vibevalley/base-ui";
-import { variant, Keyed } from "@/base/util";
-import { t } from "@vibevalley/i18n";
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
 
-import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
+import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
+import { Meter } from "@vibevalley/base-ui";
+import { t } from "@vibevalley/i18n";
 import {
   type Agent,
   type InventoryEntry,
@@ -19,23 +19,26 @@ import {
   type UsageWindow,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
-import { api, reasonOf } from "@/base/api";
-import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
-import { momentText, wallClockText, yuan } from "@/base/format";
-import { toast } from "@/ui/toasts";
-import { A } from "@/ui/A";
+
 import { useWorkAgents } from "@/base/agents";
+import { api, reasonOf } from "@/base/api";
+import { momentText, wallClockText, yuan } from "@/base/format";
 import { ready, useRuntimes } from "@/base/query";
-import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { variant, Keyed } from "@/base/util";
+import { A } from "@/ui/A";
 import { Button } from "@/ui/Button";
 import { KeyValueEditor } from "@/ui/Chips";
 import { AgentFace } from "@/ui/Face";
 import { Select, TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
-import { SpriteIcon } from "@/ui/pixel";
-import { Segmented } from "@/ui/Segmented";
 import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "@/ui/layout";
+import { SpriteIcon } from "@/ui/pixel";
+import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
+import { Segmented } from "@/ui/Segmented";
 import { Hint } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
+
+import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: t("web.runtime.capability.listModels"),
@@ -366,7 +369,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
 
 /** The text is kept as typed, the number follows it (empty or 0 means none). */
 function NumberInput(props: { value?: number | undefined; onChange: (n: number | undefined) => void; placeholder: string; label: string; testid?: string }) {
-  const [text, setText] = createSignal(untrack(() => (props.value ? String(props.value) : "")));
+  const [text, setText] = createSignal(untrack(() => (props.value != null && props.value !== 0 ? String(props.value) : "")));
   return (
     <TextInput
       data-testid={props.testid}

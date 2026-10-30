@@ -1,29 +1,32 @@
-import { t } from "@vibevalley/i18n";
 // The farm phone: a wooden handset over the phone button, its screen showing a call ringing, else the app picked on the
 // home screen; the games take the pad. It folds like a foldable: folded, a tab on its right edge says 田头 and whether
 // there is something new; unfolded, its right screen is the chat (ChatWindow), and on a narrow screen only the chat
 // shows. Esc folds it, then puts it away; put away, it comes out folded.
 
-import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
-import { missedOf, phoneCalls } from "./calls";
-import { ChatWindow } from "@/farm/chat/ChatWindow";
+
 import { useCore } from "@/base/frame";
-import { unreadTotal } from "@/features/channel";
-import { useFarm } from "@/farm/ui";
-import { voiceCall } from "@/features/voice";
-import { lcd } from "./lcd";
-import type { PadButton } from "./pad";
-import { playSound } from "@/ui/pixel/sound";
-import { farm } from "@/farm/store";
 import { useRouter } from "@/base/router";
+import { ChatWindow } from "@/farm/chat/ChatWindow";
+import { farm } from "@/farm/store";
 import { padListening, phoneState, pressPad } from "@/farm/support";
+import { useFarm } from "@/farm/ui";
+import { unreadTotal } from "@/features/channel";
+import { voiceCall } from "@/features/voice";
+import { playSound } from "@/ui/pixel/sound";
+
+import { missedOf, phoneCalls } from "./calls";
 import { BlocksGame } from "./games/BlocksGame";
 import { BugSnakeGame } from "./games/BugSnakeGame";
 import { DinoGame } from "./games/DinoGame";
 import { MergeGame } from "./games/MergeGame";
 import { SokobanGame } from "./games/SokobanGame";
+import { lcd } from "./lcd";
+import type { PadButton } from "./pad";
 import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
@@ -32,6 +35,8 @@ const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs
 const aboutOf = (call: InboxItem) => t("shared.join.sentence", { text: t("shared.join.labeled", { label: call.who, text: call.words.label }) }) + call.text;
 
 /** room: the most it may take, inside the farm's box. */
+const listOf = (app: PhoneApp) => (app === "missed" || app === "log" ? app : undefined);
+
 export function Phone(props: { room: { w: number; h: number } }) {
   const phone = phoneState();
   const router = useRouter();
@@ -112,8 +117,8 @@ export function Phone(props: { room: { w: number; h: number } }) {
             <Match when={app() === "games"}>
               <GamesScreen onOpen={open} />
             </Match>
-            <Match when={app() === "missed" || app() === "log"}>
-              <ListScreen screen={app() as "missed" | "log"} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("orchestrator")} />
+            <Match when={listOf(app())}>
+              {(screen) => <ListScreen screen={screen()} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("orchestrator")} />}
             </Match>
             <Match when={app() === "orchestrator"}>
               <OrchestratorScreen />

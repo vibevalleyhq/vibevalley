@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
+
 import { expect, test } from "vite-plus/test";
 
 const features = join(import.meta.dirname, "features");
@@ -9,9 +10,9 @@ function graph() {
   for (const feature of readdirSync(features)) {
     const uses = new Set<string>();
     for (const file of readdirSync(join(features, feature), { recursive: true, encoding: "utf8" })) {
-      if (!/\.tsx?$/.test(file)) continue;
+      if (!/\.tsx?$/u.test(file)) continue;
       const at = join(features, feature, file);
-      for (const m of readFileSync(at, "utf8").matchAll(/(?:from|import)\s*"(\.[^"]+)"/g)) {
+      for (const m of readFileSync(at, "utf8").matchAll(/(?:from|import)\s*"(\.[^"]+)"/gu)) {
         const path = relative(features, join(dirname(at), m[1]!));
         const used = path.split(sep)[0]!;
         if (!path.startsWith("..") && used !== feature) uses.add(used);
@@ -33,7 +34,7 @@ function cycleIn(edges: Map<string, Set<string>>): string[] {
     path.push(f);
     for (const g of edges.get(f) ?? []) {
       const found = visit(g);
-      if (found.length) return found;
+      if (found.length > 0) return found;
     }
     path.pop();
     done.add(f);
@@ -41,7 +42,7 @@ function cycleIn(edges: Map<string, Set<string>>): string[] {
   };
   for (const f of edges.keys()) {
     const found = visit(f);
-    if (found.length) return found;
+    if (found.length > 0) return found;
   }
   return [];
 }

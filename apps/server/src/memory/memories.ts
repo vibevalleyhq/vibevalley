@@ -1,19 +1,22 @@
-import { t } from "@vibevalley/i18n";
 // This farm's own memories, rows in the memory table: what each agent noted (its
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
-import { sessionId } from "@vibevalley/protocol/schema";
-import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
-import type { Actor } from "@/base/actor.ts";
 import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
+import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
+
+import type { Actor } from "@/base/actor.ts";
 import { Db } from "@/base/db.ts";
-import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "@/base/ids.ts";
+
+import * as q from "../../db/generated/memory.sql.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {
@@ -136,12 +139,12 @@ export const makeMemories = Effect.gen(function* () {
       : sql
           .withTransaction(
             Effect.gen(function* () {
-              let known: readonly Pick<Memory, "kind" | "text" | "project">[] = yield* list(run.agent);
+              const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
               for (const note of memoryNotesOf(run.said)) {
                 const project = note.everywhere ? undefined : run.project;
                 if (!memoryIsNewNote(known, note.text, project)) continue;
                 yield* insertNote(run.agent, note.text, project, run.session, "session");
-                known = [...known, { kind: "note", text: note.text, ...(project ? { project } : {}) }];
+                known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
               }
               const job = memoryJobText(run.job, run.summary, run.outcome);
               yield* db(

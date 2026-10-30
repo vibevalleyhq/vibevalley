@@ -1,7 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // Agora exposes one native engine. Each attempt owns it until it ends; late permission replies and callbacks from an
 // ended attempt cannot initialize, release or send events through its successor.
 
+import { PermissionsAndroid, Platform } from "react-native";
 import {
   ChannelProfileType,
   ClientRoleType,
@@ -11,8 +11,10 @@ import {
   type IRtcEngineEventHandler,
   type RtcConnection,
 } from "react-native-agora";
-import { PermissionsAndroid, Platform } from "react-native";
+
+import { t } from "@vibevalley/i18n";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
+
 import { level } from "./pairing";
 
 const fail = (code: number, what: string) => {
@@ -82,7 +84,7 @@ export function nativeRtc() {
             let theirs = 0;
             // uid 0 is this phone.
             for (const s of speakers) {
-              if (!s.uid) mine = level(s.volume);
+              if (s.uid == null || s.uid === 0) mine = level(s.volume);
               else theirs = level(s.volume);
             }
             events.levels(mine, theirs);

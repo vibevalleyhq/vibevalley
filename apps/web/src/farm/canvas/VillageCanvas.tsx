@@ -1,29 +1,31 @@
-import { t } from "@vibevalley/i18n";
 // The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
 
-import { messageOf } from "@/base/format";
 import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
+
+import { createExternal } from "@/base/external";
+import { messageOf } from "@/base/format";
 import { frames } from "@/base/frames";
-import { startScene, type Scene } from "./scene";
-import { background, cssCursor, holdTimeOfDay, type Hotspots, lightOn, screenOf } from "./screen";
+import { ready, useAgents, useQuery } from "@/base/query";
+import { useRouter } from "@/base/router";
 import { clickBed, openPlace } from "@/farm/commands";
-import { playSound } from "@/ui/pixel/sound";
+import { commands } from "@/farm/frames";
+import { farmFrameOf } from "@/farm/scope";
 import { farm, farmState, subscribeFarm } from "@/farm/store";
+import { useVillage } from "@/farm/support";
+import { farmProject } from "@/farm/ui";
 import { yardPlace } from "@/farm/world/places";
 import { beds } from "@/farm/world/plots";
-import { spriteUrl } from "@/ui/pixel/atlas";
 import { textureProgress } from "@/farm/world/textures";
-import { createExternal } from "@/base/external";
-import { useRouter } from "@/base/router";
-import { ready, useAgents, useQuery } from "@/base/query";
-import { commands } from "@/farm/frames";
-import { farmProject } from "@/farm/ui";
-import { farmFrameOf } from "@/farm/scope";
-import { useVillage } from "@/farm/support";
+import { spriteUrl } from "@/ui/pixel/atlas";
+import { playSound } from "@/ui/pixel/sound";
+
+import { startScene, type Scene } from "./scene";
+import { background, cssCursor, holdTimeOfDay, type Hotspots, lightOn, screenOf } from "./screen";
 
 export function VillageCanvas() {
   let host!: HTMLDivElement;
@@ -34,6 +36,7 @@ export function VillageCanvas() {
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const hotspotsQuery = useQuery(() => ({
     queryKey: ["cursors"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => (await (await fetch("/cursors/cursors.json")).json()) as Hotspots,
     staleTime: Infinity,
   }));
@@ -147,7 +150,7 @@ export function VillageCanvas() {
       </Show>
       <div ref={(el) => (host = el)} class="absolute inset-0" data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
-        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">{t("web.farm.canvas.noMap", { why: String(why()) })}</p>}
+        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">{t("web.farm.canvas.noMap", { why: why() })}</p>}
       </Show>
     </div>
   );

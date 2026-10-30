@@ -1,7 +1,7 @@
 // A chat/completions request for DeepSeek, as pi-ai 1.3.0's openai-completions builds one for it
 // (testdata/deepseek.jsonl.gz holds what pi-ai sent; a change here is a change in what the model reads and caches).
 
-import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, ToolResultMessage, Usage } from "./messages.ts";
+import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, Usage } from "./messages.ts";
 import { clampThinkingLevel, type Model, type ThinkingLevel } from "./models.ts";
 
 export interface RequestOptions {
@@ -15,8 +15,8 @@ const userImageOmitted = "(image omitted: model does not support images)";
 const toolImageOmitted = "(tool image omitted: model does not support images)";
 const reasoningFields = new Set(["reasoning", "reasoning_content", "reasoning_text"]);
 
-/** Unpaired surrogates fail the provider's JSON; paired ones (emoji) stay. */
-export const sanitizeSurrogates = (text: string) => text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+/** Unpaired surrogates fail the provider's JSON; paired ones (emoji) stay: with u, a pair is one code point the class does not take. */
+export const sanitizeSurrogates = (text: string) => text.replace(/[\uD800-\uDFFF]/gu, "");
 
 export function requestBody(model: Model, context: Context, options: RequestOptions = {}): Record<string, unknown> {
   const clamped = options.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
@@ -70,8 +70,7 @@ function chatMessages(model: Model, context: Context): Record<string, unknown>[]
         // A turn's results go together; images, for a model that reads them, follow as one user message.
         const images: Record<string, unknown>[] = [];
         let j = i;
-        for (; j < messages.length && messages[j]!.role === "toolResult"; j++) {
-          const r = messages[j] as ToolResultMessage;
+        for (let r = messages[j]; r?.role === "toolResult"; r = messages[++j]) {
           const text = r.content
             .filter((c): c is TextContent => c.type === "text")
             .map((c) => c.text)
@@ -109,7 +108,7 @@ function assistantMessage(model: Model, m: AssistantMessage): Record<string, unk
     said.tool_calls = calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
   // DeepSeek wants it on every assistant message once thinking is in play.
   if (model.reasoning && said.reasoning_content === undefined) said.reasoning_content = "";
-  if ((said.content === null || said.content === "") && !said.tool_calls) return undefined;
+  if ((said.content === null || said.content === "") && said.tool_calls === undefined) return undefined;
   return said;
 }
 
@@ -209,17 +208,18 @@ function messageTokens(m: Message): number {
   return Math.ceil(chars / charsPerToken);
 }
 
-const usageTokens = (u: Usage) => u.totalTokens || u.input + u.output + u.cacheRead + u.cacheWrite;
+const usageTokens = (u: Usage) => (u.totalTokens > 0 ? u.totalTokens : u.input + u.output + u.cacheRead + u.cacheWrite);
 
 function estimateTokens(context: Context): number {
   // The system prompt leads at timestamp 0, as pi-ai's leading system message does.
   const head = textTokens(context.system) + (context.tools.length > 0 ? textTokens(JSON.stringify(context.tools)) : 0);
   let latest = 0;
-  let last = -1;
+  let last: { readonly at: number; readonly usage: Usage } | undefined;
   context.messages.forEach((m, i) => {
-    if (m.role === "assistant" && m.timestamp >= latest && m.stopReason !== "aborted" && m.stopReason !== "error" && usageTokens(m.usage) > 0) last = i;
+    if (m.role === "assistant" && m.timestamp >= latest && m.stopReason !== "aborted" && m.stopReason !== "error" && usageTokens(m.usage) > 0)
+      last = { at: i, usage: m.usage };
     latest = Math.max(latest, m.timestamp);
   });
-  if (last < 0) return context.messages.reduce((n, m) => n + messageTokens(m), head);
-  return context.messages.slice(last + 1).reduce((n, m) => n + messageTokens(m), usageTokens((context.messages[last] as AssistantMessage).usage));
+  if (!last) return context.messages.reduce((n, m) => n + messageTokens(m), head);
+  return context.messages.slice(last.at + 1).reduce((n, m) => n + messageTokens(m), usageTokens(last.usage));
 }

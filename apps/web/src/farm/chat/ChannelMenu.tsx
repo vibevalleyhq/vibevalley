@@ -1,19 +1,21 @@
-import { t } from "@vibevalley/i18n";
 // The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, the
 // owner's direct channels, a new channel, the current one's settings, and the way to its full page (its crons are there).
 
-import { farmChannelLabel } from "./labels";
-
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
-import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "@/features/channel";
-import { playSound } from "@/ui/pixel/sound";
-import { farm } from "@/farm/store";
-import { aria, useClickAway } from "@/base/util";
-import { useRouter } from "@/base/router";
+
 import { useCore } from "@/base/frame";
 import { ready, useProjects } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { aria, useClickAway } from "@/base/util";
+import { farm } from "@/farm/store";
+import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "@/features/channel";
 import { PxButton, PxTextInput, SpriteIcon } from "@/ui/pixel";
+import { playSound } from "@/ui/pixel/sound";
+
+import { farmChannelLabel } from "./labels";
 
 type Mode = "list" | "create" | "settings";
 

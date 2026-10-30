@@ -53,9 +53,9 @@ interface Frame {
 
 const f = (picture: DogPicture, s: number, more: { lift?: number; grow?: number } = {}): Frame => ({ picture, s, ...more });
 /** The tail going side to side for about `s` seconds. */
-const wagging = (s: number): Frame[] => Array.from({ length: Math.round(s / 0.12) }, (_, i) => f(i % 2 ? "dog-wag-2" : "dog-wag-1", 0.12));
+const wagging = (s: number): Frame[] => Array.from({ length: Math.round(s / 0.12) }, (_, i) => f(i % 2 !== 0 ? "dog-wag-2" : "dog-wag-1", 0.12));
 /** A hind leg at an ear: it jiggles. */
-const scratching = (s: number): Frame[] => Array.from({ length: Math.round(s / 0.08) }, (_, i) => f("dog-scratch", 0.08, { grow: i % 2 ? -1 : 0 }));
+const scratching = (s: number): Frame[] => Array.from({ length: Math.round(s / 0.08) }, (_, i) => f("dog-scratch", 0.08, { grow: i % 2 !== 0 ? -1 : 0 }));
 
 const ACTS: Record<Act, readonly Frame[]> = {
   wake: [f("dog-lie", 0.35), f("dog-awake", 0.15), ...wagging(1.2)],
@@ -156,7 +156,7 @@ export function villageDog(random: () => number = Math.random): Dog {
     },
     pet: (t) => {
       pats.push(t);
-      while (pats.length && t - (pats[0] ?? t) > QUICK_S) pats.shift();
+      while (pats.length > 0 && t - (pats[0] ?? t) > QUICK_S) pats.shift();
       const asleep = !up;
       upUntil = t + AWAKE_S;
       up = true;

@@ -1,19 +1,22 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+
 import { it as effectIt } from "@effect/vitest";
 import { Effect, Exit, Fiber, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
+import { afterEach, describe, expect, it } from "vite-plus/test";
+
+import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
+import { objectSchema } from "@vibevalley/ai/tools";
+import { gate, nextTurn, whenTrue } from "@vibevalley/testkit/until";
+
 import { resumedUnknown, sessionUnfinished } from "./brain.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
+import { stopped, textTool } from "./core/tool.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, withAgent } from "./testing.ts";
-import { stopped, textTool } from "./core/tool.ts";
-import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
-import { objectSchema } from "@vibevalley/ai/tools";
-import { gate, nextTurn, whenTrue } from "@vibevalley/testkit/until";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -137,7 +140,7 @@ describe("the agent", () => {
       dir,
       [
         answer([thinking("先读文件"), toolCall("read_file", { path: "notes.txt" })]),
-        step((c) => answer(results(c)[0]?.text.includes("第二行") ? "读到了：两行" : "读到了：没读到")),
+        step((c) => answer(results(c)[0]?.text.includes("第二行") === true ? "读到了：两行" : "读到了：没读到")),
       ],
       async (r) => {
         expect(await r.ask("看看 notes.txt")).toBe("读到了：两行");
@@ -172,7 +175,7 @@ describe("the agent", () => {
         ),
       ],
       async (r) => {
-        expect(await r.ask("改")).toMatch(/^true:old_text 在 a\|true:\S/);
+        expect(await r.ask("改")).toMatch(/^true:old_text 在 a\|true:\S/u);
       },
     );
   });
@@ -244,13 +247,14 @@ describe("the agent", () => {
       dir,
       repeat(12, long),
       async (r) => {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
         for (let n = 1; n <= 5; n++) await r.ask(`第 ${n} 件事`);
         await whenTrue(
           () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined),
           'r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined)',
         );
-        const last = r.requests.filter((c) => !summarizing(c)).at(-1)!;
-        expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/);
+        const last = r.requests.findLast((c) => !summarizing(c))!;
+        expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/u);
         expect(r.agent.history()[0]!.role).toBe("compactionSummary");
       },
       options,
@@ -337,7 +341,7 @@ describe("the agent", () => {
   effectIt.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
-      const move = Effect.runPromiseWith(yield* Effect.context<never>());
+      const move = Effect.runPromiseWith(yield* Effect.context());
       const scope = yield* Effect.scope;
       const dir = home();
       writeFileSync(
@@ -375,8 +379,8 @@ describe("the agent", () => {
       expect(r.agent.memoryNews()).toBe("");
       await r.ask(news + "\n\nb");
       expect(systemPrompt(r.requests[1]!)).toBe(systemPrompt(r.requests[0]!));
-      expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/);
-      expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/);
+      expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/u);
+      expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/u);
       expect(prefixChanges(r)).toEqual([]);
     });
   });
@@ -391,6 +395,7 @@ describe("the agent", () => {
         await r.ask("第 1 件事");
         remember(dir, "记在折叠之前", new Date());
         const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
+        // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
         for (let n = 2; n <= 5 && !folded(); n++) await r.ask(`第 ${n} 件事`);
         await whenTrue(folded, "the history folded");
         await r.ask("折叠之后");
@@ -496,6 +501,7 @@ describe("the agent", () => {
         undefined,
         () => answer("就地的摘要"),
         async (r, choices) => {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
           for (const words of ["一", "二", "三"]) await r.ask(words);
           expect(r.requests.length).toBe(3);
           await whenTrue(() => idleFolded(r), "idleFolded(r)");
@@ -518,6 +524,7 @@ describe("the agent", () => {
         undefined,
         () => answer([toolCall("list_dir", {})]),
         async (r) => {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await whenTrue(() => idleFolded(r), "idleFolded(r)");
           expect((r.agent.history()[0] as CompactionSummaryMessage).summary).toBe("另起的摘要");
@@ -535,6 +542,7 @@ describe("the agent", () => {
         },
         () => answer("摘要"),
         async (r) => {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await whenTrue(() => asked > 0, "asked > 0");
           await whenTrue(() => !r.agent.busy(), "!r.agent.busy()");

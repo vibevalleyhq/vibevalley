@@ -134,7 +134,7 @@ export function text(g: readonly AgentTask[]): string {
     let line = "- [" + mark + "] " + t.id + " " + t.title;
     if (t.by === "subagent") line += words.bySubagent;
     if (t.after.length > 0 && !settled(t)) line += words.waitingOn(t.after);
-    if (t.result) line += " → " + head(t.result.split(/\s+/).filter(Boolean).join(" "), 80);
+    if (t.result) line += " → " + head(t.result.split(/\s+/u).filter(Boolean).join(" "), 80);
     lines.push(line);
   }
   return lines.join("\n");

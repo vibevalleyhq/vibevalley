@@ -1,18 +1,21 @@
 import type { JSX } from "@solidjs/web";
 
 /** A state as a data attribute: present (empty) when on, absent when off. */
-export const flag = (on: boolean | undefined): "" | undefined => (on ? "" : undefined);
+export const flag = (on: boolean | undefined): "" | undefined => (on === true ? "" : undefined);
 
 /** Calls a handler given as a JSX prop: a function, or Solid's [handler, data] pair. */
-export function call<E extends Event>(handler: unknown, event: E) {
-  if (typeof handler === "function") (handler as (e: E) => void)(event);
-  else if (Array.isArray(handler) && typeof handler[0] === "function") (handler[0] as (d: unknown, e: E) => void)(handler[1], event);
+export function call(handler: unknown, event: Event) {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a JSX event prop: Solid's handler, or its [handler, data] pair
+  if (typeof handler === "function") (handler as (e: Event) => void)(event);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a JSX event prop: Solid's handler, or its [handler, data] pair
+  else if (Array.isArray(handler) && typeof handler[0] === "function") (handler[0] as (d: unknown, e: Event) => void)(handler[1], event);
 }
 
 /** A ref given as a JSX prop, and the component's own, both told of the element. */
 export function refs<T>(given: unknown, own: (el: T) => void) {
   return (el: T) => {
     own(el);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a JSX ref prop that is a function is Solid's ref callback
     if (typeof given === "function") (given as (el: T) => void)(el);
   };
 }

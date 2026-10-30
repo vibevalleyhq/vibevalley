@@ -1,7 +1,8 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
+
 import { splitChips } from "./chips";
-import { pickItems } from "./pick";
 import { plainText, withMentions } from "./markdown";
+import { pickItems } from "./pick";
 import { ToastStore } from "./toasts";
 
 // The toasts' timeouts run on fake timers, moved through rather than waited out.

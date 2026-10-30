@@ -1,10 +1,12 @@
 // What the agent reminded itself to do later, in reminders.json in its home. One missed while the agent was away runs once
 // when it is back, not once per miss. Cron is in the machine's time zone.
 
-import type { Tool } from "./core/loop.ts";
-import { Cron, Result, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { Cron, Result, Schema } from "effect";
+
+import type { Tool } from "./core/loop.ts";
 import { schemaTool } from "./core/tool.ts";
 import { reminders as reminderWords } from "./prompts.ts";
 
@@ -45,7 +47,7 @@ export function parseCron(expr: string): Cron.Cron {
 export function nextRun(reminder: Reminder): Date | undefined {
   const from = parseDate(reminder.lastRun || reminder.created) ?? new Date(0);
   if (reminder.at) return reminder.lastRun ? undefined : parseDate(reminder.at);
-  if (reminder.everyMinutes) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
+  if (reminder.everyMinutes != null && reminder.everyMinutes !== 0) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
   if (reminder.cron) {
     try {
       // Effect's Cron starts at the second after from.
@@ -70,7 +72,7 @@ const localeTime = (t: Date) => `${t.getFullYear()}/${t.getMonth() + 1}/${t.getD
 export function describeReminder(j: Reminder): string {
   const when = j.at
     ? localeTime(parseDate(j.at) ?? new Date(0)) + reminderWords.onceNote
-    : j.everyMinutes
+    : j.everyMinutes != null && j.everyMinutes !== 0
       ? reminderWords.everyNote(j.everyMinutes)
       : "cron " + j.cron;
   const next = nextRun(j);
@@ -83,11 +85,13 @@ export class Reminders {
   readonly tools: Tool[];
   private readonly file: string;
 
-  constructor(
-    private readonly home: string,
-    /** The brain's clock: when a reminder is due. */
-    private readonly now: () => number,
-  ) {
+  private readonly home: string;
+  /** The brain's clock: when a reminder is due. */
+  private readonly now: () => number;
+
+  constructor(home: string, now: () => number) {
+    this.home = home;
+    this.now = now;
     this.file = join(home, "reminders.json");
     this.tools = this.makeTools();
   }

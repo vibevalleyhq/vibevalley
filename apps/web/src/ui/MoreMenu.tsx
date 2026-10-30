@@ -1,5 +1,7 @@
-import { Menu } from "@vibevalley/base-ui";
 import { type ComponentProps, For, Show } from "solid-js";
+
+import { Menu } from "@vibevalley/base-ui";
+
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
@@ -59,10 +61,10 @@ export function MoreMenu(props: {
                     onClick={() => item.onSelect()}
                     class={[
                       "flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-sm outline-none data-highlighted:bg-hover",
-                      item.danger ? "text-berry" : "",
+                      item.danger === true ? "text-berry" : "",
                     ]}
                   >
-                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} class={item.danger ? "" : "text-muted"} />}</Show>
+                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} class={item.danger === true ? "" : "text-muted"} />}</Show>
                     {item.label}
                   </Menu.Item>
                 </>

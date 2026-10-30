@@ -1,9 +1,12 @@
 import { expect, test } from "vite-plus/test";
+
 import type { Session } from "@vibevalley/protocol";
-import { emptyWorkspaceState } from "@/core/core.ts";
-import { playOf, withStations } from "./play.ts";
-import { reduce } from "@/projection/reduce.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { emptyWorkspaceState } from "@/core/core.ts";
+import { reduce } from "@/projection/reduce.ts";
+
+import { playOf, withStations } from "./play.ts";
 
 const session = (id: string, project?: string): Session => ({
   id: sessionId(id),

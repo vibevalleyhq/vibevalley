@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { restartWhenIdle } from "./dev.ts";
 
 test("a restart waits until no helper is working, and goes at once when none is", async () => {

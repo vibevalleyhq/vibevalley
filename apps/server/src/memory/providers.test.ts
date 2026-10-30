@@ -1,15 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
+
+import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner as ownerActor } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
-import { Setting } from "@/setting/setting.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { whenTrue } from "@/testing/until.ts";
-import { owner as ownerActor } from "@/base/actor.ts";
+
 import { type BuildSource, type FinishedRun, foundText, type Found, Memories, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
 import { mergeRecalled, type RecalledLine, type Source, sourceError } from "./sources.ts";
@@ -27,7 +30,10 @@ class Fake {
   synced: FinishedRun[] = [];
   added: Note[] = [];
   forgot: string[] = [];
-  constructor(readonly name: string) {}
+  readonly name: string;
+  constructor(name: string) {
+    this.name = name;
+  }
   get can() {
     return { list: true, forget: !this.noForget, transcripts: false };
   }
@@ -225,7 +231,7 @@ describe("memory sources", () => {
       release();
       yield* Effect.promise(() => until(() => events.includes("old:stop")));
       expect(events).toEqual(["old:first", "old:stop", "new:third"]);
-      expect((yield* m.list("lab")).map((m) => m.text).sort()).toEqual(["first", "second", "third"]);
+      expect((yield* m.list("lab")).map((m) => m.text).toSorted()).toEqual(["first", "second", "third"]);
     }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => sourceOf(c.url === nowledgeOn.url ? old : fresh))));
   });
 
@@ -250,7 +256,7 @@ describe("memory sources", () => {
       old.forget = async (_, __, signal) => void (await read(signal));
       old.stop = async () => void (stopped = true);
       return Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         yield* save(nowledgeOn);
         const m = yield* Memories;
         const pending = runPromise(
@@ -285,7 +291,7 @@ describe("memory sources", () => {
         const local = got.ids.filter((id) => !id.includes(":"));
         expect([got.ids.length, local.length]).toEqual([recallCount, recallCount / 2]);
         const marked = (yield* m.list("lab")).filter((x) => x.recalled > 0 && !x.id.includes(":"));
-        expect(marked.map((x) => x.id).sort()).toEqual([...local].sort());
+        expect(marked.map((x) => x.id).toSorted()).toEqual([...local].toSorted());
       }),
     );
   });

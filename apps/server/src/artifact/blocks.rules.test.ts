@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
-import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
+
+import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { ordered, Page } from "./ops.ts";
 import { normal, plain, runeLen, sameText, splitAt } from "./spans.ts";
 import { bold, para, sample, span } from "./testing.ts";
@@ -78,7 +80,7 @@ describe("order keys", () => {
       const [at, a, b] = next(keys);
       keys.splice(at, 0, keyBetween(a, b));
     }
-    expect([...keys].sort()).toEqual(keys);
+    expect([...keys].toSorted()).toEqual(keys);
     if (name !== "same gap") expect(Math.max(...keys.map((k) => k.length))).toBeLessThanOrEqual(12);
   });
 
@@ -258,7 +260,7 @@ describe("ops", () => {
           block: block({ id: "", orderKey: "", type: "" as BlockType }),
           newBlock: block({ id: "", orderKey: "", type: "" as BlockType }),
         } as never).reason ?? "",
-      ).not.toMatch(/^不认识的改动/);
+      ).not.toMatch(/^不认识的改动/u);
   });
 
   it("code has no marks", () => {
@@ -295,7 +297,7 @@ const attrsText = (a: BlockAttrs) => {
   ] as const)
     if (v !== undefined) parts.push(`${name}=${v}`);
   if (a.width !== undefined) parts.push(`size=${a.width}x${a.height}`);
-  return parts.sort().join(",");
+  return parts.toSorted().join(",");
 };
 
 const spansText = (spans: readonly TextSpan[]) =>
@@ -303,10 +305,10 @@ const spansText = (spans: readonly TextSpan[]) =>
     .map(
       (s) =>
         JSON.stringify(s.t) +
-        (s.marks.bold ? "B" : "") +
-        (s.marks.italic ? "I" : "") +
-        (s.marks.code ? "C" : "") +
-        (s.marks.strike ? "S" : "") +
+        (s.marks.bold === true ? "B" : "") +
+        (s.marks.italic === true ? "I" : "") +
+        (s.marks.code === true ? "C" : "") +
+        (s.marks.strike === true ? "S" : "") +
         (s.marks.link !== undefined ? `L(${s.marks.link})` : ""),
     )
     .join("+");

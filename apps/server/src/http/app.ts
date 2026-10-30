@@ -2,22 +2,25 @@
 // run it on a free port.
 
 import { createServer } from "node:http";
+
 import { NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
+
 import type { ServerConfig } from "@/base/config.ts";
 import { handlers } from "@/handlers.ts";
 import { Lan } from "@/lan/lan.ts";
 import { type ServiceOptions, services } from "@/services.ts";
 import { Sessions } from "@/session/session.ts";
+
 import { api } from "./api.ts";
+import { artifactContent } from "./artifact.ts";
+import { attachments } from "./attachment.ts";
 import { mcpRoute } from "./mcp.ts";
+import { mossLine } from "./moss.ts";
 import { page } from "./page.ts";
 import { subscriptions } from "./rpc.ts";
-import { mossLine } from "./moss.ts";
 import { streams } from "./streams.ts";
-import { attachments } from "./attachment.ts";
-import { artifactContent } from "./artifact.ts";
 
 const routes = (config: ServerConfig["Service"]) =>
   Layer.mergeAll(

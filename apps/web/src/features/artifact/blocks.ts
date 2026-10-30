@@ -62,10 +62,10 @@ export function editSpans(old: readonly TextSpan[], text: string): TextSpan[] {
   const m = head.at(-1)?.marks;
   const marks: SpanMarks = m
     ? {
-        ...(m.bold ? { bold: m.bold } : {}),
-        ...(m.italic ? { italic: m.italic } : {}),
-        ...(m.code ? { code: m.code } : {}),
-        ...(m.strike ? { strike: m.strike } : {}),
+        ...(m.bold === true ? { bold: m.bold } : {}),
+        ...(m.italic === true ? { italic: m.italic } : {}),
+        ...(m.code === true ? { code: m.code } : {}),
+        ...(m.strike === true ? { strike: m.strike } : {}),
       }
     : {};
   return normalSpans([...head, { t: typed, marks }, ...tail]);
@@ -79,13 +79,13 @@ export const hasText = (type: string) => textTypes.has(type);
 
 /** A paragraph that starts with Markdown for another block: its type, its attrs, and how much of the start to drop. */
 export function markdownShortcut(text: string): { type: BlockType; attrs: BlockAttrs; strip: number } | undefined {
-  const heading = /^(#{1,3}) /.exec(text);
+  const heading = /^(#{1,3}) /u.exec(text);
   if (heading) return { type: "heading", attrs: { level: heading[1]!.length }, strip: heading[0].length };
-  const todo = /^\[( |x)?\] /.exec(text);
+  const todo = /^\[( |x)?\] /u.exec(text);
   if (todo) return { type: "todo", attrs: { checked: todo[1] === "x" }, strip: todo[0].length };
-  const bullet = /^[-*] /.exec(text);
+  const bullet = /^[-*] /u.exec(text);
   if (bullet) return { type: "bulleted", attrs: {}, strip: bullet[0].length };
-  const number = /^\d+[.)] /.exec(text);
+  const number = /^\d+[.)] /u.exec(text);
   if (number) return { type: "numbered", attrs: {}, strip: number[0].length };
   if (text.startsWith("> ")) return { type: "quote", attrs: {}, strip: 2 };
   if (text.startsWith("```")) return { type: "code", attrs: {}, strip: text.startsWith("``` ") ? 4 : 3 };

@@ -1,25 +1,25 @@
-import { t } from "@vibevalley/i18n";
 // The debug console: ` opens it over the farm, unless a field has the keys. It drives the farm by its real calls (open
 // the farm, stop or dismiss a helper, harvest) and the page's own clock and effects (which earn nothing), plays each
 // sound, and keeps the frames and side events it saw, to copy as JSON lines.
 
-import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
-import type { Session, StateFrame } from "@vibevalley/protocol";
 import { clockText } from "@vibevalley/engine/clock";
+import { t } from "@vibevalley/i18n";
+import type { Session, StateFrame } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
+import { createExternal } from "@/base/external";
+import { orchestratorMood, useCore, useFrames, rawFrame } from "@/base/frame";
 import { subscribeLive } from "@/base/live";
+import { ready, useQuery } from "@/base/query";
+import { aria } from "@/base/util";
 import { localEffects } from "@/farm/effects";
-import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
 import { clock, farm } from "@/farm/store";
 import { typing } from "@/farm/tools";
-import { aria } from "@/base/util";
-import { createExternal } from "@/base/external";
-import { orchestratorMood, useCore, useFrames } from "@/base/frame";
-import { ready, useQuery } from "@/base/query";
 import { toasts, ToastType } from "@/ui/pixel";
-import { rawFrame } from "@/base/frame";
+import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
 
 const keep = 2000;
 
@@ -108,7 +108,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const issueOf = (h: Session) => h.issue ?? h.id;
   const everyone = (action: "stop" | "dismiss") =>
     run(async () => {
-      for (const h of sessions()) await (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status.update({ id: issueOf(h), status: "canceled" }));
+      await Promise.all(
+        sessions().map((h) => (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status.update({ id: issueOf(h), status: "canceled" }))),
+      );
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
@@ -287,7 +289,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           }
         >
           <ol class="flex flex-col gap-0.5">
-            <For each={props.log.entries().slice(-200).reverse()} keyed={(e) => e.seq}>
+            <For each={props.log.entries().slice(-200).toReversed()} keyed={(e) => e.seq}>
               {(e) => (
                 <li data-testid="debug-frame" data-type={e().type} class="flex gap-2">
                   <span class="w-8 shrink-0 text-right text-ink-500">{e().seq}</span>

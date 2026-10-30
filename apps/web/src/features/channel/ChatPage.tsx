@@ -1,12 +1,30 @@
-import { Tabs } from "@/ui/Tabs";
-import { t } from "@vibevalley/i18n";
-import { tookText } from "@/base/format";
-import { Splitter, usePaneWidth } from "@/ui/Splitter";
-import type { IconName } from "@/ui/icons";
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type SessionView } from "@vibevalley/protocol";
+
+import { useAgent, useOrchestrators } from "@/base/agents";
 import { api, reasonOf } from "@/base/api";
+import { tookText } from "@/base/format";
+import { orchestratorMood, useCore } from "@/base/frame";
+import { ready, useAgents } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { Dialog } from "@/ui/Dialog";
+import { OrchestratorFace } from "@/ui/Face";
+import { Select } from "@/ui/Field";
+import { Icon } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
+import { Splitter, usePaneWidth } from "@/ui/Splitter";
+import { Tabs } from "@/ui/Tabs";
+import { toast } from "@/ui/toasts";
+
+import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
+import { Composer, FileDrop } from "./Composer";
+import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
+import { workbenchClock } from "./feed";
+import { MessageList } from "./MessageList";
 import {
   archivedOf,
   groupsOf,
@@ -22,26 +40,11 @@ import {
   channelOf,
   defaultOf,
 } from "./places";
-import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
 import { phaseDot, phaseText } from "./presence";
-import { unreadIn, unreadUnder } from "./unread";
-import { workbenchClock } from "./feed";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
-import { useRouter } from "@/base/router";
-import { orchestratorMood, useCore } from "@/base/frame";
-import { OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
-import { Composer, FileDrop } from "./Composer";
 import { switcher } from "./QuickSwitcher";
-import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
-import { ready, useAgents } from "@/base/query";
-import { useAgent, useOrchestrators } from "@/base/agents";
-import { toast } from "@/ui/toasts";
-import { Dialog } from "@/ui/Dialog";
-import { Select } from "@/ui/Field";
-import { MessageList } from "./MessageList";
 import { Jobs, Crons } from "./Tabs";
+import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
+import { unreadIn, unreadUnder } from "./unread";
 
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
@@ -61,7 +64,7 @@ function Chat() {
       router
         .path()
         .split("?")[0]!
-        .replace(/^\/chat\/?/, ""),
+        .replace(/^\/chat\/?/u, ""),
     ) || undefined;
   const chat = () => core()?.chat;
   const shown = createMemo(() => channelOf(chat(), id()));
@@ -95,7 +98,7 @@ function Chat() {
       <Show when={thread()}>
         {(shown) => (
           <div
-            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 starting:translate-x-full lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0"
+            class="absolute inset-0 z-20 flex border-l border-line bg-page transition-transform duration-180 lg:relative lg:z-auto lg:w-(--pane-w) lg:shrink-0 starting:translate-x-full"
             style={{ "--pane-w": `${threadWidth()}px` }}
           >
             <div class="hidden lg:block">
@@ -139,7 +142,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.default ? t("web.channel.defaultHint") : undefined}>
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
@@ -323,7 +326,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           <Icon name="search" size={16} />
         </button>
       </div>
-      <div class="scroll-fade-y flex-1 overflow-y-auto p-3">
+      <div class="flex-1 scroll-fade-y overflow-y-auto p-3">
         <button
           type="button"
           data-testid="switcher-open"
@@ -331,7 +334,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           class="mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2.5 text-left text-sm text-muted hover:bg-hover"
         >
           <span class="flex-1">{t("web.channel.switcher.open")}</span>
-          <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/.test(navigator.userAgent) })}</span>
+          <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/u.test(navigator.userAgent) })}</span>
         </button>
         <Section
           item="channels"
@@ -414,7 +417,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
  * first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();
-  const agents = () => [...ready(all, [])].sort((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
+  const agents = () => [...ready(all, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
   const open = (agent: string) =>
     api.channel.direct
       .create({ agent })
@@ -452,9 +455,9 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
 }
 
 function Section(props: { title: string; item: string; count: number; action?: JSX.Element; nested?: boolean; closed?: boolean; children: JSX.Element }) {
-  const [open, setOpen] = createSignal(untrack(() => !props.closed));
+  const [open, setOpen] = createSignal(untrack(() => props.closed !== true));
   return (
-    <section class={props.nested ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
+    <section class={props.nested === true ? "mt-1 mb-1" : "mb-4"} aria-label={props.title} data-testid="side-section" data-key={props.item}>
       <div class="flex items-center px-1 pb-1">
         <button
           type="button"
@@ -500,8 +503,8 @@ function ChannelRow(props: {
       data-notify={props.channel.notify ?? "all"}
       onClick={() => props.onClick?.()}
       aria-current={props.here ? "page" : undefined}
-      draggable={props.movable ? "true" : "false"}
-      title={props.movable ? t("web.channel.manage.drag") : undefined}
+      draggable={props.movable === true ? "true" : "false"}
+      title={props.movable === true ? t("web.channel.manage.drag") : undefined}
       onDragStart={(e) => {
         e.dataTransfer?.setData("text/plain", props.channel.id);
         untrack(() => props.onDragStart)?.();

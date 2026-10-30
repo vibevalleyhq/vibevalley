@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
+
 import { drift, escapesByArea, escapesIn, hotspots, mechanicalFiles, underTodaysNames } from "./readings.ts";
 
 const day = 86_400_000;

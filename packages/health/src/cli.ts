@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
+
 import { commits, firstTime, headTime, sources } from "./collect.ts";
 import { drift, type Escapes, escapesByArea, type Health, hotspots, underTodaysNames } from "./readings.ts";
 import { report } from "./report.ts";
@@ -16,6 +17,7 @@ const { values } = parseArgs({ options: { config: { type: "string" }, check: { t
 if (!values.config) throw new Error("--config <file>: the repository's Health (packages/health/README.md)");
 
 const configPath = resolve(values.config);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- --config names the repository's Health module, which exports one by default
 const health = ((await import(configPath)) as { default: Health }).default;
 const root = execRoot(dirname(configPath));
 const ratchetPath = resolve(root, health.ratchet);
@@ -23,12 +25,13 @@ const ratchetPath = resolve(root, health.ratchet);
 const now = headTime(root);
 const files = sources(root);
 const escapes = escapesByArea(files, health);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the ratchet is written by --write below
 const kept: Record<string, Escapes> = existsSync(ratchetPath) ? (JSON.parse(readFileSync(ratchetPath, "utf8")) as Record<string, Escapes>) : {};
 
-if (values.write) {
+if (values.write === true) {
   writeFileSync(ratchetPath, JSON.stringify(escapes, null, 2) + "\n");
   console.log(`health: kept the escape counts of ${Object.keys(escapes).length} areas in ${health.ratchet}`);
-} else if (values.check) {
+} else if (values.check === true) {
   const off = drift(kept, escapes);
   const tracked = new Set(files.map((f) => f.path));
   const stale = Object.keys(health.hotByDesign).filter((p) => !tracked.has(p));
@@ -44,7 +47,7 @@ if (values.write) {
 } else {
   const hot = hotspots(underTodaysNames(commits(root, now - 2 * health.days * 86_400_000)), files, now, health.days, health.counted);
   console.log(
-    values.json
+    values.json === true
       ? JSON.stringify({ now, hotspots: hot, escapes, kept }, null, 2)
       : report({
           now,

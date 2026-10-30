@@ -1,4 +1,3 @@
-import { recordOf } from "@/base/util";
 // The live captions of a call, from the conversational AI agent's messages on the RTC data
 // stream (the server starts it with data_channel 'datastream'). A message comes in chunks, `id|part|parts|base64`,
 // 1-based; put together and decoded, it is JSON with an `object`:
@@ -7,6 +6,8 @@ import { recordOf } from "@/base/util";
 //   message.interrupt        you talked over the orchestrator: its turn `turn_id` stops there
 //   message.state            the agent's state: idle, listening, thinking, speaking, silent
 // Every message of a turn carries the whole text so far, so a turn's caption is replaced, never appended to.
+
+import { recordOf } from "@/base/util";
 
 export type Speaker = "you" | "orchestrator";
 
@@ -135,9 +136,9 @@ export class LiveCaptions {
         return undefined;
       }
     }
-    const [id, index, total, data] = parts as [string, string, string, string];
-    const i = /^\d+$/.test(index) ? Number(index) : NaN;
-    const n = total === "???" ? undefined : /^\d+$/.test(total) ? Number(total) : NaN;
+    const [id = "", index = "", total = "", data = ""] = parts;
+    const i = /^\d+$/u.test(index) ? Number(index) : NaN;
+    const n = total === "???" ? undefined : /^\d+$/u.test(total) ? Number(total) : NaN;
     if (!(i >= 1) || (n !== undefined && (!(n >= 1) || i > n))) return undefined;
     let got = this.chunks.get(id);
     if (!got) this.chunks.set(id, (got = new Map<number, string>()));

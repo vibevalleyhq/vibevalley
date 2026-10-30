@@ -151,7 +151,6 @@
     "notMerged": "没合进去：{why}。计划分支 {branch} 留着",
     "mergeNotSaved": "计划分支已合进主分支，但完成状态没能保存：{why}",
     "merged": "计划「{title}」合进去了：{text}",
-    "unknownAction": "不认识 {action} 这个动作",
     "noStep": "计划里没有「{id}」这一步",
     "graphIs": "计划{state}",
     "notFailed": "「{title}」没有失败，不用重试",

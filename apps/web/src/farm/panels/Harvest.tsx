@@ -1,22 +1,24 @@
-import { t } from "@vibevalley/i18n";
 // The checklist's words are src/features/issue/overview.ts's.
 
 import { For, Match, Show, Switch } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import type { Changes, Session } from "@vibevalley/protocol";
+
 import { reasonOf } from "@/base/api";
+import { ago } from "@/base/format";
+import { useCore, useFrames } from "@/base/frame";
+import { ready, useAgents } from "@/base/query";
+import { useRouter } from "@/base/router";
+import { useNow } from "@/base/util";
 import { fire } from "@/farm/commands";
+import { commands } from "@/farm/frames";
 import { harvestedOf } from "@/farm/hud/readout";
 import { farm } from "@/farm/store";
 import { issueOf } from "@/farm/world/plots";
 import { changeKind, lineCounts, nothingChanged, issueTitle, useIssueChanges } from "@/features/issue";
-import { ago } from "@/base/format";
-import { useRouter } from "@/base/router";
-import { useNow } from "@/base/util";
-import { useCore, useFrames } from "@/base/frame";
-import { ready, useAgents } from "@/base/query";
 import { FarmSection, PxButton, SpriteIcon } from "@/ui/pixel";
-import { commands } from "@/farm/frames";
+
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";
 
 const xs = "text-[12px] text-bark-600";

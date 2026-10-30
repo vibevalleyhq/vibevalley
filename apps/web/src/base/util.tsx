@@ -1,11 +1,11 @@
-import { type Accessor, createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { type Accessor, createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 
 /** A ref that focuses its element once it is on the page: what React's autoFocus does on mount. */
-export function autofocus<T extends HTMLElement>() {
-  let el: T | undefined;
+export function autofocus() {
+  let el: HTMLElement | undefined;
   onSettled(() => el?.focus());
-  return (next: T) => {
+  return (next: HTMLElement) => {
     el = next;
   };
 }
@@ -42,6 +42,7 @@ export function useViewport(): Accessor<{ w: number; h: number }> {
 
 /** The value once it has stopped changing for `ms`: what is asked of the server while someone types. */
 export function createSettled<T>(value: Accessor<T>, ms = 250): Accessor<T> {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Solid reads a function as a compute; a T that is one goes through the setter's updater form below
   const [settled, setSettled] = createSignal<T>(untrack(value) as Exclude<T, Function>);
   createEffect(value, (v) => {
     const t = setTimeout(() => setSettled(() => v), ms);
@@ -60,7 +61,7 @@ export function useClickAway(open: Accessor<boolean>, close: () => void) {
   createEffect(open, (on) => {
     if (!on) return;
     const away = (e: PointerEvent) => {
-      if (box && !box.contains(e.target as Node)) close();
+      if (box && !(e.target instanceof Node && box.contains(e.target))) close();
     };
     document.addEventListener("pointerdown", away, true);
     return () => document.removeEventListener("pointerdown", away, true);

@@ -1,12 +1,15 @@
-import { t } from "@vibevalley/i18n";
 // /pair: another device joins the farm (连接到本机). The owner's QR code opens it with the code; the device names itself
 // and questions, the owner nods on the farm's computer, and the key the farm hands back is kept in a cookie.
 
 import { createSignal, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+
 import { api, reasonOf } from "@/base/api";
-import { deviceGuess, keyCookie } from "./device";
 import { Button } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
+
+import { deviceGuess, keyCookie } from "./device";
 
 export function PairPage() {
   const given = new URLSearchParams(location.search).get("c") ?? "";

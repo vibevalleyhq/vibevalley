@@ -1,41 +1,42 @@
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Scope, Semaphore, Stream } from "effect";
+
+import { selfTools } from "@vibevalley/agent/self";
+import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
+import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
-
-import { ownersLanguage } from "@/prompts.ts";
-
-import { agentPrompt, identityNote, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
-import { orchestrator } from "@/base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
-import { runtimeLabel } from "@/agent/seed.ts";
-import { nextRun } from "@/cron/when.ts";
-import { isOpen } from "@/task/graph.ts";
-import { graphText } from "@/task/prompts.ts";
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Scope, Semaphore, Stream } from "effect";
+
 import { Agents } from "@/agent/agent.ts";
-import { traitsOf } from "@/agent/prompts.ts";
-import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
-import { Llm } from "@vibevalley/ai/llm";
-import { localeMinute } from "@/base/time.ts";
-import { selfTools } from "@vibevalley/agent/self";
+import { traitsOf } from "@/agent/prompts.ts";
+import { runtimeLabel } from "@/agent/seed.ts";
+import { orchestrator } from "@/base/actor.ts";
 import { agentHome, projectsDir, ServerConfig } from "@/base/config.ts";
+import { localeMinute } from "@/base/time.ts";
 import { Channels, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
+import { Crons } from "@/cron/cron.ts";
+import { nextRun } from "@/cron/when.ts";
 import type { ApiError } from "@/errors.ts";
 import { Issues, type OrchestratorWork } from "@/issue/issue.ts";
 import { Notices, type Overdue } from "@/notice/notice.ts";
 import { Projects } from "@/project/project.ts";
+import { ownersLanguage } from "@/prompts.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
-import { Crons } from "@/cron/cron.ts";
-import type { Answer } from "./openai.ts";
 import { type AgentHost, Caller } from "@/session/host.ts";
 import { Sessions } from "@/session/session.ts";
 import { Setting } from "@/setting/setting.ts";
+import { isOpen } from "@/task/graph.ts";
+import { graphText } from "@/task/prompts.ts";
 import { Tasks } from "@/task/task.ts";
-import { Tools } from "@/tool/tool.ts";
 import { channelLine } from "@/tool/prompts.ts";
-import { deepseekModel, orchestratorModel } from "./model.ts";
+import { Tools } from "@/tool/tool.ts";
+
 import { intake, type Source } from "./intake.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import type { Answer } from "./openai.ts";
+import { agentPrompt, identityNote, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { orchestratorInboxLines, quotaText, situationDelta } from "./situation.ts";
 
 const keepEvents = 1000;
@@ -125,7 +126,7 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const service = yield* Llm;
-    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const forkHere = yield* FiberSet.makeRuntime();
     const scope = yield* Effect.scope;
 
     const toolsFor = (id: string) => (current: () => Route) =>
@@ -194,7 +195,7 @@ export const make = (options: OrchestratorOptions = {}) =>
                 quiet: (r) => r.quiet ?? false,
                 say: (r, text, runId) => chat.orchestratorSays(r.channel, text, runId, id),
                 // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
-                state: (s, r) => core.setOrchestrator(id, s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.channel : undefined),
+                state: (s, r) => core.setOrchestrator(id, s, r && (s === "thinking" || s === "speaking") && r.quiet !== true ? r.channel : undefined),
                 fresh: () => {
                   me.shown = "";
                 },
@@ -277,7 +278,7 @@ export const make = (options: OrchestratorOptions = {}) =>
           ...(i.agent ? { agent: i.agent } : {}),
           source: i.source,
           ...(i.issue ? { issue: i.issue } : {}),
-          ...(i.owner ? { owner: true } : {}),
+          ...(i.owner === true ? { owner: true } : {}),
         };
         const taken = yield* me.host.submit(
           (busy, memoryNews) =>
@@ -358,7 +359,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         let line = lineWords.issue(w.issue.title, w.issue.description, again, channel.name);
         const s = w.cron;
         if (s) {
-          const missed = w.by.missed ? lineWords.missed : "";
+          const missed = w.by.missed === true ? lineWords.missed : "";
           line = lineWords.cron(s.name, missed, s.text, channel.name, s.id);
         }
         // The issue's assignee is the orchestrator it is for; a cron that names none is its channel's orchestrator's.

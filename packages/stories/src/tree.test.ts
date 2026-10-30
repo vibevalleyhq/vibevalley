@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import type { Stories } from "./format";
 import { ancestors, compareTitles, entries, isOpen, treeOf, type Node } from "./tree";
 
@@ -11,7 +12,7 @@ const order = ["设计体系", "组件", "交互", "界面", "组件/工作台",
 
 test("titles go level by level, as ordered, the rest by name", () => {
   const titles = ["界面/工单/看板", "组件/像素/PxButton", "设计体系/令牌", "组件/工作台/Tag", "组件/工单/StatusMark", "组件/工作台/Button", "其他"];
-  expect([...titles].sort(compareTitles(order))).toEqual([
+  expect([...titles].toSorted(compareTitles(order))).toEqual([
     "设计体系/令牌",
     "组件/工作台/Button",
     "组件/工作台/Tag",

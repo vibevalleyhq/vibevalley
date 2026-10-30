@@ -1,21 +1,22 @@
+import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+
 import { Slider } from "@vibevalley/base-ui";
-import { Tabs } from "@/ui/Tabs";
 import { t } from "@vibevalley/i18n";
 
-import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import type { JSX } from "@solidjs/web";
-
-import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "@/ui/pixel/sound";
-import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./shelves";
 import { numberText } from "@/base/format";
+import { ready, useQuery } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
-import { ready, useQuery } from "@/base/query";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
-import { Segmented } from "@/ui/Segmented";
 import { Card, Quiet, Toggle } from "@/ui/layout";
+import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "@/ui/pixel/sound";
+import { Segmented } from "@/ui/Segmented";
+import { Tabs } from "@/ui/Tabs";
+
+import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./shelves";
 
 type Ground = "check" | "grass" | "night";
 const grounds: { value: Ground; label: string }[] = [
@@ -52,6 +53,7 @@ function Img(props: { p: Picture; scale: number }) {
 const usePictures = () =>
   useQuery(() => ({
     queryKey: ["pictures"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => picturesOf((await (await fetch("/pixel/sprites.json")).json()) as Parameters<typeof picturesOf>[0]),
     staleTime: Infinity,
   }));
@@ -309,7 +311,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
     return (f && playing() ? props.byName.get(f[frame() % f.length]!) : undefined) ?? props.picture;
   };
   const remake = () => remakeOf(props.picture);
-  const scales = () => [...new Set([1, 2, 4, 8, scale()])].sort((a, b) => a - b);
+  const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
     <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
       <div class="flex max-h-88 min-h-40 items-center justify-center overflow-auto rounded-md p-3" style={groundStyle(props.ground)}>
@@ -343,7 +345,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
         <Segmented
           label={t("web.catalog.zoom")}
           value={String(scale())}
-          options={scales().map((s) => ({ value: String(s), label: `${s < 1 ? s.toFixed(2).replace(/0$/, "") : numberText(s)}×` }))}
+          options={scales().map((s) => ({ value: String(s), label: `${s < 1 ? s.toFixed(2).replace(/0$/u, "") : numberText(s)}×` }))}
           onChange={(v) => setScale(Number(v))}
         />
         <Toggle label={t("web.catalog.marks")} checked={marks()} onChange={setMarks} />
@@ -429,6 +431,7 @@ function Cursors(props: { tabs: JSX.Element }) {
     queryKey: ["cursors"],
     queryFn: async () => {
       const r = await fetch("/cursors/cursors.json");
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
       return r.ok ? ((await r.json()) as Record<string, { hx: number; hy: number }>) : null;
     },
     staleTime: Infinity,
@@ -470,7 +473,7 @@ function CursorTile(props: { name: string; hx: number; hy: number; ground: Groun
   return (
     <div data-testid="cursor" data-key={props.name} class="flex flex-col items-center gap-1 p-1">
       <span class="flex h-16 w-full items-center justify-center rounded-md" style={groundStyle(props.ground)}>
-        <span class="relative" style={{ height: `${height}px`, width: `${natural() && k() ? natural()!.w * k()! : height}px` }}>
+        <span class="relative" style={{ height: `${height}px`, width: `${natural() && k() != null && k() !== 0 ? natural()!.w * k()! : height}px` }}>
           <img
             src={`/cursors/${props.name}@2x.png`}
             alt=""

@@ -1,12 +1,16 @@
-import { describe, expect, test } from "vite-plus/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { describe, expect, test } from "vite-plus/test";
+
 import { farmFraming } from "@vibevalley/protocol/host";
+
+import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
+
 import { frameVillage, villageCutAcross, villageCutDown } from "./framing";
 import { Level } from "./level";
-import { beds, cropOfBed } from "./plots";
 import { yardPlaces } from "./places";
-import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
+import { beds, cropOfBed } from "./plots";
 import { VillageWorld } from "./world";
 
 const assets = join(import.meta.dirname, "../../../public");
@@ -18,7 +22,7 @@ describe("the level", () => {
   test("is 384 by 256 with its nine plots, the places helpers walk to and the yard's spots", () => {
     expect([world.width, world.height]).toEqual([384, 256]);
     expect(farmFraming.picture).toEqual({ w: world.width, h: world.height });
-    expect([...world.plots.keys()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect([...world.plots.keys()].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
     expect(beds.map((b) => world.plotAt(b.index))).toHaveLength(9);
     expect(level.thingsOf("Place")).toHaveLength(4);
     expect(world.places.has("library")).toBe(true);

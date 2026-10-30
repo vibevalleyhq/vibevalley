@@ -1,8 +1,10 @@
 import { keepPreviousData } from "@tanstack/solid-query";
+
 import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+
 import { api } from "./api";
-import { createSettled } from "./util";
 import { ready, useAgents, useQuery } from "./query";
+import { createSettled } from "./util";
 
 /** The profiles work is sent to, the workers; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
@@ -16,7 +18,7 @@ export function useOrchestrators() {
   return (): Agent[] =>
     ready(all, [])
       .filter((a) => a.role === "orchestrator")
-      .sort((a, b) => (a.id === defaultOrchestrator ? -1 : b.id === defaultOrchestrator ? 1 : 0));
+      .toSorted((a, b) => (a.id === defaultOrchestrator ? -1 : b.id === defaultOrchestrator ? 1 : 0));
 }
 
 /** An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. */

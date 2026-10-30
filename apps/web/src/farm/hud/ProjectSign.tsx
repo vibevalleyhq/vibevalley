@@ -1,11 +1,13 @@
-import { t } from "@vibevalley/i18n";
 // The project sign by the mast: whose farm this is (every plot here is that project's); a click goes back to the
 // projects' map to enter another island.
 
 import { Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+
 import { useRouter } from "@/base/router";
-import { playSound } from "@/ui/pixel/sound";
 import { useFarm } from "@/farm/ui";
+import { playSound } from "@/ui/pixel/sound";
 
 /** Where the sign's post stands, in the village's pixels: on the grass right of the mast (village.ldtk: its top at 18, 73). */
 const signFoot = { x: 44, y: 104 };

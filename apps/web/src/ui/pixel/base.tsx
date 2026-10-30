@@ -1,5 +1,6 @@
-import { Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { Show } from "solid-js";
+
 import { pxText, pxWindow } from "./style";
 
 /** `border` draws a second edge inside the frame. `paper` is a bg-* class. */
@@ -14,7 +15,7 @@ export function PxWindow(props: {
   return (
     <div
       data-testid={props.testid}
-      class={[props.paper ?? "bg-cream-50", pxWindow, { "border-2 border-bark-500": !!props.border }, "text-bark-900", props.class]}
+      class={[props.paper ?? "bg-cream-50", pxWindow, { "border-2 border-bark-500": !(props.border !== true) }, "text-bark-900", props.class]}
       style={props.style}
     >
       {props.children}
@@ -48,9 +49,9 @@ export function DashedLine(props: { color?: string; thickness?: number; vertical
       aria-hidden="true"
       class={["shrink-0", props.class]}
       style={{
-        [props.vertical ? "width" : "height"]: `${thickness()}px`,
-        [props.vertical ? "height" : "width"]: "100%",
-        background: `repeating-linear-gradient(${props.vertical ? "to bottom" : "to right"}, ${color()} 0 ${thickness() * 2}px, transparent ${thickness() * 2}px ${thickness() * 4}px)`,
+        [props.vertical === true ? "width" : "height"]: `${thickness()}px`,
+        [props.vertical === true ? "height" : "width"]: "100%",
+        background: `repeating-linear-gradient(${props.vertical === true ? "to bottom" : "to right"}, ${color()} 0 ${thickness() * 2}px, transparent ${thickness() * 2}px ${thickness() * 4}px)`,
       }}
     />
   );

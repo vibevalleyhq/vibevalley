@@ -1,41 +1,40 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import type { EvalCase } from "./evals.ts";
-import { owner } from "@/base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
+import { Effect, Fiber, Layer } from "effect";
+
+import { messageText } from "@vibevalley/agent/messages";
+import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
 import type { Message } from "@vibevalley/ai/messages";
 import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
-import { Said } from "@/testing/said.ts";
-import { starter } from "@/testing/layers.ts";
-import { Effect, Fiber, Layer } from "effect";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+
 import { Agents } from "@/agent/agent.ts";
-import { messageText } from "@vibevalley/agent/messages";
-import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
+import { owner } from "@/base/actor.ts";
 import type { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
 import { Crons } from "@/cron/cron.ts";
+import { Issues } from "@/issue/issue.ts";
 import { Notices } from "@/notice/notice.ts";
 import { Sessions } from "@/session/session.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
-import { Orchestrator } from "./orchestrator.ts";
-import { deepseekModel, orchestratorModel } from "./model.ts";
-import { intake } from "./intake.ts";
+import { starter, testConfig } from "@/testing/layers.ts";
+import { Said } from "@/testing/said.ts";
 import { gate, untilGot as until, whenTrue, within } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
+
+import type { EvalCase } from "./evals.ts";
+import { intake } from "./intake.ts";
+import { deepseekModel, orchestratorModel } from "./model.ts";
+import { Orchestrator } from "./orchestrator.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
 const onPhone = (o: Orchestrator["Service"], text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
-const lastInput = (c: Request) =>
-  c.messages
-    .map(userText)
-    .filter((t): t is string => t !== undefined)
-    .at(-1) ?? "";
+const lastInput = (c: Request) => c.messages.map(userText).findLast((t) => t !== undefined) ?? "";
 const heads = ["【现在】", "【现状】", "【现状变了】", "【记性有更新】", "这期间群聊里的汇报"];
 /** An input without what the orchestrator puts before the words. */
 const words = (input: string) => {
@@ -57,7 +56,7 @@ const sinceAnswer = (c: Request) => {
     .join("\n");
 };
 
-const asked = /加个 (README|CHANGELOG)$/m;
+const asked = /加个 (README|CHANGELOG)$/mu;
 
 const respond = (c: Request): Answer => {
   const result = answeredWith(c);
@@ -119,7 +118,7 @@ describe("the orchestrator", () => {
     expect(deepseekModel("", "deepseek-flash")).toBe("deepseek-flash");
     expect(deepseekModel("deepseek/deepseek-v4-pro", "x")).toBe("deepseek-v4-pro");
     expect(deepseekModel("deepseek-v4-pro", "x")).toBe("deepseek-v4-pro");
-    expect(() => deepseekModel("anthropic/claude", "x")).toThrow(/只接 DeepSeek/);
+    expect(() => deepseekModel("anthropic/claude", "x")).toThrow(/只接 DeepSeek/u);
   });
 
   it.live("writes an issue down and starts it, and hears the owner's voice in the default channel", () => {
@@ -134,7 +133,7 @@ describe("the orchestrator", () => {
       yield* orchestrator.say("帮我在 demo 里加个 README", {}, undefined, "");
       expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，记下了"]);
       const first = f.requests[0]!;
-      expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【现状】[\s\S]*可以派的帮工：\n- /);
+      expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【现状】[\s\S]*可以派的帮工：\n- /u);
       expect(first.system).not.toContain("【现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
       const trail = yield* until(() => {
@@ -144,7 +143,7 @@ describe("the orchestrator", () => {
       const [ask, tool, result, answer] = trail.slice(-5, -1);
       expect(result).toMatchObject({ type: "tool/result", call: tool!.seq, ok: true });
       expect(ask!.type).toBe("user/message");
-      expect(ask!.text).toMatch(/^\[来源：主人\][\s\S]*加个 README/);
+      expect(ask!.text).toMatch(/^\[来源：主人\][\s\S]*加个 README/u);
       expect(tool).toMatchObject({ tool: "issue_create", text: "记一张工单：demo" });
       expect(tool!.input).toContain(`"project":"demo"`);
       expect(answer!.text).toBe("好，记下了");
@@ -227,8 +226,8 @@ describe("the orchestrator", () => {
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
       const kept = readFileSync(join(config.home, "agent", "orchestrator", "orchestrator.jsonl"), "utf8");
-      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/);
-      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/);
+      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/u);
+      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/u);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -244,7 +243,7 @@ describe("the orchestrator", () => {
         return out;
       });
       expect(got).toBe("收到\n");
-      expect(lastLine(f.requests.at(-1)!)).toMatch(/主人在电话里说的[\s\S]*主人说：现在地里怎么样/);
+      expect(lastLine(f.requests.at(-1)!)).toMatch(/主人在电话里说的[\s\S]*主人说：现在地里怎么样/u);
       expect(f.requests.length).toBe(1);
       const call = () =>
         saidIn(chat.defaultChannel())
@@ -354,7 +353,7 @@ describe("the orchestrator", () => {
       expect(first.length).toBe(1);
       expect(first[0]).toContain("只接 DeepSeek");
       const refusal = () => saidIn(chat.defaultChannel()).filter((m) => m.from === defaultOrchestrator);
-      expect((yield* until(() => refusal()[0], "the refusal in the default channel")).text).toMatch(/^我这边起不来：/);
+      expect((yield* until(() => refusal()[0], "the refusal in the default channel")).text).toMatch(/^我这边起不来：/u);
       expect((yield* pieces("还在吗")).length).toBe(1);
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
       yield* pieces("（标记）");
@@ -392,7 +391,7 @@ describe("the orchestrator", () => {
       yield* orchestrator.say("修一个 bug：登录闪退", { agent: lab.id, project: " notes " }, undefined, "");
       yield* until(() => words().length >= 1, "its words");
       expect(lastLine(f.requests[0]!)).toMatch(
-        new RegExp(`（主人在对话框里选定了帮工：${lab.name}）\n（主人选定了项目：notes，派活就派在这个项目里）\n主人说：修一个 bug：登录闪退$`),
+        new RegExp(`（主人在对话框里选定了帮工：${lab.name}）\n（主人选定了项目：notes，派活就派在这个项目里）\n主人说：修一个 bug：登录闪退$`, "u"),
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -428,7 +427,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const { in: saidIn } = yield* Said;
@@ -473,7 +472,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
@@ -560,14 +559,14 @@ describe("the orchestrator", () => {
       yield* enableLab;
       yield* orchestrator.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "done"), "the work handed back");
-      const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/;
+      const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/u;
       yield* notices.patrol;
       yield* marked(f);
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
       offset = 3 * 3_600_000;
       yield* notices.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
-      expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#general 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/);
+      expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#general 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/u);
       offset = 3.5 * 3_600_000;
       yield* notices.patrol;
       yield* marked(f);
@@ -594,7 +593,7 @@ describe("the orchestrator", () => {
         tools: string[];
       };
       // Written in session/host.ts, read as an EvalCase here: every field the reader expects is there.
-      expect(Object.keys(saved).sort()).toEqual(["before", "createdAt", "did", "expect", "id", "input", "memory", "model", "tools", "want"]);
+      expect(Object.keys(saved).toSorted()).toEqual(["before", "createdAt", "did", "expect", "id", "input", "memory", "model", "tools", "want"]);
       expect(saved.want).toBe("应该先看一眼地里");
       expect(saved.input.customType).toBe("orchestratorInput");
       expect(saved.did.map((m) => m.role)).toContain("assistant");

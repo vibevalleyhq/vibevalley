@@ -3,8 +3,9 @@
 // image's size in its title ("640x480"). Nesting is two spaces of indent per level. What the export writes, the import
 // reads back to the same blocks.
 
-import { issueId } from "@vibevalley/protocol/schema";
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
+
 import { ordered, textFor } from "./ops.ts";
 import { normal, plain, unmarked } from "./spans.ts";
 
@@ -56,7 +57,7 @@ function blockLine(b: Block, number: number): string {
     case "numbered":
       return `${number}. ${text}`;
     case "todo":
-      return (b.attrs.checked ? "- [x] " : "- [ ] ") + text;
+      return (b.attrs.checked === true ? "- [x] " : "- [ ] ") + text;
     case "quote":
       return "> " + text.replaceAll("\n", "\n> ");
     case "code":
@@ -86,20 +87,20 @@ const specials = "\\*_`~[]";
 const escape = (t: string) => Array.from(t, (c) => (specials.includes(c) ? "\\" + c : c)).join("");
 
 /** An ASCII letter or digit. */
-const wordy = (c: string | undefined) => c !== undefined && /^[A-Za-z0-9]$/.test(c);
+const wordy = (c: string | undefined) => c !== undefined && /^[A-Za-z0-9]$/u.test(c);
 
 function inlineOf(spans: readonly TextSpan[]): string {
   const all = normal(spans);
   return all
     .map((s, i) => {
-      let t = s.marks.code ? codeSpan(s.t) : escape(s.t);
-      if (s.marks.italic) {
+      let t = s.marks.code === true ? codeSpan(s.t) : escape(s.t);
+      if (s.marks.italic === true) {
         // Against a letter or digit an underscore would read as part of a word: a star does not.
         const mark = (i > 0 && wordy(Array.from(all[i - 1]!.t).at(-1))) || (i + 1 < all.length && wordy(Array.from(all[i + 1]!.t)[0])) ? "*" : "_";
         t = mark + t + mark;
       }
-      if (s.marks.bold) t = "**" + t + "**";
-      if (s.marks.strike) t = "~~" + t + "~~";
+      if (s.marks.bold === true) t = "**" + t + "**";
+      if (s.marks.strike === true) t = "~~" + t + "~~";
       if (s.marks.link !== undefined) t = "[" + t + "](" + s.marks.link + ")";
       return t;
     })
@@ -108,17 +109,17 @@ function inlineOf(spans: readonly TextSpan[]): string {
 
 const codeSpan = (t: string) => (t.includes("`") ? "`` " + t + " ``" : "`" + t + "`");
 
-const headingLine = /^(#{1,3}) (.*)$/s;
-const todoLine = /^[-*+] \[( |x|X)\] ?(.*)$/s;
-const bulletLine = /^[-*+] (.*)$/s;
-const numberLine = /^\d+[.)] (.*)$/s;
-const dividerLine = /^(-{3,}|\*{3,}|_{3,})$/;
-const imageLine = /^!\[((?:\\.|[^\]])*)\]\(([^)\s]*)(?: "(\d+)x(\d+)")?\)$/s;
-const issueLine = /^<!-- issue:(\S+) -->$/;
-const memoryLine = /^<!-- memory:(\S+) -->(?: (.*))?$/s;
-const fenceLine = /^```(\S*)$/;
-const quoteLine = /^> ?(.*)$/s;
-const indentOf = (s: string) => /^ */.exec(s)![0].length;
+const headingLine = /^(#{1,3}) (.*)$/su;
+const todoLine = /^[-*+] \[( |x|X)\] ?(.*)$/su;
+const bulletLine = /^[-*+] (.*)$/su;
+const numberLine = /^\d+[.)] (.*)$/su;
+const dividerLine = /^(-{3,}|\*{3,}|_{3,})$/u;
+const imageLine = /^!\[((?:\\.|[^\]])*)\]\(([^)\s]*)(?: "(\d+)x(\d+)")?\)$/su;
+const issueLine = /^<!-- issue:(\S+) -->$/u;
+const memoryLine = /^<!-- memory:(\S+) -->(?: (.*))?$/su;
+const fenceLine = /^```(\S*)$/u;
+const quoteLine = /^> ?(.*)$/su;
+const indentOf = (s: string) => /^ */u.exec(s)![0].length;
 
 /** One line (its indent taken off) read as the start of a block; the text is still Markdown. */
 interface LineKind {
@@ -163,7 +164,7 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
     const spaces = indentOf(raw);
     const depth = Math.min(Math.floor(spaces / 2), open);
     const line = raw.slice(spaces);
-    const strip = (l: string): [string, boolean] => (indentOf(l) < spaces ? [l.replace(/^ +/, ""), false] : [l.slice(spaces), true]);
+    const strip = (l: string): [string, boolean] => (indentOf(l) < spaces ? [l.replace(/^ +/u, ""), false] : [l.slice(spaces), true]);
     const k = classify(line);
     if (k.type === "code") {
       const body: string[] = [];

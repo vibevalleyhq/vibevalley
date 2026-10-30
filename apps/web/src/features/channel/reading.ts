@@ -1,8 +1,11 @@
 // The chat page's reads beyond the channels it follows (features/channel/follow.ts).
 
 import { type Accessor, createEffect, createSignal } from "solid-js";
+
 import type { Channel } from "@vibevalley/protocol";
+
 import { api } from "@/base/api";
+
 import { newestUnread } from "./unread";
 // Channels the owner marked unread while looking at them: they stay unread until the owner leaves and comes back.
 const [held, setHeld] = createSignal<ReadonlySet<string>>(new Set());
@@ -30,8 +33,11 @@ export function useMarkRead(channel: Accessor<Channel | undefined>) {
     },
     (read) => {
       if (!read) return;
-      const [id, number] = JSON.parse(read) as [string, number];
-      api.channel.markRead({ id, number }).catch(() => {});
+      const parsed: unknown = JSON.parse(read);
+      if (!Array.isArray(parsed)) return;
+      const id: unknown = parsed[0];
+      const number: unknown = parsed[1];
+      if (typeof id === "string" && typeof number === "number") api.channel.markRead({ id, number }).catch(() => {});
     },
   );
 }

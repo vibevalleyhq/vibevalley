@@ -1,6 +1,8 @@
 import { maybe, t } from "@vibevalley/i18n";
-import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
 import type { Issue, IssueTemplate, ProjectStack, TemplateBlank, TemplateKind } from "@vibevalley/protocol";
+
+import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
+
 import { isForOrchestrator } from "./status.ts";
 const recentTitles = 5;
 
@@ -19,10 +21,10 @@ export function sentTitles(all: readonly Issue[], project: string, orchestrator:
         i.cron === undefined &&
         !isForOrchestrator(i, orchestrator),
     )
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .toSorted((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];
   for (const i of mine) {
-    const title = i.title.split(/\s+/).filter(Boolean).join(" ");
+    const title = i.title.split(/\s+/u).filter(Boolean).join(" ");
     if (!title || [...title].length > recentTitleLength || out.includes(title)) continue;
     out.push(title);
     if (out.length === recentTitles) break;
@@ -30,7 +32,7 @@ export function sentTitles(all: readonly Issue[], project: string, orchestrator:
   return out;
 }
 
-const commandHoles = /\s?\{(test|lint|build)\}\s?/g;
+const commandHoles = /\s?\{(test|lint|build)\}\s?/gu;
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
 export function filledTemplate(s: WrittenTemplate, stack: Partial<ProjectStack>): IssueTemplate {
@@ -47,6 +49,6 @@ export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<Projec
   kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): TemplateBlank | undefined {
-  const m = /〔[^〕]*〕/.exec(text);
+  const m = /〔[^〕]*〕/u.exec(text);
   return m ? { start: m.index, end: m.index + m[0].length } : undefined;
 }

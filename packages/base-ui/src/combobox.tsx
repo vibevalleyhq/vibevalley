@@ -5,11 +5,12 @@
 
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
+
+import { createControllable } from "./internal/controllable";
 import { createDismiss } from "./internal/dismiss";
+import { call, type DivProps, flag, refs } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 import { itemsIn } from "./internal/roving";
-import { call, type DivProps, flag, refs } from "./internal/element";
-import { createControllable } from "./internal/controllable";
 
 export type ComboboxOpenChangeReason = "input" | "item" | "escape" | "outside" | "tab";
 
@@ -48,7 +49,7 @@ function Root(props: ComboboxRootProps) {
   const f = createFloating<ComboboxOpenChangeReason>(
     {
       get open() {
-        return props.inline ? true : props.open;
+        return props.inline === true ? true : props.open;
       },
       get defaultOpen() {
         return props.defaultOpen;
@@ -105,15 +106,15 @@ function Root(props: ComboboxRootProps) {
   };
   // After the options have changed: the first, if the highlighted one is gone.
   const keepHighlight = () => {
-    if (!props.autoHighlight) return;
+    if (props.autoHighlight !== true) return;
     queueMicrotask(() => {
       const h = highlighted();
       const l = list();
-      if (h?.isConnected && l?.contains(h)) return;
+      if (h?.isConnected === true && l?.contains(h) === true) return;
       ctx.highlight(l ? itemsIn(l, option)[0] : undefined);
     });
   };
-  createDismiss({ open: () => !props.inline && f.open(), elements: () => [f.trigger(), f.positioner()], dismiss: (why) => ctx.setOpen(false, why) });
+  createDismiss({ open: () => props.inline !== true && f.open(), elements: () => [f.trigger(), f.positioner()], dismiss: (why) => ctx.setOpen(false, why) });
   return <Context value={ctx}>{props.children}</Context>;
 }
 
@@ -224,17 +225,17 @@ function Item(props: ComboboxItemProps) {
       ref={refs(props.ref, setEl)}
       id={id}
       aria-selected={selected() ? "true" : "false"}
-      aria-disabled={props.disabled ? "true" : undefined}
+      aria-disabled={props.disabled === true ? "true" : undefined}
       data-value={props.value}
       data-selected={flag(selected())}
       data-highlighted={flag(highlighted())}
       data-disabled={flag(props.disabled)}
       onPointerMove={(e) => {
         call(props.onPointerMove, e);
-        if (!props.disabled && !highlighted()) c.highlight(e.currentTarget);
+        if (props.disabled !== true && !highlighted()) c.highlight(e.currentTarget);
       }}
       onClick={(e) => {
-        if (props.disabled) return;
+        if (props.disabled === true) return;
         call(props.onClick, e);
         if (!e.defaultPrevented) c.pick(props.value, props.label ?? e.currentTarget.textContent);
       }}

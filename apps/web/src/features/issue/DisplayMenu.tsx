@@ -1,10 +1,12 @@
-import { t } from "@vibevalley/i18n";
+import { Show } from "solid-js";
 
 import { Popover } from "@vibevalley/base-ui";
-import { Show } from "solid-js";
-import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
+import { t } from "@vibevalley/i18n";
+
 import { Button } from "@/ui/Button";
 import { Segmented } from "@/ui/Segmented";
+
+import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 
 /** 显示: a small panel under its button with how the list groups and how both views order. */
 export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) => void }) {

@@ -1,9 +1,12 @@
-import { maybe } from "@vibevalley/i18n";
 // What a run recalls, with no model: the server picks at the start of each
 // turn, and the agent page shows the same pick ahead of time. Characters are UTF-16 units.
 
-import { recallWords } from "./prompts.ts";
+import { maybe } from "@vibevalley/i18n";
 import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";
+
+import { compare, or } from "@/base/order.ts";
+
+import { recallWords } from "./prompts.ts";
 import { termsInCommon, termsOf } from "./terms.ts";
 
 export const recallCount = 8;
@@ -29,7 +32,7 @@ const recallSharedWeight = 0.5;
 
 /** Another project's note only when it plainly shares the turn's words; another project's job never. */
 export function relevance(m: Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
-  if (cue.skip?.has(m.id) || (m.session !== undefined && m.session === cue.session)) return undefined;
+  if (cue.skip?.has(m.id) === true || (m.session !== undefined && m.session === cue.session)) return undefined;
   const shared = termsInCommon(termsOf(m.text), terms);
   const here = m.project !== undefined && m.project === cue.project;
   const everywhere = m.project === undefined;
@@ -50,8 +53,6 @@ export function lineOf(m: Memory, project: string): string {
   return m.kind === "issue" ? w.issue(where, m.text) : w.note(where, m.text);
 }
 
-const compare = (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0);
-
 export function pick(memories: readonly Memory[], cue: PickCue): Memory[] {
   const terms = termsOf(cue.text);
   const ranked: { m: Memory; score: number }[] = [];
@@ -59,7 +60,7 @@ export function pick(memories: readonly Memory[], cue: PickCue): Memory[] {
     const score = relevance(m, cue, terms);
     if (score !== undefined) ranked.push({ m, score });
   }
-  ranked.sort((a, b) => compare(b.score, a.score) || compare(b.m.at, a.m.at));
+  ranked.sort((a, b) => or(compare(b.score, a.score), compare(b.m.at, a.m.at)));
   const picked: Memory[] = [];
   let chars = 0;
   let jobs = 0;
@@ -80,7 +81,7 @@ export function nextForgotten(memories: readonly Memory[], coming: number): stri
   if (over <= 0) return [];
   const used = (m: Memory) => m.recalledAt ?? m.at;
   return [...memories]
-    .sort((a, b) => compare(used(a), used(b)))
+    .toSorted((a, b) => compare(used(a), used(b)))
     .slice(0, over)
     .map((m) => m.id);
 }
@@ -94,7 +95,7 @@ const noteLine =
 
 /** s on one line (each run of white space one space, trimmed), at most max units with the ellipsis. */
 export const clip = (s: string, max: number) => {
-  const flat = s.replace(/\s+/g, " ").trim();
+  const flat = s.replace(/\s+/gu, " ").trim();
   return flat.length > max ? flat.slice(0, max - 1) + "…" : flat;
 };
 
@@ -176,7 +177,7 @@ export function search(memories: readonly Memory[], q: SearchQuery, matches: Rea
     if (q.project !== "" && m.project !== undefined) score += 0.5;
     out.push({ ...m, source: localName, score, scope });
   }
-  out.sort((a, b) => compare(b.score, a.score) || compare(b.at, a.at));
+  out.sort((a, b) => or(compare(b.score, a.score), compare(b.at, a.at)));
   return out.slice(0, limit);
 }
 

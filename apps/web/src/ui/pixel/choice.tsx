@@ -1,10 +1,12 @@
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
-import { type PickOption, pickItems } from "./pick";
-import { pxDrop, pxFocus, pxRing, pxText } from "./style";
+
 import { aria } from "@/base/util";
+
 import { PxWindow } from "./base";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
+import { type PickOption, pickItems } from "./pick";
+import { pxDrop, pxFocus, pxRing, pxText } from "./style";
 
 export interface SegmentOption<T> {
   value: T;
@@ -71,7 +73,7 @@ export function PxPick(props: {
   createEffect(open, (on) => {
     if (!on) return;
     const away = (e: PointerEvent) => {
-      if (!wrap.contains(e.target as Node)) setOpen(false);
+      if (!(e.target instanceof Node && wrap.contains(e.target))) setOpen(false);
     };
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
@@ -100,7 +102,7 @@ export function PxPick(props: {
         aria-controls={open() ? listId : undefined}
         aria-activedescendant={open() ? `${listId}-${highlight()}` : undefined}
         onClick={() => (open() ? setOpen(false) : show())}
-        onBlur={(e) => !wrap.contains(e.relatedTarget as Node | null) && setOpen(false)}
+        onBlur={(e) => !wrap.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null) && setOpen(false)}
         onKeyDown={(e) => {
           const n = items().length;
           if (!open()) {
@@ -131,7 +133,7 @@ export function PxPick(props: {
         <SpriteIcon name="button-next" size={12} class="rotate-90" />
       </button>
       <Show when={open()}>
-        <PxWindow class="absolute top-full left-0 z-30 mt-1.5 min-w-full origin-top p-1 transition-[opacity,scale] duration-100 starting:scale-95 starting:opacity-0 motion-reduce:transition-none">
+        <PxWindow class="absolute top-full left-0 z-30 mt-1.5 min-w-full origin-top p-1 transition-[opacity,scale] duration-100 motion-reduce:transition-none starting:scale-95 starting:opacity-0">
           <ul id={listId} role="listbox" aria-label={props.label} class="max-h-[50vh] overflow-y-auto">
             <For each={items()}>
               {(o, i) => (

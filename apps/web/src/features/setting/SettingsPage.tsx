@@ -1,20 +1,23 @@
-import { t } from "@vibevalley/i18n";
 // 设置: a search over it, then its sections in groups on the left, each an icon and a name with its own address, so a
 // link lands on it; the chosen one on the right, as groups of rows (ui/settings.tsx). The search keeps the sections
 // whose name or words hold it, and lights the rows that do.
 
-import { Splitter, usePaneWidth } from "@/ui/Splitter";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
-import type { IconName } from "@/ui/icons";
-import { SkillsPage } from "@/features/runtime";
-import { LanPage } from "@/features/lan";
+
+import { t } from "@vibevalley/i18n";
+
+import { matches } from "@/base/search";
 import { ConnectorsPage } from "@/features/connector";
+import { LanPage } from "@/features/lan";
+import { SkillsPage } from "@/features/runtime";
 import { MossPlayground, VoiceForm } from "@/features/voice";
 import { A, Navigate } from "@/ui/A";
-import { Icon } from "@/ui/Icon";
 import { TextInput } from "@/ui/Field";
-import { matches } from "@/base/search";
+import { Icon } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
 import { SettingsPage as Page, SettingsSearch } from "@/ui/settings";
+import { Splitter, usePaneWidth } from "@/ui/Splitter";
+
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
@@ -105,7 +108,7 @@ export function SettingsPage(props: { rest: string }) {
                 )}
               </For>
             </nav>
-            <div class="scroll-fade-y min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
+            <div class="min-h-0 min-w-0 flex-1 scroll-fade-y overflow-y-auto p-5">
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />

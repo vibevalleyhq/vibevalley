@@ -1,4 +1,5 @@
 import { expect, it } from "vite-plus/test";
+
 import { usageText } from "./usage.ts";
 it("words a model answer's tokens", () => {
   expect(usageText({ input: 1_000, cacheRead: 1_000, output: 1_234_567 }, ["memory", "tools"])).toBe(

@@ -1,11 +1,12 @@
 // A task graph is issues: the graph's own and one per step.
 
 import type { WorkspaceState, Issue, TaskGraph, GraphState, Task, IssueId } from "@vibevalley/protocol";
-import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
-import { compare, compareText, or } from "@/base/order.ts";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
 import { issueId } from "@vibevalley/protocol/schema";
+
+import { compare, compareText, or } from "@/base/order.ts";
+
+import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
 export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   const g = parent.graph!;
   const graph: TaskGraph = omitUndefined({
@@ -21,7 +22,9 @@ export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
     tasks: [],
     ...graphView(),
   });
-  const steps = issues.filter((t) => t.parent === parent.id && t.task).sort((a, b) => or(compare(a.rank ?? 0, b.rank ?? 0), compareText(a.id, b.id)));
+  const steps = issues
+    .filter((t) => t.parent === parent.id && t.task !== undefined)
+    .toSorted((a, b) => or(compare(a.rank ?? 0, b.rank ?? 0), compareText(a.id, b.id)));
   for (const t of steps) {
     const s = t.task!;
     graph.tasks.push(
@@ -64,7 +67,7 @@ export function graphsOf(state: WorkspaceState): TaskGraph[] {
   return issues
     .filter((t) => t.graph)
     .map((t) => graphFrom(t, issues))
-    .sort((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
+    .toSorted((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
 }
 
 export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
@@ -141,7 +144,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
 
 export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
   const issues = state.issues;
-  const item = issues.find((issue) => issue.id === id && issue.graph);
+  const item = issues.find((issue) => issue.id === id && issue.graph !== undefined);
   return item ? graphFrom(item, issues) : undefined;
 }
 

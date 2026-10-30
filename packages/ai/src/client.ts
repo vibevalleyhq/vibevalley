@@ -1,6 +1,7 @@
 // A model to talk to: the model, the service that carries the request, and the key, asked for at each request.
 
 import type { Effect } from "effect";
+
 import type { Llm } from "./llm.ts";
 import type { AssistantMessage, Context } from "./messages.ts";
 import { getModel, type Model, models } from "./models.ts";

@@ -1,9 +1,12 @@
+import { Show } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 import type { ArtifactBody, ArtifactCard as Card } from "@vibevalley/protocol";
-import { Show } from "solid-js";
+
 import { A } from "@/ui/A";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
+
 import { artifactHref } from "./queries";
 
 export const bodyLabel: Record<ArtifactBody, string> = { blocks: t("web.artifact.body.blocks"), html: t("web.artifact.body.html") };

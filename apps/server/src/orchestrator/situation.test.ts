@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import { orchestratorInboxLines, situationDelta } from "./situation.ts";
+
 import { intake } from "./intake.ts";
 import { patrolText } from "./prompts.ts";
+import { orchestratorInboxLines, situationDelta } from "./situation.ts";
 
 describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
@@ -45,7 +46,7 @@ describe("the orchestrator's rules", () => {
   });
 
   it("give every source its head", () => {
-    for (const s of Object.values(intake)) expect(s.head).toMatch(/^\[来源：.+\]/);
+    for (const s of Object.values(intake)) expect(s.head).toMatch(/^\[来源：.+\]/u);
   });
 
   it("word the patrol's finds", () => {

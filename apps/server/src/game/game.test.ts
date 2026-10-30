@@ -1,20 +1,24 @@
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { Repo, Session } from "@vibevalley/protocol";
-import { sessionOf } from "@/session/roster.ts";
-import { playOf } from "./play.ts";
 import { Deferred, Effect, Layer } from "effect";
-import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
+
+import type { Repo, Session } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { Core } from "@/core/core.ts";
 import { Projects } from "@/project/project.ts";
+import { sessionOf } from "@/session/roster.ts";
 import { gitSync, repo } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
-import { Game, start as gameStart } from "./game.ts";
 import { waitFor as until } from "@/testing/until.ts";
+import { world } from "@/testing/world.ts";
+
 import * as q from "../../db/generated/game_ledger.sql.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { Game, start as gameStart } from "./game.ts";
+import { playOf } from "./play.ts";
 
 const farm = (config = testConfig()) => Game.layer.pipe(Layer.provideMerge(world({ config })));
 
@@ -82,7 +86,7 @@ describe("the game", () => {
       // The game hears the owner from its start: Core.owner is subscribed before the game's layer is built.
       yield* core.did({ kind: "reviewed", session: sessionId("w1") });
       yield* core.did({ kind: "talked" });
-      yield* until(kinds, (k) => [...k].sort().join() === "reviewed,voice", "both");
+      yield* until(kinds, (k) => [...k].toSorted().join() === "reviewed,voice", "both");
     }).pipe(Effect.scoped, Effect.provide(farm())),
   );
 
@@ -100,7 +104,7 @@ describe("the game", () => {
       // The worktree is not a second repository; 3 + 1 on the worktree branch in app, 1 in cli; the colleague's 2 do not count.
       expect(count.repos.length).toBe(2);
       expect(count.total).toBe(5);
-      expect(count.repos.map((r) => r.commits).sort((a, b) => a - b)).toEqual([1, 4]);
+      expect(count.repos.map((r) => r.commits).toSorted((a, b) => a - b)).toEqual([1, 4]);
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 

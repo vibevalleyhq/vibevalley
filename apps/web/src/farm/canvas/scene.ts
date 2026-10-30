@@ -4,6 +4,8 @@
 // yard's own life (life.ts). What it shows comes from the server's folded state; the scene only adds what moves with
 // the clock, and keeps only that (walkers, animation clocks, particles) in its own objects.
 
+import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
+
 import {
   flatLight,
   frameAt,
@@ -21,11 +23,11 @@ import {
   type Sky,
 } from "@vibevalley/engine/pixi";
 import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
-import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
-import { castPrefix } from "@/ui/cast";
-import { playSound } from "@/ui/pixel/sound";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { orchestratorMood } from "@/base/frame";
+import { prefsNow } from "@/base/prefs";
 import { clock, farmState } from "@/farm/store";
-import { orchestratorSprite } from "@/features/orchestrator";
 import { frameVillage } from "@/farm/world/framing";
 import { villageHitAt, type VillageHit } from "@/farm/world/hits";
 import type { Box, Point } from "@/farm/world/level";
@@ -45,13 +47,14 @@ import {
   type Pose,
   type Stroll,
 } from "@/farm/world/world";
+import { orchestratorSprite } from "@/features/orchestrator";
+import { castPrefix } from "@/ui/cast";
+import { playSound } from "@/ui/pixel/sound";
+
 import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
-import { orchestratorMood } from "@/base/frame";
-import { prefsNow } from "@/base/prefs";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
 const walkSpeed = 42;
@@ -551,7 +554,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const counts = new Map<string, number>();
     const crowd = (key: string) => counts.get(key) ?? 0;
     let queued = 0;
-    for (const s of [...state.sessions].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    for (const s of [...state.sessions].toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
       const station = stationOfSession(s);
       const crop = cropOf(s);
       const pose = poseOf(s, crop);
@@ -664,7 +667,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       fall(a.footing, { x: 0, y: 0 }, lean, a.node.alpha);
       const shine = night > lanternDark ? ((night - lanternDark) / (1 - lanternDark)) * a.node.alpha : 0;
       a.lantern.visible = shine > 0;
-      if (!shine) continue;
+      if (shine === 0) continue;
       const side = a.walker.facing === "left" ? -5 : 5;
       a.lantern.position.set(a.node.x + side - 1, a.node.y - 12);
       lights.push({ x: a.node.x + side, y: a.node.y - 11, z: 10, radius: 34, color: lanternColor, intensity: 0.6 * shine });
@@ -713,7 +716,9 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
 
 /** Lights a sprite up while the pointer is on what it opens; filters are only swapped when that changes. */
 function glow(sprite: Sprite, on: boolean) {
-  const lit = sprite.filters && (sprite.filters as readonly unknown[]).length > 0;
+  // Pixi gives undefined for a sprite that never had filters, whatever its type says.
+  const filters: readonly unknown[] | undefined = sprite.filters;
+  const lit = filters !== undefined && filters.length > 0;
   if (on !== lit) sprite.filters = on ? [brighter] : [];
 }
 
@@ -722,7 +727,7 @@ brighter.brightness(1.25, false);
 
 /** `rows` taller (shorter when negative) with its feet where they are: one row shows twice (or once less). */
 function rise(sprite: Sprite, rows: number) {
-  const h = sprite.texture.height || 1;
+  const h = sprite.texture.height > 0 ? sprite.texture.height : 1;
   sprite.scale.y = 1 + rows / h;
 }
 

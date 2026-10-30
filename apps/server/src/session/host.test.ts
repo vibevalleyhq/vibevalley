@@ -1,12 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Stream } from "effect";
+
+import { scriptedLLM } from "@vibevalley/agent/testing";
+import { answer, text, toolCall } from "@vibevalley/ai/testing";
+
 import { testConfig } from "@/testing/layers.ts";
 import { aTurn, until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
-import { scriptedLLM } from "@vibevalley/agent/testing";
-import { answer, text, toolCall } from "@vibevalley/ai/testing";
-import { Sessions } from "./session.ts";
+
 import { Caller } from "./host.ts";
+import { Sessions } from "./session.ts";
 describe("Caller", () => {
   it.effect("keeps what came before its reader, then streams until it ends", () =>
     Effect.gen(function* () {

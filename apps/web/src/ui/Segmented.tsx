@@ -1,5 +1,6 @@
-import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 import { createEffect, createSignal, For, Show } from "solid-js";
+
+import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
 interface Place {
   readonly x: number;
@@ -48,11 +49,14 @@ export function Segmented<T extends string>(props: {
       ref={setTrack}
       value={[props.value]}
       // Pressing the taken choice again would leave none: one is always taken.
-      onValueChange={(v) => v[0] !== undefined && props.onChange(v[0] as T)}
+      onValueChange={(v) => {
+        const option = props.options.find((o) => o.value === v[0]);
+        if (option) props.onChange(option.value);
+      }}
       aria-label={props.label}
       data-testid={props.testid}
       // w-fit: in a column (a card's body) a track would otherwise stretch to its width, the thumb small at one end.
-      class={["relative flex-wrap gap-0.5 rounded-md bg-hover p-0.5", props.block ? "flex w-full" : "inline-flex w-fit"]}
+      class={["relative flex-wrap gap-0.5 rounded-md bg-hover p-0.5", props.block === true ? "flex w-full" : "inline-flex w-fit"]}
     >
       <Show when={thumb()}>
         {(at) => (
@@ -72,7 +76,7 @@ export function Segmented<T extends string>(props: {
             title={o.title}
             class={[
               "relative h-6 cursor-pointer rounded-sm px-2.5 text-sm whitespace-nowrap transition-colors duration-120 disabled:cursor-default disabled:opacity-50",
-              { "flex-1": !!props.block },
+              { "flex-1": !(props.block !== true) },
               o.value === props.value ? "font-medium text-ink" : "text-muted hover:text-ink",
             ]}
           >

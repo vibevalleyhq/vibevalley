@@ -1,6 +1,8 @@
 import { For } from "solid-js";
+
 import { SpeciesValues, type Species } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
+
 import type { Pose } from "./cast";
 import { PoseSprite } from "./PoseSprite";
 

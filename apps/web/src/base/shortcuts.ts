@@ -39,7 +39,7 @@ export const shortcuts = [
 
 export type ShortcutId = (typeof shortcuts)[number]["id"];
 
-const mac = () => /Mac|iPhone|iPad/.test(navigator.platform);
+const mac = () => /Mac|iPhone|iPad/u.test(navigator.platform);
 
 const glyphs: Record<string, () => string> = {
   mod: () => (mac() ? "⌘" : "Ctrl"),

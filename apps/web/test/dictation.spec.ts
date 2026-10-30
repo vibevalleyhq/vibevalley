@@ -3,6 +3,7 @@
 
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { expect, test } from "./fixtures";
 
 type Counted = Window & { heard: number };
@@ -49,7 +50,7 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
     await expect.poll(() => page.evaluate(() => (window as unknown as Counted).heard)).toBeGreaterThan(2);
     await expect(dictate).toHaveAttribute("data-state", "recording");
     await dictate.click();
-    await expect(page.locator("textarea")).toHaveValue(new RegExp(said));
+    await expect(page.locator("textarea")).toHaveValue(new RegExp(said, "u"));
 
     expect(uploads).toHaveLength(1);
     const wav = uploads[0]!.subarray(uploads[0]!.indexOf("RIFF"));

@@ -1,7 +1,9 @@
 // The farm chat's sending, as far as the page wires it: the channel and helper picked go into the request, and a retry
 // after a lost reply is the same message. Which changes make a new send and which keep it is composing.test.ts's.
 import type { Locator, Page } from "@playwright/test";
+
 import { defaultOrchestrator, type SayRequest, pathOf } from "@vibevalley/protocol";
+
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "composer-intent" });

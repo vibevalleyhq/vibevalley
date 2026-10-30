@@ -4,13 +4,14 @@
 // own tasks are its to do; nothing here does them.
 
 import { Effect, FiberSet, Schema, type Scope } from "effect";
-import type { Tool } from "./core/loop.ts";
-import { head } from "./head.ts";
+
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
-import type { Subagent } from "./self.ts";
+import type { Tool } from "./core/loop.ts";
 import { schemaEffectTool } from "./core/tool.ts";
+import { head } from "./head.ts";
 import { agentTaskTools as words } from "./prompts.ts";
+import type { Subagent } from "./self.ts";
 
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => Effect.Effect<void>): AgentTaskStore {

@@ -3,10 +3,12 @@
 // words say); the rest serve a frame and the issue's history with one in place, for states it does not reach.
 
 import type { Page, Route } from "@playwright/test";
+
 import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
-import { buttons, expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { buttons, expect, test } from "./fixtures";
 
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();

@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
-import type { IconName } from "@/ui/icons";
-
 // The workbench's places, in the rail's order; 设置 sits at the rail's bottom.
+
+import { t } from "@vibevalley/i18n";
+
+import type { IconName } from "@/ui/icons";
 
 export interface Place {
   readonly id: string;

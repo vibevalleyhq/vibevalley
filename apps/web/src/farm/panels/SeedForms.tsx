@@ -1,29 +1,29 @@
-import { t } from "@vibevalley/i18n";
 // Sowing an empty bed and watering a helper's: the sowing form sows in the farm's current project (the sign by the
 // mast), offers its seeds (its templates and recent words) and who sows; the watering form takes a
 // few words to the helper.
 
-import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 
+import { t } from "@vibevalley/i18n";
 import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "@/base/api";
-import { fire } from "@/farm/commands";
-import { playSound } from "@/ui/pixel/sound";
-import { newSendKey } from "@/base/api";
-import { writeIssue } from "@/features/issue";
-import { aria } from "@/base/util";
-import { useRouter } from "@/base/router";
+import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { useWorkAgents } from "@/base/agents";
+import { api, reasonOf, newSendKey } from "@/base/api";
+import { useCore } from "@/base/frame";
+import { usePrefs } from "@/base/prefs";
 import { ready, useProjects, useQuery } from "@/base/query";
-import { AgentFace } from "@/ui/Face";
-import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
+import { useRouter } from "@/base/router";
+import { aria } from "@/base/util";
+import { fire } from "@/farm/commands";
 import { commands } from "@/farm/frames";
 import { useFarm } from "@/farm/ui";
-import { useWorkAgents } from "@/base/agents";
-import { useCore } from "@/base/frame";
 import { issueOf } from "@/farm/world/plots";
-import { usePrefs } from "@/base/prefs";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { writeIssue } from "@/features/issue";
+import { AgentFace } from "@/ui/Face";
+import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
+import { playSound } from "@/ui/pixel/sound";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
@@ -33,7 +33,7 @@ const byOrchestrator = "auto";
 function seedsOf(bag: ProjectTemplates | undefined) {
   return {
     recent: bag?.recent ?? [],
-    kinds: (bag?.kinds ?? []).flatMap((k) => (k.templates.length ? [{ kind: k, templates: k.templates }] : [])),
+    kinds: (bag?.kinds ?? []).flatMap((k) => (k.templates.length > 0 ? [{ kind: k, templates: k.templates }] : [])),
   };
 }
 

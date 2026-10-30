@@ -1,4 +1,5 @@
 import { For } from "solid-js";
+
 import { type Cell, crossCells, tickCells } from "./cells";
 
 /** Whole cells on a `grid`×`grid` square; `color` is a CSS colour. */

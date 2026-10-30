@@ -1,26 +1,28 @@
-import { t } from "@vibevalley/i18n";
 // Crons: the owner's and the orchestrator's, kept in the cron table and in the core state.
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
-import { whenText } from "./when.ts";
-import { messageOf } from "@/errors.ts";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
-import type { Actor } from "@/base/actor.ts";
-import * as S from "@vibevalley/protocol/schema";
-import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+
+import { t } from "@vibevalley/i18n";
+import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import type { Actor } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+
 import * as q from "../../db/generated/cron.sql.ts";
+import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
+import { whenText } from "./when.ts";
 
 export interface Due {
   readonly cron: Cron;
@@ -91,9 +93,9 @@ export const make = Effect.gen(function* () {
       tz: row.tz,
       enabled: row.enabled,
       created: row.created_at,
-      ...(row.last_run ? { lastRun: row.last_run } : {}),
+      ...(row.last_run != null && row.last_run !== 0 ? { lastRun: row.last_run } : {}),
       by: row.set_by,
-      pending: !!row.pending,
+      pending: row.pending,
     };
     yield* core.apply({ type: "cron", cron: s });
   }

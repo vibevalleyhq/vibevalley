@@ -1,10 +1,12 @@
-import { list, t } from "@vibevalley/i18n";
 // The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
-import { messageOf } from "@/errors.ts";
 import { join } from "node:path";
+
+import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
+
+import { list, t } from "@vibevalley/i18n";
 import {
   type Agent,
   type AgentTemplate,
@@ -16,12 +18,13 @@ import {
   SpeciesValues,
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { defaultSettings } from "./seed.ts";
-import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
-import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
-import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+
+import { defaultSettings } from "./seed.ts";
+import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 
 interface Stored {
   readonly agents: readonly Agent[];
@@ -45,7 +48,7 @@ const lookFilled = (raw: unknown): unknown =>
   Predicate.isObject(raw) && Predicate.isObject(raw.look)
     ? {
         ...raw,
-        look: { ...raw.look, build: raw.look.build || "biped", head: raw.look.head || "rounded" },
+        look: { ...raw.look, build: raw.look.build ?? "biped", head: raw.look.head ?? "rounded" },
       }
     : raw;
 const readStored = (text: string): Stored => {
@@ -153,7 +156,7 @@ export const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "config.json");
   const disk = new FileWriter(file);
-  const forkHere = yield* FiberSet.makeRuntime<never>();
+  const forkHere = yield* FiberSet.makeRuntime();
   const builtIn = builtInTemplates();
   const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
@@ -272,8 +275,8 @@ export const make = Effect.gen(function* () {
       const stem =
         draft.name
           .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "") || "skill";
+          .replace(/[^a-z0-9]+/gu, "-")
+          .replace(/^-+|-+$/gu, "") || "skill";
       let id = stem;
       for (let n = 2; s.skills.some((k) => k.id === id); n++) id = `${stem}-${n}`;
       const created = { ...draft, id };

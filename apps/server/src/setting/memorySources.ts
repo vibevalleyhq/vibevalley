@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
-
 import { MemorySourceKindValues, type MemorySourceUpdate } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
+
 import { hasSpace, voiceURL } from "./keys.ts";
 /** A memory source as settings.json keeps it, with its key: read together, so an address is never paired with another one's key. */
 export interface MemorySourceConfig {
@@ -39,7 +39,7 @@ export function memorySourcesOver(saved: readonly MemorySourceConfig[], given: r
       ...(m.enabled ? { enabled: true } : {}),
       ...(m.read ? { read: true } : {}),
       ...(m.write ? { write: true } : {}),
-      ...(m.everything ? { everything: true } : {}),
+      ...(m.everything === true ? { everything: true } : {}),
       ...(m.user?.trim() ? { user: m.user.trim() } : {}),
       ...(key ? { key } : {}),
     };

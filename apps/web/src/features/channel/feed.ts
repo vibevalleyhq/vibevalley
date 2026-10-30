@@ -1,5 +1,4 @@
 import { t } from "@vibevalley/i18n";
-
 import { type Chat, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 /** A page of a channel read at a time (features/channel/follow.ts). */
 export const chatPage = 50;

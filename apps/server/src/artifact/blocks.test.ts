@@ -1,15 +1,18 @@
-import { t } from "@vibevalley/i18n";
-import { sampleAgent } from "@/testing/agents.ts";
 import { describe, expect, it } from "@effect/vitest";
-import type { BlockOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
-import { Database, Db } from "@/base/db.ts";
+
+import { t } from "@vibevalley/i18n";
+import type { BlockOp } from "@vibevalley/protocol";
+
 import { ServerConfig } from "@/base/config.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { waitFor, whenTrue } from "@/testing/until.ts";
+import { Database, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { orMissing } from "@/errors.ts";
+import { sampleAgent } from "@/testing/agents.ts";
+import { testConfig } from "@/testing/layers.ts";
+import { waitFor, whenTrue } from "@/testing/until.ts";
+
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { type BlocksOptions, makeBlocks } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";
@@ -166,7 +169,7 @@ describe("a blocks artifact", () => {
         expect(yield* s.markdown(snap.artifact.id)).toBe(sample);
         const [b, r] = yield* s.append(snap.artifact.id, "lab", "paragraph", {}, "帮工写的 **一段**");
         expect([r!.status, b!.rev, b!.text.length]).toEqual(["applied", 1, 2]);
-        expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/);
+        expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/u);
         expect((yield* Effect.flip(s.get("nope")))._tag).toBe("Missing");
         expect((yield* sql<{ n: number }>`select count(*)::int as n from artifact_change`)[0]!.n).toBe(2);
       }),

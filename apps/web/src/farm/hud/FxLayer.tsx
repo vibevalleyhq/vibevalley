@@ -1,15 +1,18 @@
-import { t } from "@vibevalley/i18n";
 // The farm's effects over the page: a level-up banner, an achievement toast with its medal, and the server's notices
 // (the live stream) as toasts. Rewards and penalties are drawn on the plots (canvas fx.ts, Overlay.tsx).
 
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import type { GameEffect, GameEffectAchievement } from "@vibevalley/protocol";
-import { localEffects } from "@/farm/effects";
-import { clearingLevels } from "./readout";
+
 import { subscribeLive } from "@/base/live";
-import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "@/ui/pixel";
+import { localEffects } from "@/farm/effects";
 import { rawFarmFrame } from "@/farm/frames";
 import { useVillage } from "@/farm/support";
+import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "@/ui/pixel";
+
+import { clearingLevels } from "./readout";
 
 const bannerMs = 3400;
 

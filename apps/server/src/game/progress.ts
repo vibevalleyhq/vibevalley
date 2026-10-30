@@ -16,11 +16,13 @@ import {
   type Unlock,
   type SessionId,
 } from "@vibevalley/protocol";
-import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
+
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
+import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
 import { layersOf } from "@/task/graph.ts";
-import { achievementInWords, levelForCommits } from "./view.ts";
 import { graphOf } from "@/task/issues.ts";
+
+import { achievementInWords, levelForCommits } from "./view.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
 export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
@@ -66,7 +68,7 @@ const atLeast = (counts: Record<string, number>, id: string, value: number) => (
 
 function tallied(p: Progress, e: LedgerEntry): Progress {
   const field = e.kind === "hired" ? "hired" : e.kind === "harvested" ? "harvested" : e.kind === "failed" ? "failed" : undefined;
-  const agent = field ? (e as { agent?: string }).agent : undefined;
+  const agent = field && "agent" in e ? e.agent : undefined;
   if (!field || !agent) return p;
   const was = p.agents[agent] ?? { hired: 0, harvested: 0, failed: 0 };
   return { ...p, agents: { ...p.agents, [agent]: { ...was, [field]: was[field] + 1 } } };
@@ -149,8 +151,8 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       const { title: _, ...untitled } = p;
       p = untitled;
       const tier = entry.tier;
-      const worn = entry.achievement && tier ? achievementOf(entry.achievement) : undefined;
-      if (worn && tier && isTitle(worn) && tierOf(p, worn.id) >= tier) p = { ...p, title: { id: worn.id, tier } };
+      const worn = entry.achievement && tier != null && tier !== 0 ? achievementOf(entry.achievement) : undefined;
+      if (worn && tier != null && tier !== 0 && isTitle(worn) && tierOf(p, worn.id) >= tier) p = { ...p, title: { id: worn.id, tier } };
       break;
     }
   }
@@ -220,7 +222,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
     case "left": {
       // Harvested: only when something went into the main branch, which is what earns.
       const h = sessionOf(before, fact.id);
-      if (h && fact.closed === "merged" && fact.merged && fact.merged > 0)
+      if (h && fact.closed === "merged" && fact.merged != null && fact.merged > 0)
         out.push({
           kind: "harvested",
           session: fact.id,

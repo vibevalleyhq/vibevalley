@@ -2,10 +2,12 @@
 // state stream brings an issue made through the API to the board without a reload, and a notice the page sends through
 // the host interface reaches the main process. Which calls ring is apps/web/src/features/notice/tray.ts's (its own tests).
 
-import { _electron as electron, expect, test } from "@playwright/test";
 import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { _electron as electron, expect, test } from "@playwright/test";
+
 import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
 import type { Notice } from "@vibevalley/protocol/host";
 
@@ -13,7 +15,7 @@ import type { Notice } from "@vibevalley/protocol/host";
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
 // own logins (~/.pi, ~/.claude, …) stay out of reach.
 // GIT_CONFIG_* go together: GIT_CONFIG_COUNT without its GIT_CONFIG_KEY_n stops every git command.
-const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/;
+const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
 /** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
  * starts with, as a farm whose agent.starters names them. */
 const starters = () =>
@@ -35,7 +37,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     expect(await app.evaluate(({ app }) => app.getPath("userData"))).toBe(userData);
     const page = await app.firstWindow();
     // The window opens on the workbench once the server is up; the board is a place of its own.
-    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/, { timeout: 45_000 });
+    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\/chat$/u, { timeout: 45_000 });
     server = new URL(page.url()).origin;
     await page.goto(server + "/issues");
     await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
@@ -108,7 +110,7 @@ test("the window opens on the bar at once, and says there why the server could n
   for (const out of [app.process().stdout, app.process().stderr]) out?.on("data", (d) => said.push(String(d)));
   try {
     const page = await app.firstWindow();
-    await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/);
+    await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/u);
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(page.getByRole("progressbar")).toHaveCount(0);
     // The window shows on its first ready-to-show, which may come after the page is drawn hidden: wait for it.
@@ -142,7 +144,7 @@ test("the island follows the issues in flight and opens one", async () => {
   const probe = () => app.evaluate(() => (globalThis as { vibevalleyIsland?: Probe }).vibevalleyIsland);
   try {
     const page = await app.firstWindow();
-    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 45_000 });
+    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//u, { timeout: 45_000 });
     const api = new VibeValleyApi(new URL(page.url()).origin);
     await expect.poll(async () => (await probe())?.glance).toEqual({ working: 0, waiting: 0, strip: { working: "没在干", waiting: "0 等你" }, rows: [] });
     // Built on macOS by scripts/build.ts; elsewhere there is no helper.
@@ -159,7 +161,7 @@ test("the island follows the issues in flight and opens one", async () => {
     expect((await probe())?.glance?.waiting).toBe(1);
 
     await app.evaluate((_, id) => (globalThis as { vibevalleyIsland?: { open: (issue: string) => void } }).vibevalleyIsland?.open(id), made.id);
-    await page.waitForURL(new RegExp(`/issues/${made.id}$`));
+    await page.waitForURL(new RegExp(`/issues/${made.id}$`, "u"));
     await expect(page.getByTestId("issue")).toBeVisible();
   } finally {
     await app.close();

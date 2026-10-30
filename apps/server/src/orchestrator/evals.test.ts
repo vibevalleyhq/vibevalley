@@ -1,10 +1,12 @@
-import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
-import type { BrainMessage } from "@vibevalley/agent/messages";
+import { Effect } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+
+import type { Tool } from "@vibevalley/agent/core/loop";
+import type { BrainMessage } from "@vibevalley/agent/messages";
+import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
+
 import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf, stubbed } from "./evals.ts";
 import { noResult } from "./prompts.ts";
-import { Effect } from "effect";
-import type { Tool } from "@vibevalley/agent/core/loop";
 
 const call = assistantMessage([toolCall("issue_create", { title: "加个 README", project: "demo", start: true }, "c1")]);
 const turn: BrainMessage[] = [
@@ -40,7 +42,7 @@ describe("the orchestrator's evals", () => {
       expect({ e, passes: check([e], on).length === 0 }).toEqual({ e, passes: pass });
       if (pass) passed.add(e.kind);
     }
-    expect([...passed].sort()).toEqual([...kinds].sort());
+    expect([...passed].toSorted()).toEqual([...kinds].toSorted());
   });
 
   // Each committed case is red on the turn it recorded: its expect catches the error it was saved for.

@@ -1,5 +1,7 @@
 import { expect, test } from "vite-plus/test";
+
 import type { InboxItem } from "@vibevalley/protocol";
+
 import { missedOf, PhoneCalls, ringEvery, ringFor } from "./calls";
 
 const call = (id: string): InboxItem => ({
@@ -41,10 +43,10 @@ function phone(open = false) {
   const wait = (ms: number) => {
     const until = now + ms;
     for (;;) {
-      const next = timers.filter((t) => t.at <= until).sort((a, b) => a.at - b.at)[0];
+      const next = timers.filter((t) => t.at <= until).toSorted((a, b) => a.at - b.at)[0];
       if (!next) break;
       now = next.at;
-      if (next.every) next.at += next.every;
+      if (next.every != null && next.every !== 0) next.at += next.every;
       else timers.splice(timers.indexOf(next), 1);
       next.f();
     }

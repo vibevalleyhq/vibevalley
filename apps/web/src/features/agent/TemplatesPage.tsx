@@ -1,22 +1,24 @@
-import { list, t } from "@vibevalley/i18n";
 // 模板: every template a profile installs from, the orchestrators' first; a card shows its whole recipe before it is
 // installed, and a folder on this machine can be added beside the built-in ones. /agents/templates.
 
-import { createSignal, For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
+import { createSignal, For, Show } from "solid-js";
+
+import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
+import { ready, useAgentTemplates, useRuntimes } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
-import { ready, useAgentTemplates, useRuntimes } from "@/base/query";
-import { toast } from "@/ui/toasts";
-import { ConfirmButton } from "@/ui/ConfirmButton";
 import { A } from "@/ui/A";
-import { Hint } from "@/ui/Tip";
 import { Button } from "@/ui/Button";
+import { ConfirmButton } from "@/ui/ConfirmButton";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { TextInput } from "@/ui/Field";
 import { runtimeName } from "@/ui/runtimes";
+import { Hint } from "@/ui/Tip";
+import { toast } from "@/ui/toasts";
 
 export function TemplatesPage() {
   const templates = useAgentTemplates();
@@ -24,7 +26,7 @@ export function TemplatesPage() {
   const client = useQueryClient();
   const [path, setPath] = createSignal("");
   const [adding, setAdding] = createSignal(false);
-  const sorted = () => [...ready(templates, [])].sort((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
+  const sorted = () => [...ready(templates, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
   const add = async () => {
     setAdding(true);
     try {

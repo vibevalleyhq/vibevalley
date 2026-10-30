@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import { format, placeholderKinds, placeholders } from "../packages/i18n/src/format.ts";
 
 const root = join(import.meta.dirname, "..");
@@ -28,17 +29,19 @@ interface Nested {
 
 const han = /\p{Script=Han}/u;
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const same = new Set((JSON.parse(readFileSync(join(pkg, "same.json"), "utf8")) as { keys: string[] }).keys);
-const placeholdersOf = (text: string) => placeholders(text).sort();
+const placeholdersOf = (text: string) => placeholders(text).toSorted();
 
 const namespaces = (locale: Locale) =>
   existsSync(join(localesDir, locale))
     ? readdirSync(join(localesDir, locale))
         .filter((f) => f.endsWith(".json"))
         .map((f) => f.slice(0, -5))
-        .sort()
+        .toSorted()
     : [];
 
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const readCatalog = (locale: Locale, ns: string): Nested => JSON.parse(readFileSync(join(localesDir, locale, ns + ".json"), "utf8")) as Nested;
 
 function flatten(prefix: string, v: string | Nested, out: Map<string, string>) {
@@ -67,17 +70,17 @@ function generated(): string {
     lines.push("  },");
   }
   lines.push("};", "", "/** Every key, and the params its zh message names (undefined: none). */", "export interface Messages {");
-  for (const [key, text] of [...zh].sort(([a], [b]) => (a < b ? -1 : 1))) {
+  for (const [key, text] of [...zh].toSorted(([a], [b]) => (a < b ? -1 : 1))) {
     // A message's params are every language's: an English plural may name a count the Chinese does not say.
     const kinds = new Map<string, string>();
     for (const one of [text, ...all.map((m) => m.get(key) ?? "")])
       for (const [n, kind] of placeholderKinds(one)) if (kinds.get(n) === undefined || kind !== "value") kinds.set(n, kind);
     // A select on true is a flag; one on other values (a month's number) takes the value.
-    const flag = (n: string) => [text, ...all.map((m) => m.get(key) ?? "")].some((one) => new RegExp(`\\{${n}, select, true \\{`).test(one));
+    const flag = (n: string) => [text, ...all.map((m) => m.get(key) ?? "")].some((one) => new RegExp(`\\{${n}, select, true \\{`, "u").test(one));
     const typeOf = (n: string, kind: string | undefined) =>
       kind === "plural" || kind === "selectordinal" ? "number" : kind === "select" && flag(n) ? "boolean" : "string | number";
-    const names = [...kinds.keys()].sort();
-    lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
+    const names = [...kinds.keys()].toSorted();
+    lines.push(`  ${quote(key)}: ${names.length > 0 ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
   }
   lines.push("}", "");
   return lines.join("\n");
@@ -93,7 +96,7 @@ const sources = () =>
     .split("\n")
     .filter(
       (f) =>
-        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/.test(f)) &&
+        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f)) &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );
@@ -109,10 +112,9 @@ function scan(): Use[] {
   const uses: Use[] = [];
   for (const file of sources()) {
     const text = readFileSync(join(root, file), "utf8");
-    if (!text.includes("t(")) continue;
     const lineOf = (i: number) => text.slice(0, i).split("\n").length;
-    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
-    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
+    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/gu)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
+    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/gu)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
   }
   return uses;
 }
@@ -141,7 +143,7 @@ function check(): string[] {
   const used = new Set(uses.filter((u) => !u.prefix).map((u) => u.key));
   // A key may also be picked before the call (t(ok ? "a" : "b")): a literal that names one counts as using it.
   for (const file of sources())
-    for (const m of readFileSync(join(root, file), "utf8").matchAll(/"([a-z][\w.-]*\.[\w.$/-]+)"/g)) if (zh.has(m[1]!)) used.add(m[1]!);
+    for (const m of readFileSync(join(root, file), "utf8").matchAll(/"([a-z][\w.-]*\.[\w.$/-]+)"/gu)) if (zh.has(m[1]!)) used.add(m[1]!);
   const prefixes = uses.filter((u) => u.prefix).map((u) => u.key);
   for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
   for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);
@@ -173,11 +175,11 @@ function find(text: string) {
 
 /** web.setting for apps/web/src/features/setting/words.ts; shared for packages/protocol/src/words. */
 function namespaceOf(file: string): string {
-  const rel = relative(root, file).replace(/\\/g, "/");
+  const rel = relative(root, file).replace(/\\/gu, "/");
   if (rel.startsWith("packages/protocol/src/words")) return "shared";
-  const m = /^apps\/([^/]+)\/src\/(.*?)\/?words\.ts$/.exec(rel);
+  const m = /^apps\/([^/]+)\/src\/(.*?)\/?words\.ts$/u.exec(rel);
   if (!m) throw new Error(`not a word table: ${rel}`);
-  const parts = m[2]!.split("/").filter((p) => p && p !== "features");
+  const parts = m[2]!.split("/").filter((p) => p !== "" && p !== "features");
   return [m[1]!, ...parts].join(".");
 }
 
@@ -185,11 +187,11 @@ const sentinel = (i: number) => `\u0001${i}\u0001`;
 
 function paramNames(fn: Function): string[] {
   const src = fn.toString();
-  const m = /^\s*(?:async\s*)?(?:function\s*[\w$]*\s*)?\(([^)]*)\)/.exec(src) ?? /^\s*([\w$]+)\s*=>/.exec(src);
+  const m = /^\s*(?:async\s*)?(?:function\s*[\w$]*\s*)?\(([^)]*)\)/u.exec(src) ?? /^\s*([\w$]+)\s*=>/u.exec(src);
   if (!m) return [];
   return m[1]!
     .split(",")
-    .map((p) => p.replace(/=.*$/, "").replace(/:.*$/, "").trim())
+    .map((p) => p.replace(/=.*$/u, "").replace(/:.*$/u, "").trim())
     .filter(Boolean);
 }
 
@@ -199,6 +201,7 @@ function templateOf(fn: Function): string | undefined {
   if (names.length === 0 || names.length !== fn.length) return undefined;
   const call = (args: unknown[]) => {
     try {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a word table's entry is a function of its parameters
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" ? r : undefined;
     } catch {
@@ -206,7 +209,7 @@ function templateOf(fn: Function): string | undefined {
     }
   };
   const a = call(names.map((_, i) => sentinel(i)));
-  if (a === undefined || /undefined|NaN|\[object /.test(a)) return undefined;
+  if (a === undefined || /undefined|NaN|\[object /u.test(a)) return undefined;
   let text = a;
   names.forEach((n, i) => (text = text.split(sentinel(i)).join(`{${n}}`)));
   if (text.includes("\u0001")) return undefined;
@@ -224,8 +227,9 @@ function choiceOf(fn: Function): string | undefined {
   if (names.length === 0 || names.length !== fn.length) return undefined;
   const call = (args: unknown[]) => {
     try {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a word table's entry is a function of its parameters
       const r = (fn as (...a: unknown[]) => unknown)(...args);
-      return typeof r === "string" && !/undefined|NaN|\[object /.test(r) ? r : undefined;
+      return typeof r === "string" && !/undefined|NaN|\[object /u.test(r) ? r : undefined;
     } catch {
       return undefined;
     }
@@ -234,6 +238,7 @@ function choiceOf(fn: Function): string | undefined {
   const agrees = (message: string, samples: unknown[][]) =>
     samples.every((args) => {
       const want = call(args);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the arguments made above for these names are strings, numbers and booleans
       const params = Object.fromEntries(names.map((n, i) => [n, args[i] as string | number | boolean]));
       return want !== undefined && format(message, params) === want;
     });
@@ -254,7 +259,7 @@ function choiceOf(fn: Function): string | undefined {
     // A param put into the text as it is prints true or false: that is a value, not a flag.
     // A flag: whatever truthy value comes, the same text (a count or a delay that only looks like one shows itself).
     const truthy = [7, 5000, "x"].every((v) => call(others(i, v)) === yes);
-    if (yes !== undefined && no !== undefined && yes !== no && truthy && !/true|false/.test(yes + no)) {
+    if (yes !== undefined && no !== undefined && yes !== no && truthy && !/true|false/u.test(yes + no)) {
       const message = `{${n}, select, true {${named(yes)}} other {${named(no)}}}`;
       if (agrees(message, [others(i, true), others(i, false)])) return message;
     }
@@ -274,7 +279,9 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
   const skipped: string[] = [];
   const out = { zh: {} as Nested, en: {} as Nested };
   const walk = (z: unknown, e: unknown, path: string[], zo: Nested, eo: Nested) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- walk is called on the parsed catalogs' objects
     for (const [k, zv] of Object.entries(z as object)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- walk is called on the parsed catalogs' objects
       const ev = (e as Record<string, unknown> | undefined)?.[k];
       const at = [...path, k];
       if (typeof zv === "string" && typeof ev === "string") {
@@ -292,8 +299,9 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
       } else if (Array.isArray(zv) && Array.isArray(ev) && zv.length === ev.length && [...zv, ...ev].every((x) => typeof x === "string")) {
         // A list of sentences or names is kept by index: weekdays.0 … weekdays.6.
         zo[k] = Object.fromEntries(zv.map((x, i) => [String(i), x]));
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a catalog's arrays hold strings
         eo[k] = Object.fromEntries(ev.map((x, i) => [String(i), x as string]));
-      } else if (zv && typeof zv === "object" && !Array.isArray(zv)) {
+      } else if (typeof zv === "object" && zv !== null && !Array.isArray(zv)) {
         zo[k] = {};
         eo[k] = {};
         walk(zv, ev, at, zo[k], eo[k]);
@@ -363,13 +371,22 @@ function closing(text: string, open: number): number {
   return -1;
 }
 
+/** The import goes after the file's header comment, so the header stays first; the formatter sorts it among the others. */
+function withImport(text: string, line: string): string {
+  const header = /^(?:(?:\/\/[^\n]*\n)+|\/\*[\s\S]*?\*\/\n)\n/u.exec(text)?.[0] ?? "";
+  return header + line + "\n" + text.slice(header.length);
+}
+
 async function migrate(file: string) {
   const abs = join(root, file);
   const ns = namespaceOf(abs);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- packages/i18n's own modules
   const locale = (await import(pathToFileURL(join(pkg, "src/locale.ts")).href)) as { setLocale: (l: Locale) => void };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a module's exports
   const mod = (await import(pathToFileURL(abs).href)) as Record<string, unknown>;
-  const accessorName = Object.keys(mod).find((k) => typeof mod[k] === "function" && /(ording|Words)$|^wording$/.test(k));
+  const accessorName = Object.keys(mod).find((k) => typeof mod[k] === "function" && /(ording|Words)$|^wording$/u.test(k));
   if (!accessorName) throw new Error(`no word table in ${file}`);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the word table's accessor, found by its name above
   const accessor = mod[accessorName] as () => unknown;
   locale.setLocale("zh");
   const zh = accessor();
@@ -390,9 +407,9 @@ async function migrate(file: string) {
     .split("\n")
     // Tables in different apps share names (voiceWording): only the app that has this one calls it.
     .filter(
-      (f) => /\.tsx?$/.test(f) && f !== file && (file.startsWith("packages/") || f.split("/").slice(0, 2).join("/") === file.split("/").slice(0, 2).join("/")),
+      (f) => /\.tsx?$/u.test(f) && f !== file && (file.startsWith("packages/") || f.split("/").slice(0, 2).join("/") === file.split("/").slice(0, 2).join("/")),
     );
-  const chain = new RegExp(`\\b${accessorName}\\(\\)((?:\\.[A-Za-z_$][\\w$]*)+)`, "g");
+  const chain = new RegExp(`\\b${accessorName}\\(\\)((?:\\.[A-Za-z_$][\\w$]*)+)`, "gu");
   /** Rewrites every chain in `text` that ends in a moved message; arguments are rewritten the same way first. */
   const rewrite = (text: string, caller: string, base: number): { out: string; changed: boolean } => {
     let out = "";
@@ -434,28 +451,28 @@ async function migrate(file: string) {
     const path = join(root, caller);
     const { out, changed } = rewrite(readFileSync(path, "utf8"), caller, 1);
     let text: string;
-    for (const m of out.matchAll(new RegExp(`\\b${accessorName}\\(\\)`, "g")))
+    for (const m of out.matchAll(new RegExp(`\\b${accessorName}\\(\\)`, "gu")))
       left.push(`${caller}:${out.slice(0, m.index).split("\n").length}: ${accessorName}() used another way`);
     if (!changed) continue;
     text = out;
     // The table's import goes with its last use.
-    if (!new RegExp(`\\b${accessorName}\\b`).test(text.replace(/^import [^;]*;$/gm, "")))
-      text = text.replace(new RegExp(`^import \\{([^}]*)\\} from "([^"]+)";$`, "gm"), (whole, names: string, from: string) => {
+    if (!new RegExp(`\\b${accessorName}\\b`, "u").test(text.replace(/^import [^;]*;$/gmu, "")))
+      text = text.replace(new RegExp(`^import \\{([^}]*)\\} from "([^"]+)";$`, "gmu"), (whole, names: string, from: string) => {
         const kept = names
           .split(",")
           .map((n) => n.trim())
-          .filter((n) => n && n !== accessorName);
+          .filter((n) => n !== "" && n !== accessorName);
         return kept.length ===
           names
             .split(",")
             .map((n) => n.trim())
             .filter(Boolean).length
           ? whole
-          : kept.length
+          : kept.length > 0
             ? `import { ${kept.join(", ")} } from "${from}";`
             : "";
       });
-    if (!/import \{[^}]*\bt\b[^}]*\} from "@vibevalley\/i18n"/.test(text)) text = `import { t } from "@vibevalley/i18n";\n` + text;
+    if (!/import \{[^}]*\bt\b[^}]*\} from "@vibevalley\/i18n"/u.test(text)) text = withImport(text, `import { t } from "@vibevalley/i18n";`);
     writeFileSync(path, text);
   }
   gen();
@@ -474,14 +491,15 @@ switch (command) {
   case "check": {
     const problems = check();
     for (const p of problems) console.log(p);
-    console.log(problems.length ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
-    if (problems.length) process.exit(1);
+    console.log(problems.length > 0 ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
+    if (problems.length > 0) process.exit(1);
     break;
   }
   case "find":
     find(rest.join(" "));
     break;
   case "migrate":
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each file's migration adds to the same catalogs
     for (const f of rest) await migrate(f);
     break;
   default:

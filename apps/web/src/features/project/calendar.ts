@@ -30,7 +30,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
   const today = plusDays(now, 0);
   const weekday = (today.getDay() + 6) % 7;
   const start = plusDays(plusDays(today, -weekday), -(weeks - 1) * 7);
-  const busyDays = [...commits.values()].filter((n) => n > 0).sort((a, b) => a - b);
+  const busyDays = [...commits.values()].filter((n) => n > 0).toSorted((a, b) => a - b);
   const q = busyDays.length === 0 ? 0 : busyDays[Math.min(busyDays.length - 1, Math.max(0, Math.floor(0.95 * busyDays.length)))]!;
   const busy = q < 1 ? 1 : q;
   const level = (n: number) => (n <= 0 ? 0 : Math.min(4, Math.max(0, Math.ceil((4 * n) / busy))));
@@ -111,6 +111,7 @@ export const dateText = (at: number) => {
 };
 
 export const dayText = (d: Date) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- getDay() is 0 to 6
   t("web.base.time.day", { m: d.getMonth() + 1, d: d.getDate(), weekday: t(`web.base.time.weekdays.${d.getDay() as Weekday}`) });
 
 /** A day of the week as Date.getDay counts it, Sunday first. */

@@ -1,6 +1,6 @@
 export const mentionHref = "#mention";
 
-const codeParts = /(```[\s\S]*?```|`[^`\n]*`)/g;
+const codeParts = /(```[\s\S]*?```|`[^`\n]*`)/gu;
 
 const mention = /(^|[^\p{L}\p{N}_@])@(w\d+|管家|主人|所有人)/gu;
 

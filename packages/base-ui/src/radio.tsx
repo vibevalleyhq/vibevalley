@@ -2,9 +2,10 @@
 // first enabled); the arrow keys move to the next radio and check it, as a native radio group does.
 
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
-import { itemsIn, roveFocus } from "./internal/roving";
-import { type ButtonProps, call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
+
 import { createControllable } from "./internal/controllable";
+import { type ButtonProps, call, type DivProps, flag, refs, type SpanProps } from "./internal/element";
+import { itemsIn, roveFocus } from "./internal/roving";
 
 interface GroupCtx {
   readonly value: () => string | undefined;
@@ -40,7 +41,7 @@ export function RadioGroup(props: RadioGroupProps) {
   const ctx: GroupCtx = {
     value,
     check: (v) => {
-      if (!props.readOnly) setValue(v);
+      if (props.readOnly !== true) setValue(v);
     },
     disabled: () => Boolean(props.disabled),
     readOnly: () => Boolean(props.readOnly),
@@ -55,8 +56,8 @@ export function RadioGroup(props: RadioGroupProps) {
           root = el;
           queueMicrotask(() => setFirst(itemsIn(el, `${radio}:not([data-disabled])`)[0]?.dataset.value));
         })}
-        aria-disabled={props.disabled ? "true" : undefined}
-        aria-readonly={props.readOnly ? "true" : undefined}
+        aria-disabled={props.disabled === true ? "true" : undefined}
+        aria-readonly={props.readOnly === true ? "true" : undefined}
         data-disabled={flag(props.disabled)}
         onKeyDown={(e) => {
           call(props.onKeyDown, e);

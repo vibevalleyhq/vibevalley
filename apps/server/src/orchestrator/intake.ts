@@ -1,5 +1,6 @@
-import { sourceHead } from "./prompts.ts";
 import { type RunTriggerKind } from "@vibevalley/protocol";
+
+import { sourceHead } from "./prompts.ts";
 
 /** Who woke the orchestrator: what the input's words are worth. */
 export type Source =

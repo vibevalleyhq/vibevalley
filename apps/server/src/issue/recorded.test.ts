@@ -1,16 +1,19 @@
+import { describe, expect, it, test } from "vite-plus/test";
+
 import { type Issue, defaultOrchestrator, type ProjectStack, type Run } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
 import { templateCatalog } from "@/agent/seed.ts";
 import { graphsOf } from "@/task/issues.ts";
-import { describe, expect, it, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
+
 import { pullRequestConclusion, issueBrief, splitBrief } from "./brief.ts";
-import { refinementDescription, kept, parseRefinement } from "./refinement.ts";
-import { filledKinds, filledTemplate, sentTitles } from "./templates.ts";
-import { nextTaskId } from "./stored.ts";
-import { milestonesOf } from "./timeline.ts";
 import { pickIssues } from "./filter.ts";
 import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { refinementDescription, kept, parseRefinement } from "./refinement.ts";
+import { nextTaskId } from "./stored.ts";
+import { filledKinds, filledTemplate, sentTitles } from "./templates.ts";
+import { milestonesOf } from "./timeline.ts";
 test("the recorded cases", () => {
   const cases = goldenCases("issue");
   expect(new Set(cases.map((c) => c.fn))).toEqual(new Set(["nextTaskID"]));
@@ -177,7 +180,7 @@ describe("templates", () => {
       for (const s of k.templates) {
         expect(s.id && !ids.has(s.id) && s.title && s.done).toBeTruthy();
         ids.add(s.id);
-        for (const hole of (s.title + s.done).match(/\{[^}]*\}/g) ?? []) expect(["{test}", "{lint}", "{build}"]).toContain(hole);
+        for (const hole of (s.title + s.done).match(/\{[^}]*\}/gu) ?? []) expect(["{test}", "{lint}", "{build}"]).toContain(hole);
       }
     }
   });
@@ -198,7 +201,7 @@ describe("templates", () => {
     for (const stack of [goStack, {}])
       for (const k of filledKinds(templateCatalog(), stack))
         for (const s of k.templates) {
-          expect(/[{}]/.test(s.text)).toBe(false);
+          expect(/[{}]/u.test(s.text)).toBe(false);
           expect(s.text).toContain("\n做到什么程度算完：");
           expect(s.title.includes("〔")).toBe(s.blank !== undefined);
         }

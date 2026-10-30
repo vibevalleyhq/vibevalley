@@ -1,4 +1,5 @@
 import { defaultOrchestrator } from "@vibevalley/protocol";
+
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "runtime-avatars" });

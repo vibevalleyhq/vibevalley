@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
+
 import { Select } from "../src/index";
 import { $, mount, settle } from "./render";
 
@@ -62,7 +63,7 @@ test("a click opens it on the chosen option; picking one closes it, shows its la
     null,
     trigger,
   ]);
-  expect(new FormData($<HTMLFormElement>("[data-testid=form]")).get("runtime")).toBe("claude");
+  expect(new FormData($("[data-testid=form]", HTMLFormElement)).get("runtime")).toBe("claude");
 });
 
 test("from the keyboard: ArrowDown opens, arrows stop at the ends and pass disabled ones, letters jump, Enter picks", async () => {

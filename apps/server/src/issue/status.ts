@@ -1,9 +1,11 @@
 import type { WorkspaceState, Issue, IssueRefining, IssueStatus } from "@vibevalley/protocol";
 import { isBusy, omitUndefined, same } from "@vibevalley/protocol/rules";
-import { sessionOf } from "@/session/roster.ts";
-import { statusMoves } from "./moves.ts";
-import { attentionIn } from "./attention.ts";
+
 import { compare, compareText, or } from "@/base/order.ts";
+import { sessionOf } from "@/session/roster.ts";
+
+import { attentionIn } from "./attention.ts";
+import { statusMoves } from "./moves.ts";
 
 /** One rule whoever does the work: a session on the farm says where its issue stands; an issue run by no session (an
  * in-process agent's, the orchestrator's) is in progress while its latest run goes on and waits on the owner once it
@@ -74,7 +76,7 @@ export function withIssue(all: readonly Issue[] | undefined, t: Issue): Issue[] 
     const drop = new Set(closed.slice(keepClosedIssues).map((x) => x.id));
     next = next.filter((x) => !drop.has(x.id) && !(x.parent !== undefined && drop.has(x.parent)));
   }
-  return next.sort(issueOrder);
+  return next.toSorted(issueOrder);
 }
 
 export function issueRefiningOf(t: Issue, state: WorkspaceState): IssueRefining | undefined {

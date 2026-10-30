@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+
 import { captionLinger, LiveCaptions, liveCaptions } from "./captions";
 
 function chunked(id: string, message: Record<string, unknown>, parts: number) {

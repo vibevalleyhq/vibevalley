@@ -1,24 +1,28 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { owner } from "@/base/actor.ts";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
-import { openFindings } from "@/issue/status.ts";
-import { Said } from "@/testing/said.ts";
-import { viewOf } from "@/game/view.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
+
+import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
+
 import { Agents } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
 import { Crons } from "@/cron/cron.ts";
+import { viewOf } from "@/game/view.ts";
+import { Issues } from "@/issue/issue.ts";
+import { openFindings } from "@/issue/status.ts";
+import { Runtimes } from "@/runtime/runtime.ts";
 import { Sessions, type SessionsInside } from "@/session/session.ts";
 import { write } from "@/testing/git.ts";
+import { Said } from "@/testing/said.ts";
+
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
-import { sessionId } from "@vibevalley/protocol/schema";
 
 const refusedWith = (e: unknown, words = "") => {
   const tagged = e as { _tag?: string; reason?: string };
@@ -119,8 +123,8 @@ describe("an issue", () => {
         undefined,
       ]);
       const reopened = (yield* sessions.get(again))!;
-      expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`));
-      expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/);
+      expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`, "u"));
+      expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/u);
       refusedWith(yield* Effect.flip(issues.reopen(session.issue!, "", "")));
       expect((yield* Effect.flip(issues.reopen("w404", "", "")))._tag).toBe("Missing");
       yield* sessions.dismiss(again);
@@ -334,7 +338,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       issue = yield* move(issue.id, "done");
       expect(issue.status).toBe("done");
-      expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/);
+      expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/u);
       expect(issue.moves).toEqual(["todo"]);
 
       let dropped = yield* issues.add({ title: "算了" });
@@ -459,9 +463,9 @@ describe("an issue", () => {
       yield* w.nextReport;
       const before = git(project, "log", "--format=%s", "main");
       const merging = yield* issues.previewStatus(committed.issue!, "done", "");
-      expect(merging.does.at(-1)).toMatch(/^合进 main（1 个提交），关成已完成，/);
+      expect(merging.does.at(-1)).toMatch(/^合进 main（1 个提交），关成已完成，/u);
       const keeping = yield* issues.previewStatus(committed.issue!, "done", "", {}, { deliver: "branch" });
-      expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/);
+      expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/u);
       expect([git(project, "log", "--format=%s", "main"), (yield* issues.get(committed.issue!)).status]).toEqual([before, "in_review"]);
       yield* issues.setStatus(committed.issue!, "done", "", "", owner);
       const done = yield* await_(
@@ -473,8 +477,8 @@ describe("an issue", () => {
 
       const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
       yield* w.nextReport;
-      expect((yield* issues.previewStatus(looked.issue!, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/);
-      expect((yield* issues.previewStatus(looked.issue!, "canceled", "")).does[0]).toMatch(/关成已取消$/);
+      expect((yield* issues.previewStatus(looked.issue!, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/u);
+      expect((yield* issues.previewStatus(looked.issue!, "canceled", "")).does[0]).toMatch(/关成已取消$/u);
       refusedWith(yield* Effect.flip(issues.previewStatus(looked.issue!, "todo", "")), "要说一句");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -629,7 +633,7 @@ describe("an issue", () => {
 
       issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
       expect([issue.status, openFindings(issue)]).toEqual(["done", 0]);
-      expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/);
+      expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/u);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -650,12 +654,12 @@ describe("an issue", () => {
         balances: [{ currency: "CNY", amount: 0 }],
       };
       yield* runtimes.refresh("pi");
-      expect(yield* hire()).toMatch(/余额用完了/);
+      expect(yield* hire()).toMatch(/余额用完了/u);
 
       usage = null;
       runtimes.spend("pi", 1.2);
       yield* runtimes.update("pi", { ...settings, dailyBudget: 1 });
-      expect(yield* hire()).toMatch(/每日预算 ¥1\.00/);
+      expect(yield* hire()).toMatch(/每日预算 ¥1\.00/u);
 
       // A window used up would only fail with a quota error.
       const resets = new Date(2026, 9, 14, 8, 0).getTime();
@@ -668,7 +672,7 @@ describe("an issue", () => {
         ],
       };
       yield* runtimes.update("pi", settings);
-      expect(yield* hire()).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/);
+      expect(yield* hire()).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/u);
 
       usage = {
         status: "ok",

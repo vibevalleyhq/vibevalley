@@ -27,11 +27,13 @@ export const settle = async () => {
   flush();
 };
 
-export const $ = <T extends Element = HTMLElement>(selector: string) => {
-  const el = document.querySelector<T>(selector);
-  if (!el) throw new Error(`nothing matches ${selector}`);
+export function $(selector: string): HTMLElement;
+export function $<T extends Element>(selector: string, kind: abstract new () => T): T;
+export function $(selector: string, kind: abstract new () => Element = HTMLElement): Element {
+  const el = document.querySelector(selector);
+  if (!(el instanceof kind)) throw new Error(`nothing that is a ${kind.name} matches ${selector}`);
   return el;
-};
+}
 
 /** No axe violation in the page as it is now (the open popup included). */
 export async function expectAccessible() {

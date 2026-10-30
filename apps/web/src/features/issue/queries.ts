@@ -1,9 +1,11 @@
 import { createEffect, createMemo, deep } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueHistory, defaultOrchestrator, type TaskGraph } from "@vibevalley/protocol";
+
 import { api } from "@/base/api";
 import { useCore, useFrames } from "@/base/frame";
 import { queries, ready, useQuery, useAgents } from "@/base/query";
-import { t } from "@vibevalley/i18n";
 
 /** Every issue with its real sessions (issue.history), read again whenever the frame's issues change. */
 export function useIssueHistory(older: () => boolean) {

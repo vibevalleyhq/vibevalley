@@ -1,15 +1,19 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
-import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import { emptyProgress } from "@/game/progress.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { layer as projection } from "@/projection/projection.ts";
-import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
+
+import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
+
+import { ServerConfig } from "@/base/config.ts";
+import { emptyProgress } from "@/game/progress.ts";
+import { layer as projection } from "@/projection/projection.ts";
+import { testConfig } from "@/testing/layers.ts";
+
+import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 
 const helper: Session = {
   id: sessionId("w1"),
@@ -97,7 +101,7 @@ describe("core", () => {
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
       expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking", since: expect.any(Number) } });
       expect(kept.progress).toBeUndefined();
-      expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/);
+      expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/u);
     });
   });
 
@@ -185,7 +189,7 @@ describe("core", () => {
 
   it.effect("apply stays synchronous for oar callbacks", () =>
     Effect.gen(function* () {
-      const runSync = Effect.runSyncWith(yield* Effect.context<never>());
+      const runSync = Effect.runSyncWith(yield* Effect.context());
       const core = yield* Core;
       yield* Effect.sync(() => runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
       expect(core.state().orchestrators.orchestrator?.state).toBe("thinking");

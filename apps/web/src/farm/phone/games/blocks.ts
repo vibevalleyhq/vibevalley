@@ -162,19 +162,15 @@ export function fall(g: Blocks): Blocks {
 /** Two points for each row dropped. */
 export function slam(g: Blocks): Blocks {
   if (g.over) return g;
-  let p = g.piece;
-  let rows = 0;
-  while (fits(g.well, { ...p, y: p.y + 1 })) {
-    p = { ...p, y: p.y + 1 };
-    rows++;
-  }
+  const p = landingOf(g);
+  const rows = p.y - g.piece.y;
   return land({ ...g, piece: p, score: g.score + rows * 2 });
 }
 
 export function landingOf(g: Blocks): Falling {
-  let p = g.piece;
-  while (fits(g.well, { ...p, y: p.y + 1 })) p = { ...p, y: p.y + 1 };
-  return p;
+  let y = g.piece.y;
+  while (fits(g.well, { ...g.piece, y: y + 1 })) y++;
+  return { ...g.piece, y };
 }
 
 function land(g: Blocks): Blocks {

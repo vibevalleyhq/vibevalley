@@ -1,27 +1,30 @@
-import { Toolbar } from "@vibevalley/base-ui";
-import { MoreMenu } from "@/ui/MoreMenu";
-import { list, t } from "@vibevalley/i18n";
 // Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
-import { Lightbox } from "@/ui/Lightbox";
-import { fileKind, sizeText } from "@/ui/AttachmentTile";
 import { createSignal, For, onSettled, Show, untrack } from "solid-js";
+
+import { Toolbar } from "@vibevalley/base-ui";
+import { list, t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
+
 import { api, reasonOf } from "@/base/api";
+import { useCore } from "@/base/frame";
 import { useRouter } from "@/base/router";
-import { Icon } from "@/ui/Icon";
-import { Markdown } from "@/ui/Markdown";
-import { toast } from "@/ui/toasts";
 import { aria, autofocus } from "@/base/util";
+import { fileKind, sizeText } from "@/ui/AttachmentTile";
+import { Icon } from "@/ui/Icon";
+import { Lightbox } from "@/ui/Lightbox";
+import { Markdown } from "@/ui/Markdown";
+import { MoreMenu } from "@/ui/MoreMenu";
+import { toast } from "@/ui/toasts";
+
 import { drafts } from "./draft";
-import { useMessage } from "./follow";
 import { quickReactions } from "./emoji";
 import { EmojiPicker } from "./EmojiPicker";
-import { useCore } from "@/base/frame";
-import { markUnread } from "./reading";
-import { channelLabel, channelOf, messagePath } from "./places";
-import { type LinkedMessage, linkedMessages } from "./links";
 import { workbenchClock } from "./feed";
+import { useMessage } from "./follow";
+import { type LinkedMessage, linkedMessages } from "./links";
+import { channelLabel, channelOf, messagePath } from "./places";
+import { markUnread } from "./reading";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
@@ -72,7 +75,7 @@ export function MessageBody(props: { m: ChatMessage }) {
           ref={(el) => (box = el)}
           data-testid="message-body"
           data-folded={long() && !open() ? "" : undefined}
-          class={{ "fold-fade overflow-hidden": long() && !open() }}
+          class={{ "overflow-hidden fold-fade": long() && !open() }}
           style={long() && !open() ? { "max-height": `${foldPx}px` } : undefined}
         >
           <Markdown text={props.m.text} mentions />
@@ -489,7 +492,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
             done();
           }
         }}
-        class="block w-full resize-none rounded-md border border-focus bg-page px-2 py-1.5 text-base outline-none [field-sizing:content]"
+        class="block [field-sizing:content] w-full resize-none rounded-md border border-focus bg-page px-2 py-1.5 text-base outline-none"
       />
       <Show when={files.length > 0}>
         <div class="mt-1 flex flex-wrap gap-1.5">

@@ -1,10 +1,12 @@
 import { afterEach, expect, test } from "vite-plus/test";
+
 import type { Issue, IssueAct, IssueAction, IssueAttention, StateFrame, SessionView } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
 import { farmCommands } from "./commands";
 import { farm, resetFarm } from "./store";
-import { beds } from "./world/plots";
 import type { Tool } from "./tools";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { beds } from "./world/plots";
 afterEach(resetFarm);
 
 const buttons = (...names: IssueAct[]): IssueAction[] =>

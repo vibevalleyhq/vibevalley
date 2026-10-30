@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
-import { closedText } from "@vibevalley/protocol/rules";
 import type { Issue } from "@vibevalley/protocol";
+import { closedText } from "@vibevalley/protocol/rules";
 export type IssueTag = "queued" | "working" | "waiting" | "closed";
 
 export function issueTag(issue: Issue): IssueTag {

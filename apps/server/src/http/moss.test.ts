@@ -1,11 +1,15 @@
 import { request } from "node:http";
+
 import { describe, expect, it } from "@effect/vitest";
-import { mossLinePath } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+
+import { mossLinePath } from "@vibevalley/protocol";
+
 import { testConfig } from "@/testing/layers.ts";
 import { whenTrue } from "@/testing/until.ts";
 import { quietApp } from "@/testing/world.ts";
 import type { MossTransport } from "@/voice/moss.ts";
+
 import { app } from "./app.ts";
 
 /** A MOSS that attaches a session when asked and sends audio back as it came; it keeps the key it was given. */

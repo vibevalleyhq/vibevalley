@@ -3,6 +3,7 @@
 
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+
 import type { BrainMessage, CompactionSummaryMessage } from "./messages.ts";
 
 export function applySummary(messages: readonly BrainMessage[], summary: CompactionSummaryMessage): BrainMessage[] {
@@ -23,9 +24,10 @@ function parseLines(text: string): BrainMessage[] {
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     try {
-      const m = JSON.parse(line) as BrainMessage;
+      const m: unknown = JSON.parse(line);
       // A line cut off by a crash: the rest still reads.
-      if (m && typeof m === "object" && typeof m.role === "string") out.push(m);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a line this file wrote: a whole one is a BrainMessage
+      if (typeof m === "object" && m !== null && "role" in m && typeof m.role === "string") out.push(m as BrainMessage);
     } catch {
       continue;
     }
@@ -43,7 +45,10 @@ export function readLines(file: string): BrainMessage[] {
 }
 
 export class SessionFile {
-  constructor(readonly file: string) {}
+  readonly file: string;
+  constructor(file: string) {
+    this.file = file;
+  }
 
   load(): BrainMessage[] {
     return replay(readLines(this.file));

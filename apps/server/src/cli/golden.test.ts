@@ -4,8 +4,9 @@
 
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+
 import { cli, farm } from "@/testing/cli.ts";
+import { checkCases, goldenCases } from "@/testing/golden.ts";
 
 const cases = goldenCases("cli", "cli.jsonl.gz");
 

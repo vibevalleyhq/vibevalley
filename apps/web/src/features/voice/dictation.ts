@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // Dictation: tap to talk, tap again to stop; the recording goes to the server
 // (voice.dictate), which hands it to the transcription address in 声音's 听写, and the words come back for the field it
 // was started from. Recorded as 16 kHz mono WAV, which every transcriber takes. One recording at a time.
+
+import { t } from "@vibevalley/i18n";
 
 import { api, reasonOf } from "@/base/api";
 
@@ -170,7 +171,7 @@ export const dictation = new Dictation();
 /** Dictated words at the caret, or at the end: a space only between two Latin words, as Chinese runs on without one. */
 export function insertDictated(value: string, start: number, end: number, words: string) {
   const before = value.slice(0, start);
-  const ascii = /[A-Za-z0-9]/;
+  const ascii = /[A-Za-z0-9]/u;
   const gap = before && ascii.test(before.at(-1) ?? "") && ascii.test(words[0] ?? "") ? " " : "";
   const inserted = gap + words;
   return { value: before + inserted + value.slice(end), caret: start + inserted.length };

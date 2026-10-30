@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // VibeValley's command line, on effect/cli. With no command: VibeValley's own agent in a terminal (cli/chat.ts).
 // `runtime chat <runtime>` talks to another runtime the same way. Every other command is one of the endpoints
 // (cli/api.ts), called over HTTP: its answer is JSON on stdout; a failure is JSON on stderr with what to do next, and an
@@ -8,16 +7,20 @@ import { t } from "@vibevalley/i18n";
 //	node --import tsx src/cli.ts runtime chat claude
 //	node --import tsx src/cli.ts issue list
 
-import { messageOf } from "./errors.ts";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
+
 import "./cli/locale.ts";
 
-import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
-import { NodeRuntime, NodeServices } from "@effect/platform-node";
+
+import { t } from "@vibevalley/i18n";
+
 import { DryRunFlag, eventsCommand, groupCommands, issueWorkCommand, ServerFlag, stateCommand } from "./cli/api.ts";
 import { ownChat, runtimeChat } from "./cli/chat.ts";
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
+import { messageOf } from "./errors.ts";
 
 const version = "0.1.0";
 
@@ -68,6 +71,7 @@ const root = Command.make(
   (o) => chat(ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
 ).pipe(
   Command.withDescription(t("server.cli.command.root")),
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- effect's Command types subcommands by a tuple written out; these are built from the endpoint table
   Command.withSubcommands([...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
   Command.withGlobalFlags([ServerFlag, DryRunFlag]),
 );
@@ -89,10 +93,11 @@ function usageOf(e: CliError.CliError): Failure {
 export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
   const held: string[] = [];
   const hold = (...a: unknown[]) => void held.push(a.map(String).join(" "));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the real console with its writes held: everything else is inherited
   const console_ = Object.assign(Object.create(console) as Console.Console, { log: hold, error: hold, info: hold, warn: hold });
   const flush = (to: (s: string) => Effect.Effect<void, never, Stdio.Stdio>) =>
     Effect.suspend(() => {
-      const text = held.join("\n").replace(/\n+$/, "");
+      const text = held.join("\n").replace(/\n+$/u, "");
       held.length = 0;
       return text ? to(text) : Effect.void;
     });
@@ -110,7 +115,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
 
 /** The process ends with the command's code; Ctrl+C interrupts it, and its streams and requests are let go of first. */
 const codeOf = (end: Exit.Exit<unknown, unknown>) =>
-  Exit.isSuccess(end) ? (end.value as number) : Cause.hasInterruptsOnly(end.cause) ? exit.interrupted : exit.other;
+  Exit.isSuccess(end) ? (typeof end.value === "number" ? end.value : exit.ok) : Cause.hasInterruptsOnly(end.cause) ? exit.interrupted : exit.other;
 
 // Not every loader sets import.meta.main (tsx may not): the script run is then told by its path.
 if (import.meta.main ?? process.argv[1] === new URL(import.meta.url).pathname) {

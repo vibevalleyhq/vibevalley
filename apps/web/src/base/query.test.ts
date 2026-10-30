@@ -1,7 +1,8 @@
-import { expect, test, vi } from "vite-plus/test";
+import { QueryClient, type QueryObserverResult } from "@tanstack/solid-query";
 import type * as solid from "solid-js";
 import { createRoot, createSignal, flush } from "solid-js";
-import { QueryClient, type QueryObserverResult } from "@tanstack/solid-query";
+import { expect, test, vi } from "vite-plus/test";
+
 import { ready, useQuery } from "./query";
 
 // These tests exercise the real client reactive runtime without a DOM. Node otherwise selects Solid's SSR runtime.

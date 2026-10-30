@@ -1,16 +1,14 @@
 // Text as the farm measures it, which is JavaScript's own: lengths in UTF-16 units, whitespace as \s. A surrogate pair
 // cut in half becomes U+FFFD, so what is stored and sent is always valid UTF-8.
 
-const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
-
 /** s.slice(start, end), a surrogate pair cut in half made U+FFFD. */
-export const slice = (s: string, start: number, end?: number) => s.slice(start, end).replace(lone, "�");
+export const slice = (s: string, start: number, end?: number) => s.slice(start, end).toWellFormed();
 
 /** s as it is when it fits in max units; else its first max units and an ellipsis. */
 export const cut = (s: string, max: number) => (s.length > max ? slice(s, 0, max) + "…" : s);
 
 /** Runs of white space are one space. */
-export const oneLine = (s: string) => s.replace(/\s+/g, " ");
+export const oneLine = (s: string) => s.replace(/\s+/gu, " ");
 
 /** s on one line and trimmed, at most max units with the ellipsis. */
 export const clip = (s: string, max: number) => {

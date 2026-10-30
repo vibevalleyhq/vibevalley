@@ -5,33 +5,35 @@
 // instead is .agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md. The tests assemble the same modules
 // (testing/world.ts).
 
-import { Layer } from "effect";
 import { NodeServices } from "@effect/platform-node";
+import { Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
+
+import { Llm } from "@vibevalley/ai/llm";
+
 import { Agents } from "./agent/agent.ts";
+import { Artifacts, type ArtifactOptions } from "./artifact/artifact.ts";
 import { ServerConfig } from "./base/config.ts";
 import { Database, Db } from "./base/db.ts";
-import { Core } from "./core/core.ts";
-import { Artifacts, type ArtifactOptions } from "./artifact/artifact.ts";
 import { Channels } from "./channel/chat.ts";
+import { Connectors, type ConnectorOptions } from "./connector/connector.ts";
+import { Core } from "./core/core.ts";
+import { Crons, start as cronStart } from "./cron/cron.ts";
+import { Game, start as gameStart } from "./game/game.ts";
 import { Issues, type IssueOptions } from "./issue/issue.ts";
+import { Lan, type LanOptions } from "./lan/lan.ts";
+import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memories } from "./memory/memory.ts";
-import { layer as projection } from "./projection/projection.ts";
 import { Notices, start as noticeStart } from "./notice/notice.ts";
+import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { Projects, type ProjectHooks, start as projectStart } from "./project/project.ts";
+import { layer as projection } from "./projection/projection.ts";
 import { type RuntimeOptions, Runtimes } from "./runtime/runtime.ts";
 import { Sessions, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
-import { Crons, start as cronStart } from "./cron/cron.ts";
 import { Setting } from "./setting/setting.ts";
-import { Llm } from "@vibevalley/ai/llm";
 import { Tasks, start as taskGraphStart, type TaskOptions } from "./task/task.ts";
 import { Tools } from "./tool/tool.ts";
-import { Mcp, type McpOptions } from "./mcp/mcp.ts";
-import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
-import { Game, start as gameStart } from "./game/game.ts";
-import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
-import { Connectors, type ConnectorOptions } from "./connector/connector.ts";
 
 /** Builds layer on what is below it, keeping what is below. */
 const on =

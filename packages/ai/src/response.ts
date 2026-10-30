@@ -2,6 +2,7 @@
 // (testdata/deepseek.jsonl.gz holds what pi-ai made of each stream), with pi-ai's events on the way.
 
 import { Predicate } from "effect";
+
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -42,7 +43,7 @@ export class SseData {
     if (l.startsWith(":")) return undefined;
     const colon = l.indexOf(":");
     const field = colon < 0 ? l : l.slice(0, colon);
-    if (field === "data") this.data.push(colon < 0 ? "" : l.slice(colon + 1).replace(/^ /, ""));
+    if (field === "data") this.data.push(colon < 0 ? "" : l.slice(colon + 1).replace(/^ /u, ""));
     return undefined;
   }
 }
@@ -75,10 +76,12 @@ export class Fold {
   private rawStopReason: string | undefined;
   private errorMessage: string | undefined;
 
-  constructor(
-    private readonly model: Model,
-    private readonly timestamp: number,
-  ) {}
+  private readonly model: Model;
+  private readonly timestamp: number;
+  constructor(model: Model, timestamp: number) {
+    this.model = model;
+    this.timestamp = timestamp;
+  }
 
   start(): AssistantMessageEvent {
     return { type: "start", partial: this.message() };
@@ -86,11 +89,12 @@ export class Fold {
 
   /** A data event's JSON. */
   chunk(chunk: unknown): AssistantMessageEvent[] {
-    if (!chunk || typeof chunk !== "object") return [];
+    if (typeof chunk !== "object" || chunk === null) return [];
     const c = chunk as { id?: unknown; model?: unknown; usage?: RawUsage; choices?: unknown };
     if (typeof c.id === "string" && !this.responseId) this.responseId = c.id;
     if (typeof c.model === "string" && c.model.length > 0 && c.model !== this.model.id) this.responseModel ??= c.model;
     if (c.usage) this.usage = usageOf(c.usage, this.model);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
     const choice = Array.isArray(c.choices) ? (c.choices[0] as Choice | undefined) : undefined;
     if (!choice) return [];
     if (!c.usage && choice.usage) this.usage = usageOf(choice.usage, this.model);
@@ -106,8 +110,8 @@ export class Fold {
     if (!delta) return events;
     // Thinking before the text: a proxy may put both in one delta, and the thinking block comes first.
     const field = reasoningFields.find((f) => typeof delta[f] === "string" && delta[f].length > 0);
-    if (field) {
-      const piece = delta[field] as string;
+    const piece = field === undefined ? undefined : delta[field];
+    if (field !== undefined && typeof piece === "string") {
       if (!this.thinking) {
         this.thinking = { kind: "thinking", thinking: "", signature: field };
         events.push(this.opened("thinking_start", this.thinking));
@@ -123,6 +127,7 @@ export class Fold {
       this.text.text += delta.content;
       events.push({ type: "text_delta", contentIndex: this.blocks.indexOf(this.text), delta: delta.content, partial: this.message() });
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
     for (const call of Array.isArray(delta.tool_calls) ? (delta.tool_calls as ToolCallDelta[]) : []) {
       const block = this.toolBlock(call, events);
       if (!block.id && call.id) {
@@ -143,9 +148,11 @@ export class Fold {
   /** The stream ended: each block closes, then done, or error when the model's answer was not a complete one. */
   end(): AssistantMessageEvent[] {
     const events = this.blocks.map((b) => this.closed(b));
-    if (this.stopReason === "error") return [...events, this.failed(this.errorMessage || "Provider returned an error stop reason", false)];
-    if (!this.finished || this.stopReason === "pending") return [...events, this.failed("Stream ended without finish_reason", false)];
-    return [...events, { type: "done", reason: this.stopReason as "stop" | "length" | "toolUse", message: this.message() }];
+    const reason = this.stopReason;
+    if (reason === "error" || reason === "aborted")
+      return [...events, this.failed(this.errorMessage || "Provider returned an error stop reason", reason === "aborted")];
+    if (!this.finished || reason === "pending") return [...events, this.failed("Stream ended without finish_reason", false)];
+    return [...events, { type: "done", reason, message: this.message() }];
   }
 
   /** The request failed, or was stopped, partway: the blocks stay as they are. */
@@ -163,7 +170,7 @@ export class Fold {
       provider: this.model.provider,
       model: this.model.id,
       usage: this.usage,
-      // pending only while streaming; a partial message is not read for it.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pending only while streaming; a partial message is not read for it
       stopReason: this.stopReason as StopReason,
       timestamp: this.timestamp,
       ...(this.responseId !== undefined ? { responseId: this.responseId } : {}),
@@ -207,7 +214,7 @@ export class Fold {
         const parsed = toolCallArguments(block.partial);
         block.arguments = parsed.arguments;
         if (parsed.argumentsError !== undefined) block.argumentsError = parsed.argumentsError;
-        return { type: "toolcall_end", contentIndex, toolCall: contentOf(block) as ToolCall, partial: this.message() };
+        return { type: "toolcall_end", contentIndex, toolCall: toolCallOf(block), partial: this.message() };
       }
     }
   }
@@ -220,14 +227,18 @@ function contentOf(b: Block): TextContent | ThinkingContent | ToolCall {
     case "thinking":
       return { type: "thinking", thinking: b.thinking, thinkingSignature: b.signature };
     case "tool":
-      return {
-        type: "toolCall",
-        id: b.id,
-        name: b.name,
-        arguments: b.arguments,
-        ...(b.argumentsError !== undefined ? { argumentsError: b.argumentsError } : {}),
-      };
+      return toolCallOf(b);
   }
+}
+
+function toolCallOf(b: Extract<Block, { kind: "tool" }>): ToolCall {
+  return {
+    type: "toolCall",
+    id: b.id,
+    name: b.name,
+    arguments: b.arguments,
+    ...(b.argumentsError !== undefined ? { argumentsError: b.argumentsError } : {}),
+  };
 }
 
 interface Choice {
@@ -248,17 +259,17 @@ interface RawUsage {
 
 /** input is the prompt not read from the cache; output already counts reasoning. */
 function usageOf(raw: RawUsage, model: Model): Usage {
-  const prompt = raw.prompt_tokens || 0;
+  const prompt = raw.prompt_tokens ?? 0;
   const cacheRead = raw.prompt_tokens_details?.cached_tokens ?? raw.prompt_cache_hit_tokens ?? raw.cached_tokens ?? 0;
-  const cacheWrite = raw.prompt_tokens_details?.cache_write_tokens || 0;
+  const cacheWrite = raw.prompt_tokens_details?.cache_write_tokens ?? 0;
   const input = Math.max(0, prompt - cacheRead - cacheWrite);
-  const output = raw.completion_tokens || 0;
+  const output = raw.completion_tokens ?? 0;
   const usage = {
     input,
     output,
     cacheRead,
     cacheWrite,
-    reasoning: raw.completion_tokens_details?.reasoning_tokens || 0,
+    reasoning: raw.completion_tokens_details?.reasoning_tokens ?? 0,
     totalTokens: input + output + cacheRead + cacheWrite,
   };
   return { ...usage, cost: costOf(model, usage) };
@@ -314,7 +325,7 @@ export function repairJson(json: string): string {
         out += "\\\\";
         continue;
       }
-      if (next === "u" && /^[0-9a-fA-F]{4}$/.test(json.slice(i + 2, i + 6))) {
+      if (next === "u" && /^[0-9a-fA-F]{4}$/u.test(json.slice(i + 2, i + 6))) {
         out += `\\u${json.slice(i + 2, i + 6)}`;
         i += 5;
         continue;

@@ -1,8 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // What an artifact may be, and the headers its content is served with (docs/subsystems/artifact.md).
 
-import { isOneOf } from "@vibevalley/protocol/rules";
+import { t } from "@vibevalley/i18n";
 import { ArtifactKindValues } from "@vibevalley/protocol";
+import { isOneOf } from "@vibevalley/protocol/rules";
 
 /** The largest artifact body, bytes, and title, characters. */
 export const artifactMax = 5 * 1024 * 1024;

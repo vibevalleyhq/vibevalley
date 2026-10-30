@@ -1,13 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { NodeServices } from "@effect/platform-node";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
+
 import { ServerConfig } from "@/base/config.ts";
 import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { untilGot as until } from "@/testing/until.ts";
+
 import { Projects, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
 import { type MergeFailure } from "./shapes.ts";
 
@@ -40,7 +43,7 @@ describe("projects", () => {
       expect(projectProblem({ name: "ok", github })).not.toBe("");
     for (const name of ["../bad", "/tmp/bad", ".hidden", "-option", "a/b"]) expect(projectProblem({ name })).not.toBe("");
     expect(projectProblem({ name: "ok-name_1.2" })).toBe("");
-    expect(projectProblem({ name: "x", github: "https://gitlab.com/a/b" })).toMatch(/GitHub/);
+    expect(projectProblem({ name: "x", github: "https://gitlab.com/a/b" })).toMatch(/GitHub/u);
   });
 
   it.effect("a new project has a first commit; an existing folder is refused and left alone; one of two at once", () => {
@@ -54,7 +57,7 @@ describe("projects", () => {
         const made = yield* p.create({ name: "garden" });
         expect(made.git).toBe(true);
         expect(gitSync(made.path, "rev-parse", "HEAD")).not.toBe("");
-        expect((yield* Effect.flip(p.create({ name: "existing" }))).message).toMatch(/已经存在/);
+        expect((yield* Effect.flip(p.create({ name: "existing" }))).message).toMatch(/已经存在/u);
         const both = yield* Effect.all([Effect.result(p.create({ name: "same" })), Effect.result(p.create({ name: "same" }))], { concurrency: 2 });
         expect(both.filter((r) => r._tag === "Success")).toHaveLength(1);
         expect(readFileSync(join(root, "existing", "keep"), "utf8")).toBe("mine");
@@ -103,9 +106,9 @@ describe("projects", () => {
         expect((yield* p.mergeInto(place, "vibevalley/task-1")).hashes).toHaveLength(1);
         const changes = yield* p.branchChanges("task", "vibevalley/task-1");
         expect(changes!.files.map((f) => f.path)).toEqual(["a.txt"]);
-        expect(changes!.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/);
+        expect(changes!.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/u);
         expect(yield* p.branchChanges("task", "vibevalley/missing")).toBeUndefined();
-        expect(yield* p.mergeBranch("task", "vibevalley/task-1")).toMatch(/1 个提交合进了 task 的 main/);
+        expect(yield* p.mergeBranch("task", "vibevalley/task-1")).toMatch(/1 个提交合进了 task 的 main/u);
         expect(yield* p.run(join(root, "task"), "cat a.txt && exit 3")).toEqual({
           ok: false,
           output: "a",
@@ -143,7 +146,7 @@ describe("projects", () => {
         expect(changes.files[2]!.patch).toBe(
           "diff --git a/keep.txt b/keep.txt\nindex 422c2b7..7be73ce 100644\n--- a/keep.txt\n+++ b/keep.txt\n@@ -1,2 +1,3 @@\n a\n-b\n+B\n+c\n",
         );
-        expect(changes.files[3]!.patch).toMatch(/^diff --git a\/sp ace.txt b\/sp ace.txt\n[\s\S]*\+new$/);
+        expect(changes.files[3]!.patch).toMatch(/^diff --git a\/sp ace.txt b\/sp ace.txt\n[\s\S]*\+new$/u);
         expect(changes.commits.map((c) => c.subject)).toEqual(["work"]);
       }),
     );
@@ -361,7 +364,7 @@ describe("projects", () => {
     projects(
       workRoot(),
       Effect.gen(function* () {
-        expect((yield* Effect.flip((yield* Projects).languages("app"))).message).toMatch(/tokei/);
+        expect((yield* Effect.flip((yield* Projects).languages("app"))).message).toMatch(/tokei/u);
       }),
       { tokei: "/nowhere/tokei" },
     ),
@@ -432,8 +435,8 @@ describe("projects", () => {
               if (check === "fail") {
                 expect(result._tag).toBe("Failure");
                 const e = (result as { failure: MergeFailure }).failure;
-                expect(e.message).toMatch(/check-stdout/);
-                expect(e.message).toMatch(/check-stderr/);
+                expect(e.message).toMatch(/check-stdout/u);
+                expect(e.message).toMatch(/check-stderr/u);
                 expect(gitSync(path, "rev-parse", target)).toBe(before);
                 expect(existsSync(place.cwd)).toBe(true);
               } else {
@@ -464,9 +467,9 @@ describe("projects", () => {
           );
           const started = Date.now();
           const e = yield* Effect.flip(p.merge(place));
-          expect(e.message).toMatch(/超时/);
-          expect(e.message).toMatch(/line-59/);
-          expect(e.message).not.toMatch(/discarded-first-line/);
+          expect(e.message).toMatch(/超时/u);
+          expect(e.message).toMatch(/line-59/u);
+          expect(e.message).not.toMatch(/discarded-first-line/u);
           expect(Date.now() - started).toBeLessThan(10_000);
           expect(existsSync(place.cwd)).toBe(true);
         }),
@@ -542,7 +545,7 @@ describe("projects", () => {
         gitSync(kept.cwd, "commit", "-qm", "work");
         expect(yield* p.clear("demo", 8)).toMatchObject({
           kept: true,
-          reason: expect.stringMatching(/分支留着/),
+          reason: expect.stringMatching(/分支留着/u),
         });
         expect(yield* p.clear("missing", 9)).toEqual({ kept: false });
       }),
@@ -621,7 +624,7 @@ describe("projects", () => {
                 const result = yield* Fiber.join(merging);
                 if (changed) {
                   expect(result._tag).toBe("Failure");
-                  expect((result as { failure: Error }).failure.message).toMatch(/检查以后/);
+                  expect((result as { failure: Error }).failure.message).toMatch(/检查以后/u);
                   expect(gitSync(join(root, "demo"), "rev-parse", target)).toBe(before);
                   expect(existsSync(place.cwd)).toBe(true);
                 } else expect(result._tag).toBe("Success");
@@ -659,7 +662,7 @@ describe("projects", () => {
     return projects(
       root,
       Effect.gen(function* () {
-        expect((yield* Effect.flip((yield* Projects).workplace("linked", 1, true, ""))).message).toMatch(/工作目录里面/);
+        expect((yield* Effect.flip((yield* Projects).workplace("linked", 1, true, ""))).message).toMatch(/工作目录里面/u);
       }),
     );
   });

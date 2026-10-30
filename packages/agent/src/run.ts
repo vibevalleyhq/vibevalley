@@ -1,6 +1,7 @@
 // What a run cost and said. One run takes in its tool turns and the inputs that came while it went on.
 
 import { type AssistantMessage, type Usage, zeroUsage } from "@vibevalley/ai/messages";
+
 import { messageText } from "./messages.ts";
 
 /** usage leaves out earlier runs; contextTokens is the newest request's. */
@@ -69,7 +70,7 @@ export class RunAccounting {
 
   partial(m: AssistantMessage) {
     if (!this.active()) this.begin();
-    this.pending = m.usage ? { ...m.usage, cost: { ...m.usage.cost } } : zeroUsage();
+    this.pending = { ...m.usage, cost: { ...m.usage.cost } };
     this.current = { ...this.current, contextTokens: contextOf(m) };
   }
 
@@ -111,4 +112,4 @@ export class RunAccounting {
   }
 }
 
-const contextOf = (m: AssistantMessage) => (m.usage ? m.usage.input + m.usage.cacheRead + m.usage.output : 0);
+const contextOf = (m: AssistantMessage) => m.usage.input + m.usage.cacheRead + m.usage.output;

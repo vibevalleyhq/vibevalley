@@ -6,7 +6,8 @@ export type Value = string | number | boolean;
 export type Params = Readonly<Record<string, Value>>;
 
 /** The parts of a message: text, and placeholders with their branches. */
-type Kind = "plural" | "selectordinal" | "select";
+const kinds = ["plural", "selectordinal", "select"] as const;
+type Kind = (typeof kinds)[number];
 type Part = string | { readonly name: string; readonly kind?: Kind; readonly cases?: Readonly<Record<string, Part[]>> };
 
 const parsed = new Map<string, Part[]>();
@@ -34,17 +35,18 @@ function parse(text: string): Part[] {
     return out;
   };
   const placeholderAt = (start: number): Part | undefined => {
-    const m = /^\{\s*([A-Za-z_$][\w$]*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/.exec(text.slice(start));
+    const m = /^\{\s*([A-Za-z_$][\w$]*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/u.exec(text.slice(start));
     if (!m) return undefined;
     i = start + m[0].length;
-    if (!m[2]) {
+    const kind = kinds.find((k) => k === m[2]);
+    if (!kind) {
       if (text[i] !== "}") return void (i = start);
       i++;
       return { name: m[1]! };
     }
     const cases: Record<string, Part[]> = {};
     while (true) {
-      const c = /^\s*([^\s{}]+)\s*\{/.exec(text.slice(i));
+      const c = /^\s*([^\s{}]+)\s*\{/u.exec(text.slice(i));
       if (!c) break;
       i += c[0].length;
       cases[c[1]!] = parts("}");
@@ -53,7 +55,7 @@ function parse(text: string): Part[] {
     while (text[i] === " ") i++;
     if (text[i] !== "}") return void (i = start);
     i++;
-    return { name: m[1]!, kind: m[2] as Kind, cases };
+    return { name: m[1]!, kind, cases };
   };
   return parts("");
 }
@@ -64,7 +66,7 @@ const ordinal = new Intl.PluralRules("en", { type: "ordinal" });
 function render(parts: readonly Part[], params: Params, count?: number): string {
   let out = "";
   for (const p of parts) {
-    if (typeof p === "string") out += count === undefined ? p : p.replace(/#/g, String(count));
+    if (typeof p === "string") out += count === undefined ? p : p.replace(/#/gu, String(count));
     else if (!p.kind) out += p.name in params ? String(params[p.name]) : `{${p.name}}`;
     else {
       const v = params[p.name];

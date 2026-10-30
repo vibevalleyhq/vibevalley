@@ -2,6 +2,7 @@
 
 import { Clock, Context, Data, Effect, Layer, Stream, Predicate } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
+
 import type { AssistantMessage, Context as LlmContext } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -91,9 +92,14 @@ export const make = Effect.gen(function* () {
             if (data === undefined) return Effect.succeed([] as AssistantMessageEvent[]);
             return Effect.try({ try: () => JSON.parse(data) as unknown, catch: () => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`) }).pipe(
               Effect.flatMap((chunk) => {
-                const error = (chunk as { error?: { message?: unknown } } | null)?.error;
-                return error
-                  ? Effect.fail(failed("stream", typeof error.message === "string" ? error.message : JSON.stringify(error)))
+                const error: unknown = typeof chunk === "object" && chunk !== null && "error" in chunk ? chunk.error : undefined;
+                return error !== undefined && error !== null
+                  ? Effect.fail(
+                      failed(
+                        "stream",
+                        typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : JSON.stringify(error),
+                      ),
+                    )
                   : Effect.succeed(fold.chunk(chunk));
               }),
             );

@@ -1,17 +1,19 @@
-import { t } from "@vibevalley/i18n";
 // Talking to the orchestrator: the server hands out the call (appId, channel, uid, one token) and starts Agora's
 // conversational AI agent in it; the page only joins, on the host's line (the phone's) or Agora's Web SDK (agora.ts). The
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
-import type { RtcLine } from "@vibevalley/protocol/host";
-import { currentHost } from "@/base/host";
+import { t } from "@vibevalley/i18n";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
+import type { RtcLine } from "@vibevalley/protocol/host";
+
 import { api, reasonOf } from "@/base/api";
+import { currentHost } from "@/base/host";
+import { prefsNow } from "@/base/prefs";
+
 import { webRtc } from "./agora";
 import { LiveCaptions } from "./captions";
-import { prefsNow } from "@/base/prefs";
 
 export type CallPhase = "idle" | "connecting" | "live" | "ending";
 
@@ -41,7 +43,9 @@ export class VoiceCall {
   private readonly listeners = new Set<() => void>();
 
   /** The helper the owner picked to send work to, or undefined for the orchestrator's choice. */
-  constructor(private readonly agentPick: () => string | undefined = () => undefined) {
+  private readonly agentPick: () => string | undefined;
+  constructor(agentPick: () => string | undefined = () => undefined) {
+    this.agentPick = agentPick;
     this.captions.onHeard = (text) => this.caption(text, true);
     this.captions.onAnswered = (text) => this.caption(text, false);
   }

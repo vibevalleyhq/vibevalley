@@ -2,6 +2,7 @@
 // the state stream's updates while a REST read is in flight.
 import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, type QueryObserverResult } from "@tanstack/solid-query";
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
+
 import { api } from "./api";
 
 /** REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. */
@@ -33,7 +34,7 @@ export function useQuery<TQueryFnData, TError = Error, TData = TQueryFnData, TQu
     };
   });
   return new Proxy(observer.getCurrentResult(), {
-    get: (_, key) => result()[key as keyof ReturnType<typeof observer.getCurrentResult>],
+    get: (_, key): unknown => Reflect.get(result(), key),
   });
 }
 
@@ -48,6 +49,7 @@ export type Sprites = Record<string, { w: number; h: number; ax?: number; ay?: n
 export const useSprites = () =>
   useQuery(() => ({
     queryKey: ["sprites"],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
     queryFn: async () => (await (await fetch("/pixel/sprites.json")).json()) as Sprites,
     staleTime: Infinity,
   }));

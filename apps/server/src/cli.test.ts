@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+
 import { endpoints, kebab, pathOf } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
+
 import { lookIn, memoriesOf } from "./errors.ts";
 import { cli, farm } from "./testing/cli.ts";
 
@@ -57,7 +59,7 @@ describe("the command line", () => {
       const refused = yield* cli(["issue", "status", "update", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
       expect([refused.code, refused.out, refused.failure?.tag]).toEqual([3, "", "Refused"]);
       // The refusal says what can be done instead, as commands that run as they are.
-      const cancel = refused.failure?.next?.find((n) => n.run?.includes('{"status":"canceled"}'));
+      const cancel = refused.failure?.next?.find((n) => n.run?.includes('{"status":"canceled"}') === true);
       expect(cancel?.run).toBeDefined();
       const canceled = yield* cli([...cancel!.run!, "--server", server]);
       expect([canceled.code, (JSON.parse(canceled.out) as { status: string }).status]).toEqual([0, "canceled"]);
