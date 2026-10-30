@@ -136,6 +136,9 @@ export default defineConfig({
       // Frames and the core state are shared: sorting or reversing one in place changes it for everyone holding it.
       "unicorn/no-array-sort": "error",
       "unicorn/no-array-reverse": "error",
+      // Awaits one after another in a loop: either the steps depend on each other, which the code says where it does it,
+      // or they could run together.
+      "eslint/no-await-in-loop": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -198,6 +201,11 @@ export default defineConfig({
           "packages/testkit/src/**",
         ],
         rules: { "typescript/no-unsafe-type-assertion": "off" },
+      },
+      {
+        // Playwright drives one page: its steps cannot run together.
+        files: ["apps/*/test/**/*.spec.ts", "apps/*/test/fixtures.ts"],
+        rules: { "eslint/no-await-in-loop": "off" },
       },
       {
         // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; so does

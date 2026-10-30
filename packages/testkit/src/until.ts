@@ -45,9 +45,11 @@ export const until = (ok: () => boolean | Promise<boolean>, what: string | (() =
  * real time, or rejected with what it waited for. */
 export const whenTrue = async (ok: () => boolean | Promise<boolean>, what: string, ms = 5_000): Promise<void> => {
   const deadline = performance.now() + ms;
+  /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
   while (!(await ok())) {
     if (performance.now() > deadline) throw new Error(`waited for ${what}`);
     await aMoment();
+    /* oxlint-enable eslint/no-await-in-loop */
   }
 };
 

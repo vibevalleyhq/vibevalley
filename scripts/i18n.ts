@@ -492,6 +492,7 @@ switch (command) {
     find(rest.join(" "));
     break;
   case "migrate":
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each file's migration adds to the same catalogs
     for (const f of rest) await migrate(f);
     break;
   default:

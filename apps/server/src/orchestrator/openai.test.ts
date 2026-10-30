@@ -102,10 +102,13 @@ describe("chat/completions", () => {
       [strict, { model: "m", messages: [] }, 400, "no_user_message"],
       [strict, "not an object", 400, "invalid_json"],
     ];
-    for (const [handle, body, status, code] of cases) {
-      const res = await ask(handle, body);
-      expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([status, code]);
-    }
+    const answers = await Promise.all(
+      cases.map(async ([handle, body]) => {
+        const res = await ask(handle, body);
+        return [res.status, ((await res.json()) as { error: { code: string } }).error.code];
+      }),
+    );
+    expect(answers).toEqual(cases.map(([, , status, code]) => [status, code]));
     const misheard = await ask(lenient, { model: "m", messages: [] });
     expect([misheard.status, await misheard.text()]).toEqual([200, expect.stringContaining("没听清")]);
     expect((await ask(strict, undefined, "GET")).status).toBe(405);
@@ -127,10 +130,13 @@ describe("chat/completions", () => {
       { model: "m", stream: "false", messages: [] },
       { model: 1, messages: [] },
     ];
-    for (const body of cases) {
-      const res = await ask(handle, body);
-      expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([400, "invalid_json"]);
-    }
+    const answers = await Promise.all(
+      cases.map(async (body) => {
+        const res = await ask(handle, body);
+        return [res.status, ((await res.json()) as { error: { code: string } }).error.code];
+      }),
+    );
+    expect(answers).toEqual(cases.map(() => [400, "invalid_json"]));
     expect(calls).toBe(0);
   });
 });

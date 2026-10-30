@@ -101,7 +101,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       yield* Effect.addFinalizer(() =>
         Effect.promise(async () => {
-          for (const cleanup of cleanups) await cleanup();
+          await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
       const issues = yield* Issues;
@@ -159,7 +159,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       yield* Effect.addFinalizer(() =>
         Effect.promise(async () => {
-          for (const cleanup of cleanups) await cleanup();
+          await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
       const issues = yield* Issues;

@@ -135,6 +135,7 @@ export async function runVerification(command: string[] = [], options: Verificat
   const stop = async (child: Child) => {
     signal(child, "SIGTERM");
     const deadline = Date.now() + 30_000;
+    // oxlint-disable-next-line eslint/no-await-in-loop -- a poll: each try waits for the one before
     while (alive(child) && Date.now() < deadline) await sleep(50);
     if (alive(child) && !signal(child, "SIGKILL")) throw new Error(`cannot stop owned process group ${child.pid}`);
     await child.exited;
@@ -188,6 +189,7 @@ export async function runVerification(command: string[] = [], options: Verificat
         throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : inspect(outputFailure)}`);
       if (address) {
         try {
+          /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
           const response = await fetch(address + pathOf("server.health.get"), { method: "POST", signal: AbortSignal.timeout(1_000) });
           if (response.ok) {
             const health = await response.json();
@@ -201,6 +203,7 @@ export async function runVerification(command: string[] = [], options: Verificat
         }
       }
       await sleep(100);
+      /* oxlint-enable eslint/no-await-in-loop */
     }
     if (!address || !existsSync(join(evidence, "health.json"))) throw new Error(`server did not become healthy; see ${log}`);
     const run = command.length > 0 ? command : [cli, "server", "health"];
@@ -215,6 +218,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     const failures: unknown[] = [];
     for (const child of [...owned].toReversed()) {
       try {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- the last started stops first: it may hold what an earlier one serves
         await stop(child);
       } catch (error) {
         failures.push(error);

@@ -19,7 +19,7 @@ const home = () => {
 };
 const sessions: Session[] = [];
 afterEach(async () => {
-  for (const s of sessions.splice(0)) await s.dispose();
+  await Promise.all(sessions.splice(0).map((s) => s.dispose()));
   for (const done of homes.splice(0)) done();
 });
 

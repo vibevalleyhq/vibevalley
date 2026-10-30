@@ -157,6 +157,7 @@ export async function review(rule: string, comments: readonly Comment[], ask: As
   const found: Finding[][] = [];
   let next = 0;
   const worker = async () => {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- a worker of a pool: each takes the next batch when it is done with one
     for (let i = next++; i < batches.length; i = next++) found[i] = readVerdicts(await ask(prompt(rule, batches[i]!)), batches[i]!);
   };
   await Promise.all(Array.from({ length: Math.min(parallel, batches.length) }, worker));

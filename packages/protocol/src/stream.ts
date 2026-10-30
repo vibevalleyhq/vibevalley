@@ -25,6 +25,7 @@ export async function readStream<P extends keyof Streams>(
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
   for (;;) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- a stream is read a chunk at a time
     const { value, done } = await reader.read();
     if (done) throw new Error(`${url}: ended`);
     buffer += value;

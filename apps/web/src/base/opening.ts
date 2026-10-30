@@ -42,8 +42,10 @@ async function pageReady() {
   await firstFrame();
   // A place shown on the frame mounts now and starts its reads; one read's answer can start the next.
   for (let round = 0; round < 3; round++) {
+    /* oxlint-disable eslint/no-await-in-loop -- frames come one after another, and one read's answer can start the next */
     await nextFrame();
     await readsDone();
+    /* oxlint-enable eslint/no-await-in-loop */
   }
   await Promise.all([...document.images].filter((i) => !i.complete).map((i) => i.decode().catch(() => undefined)));
 }

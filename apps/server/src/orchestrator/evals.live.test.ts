@@ -104,6 +104,7 @@ describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {
       let passed = 0;
       let tokens = 0;
       for (let i = 0; i < n; i++) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- one request at a time to the live model, within its rate limit
         const sample = await replay(c, model, tools);
         tokens += sample.tokens;
         const missed = check(c.expect, sample.turn);

@@ -107,7 +107,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const issueOf = (h: Session) => h.issue ?? h.id;
   const everyone = (action: "stop" | "dismiss") =>
     run(async () => {
-      for (const h of sessions()) await (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status.update({ id: issueOf(h), status: "canceled" }));
+      await Promise.all(
+        sessions().map((h) => (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status.update({ id: issueOf(h), status: "canceled" }))),
+      );
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (

@@ -21,8 +21,10 @@ const out = join(mobile, ".screens");
 mkdirSync(out, { recursive: true });
 const run = (cmd: string, ...args: string[]) => execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
 const until = async <T>(get: () => Promise<T | undefined> | T | undefined, what: string, ms = 120_000): Promise<T> => {
+  /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
   for (const end = Date.now() + ms; Date.now() < end; await sleep(500)) {
     const got = await get();
+    /* oxlint-enable eslint/no-await-in-loop */
     if (got !== undefined) return got;
   }
   throw new Error("waited for " + what);
@@ -66,7 +68,7 @@ function android(): Device {
       let port = 9333;
       for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/gu) ?? [])) {
         adb("forward", `tcp:${++port}`, "localabstract:" + socket);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Chrome's DevTools list
+        // oxlint-disable-next-line eslint/no-await-in-loop, typescript/no-unsafe-type-assertion -- each socket is forwarded to the next port before it is asked; Chrome's DevTools list
         const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).catch(() => undefined))?.json().catch(() => [])) as
           | { url: string; webSocketDebuggerUrl: string }[]
           | undefined;
@@ -186,6 +188,6 @@ try {
   if ((await api.lan.get()).pairing) throw new Error("it asked to pair again");
   console.log("back after a restart");
 } finally {
-  for (const d of (await api.lan.get()).devices) await api.lan.device.delete({ id: d.id });
+  await Promise.all((await api.lan.get()).devices.map((d) => api.lan.device.delete({ id: d.id })));
   await api.lan.update({ open: false });
 }

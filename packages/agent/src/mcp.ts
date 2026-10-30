@@ -126,6 +126,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
     const tools: Tool[] = [];
     let cursor: string | undefined;
     do {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each page's cursor comes with the page before
       const page = await timeout(client.listTools(cursor ? { cursor } : {}), callTimeoutMs, signal);
       for (const t of page.tools) tools.push(mcpTool(client, server.name, t));
       cursor = page.nextCursor;

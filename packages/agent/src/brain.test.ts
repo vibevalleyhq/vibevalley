@@ -244,6 +244,7 @@ describe("the agent", () => {
       dir,
       repeat(12, long),
       async (r) => {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
         for (let n = 1; n <= 5; n++) await r.ask(`第 ${n} 件事`);
         await whenTrue(
           () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined),
@@ -391,6 +392,7 @@ describe("the agent", () => {
         await r.ask("第 1 件事");
         remember(dir, "记在折叠之前", new Date());
         const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
+        // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
         for (let n = 2; n <= 5 && !folded(); n++) await r.ask(`第 ${n} 件事`);
         await whenTrue(folded, "the history folded");
         await r.ask("折叠之后");
@@ -496,6 +498,7 @@ describe("the agent", () => {
         undefined,
         () => answer("就地的摘要"),
         async (r, choices) => {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
           for (const words of ["一", "二", "三"]) await r.ask(words);
           expect(r.requests.length).toBe(3);
           await whenTrue(() => idleFolded(r), "idleFolded(r)");
@@ -518,6 +521,7 @@ describe("the agent", () => {
         undefined,
         () => answer([toolCall("list_dir", {})]),
         async (r) => {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await whenTrue(() => idleFolded(r), "idleFolded(r)");
           expect((r.agent.history()[0] as CompactionSummaryMessage).summary).toBe("另起的摘要");
@@ -535,6 +539,7 @@ describe("the agent", () => {
         },
         () => answer("摘要"),
         async (r) => {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a conversation's turns, in order
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await whenTrue(() => asked > 0, "asked > 0");
           await whenTrue(() => !r.agent.busy(), "!r.agent.busy()");
