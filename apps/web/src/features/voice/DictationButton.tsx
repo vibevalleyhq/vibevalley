@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // The dictation button every input row has.
+
+import { t } from "@vibevalley/i18n";
 
 import type { IconName } from "@/ui/icons";
 

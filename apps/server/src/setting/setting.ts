@@ -1,7 +1,8 @@
-import { t, setLocale } from "@vibevalley/i18n";
 // settings.json in the home, readable by the owner only (0600). A key saved here wins over the configuration's and is read
 // at each use, so it takes effect at once; keys are never logged, and a page sees only where each comes from and its last
 // characters.
+
+import { t, setLocale } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
 import { readFileSync } from "node:fs";

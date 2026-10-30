@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The project sign by the mast: whose farm this is (every plot here is that project's); a click goes back to the
 // projects' map to enter another island.
+
+import { t } from "@vibevalley/i18n";
 
 import { Show } from "solid-js";
 import { useRouter } from "@/base/router";

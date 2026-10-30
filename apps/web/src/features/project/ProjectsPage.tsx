@@ -1,6 +1,7 @@
-import { list, t } from "@vibevalley/i18n";
 // 项目: the codebases in the work root; 全部 is the whole map, a project its island, its
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
+
+import { list, t } from "@vibevalley/i18n";
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";

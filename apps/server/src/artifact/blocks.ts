@@ -1,7 +1,8 @@
-import { list, t } from "@vibevalley/i18n";
 // A blocks artifact's blocks, changed only by batches of ops (ops.ts), from the owner over HTTP and from helpers through
 // their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
 // its seq goes up in order. Part of Artifacts (artifact.ts), which owns the artifact's row.
+
+import { list, t } from "@vibevalley/i18n";
 
 import type {
   Agent,

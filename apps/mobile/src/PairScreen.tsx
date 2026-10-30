@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // Pairing: the camera reads the QR code the farm's 连接到本机 shows (or the link is pasted, or arrives as a
 // vibevalley:// link); the phone names itself and waits for the owner to nod on that computer.
+
+import { t } from "@vibevalley/i18n";
 
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useState } from "react";

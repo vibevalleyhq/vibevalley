@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // 种田 2048 on the phone: the rules are farm/phone/games/merge.ts; here the pad, swipes and the drawing, each stage a
 // 12×12 picture. The field is kept while the phone is away or a call comes in. Arrows (or a swipe on the field) slide,
 // B takes one slide back, A starts, goes on after 丰收, and asks before starting over.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show } from "solid-js";
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";

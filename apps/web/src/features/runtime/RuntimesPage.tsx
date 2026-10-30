@@ -1,8 +1,9 @@
+// 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
+// its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
+
 import { Meter } from "@vibevalley/base-ui";
 import { variant, Keyed } from "@/base/util";
 import { t } from "@vibevalley/i18n";
-// 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
-// its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

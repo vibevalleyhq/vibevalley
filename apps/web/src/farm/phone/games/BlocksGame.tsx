@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // 方块 on the phone: the rules are farm/phone/games/blocks.ts; here the clock, the pad and the drawing.
 // Leaving the game (or putting the phone away) pauses it where it is.
+
+import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";

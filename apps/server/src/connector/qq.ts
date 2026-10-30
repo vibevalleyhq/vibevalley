@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
+
+import { t } from "@vibevalley/i18n";
 
 import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";

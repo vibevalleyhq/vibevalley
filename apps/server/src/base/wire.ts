@@ -1,8 +1,8 @@
-import { Schema } from "effect";
-
 // What goes on the wire is JSON: a key whose value is undefined is not there. The services keep TypeScript's optional
 // fields that way (`{ ...x, callReason: undefined }`), and the Schemas say "absent or a value", so values are encoded
 // as JSON.stringify would send them: such keys dropped first, everything else still checked by the Schema.
+
+import { Schema } from "effect";
 
 /** value with every own key set to undefined dropped, in plain objects and arrays all the way down; other objects as
  * they are (class instances, such as a tagged error, encode through their own Schema). */

@@ -1,6 +1,6 @@
-import { expect, test } from "./fixtures";
-
 // The memory tree's memories are made up (src/tree/mock.ts) until the server sums them up.
+
+import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));

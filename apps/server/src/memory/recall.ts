@@ -1,6 +1,7 @@
-import { maybe } from "@vibevalley/i18n";
 // What a run recalls, with no model: the server picks at the start of each
 // turn, and the agent page shows the same pick ahead of time. Characters are UTF-16 units.
+
+import { maybe } from "@vibevalley/i18n";
 
 import { recallWords } from "./prompts.ts";
 import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";

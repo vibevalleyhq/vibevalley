@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // Each handler only forwards to the service that owns the rule.
+
+import { t } from "@vibevalley/i18n";
 
 import { defaultOrchestrator, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";

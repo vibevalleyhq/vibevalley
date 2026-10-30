@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // The farm phone: a wooden handset over the phone button, its screen showing a call ringing, else the app picked on the
 // home screen; the games take the pad. It folds like a foldable: folded, a tab on its right edge says 田头 and whether
 // there is something new; unfolded, its right screen is the chat (ChatWindow), and on a narrow screen only the chat
 // shows. Esc folds it, then puts it away; put away, it comes out folded.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";

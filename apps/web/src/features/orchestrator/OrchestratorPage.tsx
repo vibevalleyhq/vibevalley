@@ -1,8 +1,9 @@
-import { Tabs } from "@/ui/Tabs";
-import { t } from "@vibevalley/i18n";
 // 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
 // folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
 // the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
+
+import { Tabs } from "@/ui/Tabs";
+import { t } from "@vibevalley/i18n";
 
 import { Match, Show, Switch } from "solid-js";
 import { defaultOrchestrator } from "@vibevalley/protocol";

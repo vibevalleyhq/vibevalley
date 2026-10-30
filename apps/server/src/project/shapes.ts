@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What the projects hand to the modules that use them (a workplace, what a merge did or why it did not): shapes and
 // errors only, so a rule elsewhere can name them without the git and processes behind project.ts.
+
+import { t } from "@vibevalley/i18n";
 
 import type { PullRequest } from "@vibevalley/protocol";
 import { Data } from "effect";

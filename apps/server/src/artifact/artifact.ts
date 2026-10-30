@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // Artifacts (docs/subsystems/artifact.md): what the owner and the agents leave for people to read. A blocks one is written
 // together, block by block (blocks.ts); an html one is handed in whole, each version kept once by its sha256 under the
 // home directory's artifacts/. A hand-in is announced where it belongs by its maker, with its card; its comments are the
 // replies to that message, nothing of their own.
+
+import { t } from "@vibevalley/i18n";
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";

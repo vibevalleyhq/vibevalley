@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // A blocks artifact, written block by block with the helpers. A block shows its marks until it is clicked into; then it is
 // a plain field (marks are kept through the edit), and Enter splits it, Backspace at its start joins it to the one before,
 // Up and Down at its ends move between blocks.
+
+import { t } from "@vibevalley/i18n";
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

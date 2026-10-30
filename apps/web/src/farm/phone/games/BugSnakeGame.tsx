@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // 贪吃虫 on the phone: the rules are farm/phone/games/bugSnake.ts; here the clock, the pad and the drawing, each cell
 // six of the game's pixels, zoomed whole. Leaving the game (or putting the phone away) pauses it.
+
+import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, Show } from "solid-js";
 import {

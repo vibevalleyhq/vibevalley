@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
 // runtime's machine, usage windows, today's spend and a stop it is under.
+
+import { t } from "@vibevalley/i18n";
 
 import { yuan } from "@/base/format";
 import { createSignal, For, Match, Show, Switch } from "solid-js";

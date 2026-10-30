@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // This farm's own memories, rows in the memory table: what each agent noted (its
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
+
+import { t } from "@vibevalley/i18n";
 
 import { sessionId } from "@vibevalley/protocol/schema";
 import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";

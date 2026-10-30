@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
 // the orchestrator's line. The web has no voice yet, so calling the orchestrator says so and points to 田头 instead of dialing.
+
+import { t } from "@vibevalley/i18n";
 
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";

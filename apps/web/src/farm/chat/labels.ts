@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The farm chat window's words: a channel's name as the farm says it, a message's clock time, and whether it is long
 // enough to fold.
+
+import { t } from "@vibevalley/i18n";
 
 import type { Channel } from "@vibevalley/protocol";
 import { channelLabel } from "@/features/channel";

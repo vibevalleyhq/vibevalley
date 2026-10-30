@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
-import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 // Kept in memory beside the chat's model (model.ts): the chat tells it each follow and delivery as it writes them, and
 // reloads it with the model when a transaction fails.
+
+import { t } from "@vibevalley/i18n";
+import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 const agentLike = (kind: string) => kind === "session" || kind === "orchestrator";
 

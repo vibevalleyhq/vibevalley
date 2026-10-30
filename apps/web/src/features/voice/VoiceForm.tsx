@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // 声音: the line's settings in 设置 › 语音 (/settings/call: credentials, how it listens, who answers; /settings/moss:
 // MOSS Live's key; /settings/dictation) and the orchestrator's voice
 // on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
+
+import { t } from "@vibevalley/i18n";
 
 import { variant, aria, createSettled, Keyed } from "@/base/util";
 import { saveSettings } from "@/base/settings";

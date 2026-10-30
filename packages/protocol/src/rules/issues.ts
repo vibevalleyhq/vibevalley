@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // An issue's title in one short line, and its state in words, as the board, the phone, the tools and the orchestrator say them.
+
+import { t } from "@vibevalley/i18n";
 
 import type { Issue } from "../shapes";
 

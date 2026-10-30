@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // What is waiting on the owner: the inbox the phone rings with, and what the
 // orchestrator's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
 // questions in their place; a quiet one still questions.
+
+import { t } from "@vibevalley/i18n";
 
 import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
 

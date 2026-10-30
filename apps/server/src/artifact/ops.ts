@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The op rules, over one artifact held in memory: Submit loads the page in a transaction,
 // applies a batch's ops in order and writes back what changed. A stale update (baseRev behind) is taken only when the
 // block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
 import type {

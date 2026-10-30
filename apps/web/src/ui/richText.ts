@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // What rendered Markdown becomes after its DOM is made, for both renderers (ui/Markdown.tsx, ui/pixel/PxMarkdown.tsx):
 // links made safe and kept in the app, fenced code with its language, a copy button, colours and a fold, Mermaid drawn
 // by Pele, task lists that read as lists. Messages, reports, descriptions and artifacts are agents' words: nothing here
 // may let them run as the farm's page.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/base/format";
 import type { MountOptions, Mounted } from "pele/lazy";

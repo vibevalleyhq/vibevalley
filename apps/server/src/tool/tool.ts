@@ -1,3 +1,7 @@
+// The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
+// tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
+// Every tool answers in a sentence, a refusal included: the model acts on it.
+
 import { maybe, t } from "@vibevalley/i18n";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
@@ -5,9 +9,6 @@ import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
 import { artifactMax } from "@/artifact/policy.ts";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-// The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
-// tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
-// Every tool answers in a sentence, a refusal included: the model acts on it.
 
 import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";

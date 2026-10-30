@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // Talking to the orchestrator: the server hands out the call (appId, channel, uid, one token) and starts Agora's
 // conversational AI agent in it; the page only joins, on the host's line (the phone's) or Agora's Web SDK (agora.ts). The
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
+
+import { t } from "@vibevalley/i18n";
 
 import type { RtcLine } from "@vibevalley/protocol/host";
 import { currentHost } from "@/base/host";

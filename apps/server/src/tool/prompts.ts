@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // How the tools word what they found.
+
+import { t } from "@vibevalley/i18n";
 
 import {
   type Artifact,

@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // A runtime's account, as the runtimes page and the farm's bottle both say it: how much is left, its windows in
 // words, when it resets.
+
+import { t } from "@vibevalley/i18n";
 
 import type { RuntimeInfo } from "@vibevalley/protocol";
 import { numberText } from "@/base/format";

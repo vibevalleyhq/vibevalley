@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The page opened from another device, through the farm's lan listener (连接到本机): it pairs once on /pair and keeps
 // its key in a cookie the listener reads (lanKeyCookie); on the farm's own computer it needs none.
+
+import { t } from "@vibevalley/i18n";
 
 import { lanKeyCookie } from "@vibevalley/protocol";
 

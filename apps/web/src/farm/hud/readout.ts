@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // Words the HUD shows, from the frame: the clock, the warehouse, what a helper is doing, a plot's title and what the
 // orchestrator last said. The runtimes' quotas are features/runtime/quota.ts.
+
+import { t } from "@vibevalley/i18n";
 
 import type { ChatMessage, WorkspaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
 

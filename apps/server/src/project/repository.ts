@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // A git repository as the projects use it: what it can say (its main branch, whether a branch is there and where it
 // points, how far one is ahead) and what it does (commit what a session left, merge without checking out, describe a
 // branch, clear a worktree away). The git spelling is here; what is done with the answers (the merge rules, pull
 // requests, the project's check, what a release keeps) stays in project.ts.
+
+import { t } from "@vibevalley/i18n";
 
 import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
 import { Effect } from "effect";

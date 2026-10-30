@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // The owner's calls: Agora RTC grants, the voice agent Agora runs for a call, the voice line the
 // orchestrator answers it on, and dictation. A grant is signed for one channel and uid and lives as long as its token, or the
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf, errnoOf } from "@/errors.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";

@@ -1,5 +1,6 @@
-import { list, t } from "@vibevalley/i18n";
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
+
+import { list, t } from "@vibevalley/i18n";
 
 import {
   OutfitValues,

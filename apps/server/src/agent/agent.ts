@@ -1,7 +1,8 @@
-import { list, t } from "@vibevalley/i18n";
 // The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
+
+import { list, t } from "@vibevalley/i18n";
 
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { join } from "node:path";

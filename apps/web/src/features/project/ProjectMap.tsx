@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The map: every project an island on parchment, its plots its helpers'
 // worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
 // plot its issue, an empty plot a seed for the project.
+
+import { t } from "@vibevalley/i18n";
 
 import { variant, autofocus } from "@/base/util";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";

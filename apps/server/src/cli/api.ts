@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // The endpoints as commands: one per entry in the endpoint table (packages/protocol/src/api.ts), `<group> <op>`, path
 // parameters as arguments, query parameters as flags, the body as --json, checked against the endpoint's Schema before it
 // is sent. Nothing here knows an endpoint by name but the composite commands, which call them by op; a new endpoint is a
 // new command with its help.
+
+import { t } from "@vibevalley/i18n";
 
 import { Config, Effect, FileSystem, Option, Predicate, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";

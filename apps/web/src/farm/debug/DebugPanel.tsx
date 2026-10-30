@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The debug console: ` opens it over the farm, unless a field has the keys. It drives the farm by its real calls (open
 // the farm, stop or dismiss a helper, harvest) and the page's own clock and effects (which earn nothing), plays each
 // sound, and keeps the frames and side events it saw, to copy as JSON lines.
+
+import { t } from "@vibevalley/i18n";
 
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

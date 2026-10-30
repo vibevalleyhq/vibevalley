@@ -1,7 +1,7 @@
+// Each closes after its timeout (5 s by default), held while the pointer is over the stack; past `limit` they hide.
+
 import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-
-// Each closes after its timeout (5 s by default), held while the pointer is over the stack; past `limit` they hide.
 
 export const ToastType = { info: "info", warn: "warn", error: "error", achievement: "achievement" } as const;
 export type ToastType = (typeof ToastType)[keyof typeof ToastType];

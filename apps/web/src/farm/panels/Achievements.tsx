@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // 任务与成就: the farm's level, coins and worn title, the starter tasks, the beds cleared by level, each wall of
 // achievements with its medals and how far along it is, and the secrets found. The catalogue is the server's
 // (game.achievements), the standings come with the frame (view.achievements).
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show } from "solid-js";
 

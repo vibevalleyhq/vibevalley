@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // Lan access (连接到本机). The main server listens on loopback alone; lan access is a second listener
 // on every interface, shut until the owner opens it. Through it go the endpoints marked remote and the state and side-event
 // streams, never /mcp, and only with a paired device's key (a Bearer header, or the cookie a paired browser keeps):
@@ -7,6 +6,8 @@ import { t } from "@vibevalley/i18n";
 // it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The listener
 // speaks plain HTTP: a key can be overheard on the network it is open on. What it lets through it hands to the loopback
 // server, saying which device asks.
+
+import { t } from "@vibevalley/i18n";
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";

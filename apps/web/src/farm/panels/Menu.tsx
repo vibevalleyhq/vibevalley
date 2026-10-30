@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // The Esc menu: go on, back to the title, sounds on or off, the other places, and what can be clicked in the yard.
+
+import { t } from "@vibevalley/i18n";
 
 import { For } from "solid-js";
 import { farm } from "@/farm/store";

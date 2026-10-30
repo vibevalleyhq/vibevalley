@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // Whether MOSS Live takes the key: the one typed in, or the saved one. The server attaches a session and closes it
 // (voice.moss.verify); the answer is a mark, its reason on hover.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, Match, Switch } from "solid-js";
 import { api, reasonOf } from "@/base/api";

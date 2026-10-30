@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // A session's log by round (shownEvents, roundsOf, spansOf, roundMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
+
+import { t } from "@vibevalley/i18n";
 
 import type { SessionEvent } from "@vibevalley/protocol";
 import { big, tookText } from "@/base/format";

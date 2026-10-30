@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The blocks artifact being edited: blocks in order, the owner's edits as ops
 // waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
+
+import { t } from "@vibevalley/i18n";
 
 import {
   type Block,

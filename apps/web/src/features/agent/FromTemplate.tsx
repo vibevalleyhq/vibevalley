@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // Where a saved profile came from: its template and version, and, when the template has a newer one, the update. The
 // update is asked twice: it replaces what the owner may have changed in what came from the template.
+
+import { t } from "@vibevalley/i18n";
 
 import { Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";

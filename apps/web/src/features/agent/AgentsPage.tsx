@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // 档案: every profile as a card, the orchestrators first and then the workers; an orchestrator's card opens its page, a
 // worker's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
 // new worker, /agents/new?role=orchestrator a new orchestrator.
+
+import { t } from "@vibevalley/i18n";
 
 import { createMemo, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";

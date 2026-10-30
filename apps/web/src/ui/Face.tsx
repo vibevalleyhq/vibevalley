@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // Faces cut from the pixel drawings (public/pixel/sprites.json).
+
+import { t } from "@vibevalley/i18n";
 
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";

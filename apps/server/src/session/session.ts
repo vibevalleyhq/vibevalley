@@ -1,10 +1,11 @@
-import { t } from "@vibevalley/i18n";
 // oar runs sessions without permission prompts or a sandbox: the only fence is where a session starts, inside the work root in
 // its own worktree. Each farm session owns its subagents; what only it takes (the farm's MCP server, its prompt, its refused
 // tools) goes in through a copy of its runtime, so the shared registry is never changed. A run starts when the runtime opens a
 // turn and ends with that turn's report; what started it is known only to whoever sent the input, so the sender leaves its
 // trigger on the hand first and the turn takes the oldest. Admission serializes room and opening turns; each hand owns its
 // input, handover and departure, so one worktree's checks do not hold the other sessions.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";

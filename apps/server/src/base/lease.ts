@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // One server per home: .vibevalley.lock holds the pid of the server using it. Node
 // has no flock, so a lock whose process is gone is stale and is taken over. server.json says where that server listens,
 // so the command line finds it on whatever port it got (the desktop app asks for a free one).
+
+import { t } from "@vibevalley/i18n";
 
 import { errnoOf } from "@/errors.ts";
 import { Schema } from "effect";

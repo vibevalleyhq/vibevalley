@@ -1,9 +1,9 @@
+// What changed in a task graph, step by step, and how each change is said. What is kept is the fact (a field's key, a
+// count), so the history reads in the locale of whoever reads it.
+
 import { list, t } from "@vibevalley/i18n";
 import type { GraphEventKind, Task, TaskFieldChange, TaskGraph, GraphEvent } from "@vibevalley/protocol";
 import { taskOf } from "./graph.ts";
-
-// What changed in a task graph, step by step, and how each change is said. What is kept is the fact (a field's key, a
-// count), so the history reads in the locale of whoever reads it.
 
 /** A graph event before it is stored: no id, actor or time yet. */
 export interface GraphChange {

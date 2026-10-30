@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // The projects under the work root and their git: making and listing them, a session's
 // worktree on its own branch, what a branch changed, merging it into the main branch, a graph's branch, the project's
 // own check (.vibevalley/check), GitHub pull requests through gh, and what the code is written in.
@@ -7,6 +6,8 @@ import { t } from "@vibevalley/i18n";
 // Merging into a graph's branch never checks it out: merge-tree writes the tree, commit-tree and update-ref put it on
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";

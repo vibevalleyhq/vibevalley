@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // When a cron runs: what is due, whether it was missed, what a run leaves, and
 // whether a cron waits for the owner's yes.
+
+import { t } from "@vibevalley/i18n";
 
 import type { Cron, CronRequest } from "@vibevalley/protocol";
 import { actsForOwner, type Actor } from "@/base/actor.ts";

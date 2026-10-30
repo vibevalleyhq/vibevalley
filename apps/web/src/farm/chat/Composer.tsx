@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
 // sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
 // the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
+
+import { t } from "@vibevalley/i18n";
 
 import { useRouter } from "@/base/router";
 import { toasts } from "@/ui/pixel/toasts";

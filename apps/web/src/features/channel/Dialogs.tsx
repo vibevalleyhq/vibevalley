@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // A channel has no members to pick: helpers are in the channel their job was arranged in.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

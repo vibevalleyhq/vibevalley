@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/base/format";
 import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";

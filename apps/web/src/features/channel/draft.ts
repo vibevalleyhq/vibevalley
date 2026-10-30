@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // Kept on this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal } from "solid-js";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";

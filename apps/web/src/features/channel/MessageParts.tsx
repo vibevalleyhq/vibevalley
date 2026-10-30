@@ -1,7 +1,8 @@
+// Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
+
 import { Toolbar } from "@vibevalley/base-ui";
 import { MoreMenu } from "@/ui/MoreMenu";
 import { list, t } from "@vibevalley/i18n";
-// Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
 import { Lightbox } from "@/ui/Lightbox";
 import { fileKind, sizeText } from "@/ui/AttachmentTile";

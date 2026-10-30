@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // 外观: how the workbench looks on this machine. The farm, the memory tree and the pixel skin are drawn and keep theirs.
+
+import { t } from "@vibevalley/i18n";
 
 import { ThemeChoiceValues } from "@vibevalley/protocol/host";
 import { ScaleValues, setScale, setTheme, usePrefs } from "@/base/prefs";

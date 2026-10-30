@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The pixel skins' sounds, synthesized from recipes (no audio files); when the farm plays them is farm/cues.ts.
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 

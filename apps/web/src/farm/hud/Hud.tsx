@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // The farm's HUD over the village: the orchestrator's face and the farm's level, coins and clock at the top left; the
 // memory tree, the map, the channels, the quota and the menu at the top right; the phone and the helpers at the bottom left; the tools along the
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
+
+import { t } from "@vibevalley/i18n";
 
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";

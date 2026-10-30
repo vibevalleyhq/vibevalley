@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
 // folded away.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

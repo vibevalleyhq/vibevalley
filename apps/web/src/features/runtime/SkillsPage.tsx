@@ -1,6 +1,7 @@
-import { list as listed, t } from "@vibevalley/i18n";
 // 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
+
+import { list as listed, t } from "@vibevalley/i18n";
 
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";

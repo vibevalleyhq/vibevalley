@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // What an artifact may be, and the headers its content is served with (docs/subsystems/artifact.md).
+
+import { t } from "@vibevalley/i18n";
 
 import { isOneOf } from "@vibevalley/protocol/rules";
 import { ArtifactKindValues } from "@vibevalley/protocol";

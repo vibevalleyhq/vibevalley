@@ -1,9 +1,10 @@
-import { t } from "@vibevalley/i18n";
 // /tree: the farm's memory tree, every helper's and every project's memories summed up for the owner, showing only how
 // the farm grows (.agents/notes/proposed/feature/2026-10-22-memory-tree.md). Full-bleed like the farm, outside the
 // workbench's shell; the farm's HUD has its button. One canvas (Scene.tsx) draws the tree grown from the memories and,
 // looking up, the same memories as a sky; the panel to the right. The memories are made up (mock.ts) until the server
 // sums them up.
+
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

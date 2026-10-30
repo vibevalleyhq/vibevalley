@@ -1,5 +1,6 @@
-import { list, t } from "@vibevalley/i18n";
 // What a session is doing and what it waits on.
+
+import { list, t } from "@vibevalley/i18n";
 
 import type { Conflict, Retry, Session } from "../shapes";
 

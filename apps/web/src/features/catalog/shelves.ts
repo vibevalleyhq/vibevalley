@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // 图鉴's shelves: every drawing in sprites.json on a shelf by its name, a
 // helper's by animal and outfit; which ones are a walk's frames; how one is drawn again.
+
+import { t } from "@vibevalley/i18n";
 
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { outfitLabel, speciesLabel } from "@/ui/cast";

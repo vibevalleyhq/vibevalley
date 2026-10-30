@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // 合成: 2048 with crops. Slide the field; two of a stage grow into the next; a seed is sown
 // on an empty cell after every slide that moves something. One slide back can be taken.
+
+import { t } from "@vibevalley/i18n";
 
 import { nextRandom } from "./random";
 

@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // 通用: the farm's language, and where this machine's page opens.
+
+import { t } from "@vibevalley/i18n";
 
 import { setStart, StartValues, usePrefs } from "@/base/prefs";
 import { Segmented } from "@/ui/Segmented";

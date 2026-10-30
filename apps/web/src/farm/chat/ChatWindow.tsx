@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // The farm's chat, 田头: the right screen of the farm phone when it is unfolded (Phone.tsx), filling it: a head (the channel
 // menu and what the orchestrator is doing, or a thread's title and its helper), the messages newest at the bottom with the
 // lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
 // the phone large.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/base/format";
 import { farmChannelLabel } from "./labels";

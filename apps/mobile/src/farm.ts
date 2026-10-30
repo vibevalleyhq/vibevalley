@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The phone's current farm: one choice owns its pending pairing, durable key and published page. Native keychain writes
 // cannot be aborted, so they are serialized and a superseded write restores the last committed choice before the next one.
+
+import { t } from "@vibevalley/i18n";
 
 import { pathOf } from "@vibevalley/protocol";
 

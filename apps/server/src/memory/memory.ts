@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // What the agents remember: every agent's rows and the outside sources (sources.ts), and the
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
+
+import { t } from "@vibevalley/i18n";
 
 import { sessionId } from "@vibevalley/protocol/schema";
 import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";

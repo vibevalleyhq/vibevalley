@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // A trajectory a row per step: the round in the gutter, what kind of step in the tag, its text cut to a line until the
 // row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
+
+import { t } from "@vibevalley/i18n";
 
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

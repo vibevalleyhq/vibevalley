@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The voice form's choices: what each stage offers, the limits on the numbers
 // and what 恢复默认 on one part touches. Why settings cannot be saved is the server's answer (setting.validate).
+
+import { t } from "@vibevalley/i18n";
 
 import {
   type Area,

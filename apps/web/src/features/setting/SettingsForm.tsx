@@ -1,6 +1,7 @@
-import { t, currentLocale } from "@vibevalley/i18n";
 // The DeepSeek key (模型), the language (通用) and the memory sources (记性), a part at a time (setting.update); and what
 // the server found of gh (GitHub).
+
+import { t, currentLocale } from "@vibevalley/i18n";
 
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import {

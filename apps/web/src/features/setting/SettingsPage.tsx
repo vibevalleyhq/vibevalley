@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // 设置: a search over it, then its sections in groups on the left, each an icon and a name with its own address, so a
 // link lands on it; the chosen one on the right, as groups of rows (ui/settings.tsx). The search keeps the sections
 // whose name or words hold it, and lights the rows that do.
+
+import { t } from "@vibevalley/i18n";
 
 import { Splitter, usePaneWidth } from "@/ui/Splitter";
 import { createSignal, For, Match, Show, Switch } from "solid-js";

@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The layers over the farm a click or a key opens, from the store's overlays: the harvest, the sowing and watering
 // forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
 // (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
+
+import { t } from "@vibevalley/i18n";
 
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";

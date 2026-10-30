@@ -1,8 +1,8 @@
-import { t } from "@vibevalley/i18n";
-import type { OrchestratorLook } from "@vibevalley/protocol";
-
 // The orchestrators' looks (an orchestrator's profile keeps its own) and the pets the owner can pick (base/prefs.ts
 // keeps the choice), and their sprites.
+
+import { t } from "@vibevalley/i18n";
+import type { OrchestratorLook } from "@vibevalley/protocol";
 
 /** The orchestrators' looks: sprite manager-<id>, the plain one is farmer. */
 export const orchestratorLooks: readonly { readonly id: OrchestratorLook; readonly name: string; readonly blurb: string }[] = [

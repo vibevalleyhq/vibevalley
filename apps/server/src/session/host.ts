@@ -1,3 +1,7 @@
+// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words go.
+// An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
+// to the route of the input taken last, and the tools read that route too.
+
 import { t } from "@vibevalley/i18n";
 import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -17,9 +21,6 @@ import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
-// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words go.
-// An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
-// to the route of the input taken last, and the tools read that route too.
 
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before.
  * Its words are read once: what came before the reader is kept for it. */

@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // The chat apps: WeChat, Feishu and QQ, each tied to one farm channel; each app's protocol is
 // its adapter's. Only outbound connections: no public HTTP endpoint. The bots' secrets never leave the database.
 //
@@ -8,6 +7,8 @@ import { t } from "@vibevalley/i18n";
 // whose mark was not written yet may come again after a restart. Some apps let a bot answer only on the context of the
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
+
+import { t } from "@vibevalley/i18n";
 
 import { HttpClient } from "effect/http";
 import { createHash, randomInt } from "node:crypto";

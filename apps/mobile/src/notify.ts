@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // The page's notices as the phone's own (expo-notifications): shown in front too, as the page asks only when the owner
 // is not looking at the farm (Follow.tsx).
+
+import { t } from "@vibevalley/i18n";
 
 import * as Notifications from "expo-notifications";
 import type { Notice } from "@vibevalley/protocol/host";

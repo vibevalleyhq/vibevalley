@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
+
+import { t } from "@vibevalley/i18n";
 
 import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";

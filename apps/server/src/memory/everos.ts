@@ -1,9 +1,10 @@
-import { t } from "@vibevalley/i18n";
 // EverOS (github.com/EverMind-AI/EverOS) over its HTTP API, /api/v2. It is given whole
 // runs and extracts memories itself with a model: memory/add takes a session's messages, memory/flush makes it extract
 // them (here when the session leaves the farm), memory/search reads back. What a helper says is the agent's (agent_id,
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
+
+import { t } from "@vibevalley/i18n";
 
 import { everosWords, recallWords } from "./prompts.ts";
 import type { Memory, MemoryKind } from "@vibevalley/protocol";

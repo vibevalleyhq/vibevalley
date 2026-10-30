@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The server's configuration: the defaults, then the YAML file, then the environment
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
 import { homedir } from "node:os";

@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // A line to MOSS Live for the playground: the server relays it (mossLinePath) and adds the key; this side speaks MOSS's
 // protocol. Up: JSON actions, and the microphone as 20 ms frames of 16 kHz mono PCM, each behind a 0x00 byte. Down: JSON
 // events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
 // and the playback's account are moss.ts's; this wires them to the socket and the audio.
+
+import { t } from "@vibevalley/i18n";
 
 import { recordOf } from "@/base/util";
 import { messageOf } from "@/base/format";

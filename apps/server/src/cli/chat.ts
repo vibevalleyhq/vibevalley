@@ -1,7 +1,8 @@
-import { t, currentLocale } from "@vibevalley/i18n";
 // The conversations in a terminal: VibeValley's own agent (DeepSeek, with the coding tools, skills, memory, sessions,
 // reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
+
+import { t, currentLocale } from "@vibevalley/i18n";
 
 import { standaloneLlm } from "./llm.ts";
 

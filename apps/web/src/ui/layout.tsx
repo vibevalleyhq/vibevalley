@@ -1,7 +1,8 @@
-import { Switch } from "@vibevalley/base-ui";
-import { t } from "@vibevalley/i18n";
 // What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
 // and the few controls their forms use.
+
+import { Switch } from "@vibevalley/base-ui";
+import { t } from "@vibevalley/i18n";
 
 import { createSignal, omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";

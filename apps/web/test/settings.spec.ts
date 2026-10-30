@@ -1,6 +1,6 @@
-import { expect, test } from "./fixtures";
-
 // The worker's server is shared by its tests: each puts back what it changed.
+
+import { expect, test } from "./fixtures";
 
 const sections = ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
 

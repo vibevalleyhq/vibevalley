@@ -370,6 +370,13 @@ function closing(text: string, open: number): number {
   return -1;
 }
 
+/** text with an import added after its header comment (the file's first lines of // or a block, and the blank line
+ * after them), so the header stays first; the formatter sorts it among the others. */
+function withImport(text: string, line: string): string {
+  const header = /^(?:(?:\/\/[^\n]*\n)+|\/\*[\s\S]*?\*\/\n)\n/u.exec(text)?.[0] ?? "";
+  return header + line + "\n" + text.slice(header.length);
+}
+
 async function migrate(file: string) {
   const abs = join(root, file);
   const ns = namespaceOf(abs);
@@ -465,7 +472,7 @@ async function migrate(file: string) {
             ? `import { ${kept.join(", ")} } from "${from}";`
             : "";
       });
-    if (!/import \{[^}]*\bt\b[^}]*\} from "@vibevalley\/i18n"/u.test(text)) text = `import { t } from "@vibevalley/i18n";\n` + text;
+    if (!/import \{[^}]*\bt\b[^}]*\} from "@vibevalley\/i18n"/u.test(text)) text = withImport(text, `import { t } from "@vibevalley/i18n";`);
     writeFileSync(path, text);
   }
   gen();

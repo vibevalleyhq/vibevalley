@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
+
+import { t } from "@vibevalley/i18n";
 
 import { isOneOf } from "@vibevalley/protocol/rules";
 import { messageOf } from "@/errors.ts";

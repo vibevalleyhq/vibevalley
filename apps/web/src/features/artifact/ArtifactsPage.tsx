@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // 产出 (docs/subsystems/artifact.md): every artifact on the left, newest change first, found by its title; the one open on
 // the right, written block by block or looked at as a page, with its versions and a reply that reaches its maker.
+
+import { t } from "@vibevalley/i18n";
 
 import { type Artifact, type ArtifactVersion, artifactPath } from "@vibevalley/protocol";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";

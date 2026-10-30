@@ -1,5 +1,6 @@
-import { t } from "@vibevalley/i18n";
 // The farm at a glance in the tray (traySummary); each inbox item comes worded for it (InboxItem.words).
+
+import { t } from "@vibevalley/i18n";
 
 import type { WorkspaceState, InboxItem } from "@vibevalley/protocol";
 import type { TraySummary } from "@vibevalley/protocol/host";

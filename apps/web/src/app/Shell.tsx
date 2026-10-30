@@ -1,7 +1,8 @@
-import { t } from "@vibevalley/i18n";
 // The workbench's frame: a dark rail of places on the left (the orchestrator's face
 // back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
 // head with the place's name and whether the farm is open.
+
+import { t } from "@vibevalley/i18n";
 
 import { For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";

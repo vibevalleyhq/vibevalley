@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What the farm draws of the core state: levels, plots,
 // the effects a fact sets off, and the achievements in words.
+
+import { t } from "@vibevalley/i18n";
 
 import type {
   Achievement,

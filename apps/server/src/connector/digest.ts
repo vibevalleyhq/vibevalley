@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
+
+import { t } from "@vibevalley/i18n";
 
 import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
 import { slice } from "@/base/clip.ts";

@@ -1,8 +1,9 @@
-import { t } from "@vibevalley/i18n";
 // A document's order keys are fractional indexes in base62 (David Greenspan's midpoint between two keys; one digit up
 // or down at either end): a key sorts between its neighbours as a plain string, never ends in '0' (so there is always
 // room before it), and siblings that got the same key sort by id. The server checks them; the page makes them for the
 // blocks it inserts.
+
+import { t } from "@vibevalley/i18n";
 
 const keyDigits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 

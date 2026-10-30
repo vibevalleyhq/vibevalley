@@ -1,9 +1,10 @@
-import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 // The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
 // Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
 // tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
 // every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
 // day's budget takes no work.
+
+import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 
 import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";

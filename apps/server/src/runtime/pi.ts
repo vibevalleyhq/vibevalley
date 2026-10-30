@@ -1,6 +1,7 @@
-import { t } from "@vibevalley/i18n";
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
 import { existsSync, readFileSync } from "node:fs";

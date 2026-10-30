@@ -1,4 +1,3 @@
-import { t } from "@vibevalley/i18n";
 // VibeValley's command line, on effect/cli. With no command: VibeValley's own agent in a terminal (cli/chat.ts).
 // `runtime chat <runtime>` talks to another runtime the same way. Every other command is one of the endpoints
 // (cli/api.ts), called over HTTP: its answer is JSON on stdout; a failure is JSON on stderr with what to do next, and an
@@ -7,6 +6,8 @@ import { t } from "@vibevalley/i18n";
 //	node --import tsx src/cli.ts [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
 //	node --import tsx src/cli.ts runtime chat claude
 //	node --import tsx src/cli.ts issue list
+
+import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "./errors.ts";
 import "./cli/locale.ts";
