@@ -143,3 +143,20 @@ tester.run("one-absent", rule("one-absent"), {
   ],
   invalid: [{ code: "let a: string | null | undefined;", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "both" }] }],
 });
+
+tester.run("global-doors", rule("global-doors"), {
+  valid: [
+    "window.vibevalleyHost?.notify",
+    "globalThis.vibevalleyProbe = probe",
+    { code: "const isOwn = (n: globalThis.Node) => n", filename: "a.ts" },
+    "Object.assign(target, { a: 1 })",
+    { code: "declare global { interface Window { x?: number } }\nexport {};", options: [{ door: true }], filename: "a.ts" },
+  ],
+  invalid: [
+    { code: "(window as unknown as { ran?: number }).ran", filename: "a.ts", errors: [{ messageId: "cast" }] },
+    { code: "const g = globalThis as Record<string, unknown>", filename: "a.ts", errors: [{ messageId: "cast" }] },
+    { code: "Object.assign(globalThis, { vibevalleyNotices: notices })", errors: [{ messageId: "assign" }] },
+    { code: "Object.defineProperty(window, 'x', { value: 1 })", errors: [{ messageId: "assign" }] },
+    { code: "declare global { interface Window { x?: number } }\nexport {};", filename: "a.ts", errors: [{ messageId: "declare" }] },
+  ],
+});
