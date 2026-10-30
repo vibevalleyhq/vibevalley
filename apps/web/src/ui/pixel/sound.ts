@@ -2,7 +2,7 @@
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
 
-import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
+import { createSynth, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 import { t } from "@vibevalley/i18n";
 
 function grains(
@@ -222,11 +222,6 @@ export const SOUND_LABEL: Readonly<Record<SoundName, string>> = {
   voiceOff: t("web.ui.pixel.sound.label.voiceOff"),
   ring: t("web.ui.pixel.sound.label.ring"),
 };
-
-/** Offline, for measuring levels. Needs OfflineAudioContext. */
-export function renderSound(name: SoundName): Promise<AudioBuffer> {
-  return renderRecipe(SOUNDS[name], { seconds: 2, volume: 0.55 });
-}
 
 const mutedKey = "vibevalley.farm.muted";
 const muteListeners = new Set<() => void>();

@@ -37,7 +37,7 @@ const withText: Readonly<Record<string, boolean>> = {
   issue_ref: false,
 };
 
-export const knownType = (text: string) => text in withText;
+const knownType = (text: string) => text in withText;
 
 export interface Revision {
   readonly block: string;
@@ -47,12 +47,7 @@ export interface Revision {
 }
 
 /** A result as the wire has it: rev 0, no reason and no texts are left out. */
-export function result(
-  status: BlockOpStatus,
-  blockId: string,
-  rev = 0,
-  more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {},
-): BlockOpResult {
+function result(status: BlockOpStatus, blockId: string, rev = 0, more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {}): BlockOpResult {
   return { status, blockId, ...(rev !== 0 ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
 }
 
@@ -60,7 +55,7 @@ const applied = (b: Block) => result("applied", b.id, b.rev);
 const rejected = (id: string, reason: string) => result("rejected", id, 0, { reason });
 const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: t("server.artifact.op.deleted") });
 
-export const parentOf = (b: Block) => b.parentId ?? "";
+const parentOf = (b: Block) => b.parentId ?? "";
 
 export function textFor(type: string, spans: readonly TextSpan[] | undefined): TextSpan[] {
   if (withText[type] !== true) return [];
@@ -69,12 +64,12 @@ export function textFor(type: string, spans: readonly TextSpan[] | undefined): T
 }
 
 /** The attributes as the wire has them: only those set. */
-export const attrsOf = (a: BlockAttrs | undefined): BlockAttrs => Object.fromEntries(Object.entries(a ?? {}).filter(([, v]) => v !== undefined && v !== null));
+const attrsOf = (a: BlockAttrs | undefined): BlockAttrs => Object.fromEntries(Object.entries(a ?? {}).filter(([, v]) => v !== undefined && v !== null));
 
 const attrNames = ["level", "checked", "language", "src", "width", "height", "alt", "issueId", "memoryId"] as const;
 
 /** Lays a set_attrs patch over attrs: what the patch sets is written, the names in unset removed. */
-export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly string[] = []): BlockAttrs {
+function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly string[] = []): BlockAttrs {
   const out: Record<string, unknown> = { ...attrs };
   for (const name of attrNames) if (patch[name] !== undefined) out[name] = patch[name];
   for (const name of unset) {

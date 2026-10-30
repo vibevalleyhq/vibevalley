@@ -37,8 +37,6 @@ export const shortcuts = [
   { id: "voice", place: "desktop", keys: ["alt", "shift", "space"] },
 ] as const satisfies readonly Shortcut[];
 
-export type ShortcutId = (typeof shortcuts)[number]["id"];
-
 const mac = () => /Mac|iPhone|iPad/u.test(navigator.platform);
 
 const glyphs: Record<string, () => string> = {

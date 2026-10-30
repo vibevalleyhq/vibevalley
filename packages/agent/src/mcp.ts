@@ -19,7 +19,7 @@ import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
 import { afterRealTime } from "./realTime.ts";
 
 /** Also for connecting. */
-export const callTimeoutMs = 120_000;
+const callTimeoutMs = 120_000;
 
 // A tool's result as its server sends it: only the fields read here, the rest let through.
 const Block = Schema.Struct({
@@ -87,7 +87,7 @@ const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
     );
   });
 
-export async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpConnection> {
+async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpConnection> {
   if (signal?.aborted === true) throw new Error("canceled");
   let stderr = "";
   let transport: Transport;

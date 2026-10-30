@@ -12,7 +12,7 @@ import { FetchHttpClient, HttpClient } from "effect/http";
 
 import type { Embed } from "@vibevalley/protocol";
 /** At most this many links of a message get a preview. */
-export const embedMax = 3;
+const embedMax = 3;
 const timeoutMs = 3000;
 const bodyMax = 512 * 1024;
 const redirectsMax = 3;

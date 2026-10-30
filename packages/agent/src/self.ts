@@ -18,7 +18,7 @@ export interface SelfOptions {
   readonly memory: boolean;
 }
 
-export function searchIn(home: string, query: string): string {
+function searchIn(home: string, query: string): string {
   if (query.trim() === "") throw new Error(selfWords.emptyQuery);
   if (archiveFiles(home).length === 0) return selfWords.noArchive;
   const hits = searchArchive(home, query);

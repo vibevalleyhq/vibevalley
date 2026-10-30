@@ -85,7 +85,7 @@ const listedMax = 200;
 
 const missingArtifact = (id: string) => missing(t("server.artifact.missing", { id }), [lookIn.artifact]);
 
-export const make = (options: ArtifactOptions = {}) =>
+const make = (options: ArtifactOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const chat = yield* Channels;

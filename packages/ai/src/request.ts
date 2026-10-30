@@ -16,7 +16,7 @@ const toolImageOmitted = "(tool image omitted: model does not support images)";
 const reasoningFields = new Set(["reasoning", "reasoning_content", "reasoning_text"]);
 
 /** Unpaired surrogates fail the provider's JSON; paired ones (emoji) stay: with u, a pair is one code point the class does not take. */
-export const sanitizeSurrogates = (text: string) => text.replace(/[\uD800-\uDFFF]/gu, "");
+const sanitizeSurrogates = (text: string) => text.replace(/[\uD800-\uDFFF]/gu, "");
 
 export function requestBody(model: Model, context: Context, options: RequestOptions = {}): Record<string, unknown> {
   const clamped = options.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;

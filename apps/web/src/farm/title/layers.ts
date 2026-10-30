@@ -4,8 +4,8 @@
 
 import type { TitleScene } from "./scene";
 
-export const sceneW = 1536;
-export const sceneH = 1024;
+const sceneW = 1536;
+const sceneH = 1024;
 
 /** Each sprite's size in the scene's pixels (apps/web/public/title/sprites.json). */
 export type TitleSprites = Readonly<Record<string, { readonly w: number; readonly h: number }>>;

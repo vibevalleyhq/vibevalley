@@ -52,7 +52,7 @@ export class ServerConfig extends Context.Service<
   }
 >()("vibevalley/ServerConfig") {}
 
-export const noticeBatchMs = 3_000;
+const noticeBatchMs = 3_000;
 
 export function defaults(home = homedir()): ServerConfig["Service"] {
   return {

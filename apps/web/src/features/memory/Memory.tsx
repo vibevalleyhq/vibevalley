@@ -50,7 +50,7 @@ function memoryActions(agent: string) {
 }
 
 /** A titled part of a panel, its count beside the title. */
-export function Section(props: { title: string; count?: number; aside?: JSX.Element; testid?: string; children: JSX.Element }) {
+function Section(props: { title: string; count?: number; aside?: JSX.Element; testid?: string; children: JSX.Element }) {
   return (
     <section aria-label={props.title} data-testid={props.testid} data-count={props.count} class="flex flex-col gap-2">
       <header class="flex items-center gap-2">

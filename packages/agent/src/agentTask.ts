@@ -24,10 +24,10 @@ export interface AgentTask {
 }
 
 /** A graph past this is a project, not one piece of work: it belongs in issues. */
-export const maxTasks = 30;
+const maxTasks = 30;
 
 /** Retries a subagent's task gets after its first failure. */
-export const retries = 1;
+const retries = 1;
 
 /** Done or skipped: what lets the tasks after it start. */
 const settled = (t: AgentTask) => t.state === "done" || t.state === "skipped";

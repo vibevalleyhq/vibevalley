@@ -10,7 +10,7 @@ import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
-import type { Memory, MemoryKind } from "@vibevalley/protocol";
+import type { MemoryKind } from "@vibevalley/protocol";
 
 import { newId } from "@/base/ids.ts";
 import { redact } from "@/base/redact.ts";
@@ -223,5 +223,3 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     can: { list: false, forget: false, transcripts: true },
   };
 }
-
-export type { Memory };

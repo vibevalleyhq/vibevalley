@@ -12,9 +12,9 @@ import { toolResult } from "./prompts.ts";
 export const stopped = toolResult.stopped;
 
 /** The model gets the head and the tail, and a note. */
-export const maxResultChars = 30_000;
+const maxResultChars = 30_000;
 
-export function clip(text: string, limit = maxResultChars): string {
+function clip(text: string, limit = maxResultChars): string {
   const r = [...text];
   if (r.length <= limit) return text;
   const head = Math.trunc(limit * 0.7);

@@ -14,9 +14,9 @@ import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
-export const version = "2.4.10";
-export const staleToken = -14;
-export const restricted = -2;
+const version = "2.4.10";
+const staleToken = -14;
+const restricted = -2;
 
 export interface Account {
   readonly baseUrl: string;
@@ -126,7 +126,7 @@ export interface WeixinApi {
   readonly sendText: (account: Account, to: string, text: string, contextToken: string) => Effect.Effect<string, AppFailed>;
 }
 
-export const failed = (ret?: number, errcode?: number) => (ret !== undefined && ret !== 0 ? ret : errcode !== undefined && errcode !== 0 ? errcode : undefined);
+const failed = (ret?: number, errcode?: number) => (ret !== undefined && ret !== 0 ? ret : errcode !== undefined && errcode !== 0 ? errcode : undefined);
 
 const clientVersion = (v: string) => {
   const [a = 0, b = 0, c = 0] = v.split(".").map((x) => numberIn(x));
@@ -277,7 +277,7 @@ export class WeixinClient implements WeixinApi {
   }
 }
 
-export function text(m: Message): string {
+function text(m: Message): string {
   const parts: string[] = [];
   for (const item of m.item_list ?? []) {
     let part = "";
@@ -305,7 +305,7 @@ export function text(m: Message): string {
   return parts.join("\n").trim();
 }
 
-export const quoted = (m: Message) => (m.item_list ?? []).find((i) => i.ref_msg?.svr_id)?.ref_msg?.svr_id ?? "";
+const quoted = (m: Message) => (m.item_list ?? []).find((i) => i.ref_msg?.svr_id)?.ref_msg?.svr_id ?? "";
 
 /** The long poll's own length until WeChat says another. */
 const weixinPollMs = 35_000;

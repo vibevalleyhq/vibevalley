@@ -155,7 +155,7 @@ export const withTask = (graph: TaskGraph, id: string, change: (n: Task) => Task
   tasks: graph.tasks.map((n) => (n.id === id ? change(n) : n)),
 });
 
-export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
+function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
   const seen = new Set<string>();
   const visit = (id: string) => {
     if (seen.has(id)) return;
@@ -168,7 +168,7 @@ export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
 
 export const acceptancesOf = (graph: TaskGraph, task: Task) => ancestorsOf(graph, task).filter((n) => isAcceptance(n) && n.state === "merged");
 
-export const isLast = (graph: TaskGraph, task: Task) => !graph.tasks.some((n) => n.needs.includes(task.id));
+const isLast = (graph: TaskGraph, task: Task) => !graph.tasks.some((n) => n.needs.includes(task.id));
 
 export function acceptanceChecks(graph: TaskGraph, task: Task): string[] {
   const out: string[] = [];

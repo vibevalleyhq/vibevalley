@@ -23,6 +23,7 @@
     "@vibevalley/health": "workspace:*",
     "effect": "catalog:",
     "eslint-plugin-solid": "catalog:",
+    "knip": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

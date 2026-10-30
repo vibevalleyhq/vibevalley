@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { type Crop, dayMs } from "@vibevalley/protocol";
 
-export const two = (n: number) => String(n).padStart(2, "0");
+const two = (n: number) => String(n).padStart(2, "0");
 
 /** The server counts commits by the same day. */
 const dayKey = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;

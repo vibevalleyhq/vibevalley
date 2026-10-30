@@ -14,10 +14,10 @@ export type Facing = "up" | "down" | "left" | "right";
 export type PlotSpot = "front" | "left" | "right" | "back";
 
 /** Around a plot, from its bottom-centre: where a helper stands to look on. */
-export const around: Record<PlotSpot, Point> = { front: { x: 0, y: 5 }, left: { x: -24, y: -10 }, right: { x: 24, y: -10 }, back: { x: 6, y: -29 } };
+const around: Record<PlotSpot, Point> = { front: { x: 0, y: 5 }, left: { x: -24, y: -10 }, right: { x: 24, y: -10 }, back: { x: 6, y: -29 } };
 
 /** In a plot's soil, from its bottom-centre: where a helper stands to work it, the tool landing in the soil. */
-export const inBed: Record<PlotSpot, Point> = { front: { x: 0, y: -9 }, left: { x: -7, y: -11 }, right: { x: 7, y: -11 }, back: { x: 0, y: -13 } };
+const inBed: Record<PlotSpot, Point> = { front: { x: 0, y: -9 }, left: { x: -7, y: -11 }, right: { x: 7, y: -11 }, back: { x: 0, y: -13 } };
 
 const facingAt: Record<PlotSpot, Facing> = { front: "up", back: "down", left: "right", right: "left" };
 

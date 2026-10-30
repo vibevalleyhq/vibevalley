@@ -22,10 +22,10 @@ import { messageOf } from "@/errors.ts";
 
 import { helperInstructions } from "./prompts.ts";
 
-export const vibevalleyRuntime = "vibevalley";
+const vibevalleyRuntime = "vibevalley";
 
 /** DeepSeek's two. */
-export const efforts = ["high", "max"] as const;
+const efforts = ["high", "max"] as const;
 
 export { helperInstructions };
 

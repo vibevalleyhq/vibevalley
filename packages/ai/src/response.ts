@@ -276,7 +276,7 @@ function usageOf(raw: RawUsage, model: Model): Usage {
 }
 
 /** As pi-ai's calculateCost, the same operations in the same order, so the floating point agrees. */
-export function costOf(model: Model, u: Omit<Usage, "cost">): Usage["cost"] {
+function costOf(model: Model, u: Omit<Usage, "cost">): Usage["cost"] {
   const r = model.cost;
   const input = (r.input / 1000000) * u.input;
   const output = (r.output / 1000000) * u.output;
@@ -304,7 +304,7 @@ const jsonEscapes = new Set(['"', "\\", "/", "b", "f", "n", "r", "t"]);
 const controlEscapes: Record<string, string> = { "\b": "\\b", "\f": "\\f", "\n": "\\n", "\r": "\\r", "\t": "\\t" };
 
 /** As pi-ai's repairJson: inside strings, raw control characters are escaped and a stray backslash is doubled. */
-export function repairJson(json: string): string {
+function repairJson(json: string): string {
   let out = "";
   let inString = false;
   for (let i = 0; i < json.length; i++) {
@@ -355,7 +355,7 @@ function parseWithRepair(json: string): unknown {
 }
 
 /** A tool call's whole arguments: an object, or {} and why not with the text that came. */
-export function toolCallArguments(json: string): { arguments: Readonly<Record<string, unknown>>; argumentsError?: string } {
+function toolCallArguments(json: string): { arguments: Readonly<Record<string, unknown>>; argumentsError?: string } {
   if (!json.trim()) return { arguments: {} };
   const refused = (why: string) => ({ arguments: {}, argumentsError: `${why}\n\nReceived arguments:\n${json}` });
   let parsed: unknown;

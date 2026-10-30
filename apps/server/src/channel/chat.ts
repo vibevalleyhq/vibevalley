@@ -90,7 +90,7 @@ const readLimit = 30;
 /** A follower further behind than this reads the room's newest page instead of every message since. */
 export const catchUpMax = 200;
 /** The reports a new reader of the farm's log starts from. */
-export const logKeep = 80;
+const logKeep = 80;
 /** A thread named by the message it hangs under shows this much of it. */
 const threadTitleMax = 24;
 /** How much of a channel's newest message a list shows. */
@@ -473,7 +473,7 @@ export interface Helpers {
   readonly presentSessions: () => readonly Session[];
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const core = yield* Core;

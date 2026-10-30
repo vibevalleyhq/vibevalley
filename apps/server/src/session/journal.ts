@@ -29,7 +29,7 @@ const pushAfterMs = 300;
 const saveAfterMs = 1500;
 const decodeEvents = Schema.decodeUnknownSync(Schema.Array(SessionEventSchema));
 
-export function clipOutput(text: string): string {
+function clipOutput(text: string): string {
   const n = text.length;
   if (n <= outputHead + outputTail + 40) return text;
   return `${text.slice(0, outputHead)}\n${t("server.session.log.clipped", { n: n - outputHead - outputTail })}\n${text.slice(n - outputTail)}`;

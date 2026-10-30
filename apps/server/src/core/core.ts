@@ -141,7 +141,7 @@ const isFact = (e: SideEvent): e is Fact => {
   }
 };
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;

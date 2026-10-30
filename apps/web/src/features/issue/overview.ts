@@ -30,7 +30,7 @@ export interface OwnerQuestion {
   tone: Tone;
 }
 
-export const nothing: DoingView = { action: "none", label: "", actionText: "" };
+const nothing: DoingView = { action: "none", label: "", actionText: "" };
 
 const doingOf = (s: SessionView): DoingView => (s.phase._tag === "working" ? s.phase.doing : nothing);
 
@@ -173,8 +173,6 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     showsChanges: session !== undefined && attention.state !== "done" && attention.state !== "canceled",
   };
 }
-
-export type IssueState = ReturnType<typeof issueState>;
 
 /** The empty 干活过程 says why. */
 export const noStepsText = (head: Session) => (endedAt(head) === undefined ? t("web.issue.issue.noSteps") : t("web.issue.issue.stepsGone"));

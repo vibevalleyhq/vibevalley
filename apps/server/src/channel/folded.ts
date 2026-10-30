@@ -6,7 +6,7 @@ import { compareText, or } from "@/base/order.ts";
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
 export const keepChannels = 100;
 
-export const isTop = (c: Channel) => c.type !== "thread";
+const isTop = (c: Channel) => c.type !== "thread";
 
 const emptyChat = (): Chat => ({ channels: [], ownerMentions: [] });
 
@@ -47,13 +47,3 @@ export function targetOf(c: Pick<Channel, "type" | "rootNumber" | "name">, chann
 export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
 
 export const channelOf = (chat: Chat | undefined, id: string) => chat?.channels.find((c) => c.id === id);
-
-export function topOf(chat: Chat | undefined, c: Channel | undefined): Channel | undefined {
-  if (!c) return defaultOf(chat);
-  if (isTop(c)) return c;
-  return channelOf(chat, c.parent ?? "") ?? defaultOf(chat);
-}
-
-export const addressOf = (chat: Chat | undefined, c: Channel) => targetOf(c, topOf(chat, c)?.name ?? "");
-
-export const noticeBatchMs = 3_000;

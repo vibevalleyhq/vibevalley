@@ -39,7 +39,7 @@ export function testConfig(change: Partial<ServerConfig["Service"]> = {}): Serve
   };
 }
 
-export const testSettings = (change: Partial<ServerConfig["Service"]> = {}) => Layer.succeed(ServerConfig, testConfig(change));
+const testSettings = (change: Partial<ServerConfig["Service"]> = {}) => Layer.succeed(ServerConfig, testConfig(change));
 
 export const testDatabase = (change: Partial<ServerConfig["Service"]> = {}) => Database.pipe(Layer.provide(testSettings(change)));
 

@@ -43,7 +43,7 @@ export class Notices extends Context.Service<
   );
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const core = yield* Core;
   const chat = yield* Channels;
 

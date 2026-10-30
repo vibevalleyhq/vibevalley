@@ -10,7 +10,6 @@
     "db:check": "vpx scripts/db-generate.ts --check"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "catalog:",
     "@botiverse/oar": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@effect/platform-node": "catalog:",

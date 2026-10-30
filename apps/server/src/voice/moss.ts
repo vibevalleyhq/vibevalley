@@ -10,7 +10,7 @@ import { Socket } from "effect/socket";
 import { jsonOrNone } from "@/base/json.ts";
 import { afterRealTime } from "@/base/time.ts";
 
-export const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
+const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 
 /** MOSS's transcription (platform.mosi.cn/docs/reference/transcriptions): OpenAI's /audio/transcriptions, with the same key
  * as MOSS Live. moss-transcribe-1.0 is the plain one; the diarize model (speakers, streaming) is not needed to dictate. */
@@ -47,7 +47,7 @@ export interface MossTransport {
   readonly status: (key: string) => Promise<{ readonly code: number; readonly body: string }>;
 }
 
-export const nodeTransport: MossTransport = {
+const nodeTransport: MossTransport = {
   connect: (key, on) => {
     const ws = new WebSocket(mossUrl, { headers: { Authorization: `Bearer ${key}` } });
     ws.binaryType = "arraybuffer";

@@ -32,7 +32,6 @@ export interface Farm {
 
 /** The farm with its one runtime, pi: testing/helper.ts's unless the test gives its own. As the server starts it, sessions
  * left on the farm by the last run come back (Agent Sessions' startup), and the game keeps its ledger. */
-export { helper };
 
 export function farm(
   options: Omit<WorldOptions, "runtimes"> & {

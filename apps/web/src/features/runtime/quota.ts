@@ -12,7 +12,7 @@ export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) =>
 export type QuotaLevel = "plenty" | "low" | "gold" | "empty" | "unknown";
 
 /** Below this much left (percent) the farm warns and the orchestrator sends someone else if it can (protocol.QuotaLow). */
-export const quotaLow = 15;
+const quotaLow = 15;
 
 /** How full a quota's bottle is drawn, by the share left. */
 export const quotaLevel = (left: number | undefined): QuotaLevel => (left === undefined ? "unknown" : left < quotaLow ? "empty" : left < 50 ? "low" : "plenty");

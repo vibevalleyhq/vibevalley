@@ -23,7 +23,6 @@ export * from "./normals";
 export * from "./particles";
 export * from "./rhythm";
 export * from "./sky";
-export * from "./ui";
 
 export interface PixelStage {
   readonly app: Application;
@@ -240,24 +239,6 @@ export function leanToPointer(stage: PixelStage, { pointer = 0.7, ease = 2.5 }: 
       window.removeEventListener("pointermove", onMove);
       stage.app.ticker.remove(step);
     },
-  };
-}
-
-/**
- * Lets the camera sway with the pointer by up to `reach` art pixels (the stage's margin at most): the whole scene
- * moves, the layers by their depth. Returns how to stop.
- */
-export function swayCamera(stage: PixelStage, { reach, ...options }: LeanOptions & { readonly reach: number }): () => void {
-  const lean = leanToPointer(stage, options);
-  const step = () => {
-    stage.camera.x = lean.at.x * reach;
-    stage.camera.y = lean.at.y * reach;
-  };
-  // After the lean (HIGH + 1), before the stage places its layers (HIGH).
-  stage.app.ticker.add(step, undefined, UPDATE_PRIORITY.HIGH + 0.5);
-  return () => {
-    lean.stop();
-    stage.app.ticker.remove(step);
   };
 }
 

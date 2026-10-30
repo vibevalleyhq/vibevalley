@@ -61,7 +61,7 @@ export const summaryOf = (text: string) => reportVerdict(text) || conclusion(tex
 /** Said out loud on the farm, not only in the report. */
 const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unavailable"]);
 
-export const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
+const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
 
 export interface SessionRead {
   readonly outcome: Outcome;

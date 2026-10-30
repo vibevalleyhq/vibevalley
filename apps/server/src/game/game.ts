@@ -51,7 +51,7 @@ export class Game extends Context.Service<
   );
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const core = yield* Core;

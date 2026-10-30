@@ -35,7 +35,7 @@ const iconOf = (name: "copy" | "expand" | "check", size = 14): Node => {
 
 /** An SVG string as nodes, with nothing that could run or reach out: no scripts, no foreign HTML, no event handlers, no
  * links but in-page ones. Pele escapes and filters too (links and images off); this is the page's own guarantee. */
-export function cleanSvg(svg: string): Node {
+function cleanSvg(svg: string): Node {
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
   const root = doc.documentElement;
   if (root.nodeName !== "svg") return document.createTextNode("");

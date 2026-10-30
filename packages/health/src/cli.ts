@@ -10,7 +10,7 @@ import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import { commits, firstTime, headTime, sources } from "./collect.ts";
-import { drift, type Escapes, escapesByArea, type Health, hotspots, underTodaysNames } from "./readings.ts";
+import { drift, escapeAdvice, type Escapes, escapesByArea, type Health, hotspots, underTodaysNames } from "./readings.ts";
 import { report } from "./report.ts";
 
 const { values } = parseArgs({ options: { config: { type: "string" }, check: { type: "boolean" }, write: { type: "boolean" }, json: { type: "boolean" } } });
@@ -38,10 +38,10 @@ if (values.write === true) {
   for (const d of off)
     console.error(
       d.now > d.kept
-        ? `health: ${d.area} has ${d.now} ${d.kind} (kept ${d.kept}): check the new ones, or say why in the change and run --write`
-        : `health: ${d.area} is down to ${d.now} ${d.kind} (kept ${d.kept}): run --write to lower the ratchet`,
+        ? `health: ${d.area} has ${d.now - d.kept} new ${d.kind} (${d.now}, kept ${d.kept}): each one turns a check off by hand. Fix: ${escapeAdvice[d.kind]}. One that must stay says why where it is, and in the pull request, then \`vp run health:write\` keeps the new count. See packages/health/README.md`
+        : `health: ${d.area} is down to ${d.now} ${d.kind} (kept ${d.kept}). Fix: \`vp run health:write\` lowers the ratchet, so the room is not spent by the next change. See packages/health/README.md`,
     );
-  for (const p of stale) console.error(`health: ${p} is hot by design but gone: drop its reason`);
+  for (const p of stale) console.error(`health: ${p} is hot by design but gone. Fix: drop its reason from hotByDesign. See scripts/health.config.ts`);
   if (off.length > 0 || stale.length > 0) process.exit(1);
   console.log(`health: escapes on the ratchet in ${Object.keys(escapes).length} areas`);
 } else {

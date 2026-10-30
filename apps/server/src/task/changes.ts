@@ -35,7 +35,7 @@ const isField = (f: string): f is TaskField => taskFields.some((x) => x.field ==
 export const renderedChanges = (changes: readonly TaskFieldChange[]): TaskFieldChange[] =>
   changes.map((c) => ({ ...c, field: isField(c.field) ? t(`server.task.field.${c.field}`) : c.field }));
 
-export function taskFieldChanges(was: Task, now: Task): TaskFieldChange[] {
+function taskFieldChanges(was: Task, now: Task): TaskFieldChange[] {
   const out: TaskFieldChange[] = [];
   for (const f of taskFields) {
     const from = f.text(was);

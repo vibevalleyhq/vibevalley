@@ -8,8 +8,8 @@ export const dinoHeight = 40;
 export const dinoGround = 35;
 const dinoX = 8;
 
-export const dinoRunSize = { w: 12, h: 14 } as const;
-export const dinoDuckSize = { w: 16, h: 8 } as const;
+const dinoRunSize = { w: 12, h: 14 } as const;
+const dinoDuckSize = { w: 16, h: 8 } as const;
 
 export type ObstacleKind = "cactus" | "cacti" | "bird";
 

@@ -7,7 +7,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { compare, compareText, or } from "@/base/order.ts";
 
 import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
-export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
+function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   const g = parent.graph!;
   const graph: TaskGraph = omitUndefined({
     id: parent.id,

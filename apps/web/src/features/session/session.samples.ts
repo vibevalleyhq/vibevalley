@@ -2,7 +2,7 @@
 
 import type { SessionEvent, SessionEventType, ToolAction } from "@vibevalley/protocol";
 
-export const start = Date.now() - 9 * 60_000;
+const start = Date.now() - 9 * 60_000;
 
 let seq = 0;
 const at = (s: number) => start + s * 1000;

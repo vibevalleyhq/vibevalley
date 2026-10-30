@@ -54,7 +54,7 @@ const ServerReady = Schema.Struct({ url: Schema.String });
 
 /** port 0 picks a free one; a restart in development (dev.ts) asks for the one it had, so the page keeps its origin and
  * what it stored there. */
-export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Promise<RunningServer> {
+function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Promise<RunningServer> {
   mkdirSync(dirname(files.log), { recursive: true });
   const log = createWriteStream(files.log, { flags: "a" });
   log.write(`--- ${new Date().toISOString()} vibevalley: starting ${files.server}\n`);

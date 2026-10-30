@@ -1,7 +1,11 @@
-import { RuleTester } from "vite-plus/lint/plugins-dev";
-import { describe, it } from "vite-plus/test";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-import plugin from "./oxlint-plugin.ts";
+import { RuleTester } from "vite-plus/lint/plugins-dev";
+import { describe, expect, it } from "vite-plus/test";
+
+import { refused } from "../vite.config.ts";
+import plugin, { catalogOf } from "./oxlint-plugin.ts";
 
 RuleTester.describe = describe;
 RuleTester.it = it;
@@ -100,7 +104,7 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from '../features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../../farm/scene';", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
-    { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "layer" }] },
+    { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "sibling" }] },
     { code: "import { a } from '@/features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '@/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '@/features/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
@@ -115,9 +119,24 @@ tester.run("parent-import", rule("parent-import"), {
     { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
   ],
   invalid: [
-    { code: "import { a } from '../base/router';", filename: page("ui/A.tsx"), errors: [{ messageId: "parent" }] },
-    { code: "export * from '../issue/rules.ts';", filename: "/repo/apps/server/src/task/x.ts", errors: [{ messageId: "parent" }] },
-    { code: "const m = import('../../ui/A');", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "parent" }] },
+    {
+      code: "import { a } from '../base/router';",
+      filename: page("ui/A.tsx"),
+      errors: [{ messageId: "parent" }],
+      output: "import { a } from '@/base/router';",
+    },
+    {
+      code: "export * from '../issue/rules.ts';",
+      filename: "/repo/apps/server/src/task/x.ts",
+      errors: [{ messageId: "parent" }],
+      output: "export * from '@/issue/rules.ts';",
+    },
+    {
+      code: "const m = import('../../ui/A');",
+      filename: page("features/issue/Board.tsx"),
+      errors: [{ messageId: "parent" }],
+      output: "const m = import('@/ui/A');",
+    },
   ],
 });
 
@@ -159,4 +178,35 @@ tester.run("global-doors", rule("global-doors"), {
     { code: "Object.defineProperty(window, 'x', { value: 1 })", errors: [{ messageId: "assign" }] },
     { code: "declare global { interface Window { x?: number } }\nexport {};", filename: "a.ts", errors: [{ messageId: "declare" }] },
   ],
+});
+
+const root = resolve(import.meta.dirname, "..");
+
+describe("what a rule says", () => {
+  const messages = [
+    ...Object.entries(plugin.rules).flatMap(([name, r]) => Object.entries(r.meta?.messages ?? {}).map(([id, text]) => ({ where: `${name}/${id}`, text }))),
+    ...Object.entries(refused).map(([id, text]) => ({ where: `no-restricted-imports/${id}`, text })),
+  ];
+
+  it("says what is wrong, how to fix it, and a file here that shows it", () => {
+    for (const { where, text } of messages) {
+      // A path the rule fills in names one file per value: apps/{{app}}/tsconfig.json is apps/web's and apps/server's.
+      const see = / See (\S+)$/u.exec(text)?.[1]?.replaceAll("{{app}}", "web");
+      expect(text, where).toMatch(/\. Fix: .+\. See \S+$/u);
+      expect(existsSync(resolve(root, see ?? "")), `${where}: ${see}`).toBe(true);
+    }
+  });
+
+  it("leaves no-restricted-imports no message of its own outside refused", () => {
+    expect(readFileSync(resolve(root, "vite.config.ts"), "utf8")).not.toMatch(/message: ["'`]/u);
+  });
+
+  it("names the catalog the file's words belong in", () => {
+    expect(catalogOf("/repo/apps/server/src/issue/issue.ts")).toBe("server.issue");
+    expect(catalogOf("/repo/apps/web/src/features/issue/Board.tsx")).toBe("web.issue");
+    expect(catalogOf("/repo/apps/web/src/farm/phone/screens.tsx")).toBe("web.farm.phone");
+    expect(catalogOf("/repo/apps/web/src/farm/hud/Hud.tsx")).toBe("web.farm");
+    expect(catalogOf("/repo/apps/server/src/flows/farm.ts")).toBe("server");
+    expect(catalogOf("/repo/packages/agent/src/brain.ts")).toBe("shared");
+  });
 });

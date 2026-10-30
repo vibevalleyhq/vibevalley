@@ -58,7 +58,7 @@ const standingsOf = (list: readonly AchievementStanding[]): Standings => {
 };
 
 /** An emblem in its frame: wood before the first tier, then bronze, silver, gold (one tier alone is gold). */
-export function Medal(props: { a: Achievement; tier: number; size: number }) {
+function Medal(props: { a: Achievement; tier: number; size: number }) {
   const earned = () => props.tier > 0;
   const frame = () => {
     const frameTier = props.a.tiers.length === 1 ? 3 : props.tier;

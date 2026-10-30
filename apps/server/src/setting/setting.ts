@@ -123,7 +123,7 @@ export function savedLocale(home: string): Locale {
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "settings.json");
   const disk = new FileWriter(file, 0o600);

@@ -199,7 +199,7 @@ export class FeishuClient implements FeishuApi {
   }
 }
 
-export function text(m: Message): string {
+function text(m: Message): string {
   if (m.messageType !== "text")
     return (
       (

@@ -6,11 +6,11 @@ import { farmOf } from "@vibevalley/protocol/rules";
 
 import { sessionOf, withSession } from "@/session/roster.ts";
 
-export const historyLimit = 30;
+const historyLimit = 30;
 
-export const fileLimit = 24;
+const fileLimit = 24;
 
-export const commandLimit = 12;
+const commandLimit = 12;
 
 /** One saved before plays were kept has an empty one, with no bed. */
 export const playOf = (h: Session): SessionPlay => h.play ?? { station: -1, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] };
@@ -48,7 +48,7 @@ const remember = (list: readonly string[], item: string, limit: number) => {
 
 const lastN = <T>(list: readonly T[], n: number) => list.slice(Math.max(0, list.length - n));
 
-export const isToolAction = (action: SessionAction) =>
+const isToolAction = (action: SessionAction) =>
   action === "run_command" ||
   action === "read_file" ||
   action === "edit_file" ||

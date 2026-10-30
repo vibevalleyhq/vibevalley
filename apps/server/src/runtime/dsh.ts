@@ -60,7 +60,7 @@ const rpcAnswer = jsonOrNone(
   }),
 );
 
-export const refusedSessionOptions: RefusedSessionOptions = {
+const refusedSessionOptions: RefusedSessionOptions = {
   systemPrompt: "dsh-acp has no per-session system prompt input",
   appendSystemPrompt: "dsh-acp has no per-session system prompt append input",
   disallowedTools: "dsh-acp has no session tool denylist",
@@ -95,7 +95,7 @@ export function modelId(value: string): string {
 }
 
 /** A model id with the retired name folded into today's. */
-export function canonicalModelId(id: string): string {
+function canonicalModelId(id: string): string {
   const slash = id.indexOf("/");
   if (slash < 0 || slash === id.length - 1) return id;
   const provider = id.slice(0, slash);

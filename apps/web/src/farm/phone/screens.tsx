@@ -32,7 +32,7 @@ const declineRed = "#c84a3a";
 const failedInk = "#8f2a1e";
 
 /** Cells on a grid, scaled whole into `size` and centred. */
-export function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; size: [number, number]; origin?: [number, number] }) {
+function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; size: [number, number]; origin?: [number, number] }) {
   const origin = () => props.origin ?? [0, 0];
   return (
     <svg
@@ -48,7 +48,7 @@ export function Cells(props: { cells: readonly GlyphCell[]; grid: [number, numbe
   );
 }
 
-export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
+const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
   <Cells cells={phoneCells(props.lit ?? false)} grid={[10, 16]} size={[(props.size * 10) / 16, props.size]} />
 );
 

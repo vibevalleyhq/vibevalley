@@ -36,9 +36,9 @@ export const inCny = (p: Price, cnyPerUsd: number): Rate => ({
   },
 });
 
-export const vibevalleyRuntime = "vibevalley";
+const vibevalleyRuntime = "vibevalley";
 /** VibeValley's agent's model when the profile names none. */
-export const defaultModel = "deepseek-flash";
+const defaultModel = "deepseek-flash";
 
 const priceOf = (cost: Price | undefined): Price | undefined =>
   cost

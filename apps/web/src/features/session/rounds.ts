@@ -343,7 +343,7 @@ export const secondsText = (ms: number) => (ms < 10000 ? t("web.base.time.tenths
 export const tokensText = (n: number) => (n < 10000 ? `${n}` : big(n, 1));
 
 /** The part after an MCP server's prefix: `mcp__vibevalley__channel_message_send` is channel_message_send. */
-export function toolName(tool: string) {
+function toolName(tool: string) {
   const at = tool.lastIndexOf("__");
   return at >= 0 && at + 2 < tool.length ? tool.slice(at + 2) : tool;
 }

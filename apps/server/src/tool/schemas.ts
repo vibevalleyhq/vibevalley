@@ -308,7 +308,7 @@ const written = (node: unknown): unknown => {
   return out;
 };
 
-export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
+const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
   if (Object.keys(parameters.fields).length === 0) return { additionalProperties: true, properties: {}, type: "object" };
   const shaped = written(Schema.toJsonSchemaDocument(parameters, { includeAnnotationKey: (key) => key === "requiredOrder" || key === "parseOptions" }).schema);
   return Predicate.isObject(shaped) ? Object.fromEntries(Object.entries(shaped)) : {};

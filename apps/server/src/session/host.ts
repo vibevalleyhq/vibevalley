@@ -434,7 +434,7 @@ const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.r
 /** The input that began the turn asked: logged when the input is taken, after it was made, so the message is no newer
  * than the step, and it holds the step's words (trimmed and maybe cut; the message puts what the owner adds before them).
  * Of those, the newest: an older one with the same words was taken before. -1 when none is. */
-export function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
+function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;
   lines.forEach((m, i) => {
@@ -444,7 +444,7 @@ export function turnAt(lines: readonly BrainMessage[], text: string, time: numbe
 }
 
 /** What followed an input until the next one, without the compactions written after a run. */
-export function turnOf(rest: readonly BrainMessage[], inputType: string): BrainMessage[] {
+function turnOf(rest: readonly BrainMessage[], inputType: string): BrainMessage[] {
   const out: BrainMessage[] = [];
   for (const m of rest) {
     if (isHosted(m, inputType)) break;

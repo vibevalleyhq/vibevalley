@@ -79,7 +79,7 @@ export const sourceLife = (name: string) => {
 /** How long a source outside the farm may take to answer a read: a run waiting on it is the owner waiting. */
 export const prefetchTimeoutMs = 2_000;
 /** A write goes in the background, so it may take longer; one that hangs still must not hold the queue for ever. */
-export const writeTimeoutMs = 30_000;
+const writeTimeoutMs = 30_000;
 const writeQueue = 256;
 
 /** The local source: the memory table, picked by recall.ts. Nothing is marked recalled here: the caller marks those it keeps. */
@@ -124,10 +124,10 @@ export function localSource(m: Memories, profiles: () => string[]): Source {
 }
 
 /** The local source's ids go as they are; another's carry its name: name:id. */
-export const idOf = (one: Source, id: string) => (one.name === localName || id === "" ? id : `${one.name}:${id}`);
+const idOf = (one: Source, id: string) => (one.name === localName || id === "" ? id : `${one.name}:${id}`);
 
 /** Which source an id is from, and the id as that source knows it. */
-export function owner(all: readonly Source[], id: string): [Source, string] {
+function owner(all: readonly Source[], id: string): [Source, string] {
   const colon = id.indexOf(":");
   if (colon >= 0) {
     const named = all.find((s) => s.name === id.slice(0, colon));
@@ -137,7 +137,7 @@ export function owner(all: readonly Source[], id: string): [Source, string] {
 }
 
 /** The cue as one source gets it: only its own ids to skip, as it knows them. */
-export function cueFor(one: Source, cue: RecallCue): RecallCue {
+function cueFor(one: Source, cue: RecallCue): RecallCue {
   if (!cue.skip || cue.skip.size === 0) return cue;
   const skip = new Set<string>();
   for (const id of cue.skip) {

@@ -17,7 +17,7 @@ export const tools: readonly { readonly id: Tool; readonly label: string; readon
 ];
 
 /** The keys 1–6 pick the tools in this order. */
-export const toolForKey = (key: string): Tool | undefined => tools[Number(key) - 1]?.id;
+const toolForKey = (key: string): Tool | undefined => tools[Number(key) - 1]?.id;
 
 export type BedFxKind = "water" | "spray" | "harvest" | "shovel" | "note";
 

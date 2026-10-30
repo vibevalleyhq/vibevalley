@@ -22,7 +22,7 @@ export interface Followed {
 
 const empty: Followed = { messages: [], complete: false, ready: false };
 
-export function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]): ChatMessage[] {
+function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]): ChatMessage[] {
   const by = new Map(was.map((m) => [m.number, m]));
   for (const m of more) {
     const had = by.get(m.number);

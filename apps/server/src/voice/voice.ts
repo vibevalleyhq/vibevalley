@@ -411,7 +411,7 @@ const tunnelAnswers = (url: string) =>
     return false;
   });
 
-export const make = (options: VoiceOptions = {}) =>
+const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     const config = yield* ServerConfig;

@@ -52,7 +52,7 @@ export class Crons extends Context.Service<
 }
 
 /** $TZ when it names a zone, else the system's. */
-export function localZone(): string {
+function localZone(): string {
   const tz = process.env.TZ;
   if (tz) {
     try {
@@ -65,7 +65,7 @@ export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agents;
   const chat = yield* Channels;

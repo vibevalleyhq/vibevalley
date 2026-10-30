@@ -19,9 +19,6 @@ export const pxText = {
   read: "font-sans font-normal text-[14px] leading-[1.7]",
 } as const;
 
-/** A line of pxText.read is at most this many of its characters wide. */
-export const readMeasure = 40;
-
 export const pxDrop = "shadow-[2px_2px_0_0_var(--color-px-drop)]";
 
 /** The pixel skin's one focus ring: a leaf line a pixel off the edge, only when the keyboard got there. */
@@ -39,6 +36,3 @@ export const pxWindow =
 // right and 4 px down that shows past the corner.
 export const pxFrame =
   "shadow-[inset_0_0_0_2px_var(--color-rim),inset_0_-4px_0_0_var(--color-cream-300),0_-2px_0_0_var(--color-px-ink),0_2px_0_0_var(--color-px-ink),-2px_0_0_0_var(--color-px-ink),2px_0_0_0_var(--color-px-ink),2px_4px_0_0_var(--color-px-drop)]";
-
-/** A sunken well: `fill` a bg-* class, `line` a border-* class. */
-export const pxInset = ({ fill = "bg-cream-200", line = "border-cream-300" }: { fill?: string; line?: string } = {}) => cx(fill, "border-2", line);

@@ -16,7 +16,7 @@ const patrolGrace: Partial<Record<InboxKind, number>> = {
   "task-failed": 30 * 60_000,
 };
 
-export const reportAgainMs = 4 * 60 * 60_000;
+const reportAgainMs = 4 * 60 * 60_000;
 
 export interface PatrolNote {
   readonly key: string;

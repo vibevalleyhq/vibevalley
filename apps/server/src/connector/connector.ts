@@ -102,7 +102,7 @@ const sleepOrWake = (ms: number, register: (wake: () => void) => void) =>
     );
   });
 
-export const make = (options: ConnectorOptions = {}) =>
+const make = (options: ConnectorOptions = {}) =>
   Effect.gen(function* () {
     // The farm's own waits and times (a pause, a retry, when a message went out) on the service's Clock.
     const clock = yield* Clock.Clock;

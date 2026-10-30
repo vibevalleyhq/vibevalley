@@ -124,7 +124,7 @@ export function toolStart(name: string, args: unknown): ToolStart {
 const spaces = /\s+/gu;
 
 /** Told to the model as the tool's failed result: the message is what it reads. */
-export class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly message: string }> {}
+class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly message: string }> {}
 
 const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
 
@@ -136,7 +136,7 @@ const said = (e: unknown) => toFailed(e).message;
 /** who throws for a caller nobody knows: the model reads it as the tool's failure. */
 const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e) }) });
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const agents = yield* Agents;
   const projects = yield* Projects;

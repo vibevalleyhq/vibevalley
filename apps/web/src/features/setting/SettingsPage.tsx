@@ -36,7 +36,7 @@ interface Section {
   readonly words: string;
 }
 
-export const sections: readonly Section[] = [
+const sections: readonly Section[] = [
   { id: "general", group: "options", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
   { id: "appearance", group: "options", icon: "appearance", label: t("web.setting.nav.appearance"), words: t("web.setting.words.appearance") },
   { id: "models", group: "options", icon: "key", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },

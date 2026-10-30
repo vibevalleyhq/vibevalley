@@ -14,7 +14,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { messageOf } from "@/errors.ts";
 
 export const builtInDir = join(import.meta.dirname, "templates");
-export const addedDir = (home: string) => join(home, "agent-templates");
+const addedDir = (home: string) => join(home, "agent-templates");
 
 /** The files a template is made of: nothing else in its folder is read or copied. */
 const files = ["agent.json", "agent.en.json", "persona.md", "persona.en.md"] as const;

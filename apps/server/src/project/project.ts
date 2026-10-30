@@ -7,7 +7,7 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
+import { lstatSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime } from "effect";
@@ -282,7 +282,7 @@ export interface ProjectHooks {
   readonly fetch?: (path: string, branch: string) => Effect.Effect<boolean>;
 }
 
-export const make = (hooks: ProjectHooks = {}) =>
+const make = (hooks: ProjectHooks = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const work = resolve(config.workRoot);
@@ -968,8 +968,6 @@ function repoDirs(dir: string, depth: number): string[] {
   if (depth === 0) return [];
   return entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)).flatMap((e) => repoDirs(join(dir, e.name), depth - 1));
 }
-
-export const isDir = (path: string) => existsSync(path) && statSync(path).isDirectory();
 
 /** As the server starts: a first look at GitHub; the page asks again with github.refresh. */
 export const start = Layer.effectDiscard(Effect.flatMap(Projects, (p) => Effect.forkScoped(p.refreshGitHub())));

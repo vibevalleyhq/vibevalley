@@ -19,7 +19,7 @@ import { SpriteIcon } from "@/ui/pixel";
 import { Qr } from "@/ui/Qr";
 import { toast } from "@/ui/toasts";
 
-export const connectorLabel: Record<ConnectorID, string> = {
+const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),
   feishu: t("web.connector.connectors.label.feishu"),
   qq: "QQ",
@@ -39,7 +39,7 @@ const connectorNotes: Record<ConnectorID, string[]> = {
 
 const connectorsAlways = t("web.connector.connectors.always");
 
-export const stateLabel: Record<ConnectorState, string> = {
+const stateLabel: Record<ConnectorState, string> = {
   off: t("web.connector.connectors.state.off"),
   waiting: t("web.connector.connectors.state.waiting"),
   scanned: t("web.connector.connectors.state.scanned"),

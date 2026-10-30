@@ -10,7 +10,7 @@ export const plain = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join(
 export const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n + chars(s.t).length, 0);
 
 /** The marks as the wire has them: only those set. */
-export function marksOf(m: SpanMarks | undefined): SpanMarks {
+function marksOf(m: SpanMarks | undefined): SpanMarks {
   const out: SpanMarks = {};
   if (m?.bold === true) out.bold = true;
   if (m?.italic === true) out.italic = true;
@@ -20,7 +20,7 @@ export function marksOf(m: SpanMarks | undefined): SpanMarks {
   return out;
 }
 
-export const sameMarks = (a: SpanMarks, b: SpanMarks) =>
+const sameMarks = (a: SpanMarks, b: SpanMarks) =>
   !(a.bold !== true) === !(b.bold !== true) &&
   !(a.italic !== true) === !(b.italic !== true) &&
   !(a.code !== true) === !(b.code !== true) &&

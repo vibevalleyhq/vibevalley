@@ -25,7 +25,7 @@ import { installedOnly } from "./helper.ts";
 import { testConfig } from "./layers.ts";
 import { said } from "./said.ts";
 
-export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
+const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
 /** For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. No runtime is
  * probed (the coding agents installed here would be started and asked their models), gh is never run, the orchestrator does

@@ -82,7 +82,7 @@ const send = (base: string, request: HttpClientRequest.HttpClientRequest) =>
   Effect.flatMap(HttpClient.HttpClient, (client) => client.execute(request)).pipe(Effect.mapError(unreachable(base)));
 
 /** One call: its answer's text, or the failure the server answered with. */
-export const request = Effect.fn("Cli.request")(function* (base: string, path: string, body?: string) {
+const request = Effect.fn("Cli.request")(function* (base: string, path: string, body?: string) {
   const plain = HttpClientRequest.post(base + path);
   const res = yield* send(base, body === undefined ? plain : HttpClientRequest.bodyText(plain, body, "application/json"));
   const text = yield* res.text.pipe(Effect.mapError(unreachable(base)));

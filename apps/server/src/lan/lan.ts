@@ -92,10 +92,10 @@ export class Lan extends Context.Service<
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-export const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
+const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
-export function lanAddress(): string {
+function lanAddress(): string {
   let best = "";
   let rank = 3;
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
@@ -113,7 +113,7 @@ export function lanAddress(): string {
 const deviceName = (name: string) => [...name.split(/\s+/u).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
 
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
-export const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
+const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
 
 const keyOf = (req: IncomingMessage) => {
   const auth = req.headers.authorization;
@@ -143,7 +143,7 @@ export interface LanOptions {
   readonly host?: string;
 }
 
-export const make = (options: LanOptions = {}) =>
+const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.

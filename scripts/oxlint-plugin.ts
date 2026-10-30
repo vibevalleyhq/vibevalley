@@ -60,14 +60,32 @@
  *   and moving a file does not change what its imports say. Siblings and children stay ./x.
  */
 
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
 
 import { hexClass, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
 
-const message = "time comes from Effect's Clock, or the Time a class was handed (apps/server/src/base/time.ts), so tests can move it";
+/**
+ * What a rule says when it fires, which is all an agent reads before its next try: what is wrong and why, what to write
+ * instead, and a file in this repository that shows it (oxlint-plugin.test.ts checks the file is there). A message that
+ * only says what is not allowed leaves the agent to guess, and a guess is often a way around the rule.
+ */
+export const says = (wrong: string, fix: string, see: string) => `${wrong}. Fix: ${fix}. See ${see}`;
+
+const repo = resolve(import.meta.dirname, "..");
 
 const noWallClock = defineRule({
-  meta: { messages: { wallClock: message } },
+  meta: {
+    messages: {
+      wallClock: says(
+        "this reads or waits on the wall clock, which a test's TestClock cannot move",
+        "in Effect code `yield* Clock.currentTimeMillis` to read and `Effect.sleep` to wait; in a class, the `Time` it was handed (`time.now()`, `time.sleep(ms)`)",
+        "apps/server/src/base/time.ts",
+      ),
+    },
+  },
   create(context) {
     return {
       CallExpression(node) {
@@ -92,8 +110,11 @@ const noWallClock = defineRule({
 const noTestSleep = defineRule({
   meta: {
     messages: {
-      sleep:
-        "a test does not wait by the clock: ask after what it waits for (until, whenState), move a window with TestClock, or hold a fake until the test lets it go",
+      sleep: says(
+        "a test that waits a set time guesses how long the work takes: slow when it is quick, flaky when it is slow",
+        "wait for the thing itself: `until(() => …)`, `untilGot`, `waitFor` or `whenState` for work in the background, `TestClock.adjust(…)` through a window, `gate()` to hold a fake until the test lets it go, `aTurn` before checking nothing happened",
+        "packages/testkit/src/until.ts",
+      ),
     },
   },
   create(context) {
@@ -113,7 +134,15 @@ const noTestSleep = defineRule({
 });
 
 const noCommentDivider = defineRule({
-  meta: { messages: { divider: "a comment does not title or fence off code (docs/style/code.md): say why where it is not obvious, or nothing" } },
+  meta: {
+    messages: {
+      divider: says(
+        "a divider titles or fences off code, which says nothing the code does not",
+        "delete it; a stretch that needs a name becomes a function with that name, and a comment stays only to say why",
+        "docs/style/code.md",
+      ),
+    },
+  },
   create(context) {
     return {
       Program() {
@@ -142,7 +171,11 @@ const chineseLiteral = (node: { type: string; value?: unknown; regex?: { pattern
 const noCopySelector = defineRule({
   meta: {
     messages: {
-      copy: "page tests find elements by data-testid and state attributes, and leave the words to the catalogs' checks (docs/subsystems/foundation.md): no interface words here; data the test made goes in a fixtures constant",
+      copy: says(
+        "a page test that finds or checks the interface's words breaks on every rewording; the words are the catalogs' to check",
+        'find it by `getByTestId("…")` or a state attribute (`[data-state=…]`) and add the data-testid to the component if it has none; data the test made itself goes in a constant in fixtures.ts',
+        "apps/web/test/fixtures.ts",
+      ),
     },
   },
   create(context) {
@@ -168,7 +201,11 @@ const noCopySelector = defineRule({
 const noHexColor = defineRule({
   meta: {
     messages: {
-      hex: "the workbench's colours are the palette's (apps/web/src/style.css: bg-ok-soft, text-warn-ink, bg-ink/20…), so they follow 设置 › 外观; add one there for a new purpose",
+      hex: says(
+        "a colour written into a class stays as it is when the theme changes (设置 › 外观)",
+        "use the palette's name for what it is for (`bg-ok-soft`, `text-warn-ink`, `bg-ink/20`…); a new purpose gets a new name in style.css, in both themes",
+        "apps/web/src/style.css",
+      ),
     },
   },
   create(context) {
@@ -187,7 +224,10 @@ const designTokens = defineRule({
   meta: {
     messages: Object.fromEntries(
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tokenAdvice has one key per TokenKind and no more
-      (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [kind, `off the workbench's ${kind} ladder (docs/style/design.md): use ${tokenAdvice[kind]}`]),
+      (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [
+        kind,
+        says(`this ${kind} is off the workbench's ladder, so it matches nothing beside it`, `use ${tokenAdvice[kind]}`, "docs/style/design.md"),
+      ]),
     ),
   },
   create(context) {
@@ -206,22 +246,47 @@ const designTokens = defineRule({
 // Chinese punctuation too: a word joined to its neighbor with 「：」 or 「、」 in code reads as Chinese in an English farm.
 const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 
+/**
+ * The catalog a file's words belong in: packages/i18n/locales/zh/<host>.<module>.json, the deepest that exists for the
+ * file's place (apps/web/src/farm/phone/x.tsx: web.farm.phone, then web.farm, then web).
+ */
+export function catalogOf(filename: string): string {
+  const at = /\/apps\/(server|web|desktop|mobile)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
+  const host = at?.[1];
+  const rest = at?.[2];
+  if (host === undefined || rest === undefined) return "shared";
+  const folders = rest
+    .split("/")
+    .slice(0, -1)
+    .filter((f) => f !== "features");
+  for (let n = folders.length; n > 0; n--) {
+    const name = [host, ...folders.slice(0, n)].join(".");
+    if (existsSync(resolve(repo, "packages/i18n/locales/zh", `${name}.json`))) return name;
+  }
+  return host;
+}
+
 const noCjkLiteral = defineRule({
   meta: {
     messages: {
-      cjk: 'words for the owner go in the catalogs (packages/i18n/locales, with their English; t("key")), words for a model in a prompts.ts',
+      cjk: says(
+        "words written in code are not translated: an English farm would show them in Chinese",
+        'for the owner, add a key to packages/i18n/locales/zh/{{catalog}}.json and en/{{catalog}}.json, run `vp run i18n:gen`, and write `t("{{catalog}}.<key>")`; for a model, put it in this module\'s prompts.ts',
+        "packages/i18n/README.md",
+      ),
     },
   },
   create(context) {
+    const data = { catalog: catalogOf(context.filename) };
     return {
       Literal(node) {
-        if (typeof node.value === "string" && han.test(node.value)) context.report({ node, messageId: "cjk" });
+        if (typeof node.value === "string" && han.test(node.value)) context.report({ node, messageId: "cjk", data });
       },
       TemplateLiteral(node) {
-        if (node.quasis.some((q) => han.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "cjk" });
+        if (node.quasis.some((q) => han.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "cjk", data });
       },
       JSXText(node) {
-        if (han.test(node.value)) context.report({ node, messageId: "cjk" });
+        if (han.test(node.value)) context.report({ node, messageId: "cjk", data });
       },
     };
   },
@@ -232,7 +297,11 @@ const nativeTypes = new Set(["checkbox", "radio", "range"]);
 const nativeControl = defineRule({
   meta: {
     messages: {
-      native: "the workbench draws its own choosers: ui/Field.tsx's Select, ui/Checkbox.tsx, base-ui's RadioGroup and Slider (docs/style/design.md)",
+      native: says(
+        "a native chooser is drawn by the system: it looks different on every machine and stays light in the dark theme",
+        "`Select` from ui/Field.tsx for a <select>, ui/Checkbox.tsx for a checkbox, base-ui's `RadioGroup` and `Slider` for radio and range",
+        "apps/web/src/ui/Field.tsx",
+      ),
     },
   },
   create(context) {
@@ -274,15 +343,29 @@ function joinPath(from: string, spec: string) {
 const pageLayersRule = defineRule({
   meta: {
     messages: {
-      layer: "the page imports only from its own layer or one before it: base, ui, ui/pixel, features, farm and tree, app (apps/web/README.md)",
-      index: "another feature is used through its index.ts (features/<concept>), not a file inside it (apps/web/README.md)",
+      layer: says(
+        "{{from}} is before {{to}} in the page's layers (base, ui, ui/pixel, features, farm and tree, app), and a layer imports only its own and those before it",
+        "move what both need down into a layer before {{from}} (a pure function to base, a component to ui), or have {{to}} pass it in as a prop",
+        "apps/web/README.md",
+      ),
+      index: says(
+        "a file inside another feature is its own business, free to change",
+        'import it from "@/{{unit}}", and export it from {{unit}}/index.ts if it is meant to be shared',
+        "apps/web/README.md",
+      ),
+      sibling: says(
+        "one feature does not import another's files, nor a skin another skin's: each is its own unit",
+        "move what both need down into base or ui",
+        "apps/web/README.md",
+      ),
     },
   },
   create(context) {
     const at = context.filename.replaceAll("\\", "/").split("/apps/web/src/")[1];
     if (at === undefined) return {};
     const from = pageUnit(at);
-    const verdict = (spec: unknown): "layer" | "index" | undefined => {
+    type Verdict = { messageId: "layer" | "index" | "sibling"; data: Record<string, string> };
+    const verdict = (spec: unknown): Verdict | undefined => {
       if (typeof spec !== "string" || !(spec.startsWith(".") || spec.startsWith("@/"))) return;
       const target = spec.startsWith("@/") ? spec.slice(2) : joinPath(at, spec);
       if (target.startsWith("..")) return;
@@ -290,23 +373,20 @@ const pageLayersRule = defineRule({
       if (to.unit === from.unit) return;
       const a = pageLayers.indexOf(from.layer);
       const b = pageLayers.indexOf(to.layer);
-      if (b > a || (b === a && from.layer !== "features")) return "layer";
-      if (to.layer === "features" && target !== to.unit && target !== `${to.unit}/index`) return "index";
+      const data = { from: from.unit || "the page's root", to: to.unit || "the page's root", unit: to.unit };
+      if (b > a) return { messageId: "layer", data };
+      if (b === a && from.layer !== "features") return { messageId: "sibling", data };
+      if (to.layer === "features" && target !== to.unit && target !== `${to.unit}/index`) return { messageId: "index", data };
       return undefined;
     };
+    const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
+      const v = verdict(spec);
+      if (v) context.report({ node, ...v });
+    };
     return {
-      ImportDeclaration(node) {
-        const messageId = verdict(node.source.value);
-        if (messageId) context.report({ node, messageId });
-      },
-      ExportNamedDeclaration(node) {
-        const messageId = verdict(node.source?.value);
-        if (messageId) context.report({ node, messageId });
-      },
-      ExportAllDeclaration(node) {
-        const messageId = verdict(node.source.value);
-        if (messageId) context.report({ node, messageId });
-      },
+      ImportDeclaration: (node) => check(node, node.source.value),
+      ExportNamedDeclaration: (node) => check(node, node.source?.value),
+      ExportAllDeclaration: (node) => check(node, node.source.value),
     };
   },
 });
@@ -335,9 +415,16 @@ function inEffectPromise(node: { parent?: unknown }): boolean {
 const promiseBoundary = defineRule({
   meta: {
     messages: {
-      async:
-        "the server is Effect: write this in Effect.gen, and keep the library's one call in Effect.tryPromise (scripts/oxlint-plugin.ts, promise-boundary)",
-      promise: "the server is Effect: wait with Effect.callback, Deferred or Queue instead of a new Promise (scripts/oxlint-plugin.ts, promise-boundary)",
+      async: says(
+        "an async function in the server is a loop, a wait or an error path written outside Effect, where interruption, the Clock and typed errors do not reach",
+        "write it as `Effect.gen(function* () { … })`, and keep the library's one Promise call inside `Effect.tryPromise({ try: () => lib.call(…), catch: (e) => new XError({ cause: e }) })`",
+        "docs/subsystems/foundation.md",
+      ),
+      promise: says(
+        "a new Promise in the server is a wait written by hand, outside interruption and the Clock",
+        "`Effect.callback((resume) => …)` for a callback API, a `Deferred` for one value handed over later, a `Queue` for many",
+        "docs/subsystems/foundation.md",
+      ),
     },
   },
   create(context) {
@@ -357,7 +444,15 @@ const promiseBoundary = defineRule({
 });
 
 const oneAbsent = defineRule({
-  meta: { messages: { both: "one word for none: undefined inside, null only at a door to the outside (docs/style/code.md, 没有值)" } },
+  meta: {
+    messages: {
+      both: says(
+        "a type with both null and undefined has two words for one thing, and every reader must check for both",
+        "inside the program `T | undefined` (or an optional field); where null comes in from outside (JSON, a library), turn it into undefined right there (`x ?? undefined`)",
+        "docs/style/code.md",
+      ),
+    },
+  },
   create(context) {
     return {
       TSUnionType(node) {
@@ -375,9 +470,21 @@ const isGlobal = (node: { type: string } | undefined) =>
 const globalDoors = defineRule({
   meta: {
     messages: {
-      cast: "declare a global once in its door (declare global, interface Window) and read it with its type, not through a cast",
-      assign: "set a global by its declared name, not with Object.assign or Object.defineProperty",
-      declare: "declare global only in a door file (vite.config.ts, global-doors): a global is a contract between two worlds",
+      cast: says(
+        "a cast of the global object reads a global nobody declared, so the two sides that share it can drift apart",
+        "declare it once in its door (`declare global { interface Window { … } }`) and read `window.x` with that type",
+        "packages/protocol/src/host.ts",
+      ),
+      assign: says(
+        "Object.assign or defineProperty onto the global object sets a global nobody declared",
+        "declare it in its door and set it by its name (`window.x = …`)",
+        "packages/protocol/src/host.ts",
+      ),
+      declare: says(
+        "a global is a contract between two worlds (a page and its shell, a test and the program it drives), declared in one place",
+        "move this declaration into the door that owns it, or list a new door in vite.config.ts with `{ door: true }`",
+        "packages/protocol/src/host.ts",
+      ),
     },
     // { door: true } in a door file: it may declare globals.
     schema: [{ type: "object", properties: { door: { type: "boolean" } }, additionalProperties: false }],
@@ -410,24 +517,34 @@ const globalDoors = defineRule({
 
 const parentImportRule = defineRule({
   meta: {
-    messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
+    messages: {
+      parent: says(
+        "an import that climbs out of its folder reads differently from every file and changes when the file moves",
+        "write it as `{{alias}}` (vp check --fix does it)",
+        "apps/{{app}}/tsconfig.json",
+      ),
+    },
+    fixable: "code",
   },
   create(context) {
     const [, app, at] = /\/apps\/(web|server)\/src\/(.+)$/u.exec(context.filename.replaceAll("\\", "/")) ?? [];
     if (app === undefined || at === undefined) return {};
-    const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
-      if (typeof spec !== "string" || !spec.startsWith("../")) return;
+    // The string itself is replaced, quotes kept, so the fix is the same for every kind of import.
+    const check = (source: { type: string; value?: unknown; range: [number, number] } | null | undefined) => {
+      if (source?.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith("../")) return;
+      const spec = source.value;
       const ups = spec.split("/").filter((p) => p === "..").length;
       // Out of src (the server's db/generated): no alias reaches it.
       if (ups >= at.split("/").length) return;
-      const target = joinPath(at, spec);
-      context.report({ node, messageId: "parent", data: { alias: `@/${target}` } });
+      const alias = `@/${joinPath(at, spec)}`;
+      const [start, end] = source.range;
+      context.report({ node: source, messageId: "parent", data: { alias, app }, fix: (fixer) => fixer.replaceTextRange([start + 1, end - 1], alias) });
     };
     return {
-      ImportDeclaration: (node) => check(node, node.source.value),
-      ImportExpression: (node) => check(node, node.source.type === "Literal" ? node.source.value : undefined),
-      ExportNamedDeclaration: (node) => check(node, node.source?.value),
-      ExportAllDeclaration: (node) => check(node, node.source.value),
+      ImportDeclaration: (node) => check(node.source),
+      ImportExpression: (node) => check(node.source),
+      ExportNamedDeclaration: (node) => check(node.source),
+      ExportAllDeclaration: (node) => check(node.source),
     };
   },
 });

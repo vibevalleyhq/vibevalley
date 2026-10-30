@@ -182,7 +182,7 @@ const triggerOf = jsonOf(S.RunTrigger);
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
-export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
+function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
   const how = handedOver
     ? t("server.issue.brief.handedOver", { name: last.name, id: last.id })
     : t("server.issue.brief.reopened", { name: last.name, id: last.id });
@@ -216,7 +216,7 @@ export interface IssueOptions {
   readonly talkIdleMs?: number;
 }
 
-export const make = (options: IssueOptions = {}) =>
+const make = (options: IssueOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;

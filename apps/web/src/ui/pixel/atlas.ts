@@ -6,11 +6,6 @@ import { type Accessor, createSignal, onSettled } from "solid-js";
 
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-export interface Size {
-  readonly w: number;
-  readonly h: number;
-}
-
 export interface SpriteInfo {
   readonly name: string;
   /** Art pixels. */

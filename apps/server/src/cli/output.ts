@@ -48,7 +48,7 @@ export const err = (text: string) => line("stderr", text);
 export const stdinText = Effect.flatMap(Stdio.Stdio, (io) => io.stdin.pipe(Stream.decodeText, Stream.mkString));
 
 /** A document as stdout takes it: laid out for a person on a terminal, one line otherwise. */
-export const printDocument = (value: unknown) =>
+const printDocument = (value: unknown) =>
   Effect.flatMap(Stdio.Stdio, (io) => io.stdoutIsTerminal).pipe(Effect.flatMap((tty) => out(tty ? JSON.stringify(value, null, 2) : JSON.stringify(value))));
 
 const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));

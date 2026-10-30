@@ -49,7 +49,7 @@ export async function restartWhenIdle(h: Pick<DevHooks, "working" | "restartServ
   await h.restartServer();
 }
 
-export function watchForDev(h: DevHooks): () => void {
+function watchForDev(h: DevHooks): () => void {
   const watchers: FSWatcher[] = [];
   const page = debounce(h.reloadPage);
   watchers.push(watch(h.web, { recursive: true }, page));

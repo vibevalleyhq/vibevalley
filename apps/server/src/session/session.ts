@@ -74,7 +74,7 @@ import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type 
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 
 import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
-import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
+import { eventFacts, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { type Journal, Trajectories } from "./journal.ts";
@@ -1356,5 +1356,3 @@ export type SessionsInside = Effect.Success<ReturnType<typeof make>>;
 
 /** Brings the sessions back once every service is built. */
 export const ready = Layer.effectDiscard(Effect.flatMap(Sessions, (s) => s.restore));
-
-export type { From };

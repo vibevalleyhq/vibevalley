@@ -5,8 +5,6 @@ import { t } from "@vibevalley/i18n";
 
 export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator" | "taskBoard";
 
-export const farmPanels: readonly FarmPanel[] = ["shop", "warehouse", "graphs", "log", "orchestrator", "taskBoard"];
-
 export interface YardPlace {
   readonly id: string;
   readonly label: string;

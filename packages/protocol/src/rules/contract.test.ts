@@ -42,5 +42,8 @@ test("every rule here is one the page uses", () => {
       if (!used.has(name) && !new RegExp(`\\b${name}\\b`, "u").test(rest)) unused.push(`${f}: ${name}`);
     }
   }
-  expect(unused).toEqual([]);
+  expect(
+    unused,
+    "packages/protocol/src/rules holds only what the page and the server both run. Fix: a rule only the server runs moves into the module that owns it in apps/server/src, and its conclusion goes into the frame. See docs/subsystems/foundation.md",
+  ).toEqual([]);
 });

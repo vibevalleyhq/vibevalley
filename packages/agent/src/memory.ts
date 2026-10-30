@@ -8,7 +8,7 @@ import { basename, join } from "node:path";
 import { memory as memoryWords } from "./prompts.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
-export const memoryPromptChars = 8_000;
+const memoryPromptChars = 8_000;
 
 /** Where an agent with this home keeps its memory; the orchestrator page reads it there. */
 export const memoryFile = (home: string) => join(home, "MEMORY.md");

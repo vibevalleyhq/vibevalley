@@ -27,7 +27,7 @@ import { sessionOf } from "@/session/roster.ts";
 
 import { playOf } from "./play.ts";
 
-export const xpToNext = (level: number) => 10 * level;
+const xpToNext = (level: number) => 10 * level;
 
 export function levelForCommits(total: number): [level: number, xp: number] {
   let level = 1;
@@ -39,7 +39,7 @@ export function levelForCommits(total: number): [level: number, xp: number] {
   return [level, rest];
 }
 
-export function farmLevelOf(state: WorkspaceState): FarmLevel {
+function farmLevelOf(state: WorkspaceState): FarmLevel {
   const [level, xp] = levelForCommits(state.commits?.total ?? 0);
   return { level, xp, need: xpToNext(level) };
 }
@@ -121,7 +121,7 @@ export function plotOf(h: Session, issue: Issue | undefined): PlotView {
 }
 
 /** A session that works no issue (a draft, the one splitting a task graph): its own phase is all there is. */
-export function plotOfSession(h: Session): PlotView {
+function plotOfSession(h: Session): PlotView {
   const need = needOf(h);
   const conflict = need?.kind === "conflict";
   switch (h.phase._tag) {
@@ -144,7 +144,7 @@ export function plotOfSession(h: Session): PlotView {
 }
 
 /** None on a farm's first count. */
-export function levelUps(before: number | undefined, after: number): GameEffect[] {
+function levelUps(before: number | undefined, after: number): GameEffect[] {
   if (before === undefined) return [];
   const out: GameEffect[] = [];
   const [from] = levelForCommits(before);

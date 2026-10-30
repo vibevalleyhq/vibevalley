@@ -46,6 +46,9 @@ description: 给 VibeValley 开、改、合 PR：先定这次的改动该是几�
 - `## What changed`：现在的行为和为什么；一处问题一条，说清以前会怎样（输入、结果），现在怎样。链接 Agent Note 或 issue。看过、决定不改的，也写一句和理由，下一个人不用再查一遍。
 - `## Checks`：跑了的命令和它们打出的结果（`vp check`、`server:check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [acceptance](.agents/skills/acceptance/SKILL.md) 要的证据。
 - `## Not verified`：没验的和原因（真机、花钱的评测、真的厂商）。都验了写 `None.`。
+- `## Regression`（要的时候才有）：这个 PR 删了或改了名字以 `regression: ` 开头的测试，逐个写出测试名和为什么（行为有意改了、挪了地方）；`fix/` 没补回归测试时写为什么补不了。CI 的 `scripts/regression.ts` 查。
+
+`fix/` 先写回归测试：名字 `regression: <修好以后一直成立的事>`，修之前跑一次看它失败，把失败的输出写进 `## Checks`，再修。被改动牵连到别的回归测试时，先想是不是代码改错了：测试守的是一个修过的缺陷，改它要有行为上的理由，不是为了变绿。
 
 不写过程（「先试了 A 又改成 B」），不写 agent 的署名，不贴密钥和主人的私人数据。正文里引用中文的报错、界面上的话，用反引号或「」。
 
@@ -67,6 +70,7 @@ description: 给 VibeValley 开、改、合 PR：先定这次的改动该是几�
    vpx scripts/commit-msg.ts --title "$(jq -r .title /tmp/pr.json)"
    vpx scripts/commit-msg.ts --body "$(jq -r .body /tmp/pr.json)"
    vpx scripts/commit-msg.ts --branch "$(jq -r .headRefName /tmp/pr.json)"
+   vpx scripts/regression.ts --base origin/main --branch "$(jq -r .headRefName /tmp/pr.json)" --body "$(jq -r .body /tmp/pr.json)"
    ```
 
 5. 合不合听主人的。要合时只用 squash：`gh pr merge <号> --squash`。合完删掉本机的分支和 worktree；远端的分支 GitHub 会自动删。

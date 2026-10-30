@@ -46,12 +46,12 @@ export const userMessage = (text: string, now: number): UserMessage => ({
   timestamp: now,
 });
 
-export function summaryText(m: { readonly summary: string; readonly archive?: string }): string {
+function summaryText(m: { readonly summary: string; readonly archive?: string }): string {
   const where = m.archive ? summaryWords.archivedNote(m.archive) : "";
   return summaryWords.wrapped(where, m.summary);
 }
 
-export function llmMessages(messages: readonly BrainMessage[]): Message[] {
+function llmMessages(messages: readonly BrainMessage[]): Message[] {
   const out: Message[] = [];
   for (const m of messages) {
     switch (m.role) {

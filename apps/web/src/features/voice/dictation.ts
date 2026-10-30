@@ -32,7 +32,7 @@ const capture = `registerProcessor("vibevalley-capture", class extends AudioWork
 let captureUrl: string | undefined;
 
 /** Mono 16-bit PCM in a WAV file. */
-export function wavOf(samples: Float32Array, sampleRate = rate): Uint8Array {
+function wavOf(samples: Float32Array, sampleRate = rate): Uint8Array {
   const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
   const text = (at: number, s: string) => [...s].forEach((c, i) => out.setUint8(at + i, c.charCodeAt(0)));
   text(0, "RIFF");
@@ -66,7 +66,7 @@ interface Recording {
   readonly onWords: (words: string) => void;
 }
 
-export class Dictation {
+class Dictation {
   phase: DictationPhase = "idle";
   problem = "";
   version = 0;

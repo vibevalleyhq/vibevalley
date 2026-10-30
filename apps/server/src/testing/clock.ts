@@ -3,7 +3,7 @@
 
 import { Clock, Duration, Effect, Layer } from "effect";
 
-export const clockAt = (at: () => number): Clock.Clock => ({
+const clockAt = (at: () => number): Clock.Clock => ({
   currentTimeMillisUnsafe: at,
   currentTimeMillis: Effect.sync(at),
   currentTimeNanosUnsafe: () => BigInt(Math.round(at())) * 1_000_000n,

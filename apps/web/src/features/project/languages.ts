@@ -9,7 +9,7 @@ interface LangDef {
   readonly names: readonly string[];
 }
 
-export const langs: Record<string, LangDef> = {
+const langs: Record<string, LangDef> = {
   typescript: { label: "TypeScript", color: "#3178c6", names: ["typescript", "tsx", "ts"] },
   javascript: { label: "JavaScript", color: "#f1e05a", names: ["javascript", "jsx", "js", "mjs", "cjs"] },
   python: { label: "Python", color: "#3572a5", names: ["python", "py", "cython"] },

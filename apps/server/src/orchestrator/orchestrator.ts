@@ -107,7 +107,7 @@ export interface OrchestratorOptions {
   readonly listen?: boolean;
 }
 
-export const make = (options: OrchestratorOptions = {}) =>
+const make = (options: OrchestratorOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;

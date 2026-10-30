@@ -16,7 +16,7 @@ import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors
 import { Setting } from "@/setting/setting.ts";
 
 import { everos } from "./everos.ts";
-import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
+import { type FinishedRun, makeMemories, type Note, type RecallCue } from "./memories.ts";
 import { nowledge } from "./nowledge.ts";
 import { fromOwner } from "./prompts.ts";
 import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
@@ -203,5 +203,3 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
     return shape;
   });
-
-export { MemoryRefused };

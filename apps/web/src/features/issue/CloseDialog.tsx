@@ -66,7 +66,7 @@ async function pressed(issue: Issue | undefined, act: IssueAct) {
 }
 
 /** What the branch brings before it is merged. */
-export function ChangesReview(props: { issue: string; onDone: () => void }) {
+function ChangesReview(props: { issue: string; onDone: () => void }) {
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue);
@@ -214,7 +214,7 @@ export function ChangesBody(props: { changes: Changes }) {
   );
 }
 
-export function PlusMinus(props: { added: number; removed: number }) {
+function PlusMinus(props: { added: number; removed: number }) {
   return (
     <span class="font-mono text-xs">
       <span class="text-accent">+{props.added}</span> <span class="text-berry">−{props.removed}</span>

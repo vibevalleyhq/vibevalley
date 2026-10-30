@@ -28,7 +28,7 @@ const tabs = [
 type Tab = (typeof tabs)[number]["id"];
 
 /** Which orchestrator and tab a path after /orchestrator/ is: a tab alone is the default orchestrator's. */
-export function orchestratorPath(rest: string): { readonly agent: string; readonly tab: Tab } {
+function orchestratorPath(rest: string): { readonly agent: string; readonly tab: Tab } {
   const [first = "", second = ""] = rest.split("/").map(decodeURIComponent);
   const tabOf = (t: string): Tab => tabs.find((x) => x.id === t)?.id ?? "memory";
   if (!first || tabs.some((t) => t.id === first)) return { agent: defaultOrchestrator, tab: tabOf(first) };

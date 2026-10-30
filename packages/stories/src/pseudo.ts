@@ -51,7 +51,7 @@ interface Wrap {
 }
 
 /** The copies, as CSS text, of every rule in `rules` that waits on an interaction state, inside the same layers and media. */
-export function forcedRules(rules: CSSRuleList | readonly CSSRule[], wraps: readonly Wrap[] = []): string {
+function forcedRules(rules: CSSRuleList | readonly CSSRule[], wraps: readonly Wrap[] = []): string {
   let out = "";
   for (const rule of Array.from(rules)) {
     if (rule instanceof CSSStyleRule) {

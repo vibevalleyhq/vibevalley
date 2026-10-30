@@ -61,7 +61,7 @@ const readStored = (text: string): Stored => {
 };
 
 /** Over each code point's first UTF-16 unit, wrapping at 32 bits, as the client counts. */
-export function castHash(s: string): number {
+function castHash(s: string): number {
   let h = 0;
   for (const ch of s) {
     const cp = ch.codePointAt(0)!;
@@ -152,7 +152,7 @@ const installed = (template: AgentTemplate, beside: readonly Agent[], id?: strin
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "config.json");
   const disk = new FileWriter(file);

@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, everyone, defaultOrchestrator, ownerId, type Session, type SessionView } from "@vibevalley/protocol";
 
 import { phaseText } from "./presence";
-export const mentionOf: Record<string, string> = {
+const mentionOf: Record<string, string> = {
   [defaultOrchestrator]: t("web.channel.names.mention.orchestrator"),
   [ownerId]: t("web.channel.names.mention.owner"),
   [everyone]: t("web.channel.names.mention.everyone"),
@@ -17,7 +17,7 @@ export interface Nameable {
   orchestrator?: string;
 }
 
-export const menuMax = 6;
+const menuMax = 6;
 
 /** The place's orchestrator (here) is @管家, every other orchestrator its @<profile id>; everyone only when there is
  * more than one helper. */
@@ -35,7 +35,7 @@ export const nameables = (sessions: SessionView[], orchestrators: readonly Agent
   ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }] : []),
 ];
 
-export const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;
+const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;
 
 /** The @name being typed before the caret: where its @ is and what follows it. */
 export function typedName(text: string, caret: number) {
@@ -55,6 +55,3 @@ export function insertName(text: string, caret: number, start: number, token: st
   const next = `${text.slice(0, start)}${token} ${text.slice(Math.min(Math.max(caret, start), text.length))}`;
   return { text: next, caret: start + token.length + 1 };
 }
-
-/** @tokens in a message's text, as the chat draws them apart. */
-export const mentionPattern = /(^|[^\p{L}\p{N}_@])(@[\p{L}\p{N}_-]+)/gu;

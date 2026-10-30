@@ -12,7 +12,7 @@ const maxKeyLen = 256;
 
 export const validKey = (k: string) => k !== "" && k.length <= maxKeyLen && !k.endsWith("0") && [...k].every((c) => keyDigits.includes(c));
 
-export class KeyError extends Error {}
+class KeyError extends Error {}
 
 /** A key after a and before b; "" for a is the start, "" for b the end. */
 export function keyBetween(a: string, b: string): string {

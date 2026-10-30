@@ -48,7 +48,7 @@ export interface Note {
   readonly by: Actor;
 }
 
-export class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
+class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
 
 /** Fading marks the ones that would go if this many more were kept. */
 const fadingSoon = 10;

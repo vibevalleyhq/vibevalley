@@ -9,7 +9,7 @@ export const codePointOffset = (text: string, utf16: number) => [...text.slice(0
 
 export const plainOf = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join("");
 
-export const sameMarks = (a: SpanMarks, b: SpanMarks) =>
+const sameMarks = (a: SpanMarks, b: SpanMarks) =>
   (a.bold ?? false) === (b.bold ?? false) &&
   (a.italic ?? false) === (b.italic ?? false) &&
   (a.code ?? false) === (b.code ?? false) &&
@@ -71,7 +71,7 @@ export function editSpans(old: readonly TextSpan[], text: string): TextSpan[] {
   return normalSpans([...head, { t: typed, marks }, ...tail]);
 }
 
-export const textTypes: ReadonlySet<string> = new Set(["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code", "memory_item"]);
+const textTypes: ReadonlySet<string> = new Set(["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code", "memory_item"]);
 export const knownTypes: ReadonlySet<string> = new Set(BlockTypeValues);
 export const listTypes: ReadonlySet<string> = new Set(["bulleted", "numbered", "todo"]);
 

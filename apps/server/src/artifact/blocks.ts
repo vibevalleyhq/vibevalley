@@ -98,7 +98,7 @@ const blockOf = (r: qb.ArtifactBlocksResult): Block =>
     updated: r.updated_at,
   });
 
-export const spansOf = (type: string, text: string) => (type === "code" ? unmarked([{ t: text, marks: {} }]) : inlineSpans(text));
+const spansOf = (type: string, text: string) => (type === "code" ? unmarked([{ t: text, marks: {} }]) : inlineSpans(text));
 
 const blockIn = (ack: BlockAck, id: string) => ack.blocks.find((b) => b.id === id);
 
