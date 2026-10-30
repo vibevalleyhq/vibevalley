@@ -69,7 +69,8 @@
           "unnecessaryPipeChain": "warning",
           "unnecessaryEffectGen": "warning",
           "schemaSyncInEffect": "warning",
-          "abortControllerInEffect": "warning"
+          "abortControllerInEffect": "warning",
+          "globalFetchInEffect": "error"
         }
       }
     ]

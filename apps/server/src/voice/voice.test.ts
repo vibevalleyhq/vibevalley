@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
@@ -26,17 +27,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A dictation upload that never answers: it ends only when its signal aborts (the 120 s timeout is the test's to fire). */
+/** A dictation upload that never answers: it ends only when its signal aborts. The service's HttpClient reaches it as
+ * FetchHttpClient.Fetch, provided to the test. */
 const pendingDictation = () => {
-  const timeout = new AbortController();
   let seen: AbortSignal | undefined;
   let entered!: () => void;
   const started = new Promise<void>((done) => (entered = done));
-  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
-    expect(ms).toBe(120_000);
-    return timeout.signal;
-  });
-  vi.stubGlobal("fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+  const fetch: typeof globalThis.fetch = async (_input, init) => {
     const signal = init?.signal ?? undefined;
     seen = signal;
     entered();
@@ -44,8 +41,8 @@ const pendingDictation = () => {
       if (signal?.aborted === true) reject(signal.reason);
       else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
     });
-  });
-  return { timeout, started, signal: () => seen };
+  };
+  return { fetch, started, signal: () => seen };
 };
 
 const appId = "11111111111111111111111111111111";
@@ -712,10 +709,10 @@ describe("voice", () => {
       yield* Effect.promise(() => pending.started);
       yield* Fiber.interrupt(dictating);
       expect(pending.signal()?.aborted).toBe(true);
-    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, pending.fetch));
   });
 
-  it.live("dictation's timeout still aborts its upload", () => {
+  it.effect("dictation's timeout still aborts its upload", () => {
     const pending = pendingDictation();
     return Effect.gen(function* () {
       const voice = yield* Voice;
@@ -723,12 +720,11 @@ describe("voice", () => {
       yield* Effect.orDie(setting.save({ dictation: { via: "own", url: "http://dictation.test/v1", model: "whisper-1" } }));
       const dictating = yield* Effect.forkChild(Effect.flip(voice.dictate("AAAA", "wav")));
       yield* Effect.promise(() => pending.started);
-      const reason = new DOMException("test timeout", "TimeoutError");
-      pending.timeout.abort(reason);
+      yield* TestClock.adjust("120 seconds");
       const failure = yield* Fiber.join(dictating);
-      expect(pending.signal()?.reason).toBe(reason);
-      expect(failure).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("test timeout") });
-    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+      expect(pending.signal()?.aborted).toBe(true);
+      expect(failure).toMatchObject({ _tag: "VoiceUnavailable", settings: "dictation" });
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, pending.fetch));
   });
 
   it.live("says dictation is not set up: MOSS without its key, or an own address left empty", () =>
@@ -750,7 +746,7 @@ describe("voice", () => {
 
   it.live("dictation goes to MOSS's transcription by default, with the MOSS key", () => {
     const sent: { url: string; auth: string | null; model: unknown; format: unknown; file: unknown }[] = [];
-    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+    const fetch: typeof globalThis.fetch = async (input, init) => {
       const form = init?.body as FormData;
       sent.push({
         url: input instanceof Request ? input.url : input.toString(),
@@ -760,7 +756,7 @@ describe("voice", () => {
         file: (form.get("file") as File | null)?.name,
       });
       return new Response(JSON.stringify({ text: " 你好 " }), { status: 200, headers: { "content-type": "application/json" } });
-    });
+    };
     return Effect.gen(function* () {
       const setting = yield* Setting;
       yield* Effect.orDie(setting.save({ mossKey: "sk-moss-test" }));
@@ -785,6 +781,6 @@ describe("voice", () => {
       expect(setting.status().dictation).toEqual({ via: "moss", url: "http://dictation.test/v1", model: "whisper-1" });
       yield* voice.dictate("AAAA", "wav");
       expect(sent[2]).toMatchObject({ url: "https://api.mosi.cn/v1/audio/transcriptions", auth: "Bearer sk-moss-test" });
-    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, fetch));
   });
 });

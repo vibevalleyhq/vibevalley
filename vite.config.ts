@@ -418,6 +418,18 @@ export default defineConfig({
         rules: { "vibevalley/try-promise-catch": "error" },
       },
       {
+        // Errors are told apart by their tag, not their class (scripts/oxlint-plugin.ts, no-instanceof-tagged).
+        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**"],
+        excludeFiles: ["**/*.test.ts"],
+        rules: { "vibevalley/no-instanceof-tagged": "error" },
+      },
+      {
+        // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/oxlint-plugin.ts, no-object-guard).
+        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
+        excludeFiles: ["**/*.test.ts"],
+        rules: { "vibevalley/no-object-guard": "error" },
+      },
+      {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
         // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
         // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).

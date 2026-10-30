@@ -217,6 +217,41 @@ tester.run("global-doors", rule("global-doors"), {
   ],
 });
 
+tester.run("no-instanceof-tagged", rule("no-instanceof-tagged"), {
+  valid: [
+    "if (e instanceof Error) f(e.message)",
+    "if (e instanceof TypeError) f()",
+    "if (e instanceof TemplateProblem) f()",
+    'const isMerge = Predicate.isTagged(e, "MergeFailure")',
+    "class Plain extends Error {}\nif (e instanceof Plain) f()",
+  ],
+  invalid: [
+    { code: "const a = e instanceof MergeFailure ? e : wrap(e)", errors: [{ messageId: "tagged" }] },
+    { code: "if (e instanceof SqlError.SqlError) f()", errors: [{ messageId: "tagged" }] },
+    { code: "if (e instanceof Refused) f()", errors: [{ messageId: "tagged" }] },
+    {
+      code: 'if (e instanceof Busy) f()\nexport class Busy extends Data.TaggedError("Busy")<{ readonly message: string }> {}',
+      filename: "a.ts",
+      errors: [{ messageId: "tagged" }],
+    },
+  ],
+});
+
+tester.run("no-object-guard", rule("no-object-guard"), {
+  valid: [
+    "const ok = Predicate.isObject(x)",
+    'const ok = typeof x === "string" && x !== ""',
+    'const ok = typeof x === "object" && y !== null',
+    "const ok = x !== null && x !== undefined",
+  ],
+  invalid: [
+    { code: 'const ok = typeof x === "object" && x !== null', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = x !== null && typeof x === "object"', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = typeof v.a === "object" && v.a !== null && !Array.isArray(v.a)', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = ready && typeof x === "object" && x != null', errors: [{ messageId: "guard" }] },
+  ],
+});
+
 const root = resolve(import.meta.dirname, "..");
 
 describe("what a rule says", () => {

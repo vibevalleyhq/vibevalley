@@ -29,7 +29,7 @@ import {
   Predicate,
 } from "effect";
 import { HttpClient } from "effect/http";
-import type { SqlClient } from "effect/sql";
+import type { SqlClient, SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
@@ -81,7 +81,8 @@ const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil
 /** Why a step of the bridge did not go through: the database, the orchestrator, or an app. Said as the status's error. */
 class BridgeError extends Data.TaggedError("BridgeError")<{ readonly message: string }> {}
 
-const bridgeError = (e: unknown) => (e instanceof BridgeError ? e : new BridgeError({ message: causeMessage(e) }));
+/** A bridge's step that the database or the farm failed, in the words its status says. */
+const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError | ApiError) => new BridgeError({ message: causeMessage(e) });
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
@@ -139,8 +140,10 @@ const make = (options: ConnectorOptions = {}) =>
     // it and keep its services (the logger, the Clock).
     const forkHere = yield* FiberSet.makeRuntime();
     /** The database's own failures stay failures here: the status says them. */
-    const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
-    const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(attemptTx(work), bridgeError);
+    const run = <A>(e: Effect.Effect<A, SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError, SqlClient.SqlClient>) =>
+      Effect.mapError(db(e), bridgeError);
+    const inTx = <A>(work: Effect.Effect<A, SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError>) =>
+      Effect.mapError(attemptTx(work), bridgeError);
     let closing = false;
     const say = (text: string, channel: string | undefined, sendKey: string) =>
       options.say ? options.say(text, channel, sendKey, chat) : orchestrator.say(text, {}, channel, sendKey);

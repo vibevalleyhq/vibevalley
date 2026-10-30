@@ -41,7 +41,7 @@ import { numberIn } from "@/base/number.ts";
 import { or } from "@/base/order.ts";
 import { messageOf } from "@/errors.ts";
 
-import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
+import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import {
   type Merged,
@@ -84,7 +84,8 @@ export function projectProblem(req: NewProject): string {
 /** What a fresh repository ignores, so a first commit of an existing folder does not take its dependencies. */
 const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.DS_Store\n__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\n";
 
-const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
+/** A merge's failure as the owner reads it: git's own, or the one the merge already said. */
+const failed = (e: MergeFailure | GitError | ProjectError) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
   if ((yield* repository(path).tip(branch)) !== checked) return yield* MergeFailure.check(t("server.project.branchMoved"));
@@ -490,7 +491,7 @@ const make = (hooks: ProjectHooks = {}) =>
       return { main, ahead };
     });
 
-    const toMergeFailure = <A, E, R>(e: Effect.Effect<A, E, R>) => Effect.mapError(e, failed);
+    const toMergeFailure = <A, R>(e: Effect.Effect<A, MergeFailure | GitError | ProjectError, R>) => Effect.mapError(e, failed);
 
     const shape = Projects.of({
       root,

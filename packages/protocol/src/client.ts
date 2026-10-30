@@ -1,5 +1,7 @@
 // Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
+import { Predicate } from "effect";
+
 import { t } from "@vibevalley/i18n";
 
 import type { ApiError } from "./api";
@@ -26,16 +28,15 @@ export class VibeValleyApiError extends Error {
   }
 }
 
-const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string");
 const validNext = (value: unknown): boolean =>
   value === undefined ||
-  (Array.isArray(value) && value.every((item) => record(item) && typeof item.say === "string" && (item.run === undefined || strings(item.run))));
-const validReason = (value: unknown): boolean => record(value) && typeof value.reason === "string";
+  (Array.isArray(value) && value.every((item) => Predicate.isObject(item) && typeof item.say === "string" && (item.run === undefined || strings(item.run))));
+const validReason = (value: unknown): boolean => Predicate.isObject(value) && typeof value.reason === "string";
 
-// Kept dependency-free: the page does not load the endpoint Schemas just to read an error.
+// Kept free of Schema: the page does not load the endpoint Schemas just to read an error.
 function apiErrorOf(value: unknown): ApiError | undefined {
-  if (!record(value) || typeof value._tag !== "string") return undefined;
+  if (!Predicate.isObject(value) || typeof value._tag !== "string") return undefined;
   let valid: boolean;
   switch (value._tag) {
     case "Refused":
@@ -438,7 +439,7 @@ export class VibeValleyApi {
         decoded = undefined;
       }
       const error = apiErrorOf(decoded);
-      const j = record(decoded) ? decoded : {};
+      const j = Predicate.isObject(decoded) ? decoded : {};
       const reason = error
         ? error._tag === "Missing"
           ? error.what

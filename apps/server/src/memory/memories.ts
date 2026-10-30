@@ -12,6 +12,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import type { Actor } from "@/base/actor.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
+import { bestEffort } from "@/base/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
@@ -127,7 +128,7 @@ export const makeMemories = Effect.gen(function* () {
 
   const markRecalled = (ids: readonly string[]) =>
     Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: clock.currentTimeMillisUnsafe(), id })), { discard: true }).pipe(
-      Effect.catch((e) => Effect.logWarning(`a memory was recalled but not marked: ${String(e)}`)),
+      bestEffort("a memory was recalled but not marked"),
     );
 
   /** Reading for deduplication, keeping notes and pruning are one durable change. A stopped run leaves nothing. */
@@ -158,7 +159,7 @@ export const makeMemories = Effect.gen(function* () {
             );
             for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
           }),
-        ).pipe(Effect.catch((e) => Effect.logWarning(`what ${run.session} learned was not kept: ${String(e)}`)));
+        ).pipe(bestEffort(`what ${run.session} learned was not kept`));
 
   const listed = Effect.fnUntraced(
     function* (agent: string) {
@@ -202,7 +203,7 @@ export const makeMemories = Effect.gen(function* () {
       for (const r of rows) yield* db(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id }));
       if (rows.length < recutBatch) return;
     }
-  }).pipe(Effect.catch((e) => Effect.logWarning(`memories were not cut again: ${String(e)}`)));
+  }).pipe(bestEffort("memories were not cut again"));
 
   return { list, listed, matches, recallable, markRecalled, keep, write, forget, recutTerms };
 });

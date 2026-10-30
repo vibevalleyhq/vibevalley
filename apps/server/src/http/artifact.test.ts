@@ -22,6 +22,8 @@ describe("an artifact's content", () => {
     Effect.gen(function* () {
       const { address, artifacts } = yield* farm;
       const owner = { from: ownerId, by: ownerId };
+      // The test reads the server as a browser does, through the platform's own fetch.
+      // @effect-diagnostics-next-line globalFetchInEffect:off
       const get = (path: string) => Effect.promise(() => fetch(`http://${address}${path}`));
       const html = yield* artifacts.create(owner, { title: "页", kind: "html", content: "<p>第一版</p>" });
       yield* artifacts.version(owner, { id: html.id, content: "<p>第二版</p>" });
@@ -33,6 +35,8 @@ describe("an artifact's content", () => {
       ]);
       expect([first.headers.get("x-content-type-options"), first.headers.get("cache-control")]).toEqual(["nosniff", "private, max-age=31536000, immutable"]);
       expect(yield* Effect.promise(() => first.text())).toBe("<p>第一版</p>");
+      // The test reads the server as a browser does, through the platform's own fetch.
+      // @effect-diagnostics-next-line globalFetchInEffect:off
       expect(yield* Effect.promise(async () => (await fetch(`http://${address}${artifactPath(html.id, 2)}`)).text())).toBe("<p>第二版</p>");
       const md = yield* artifacts.create(owner, { title: "说明", kind: "markdown", content: "# 题\n\n<script>no</script>" });
       for (const path of [

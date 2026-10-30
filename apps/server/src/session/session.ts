@@ -63,6 +63,7 @@ import { serverAddress, ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { timeHere } from "@/base/time.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
@@ -407,12 +408,6 @@ export const make = (options: SessionOptionsIn = {}) =>
     const projects = yield* Projects;
     const runtimes = yield* Runtimes;
     const { run: db, attempt } = yield* Db;
-    /** A write that must not stop a run: logged, and the run goes on. */
-    const logged = <A, E>(what: string, e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      attempt(e).pipe(
-        Effect.asVoid,
-        Effect.catch((err) => Effect.logWarning(`vibevalley: ${what}: ${String(err)}`)),
-      );
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const run = yield* FiberSet.makeRuntimePromise();
     const forkHere = yield* FiberSet.makeRuntime();
@@ -489,7 +484,11 @@ export const make = (options: SessionOptionsIn = {}) =>
       };
     };
     const keepHands = Effect.suspend(() =>
-      Effect.forEach([...hands.values()], (h) => logged(`session ${h.id}: what brings it back not kept`, qs.keepHand(handRow(h))), { discard: true }),
+      Effect.forEach(
+        [...hands.values()],
+        (h) => attempt(qs.keepHand(handRow(h))).pipe(bestEffort(`vibevalley: session ${h.id}: what brings it back not kept`)),
+        { discard: true },
+      ),
     );
 
     const save = () => {
@@ -498,8 +497,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
 
     const keep = (s: Session) =>
-      logged(
-        `session ${s.id} not kept`,
+      attempt(
         qs.keepSession({
           id: s.id,
           agent: s.agent,
@@ -511,10 +509,10 @@ export const make = (options: SessionOptionsIn = {}) =>
           graph: s.graph ? JSON.stringify(s.graph) : null,
           hired_at: s.hiredAt,
         }),
-      );
+      ).pipe(bestEffort(`vibevalley: session ${s.id} not kept`));
 
     const ended = (id: string, closed: SessionClose) =>
-      logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id }));
+      attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
 
     const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
 
@@ -529,9 +527,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
         tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
     };
-    /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
-    const keptRun = (what: string, e: Effect.Effect<unknown, NotRecorded>) =>
-      Effect.catch(Effect.asVoid(e), (err) => Effect.logWarning(`vibevalley: ${what}: ${err.message}`));
 
     /** Called before the input goes out, so the turn it opens finds it. */
     const expect = (h: Hand, by: RunTrigger) => void h.triggers.push(by);
@@ -546,13 +541,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.run = id;
       h.heard = [];
       h.journal.runStarted(id);
-      fire(keptRun(`${h.id}'s run not kept`, runs.start(id, h.id, issue, by)));
+      fire(runs.start(id, h.id, issue, by).pipe(bestEffort(`vibevalley: ${h.id}'s run not kept`)));
     };
 
     const heardInRun = (h: Hand, message: string) => {
       if (!h.run) return;
       h.heard.push(message);
-      fire(keptRun(`run ${h.run}`, runs.heard(h.run, h.heard)));
+      fire(runs.heard(h.run, h.heard).pipe(bestEffort(`vibevalley: run ${h.run}`)));
     };
 
     const endRun = (h: Hand, outcome: Outcome, summary: string, spent?: Spent) => {
@@ -561,7 +556,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.heard = [];
       if (!id) return;
       h.journal.runEnded(id, outcome);
-      fire(keptRun(`run ${id}`, runs.finish(id, outcome, summary, spent)));
+      fire(runs.finish(id, outcome, summary, spent).pipe(bestEffort(`vibevalley: run ${id}`)));
     };
 
     const closedLaunch = (h: Hand) => {
@@ -1009,7 +1004,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db(qr.openRuns())) yield* keptRun(`run ${r.id}`, runs.finish(r.id, "interrupted", t("server.session.log.restarted")));
+      for (const r of yield* db(qr.openRuns()))
+        yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted")).pipe(bestEffort(`vibevalley: run ${r.id}`));
       const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(

@@ -1,4 +1,4 @@
-import { Effect, Semaphore, Predicate } from "effect";
+import { Effect, Result, Schema, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -6,6 +6,7 @@ import type { Agent, Question, Issue } from "@vibevalley/protocol";
 
 import type { Agents } from "@/agent/agent.ts";
 import { cut, clip } from "@/base/clip.ts";
+import { lastJsonBlock, misfitField } from "@/base/json.ts";
 import type { Channels } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
@@ -165,51 +166,46 @@ export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map(
 
 export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
-function linesOf(v: unknown, field: string): string[] {
-  if (v === undefined || v === null) return [];
-  if (typeof v === "string") return [v];
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
-  throw new Error(t("server.issue.refinement.lines", { field }));
-}
+const Text = Schema.optional(Schema.NullOr(Schema.String));
+const Lines = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Array(Schema.String)])));
 
-function textOf(v: unknown, field: string): string {
-  if (v === undefined || v === null) return "";
-  if (typeof v === "string") return v;
-  throw new Error(t("server.issue.refinement.text", { field }));
-}
+/** A draft as the drafter writes it: a missing or null field is empty, one line may stand for a list. */
+const RefinementBlock = Schema.Struct({ title: Text, why: Text, todo: Lines, criteria: Lines, notDoing: Lines, files: Lines });
 
-const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
+const textFields = new Set(["title", "why"]);
+
+const linesOf = (v: (typeof RefinementBlock.Type)["todo"]): string[] => (v == null ? [] : typeof v === "string" ? [v] : [...v]);
 
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
-  const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: t("server.issue.refinement.noBlock") };
-  let problem = "";
-  for (let i = blocks.length - 1; i >= 0; i--) {
-    let d: IssueRefinement;
-    try {
-      const raw: unknown = JSON.parse(blocks[i]!);
-      if (!Predicate.isObject(raw)) throw new Error(t("server.issue.refinement.notObject"));
-      d = {
-        title: textOf(raw.title, "title"),
-        why: textOf(raw.why, "why"),
-        todo: linesOf(raw.todo, "todo"),
-        criteria: linesOf(raw.criteria, "criteria"),
-        notDoing: linesOf(raw.notDoing, "notDoing"),
-        files: linesOf(raw.files, "files"),
-      };
-    } catch (e) {
-      problem = t("server.issue.refinement.unreadable", { why: messageOf(e) });
-      continue;
-    }
-    const title = clip(d.title, 80);
-    if (!title) {
-      problem = t("server.issue.refinement.noTitle");
-      continue;
-    }
-    return { draft: { ...d, title }, problem: "" };
-  }
-  return { problem };
+  const read = lastJsonBlock(text, RefinementBlock, {
+    none: t("server.issue.refinement.noBlock"),
+    unparsed: (e) => t("server.issue.refinement.unreadable", { why: messageOf(e) }),
+    misfit: (issue) => {
+      const field = misfitField(issue);
+      const why =
+        field === undefined
+          ? t("server.issue.refinement.notObject")
+          : textFields.has(field)
+            ? t("server.issue.refinement.text", { field })
+            : t("server.issue.refinement.lines", { field });
+      return t("server.issue.refinement.unreadable", { why });
+    },
+    refuse: (d) => (clip(d.title ?? "", 80) ? undefined : t("server.issue.refinement.noTitle")),
+  });
+  if (Result.isFailure(read)) return { problem: read.failure };
+  const d = read.success;
+  return {
+    draft: {
+      title: clip(d.title ?? "", 80),
+      why: d.why ?? "",
+      todo: linesOf(d.todo),
+      criteria: linesOf(d.criteria),
+      notDoing: linesOf(d.notDoing),
+      files: linesOf(d.files),
+    },
+    problem: "",
+  };
 }
 
 export function refinementDescription(d: IssueRefinement): string {

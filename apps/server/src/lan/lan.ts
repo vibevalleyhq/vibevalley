@@ -11,11 +11,10 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
 import { hostname, networkInterfaces } from "node:os";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
-import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 
-import { Cause, Clock, Context, Data, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+import { NodeSink, NodeStream } from "@effect/platform-node";
+import { Cause, Clock, Context, Data, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect";
+import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -155,6 +154,7 @@ const make = (options: LanOptions = {}) =>
     const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
     const { run: db } = yield* Db;
+    const http = yield* HttpClient.HttpClient;
     const address = options.address ?? lanAddress;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
@@ -236,23 +236,25 @@ const make = (options: LanOptions = {}) =>
     /** Handed to the loopback server as it came, the device said; the answer streams back. */
     const forward = (req: IncomingMessage, res: ServerResponse, device: string) =>
       Effect.gen(function* () {
-        const headers = new Headers();
-        for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
-        if (device) headers.set(deviceHeader, device);
-        const body = req.method === "GET" || req.method === "HEAD" ? undefined : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
-        const answer = yield* Effect.tryPromise({
-          try: (signal) =>
-            fetch(`http://${upstream}${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(body ? { body, duplex: "half" } : {}), signal }),
-          catch: forwardFailed,
-        });
-        res.writeHead(answer.status, Object.fromEntries(answer.headers));
-        const streamed = answer.body;
-        if (!streamed) return void res.end();
-        yield* Effect.tryPromise({
-          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same web stream: the DOM's and Node's types name it apart
-          try: (signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }),
-          catch: forwardFailed,
-        });
+        const method = req.method;
+        if (!HttpMethod.isHttpMethod(method)) return refuseHttp(res, 405, t("server.lan.notRemote"));
+        const headers: Record<string, string> = {};
+        for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers[k] = Array.isArray(v) ? v.join(", ") : v;
+        if (device) headers[deviceHeader] = device;
+        const body =
+          method === "GET" || method === "HEAD"
+            ? HttpBody.empty
+            : HttpBody.stream(NodeStream.fromReadable({ evaluate: () => req, onError: forwardFailed }), req.headers["content-type"]);
+        const answer = yield* http
+          .execute(HttpClientRequest.make(method)(`http://${upstream}${req.url ?? "/"}`, { headers, body }))
+          .pipe(Effect.mapError(forwardFailed));
+        res.writeHead(answer.status, answer.headers);
+        yield* Stream.run(answer.stream, NodeSink.fromWritable({ evaluate: () => res, onError: forwardFailed })).pipe(
+          // A HEAD, a 204 or a 304 has no body to stream.
+          Effect.catchTag("HttpClientError", (e) => (e.reason._tag === "EmptyBodyError" ? Effect.sync(() => void res.end()) : Effect.fail(forwardFailed(e)))),
+          // Cut off (the device forgotten, the client gone): the answer under way ends with it, or a stream would stay open.
+          Effect.onInterrupt(() => Effect.sync(() => void res.destroy())),
+        );
       });
 
     /** One request on the listener, on the service's fibers: the client leaving, or its device being forgotten, interrupts
@@ -338,7 +340,7 @@ const make = (options: LanOptions = {}) =>
         problem = "";
         server = s;
         const a = s.address();
-        port = typeof a === "object" && a !== null ? a.port : config.lan.port;
+        port = a === null || typeof a === "string" ? config.lan.port : a.port;
         logs.info(`vibevalley: lan access is open on port ${port}`);
         resume(Effect.void);
       });

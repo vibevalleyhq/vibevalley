@@ -10,8 +10,8 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
-import { HttpEffect } from "effect/http";
+import { type Cause, Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
+import { HttpBody, HttpClient, type HttpClientError, HttpEffect } from "effect/http";
 import type { Socket } from "effect/socket";
 
 import { t } from "@vibevalley/i18n";
@@ -19,7 +19,7 @@ import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrch
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 
 import { ServerConfig } from "@/base/config.ts";
-import { callbackLog } from "@/base/log.ts";
+import { callbackLog, bestEffort } from "@/base/log.ts";
 import { afterRealTime } from "@/base/time.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
@@ -78,6 +78,10 @@ const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => (
 class CallStepFailed extends Data.TaggedError("CallStepFailed")<{ readonly message: string; readonly cause: unknown }> {}
 
 const callStepFailed = (cause: unknown) => new CallStepFailed({ message: messageOf(cause), cause });
+
+/** What an HTTP call's failure says to the owner: the network's own words (refused, reset), not the client's wrapper. */
+const causeText = (e: HttpClientError.HttpClientError | Cause.TimeoutError) =>
+  e._tag === "HttpClientError" && "cause" in e.reason && e.reason.cause !== undefined ? messageOf(e.reason.cause) : e.message;
 
 const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
 
@@ -398,14 +402,11 @@ const cloudflared = (port: number) =>
   });
 
 /** The line refusing a keyless request counts as an answer. Asked over the real network. */
-const tunnelAnswers = (url: string) =>
+const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
   Effect.gen(function* () {
     const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
     while ((yield* Clock.currentTimeMillis) < deadline) {
-      const res = yield* Effect.tryPromise({
-        try: (signal) => fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) }),
-        catch: callStepFailed,
-      }).pipe(Effect.option);
+      const res = yield* client.post(url + "/llm/ready/chat/completions").pipe(Effect.timeout("5 seconds"), Effect.option);
       if (res._tag === "Some" && res.value.status === 401) return true;
       yield* Effect.sleep(2_000);
     }
@@ -423,6 +424,7 @@ const make = (options: VoiceOptions = {}) =>
     const orchestrator = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
+    const httpClient = yield* HttpClient.HttpClient;
     // Fibers started from callbacks belong to this service: they end with it, and sleep on its Clock.
     const forkHere = yield* FiberSet.makeRuntime();
     const runHere: Run = yield* FiberSet.makeRuntimePromise();
@@ -498,7 +500,7 @@ const make = (options: VoiceOptions = {}) =>
       options.tunnel ??
       ((port: number) =>
         Effect.tap(cloudflared(port), (item) =>
-          Effect.flatMap(tunnelAnswers(item.url), (answers) =>
+          Effect.flatMap(tunnelAnswers(httpClient, item.url), (answers) =>
             answers ? Effect.void : Effect.logInfo(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`),
           ),
         ));
@@ -770,7 +772,7 @@ const make = (options: VoiceOptions = {}) =>
                       joined._tag === "None"
                         ? Effect.void
                         : Effect.tryPromise({ try: () => agora.stopAgent(joined.value), catch: callStepFailed }).pipe(
-                            Effect.catch((e) => Effect.logWarning("vibevalley: voice: the late agent could not be stopped: " + e.message)),
+                            bestEffort("vibevalley: voice: the late agent could not be stopped"),
                           ),
                     ),
                   ),
@@ -865,24 +867,20 @@ const make = (options: VoiceOptions = {}) =>
         form.append("model", model);
         form.append("response_format", "json");
         // A local model's first request loads it, which takes a while.
-        const res = yield* Effect.tryPromise({
-          // Effect's own signal too: an interrupted dictation (the page went away) stops its upload, not only the timeout.
-          try: (signal) =>
-            fetch(url + "/audio/transcriptions", {
-              method: "POST",
-              body: form,
-              headers: d.key ? { authorization: "Bearer " + d.key } : {},
-              signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
-            }),
-          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: messageOf(e) }), "dictation"),
-        });
-        const raw = (yield* Effect.tryPromise({
-          try: () => res.text(),
-          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: messageOf(e) }), "call"),
-        })).slice(0, 1 << 20);
+        // An interrupted dictation (the page went away) stops its upload, as the timeout does.
+        const res = yield* httpClient
+          .post(url + "/audio/transcriptions", { headers: d.key ? { authorization: "Bearer " + d.key } : {}, body: HttpBody.formData(form) })
+          .pipe(
+            Effect.timeout("120 seconds"),
+            Effect.mapError((e) => unavailable(t("server.voice.dictation.unreachable", { why: causeText(e) }), "dictation")),
+          );
+        const raw = (yield* res.text.pipe(Effect.mapError((e) => unavailable(t("server.voice.dictation.cut", { why: causeText(e) }), "call")))).slice(
+          0,
+          1 << 20,
+        );
         const got = Schema.decodeOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
-        if (!res.ok)
+        if (res.status < 200 || res.status >= 300)
           return yield* Effect.fail(
             unavailable(t("server.voice.dictation.status", { status: res.status, detail: [...(detail || raw.trim())].slice(0, 200).join("") })),
           );

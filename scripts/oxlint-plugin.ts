@@ -72,12 +72,24 @@
  *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
  *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
  *   and moving a file does not change what its imports say. Siblings and children stay ./x.
+ *
+ *   no-instanceof-tagged: an expected error is told apart by its _tag (Predicate.isTagged, catchTag), not by its class.
+ *   instanceof narrows nothing in an error channel typed unknown, and it is how a function that sorts errors ends up
+ *   taking unknown instead of the union its callers pass. Seen syntactically: x instanceof Y is reported when Y is a
+ *   class declared at the top of the same file extending something written TaggedError (Data.TaggedError,
+ *   Schema.TaggedError), or when Y's name ends in Error, Failed, Failure or Refused and is not one of JavaScript's own
+ *   errors. A tagged class imported under another kind of name is not seen, and a plain Error subclass named that way
+ *   is reported (rename it or make it tagged).
+ *
+ *   no-object-guard: typeof x === "object" && x !== null (either order, in any && chain) is Effect's Predicate.isObject
+ *   written again, and the start of a hand-written decoder; Predicate.isObject, Predicate.hasProperty or a Schema say
+ *   it once. The rule compares the two operands' text, so x and (x) are different things to it.
  */
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { definePlugin, defineRule } from "vite-plus/lint/plugins";
+import { definePlugin, defineRule, type ESTree } from "vite-plus/lint/plugins";
 
 import { hexClass, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
 
@@ -651,6 +663,87 @@ const parentImportRule = defineRule({
   },
 });
 
+/** JavaScript's own errors: plain classes, never tagged. */
+const nativeErrors = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "EvalError", "URIError", "AggregateError", "DOMException"]);
+const taggedName = /(?:Error|Failed|Failure|Refused)$/u;
+
+const noInstanceofTagged = defineRule({
+  meta: {
+    messages: {
+      tagged: says(
+        "instanceof tells a tagged error by its class: it narrows nothing in an error typed unknown, and leads a function that sorts errors to take unknown instead of the union its callers pass",
+        '`Predicate.isTagged(e, "{{name}}")` over the union the callers pass, or `Effect.catchTag("{{name}}", …)` on the Effect',
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    const local = new Set<string>();
+    return {
+      Program(node) {
+        for (const statement of node.body) {
+          const declared = statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" ? statement.declaration : statement;
+          if (
+            declared?.type === "ClassDeclaration" &&
+            declared.id &&
+            declared.superClass &&
+            /\bTaggedError\b/u.test(context.sourceCode.getText(declared.superClass))
+          )
+            local.add(declared.id.name);
+        }
+      },
+      BinaryExpression(node) {
+        if (node.operator !== "instanceof") return;
+        const r = node.right;
+        const name = r.type === "Identifier" ? r.name : r.type === "MemberExpression" && r.property.type === "Identifier" ? r.property.name : undefined;
+        if (name !== undefined && (local.has(name) || (taggedName.test(name) && !nativeErrors.has(name))))
+          context.report({ node, messageId: "tagged", data: { name } });
+      },
+    };
+  },
+});
+
+type Expression = ESTree.Expression | ESTree.PrivateIdentifier;
+
+/** The operand of an && chain that touches the next one: a && b && c is ((a && b) && c), so b meets c. */
+const lastOperand = (n: Expression): Expression => (n.type === "LogicalExpression" && n.operator === "&&" ? lastOperand(n.right) : n);
+const firstOperand = (n: Expression): Expression => (n.type === "LogicalExpression" && n.operator === "&&" ? firstOperand(n.left) : n);
+
+const noObjectGuard = defineRule({
+  meta: {
+    messages: {
+      guard: says(
+        "a hand-written object check repeats Effect's guard, and is where a decoder written by hand starts",
+        '`Predicate.isObject(x)` (not null, not an array), `Predicate.hasProperty(x, "key")` to read one field, or a Schema (`Schema.decodeUnknownResult`) to read the shape',
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    const text = (n: Expression) => context.sourceCode.getText(n);
+    /** What `typeof x === "object"` checks, or undefined. */
+    const objectOf = (n: Expression) => {
+      if (n.type !== "BinaryExpression" || (n.operator !== "===" && n.operator !== "==")) return undefined;
+      const [t, v] = n.left.type === "UnaryExpression" ? [n.left, n.right] : [n.right, n.left];
+      return t.type === "UnaryExpression" && t.operator === "typeof" && v.type === "Literal" && v.value === "object" ? text(t.argument) : undefined;
+    };
+    /** What `x !== null` checks, or undefined. */
+    const notNullOf = (n: Expression) => {
+      if (n.type !== "BinaryExpression" || (n.operator !== "!==" && n.operator !== "!=")) return undefined;
+      const isNull = (o: Expression) => o.type === "Literal" && o.value === null && o.raw === "null";
+      return isNull(n.right) ? text(n.left) : isNull(n.left) ? text(n.right) : undefined;
+    };
+    return {
+      LogicalExpression(node) {
+        if (node.operator !== "&&") return;
+        const [a, b] = [lastOperand(node.left), firstOperand(node.right)];
+        const x = objectOf(a) ?? objectOf(b);
+        if (x !== undefined && (notNullOf(a) === x || notNullOf(b) === x)) context.report({ node, messageId: "guard" });
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -669,5 +762,7 @@ export default definePlugin({
     "one-absent": oneAbsent,
     "global-doors": globalDoors,
     "native-control": nativeControl,
+    "no-instanceof-tagged": noInstanceofTagged,
+    "no-object-guard": noObjectGuard,
   },
 });

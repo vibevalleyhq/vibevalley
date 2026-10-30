@@ -50,6 +50,7 @@ import { Db } from "@/base/db.ts";
 import { writeOnce } from "@/base/files.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
@@ -511,22 +512,17 @@ const make = Effect.gen(function* () {
   // Work set off by a timer belongs to this service: it ends with it and keeps its services.
   const forkHere = yield* FiberSet.makeRuntime();
 
-  /** Runs fn under the lock a little later, unless the chat has stopped. */
-  /** What goes wrong in the background is logged, and the chat goes on with the next thing. */
-  const logged =
-    (what: string) =>
-    <A, E>(e: Effect.Effect<A, E>) =>
-      Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${what}: ${String(c)}`)));
   // The waits are keyed fibers of this service's, so one can be called off (a notice gathering, when its session leaves);
   // once a wait is over, what it runs is handed to forkHere, and calling the wait off no longer cuts it short.
   const waits = yield* FiberMap.make<string>();
   const wait = yield* FiberMap.runtime(waits)();
+  /** Runs fn under the lock a little later, unless the chat has stopped. */
   const later = (key: string, ms: number, fn: () => Effect.Effect<void>) =>
     void wait(
       key,
       Effect.delay(
         Effect.sync(() => {
-          if (!closed) void forkHere(locked(Effect.suspend(() => (closed ? Effect.void : fn()))).pipe(logged("later")));
+          if (!closed) void forkHere(locked(Effect.suspend(() => (closed ? Effect.void : fn()))).pipe(bestEffort("chat: later")));
         }),
         ms,
       ),
@@ -966,7 +962,7 @@ const make = Effect.gen(function* () {
             yield* change(now, (revision) => db(qm.setEmbeds({ meta: metaText({ ...meta, embeds: found }), revision, id: now.id })));
           }),
         );
-      }).pipe(logged("link previews")),
+      }).pipe(bestEffort("chat: link previews")),
     );
   };
 
@@ -1245,7 +1241,7 @@ const make = Effect.gen(function* () {
         if (closed) return Effect.void;
         switch (n._tag) {
           case "hired":
-            return Effect.forEach(presentSessions(), (h) => openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`))), {
+            return Effect.forEach(presentSessions(), (h) => openJob(h).pipe(bestEffort(`chat: ${h.id}'s job`)), {
               discard: true,
             });
           case "left":
@@ -1254,11 +1250,11 @@ const make = Effect.gen(function* () {
             return postReport(n.report.id, n.report.outcome, n.report.summary, n.report.spent, n.report.run);
         }
       }),
-    ).pipe(logged(`after ${n._tag}`));
+    ).pipe(bestEffort(`chat: after ${n._tag}`));
   // Once the helpers are back: each on the farm has its job, and whatever was waiting for one goes to it.
   const helpersBack = locked(
     Effect.gen(function* () {
-      for (const h of presentSessions()) yield* openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`)));
+      for (const h of presentSessions()) yield* openJob(h).pipe(bestEffort(`chat: ${h.id}'s job`));
       for (const p of model.participants()) if (p.kind === "session" && p.left_at === null) yield* kick(p.id);
     }),
   );
@@ -1364,8 +1360,7 @@ const make = Effect.gen(function* () {
     return yield* change(row, (revision) => db(qm.setReactions({ reactions: reactionsText(r), revision, id })));
   });
 
-  const received = (recipient: string, message: string) =>
-    reacting(message, recipient, handedEmoji, true).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: 👀 on ${message}: ${String(c)}`)));
+  const received = (recipient: string, message: string) => reacting(message, recipient, handedEmoji, true).pipe(bestEffort(`chat: 👀 on ${message}`));
 
   /** A channel nothing points at any more; refused with what still does. */
   const removable = Effect.fnUntraced(function* (id: string) {
@@ -1680,10 +1675,10 @@ const make = Effect.gen(function* () {
       text.trim()
         ? locked(Effect.andThen(seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} }))).pipe(
             Effect.asVoid,
-            logged("the orchestrator's words"),
+            bestEffort("chat: the orchestrator's words"),
           )
         : Effect.void,
-    notice: (channel, text, code) => locked(write({ channel, from: "system", kind: "notice", text, meta: { code } })).pipe(logged("notice")),
+    notice: (channel, text, code) => locked(write({ channel, from: "system", kind: "notice", text, meta: { code } })).pipe(bestEffort("chat: notice")),
     read: (who, opt = {}) =>
       locked(
         Effect.gen(function* () {
@@ -1986,8 +1981,8 @@ const make = Effect.gen(function* () {
       }),
     useHelpers: (h) => void (helpers = h),
     helpersBack,
-    activity: (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`)),
-    consumed: (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`)),
+    activity: (a) => locked(onActivity(a)).pipe(bestEffort(`chat: ${a.id} ${a.kind}`)),
+    consumed: (c) => locked(consumed(c)).pipe(bestEffort(`chat: input consumed by ${c.session}`)),
     sessionNews: onSessionNews,
   });
   return shape;

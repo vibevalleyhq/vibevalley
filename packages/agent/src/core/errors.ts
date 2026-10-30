@@ -9,8 +9,9 @@ export const errnoOf = (e: unknown): string | undefined => (e instanceof Error &
 /** A tool that did not do what it was asked: its message is the failed result the model reads. */
 export class ToolFailed extends Data.TaggedError("ToolFailed")<{ readonly message: string; readonly cause?: unknown }> {}
 
-/** What a tool's body threw or rejected with, as the failed result. */
-export const toolFailed = (e: unknown): ToolFailed => (e instanceof ToolFailed ? e : new ToolFailed({ message: messageOf(e), cause: e }));
+/** What a tool's body threw or rejected with, or the agent it started failed with, as the failed result. A body that
+ * means to fail a tool returns Effect.fail(new ToolFailed(…)) and is not passed here. */
+export const toolFailed = (e: unknown): ToolFailed => new ToolFailed({ message: messageOf(e), cause: e });
 
 /** A run asked of an agent that is already running one. */
 export class AgentBusy extends Data.TaggedError("AgentBusy")<{ readonly message: string }> {}

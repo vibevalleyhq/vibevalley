@@ -44,6 +44,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channels } from "@/channel/chat.ts";
 import { inboxLines } from "@/channel/prompts.ts";
@@ -316,7 +317,7 @@ const make = (options: IssueOptions = {}) =>
     const publish = (id: string) =>
       get(id).pipe(
         Effect.flatMap((issue) => core.apply({ type: "issue", issue })),
-        Effect.catch((e) => Effect.logWarning(`vibevalley: issue ${id} changed but could not be read back for the board: ${reasonOf(e)}`)),
+        bestEffort(`vibevalley: issue ${id} changed but could not be read back for the board`),
       );
 
     /** The newest session, the one a merge, changes, comments and cancel act on; a reopen makes another. */
@@ -919,7 +920,7 @@ const make = (options: IssueOptions = {}) =>
             const s = sessions.sessionOf(session);
             if (!s || isBusy(s)) return;
             yield* sessions.dismiss(session, "discard", "completed");
-          }).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: a talk's session ${session} going home: ${String(c)}`))),
+          }).pipe(bestEffort(`vibevalley: a talk's session ${session} going home`)),
           options.talkIdleMs ?? talkIdleMs,
         ),
       );
@@ -937,10 +938,6 @@ const make = (options: IssueOptions = {}) =>
     const ownerWords = yield* chat.ownerInThread;
     const finished = yield* sessions.finishedRuns;
     const due = yield* crons.due;
-    const logged =
-      (what: string) =>
-      <A, E>(e: Effect.Effect<A, E>) =>
-        Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
     // One at a time: a report and the owner's word on it do not cross.
     yield* Effect.forkScoped(
       Stream.runForEach(
@@ -950,25 +947,27 @@ const make = (options: IssueOptions = {}) =>
         ),
         (n) =>
           n._tag === "owner"
-            ? onOwnerInThread(n.thread).pipe(logged(`issues after the owner's words in ${n.thread}`))
-            : onSessionNews(n).pipe(logged(`issues after ${n._tag}`)),
+            ? onOwnerInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the owner's words in ${n.thread}`))
+            : onSessionNews(n).pipe(bestEffort(`vibevalley: issues after ${n._tag}`)),
       ),
     );
     yield* Effect.forkScoped(
       // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>
-        Effect.forEach(run.issues, (id) => endRun(id, run.outcome).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
+        Effect.forEach(run.issues, (id) => endRun(id, run.outcome).pipe(bestEffort(`vibevalley: run ${run.id} finished on issue ${id}`)), {
           discard: true,
         }),
       ),
     );
-    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`cron ${d.cron.id}`))));
+    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(bestEffort(`vibevalley: cron ${d.cron.id}`))));
     if (options.background ?? true) {
       // Each waits a period before its first run, then runs every period.
       const tryEvery = options.tryEveryMs ?? 5000;
-      yield* Effect.forkScoped(tryQueued.pipe(logged("the queue"), Effect.repeat(Schedule.spaced(tryEvery)), Effect.delay(tryEvery)));
+      yield* Effect.forkScoped(tryQueued.pipe(bestEffort("vibevalley: the queue"), Effect.repeat(Schedule.spaced(tryEvery)), Effect.delay(tryEvery)));
       const pollEvery = config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000;
-      yield* Effect.forkScoped(refreshPullRequests.pipe(logged("refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)));
+      yield* Effect.forkScoped(
+        refreshPullRequests.pipe(bestEffort("vibevalley: refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)),
+      );
     }
 
     /** On the board before another unsent issue, or last; only unsent issues have a place. */

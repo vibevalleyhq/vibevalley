@@ -28,6 +28,7 @@ import { clip } from "@/base/clip.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/errors.ts";
@@ -229,7 +230,7 @@ export const make = (options: TaskOptions = {}) =>
               payload: JSON.stringify(payload),
               created_at: clock.currentTimeMillisUnsafe(),
             }),
-          ).pipe(Effect.catch((e) => Effect.logWarning(`vibevalley: a task graph event was not kept: ${String(e)}`)));
+          ).pipe(bestEffort("vibevalley: a task graph event was not kept"));
         },
         { discard: true },
       );
@@ -309,11 +310,7 @@ export const make = (options: TaskOptions = {}) =>
         // Whatever stops the save (a refusal, a defect, an interruption), the session hired for it does not stay.
         const saved = yield* Effect.exit(putSystem(graph));
         if (saved._tag === "Failure") {
-          yield* Effect.uninterruptible(
-            dismiss(session).pipe(
-              Effect.catchCause((cause) => Effect.logWarning(`vibevalley: could not dismiss ${session} after the graph was not saved`, cause)),
-            ),
-          );
+          yield* Effect.uninterruptible(dismiss(session).pipe(bestEffort(`vibevalley: could not dismiss ${session} after the graph was not saved`)));
           return yield* saved;
         }
       }

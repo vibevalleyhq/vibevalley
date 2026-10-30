@@ -20,6 +20,8 @@ describe("an attachment", () => {
     Effect.gen(function* () {
       const { address, chat } = yield* farm;
       const png = yield* chat.attach({ name: "看这里.png", type: "image/png", data: Buffer.from("not really a png").toString("base64") });
+      // The test reads the server as a browser does, through the platform's own fetch.
+      // @effect-diagnostics-next-line globalFetchInEffect:off
       const get = (path: string) => Effect.promise(() => fetch(`http://${address}${path}`));
       const res = yield* get(attachmentPath(png.id));
       expect([res.status, res.headers.get("content-type"), res.headers.get("content-disposition")]).toEqual([

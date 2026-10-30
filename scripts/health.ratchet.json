@@ -126,7 +126,7 @@
     "swallowed": 0
   },
   "server: Agent Sessions": {
-    "nonNull": 16,
+    "nonNull": 14,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
@@ -164,14 +164,14 @@
   "server: Gateway": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 15,
-    "lintOff": 7,
+    "cast": 13,
+    "lintOff": 6,
     "orDie": 4,
     "ignored": 5,
     "swallowed": 0
   },
   "server: Issues": {
-    "nonNull": 29,
+    "nonNull": 25,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
