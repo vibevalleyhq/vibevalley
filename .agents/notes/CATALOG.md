@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（25 篇）
 
 ### feature
 
@@ -33,6 +33,7 @@
 
 ### process
 
+- 2026-10-30 [检查照「更对的写法」开，不照现在的写法](.agents/notes/proposed/process/2026-10-30-correct-checks.md)
 - 2026-10-29 [给仓库做体检：读数指出先看哪里，只有类型逃生口是棘轮](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)
 - 2026-10-18 [用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
 
