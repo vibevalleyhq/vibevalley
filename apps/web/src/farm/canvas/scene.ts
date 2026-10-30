@@ -716,9 +716,9 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
 
 /** Lights a sprite up while the pointer is on what it opens; filters are only swapped when that changes. */
 function glow(sprite: Sprite, on: boolean) {
-  // Pixi gives null for a sprite that never had filters, whatever its type says.
-  const filters: readonly unknown[] | null = sprite.filters;
-  const lit = filters !== null && filters.length > 0;
+  // Pixi gives undefined for a sprite that never had filters, whatever its type says.
+  const filters: readonly unknown[] | undefined = sprite.filters;
+  const lit = filters !== undefined && filters.length > 0;
   if (on !== lit) sprite.filters = on ? [brighter] : [];
 }
 

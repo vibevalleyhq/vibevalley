@@ -168,9 +168,9 @@ export function pixelLighting(stage: PixelStage, { normalsOf }: LightingOptions)
     const undo: (() => void)[] = [];
     const visit = (node: Container, mirrored: boolean) => {
       const flipped = node.scale.x < 0 ? !mirrored : mirrored;
-      // Pixi gives null for a node that never had filters, whatever its type says.
-      const filters: Container["filters"] | null = node.filters;
-      if (filters !== null && filters.length > 0) {
+      // Pixi gives undefined for a node that never had filters, whatever its type says.
+      const filters: Container["filters"] | undefined = node.filters;
+      if (filters !== undefined && filters.length > 0) {
         const kept = [...filters];
         node.filters = [];
         undo.push(() => (node.filters = kept));
