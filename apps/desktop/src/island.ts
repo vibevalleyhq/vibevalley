@@ -76,7 +76,6 @@ export interface IslandOptions {
   open: (issue: string) => void;
 }
 
-/** The island as the desktop test reads it (probe.ts): the last glance, whether the helper runs, and its click. */
 export interface IslandProbe {
   glance: Glance | undefined;
   helper: boolean;

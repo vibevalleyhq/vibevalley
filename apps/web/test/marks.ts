@@ -1,6 +1,3 @@
-// What a test's own script puts on the page's window to see that something happened there: declared once, so a spec
-// reads it without a cast.
-
 declare global {
   interface Window {
     /** Set only by a script the page must never run (artifact.spec.ts). */
