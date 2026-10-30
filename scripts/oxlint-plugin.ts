@@ -49,6 +49,12 @@
  *   one-absent: a type that admits null and undefined at once carries two words for one thing. Outside's null is taken in
  *   at the door (docs/style/code.md, "没有值"); vite.config.ts says where a door is.
  *
+ *   global-doors: a property on window or globalThis is a contract between two worlds (a page and its shell, a test and
+ *   the program it drives). It is declared once, in a door file (declare global, interface Window), and then read and
+ *   set with its type; TypeScript refuses one that is not declared. What gets around that is reported: casting window,
+ *   globalThis or self, and Object.assign or Object.defineProperty onto them; declare global outside a door is too
+ *   (vite.config.ts lists the doors).
+ *
  *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
  *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
  *   and moving a file does not change what its imports say. Siblings and children stay ./x.
@@ -362,6 +368,46 @@ const oneAbsent = defineRule({
   },
 });
 
+const globals = new Set(["window", "globalThis", "self"]);
+const isGlobal = (node: { type: string } | undefined) =>
+  node?.type === "Identifier" && "name" in node && typeof node.name === "string" && globals.has(node.name);
+
+const globalDoors = defineRule({
+  meta: {
+    messages: {
+      cast: "declare a global once in its door (declare global, interface Window) and read it with its type, not through a cast",
+      assign: "set a global by its declared name, not with Object.assign or Object.defineProperty",
+      declare: "declare global only in a door file (vite.config.ts, global-doors): a global is a contract between two worlds",
+    },
+    // { door: true } in a door file: it may declare globals.
+    schema: [{ type: "object", properties: { door: { type: "boolean" } }, additionalProperties: false }],
+  },
+  create(context) {
+    const options: unknown = context.options[0];
+    const door = typeof options === "object" && options !== null && "door" in options && options.door === true;
+    return {
+      TSAsExpression(node) {
+        if (isGlobal(node.expression)) context.report({ node, messageId: "cast" });
+      },
+      CallExpression(node) {
+        const c = node.callee;
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "Object" &&
+          c.property.type === "Identifier" &&
+          (c.property.name === "assign" || c.property.name === "defineProperty") &&
+          isGlobal(node.arguments[0])
+        )
+          context.report({ node, messageId: "assign" });
+      },
+      TSModuleDeclaration(node) {
+        if (!door && node.id.type === "Identifier" && node.id.name === "global") context.report({ node, messageId: "declare" });
+      },
+    };
+  },
+});
+
 const parentImportRule = defineRule({
   meta: {
     messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
@@ -400,6 +446,7 @@ export default definePlugin({
     "parent-import": parentImportRule,
     "promise-boundary": promiseBoundary,
     "one-absent": oneAbsent,
+    "global-doors": globalDoors,
     "native-control": nativeControl,
   },
 });

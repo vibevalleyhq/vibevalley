@@ -374,6 +374,16 @@ export default defineConfig({
         rules: { "vibevalley/promise-boundary": "off" },
       },
       {
+        // A global is declared once in its door and read with its type (scripts/oxlint-plugin.ts, global-doors).
+        files: ["apps/**", "packages/**", "scripts/**"],
+        rules: { "vibevalley/global-doors": "error" },
+      },
+      {
+        // The doors: the page and its shells (protocol's host.ts), the desktop's test probe, the page's test marks.
+        files: ["packages/protocol/src/host.ts", "apps/desktop/src/probe.ts", "apps/web/test/marks.ts"],
+        rules: { "vibevalley/global-doors": ["error", { door: true }] },
+      },
+      {
         // One word for none (scripts/oxlint-plugin.ts, one-absent).
         files: ["apps/**", "packages/**"],
         excludeFiles: ["apps/server/db/generated/**"],

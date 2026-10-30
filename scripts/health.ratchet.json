@@ -62,7 +62,7 @@
   "packages/i18n": {
     "nonNull": 4,
     "doubleCast": 0,
-    "cast": 1,
+    "cast": 0,
     "lintOff": 0
   },
   "packages/protocol": {
@@ -152,8 +152,8 @@
   "web: base": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 6,
-    "lintOff": 6
+    "cast": 3,
+    "lintOff": 4
   },
   "web: farm": {
     "nonNull": 67,

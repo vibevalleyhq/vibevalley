@@ -37,6 +37,7 @@
 ## 检查管着的写法
 
 - 不写收窄的 `as`：外面来的值用 Schema 或类型守卫读，DOM 的值用 `instanceof`；确实只能断言的（库的类型缺口、自己写出又读回的文件），在那一行写 `// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- <为什么成立>`。测试、故事和样例不查：断言错了，读它的断言会失败。
+- 全局的属性是两个世界之间的契约（页面和它的壳、测试和它起的程序）：在门里声明一次（`declare global`、`interface Window`），之后按名字带着类型读写。门只有三个：`packages/protocol/src/host.ts`（宿主）、`apps/desktop/src/probe.ts`（桌面测试读的探针，只在 `VIBEVALLEY_DESKTOP_PROBE=1` 时有）、`apps/web/test/marks.ts`（页面测试自己埋的点）；转型 `window`、`globalThis`，`Object.assign` 到它们上，门外的 `declare global`，lint 的 `vibevalley/global-doors` 拦。
 - 正则都带 `u`：中文和 emoji 按码点算，`.`、`[^x]` 不会切开一个字。
 - 不就地排序、倒序：`toSorted`、`toReversed`，帧和核心状态是共享的。
 - 循环里的 `await`：彼此无关的改成 `Promise.all`；一步要等上一步的（轮询、分页的游标、一个会话的轮次、按次序的批）在那一行写明为什么。Playwright 的测试不查：一页只能一步步点。
