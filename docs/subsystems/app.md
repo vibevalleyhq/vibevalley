@@ -24,7 +24,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **页面的规则**在它所属的 feature 里，是只读帧和回答的纯函数，各带 vitest：看板的分栏（`features/issue/display.ts`）、频道的未读（`features/channel/unread.ts`）、一轮的瀑布图（`features/session/rounds.ts`）、通知的说法（`features/notice/tray.ts`）、远端和配对（`features/lan/device.ts`）。
 - **宿主**：接口在 `@vibevalley/protocol/host`（`packages/protocol/src/host.ts`）：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`、`locale`），和宿主之间的两份契约（`desktopBridge`、`mobileBridge`，走 `@vibevalley/bridge`；手机壳的页面这一头是 `mobileHost`）；页面在 `src/base/host.ts` 里找自己的宿主（`currentHost()`、没有宿主时的 `browserHost`）。桌面壳的 preload、手机壳各自实现它。
 - **灵动岛** `apps/island`：Swift 的原生小程序（AppKit 的 `NSPanel` 里放 SwiftUI），`IslandCore` 是能离开屏幕测的消息（`Messages.swift`）和位置（`Geometry.swift`），`VibeValleyIsland` 画它；桌面壳那一半在 `apps/desktop/src/island.ts`（`glanceOf`、`startIsland`）。
-- **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）、`src/bridge.ts`（桥走的那一个 IPC 通道）、`src/probe.ts`（测试读的通知、菜单栏摘要和岛，只在 `VIBEVALLEY_DESKTOP_PROBE=1` 时有，打包的应用没有）；`scripts/build.ts`、`scripts/package.ts`（`vp run package:mac`）。
+- **桌面壳** `apps/desktop`：按职责一个文件，`src/main.ts` 只把它们接起来（单实例、依次起来、退出前等服务端存好）；`src/paths.ts`（服务端、页面、岛、日志、更新放在哪）、`src/window.ts`（唯一的窗口）、`src/host.ts`（main 这一侧的宿主）、`src/tray.ts`、`src/menu.ts`、`src/server.ts`（`loginShellPath`、`startServer`、`serverKeeper`）、`src/dev.ts`、`src/update.ts` 和 `src/releases.ts`（自己更新）、`src/preload.ts`（把宿主接口交给页面）、`src/bridge.ts`（桥的 IPC 通道和两头）、`src/chrome.ts`（标题条和红绿灯，main 和 preload 共用）、`src/lines.ts`（子进程的 JSON 行）、`src/probe.ts`（测试读的通知、菜单栏摘要和岛，只在 `VIBEVALLEY_DESKTOP_PROBE=1` 时有，打包的应用没有）；`scripts/build.ts`、`scripts/package.ts`（`vp run package:mac`）、`scripts/update-check.ts`。
 - **手机壳** `apps/mobile`：`App.tsx`（跟随当前农场选择）、`src/PairScreen.tsx`（扫码、粘贴、配对或取消）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（`FarmConnection`：当前农场、配对和系统钥匙串提交）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/pairing.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
 - **检查**：`vp run web:check`、`vp run --filter @vibevalley/web e2e`、`vp run desktop:test`；手机壳是 `vp run --filter @vibevalley/mobile test` 和 `scripts/e2e.ts`。
 
@@ -84,7 +84,11 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 手机的每条通话线路在桥上带自己的身份；静音、续期、挂断和字幕只归这一条。原生宿主（`apps/mobile/src/host.ts`）属于当前加载的页面；重新加载、返回配对或换农场时关闭宿主，连还在等麦克风权限、等入线的电话一起取消。原生声网只有一个引擎，`rtc.ts` 在下一次入线前结束旧尝试，按频道和本机用户号认回调；旧权限答复、旧频道排队的事件和迟到的挂断不能碰新线路。异步入线失败只认带连接身份的失败状态，不把引擎的全局错误当作某条电话的结果。锁屏不关闭页面宿主，通话继续。
 
-**打包**：`vp run package:mac` 构建页面和壳，把 `apps/server` 连同生产依赖放进 `dist/stage/server`（服务端用到的每个 workspace 包拷成真的文件夹，`src/workspace.ts` 照 `package.json` 找），electron-builder 打出 `apps/desktop/dist` 里的 `.app` 和 `.dmg`，`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。没有签名和公证。
+**打包**：`vp run package:mac` 构建页面和壳，用 `pnpm deploy --prod` 把 `apps/server` 连同生产依赖放进 `dist/stage/server`（版本照锁文件，workspace 包拷进去，测试文件、黄金数据和测试的帮手删掉），electron-builder 打出 `apps/desktop/dist` 里的 `.dmg`（第一次装）、`.zip`（更新用）和 `release.json`（`src/releases.ts` 的 `Release`：版本、这次的 PR 标题、服务端的表结构哈希、每个架构的文件名、大小和 SHA-512）。`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。版本是构建所在的 tag（`v0.2.0`），没有 tag 是 0.0.0。没有签名和公证。
+
+**发布**：推一个 `v*` 的 tag，`.github/workflows/release.yml` 在 macOS（arm64）上打包，建一个草稿 Release，放上 `.dmg`、`.zip` 和 `release.json`；人看过再发布，发布以前应用看不到它。
+
+**自己更新**（`src/update.ts`，只在打包的应用里）：开机查一次，之后每 4 小时，也能在「关于」里点。读最新 Release 的 `release.json`（`VIBEVALLEY_UPDATE_FEED` 可以换成别处），比本机新就把这台 Mac 的 zip 下到 user-data 的 `updates/<版本>/`，大小和 SHA-512 对不上就报错丢掉，`ditto` 解开，`Info.plist` 的版本要对得上。应用在安装盘里、被 macOS 挪到 App Translocation、或所在的文件夹不能写时不换，「关于」里说清楚、给 Release 的页面。能换的：退出时（服务端存好以后）起一个脱离的脚本，等这个进程走了，把旧的 `.app` 挪到 `updates/previous.app`、新的挪到原处、去掉隔离属性；「关于」里「重启更新」也一样，换完再打开。新版本的表结构和家目录里的库（`db.schema`）不一样时，它的服务端会把旧库挪到一边、从新农场开始：这样的版本退出时不换，只在「关于」里说，主人点了才换。页面经 `desktopBridge` 的 `updateState`、`updateCheck`、`updateInstall` 和推送 `update` 看到它（`Host.update`），侧栏底部在下好时多一个图标。
 
 ## 和谁打交道
 
@@ -103,6 +107,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **页面用 Solid 2。** 帧来得密：React 每来一帧，读它的组件全部重渲染；Solid 的组件只跑一次，帧按 id 合并进 store 后只更新读了变动字段的地方，不用手写选择器和 `memo`，也没有依赖数组和为闭包读旧值写的 ref。Pixi 舞台、声网通话、两条流都是外面自己会变的东西，接成信号比 `useSyncExternalStore` 加 ref 直接。放弃了留在 React 加选择器（解决了重渲染，依赖数组和 ref 还在）、Solid 1.9（2.0 改得多，等于再迁一次）和长期两种框架并存（两套写法，agent 不知道该抄哪个）。代价是 2.0 还是 RC：`solid-js`、`@solidjs/web`、`@tanstack/solid-query`、`@solidjs/vite-plugin` 钉死在具体版本，升级单独做；模型多半只会写 1.x，`eslint-plugin-solid` 的 v2 规则（经 oxlint 的 JS 插件）挡住删掉的 API、一个参数的 effect、解构的 props 和提前 `return` 的组件，语义变了、名字没变的写法（写完马上读到旧值、读窄化的值）靠 Playwright。
 - **按概念分 feature，feature 之间准用，只走出口、不成环。** 以前一个概念的页、读取、规则和字分在 `pages/`、`data/`、`rules/` 和共用的词表里，改工单要动四处；现在和服务端一样，一个概念一个文件夹。大仓库的分法在一件事上不一样：feature 之间能不能互相 import。bulletproof-react 和 Feature-Sliced Design 不准（FSD 另加 entities、widgets 两层来拼），VS Code 的 `workbench/contrib/*` 随便互相用。我们的概念本来就互相嵌着（工单详情里是帮工的干活过程，群聊里是档案的脸），全不准就得把这些都挪进上层或再加一层；随便用，环会越积越多：拆之前设置页的四栏、群聊和干活过程、工单和计划都互相依赖，原因都是放错地方的字和小函数。所以准用，但只经出口（具名导出，不用 `export *`），图不成环。FSD 的 entities、Huly 每个概念一个的契约包，在这里是 `@vibevalley/protocol`，页面不再加一层。放弃了 FSD 的六层（按「东西」还是「动作」归类，争论比收益大）和一个概念一个包（每个都要 `package.json`）。皮不拆进 feature：农场的 store、部件和 world 是一体的，「种地的词只在皮里」也靠目录分界查。
 - **路由自己写。** 只要一个路径信号、`navigate` 和按前缀分发；`@solidjs/router` 的 2.0 还在预发布。
+- **桌面版自己更新，不用 Electron 的 autoUpdater。** 它在 macOS 上是 Squirrel.Mac，只装签过名的应用，而这里没有 Apple Developer 账号。自己查、自己下、退出时换，信任和主人第一次从 Release 手动下载一样（GitHub 的 HTTPS 和 Release 上的文件，SHA-512 核对）。放弃了只提示让主人自己下（下载、拖进「应用程序」、过 Gatekeeper 都是能替人做的事），也放弃了再签一层自己的签名（写 Release 的权限和签名的钥匙在同一处，不比第一次下载更可信）。有了账号就签名、公证，换成 electron-updater。只出 arm64：服务端的原生模块和岛都分架构。表结构变了的版本不自动换，因为库不迁移（「内部不留兼容」），换上就是新农场。
+- **打包的服务端照锁文件装依赖。** 以前用没有锁文件的 `npm install`，一个传递依赖（`@effect/platform-node-shared`）跳到了要更新 `effect` 的版本，打包的应用起不来，而仓库里跑得好好的。`pnpm deploy` 装的就是测试时那一套。
 - **Electron 用自己的 Node 跑服务端。** 应用里不必再带一份 Node；服务端照样不打包，和仓库里跑的是同一份源码。代价是应用约 300 MB。
 - **推折好的整份状态，页面不折。** 页面再写一份 `reduce` 就是第二份核心状态，两边改规则靠自觉对齐。推整份的代价是带宽：一份真实状态几十 KB，本机和局域网没问题；要换增量时，增量格式又是一份两端都要遵守的约定。
 - **页面问服务端，不移植规则。** 页面要的只是结论；档案的问题依赖没存的草稿，记性的预览依赖主人正在打的字，都不是农场的状态，所以另开接口问。服务端和页面都要的纯规则放进 `packages/protocol`，一份代码两处用。
@@ -136,4 +142,5 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键；家目录是个文件、服务端起不来时，窗口先开在加载条上，再换成原因；服务端用照字眼干活的帮工（`VIBEVALLEY_TEST_RUNTIMES`）时，一张先问清楚的工单进了岛的摘要（「等你回答」），macOS 上岛真的起来了，点它把窗口开到那张工单。`apps/desktop/src/island.test.ts` 查摘要的规则。
 - 灵动岛：`apps/island` 的 `swift test`（消息、刘海和没有刘海时的位置），CI 的 `island` 跑在 macOS 上；样子用 `--snapshot` 画成图看（`apps/island/README.md`）。
 - 打包：`vp run package:mac` 后用临时家目录开 `apps/desktop/dist/mac-arm64/VibeValley.app`，`desktop-server.log` 里有收据，`curl` 那个地址拿到页面和接口。
+- 自己更新：`vp run --filter @vibevalley/desktop update-check` 打 0.0.1 和 0.0.2 两个包，在本机的更新源上走一遍（SHA-512 不对时不换；对的下好、退出时换上、再开是 0.0.2；[验收的分册](.agents/skills/acceptance/desktop-update.md)）。`src/releases.test.ts` 查版本、装在哪、换不换新农场的规则。
 - 真程序：`acceptance/page.md`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。

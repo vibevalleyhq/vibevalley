@@ -21,7 +21,8 @@ vp run desktop:dev                           # 或者桌面版：Electron 带着
 ## macOS 应用
 
 ```bash
-vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和 .dmg
+vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）、.dmg、.zip 和 release.json
+git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建草稿 Release，看过再在 GitHub 上发布
 ```
 
 `apps/desktop/scripts/package.ts` 先构建页面和壳，再把 `apps/server` 连同它的生产依赖（`packages/protocol` 拷成真的文件夹）放进 `dist/stage/server`，最后由 electron-builder 把壳、`server/` 和 `web/` 一起打进应用；服务端在应用里照样用 Electron 自带的 Node 和 tsx 跑。没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。

@@ -1,9 +1,9 @@
 {
   "apps/desktop": {
-    "nonNull": 1,
+    "nonNull": 0,
     "doubleCast": 0,
-    "cast": 3,
-    "lintOff": 4
+    "cast": 2,
+    "lintOff": 3
   },
   "apps/mobile": {
     "nonNull": 1,
