@@ -32,7 +32,7 @@ const head = (s: string, n: number) => {
 };
 
 /** Its labels are words without spaces or commas (the list is comma-separated). */
-const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/g, "-")}`;
+const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/gu, "-")}`;
 
 const projectLabel = `${app}-scope-project-`;
 const globalLabel = `${app}-scope-global`;
@@ -46,7 +46,7 @@ const scopeOf = (labels: unknown): MemoryScope => {
   const only = scopes[0]!;
   if (only === globalLabel) return { kind: "global" };
   const encoded = only.slice(projectLabel.length);
-  if (!/^(?:[0-9a-f]{2})+$/.test(encoded)) return { kind: "unknown" };
+  if (!/^(?:[0-9a-f]{2})+$/u.test(encoded)) return { kind: "unknown" };
   const project = Buffer.from(encoded, "hex").toString("utf8");
   return Buffer.from(project, "utf8").toString("hex") === encoded ? { kind: "project", project } : { kind: "unknown" };
 };

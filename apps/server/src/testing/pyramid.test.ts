@@ -50,6 +50,6 @@ describe("the test pyramid", () => {
       all.filter((f) => f.endsWith(".test.ts")),
       (f) => layerOf(f),
     );
-    expect(Object.keys(shape).sort()).toEqual(["flow", "module", "rule"]);
+    expect(Object.keys(shape).toSorted()).toEqual(["flow", "module", "rule"]);
   });
 });

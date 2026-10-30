@@ -71,7 +71,7 @@ describe("mcp", () => {
       id: "pi",
       turn: async (turn) => {
         for (const s of turn.options.mcpServers ?? [])
-          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /, ""));
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /u, ""));
         turn.say("做完了");
       },
     });
@@ -86,7 +86,7 @@ describe("mcp", () => {
       const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
-      expect((yield* Effect.promise(c.list)).sort()).toEqual([
+      expect((yield* Effect.promise(c.list)).toSorted()).toEqual([
         "artifact_block_create",
         "artifact_block_update",
         "artifact_content_get",
@@ -103,7 +103,7 @@ describe("mcp", () => {
         "session_list",
       ]);
       const who = yield* Effect.promise(() => c.tool("session_list"));
-      expect(who).toMatch(new RegExp(`^- ${id} `, "m"));
+      expect(who).toMatch(new RegExp(`^- ${id} `, "mu"));
       // Names are listed without an @: models copy a wake.
       expect(who.split("\n").slice(0, -1).join("\n")).not.toContain("@");
       expect(yield* Effect.promise(() => c.tool("channel_message_send", { text: "从 MCP 说一句", anyway: true }))).toContain("发出去了");
@@ -122,7 +122,7 @@ describe("mcp", () => {
       id: "pi",
       turn: async (turn) => {
         for (const s of turn.options.mcpServers ?? [])
-          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /, ""));
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /u, ""));
         turn.say("做完了");
       },
     });
@@ -221,7 +221,7 @@ describe("mcp", () => {
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       const added = yield* tool("artifact_block_create", { id: d.id, text: "这周做完了**第一步**" });
-      const block = /加了一块〔(\S+)〕，第 (\d+) 版/.exec(added)![1]!;
+      const block = /加了一块〔(\S+)〕，第 (\d+) 版/u.exec(added)![1]!;
       expect(yield* tool("artifact_block_create", { id: d.id, text: "下周", type: "heading", level: 1 })).toContain("加了一块");
       expect(yield* tool("artifact_block_create", { id: d.id, text: "x", type: "table" })).toContain("没成：块的类型只能是");
       const read = yield* tool("artifact_content_get", { id: d.id });

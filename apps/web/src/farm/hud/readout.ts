@@ -13,11 +13,11 @@ export function clockText(tod: number) {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(m - (m % 5)).padStart(2, "0")}`;
 }
 
-export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
 
 /** The issues harvested into their main branch (merged here, or by a pull request), newest first: the warehouse. */
 export const harvestedOf = (s: WorkspaceState | undefined): Issue[] =>
-  (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
+  (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").toSorted((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
 
 const nothing: DoingView = { action: "none", label: "", actionText: "" };
 

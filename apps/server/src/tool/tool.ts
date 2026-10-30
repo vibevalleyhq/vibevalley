@@ -117,7 +117,7 @@ export function toolStart(name: string, args: unknown): ToolStart {
   };
 }
 
-const spaces = /\s+/g;
+const spaces = /\s+/gu;
 
 /** Told to the model as the tool's failed result: the message is what it reads. */
 export class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly message: string }> {}
@@ -172,9 +172,9 @@ export const make = Effect.gen(function* () {
 
   // The orchestrator names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
   const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<Issue | string> {
-    const k = key.trim().replace(/^#/, "");
+    const k = key.trim().replace(/^#/u, "");
     const all = yield* issue.list();
-    if (/^\d+$/.test(k)) return all.find((item) => item.number === Number(k)) ?? answers.noIssueNumber(k);
+    if (/^\d+$/u.test(k)) return all.find((item) => item.number === Number(k)) ?? answers.noIssueNumber(k);
     const byId = all.find((item) => item.id === k);
     if (byId) return byId;
     const w = findSession(k);

@@ -284,7 +284,7 @@ export class Journal {
 }
 
 /** Nothing that leads out of the folder. */
-const knownId = /^[A-Za-z0-9_-]+$/;
+const knownId = /^[A-Za-z0-9_-]+$/u;
 
 /** Each session's log, events/<id>.json: the open ones in memory as they grow, the others on disk. */
 export class Trajectories {

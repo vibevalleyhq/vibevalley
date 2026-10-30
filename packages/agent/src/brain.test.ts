@@ -172,7 +172,7 @@ describe("the agent", () => {
         ),
       ],
       async (r) => {
-        expect(await r.ask("改")).toMatch(/^true:old_text 在 a\|true:\S/);
+        expect(await r.ask("改")).toMatch(/^true:old_text 在 a\|true:\S/u);
       },
     );
   });
@@ -250,7 +250,7 @@ describe("the agent", () => {
           'r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined)',
         );
         const last = r.requests.findLast((c) => !summarizing(c))!;
-        expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/);
+        expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/u);
         expect(r.agent.history()[0]!.role).toBe("compactionSummary");
       },
       options,
@@ -375,8 +375,8 @@ describe("the agent", () => {
       expect(r.agent.memoryNews()).toBe("");
       await r.ask(news + "\n\nb");
       expect(systemPrompt(r.requests[1]!)).toBe(systemPrompt(r.requests[0]!));
-      expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/);
-      expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/);
+      expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/u);
+      expect(lastUser(r.requests[1]!)).toMatch(/^【记性有更新】/u);
       expect(prefixChanges(r)).toEqual([]);
     });
   });

@@ -176,7 +176,7 @@ function textOf(v: unknown, field: string): string {
   throw new Error(t("server.issue.refinement.text", { field }));
 }
 
-const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
 
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {

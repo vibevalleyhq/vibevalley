@@ -35,7 +35,7 @@ export function FarmLog() {
         .messages.filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromKind === "orchestrator"))
         .map((message) => ({ kind: "said" as const, message })),
       ...reports().map((message) => ({ kind: "report" as const, message })),
-    ].sort((a, b) => b.message.at - a.message.at);
+    ].toSorted((a, b) => b.message.at - a.message.at);
   return (
     <Show when={rows().length > 0} fallback={<FarmEmpty text={t("web.farm.log.empty")} />}>
       <div class="flex flex-col">

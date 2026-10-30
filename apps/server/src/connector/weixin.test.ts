@@ -87,7 +87,7 @@ describe("WeChat HTTP responses", () => {
   it("rejects a QR response with the wrong shape", async () => {
     const base = await serve(() => `{"qrcode":42,"qrcode_img_content":"https://qr.example"}`);
     const client = new WeixinClient(http, base);
-    expect((await refusal(client.login(() => Effect.void, Effect.succeed("")))).message).toMatch(/拿不到登录二维码/);
+    expect((await refusal(client.login(() => Effect.void, Effect.succeed("")))).message).toMatch(/拿不到登录二维码/u);
   });
 
   it("keeps a 64-bit sent message id and rejects a wrong id shape", async () => {

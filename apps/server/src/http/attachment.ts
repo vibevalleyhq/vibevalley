@@ -6,7 +6,7 @@ import { attachmentPath } from "@vibevalley/protocol";
 import { Channels } from "@/channel/chat.ts";
 
 const prefix = attachmentPath("");
-const inline = (type: string) => /^(image|video|audio)\//.test(type) || type === "application/pdf";
+const inline = (type: string) => /^(image|video|audio)\//u.test(type) || type === "application/pdf";
 const notFound = () => HttpServerResponse.text("404 page not found\n", { status: 404 });
 
 export const attachments = HttpRouter.add(
@@ -16,7 +16,7 @@ export const attachments = HttpRouter.add(
     const chat = yield* Channels;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const id = new URL(request.url, "http://farm").pathname.slice(prefix.length);
-    if (!/^[0-9a-f]{64}$/.test(id)) return notFound();
+    if (!/^[0-9a-f]{64}$/u.test(id)) return notFound();
     const found = yield* chat.attachment(id);
     if (!found) return notFound();
     const pdf = found.type === "application/pdf";

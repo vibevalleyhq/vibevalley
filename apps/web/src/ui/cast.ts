@@ -94,4 +94,4 @@ export const stagePoses: readonly { pose: Pose; label: string; crop: Crop }[] = 
 ];
 
 /** A swatch, or the parchment colour for one that is not #rrggbb. */
-export const hexColor = (hex: string) => (/^#[0-9a-f]{6}$/i.test(hex) ? hex : "#f1e8d8");
+export const hexColor = (hex: string) => (/^#[0-9a-f]{6}$/iu.test(hex) ? hex : "#f1e8d8");

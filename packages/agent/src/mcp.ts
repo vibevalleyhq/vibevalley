@@ -54,7 +54,7 @@ export function mcpContentText(content: readonly Block[]): string {
 }
 
 /** The server's name first, only the characters function names allow. */
-export const mcpToolName = (server: string, tool: string) => (server + "__" + tool).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
+export const mcpToolName = (server: string, tool: string) => (server + "__" + tool).replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64);
 
 export interface McpConnection {
   readonly tools: Tool[];
@@ -226,7 +226,7 @@ export function readMcpConfig(path: string): McpServer[] {
   }
   const entries = config.mcpServers ?? {};
   const out: McpServer[] = [];
-  for (const name of Object.keys(entries).sort()) {
+  for (const name of Object.keys(entries).toSorted()) {
     const e = entries[name]!;
     if (e.disabled === true) continue;
     if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });

@@ -245,11 +245,11 @@ describe("profiles", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/) });
+        expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/u) });
         expect((yield* Effect.flip(s.addTemplate(join(config.home, "nowhere"))))._tag).toBe("Refused");
         const added = yield* s.addTemplate(folder);
         expect([added.source, added.runtime, added.persona]).toEqual(["added", orchestratorRuntime, "你专管前端的工单。"]);
-        expect(readdirSync(join(config.home, "agent-templates", "lead")).sort()).toEqual(["agent.json", "persona.md"]);
+        expect(readdirSync(join(config.home, "agent-templates", "lead")).toSorted()).toEqual(["agent.json", "persona.md"]);
         expect((yield* Effect.flip(s.addTemplate(folder)))._tag).toBe("Refused");
         const lead = yield* s.installTemplate("lead");
         expect([lead.role, s.isOrchestrator(lead.id)]).toEqual(["orchestrator", true]);

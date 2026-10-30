@@ -95,7 +95,7 @@ export const repository = (path: string) => {
       const uncommitted: UncommittedItem[] = [];
       if (cwd !== "") {
         const status = yield* gitRun(cwd, "status", "--porcelain=v1", "-uall");
-        for (const line of status.stdout.replace(/\n+$/, "").split("\n")) {
+        for (const line of status.stdout.replace(/\n+$/u, "").split("\n")) {
           if (line.length < 4) continue;
           const code = line.slice(0, 2).trim();
           uncommitted.push({

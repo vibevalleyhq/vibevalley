@@ -8,7 +8,7 @@ import { graphProblems } from "./graph.ts";
 import { type StepDraft, freshTask } from "./editing.ts";
 export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly tasks: Task[] } | { readonly ok: false; readonly problems: string[] };
 
-const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
 
 /** JSON as Go's decoder reads it; the words for one that does not read say what Go's would where they are the same failure. */
 function parseJson(body: string): unknown {
@@ -16,7 +16,7 @@ function parseJson(body: string): unknown {
     return JSON.parse(body);
   } catch (e) {
     const message = messageOf(e);
-    throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message, { cause: e });
+    throw new Error(body.trim() === "" || /end of JSON input/iu.test(message) ? "unexpected end of JSON input" : message, { cause: e });
   }
 }
 

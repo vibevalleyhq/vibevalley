@@ -166,7 +166,7 @@ describe("a blocks artifact", () => {
         expect(yield* s.markdown(snap.artifact.id)).toBe(sample);
         const [b, r] = yield* s.append(snap.artifact.id, "lab", "paragraph", {}, "帮工写的 **一段**");
         expect([r!.status, b!.rev, b!.text.length]).toEqual(["applied", 1, 2]);
-        expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/);
+        expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/u);
         expect((yield* Effect.flip(s.get("nope")))._tag).toBe("Missing");
         expect((yield* sql<{ n: number }>`select count(*)::int as n from artifact_change`)[0]!.n).toBe(2);
       }),

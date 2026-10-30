@@ -19,7 +19,7 @@ interface Server {
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
 // own logins (~/.pi, ~/.claude, …) stay out of reach.
 // GIT_CONFIG_* go together: GIT_CONFIG_COUNT without its GIT_CONFIG_KEY_n stops every git command.
-const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/;
+const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
 /** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm

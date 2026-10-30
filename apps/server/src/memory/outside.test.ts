@@ -90,7 +90,7 @@ class FakeNowledge {
           const query = (a.query as string) ?? "";
           const label = (a.filter_labels as string) ?? "";
           const results = [...this.memories]
-            .reverse()
+            .toReversed()
             .filter(
               (m) => (label === "" || m.labels.includes(label)) && query !== "" && (query === "*" || m.content.includes(query) || m.title.includes(query)),
             )
@@ -218,7 +218,7 @@ describe("Nowledge Mem", () => {
       expect(text).not.toContain("测试 project-b");
       expect(text).not.toContain("测试 unknown");
       expect(text).toContain("范围");
-      expect(fake.details.sort()).toEqual(["a", "b", "g", "u"]);
+      expect(fake.details.toSorted()).toEqual(["a", "b", "g", "u"]);
       const all = { ...q, project: "" };
       expect(foundText(yield* m.search(all), all)).toContain("测试 unknown");
     }).pipe(Effect.provide(world())),
@@ -343,7 +343,7 @@ describe("EverOS", () => {
         fake
           .seen("search")
           .map((r): [string, string] => [String(r.body.app_id), String(r.body.project_id)])
-          .sort(([, a], [, b]) => a.localeCompare(b)),
+          .toSorted(([, a], [, b]) => a.localeCompare(b)),
       ).toEqual([
         ["vibevalley", "global"],
         ["vibevalley", everosProject("demo")],

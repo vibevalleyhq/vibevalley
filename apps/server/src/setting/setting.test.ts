@@ -52,7 +52,7 @@ describe("settings", () => {
       Effect.gen(function* () {
         const s = yield* Setting;
         const refused = yield* s.save({ agoraAppId: "not-an-app-id" }).pipe(Effect.flip);
-        expect(refused.message).toMatch(/App ID/);
+        expect(refused.message).toMatch(/App ID/u);
         expect(s.agora()).toBeUndefined();
       }),
     ),
@@ -82,7 +82,7 @@ describe("settings", () => {
         const reset = yield* s.save({ voice: {} });
         expect(reset.voice).toEqual(reset.voiceDefaults);
         expect(file(config)).not.toHaveProperty("voice");
-        expect((yield* s.save({ voice: { silenceMs: 50 } }).pipe(Effect.flip)).message).toMatch(/200 到 2000/);
+        expect((yield* s.save({ voice: { silenceMs: 50 } }).pipe(Effect.flip)).message).toMatch(/200 到 2000/u);
       }),
     );
   });

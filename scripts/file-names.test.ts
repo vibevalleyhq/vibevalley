@@ -11,6 +11,6 @@ test("no source file under apps/ or packages/ has a name that would fit any modu
   const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "apps", "packages"], { cwd: root, encoding: "utf8" }).split(
     "\n",
   );
-  const named = new RegExp(`/(?:${vague.join("|")})(?:\\.test|\\.stories)?\\.tsx?$`);
+  const named = new RegExp(`/(?:${vague.join("|")})(?:\\.test|\\.stories)?\\.tsx?$`, "u");
   expect(files.filter((f) => named.test(f))).toEqual([]);
 });

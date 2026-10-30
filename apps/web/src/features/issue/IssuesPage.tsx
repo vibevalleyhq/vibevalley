@@ -301,8 +301,8 @@ function Toolbar(props: {
   onLook: (l: BoardLook) => void;
 }) {
   const nameOf = useNameOf();
-  const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].sort();
-  const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].sort((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
+  const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].toSorted();
+  const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
     // Narrow, the views go on their own line above the filters, at the right where the 显示 panel opens leftwards.
     <div class="@container px-3 pt-3 pb-2.5">

@@ -131,6 +131,11 @@ export default defineConfig({
       "typescript/prefer-nullish-coalescing": ["error", { ignorePrimitives: { string: true } }],
       // A cast that narrows is a claim nothing checks: read it with a Schema or a guard, or say at the cast why it holds.
       "typescript/no-unsafe-type-assertion": "error",
+      // Without u a pattern matches UTF-16 units: an emoji or a rare Han character is two of them, and . or [^x] splits it.
+      "eslint/require-unicode-regexp": "error",
+      // Frames and the core state are shared: sorting or reversing one in place changes it for everyone holding it.
+      "unicorn/no-array-sort": "error",
+      "unicorn/no-array-reverse": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

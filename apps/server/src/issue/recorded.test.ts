@@ -177,7 +177,7 @@ describe("templates", () => {
       for (const s of k.templates) {
         expect(s.id && !ids.has(s.id) && s.title && s.done).toBeTruthy();
         ids.add(s.id);
-        for (const hole of (s.title + s.done).match(/\{[^}]*\}/g) ?? []) expect(["{test}", "{lint}", "{build}"]).toContain(hole);
+        for (const hole of (s.title + s.done).match(/\{[^}]*\}/gu) ?? []) expect(["{test}", "{lint}", "{build}"]).toContain(hole);
       }
     }
   });
@@ -198,7 +198,7 @@ describe("templates", () => {
     for (const stack of [goStack, {}])
       for (const k of filledKinds(templateCatalog(), stack))
         for (const s of k.templates) {
-          expect(/[{}]/.test(s.text)).toBe(false);
+          expect(/[{}]/u.test(s.text)).toBe(false);
           expect(s.text).toContain("\n做到什么程度算完：");
           expect(s.title.includes("〔")).toBe(s.blank !== undefined);
         }

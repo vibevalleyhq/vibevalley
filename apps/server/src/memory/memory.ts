@@ -113,7 +113,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const forget = (agent: string, id: string) => Effect.mapError(sources.forget(agent, id), (e) => refused(e.message));
 
     const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (agent: string, text: string) {
-      const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
+      const body = clip(text.replace(/\s*\n\s*/gu, " "), noteMaxChars);
       if (body === "") return yield* Effect.fail(refused(t("server.memory.empty")));
       const at = yield* Clock.currentTimeMillis;
       const written = yield* Effect.try({
@@ -127,7 +127,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       const snapshot = readMemory(homeOf(agent));
       return {
         file: snapshot.file,
-        memories: snapshot.lines.map((l) => lineMemory(agent, l, snapshot.updatedAt)).reverse(),
+        memories: snapshot.lines.map((l) => lineMemory(agent, l, snapshot.updatedAt)).toReversed(),
         carried: snapshot.carried,
         sources: [],
       };

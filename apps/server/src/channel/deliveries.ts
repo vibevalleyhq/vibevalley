@@ -18,7 +18,7 @@ export class Deliveries {
 
   /** What is open for a recipient, by message. */
   of(recipient: string): DeliveryRow[] {
-    return [...(this.open.get(recipient)?.values() ?? [])].sort((a, b) => (a.message_id < b.message_id ? -1 : a.message_id > b.message_id ? 1 : 0));
+    return [...(this.open.get(recipient)?.values() ?? [])].toSorted((a, b) => (a.message_id < b.message_id ? -1 : a.message_id > b.message_id ? 1 : 0));
   }
 
   /** InsertDelivery: one already there stays as it is. */

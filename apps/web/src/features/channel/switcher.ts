@@ -60,6 +60,6 @@ export function switchTargets(
     if (only === "at" && target.kind !== "direct" && target.kind !== "profile") return false;
     return target.label.toLowerCase().includes(words);
   });
-  const starts = (target: SwitchTarget) => (words !== "" && target.label.toLowerCase().replace(/^[#@]/, "").startsWith(words) ? 0 : 1);
-  return kept.sort((a, b) => or(starts(a) - starts(b), b.unread - a.unread, b.at - a.at, compareText(a.id, b.id))).slice(0, switchMax);
+  const starts = (target: SwitchTarget) => (words !== "" && target.label.toLowerCase().replace(/^[#@]/u, "").startsWith(words) ? 0 : 1);
+  return kept.toSorted((a, b) => or(starts(a) - starts(b), b.unread - a.unread, b.at - a.at, compareText(a.id, b.id))).slice(0, switchMax);
 }

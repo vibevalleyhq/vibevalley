@@ -18,7 +18,7 @@ describe("a Time from the service's Clock", () => {
       expect(fired).toEqual([]);
       yield* TestClock.adjust(1);
       yield* Fiber.join(slept);
-      expect(fired.sort()).toEqual(["after", "slept"]);
+      expect(fired.toSorted()).toEqual(["after", "slept"]);
       expect(time.now()).toBe(1_500);
     }),
   );

@@ -773,7 +773,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
     const n = name().trim();
     const wanted = target().trim();
     if (!n || !wanted) return;
-    const words = wanted.split(/\s+/);
+    const words = wanted.split(/\s+/u);
     const server: MCPServer =
       type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: wanted, headers: {} };
     props.patch({ ...props.draft, mcpServers: [...props.draft.mcpServers.filter((s) => s.name !== n), server] });

@@ -3,12 +3,12 @@
 
 export function plainText(markdown: string): string {
   return markdown
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gm, "")
-    .replace(/(\*\*|__|\*|_|~~)(.+?)\1/g, "$2")
+    .replace(/```[\s\S]*?```/gu, " ")
+    .replace(/`([^`]*)`/gu, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, "$1")
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gmu, "")
+    .replace(/(\*\*|__|\*|_|~~)(.+?)\1/gu, "$2")
     .replaceAll("|", " ")
-    .replace(/\s+/g, " ")
+    .replace(/\s+/gu, " ")
     .trim();
 }

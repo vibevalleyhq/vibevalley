@@ -111,7 +111,7 @@ const noCommentDivider = defineRule({
     return {
       Program() {
         for (const comment of context.sourceCode.getAllComments())
-          if (/[─━═]{2}/.test(comment.value) || /^[-=*#~_/\s]{4,}$/.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
+          if (/[─━═]{2}/u.test(comment.value) || /^[-=*#~_/\s]{4,}$/u.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
       },
     };
   },
@@ -366,7 +366,7 @@ const parentImportRule = defineRule({
     messages: { parent: "write an import from outside this folder as {{alias}} (scripts/oxlint-plugin.ts, parent-import)" },
   },
   create(context) {
-    const [, app, at] = /\/apps\/(web|server)\/src\/(.+)$/.exec(context.filename.replaceAll("\\", "/")) ?? [];
+    const [, app, at] = /\/apps\/(web|server)\/src\/(.+)$/u.exec(context.filename.replaceAll("\\", "/")) ?? [];
     if (app === undefined || at === undefined) return {};
     const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
       if (typeof spec !== "string" || !spec.startsWith("../")) return;

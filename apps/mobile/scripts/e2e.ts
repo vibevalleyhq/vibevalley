@@ -64,7 +64,7 @@ function android(): Device {
       let page: { url: string; webSocketDebuggerUrl: string } | undefined;
       // A port each: a kept-alive connection to one port would still reach the socket it was forwarded to before.
       let port = 9333;
-      for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/g) ?? [])) {
+      for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/gu) ?? [])) {
         adb("forward", `tcp:${++port}`, "localabstract:" + socket);
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Chrome's DevTools list
         const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).catch(() => undefined))?.json().catch(() => [])) as

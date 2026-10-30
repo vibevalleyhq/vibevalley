@@ -148,7 +148,7 @@ function headers(token: string, auth: boolean): Record<string, string> {
 const endpoint = (base: string, path: string) => (base.endsWith("/") ? base : base + "/") + path;
 
 /** Message ids are 64-bit numbers: kept as text before they are decoded. */
-const lossless = /"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)/g;
+const lossless = /"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)/gu;
 
 /** A refused send, by WeChat's code: a stale token or a closed reply window. */
 const sendFailure = (code: number, message: string) =>

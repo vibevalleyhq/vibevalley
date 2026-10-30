@@ -271,8 +271,8 @@ export const make = Effect.gen(function* () {
       const stem =
         draft.name
           .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "") || "skill";
+          .replace(/[^a-z0-9]+/gu, "-")
+          .replace(/^-+|-+$/gu, "") || "skill";
       let id = stem;
       for (let n = 2; s.skills.some((k) => k.id === id); n++) id = `${stem}-${n}`;
       const created = { ...draft, id };

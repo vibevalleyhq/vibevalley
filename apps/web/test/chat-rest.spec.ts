@@ -30,7 +30,7 @@ test("a channel is renamed, grouped, quieted, archived and deleted from its sett
   await page.getByTestId("channel-settings-open").click();
   await dialog.getByTestId("channel-remove").click();
   await dialog.getByTestId("channel-remove-sure").click();
-  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page).toHaveURL(/\/chat$/u);
   await expect(channelRow(page, id)).toHaveCount(0);
 });
 
@@ -93,7 +93,7 @@ test("a message's address scrolls to it and lights it up, from the pins, a reply
   const at = (n: number) => page.getByTestId("messages").locator(`[data-number="${n}"]`);
   await page.getByTestId("pins-toggle").click();
   await page.getByTestId("pins").locator(`[data-testid="pin"][data-key="${first.id}"]`).click();
-  await expect(page).toHaveURL(new RegExp(`/chat/${id}\\?m=${first.number}$`));
+  await expect(page).toHaveURL(new RegExp(`/chat/${id}\\?m=${first.number}$`, "u"));
   await expect(at(first.number)).toBeInViewport();
   await expect(at(first.number)).toHaveAttribute("data-lit", "");
 
@@ -102,14 +102,14 @@ test("a message's address scrolls to it and lights it up, from the pins, a reply
     .getByTestId("messages")
     .locator(`[data-testid="quote"][data-key="${find("line 2").number}"]`)
     .click();
-  await expect(page).toHaveURL(new RegExp(`\\?m=${find("line 2").number}$`));
+  await expect(page).toHaveURL(new RegExp(`\\?m=${find("line 2").number}$`, "u"));
   await expect(at(find("line 2").number)).toBeInViewport();
 
   await page.getByTestId("farm-search-open").click();
   const search = page.getByTestId("farm-search");
   await search.getByTestId("farm-search-input").fill("in:#long line 33");
   await search.locator(`[data-testid="search-hit"][data-key="${find("line 33").id}"]`).click();
-  await expect(page).toHaveURL(new RegExp(`\\?m=${find("line 33").number}$`));
+  await expect(page).toHaveURL(new RegExp(`\\?m=${find("line 33").number}$`, "u"));
   await expect(at(find("line 33").number)).toBeInViewport();
 });
 
@@ -198,7 +198,7 @@ test("the owner talks with a helper profile alone, and its answer can be marked 
   await page.goto("/chat");
   await page.getByTestId("new-direct").click();
   await page.getByTestId("direct-picker").locator(`[data-key="${fox.id}"]`).click();
-  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/u);
   const direct = decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1)!);
   const box = await composerOn(page, direct);
   await box.fill("what is in the repository?");
@@ -211,7 +211,7 @@ test("the owner talks with a helper profile alone, and its answer can be marked 
   await answer.locator('[data-testid="message-tool"][data-key="more"]').click();
   await page.locator('[role="menuitem"][data-key="mark-unread"]').click();
   await side(page).locator('[data-testid="side-section"][data-key="channels"] [data-testid="channel-row"]').first().click();
-  await expect(channelRow(page, direct)).toHaveAttribute("data-unread", /^[1-9]/);
+  await expect(channelRow(page, direct)).toHaveAttribute("data-unread", /^[1-9]/u);
 });
 
 test("a reaction can be any emoji, picked from the toolbar or beside the reactions a message has", async ({ page, api }) => {
@@ -243,7 +243,7 @@ test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with
   await box.fill("#front");
   await expect(dialog.getByRole("option").first()).toHaveAttribute("data-key", id);
   await box.press("Enter");
-  await expect(page).toHaveURL(new RegExp(`/chat/${id}$`));
+  await expect(page).toHaveURL(new RegExp(`/chat/${id}$`, "u"));
   await expect(dialog).toBeHidden();
 
   await page.getByTestId("switcher-open").click();
@@ -252,8 +252,8 @@ test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with
   await expect(first).toHaveAttribute("data-kind", "profile");
   await expect(first).toHaveAttribute("data-key", badger.id);
   await box.press("Enter");
-  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
-  await expect(page).not.toHaveURL(new RegExp(`/chat/${id}$`));
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/u);
+  await expect(page).not.toHaveURL(new RegExp(`/chat/${id}$`, "u"));
 });
 
 test("a link to a farm message shows that message under it, and a press goes there", async ({ page, api, server }) => {
@@ -266,7 +266,7 @@ test("a link to a farm message shows that message under it, and a press goes the
   const card = page.getByTestId("messages").locator(`[data-testid="linked-message"][data-key="${from}:${said!.number}"]`);
   await expect(card).toContainText("the apples on the south slope are ripe");
   await card.click();
-  await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`));
+  await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`, "u"));
   // The server reads no preview of the farm's own address.
   const linking = (await api.channel.message.list({ id: to })).find((m) => m.text.startsWith("look "));
   expect(linking!.embeds).toEqual([]);

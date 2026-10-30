@@ -8,7 +8,7 @@ import { builtInDir, builtInIds, builtInTemplates, readTemplate } from "./templa
 describe("the built-in templates", () => {
   it("are every folder, listed once, each under its own id", () => {
     const folders = readdirSync(builtInDir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? [d.name] : []));
-    expect([...builtInIds()].sort()).toEqual(folders.sort());
+    expect([...builtInIds()].toSorted()).toEqual(folders.toSorted());
     expect(new Set(builtInIds()).size).toBe(builtInIds().length);
     for (const t of builtInTemplates()) expect(t.id).toBe(readTemplate(join(builtInDir, t.id), "builtIn").id);
   });

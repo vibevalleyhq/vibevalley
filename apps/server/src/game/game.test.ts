@@ -82,7 +82,7 @@ describe("the game", () => {
       // The game hears the owner from its start: Core.owner is subscribed before the game's layer is built.
       yield* core.did({ kind: "reviewed", session: sessionId("w1") });
       yield* core.did({ kind: "talked" });
-      yield* until(kinds, (k) => [...k].sort().join() === "reviewed,voice", "both");
+      yield* until(kinds, (k) => [...k].toSorted().join() === "reviewed,voice", "both");
     }).pipe(Effect.scoped, Effect.provide(farm())),
   );
 
@@ -100,7 +100,7 @@ describe("the game", () => {
       // The worktree is not a second repository; 3 + 1 on the worktree branch in app, 1 in cli; the colleague's 2 do not count.
       expect(count.repos.length).toBe(2);
       expect(count.total).toBe(5);
-      expect(count.repos.map((r) => r.commits).sort((a, b) => a - b)).toEqual([1, 4]);
+      expect(count.repos.map((r) => r.commits).toSorted((a, b) => a - b)).toEqual([1, 4]);
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 

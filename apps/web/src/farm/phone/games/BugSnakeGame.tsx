@@ -46,7 +46,7 @@ const turned = (rows: readonly string[]) =>
   rows.map((_, y) =>
     rows
       .map((row) => row[y])
-      .reverse()
+      .toReversed()
       .join(""),
   );
 const heads: Record<SnakeHeading, readonly string[]> = { right: head, down: turned(head), left: turned(turned(head)), up: turned(turned(turned(head))) };

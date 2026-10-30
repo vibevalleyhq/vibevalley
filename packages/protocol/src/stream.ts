@@ -19,7 +19,7 @@ export async function readStream<P extends keyof Streams>(
   signal: AbortSignal,
   fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
 ): Promise<never> {
-  const url = base.replace(/\/$/, "") + path;
+  const url = base.replace(/\/$/u, "") + path;
   const res = await fetcher(url, { headers: { Accept: "text/event-stream" }, signal });
   if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();

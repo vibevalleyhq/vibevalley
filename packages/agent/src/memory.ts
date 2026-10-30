@@ -29,8 +29,8 @@ export interface MemorySnapshot {
   readonly lineCount: number;
 }
 
-const datedLine = /^\s*[-*]\s+(\d{4}-\d{2}-\d{2})\s+(.+?)\s*$/;
-const bulletHead = /^[-*]\s+/;
+const datedLine = /^\s*[-*]\s+(\d{4}-\d{2}-\d{2})\s+(.+?)\s*$/u;
+const bulletHead = /^[-*]\s+/u;
 
 const lineID = (line: string) => createHash("sha1").update(line.trim()).digest("hex").slice(0, 12);
 
@@ -97,7 +97,7 @@ const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() +
 
 export function remember(home: string, note: string, now: Date): MemoryLine {
   mkdirSync(home, { recursive: true });
-  const line = `- ${localDate(now)} ${note.replace(/\s*\n\s*/g, " ").trim()}`;
+  const line = `- ${localDate(now)} ${note.replace(/\s*\n\s*/gu, " ").trim()}`;
   appendFileSync(memoryFile(home), line + "\n");
   return memoryLine(line)!;
 }
@@ -112,7 +112,7 @@ export function rewriteMemory(home: string, text: string): MemorySnapshot {
 const archiveDir = (home: string) => join(home, "archive");
 
 /** Date.toISOString with its colons and dot made dashes. */
-const isoStamp = (now: Date) => now.toISOString().replace(/[:.]/g, "-");
+const isoStamp = (now: Date) => now.toISOString().replace(/[:.]/gu, "-");
 
 export function archive(home: string, session: string, text: string, now: Date): string {
   mkdirSync(archiveDir(home), { recursive: true });
@@ -145,7 +145,7 @@ export function archiveFiles(home: string): ArchiveFile[] {
         chars: readFileSync(path, "utf8").length,
       };
     })
-    .sort((a, b) => b.at - a.at);
+    .toSorted((a, b) => b.at - a.at);
 }
 
 /** A name with a path in it is none. */
@@ -161,7 +161,7 @@ export function searchArchive(home: string, query: string, limit = 0): ArchiveHi
   const q = query.trim().toLowerCase();
   const hits: ArchiveHit[] = [];
   if (q === "") return hits;
-  for (const file of archiveNames(home).sort().reverse()) {
+  for (const file of archiveNames(home).toSorted().toReversed()) {
     const lines = readFileSync(join(archiveDir(home), file), "utf8").split("\n");
     lines.forEach((l, i) => {
       if (hits.length < most && l.toLowerCase().includes(q))

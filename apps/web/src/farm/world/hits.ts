@@ -19,9 +19,9 @@ export interface VillageHitData {
 }
 
 export function villageHitAt(data: VillageHitData, p: Point): VillageHit | undefined {
-  for (const [id, box] of [...data.sessions].reverse()) if (inBox(p, box)) return { kind: "session", id };
+  for (const [id, box] of [...data.sessions].toReversed()) if (inBox(p, box)) return { kind: "session", id };
   if (data.dog && inBox(p, data.dog)) return { kind: "dog" };
-  for (const [spot, box] of [...data.spots].reverse()) if (inBox(p, box)) return { kind: "spot", spot };
-  for (const [bed, b] of [...data.plots].reverse()) if (inBox(p, { ...b, y0: b.y0 - 4, y1: b.y1 + 2 })) return { kind: "plot", bed };
+  for (const [spot, box] of [...data.spots].toReversed()) if (inBox(p, box)) return { kind: "spot", spot };
+  for (const [bed, b] of [...data.plots].toReversed()) if (inBox(p, { ...b, y0: b.y0 - 4, y1: b.y1 + 2 })) return { kind: "plot", bed };
   return undefined;
 }

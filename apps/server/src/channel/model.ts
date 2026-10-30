@@ -53,7 +53,7 @@ export class ChatModel {
   channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
     const all = [...this.byId.values()].filter((c) => c.type === type);
     const place = (c: ChannelRow) => c.position ?? Number.MAX_SAFE_INTEGER;
-    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : or(place(a) - place(b), compareText(a.id, b.id))));
+    return all.toSorted((a, b) => (a.is_default ? -1 : b.is_default ? 1 : or(place(a) - place(b), compareText(a.id, b.id))));
   }
 
   threadsOf(channel: string): ChannelRow[] {

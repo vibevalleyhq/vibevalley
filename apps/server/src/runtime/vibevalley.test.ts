@@ -164,7 +164,7 @@ rl.on('line', (line) => {
       true,
     );
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
-    await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/);
+    await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     const keyless = vibevalleyRuntimeOf({
       time: wallTime,
       owner: standaloneOwner(),

@@ -9,9 +9,9 @@ function graph() {
   for (const feature of readdirSync(features)) {
     const uses = new Set<string>();
     for (const file of readdirSync(join(features, feature), { recursive: true, encoding: "utf8" })) {
-      if (!/\.tsx?$/.test(file)) continue;
+      if (!/\.tsx?$/u.test(file)) continue;
       const at = join(features, feature, file);
-      for (const m of readFileSync(at, "utf8").matchAll(/(?:from|import)\s*"(\.[^"]+)"/g)) {
+      for (const m of readFileSync(at, "utf8").matchAll(/(?:from|import)\s*"(\.[^"]+)"/gu)) {
         const path = relative(features, join(dirname(at), m[1]!));
         const used = path.split(sep)[0]!;
         if (!path.startsWith("..") && used !== feature) uses.add(used);

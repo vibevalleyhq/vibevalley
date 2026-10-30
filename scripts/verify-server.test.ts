@@ -35,7 +35,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
   ]);
   try {
     expect(result.code).toBe(23);
-    expect(result.address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(result.address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u);
     expect(JSON.parse(readFileSync(join(result.evidence, "health.json"), "utf8")).ok).toBe(true);
     const ready = JSON.parse(readFileSync(join(result.evidence, "ready.json"), "utf8"));
     expect(ready.url).toBe(result.address);

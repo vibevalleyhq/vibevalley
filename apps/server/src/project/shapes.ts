@@ -66,7 +66,7 @@ export const pullRequestFile = "vibevalley-pr.md";
 /** The title and body a helper wrote: the first line (a leading # dropped) and what follows it; undefined when it gave
  * no title. */
 export function pullRequestText(text: string): { readonly title: string; readonly body: string } | undefined {
-  const [first = "", ...rest] = text.replace(/\r\n/g, "\n").trim().split("\n");
-  const title = first.replace(/^#+\s*/, "").trim();
+  const [first = "", ...rest] = text.replace(/\r\n/gu, "\n").trim().split("\n");
+  const title = first.replace(/^#+\s*/u, "").trim();
   return title === "" ? undefined : { title, body: rest.join("\n").trim() };
 }

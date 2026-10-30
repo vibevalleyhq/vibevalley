@@ -30,14 +30,14 @@ const han = /\p{Script=Han}/u;
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const same = new Set((JSON.parse(readFileSync(join(pkg, "same.json"), "utf8")) as { keys: string[] }).keys);
-const placeholdersOf = (text: string) => placeholders(text).sort();
+const placeholdersOf = (text: string) => placeholders(text).toSorted();
 
 const namespaces = (locale: Locale) =>
   existsSync(join(localesDir, locale))
     ? readdirSync(join(localesDir, locale))
         .filter((f) => f.endsWith(".json"))
         .map((f) => f.slice(0, -5))
-        .sort()
+        .toSorted()
     : [];
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
@@ -69,16 +69,16 @@ function generated(): string {
     lines.push("  },");
   }
   lines.push("};", "", "/** Every key, and the params its zh message names (undefined: none). */", "export interface Messages {");
-  for (const [key, text] of [...zh].sort(([a], [b]) => (a < b ? -1 : 1))) {
+  for (const [key, text] of [...zh].toSorted(([a], [b]) => (a < b ? -1 : 1))) {
     // A message's params are every language's: an English plural may name a count the Chinese does not say.
     const kinds = new Map<string, string>();
     for (const one of [text, ...all.map((m) => m.get(key) ?? "")])
       for (const [n, kind] of placeholderKinds(one)) if (kinds.get(n) === undefined || kind !== "value") kinds.set(n, kind);
     // A select on true is a flag; one on other values (a month's number) takes the value.
-    const flag = (n: string) => [text, ...all.map((m) => m.get(key) ?? "")].some((one) => new RegExp(`\\{${n}, select, true \\{`).test(one));
+    const flag = (n: string) => [text, ...all.map((m) => m.get(key) ?? "")].some((one) => new RegExp(`\\{${n}, select, true \\{`, "u").test(one));
     const typeOf = (n: string, kind: string | undefined) =>
       kind === "plural" || kind === "selectordinal" ? "number" : kind === "select" && flag(n) ? "boolean" : "string | number";
-    const names = [...kinds.keys()].sort();
+    const names = [...kinds.keys()].toSorted();
     lines.push(`  ${quote(key)}: ${names.length > 0 ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(n, kinds.get(n))}`).join("; ")} }` : "undefined"};`);
   }
   lines.push("}", "");
@@ -95,7 +95,7 @@ const sources = () =>
     .split("\n")
     .filter(
       (f) =>
-        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/.test(f)) &&
+        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f)) &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );
@@ -111,10 +111,9 @@ function scan(): Use[] {
   const uses: Use[] = [];
   for (const file of sources()) {
     const text = readFileSync(join(root, file), "utf8");
-    if (!text.includes("t(")) continue;
     const lineOf = (i: number) => text.slice(0, i).split("\n").length;
-    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
-    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/g)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
+    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/gu)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
+    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/gu)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
   }
   return uses;
 }
@@ -143,7 +142,7 @@ function check(): string[] {
   const used = new Set(uses.filter((u) => !u.prefix).map((u) => u.key));
   // A key may also be picked before the call (t(ok ? "a" : "b")): a literal that names one counts as using it.
   for (const file of sources())
-    for (const m of readFileSync(join(root, file), "utf8").matchAll(/"([a-z][\w.-]*\.[\w.$/-]+)"/g)) if (zh.has(m[1]!)) used.add(m[1]!);
+    for (const m of readFileSync(join(root, file), "utf8").matchAll(/"([a-z][\w.-]*\.[\w.$/-]+)"/gu)) if (zh.has(m[1]!)) used.add(m[1]!);
   const prefixes = uses.filter((u) => u.prefix).map((u) => u.key);
   for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
   for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);
@@ -175,9 +174,9 @@ function find(text: string) {
 
 /** web.setting for apps/web/src/features/setting/words.ts; shared for packages/protocol/src/words. */
 function namespaceOf(file: string): string {
-  const rel = relative(root, file).replace(/\\/g, "/");
+  const rel = relative(root, file).replace(/\\/gu, "/");
   if (rel.startsWith("packages/protocol/src/words")) return "shared";
-  const m = /^apps\/([^/]+)\/src\/(.*?)\/?words\.ts$/.exec(rel);
+  const m = /^apps\/([^/]+)\/src\/(.*?)\/?words\.ts$/u.exec(rel);
   if (!m) throw new Error(`not a word table: ${rel}`);
   const parts = m[2]!.split("/").filter((p) => p !== "" && p !== "features");
   return [m[1]!, ...parts].join(".");
@@ -187,11 +186,11 @@ const sentinel = (i: number) => `\u0001${i}\u0001`;
 
 function paramNames(fn: Function): string[] {
   const src = fn.toString();
-  const m = /^\s*(?:async\s*)?(?:function\s*[\w$]*\s*)?\(([^)]*)\)/.exec(src) ?? /^\s*([\w$]+)\s*=>/.exec(src);
+  const m = /^\s*(?:async\s*)?(?:function\s*[\w$]*\s*)?\(([^)]*)\)/u.exec(src) ?? /^\s*([\w$]+)\s*=>/u.exec(src);
   if (!m) return [];
   return m[1]!
     .split(",")
-    .map((p) => p.replace(/=.*$/, "").replace(/:.*$/, "").trim())
+    .map((p) => p.replace(/=.*$/u, "").replace(/:.*$/u, "").trim())
     .filter(Boolean);
 }
 
@@ -209,7 +208,7 @@ function templateOf(fn: Function): string | undefined {
     }
   };
   const a = call(names.map((_, i) => sentinel(i)));
-  if (a === undefined || /undefined|NaN|\[object /.test(a)) return undefined;
+  if (a === undefined || /undefined|NaN|\[object /u.test(a)) return undefined;
   let text = a;
   names.forEach((n, i) => (text = text.split(sentinel(i)).join(`{${n}}`)));
   if (text.includes("\u0001")) return undefined;
@@ -229,7 +228,7 @@ function choiceOf(fn: Function): string | undefined {
     try {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a word table's entry is a function of its parameters
       const r = (fn as (...a: unknown[]) => unknown)(...args);
-      return typeof r === "string" && !/undefined|NaN|\[object /.test(r) ? r : undefined;
+      return typeof r === "string" && !/undefined|NaN|\[object /u.test(r) ? r : undefined;
     } catch {
       return undefined;
     }
@@ -259,7 +258,7 @@ function choiceOf(fn: Function): string | undefined {
     // A param put into the text as it is prints true or false: that is a value, not a flag.
     // A flag: whatever truthy value comes, the same text (a count or a delay that only looks like one shows itself).
     const truthy = [7, 5000, "x"].every((v) => call(others(i, v)) === yes);
-    if (yes !== undefined && no !== undefined && yes !== no && truthy && !/true|false/.test(yes + no)) {
+    if (yes !== undefined && no !== undefined && yes !== no && truthy && !/true|false/u.test(yes + no)) {
       const message = `{${n}, select, true {${named(yes)}} other {${named(no)}}}`;
       if (agrees(message, [others(i, true), others(i, false)])) return message;
     }
@@ -378,7 +377,7 @@ async function migrate(file: string) {
   const locale = (await import(pathToFileURL(join(pkg, "src/locale.ts")).href)) as { setLocale: (l: Locale) => void };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a module's exports
   const mod = (await import(pathToFileURL(abs).href)) as Record<string, unknown>;
-  const accessorName = Object.keys(mod).find((k) => typeof mod[k] === "function" && /(ording|Words)$|^wording$/.test(k));
+  const accessorName = Object.keys(mod).find((k) => typeof mod[k] === "function" && /(ording|Words)$|^wording$/u.test(k));
   if (!accessorName) throw new Error(`no word table in ${file}`);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the word table's accessor, found by its name above
   const accessor = mod[accessorName] as () => unknown;
@@ -401,9 +400,9 @@ async function migrate(file: string) {
     .split("\n")
     // Tables in different apps share names (voiceWording): only the app that has this one calls it.
     .filter(
-      (f) => /\.tsx?$/.test(f) && f !== file && (file.startsWith("packages/") || f.split("/").slice(0, 2).join("/") === file.split("/").slice(0, 2).join("/")),
+      (f) => /\.tsx?$/u.test(f) && f !== file && (file.startsWith("packages/") || f.split("/").slice(0, 2).join("/") === file.split("/").slice(0, 2).join("/")),
     );
-  const chain = new RegExp(`\\b${accessorName}\\(\\)((?:\\.[A-Za-z_$][\\w$]*)+)`, "g");
+  const chain = new RegExp(`\\b${accessorName}\\(\\)((?:\\.[A-Za-z_$][\\w$]*)+)`, "gu");
   /** Rewrites every chain in `text` that ends in a moved message; arguments are rewritten the same way first. */
   const rewrite = (text: string, caller: string, base: number): { out: string; changed: boolean } => {
     let out = "";
@@ -445,13 +444,13 @@ async function migrate(file: string) {
     const path = join(root, caller);
     const { out, changed } = rewrite(readFileSync(path, "utf8"), caller, 1);
     let text: string;
-    for (const m of out.matchAll(new RegExp(`\\b${accessorName}\\(\\)`, "g")))
+    for (const m of out.matchAll(new RegExp(`\\b${accessorName}\\(\\)`, "gu")))
       left.push(`${caller}:${out.slice(0, m.index).split("\n").length}: ${accessorName}() used another way`);
     if (!changed) continue;
     text = out;
     // The table's import goes with its last use.
-    if (!new RegExp(`\\b${accessorName}\\b`).test(text.replace(/^import [^;]*;$/gm, "")))
-      text = text.replace(new RegExp(`^import \\{([^}]*)\\} from "([^"]+)";$`, "gm"), (whole, names: string, from: string) => {
+    if (!new RegExp(`\\b${accessorName}\\b`, "u").test(text.replace(/^import [^;]*;$/gmu, "")))
+      text = text.replace(new RegExp(`^import \\{([^}]*)\\} from "([^"]+)";$`, "gmu"), (whole, names: string, from: string) => {
         const kept = names
           .split(",")
           .map((n) => n.trim())
@@ -466,7 +465,7 @@ async function migrate(file: string) {
             ? `import { ${kept.join(", ")} } from "${from}";`
             : "";
       });
-    if (!/import \{[^}]*\bt\b[^}]*\} from "@vibevalley\/i18n"/.test(text)) text = `import { t } from "@vibevalley/i18n";\n` + text;
+    if (!/import \{[^}]*\bt\b[^}]*\} from "@vibevalley\/i18n"/u.test(text)) text = `import { t } from "@vibevalley/i18n";\n` + text;
     writeFileSync(path, text);
   }
   gen();

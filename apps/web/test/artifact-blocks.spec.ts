@@ -11,7 +11,7 @@ async function newBlocks(page: Page, title: string) {
   await page.keyboard.press("Enter");
   await expect(name).toHaveValue(title);
   // Its own, by the id in the address: /artifacts first opens the newest one there was, another test's on a shared server.
-  await expect(page).toHaveURL(/\/artifacts\/[^/?]+$/);
+  await expect(page).toHaveURL(/\/artifacts\/[^/?]+$/u);
   const id = new URL(page.url()).pathname.split("/").pop()!;
   const shown = page.locator(`[data-testid="artifact"][data-key="${id}"]`);
   await expect(shown).toHaveAttribute("data-body", "blocks");

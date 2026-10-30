@@ -16,13 +16,13 @@ const bodyMax = 512 * 1024;
 const redirectsMax = 3;
 
 /** A link is the characters a URL has: it ends where other words (a Chinese comma, a space) begin. */
-const linkPattern = /https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&*+,;=%]+/g;
+const linkPattern = /https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&*+,;=%]+/gu;
 
 /** The links in some words, once each, in order; a trailing stop or bracket is not part of one. */
 export function linksIn(text: string): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(linkPattern)) {
-    const url = m[0].replace(/[.,;:!?\]]+$/, "");
+    const url = m[0].replace(/[.,;:!?\]]+$/u, "");
     if (!out.includes(url)) out.push(url);
   }
   return out.slice(0, embedMax);
@@ -72,29 +72,29 @@ export const reachable = (url: URL, resolve: Resolve = resolveAll): Effect.Effec
   Effect.gen(function* () {
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
     if (url.username || url.password) return false;
-    const host = url.hostname.replace(/^\[|\]$/g, "");
+    const host = url.hostname.replace(/^\[|\]$/gu, "");
     if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
     const addresses = yield* resolve(host);
     return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
   });
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
-const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_, e: string) => entities[e] ?? _).trim();
+const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/gu, (_, e: string) => entities[e] ?? _).trim();
 const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 /** What a page says of itself in its head: Open Graph first, then its title and description. */
 export function embedOf(url: string, html: string): Embed | undefined {
   const head = html.slice(0, bodyMax);
   const meta = (key: string) => {
-    for (const m of head.matchAll(/<meta\s+[^>]*>/gi)) {
+    for (const m of head.matchAll(/<meta\s+[^>]*>/giu)) {
       const tag = m[0];
-      const name = /(?:property|name)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase();
-      const content = /content\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1];
+      const name = /(?:property|name)\s*=\s*["']([^"']+)["']/iu.exec(tag)?.[1]?.toLowerCase();
+      const content = /content\s*=\s*["']([^"']*)["']/iu.exec(tag)?.[1];
       if (name === key && content) return decode(content);
     }
     return undefined;
   };
-  const title = meta("og:title") ?? decode(/<title[^>]*>([^<]*)<\/title>/i.exec(head)?.[1] ?? "");
+  const title = meta("og:title") ?? decode(/<title[^>]*>([^<]*)<\/title>/iu.exec(head)?.[1] ?? "");
   const description = meta("og:description") ?? meta("description");
   const site = meta("og:site_name");
   const image = meta("og:image");

@@ -15,7 +15,7 @@ export type Op = keyof Handlers;
 export const toolName = (op: Op) =>
   op
     .split(".")
-    .map((w) => w.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase()))
+    .map((w) => w.replace(/[A-Z]/gu, (c) => "_" + c.toLowerCase()))
     .join("_");
 
 /** Fields a tool takes that its endpoint does not, which only a model has a use for; tool.test.ts lets these through. */
@@ -298,7 +298,7 @@ const written = (node: unknown): unknown => {
   }
   if (Array.isArray(o.required) && o.required.length === 0) delete o.required;
   const out: Record<string, unknown> = {};
-  for (const key of Object.keys(o).sort()) {
+  for (const key of Object.keys(o).toSorted()) {
     const value = o[key];
     out[key] =
       key === "properties" && Predicate.isObject(value) ? Object.fromEntries(Object.entries(value).map(([name, p]) => [name, written(p)])) : written(value);

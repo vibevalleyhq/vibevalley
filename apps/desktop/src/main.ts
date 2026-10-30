@@ -116,7 +116,7 @@ function open(url: string) {
 /** Brings the window up on an issue: what a click on the island's row asks. */
 function openIssue(issue: string) {
   if (!server) return;
-  open(server.url.replace(/\/$/, "") + "/issues/" + encodeURIComponent(issue));
+  open(server.url.replace(/\/$/u, "") + "/issues/" + encodeURIComponent(issue));
   const w = windowNow();
   if (w.isMinimized()) w.restore();
   w.show();
@@ -227,7 +227,7 @@ if (!app.requestSingleInstanceLock()) {
         working: async () => {
           if (!server) return 0;
           try {
-            const sessions = await new VibeValleyApi(server.url.replace(/\/$/, "")).session.list({});
+            const sessions = await new VibeValleyApi(server.url.replace(/\/$/u, "")).session.list({});
             return sessions.filter((s) => s.phase._tag === "working").length;
           } catch {
             return 0;
@@ -241,7 +241,7 @@ if (!app.requestSingleInstanceLock()) {
           console.log("vibevalley dev: the server's code changed, starting it again");
           await was.stop();
           server = await startServer(files(), env, Number(url.port));
-          void window?.loadURL(server.url.replace(/\/$/, "") + (at ? at.pathname + at.search : "/"));
+          void window?.loadURL(server.url.replace(/\/$/u, "") + (at ? at.pathname + at.search : "/"));
         },
       });
       app.on("will-quit", stopWatching);

@@ -11,9 +11,9 @@ import type { Cron, CronWhen } from "@vibevalley/protocol";
 const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
 export const minEveryMinutes = 1;
 
-export const cronTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+export const cronTime = /^([01]?\d|2[0-3]):([0-5]\d)$/u;
 
-const givenOffset = /^(?:GMT)?([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/;
+const givenOffset = /^(?:GMT)?([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/u;
 
 const fixed = (sign: string, hours: string, minutes: string | undefined) =>
   DateTime.zoneMakeOffset((sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0)) * 60_000);
@@ -85,7 +85,7 @@ export function whenText(when: CronWhen, tz: string): string {
     case "daily":
       return t("server.cron.when.daily", { time: when.time });
     case "weekly": {
-      const days = [...new Set(when.days)].sort((a, b) => a - b);
+      const days = [...new Set(when.days)].toSorted((a, b) => a - b);
       return t("server.cron.when.weekly", { days: list(days.map((d) => (d >= 0 && d < 7 ? weekday(d) : String(d)))), time: when.time });
     }
     case "cron":
@@ -123,13 +123,13 @@ const cronFields = [
 
 /** Go's strconv.Atoi: an optional sign and ASCII digits, within 64 bits. */
 function atoi(s: string): number | undefined {
-  if (!/^[+-]?\d+$/.test(s)) return undefined;
+  if (!/^[+-]?\d+$/u.test(s)) return undefined;
   const n = Number(s);
   return Math.abs(n) <= 9.223372036854776e18 ? n : undefined;
 }
 
 /** Go's strings.Fields: split on Unicode white space, as Go's unicode.IsSpace has it. */
-export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/).filter((f) => f !== "");
+export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/u).filter((f) => f !== "");
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi } = cronFields[i]!;
@@ -212,7 +212,7 @@ export function cronText(expr: string): string {
       if (n === undefined) return t("server.cron.when.cron", { expr });
       days.push(n % 7);
     }
-    const sorted = [...new Set(days)].sort((a, b) => a - b);
+    const sorted = [...new Set(days)].toSorted((a, b) => a - b);
     return t("server.cron.when.weekly", { days: list(sorted.map(weekday)), time: clock });
   }
   if (clock !== "" && f[3] === "*" && f[4] === "*") {

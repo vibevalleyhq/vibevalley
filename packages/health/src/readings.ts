@@ -85,7 +85,7 @@ export function hotspots(changes: readonly Change[], sources: readonly Source[],
       const lines = lineCount(s.text);
       return [{ path: s.path, changes: n, before: earlier.get(s.path) ?? 0, lines, score: n * lines }];
     })
-    .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)));
+    .toSorted((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)));
 }
 
 /** Where a check is turned off by hand. */
@@ -126,7 +126,7 @@ export function escapesIn(path: string, text: string): Escapes {
     for (const key in node) if (key !== "parent") visit(node[key]);
   };
   visit(parsed.program);
-  const lintOff = parsed.comments.filter((c) => /^\s*(?:oxlint|eslint)-disable/.test(c.value)).length;
+  const lintOff = parsed.comments.filter((c) => /^\s*(?:oxlint|eslint)-disable/u.test(c.value)).length;
   return { nonNull, doubleCast, cast, lintOff };
 }
 
@@ -139,7 +139,7 @@ export function escapesByArea(sources: readonly Source[], health: Pick<Health, "
     const area = (out[health.areaOf(s.path)] ??= { nonNull: 0, doubleCast: 0, cast: 0, lintOff: 0 });
     for (const k of escapeKinds) area[k] += e[k];
   }
-  return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
+  return Object.fromEntries(Object.entries(out).toSorted(([a], [b]) => a.localeCompare(b)));
 }
 
 /** A count off the ratchet: up is new escapes, down is a ratchet left loose. */
@@ -152,7 +152,7 @@ export interface Drift {
 
 /** Every count that differs from the kept one; an area that is gone counts zero now, a new one zero kept. */
 export function drift(kept: Readonly<Record<string, Escapes>>, now: Readonly<Record<string, Escapes>>): Drift[] {
-  const areas = [...new Set([...Object.keys(kept), ...Object.keys(now)])].sort();
+  const areas = [...new Set([...Object.keys(kept), ...Object.keys(now)])].toSorted();
   return areas.flatMap((area) =>
     escapeKinds.flatMap((kind) => {
       const k = kept[area]?.[kind] ?? 0;

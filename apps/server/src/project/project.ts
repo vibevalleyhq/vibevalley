@@ -59,14 +59,14 @@ const runTimeoutMs = 10 * 60_000;
 const runOutput = 3000;
 const cloneTimeoutMs = 3 * 60_000;
 
-const projectName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
-const githubURL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/;
+const projectName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/u;
+const githubURL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/u;
 
 /** Only repository home URLs: never credentials, other git transports or command-line options. */
 export function githubRepository(input: string): { name: string; url: string } | undefined {
   const m = githubURL.exec(input.trim());
   if (!m) return undefined;
-  const name = m[2]!.replace(/\.git$/, "");
+  const name = m[2]!.replace(/\.git$/u, "");
   if (name === "" || name === "." || name === "..") return undefined;
   return { name, url: `https://github.com/${m[1]}/${name}.git` };
 }
@@ -165,7 +165,7 @@ export function countsOf(output: string): LanguageCount[] | undefined {
       blanks: Math.trunc(l.blanks),
     });
   }
-  return out.sort((a, b) => or(b.code + b.comments - (a.code + a.comments), localeCompare(a.name, b.name)));
+  return out.toSorted((a, b) => or(b.code + b.comments - (a.code + a.comments), localeCompare(a.name, b.name)));
 }
 
 /** The calendar day an instant falls on where the farm runs, as yyyy-mm-dd. */
@@ -184,8 +184,8 @@ export function activityOf(log: string, dayOf: (ms: number) => string = localDay
     const name = line.slice(tab + 1).trim() || t("server.project.noName");
     byAuthor.set(name, (byAuthor.get(name) ?? 0) + 1);
   }
-  const days = [...byDay].map(([day, commits]) => ({ day, commits })).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
-  const authors = [...byAuthor].map(([name, commits]) => ({ name, commits })).sort((a, b) => or(b.commits - a.commits, localeCompare(a.name, b.name)));
+  const days = [...byDay].map(([day, commits]) => ({ day, commits })).toSorted((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  const authors = [...byAuthor].map(([name, commits]) => ({ name, commits })).toSorted((a, b) => or(b.commits - a.commits, localeCompare(a.name, b.name)));
   return { days, authors };
 }
 
@@ -194,14 +194,14 @@ const secondsOf = (text: string) => {
   return text.trim() === "" || !Number.isFinite(n) || n <= 0 ? 0 : Math.trunc(n * 1000);
 };
 
-const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/m;
-const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/;
-const ghOrigin = /^(?:https:\/\/github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/;
+const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/mu;
+const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/u;
+const ghOrigin = /^(?:https:\/\/github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/u;
 
 export function githubOrigin(origin: string): string {
   const m = ghOrigin.exec(origin.trim());
   if (!m) return "";
-  const repo = m[2]!.replace(/\.git$/, "");
+  const repo = m[2]!.replace(/\.git$/u, "");
   return repo === "" || repo === "." || repo === ".." ? "" : `${m[1]}/${repo}`;
 }
 
@@ -385,7 +385,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const syncMain = Effect.fn("Projects.syncMain")(function* (name: string) {
       const path = join(root, name);
       const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
-      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* repository(path).mainOrNone;
+      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//u, "") : yield* repository(path).mainOrNone;
       const kept = Effect.as(Effect.logWarning(`project ${name}: could not fast-forward main from origin, keeping the local main`), main);
       if (main === "") return yield* kept;
       const fetched = hooks.fetch
@@ -639,7 +639,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           const fork = yield* git(cwd, "merge-base", baseBranch, "HEAD");
           const changed = yield* git(cwd, "diff", "--name-only", "--no-renames", fork);
           const added = yield* git(cwd, "ls-files", "--others", "--exclude-standard");
-          return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].sort();
+          return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].toSorted();
         },
         Effect.mapError((e) => new ProjectError({ message: reason(e) })),
       ),

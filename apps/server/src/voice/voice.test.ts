@@ -419,7 +419,7 @@ describe("voice", () => {
       const spoken = capture.requests[at]!;
       expect(spoken).toMatchObject({ priority: "APPEND", interruptable: true });
       // Agora answers 401 to a speak without the session's ConvoAI token: it once went out bare and was never heard.
-      expect(capture.auths[at]).toMatch(/^agora token=\S+/);
+      expect(capture.auths[at]).toMatch(/^agora token=\S+/u);
       expect(String(spoken.text)).not.toBe("");
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });

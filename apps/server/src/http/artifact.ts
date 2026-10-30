@@ -15,7 +15,7 @@ export const artifactContent = HttpRouter.add(
     const artifacts = yield* Artifacts;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const [id = "", version = ""] = new URL(request.url, "http://farm").pathname.slice(prefix.length).split("/");
-    if (!/^[0-9a-f-]{36}$/.test(id) || !/^[1-9]\d*$/.test(version)) return notFound();
+    if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();
     const path = yield* artifacts.file(id, Number(version));
     if (!path) return notFound();
     return yield* HttpServerResponse.file(path, { contentType: artifactHeaders["content-type"]!, headers: artifactHeaders });

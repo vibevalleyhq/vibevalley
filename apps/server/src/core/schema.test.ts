@@ -44,5 +44,5 @@ test("the golden runs and the frames made of them decode", async () => {
     expect(JSON.parse(sent)).toEqual(JSON.parse(JSON.stringify(frame)));
     decode.frame(JSON.parse(sent));
   }
-  expect(() => decode.fact({ type: "doing", at: 1, id: "w1", action: "dance", label: "" })).toThrow(/run_command/);
+  expect(() => decode.fact({ type: "doing", at: 1, id: "w1", action: "dance", label: "" })).toThrow(/run_command/u);
 });

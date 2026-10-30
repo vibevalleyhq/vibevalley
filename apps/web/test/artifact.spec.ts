@@ -21,7 +21,7 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   const card = page.locator(`[data-testid="artifact-card"][data-key="${made.id}"]`);
   await expect(card).toHaveAttribute("data-version", "1");
   await card.click();
-  await expect(page).toHaveURL(new RegExp(`/artifacts/${made.id}\\?v=1$`));
+  await expect(page).toHaveURL(new RegExp(`/artifacts/${made.id}\\?v=1$`, "u"));
   const shown = page.getByTestId("artifact");
   await expect(shown).toHaveAttribute("data-version", "1");
   const frame = page.getByTestId("artifact-frame");
@@ -53,7 +53,7 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   await page.getByTestId("artifact-more").click();
   await page.locator('[role="menuitem"][data-key="delete"]').click();
   await page.getByTestId("artifact-delete-sure").click();
-  await expect(page).toHaveURL(/\/artifacts$/);
+  await expect(page).toHaveURL(/\/artifacts$/u);
   await expect(api.artifact.get({ id: made.id })).rejects.toBeTruthy();
 });
 

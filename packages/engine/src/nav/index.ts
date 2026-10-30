@@ -128,7 +128,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
       if (i === goal) {
         const cells = [i];
         for (let k = came[i]!; k >= 0; k = came[k]!) cells.push(k);
-        return cells.reverse();
+        return cells.toReversed();
       }
       if (closed[i] === 1) continue;
       closed[i] = 1;

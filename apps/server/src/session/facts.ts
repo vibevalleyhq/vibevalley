@@ -76,7 +76,7 @@ export function since(now: Spent, from: Spent | undefined): Spent | undefined {
   return { tokens: now.tokens - from.tokens, ...(now.cny !== undefined ? { cny: now.cny - (from.cny ?? 0) } : {}) };
 }
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 /** The bubble has no room for the rest: `cd <worktree> && pnpm test` is shown as what it runs. */
 export function near(cwd: string, detail: string): string {
@@ -84,7 +84,7 @@ export function near(cwd: string, detail: string): string {
     const rel = relative(cwd, detail);
     return rel.startsWith("..") ? detail : rel || ".";
   }
-  return detail.replace(new RegExp(`^cd ${escape(cwd)}/? *(&&|;) *`), "").replaceAll(cwd + "/", "");
+  return detail.replace(new RegExp(`^cd ${escape(cwd)}/? *(&&|;) *`, "u"), "").replaceAll(cwd + "/", "");
 }
 
 const toolOutput = (content: readonly ToolOutputPart[] = []) =>

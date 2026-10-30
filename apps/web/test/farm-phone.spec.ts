@@ -142,5 +142,5 @@ test("calling the orchestrator on the phone is the chat's call: one call, the sa
   await expect(line).toHaveAttribute("data-problem", "");
   // The chat says why too, with the way to the setting that fixes it.
   await chat.getByTestId("call-problem").getByTestId("call-problem-fix").click();
-  await expect(page).toHaveURL(/\/settings\/call$/);
+  await expect(page).toHaveURL(/\/settings\/call$/u);
 });

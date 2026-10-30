@@ -137,7 +137,7 @@ export const subscribeFarm = (l: () => void) => {
 
 const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | undefined) =>
   set((s) => ({
-    overlays: [...s.overlays.filter((o) => o.kind !== kind), ...(next ? [next] : [])].sort((a, b) => overlayOrder[a.kind] - overlayOrder[b.kind]),
+    overlays: [...s.overlays.filter((o) => o.kind !== kind), ...(next ? [next] : [])].toSorted((a, b) => overlayOrder[a.kind] - overlayOrder[b.kind]),
   }));
 
 export const overlayOf = <K extends FarmOverlay["kind"]>(s: FarmUi, kind: K) => s.overlays.find((o): o is Extract<FarmOverlay, { kind: K }> => o.kind === kind);

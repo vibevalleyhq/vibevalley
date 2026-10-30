@@ -16,7 +16,7 @@ export function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]) {
     const before = bySeq.get(s.seq);
     if (!before || s.revision > before.revision) bySeq.set(s.seq, s);
   }
-  const all = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
+  const all = [...bySeq.values()].toSorted((a, b) => a.seq - b.seq);
   return all.length > stepLimit ? all.slice(all.length - stepLimit) : all;
 }
 
@@ -84,7 +84,7 @@ export function roundMs(r: Round, end: number) {
 export const lastTime = (r: Round) => allOf(r).at(-1)?.time;
 
 export function farmToolText(text: string) {
-  const m = /^vibevalley__(channel_message_send|channel_message_list|channel_unread_list|session_list)/.exec(text.trim())?.[1];
+  const m = /^vibevalley__(channel_message_send|channel_message_list|channel_unread_list|session_list)/u.exec(text.trim())?.[1];
   switch (m) {
     case undefined:
       return undefined;
@@ -375,4 +375,4 @@ export function tagOf(step: SessionEvent, asked?: string, job = false): string {
   }
 }
 
-export const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+export const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();

@@ -25,7 +25,7 @@ export default class Budgets implements Reporter {
   }
 
   onEnd() {
-    const lines = this.over.sort((a, b) => b.ms - a.ms).map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.name}`);
+    const lines = this.over.toSorted((a, b) => b.ms - a.ms).map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.name}`);
     console.log(
       `\nThe page layer: ${this.tests} tests, ${(this.ms / 1000).toFixed(1)} s, budget ${budgetMs} ms\n` +
         (lines.length > 0 ? `Over twice the budget:\n${lines.join("\n")}\n` : ""),

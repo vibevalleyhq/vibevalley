@@ -94,7 +94,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
   const console_ = Object.assign(Object.create(console) as Console.Console, { log: hold, error: hold, info: hold, warn: hold });
   const flush = (to: (s: string) => Effect.Effect<void, never, Stdio.Stdio>) =>
     Effect.suspend(() => {
-      const text = held.join("\n").replace(/\n+$/, "");
+      const text = held.join("\n").replace(/\n+$/u, "");
       held.length = 0;
       return text ? to(text) : Effect.void;
     });

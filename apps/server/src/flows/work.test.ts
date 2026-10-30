@@ -29,8 +29,8 @@ describe("a session's work", () => {
       yield* sessions.dismiss(session.id);
       yield* until(() => w.facts.some((x) => x.type === "left"), "it went home");
       expect(report.outcome).toBe("completed");
-      expect(text).toMatch(/做完了：写 hello\.py/);
-      expect(text).toMatch(/原型/);
+      expect(text).toMatch(/做完了：写 hello\.py/u);
+      expect(text).toMatch(/原型/u);
       // The farm's other news (its commits, the issue, the default channel and the owner's mentions in it) comes and goes beside the session's own.
       const mine = w.facts.filter((x) => !["commits", "issue", "message", "channel", "ownerMentions", "progress"].includes(x.type));
       expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["hired", "left"]);
@@ -44,7 +44,7 @@ describe("a session's work", () => {
     return Effect.gen(function* () {
       const issues = yield* Issues;
       expect((yield* issues.hire({ ...lab(), enabled: false }, "随便做点什么", "demo")).refused).toBe(lab().name + " 被停用了");
-      expect((yield* issues.hire(lab(), "随便做点什么", "../../etc")).refused).toMatch(/不能当项目名/);
+      expect((yield* issues.hire(lab(), "随便做点什么", "../../etc")).refused).toMatch(/不能当项目名/u);
       expect((yield* issues.hire(lab(), "随便做点什么", "")).refused).toBeTruthy();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -57,10 +57,10 @@ describe("a session's work", () => {
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const said = yield* issues.merge(session.issue!);
-      expect(session.branch).toMatch(/^vibevalley\//);
-      expect(said).toMatch(/1 个提交合进了 clock 的 main/);
+      expect(session.branch).toMatch(/^vibevalley\//u);
+      expect(said).toMatch(/1 个提交合进了 clock 的 main/u);
       const project = join(f.config.workRoot, "projects", "clock");
-      expect(git(project, "log", "--format=%s", "main")).toMatch(/加上打卡/);
+      expect(git(project, "log", "--format=%s", "main")).toMatch(/加上打卡/u);
       expect(existsSync(join(project, "clock.ts"))).toBe(true);
       expect(git(project, "worktree", "list").split("\n")).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -108,9 +108,9 @@ describe("a session's work", () => {
         expect(back).toBeDefined();
         expect(back.session.phase._tag).toBe("done");
         expect(back.place.branch).toBe(session!.branch);
-        expect(yield* sessions.tell(session!.id, "再加一句并提交", { kind: "comment" })).toMatch(/醒了/);
+        expect(yield* sessions.tell(session!.id, "再加一句并提交", { kind: "comment" })).toMatch(/醒了/u);
         yield* w.nextReport;
-        expect(yield* (yield* Issues).merge(session!.issue!)).toMatch(/个提交合进了 survivor 的 main/);
+        expect(yield* (yield* Issues).merge(session!.issue!)).toMatch(/个提交合进了 survivor 的 main/u);
       }).pipe(Effect.scoped, Effect.provide(after.layer));
     });
   });
@@ -159,7 +159,7 @@ describe("a session's work", () => {
       expect(steps[1]!.text).toBe("看看目录");
       expect([steps[2]!.action, steps[2]!.text]).toEqual(["run_command", "echo hi"]);
       expect([steps[3]!.call, steps[3]!.output, steps[3]!.ok]).toEqual([steps[2]!.seq, "hi", true]);
-      expect(steps[4]!.text).toMatch(/做完了：看看目录/);
+      expect(steps[4]!.text).toMatch(/做完了：看看目录/u);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -174,7 +174,7 @@ describe("a session's work", () => {
       const text = lastText(sessions, report.id, report.summary);
       yield* sessions.dismiss(session.id);
       expect(report.outcome).toBe("failed");
-      expect(text).toMatch(/provider said no/);
+      expect(text).toMatch(/provider said no/u);
       expect(text).not.toContain('{"');
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -212,7 +212,7 @@ describe("a session's work", () => {
       expect(changes.base).toBe("main");
       expect(changes.commits.map((c) => c.subject)).toEqual(["加上打卡"]);
       expect(changes.files.map((x) => [x.path, x.status, x.added])).toEqual([["clock.ts", "A", 1]]);
-      expect(changes.files[0]!.patch).toMatch(/\+export const clockIn/);
+      expect(changes.files[0]!.patch).toMatch(/\+export const clockIn/u);
       expect([changes.conflicts.length, changes.uncommitted.length]).toEqual([0, 0]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -228,17 +228,17 @@ describe("a session's work", () => {
       const b = mustHire(yield* issues.hire(lab(), "写版本B并提交", "clash"));
       yield* w.nextReport;
       yield* w.nextReport;
-      expect(yield* issues.merge(a.issue!)).toMatch(/个提交合进了 clash 的 main/);
+      expect(yield* issues.merge(a.issue!)).toMatch(/个提交合进了 clash 的 main/u);
       expect((yield* issues.changes(b.issue!, orchestrator(true))).conflicts).toEqual(["same.ts"]);
       const failed = yield* Effect.flip(issues.merge(b.issue!));
-      expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/);
+      expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/u);
       const stayed = sessions.find(b.id)!;
       expect(stayed.session.conflict).toEqual({ base: "main", files: ["same.ts"] });
       yield* issues.setStatus(b.issue!, "todo", "", "", owner);
       yield* w.nextReport;
       // The round settled it: the sessions look at the mark again by themselves.
       yield* until(() => sessions.find(b.id)?.session.conflict === undefined, "the conflict mark cleared");
-      expect(yield* issues.merge(b.issue!)).toMatch(/合进了 clash 的 main/);
+      expect(yield* issues.merge(b.issue!)).toMatch(/合进了 clash 的 main/u);
       const project = join(f.config.workRoot, "projects", "clash");
       expect(git(project, "show", "main:same.ts")).toBe("export const v = 'A+B'");
       expect(git(project, "status", "--porcelain")).toBe("");
@@ -254,10 +254,10 @@ describe("a session's work", () => {
       const agents = yield* Agents;
       const busy: Session[] = [];
       for (const i of ["1", "2", "3"]) busy.push(mustHire(yield* issues.hire(lab(), "发呆 " + i, "crowded")));
-      expect((yield* issues.hire(lab(), "发呆 4", "crowded")).refused).toMatch(/项目 crowded 里已经有 3 个帮工在干活/);
+      expect((yield* issues.hire(lab(), "发呆 4", "crowded")).refused).toMatch(/项目 crowded 里已经有 3 个帮工在干活/u);
       const settings = agents.settings("pi");
       yield* agents.saveSettings("pi", { ...settings, maxWorking: 3 });
-      expect((yield* issues.hire(lab(), "发呆 5", "roomy")).refused).toMatch(/最多同时 3 个/);
+      expect((yield* issues.hire(lab(), "发呆 5", "roomy")).refused).toMatch(/最多同时 3 个/u);
       yield* agents.saveSettings("pi", settings);
       yield* releaseHeld(3);
       for (let i = 0; i < 3; i++) yield* w.nextReport;
@@ -320,7 +320,7 @@ describe("a session's work", () => {
         yield* (yield* Agents).save(lab());
         session = mustHire(yield* (yield* Issues).hire(lab(), "写打卡并提交", "runs"));
         yield* w.nextReport;
-        expect(yield* sessions.tell(session.id, "再看看", said)).toMatch(/新的一轮/);
+        expect(yield* sessions.tell(session.id, "再看看", said)).toMatch(/新的一轮/u);
         yield* w.nextReport;
         const got = yield* await_(
           () => sessions.runs(session!.issue!),

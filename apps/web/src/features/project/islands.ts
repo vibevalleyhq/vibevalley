@@ -24,7 +24,7 @@ export const openOf = (i: Island) => i.spots.filter((s) => s.kind === "open").le
 const isFull = (i: Island) => i.working >= i.maxSessions;
 
 const queuedIn = (issues: readonly Issue[], project: string) =>
-  issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).sort((a, b) => a.queuedAt! - b.queuedAt!);
+  issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).toSorted((a, b) => a.queuedAt! - b.queuedAt!);
 
 /** Peopled or waited on first, then the newest commit, then by name. */
 export function islandsOf({
@@ -42,7 +42,7 @@ export function islandsOf({
   const names = new Set([...known.keys(), ...sessions.flatMap((h) => (h.project ? [h.project] : []))]);
   const islands = [...names].map((name) => {
     const summary = known.get(name);
-    const mine = sessions.filter((h) => h.project === name).sort((a, b) => a.hiredAt - b.hiredAt);
+    const mine = sessions.filter((h) => h.project === name).toSorted((a, b) => a.hiredAt - b.hiredAt);
     const working = mine.filter(isBusy).length;
     // A project the list does not have takes no more work: only its helpers show.
     const maxSessions = summary ? Math.round(summary.maxSessions) : working;
@@ -58,7 +58,7 @@ export function islandsOf({
     return { project: name, ...(summary ? { summary } : {}), spots, working, maxSessions, queued: queuedIn(issues, name) };
   });
   const quiet = (i: Island) => (i.spots.some((s) => s.kind === "taken") || i.queued.length > 0 ? 0 : 1);
-  return islands.sort((a, b) => or(quiet(a) - quiet(b), (b.summary?.last ?? 0) - (a.summary?.last ?? 0), compareText(a.project, b.project)));
+  return islands.toSorted((a, b) => or(quiet(a) - quiet(b), (b.summary?.last ?? 0) - (a.summary?.last ?? 0), compareText(a.project, b.project)));
 }
 
 export const homeless = (sessions: readonly Session[]) => sessions.filter((h) => h.project === undefined);

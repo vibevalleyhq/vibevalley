@@ -11,7 +11,7 @@ import { gunzipSync } from "node:zlib";
 const dataDir = join(import.meta.dirname, "data");
 
 /** Go's strings.ToLower where it differs from JavaScript's: İ is a plain i (JavaScript adds a combining dot). */
-export const goLower = (s: string) => s.replace(/İ/g, "i").toLowerCase();
+export const goLower = (s: string) => s.replace(/İ/gu, "i").toLowerCase();
 
 const isLetterOrNumber = /[\p{L}\p{N}]/u;
 
@@ -56,13 +56,13 @@ function dict(): Dictionary {
     freq.set(key, f);
     totalFreq += f;
   }
-  dictionary = { freq, sorted: [...freq.keys()].sort(), totalFreq };
+  dictionary = { freq, sorted: [...freq.keys()].toSorted(), totalFreq };
   return dictionary;
 }
 
 /** strconv.ParseFloat's: a number written whole, or nothing. */
 function goParseFloat(text: string): number | undefined {
-  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(text)) return undefined;
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/u.test(text)) return undefined;
   return Number(text);
 }
 
@@ -201,7 +201,7 @@ function hmmInternal(text: string): string[] {
 }
 
 const han = /\p{Script=Han}+/u;
-const skip = /(\d+\.\d+|[a-zA-Z0-9]+)/;
+const skip = /(\d+\.\d+|[a-zA-Z0-9]+)/u;
 
 /** gse's hmm.Cut with its own patterns: runs of Han by the model, numbers and Latin words whole, the rest as it comes. */
 function hmmCut(input: string): string[] {

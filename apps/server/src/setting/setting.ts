@@ -184,7 +184,7 @@ export const make = Effect.gen(function* () {
     if (u.dictation) {
       const d = {
         ...(u.dictation.via === "own" ? { via: "own" as const } : {}),
-        url: u.dictation.url.trim().replace(/\/+$/, ""),
+        url: u.dictation.url.trim().replace(/\/+$/u, ""),
         model: u.dictation.model.trim(),
       };
       next.dictation = !d.via && d.url === "" && d.model === "" ? undefined : d;

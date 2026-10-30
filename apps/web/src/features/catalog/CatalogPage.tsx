@@ -310,7 +310,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
     return (f && playing() ? props.byName.get(f[frame() % f.length]!) : undefined) ?? props.picture;
   };
   const remake = () => remakeOf(props.picture);
-  const scales = () => [...new Set([1, 2, 4, 8, scale()])].sort((a, b) => a - b);
+  const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
     <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
       <div class="flex max-h-88 min-h-40 items-center justify-center overflow-auto rounded-md p-3" style={groundStyle(props.ground)}>
@@ -344,7 +344,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
         <Segmented
           label={t("web.catalog.zoom")}
           value={String(scale())}
-          options={scales().map((s) => ({ value: String(s), label: `${s < 1 ? s.toFixed(2).replace(/0$/, "") : numberText(s)}×` }))}
+          options={scales().map((s) => ({ value: String(s), label: `${s < 1 ? s.toFixed(2).replace(/0$/u, "") : numberText(s)}×` }))}
           onChange={(v) => setScale(Number(v))}
         />
         <Toggle label={t("web.catalog.marks")} checked={marks()} onChange={setMarks} />

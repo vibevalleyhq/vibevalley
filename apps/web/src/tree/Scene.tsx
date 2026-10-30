@@ -441,7 +441,7 @@ export function Scene(props: {
             const kk = Math.min(1, Math.max(0, k * 1.25 - hash01(`${item.id}d`) * 0.25));
             return [{ s, x: start.x + (to.x - start.x) * kk, y: start.y + (to.y - start.y) * kk, depth: to.depth }];
           })
-          .sort((a, b) => b.depth - a.depth);
+          .toSorted((a, b) => b.depth - a.depth);
         // The disc's own faint light and its rings (time, the older farther out), so its shape reads first.
         const ring = (r: number, step: number, fill: boolean) => {
           if (fill) lc.beginPath();

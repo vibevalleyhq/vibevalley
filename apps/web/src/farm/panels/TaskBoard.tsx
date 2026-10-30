@@ -44,7 +44,7 @@ export function TaskBoard() {
   const frames = useFrames();
   const shown = useFarm((s) => s.graphShown);
   const [creating, setCreating] = createSignal(false);
-  const list = () => [...(frames.frame?.graphs ?? [])].reverse();
+  const list = () => [...(frames.frame?.graphs ?? [])].toReversed();
   const current = createMemo(() => list().find((g) => g.id === shown()) ?? list().find(isOpen) ?? list()[0]);
   return (
     <Show
@@ -118,7 +118,7 @@ function NewTask(props: { onCancel?: (() => void) | undefined; onSplit: (id: str
     setBusy(true);
     const answer = await graphs.split(omitUndefined({ goal: goal(), project: where(), agent: splitter() === "auto" ? undefined : splitter() }));
     setBusy(false);
-    const id = /（(p\d+)）/.exec(answer.text)?.[1];
+    const id = /（(p\d+)）/u.exec(answer.text)?.[1];
     if (answer.ok && id) props.onSplit(id);
     else setSaid(answer);
   };
@@ -596,7 +596,7 @@ function TaskLog(props: { graph: TaskGraph; only?: string | undefined; onAll: ()
   const shown = () =>
     ready(events, [] as GraphEvent[])
       .filter((e) => !props.only || e.task === props.only)
-      .reverse();
+      .toReversed();
   return (
     <FarmSection title={props.only ? t("web.farm.graph.storyOf", { title: titleOf(props.only) }) : t("web.farm.graph.story")}>
       <Show when={props.only}>

@@ -23,7 +23,7 @@ export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   });
   const steps = issues
     .filter((t) => t.parent === parent.id && t.task !== undefined)
-    .sort((a, b) => or(compare(a.rank ?? 0, b.rank ?? 0), compareText(a.id, b.id)));
+    .toSorted((a, b) => or(compare(a.rank ?? 0, b.rank ?? 0), compareText(a.id, b.id)));
   for (const t of steps) {
     const s = t.task!;
     graph.tasks.push(
@@ -66,7 +66,7 @@ export function graphsOf(state: WorkspaceState): TaskGraph[] {
   return issues
     .filter((t) => t.graph)
     .map((t) => graphFrom(t, issues))
-    .sort((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
+    .toSorted((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
 }
 
 export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);

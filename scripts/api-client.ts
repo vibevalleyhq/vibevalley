@@ -28,7 +28,7 @@ function handlers(source: string) {
     }
     member += (member ? " " : "") + t;
     if (!member.endsWith("ApiError, R>;")) continue;
-    const m = /^readonly "([\w.]+)": \((.*)\) => Effect\.Effect<(.+), ApiError, R>;$/.exec(member);
+    const m = /^readonly "([\w.]+)": \((.*)\) => Effect\.Effect<(.+), ApiError, R>;$/u.exec(member);
     if (!m) throw new Error(`api-client: cannot read the Handlers member: ${member}`);
     found.set(m[1]!, { args: m[2]!, result: m[3]!, doc });
     member = "";

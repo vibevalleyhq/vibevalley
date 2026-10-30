@@ -136,8 +136,8 @@ export class LiveCaptions {
       }
     }
     const [id = "", index = "", total = "", data = ""] = parts;
-    const i = /^\d+$/.test(index) ? Number(index) : NaN;
-    const n = total === "???" ? undefined : /^\d+$/.test(total) ? Number(total) : NaN;
+    const i = /^\d+$/u.test(index) ? Number(index) : NaN;
+    const n = total === "???" ? undefined : /^\d+$/u.test(total) ? Number(total) : NaN;
     if (!(i >= 1) || (n !== undefined && (!(n >= 1) || i > n))) return undefined;
     let got = this.chunks.get(id);
     if (!got) this.chunks.set(id, (got = new Map<number, string>()));

@@ -48,20 +48,20 @@ const fails = async (p: Promise<string>) => {
 describe("the task tools", () => {
   it("task and mark the agent's own tasks", async () => {
     const tools = taskTools(memoryStore(), false, Effect.void);
-    expect(await call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/);
-    expect(await fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/);
+    expect(await call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/u);
+    expect(await fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/u);
     const added = await call(tools, "todo_add", {
       tasks: [
         { id: "read", brief: "读代码" },
         { id: "fix", title: "改 auth", brief: "改", after: ["read"] },
       ],
     });
-    expect(added).toMatch(/任务（2 件，1 件可以做）/);
-    expect(added).toMatch(/\[等着\] fix 改 auth（等 read）/);
-    expect(await call(tools, "todo_update", { id: "read", state: "done", result: "在 jwt.go" })).toMatch(/\[可以做\] fix/);
-    expect(await fails(call(tools, "todo_update", { id: "read", state: "waiting" }))).toMatch(/不能改成/);
-    expect(await call(tools, "todo_list", {})).toMatch(/read 读代码 → 在 jwt.go/);
-    expect(await call(tools, "todo_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/);
+    expect(added).toMatch(/任务（2 件，1 件可以做）/u);
+    expect(added).toMatch(/\[等着\] fix 改 auth（等 read）/u);
+    expect(await call(tools, "todo_update", { id: "read", state: "done", result: "在 jwt.go" })).toMatch(/\[可以做\] fix/u);
+    expect(await fails(call(tools, "todo_update", { id: "read", state: "waiting" }))).toMatch(/不能改成/u);
+    expect(await call(tools, "todo_list", {})).toMatch(/read 读代码 → 在 jwt.go/u);
+    expect(await call(tools, "todo_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/u);
     expect(await call(tools, "todo_list", {})).toBe("现在没有任务。");
   });
 });
@@ -101,8 +101,8 @@ describe("the coding tools", () => {
     const tools = codingTools({ cwd: dir });
     expect(await call(tools, "write_file", { path: "src/a.ts", content: "one\ntwo\nthree\ntwo" })).toBe("写好了 src/a.ts（4 行）");
     expect(await call(tools, "read_file", { path: "src/a.ts", offset: 2, limit: 1 })).toBe("     2\ttwo\n（共 4 行，这里到第 2 行；接着读用 offset=3）");
-    expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }))).toMatch(/出现了 2 次/);
-    expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }))).toMatch(/找不到 old_text/);
+    expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }))).toMatch(/出现了 2 次/u);
+    expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }))).toMatch(/找不到 old_text/u);
     await call(tools, "edit_file", {
       path: "src/a.ts",
       old_text: "two",
@@ -122,7 +122,7 @@ describe("the coding tools", () => {
     const found = await call(tools, "grep", { pattern: "needle" }).catch((e: Error) => e.message);
     if (found !== "这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。") expect(found).toContain("b.txt:1:needle here");
     expect(await call(tools, "bash", { command: "echo hi; exit 3" })).toBe("hi\n（退出码 3）");
-    expect(await call(tools, "bash", { command: "sleep 5", timeout_seconds: 0.2 })).toMatch(/超时，停掉了/);
+    expect(await call(tools, "bash", { command: "sleep 5", timeout_seconds: 0.2 })).toMatch(/超时，停掉了/u);
   });
 
   it("turn a web page into its words", () => {
@@ -145,20 +145,20 @@ describe("skills and memory", () => {
     const skills = scanSkills([join(dir, "a"), join(dir, "b"), join(dir, "missing")]);
     expect(skills.length).toBe(1);
     expect(skills[0]!.description).toBe("第一个");
-    expect(readSkill(skills, "tidy")).toMatch(/第一个的正文$/);
-    expect(() => readSkill(skills, "nope")).toThrow(/有：tidy/);
+    expect(readSkill(skills, "tidy")).toMatch(/第一个的正文$/u);
+    expect(() => readSkill(skills, "nope")).toThrow(/有：tidy/u);
   });
 
   it("remember, rewrite and search the archive", async () => {
     const dir = home();
     const tools = selfTools({ now: Date.now, home: dir, skills: () => [], memory: true });
     await call(tools, "remember", { note: "用户喜欢\n简短的回答" });
-    expect(readMemory(dir).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/);
+    expect(readMemory(dir).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/u);
     await call(tools, "rewrite_memory", { content: "- 只说中文" });
     expect(readMemory(dir).prompt).toBe("- 只说中文");
     expect(await call(tools, "search_archive", { query: "端口" })).toBe("还没有归档的旧对话。");
     archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好", new Date());
-    expect(await call(tools, "search_archive", { query: "端口" })).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/);
+    expect(await call(tools, "search_archive", { query: "端口" })).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/u);
     expect(selfTools({ now: Date.now, home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
     const lines = readMemory(dir).lines;
     expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
@@ -178,8 +178,8 @@ describe("reminders", () => {
     expect(nextRun(every)!.toISOString()).toBe("2026-10-12T00:30:00.000Z");
     expect(nextRun(cron)!.getUTCMinutes()).toBe(0);
     expect(dueReminders([at, every, cron], new Date("2026-10-12T00:45:00.000Z")).map((j) => j.id)).toEqual(["e"]);
-    expect(() => parseCron("every day")).toThrow(/cron 写得不对/);
-    expect(describeReminder(every)).toMatch(/^- e「e」每 30 分钟；下次 /);
+    expect(() => parseCron("every day")).toThrow(/cron 写得不对/u);
+    expect(describeReminder(every)).toMatch(/^- e「e」每 30 分钟；下次 /u);
   });
 
   it("run a missed reminder once", async () => {
@@ -187,19 +187,19 @@ describe("reminders", () => {
     // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
     let at = Date.now();
     const s = new Reminders(dir, () => ++at);
-    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/);
-    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
+    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/u);
+    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/u);
     await call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
     await call(s.tools, "reminder", {
       name: "提醒",
       message: "开会",
       at: new Date(Date.now() + 60_000).toISOString(),
     });
-    expect(await call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
+    expect(await call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/u);
     const later = new Date(Date.now() + 3_600_000);
     const woke = s.tick(later);
     expect(woke.length).toBe(2);
-    expect(woke[0]).toMatch(/^【提醒「巡检」到点了/);
+    expect(woke[0]).toMatch(/^【提醒「巡检」到点了/u);
     expect(s.tick(later)).toEqual([]);
     const left = JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")) as Reminder[];
     expect(left.map((j) => j.name)).toEqual(["巡检"]);
@@ -301,9 +301,9 @@ describe("MCP", () => {
       { name: "web", url: "http://x", headers: { a: "b" } },
     ]);
     writeFileSync(file, `{"mcpServers":[]}`);
-    expect(() => readMcpConfig(file)).toThrow(/形状不对/);
+    expect(() => readMcpConfig(file)).toThrow(/形状不对/u);
     writeFileSync(file, "nope");
-    expect(() => readMcpConfig(file)).toThrow(/不是 JSON/);
+    expect(() => readMcpConfig(file)).toThrow(/不是 JSON/u);
     const directory = join(dir, "directory");
     mkdirSync(directory);
     expect(() => readMcpConfig(directory)).toThrow();
@@ -319,7 +319,7 @@ describe("MCP", () => {
     try {
       expect(all.tools.map((t) => t.name)).toEqual(["calc__add", "calc__boom"]);
       expect(all.failed.length).toBe(1);
-      expect(all.failed[0]).toMatch(/^连不上 MCP 服务 gone/);
+      expect(all.failed[0]).toMatch(/^连不上 MCP 服务 gone/u);
       expect(await call(all.tools, "calc__add", { a: 2, b: 3 })).toBe("5");
       expect(await fails(call(all.tools, "calc__boom", {}))).toBe("炸了");
     } finally {

@@ -11,11 +11,11 @@ function interfaces(source: string): Map<string, { keys: string[]; parent?: stri
   const out = new Map<string, { keys: string[]; parent?: string }>();
   const lines = source.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    const head = /^export interface (\w+)(?:<[^>]*>)?(?: extends (\w+))? \{/.exec(lines[i]!);
+    const head = /^export interface (\w+)(?:<[^>]*>)?(?: extends (\w+))? \{/u.exec(lines[i]!);
     if (!head) continue;
     const keys: string[] = [];
     for (i++; i < lines.length && lines[i] !== "}"; i++) {
-      const member = /^ {2}(?:readonly )?(\w+)\??:/.exec(lines[i]!);
+      const member = /^ {2}(?:readonly )?(\w+)\??:/u.exec(lines[i]!);
       if (member) keys.push(member[1]!);
     }
     out.set(head[1]!, { keys, ...(head[2] ? { parent: head[2] } : {}) });

@@ -77,7 +77,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     const id = props.channel?.id;
     if (!e.isComposing && id && box.offered().length === 0) {
       if (e.key === "ArrowUp" && box.text() === "") {
-        const mine = [...followed.get(id).messages].reverse().find((m) => m.from === ownerId && m.kind === "chat" && m.deleted === undefined);
+        const mine = [...followed.get(id).messages].toReversed().find((m) => m.from === ownerId && m.kind === "chat" && m.deleted === undefined);
         if (mine) {
           e.preventDefault();
           setEditingId(mine.id);

@@ -45,16 +45,16 @@ export function addedLines(diff: string): Map<string, Set<number>> {
   const added = new Map<string, Set<number>>();
   let lines: Set<number> | undefined;
   for (const l of diff.split("\n")) {
-    const file = /^\+\+\+ b\/(.+)$/.exec(l);
+    const file = /^\+\+\+ b\/(.+)$/u.exec(l);
     if (file) added.set(file[1]!, (lines = new Set()));
-    const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(l);
+    const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/u.exec(l);
     if (hunk && lines) for (let n = Number(hunk[1]), end = n + Number(hunk[2] ?? 1); n < end; n++) lines.add(n);
   }
   return added;
 }
 
 /** What the comment tells a tool, not a reader. */
-const directive = /^[*\s]*(@ts-|eslint-|oxlint-|prettier-|@vite-ignore|[#@]__PURE__|@internal\s*$|c8 |v8 |istanbul )/;
+const directive = /^[*\s]*(@ts-|eslint-|oxlint-|prettier-|@vite-ignore|[#@]__PURE__|@internal\s*$|c8 |v8 |istanbul )/u;
 
 /** Its comments, a run of `//` on the lines one after another as one. */
 export function commentsIn(file: string, src: string): Comment[] {
@@ -65,7 +65,7 @@ export function commentsIn(file: string, src: string): Comment[] {
   for (const c of comments) {
     const last = runs.at(-1);
     const isDirective = directive.test(c.value);
-    if (last?.line === true && !last.directive && c.type === "Line" && !isDirective && /^[ \t]*\n[ \t]*$/.test(src.slice(last.end, c.start))) last.end = c.end;
+    if (last?.line === true && !last.directive && c.type === "Line" && !isDirective && /^[ \t]*\n[ \t]*$/u.test(src.slice(last.end, c.start))) last.end = c.end;
     else runs.push({ start: c.start, end: c.end, line: c.type === "Line", directive: isDirective });
   }
   return runs
@@ -123,7 +123,7 @@ const verdicts = ["keep", "delete", "rewrite"] as const;
 
 /** The model's answer for these comments; a missing or malformed verdict is an error, never a keep. */
 export function readVerdicts(answer: string, comments: readonly Comment[]): Finding[] {
-  const parsed: unknown = JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+  const parsed: unknown = JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/gu, ""));
   const all: unknown = typeof parsed === "object" && parsed !== null && "verdicts" in parsed ? parsed.verdicts : undefined;
   if (!Array.isArray(all)) throw new Error("the answer has no verdicts array");
   const byId = new Map<number, Readonly<Record<string, unknown>>>();
@@ -185,7 +185,7 @@ const deepseek =
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
 
 /** Where the files are reviewed: lint's, without what tools write. */
-const reviewed = (path: string) => /^(apps|packages|scripts)\/.*\.(ts|tsx|mts)$/.test(path) && !/\.d\.ts$|\/db\/generated\/|\/testdata\//.test(path);
+const reviewed = (path: string) => /^(apps|packages|scripts)\/.*\.(ts|tsx|mts)$/u.test(path) && !/\.d\.ts$|\/db\/generated\/|\/testdata\//u.test(path);
 
 if (import.meta.main) {
   const args = process.argv.slice(2);

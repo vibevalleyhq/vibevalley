@@ -43,7 +43,7 @@ export function cleanSvg(svg: string): Node {
       const name = a.name.toLowerCase();
       if (name.startsWith("on")) e.removeAttribute(a.name);
       else if ((name === "href" || name === "xlink:href") && !a.value.startsWith("#")) e.removeAttribute(a.name);
-      else if (name === "style" && /url\(|expression|@import/i.test(a.value)) e.removeAttribute(a.name);
+      else if (name === "style" && /url\(|expression|@import/iu.test(a.value)) e.removeAttribute(a.name);
     }
   return document.importNode(root, true);
 }
@@ -71,7 +71,7 @@ export function richen(root: ParentNode, o: RichOptions = {}): Undo {
   for (const code of [...root.querySelectorAll("pre > code")]) {
     const pre = code.parentElement!;
     const lang = [...code.classList].find((c) => c.startsWith("language-"))?.slice("language-".length) ?? "";
-    const text = code.textContent.replace(/\n$/, "");
+    const text = code.textContent.replace(/\n$/u, "");
     if (lang === "mermaid") undo.push(diagram(pre, text));
     else codeBlock(pre, code, lang, text, o);
   }
@@ -95,7 +95,7 @@ function links(root: ParentNode, o: RichOptions) {
         e.preventDefault();
         go(href);
       });
-    } else if (/^https?:/i.test(href)) {
+    } else if (/^https?:/iu.test(href)) {
       a.target = "_blank";
       a.rel = "noreferrer noopener";
     }

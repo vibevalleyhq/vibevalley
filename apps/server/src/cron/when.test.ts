@@ -73,14 +73,14 @@ test("what a cron asked for gets wrong", () => {
     ...change,
   });
   expect(cronProblem(req(), now)).toBe("");
-  expect(cronProblem(req({ when: { kind: "daily", time: "9点" } }), now)).toMatch(/HH:MM/);
-  expect(cronProblem(req({ when: { kind: "once", at: now - 1 } }), now)).toMatch(/以后/);
-  expect(cronProblem(req({ when: { kind: "every", minutes: 0.2 } }), now)).toMatch(/至少/);
-  expect(cronProblem(req({ when: { kind: "weekly", days: [7], time: "09:00" } }), now)).toMatch(/0 到 6/);
-  expect(cronProblem(req({ tz: "Mars/Base" }), now)).toMatch(/时区/);
-  expect(cronProblem(req({ text: " " }), now)).toMatch(/做什么/);
+  expect(cronProblem(req({ when: { kind: "daily", time: "9点" } }), now)).toMatch(/HH:MM/u);
+  expect(cronProblem(req({ when: { kind: "once", at: now - 1 } }), now)).toMatch(/以后/u);
+  expect(cronProblem(req({ when: { kind: "every", minutes: 0.2 } }), now)).toMatch(/至少/u);
+  expect(cronProblem(req({ when: { kind: "weekly", days: [7], time: "09:00" } }), now)).toMatch(/0 到 6/u);
+  expect(cronProblem(req({ tz: "Mars/Base" }), now)).toMatch(/时区/u);
+  expect(cronProblem(req({ text: " " }), now)).toMatch(/做什么/u);
   expect(cronProblem(req({ tz: "+08:00" }), now)).toBe("");
-  expect(cronProblem(req({ tz: "Local" }), now)).toMatch(/时区/);
+  expect(cronProblem(req({ tz: "Local" }), now)).toMatch(/时区/u);
 });
 
 test("when it runs, in words", () => {
@@ -148,18 +148,18 @@ test("what a cron gets wrong", () => {
   const now = at("2026-10-12T08:00:00");
   const problem = (expr: string) => cronProblem({ name: "n", text: "t", when: { kind: "cron", expr }, tz: sh }, now);
   for (const [expr, pattern] of [
-    ["0 9 * * 1-5", /^$/],
-    ["*/5 * * * *", /^$/],
-    ["0 9 * *", /五段/],
-    ["60 * * * *", /分钟/],
-    ["0 24 * * *", /小时/],
-    ["0 9 0 * *", /日/],
-    ["0 9 * 13 *", /月/],
-    ["0 9 * * 8", /周几/],
-    ["0 9 5-1 * *", /日/],
-    ["*/0 * * * *", /分钟/],
-    ["a b c d e", /分钟/],
-    ["0 0 30 2 *", /永远/],
+    ["0 9 * * 1-5", /^$/u],
+    ["*/5 * * * *", /^$/u],
+    ["0 9 * *", /五段/u],
+    ["60 * * * *", /分钟/u],
+    ["0 24 * * *", /小时/u],
+    ["0 9 0 * *", /日/u],
+    ["0 9 * 13 *", /月/u],
+    ["0 9 * * 8", /周几/u],
+    ["0 9 5-1 * *", /日/u],
+    ["*/0 * * * *", /分钟/u],
+    ["a b c d e", /分钟/u],
+    ["0 0 30 2 *", /永远/u],
   ] as const) {
     expect(problem(expr)).toMatch(pattern);
   }

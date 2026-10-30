@@ -353,7 +353,7 @@ describe("the chat apps", () => {
       expect(refused.error).toContain("不对");
       yield* c.login("qq", { appId: "102", secret: "right" });
       const pairing = yield* reaches("qq", "pairing");
-      expect(pairing.pairCode).toMatch(/^\d{6}$/);
+      expect(pairing.pairCode).toMatch(/^\d{6}$/u);
       script.qqIn.push(qqMsg("someone", "你好"));
       script.qqIn.push(qqMsg("owner-openid", "配对 " + pairing.pairCode));
       const paired = yield* reaches("qq", "connected");

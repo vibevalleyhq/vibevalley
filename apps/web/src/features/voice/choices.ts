@@ -92,7 +92,7 @@ export const microsoftVoices = [
 ];
 
 /** A MiniMax voice's sample in the repository (public/voice-samples): anything but letters, digits, _ and - is _. */
-export const voiceSample = (id: string) => (minimaxVoices.some((v) => v.id === id) ? `/voice-samples/${id.replace(/[^\w-]/g, "_")}.mp3` : undefined);
+export const voiceSample = (id: string) => (minimaxVoices.some((v) => v.id === id) ? `/voice-samples/${id.replace(/[^\w-]/gu, "_")}.mp3` : undefined);
 
 export type VoiceNumber = "silenceMs" | "interruptMs" | "idleSeconds";
 

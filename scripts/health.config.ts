@@ -10,10 +10,10 @@ const generated = ["apps/server/db/generated/", "packages/i18n/src/catalogs.ts",
 
 const health: Health = {
   counted: (path) =>
-    /^(apps|packages)\/.+\.tsx?$/.test(path) &&
+    /^(apps|packages)\/.+\.tsx?$/u.test(path) &&
     !path.endsWith(".d.ts") &&
-    !/\.(test|spec|stories)\.tsx?$/.test(path) &&
-    !/\/(test|testing|testdata|flows)\//.test(path) &&
+    !/\.(test|spec|stories)\.tsx?$/u.test(path) &&
+    !/\/(test|testing|testdata|flows)\//u.test(path) &&
     !generated.some((g) => path.startsWith(g)),
   areaOf: (path) => {
     const parts = path.split("/");

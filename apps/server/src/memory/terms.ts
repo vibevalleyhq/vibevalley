@@ -12,7 +12,7 @@ export const termsVersion = 1;
 /** Words too common to match on, in Chinese and in English (stopwords.json: data, not words to anyone). */
 export const recallStop = new Set<string>(stopwords);
 
-const codeWord = /[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/g;
+const codeWord = /[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/gu;
 const han = /\p{Script=Han}/u;
 
 /** Words in lower case, in the order they come, each once. */

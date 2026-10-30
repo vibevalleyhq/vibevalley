@@ -289,12 +289,12 @@ export const make = (options: IssueOptions = {}) =>
 
     const everyIssue = Effect.gen(function* () {
       const rows = yield* db(q.listIssues());
-      return rows.map((r) => issueOf(r, worked.of(r.id))).sort(issueOrder);
+      return rows.map((r) => issueOf(r, worked.of(r.id))).toSorted(issueOrder);
     });
 
     const idOf = Effect.fn("Issues.idOf")(function* (ref: string): Effect.fn.Return<string, ApiError> {
       const r = ref.trim();
-      const number = /^#?(\d+)$/.exec(r)?.[1];
+      const number = /^#?(\d+)$/u.exec(r)?.[1];
       if (number !== undefined) {
         const row = yield* one(q.issueByNumber({ number: Number(number) }));
         if (!row) return yield* Effect.fail(missing(t("server.issue.issueNumbered", { n: number }), [lookIn.issue]));
@@ -874,7 +874,7 @@ export const make = (options: IssueOptions = {}) =>
 
     /** Where a talk with a profile that has no folder of its own looks: the project worked in last, else the first one. */
     const lastProject = Effect.gen(function* () {
-      const worked = (yield* everyIssue).filter((i) => i.project !== undefined && !i.talk).sort((a, b) => b.createdAt - a.createdAt)[0]?.project;
+      const worked = (yield* everyIssue).filter((i) => i.project !== undefined && !i.talk).toSorted((a, b) => b.createdAt - a.createdAt)[0]?.project;
       return worked ?? (yield* projects.list())[0]?.name ?? "";
     });
 

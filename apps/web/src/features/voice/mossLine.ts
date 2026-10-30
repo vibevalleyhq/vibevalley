@@ -157,7 +157,7 @@ export class MossLine {
       if (this.ws !== ws) return;
       // Refused before it opened (no key, not the farm's page): the server said why over plain HTTP.
       if (!opened)
-        void fetch(url.href.replace(/^ws/, "http"))
+        void fetch(url.href.replace(/^ws/u, "http"))
           .then((r) => r.text())
           .then(
             (why) => this.stop(why || t("web.voice.moss.closed")),

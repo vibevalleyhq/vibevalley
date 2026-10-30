@@ -87,7 +87,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     searching()
       ? feedOf(
           core()?.chat,
-          [...(hits() ?? [])].reverse().map((h) => h.message),
+          [...(hits() ?? [])].toReversed().map((h) => h.message),
         )
       : feedOf(core()?.chat, said().messages),
   );

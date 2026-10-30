@@ -38,6 +38,6 @@ export class WakeBreaker {
 
   /** Every tripped one, for the audience. */
   tripped(): string[] {
-    return [...this.open].sort();
+    return [...this.open].toSorted();
   }
 }

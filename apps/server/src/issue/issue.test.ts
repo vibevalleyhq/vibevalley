@@ -628,7 +628,7 @@ describe("issues", () => {
       expect(sessions.find(first!)).toBeUndefined();
       const second = (yield* sessions.get(handed.sessions[1]!))!;
       expect(second.agent).toBe("lab2");
-      expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /);
+      expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /u);
       yield* inReview(2);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

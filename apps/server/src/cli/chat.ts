@@ -28,7 +28,7 @@ import { wallTime } from "@/base/time.ts";
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {
   const r = [...s];
-  return (r.length > 120 ? r.slice(0, 120).join("") + "…" : s).split(/\s+/).filter(Boolean).join(" ");
+  return (r.length > 120 ? r.slice(0, 120).join("") + "…" : s).split(/\s+/u).filter(Boolean).join(" ");
 };
 const write = (s: string) => process.stdout.write(s);
 

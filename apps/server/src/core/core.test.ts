@@ -97,7 +97,7 @@ describe("core", () => {
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
       expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking", since: expect.any(Number) } });
       expect(kept.progress).toBeUndefined();
-      expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/);
+      expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/u);
     });
   });
 

@@ -54,7 +54,7 @@ const builtinCost = getBuiltinModel as unknown as (provider: string, model: stri
 function piPrice(model: string): Price | undefined {
   const slash = model.indexOf("/");
   if (slash >= 0) return priceOf(builtinCost(model.slice(0, slash), model.slice(slash + 1))?.cost);
-  for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).sort()) {
+  for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).toSorted()) {
     const found = builtinCost(provider, model);
     if (found !== undefined) return priceOf(found.cost);
   }

@@ -33,7 +33,7 @@ export default class Budgets implements Reporter {
       const s = shape[l];
       return `  ${l.padEnd(6)} ${String(s.files).padStart(4)} files ${String(s.tests).padStart(5)} tests ${(s.ms / 1000).toFixed(1).padStart(7)} s   budget ${budgetMs[l]} ms`;
     });
-    const lines = over.sort((a, b) => b.ms - a.ms).map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.layer.padEnd(6)} ${t.name}`);
+    const lines = over.toSorted((a, b) => b.ms - a.ms).map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.layer.padEnd(6)} ${t.name}`);
     this.vitest?.logger.log(
       `\nThe test pyramid:\n${rows.join("\n")}\n` + (lines.length > 0 ? `\nOver twice their layer's budget:\n${lines.join("\n")}\n` : ""),
     );

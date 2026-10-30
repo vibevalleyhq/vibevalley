@@ -74,7 +74,7 @@ export function withIssue(all: readonly Issue[] | undefined, t: Issue): Issue[] 
     const drop = new Set(closed.slice(keepClosedIssues).map((x) => x.id));
     next = next.filter((x) => !drop.has(x.id) && !(x.parent !== undefined && drop.has(x.parent)));
   }
-  return next.sort(issueOrder);
+  return next.toSorted(issueOrder);
 }
 
 export function issueRefiningOf(t: Issue, state: WorkspaceState): IssueRefining | undefined {

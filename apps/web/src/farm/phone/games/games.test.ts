@@ -60,7 +60,7 @@ describe("推箱子", () => {
       expect(rows.join("").split("@").length - 1).toBe(1);
       const g = newWarehouse(level);
       expect(g.boxes.length).toBe(rows.join("").split(".").length - 1);
-      const key = (s: WarehouseGame) => `${s.player}:${[...s.boxes].sort((a, b) => a - b).join(",")}`;
+      const key = (s: WarehouseGame) => `${s.player}:${[...s.boxes].toSorted((a, b) => a - b).join(",")}`;
       const queue = [g];
       const seen = new Set([key(g)]);
       let solved = false;

@@ -240,7 +240,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
   }
   // The five least used are the next to fall.
   [...items]
-    .sort((a, b) => (a.recalledAt ?? a.at) - (b.recalledAt ?? b.at))
+    .toSorted((a, b) => (a.recalledAt ?? a.at) - (b.recalledAt ?? b.at))
     .slice(0, 5)
     .forEach((leaf) => {
       items[items.indexOf(leaf)] = { ...leaf, fading: true };

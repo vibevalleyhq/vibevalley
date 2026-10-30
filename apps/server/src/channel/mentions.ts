@@ -12,11 +12,11 @@ export const chatNamed: Readonly<Record<string, string>> = {
 
 export const mentionOf = (id: string): string | undefined => maybe(`server.channel.mention.${id}`);
 
-const chatFence = /```[\s\S]*?```/g;
+const chatFence = /```[\s\S]*?```/gu;
 
-const chatTick = /`[^`\n]*`/g;
+const chatTick = /`[^`\n]*`/gu;
 
-const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 /** Who a place's words can name besides the sessions: its own orchestrator (@管家) and every orchestrator by its profile id. */
 export interface Nameable {
@@ -31,7 +31,7 @@ const onlyDefault: Nameable = { here: defaultOrchestrator, orchestrators: [defau
 export function mentionsIn(text: string, names: Nameable = onlyDefault): string[] {
   const pattern = new RegExp(
     `(^|[^\\p{L}\\p{N}_@])@(w[0-9]+|${[...names.orchestrators, ...Object.keys(chatNamed)]
-      .sort((a, b) => b.length - a.length)
+      .toSorted((a, b) => b.length - a.length)
       .map(escaped)
       .join("|")})`,
     "gu",

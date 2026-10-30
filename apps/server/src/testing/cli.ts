@@ -33,7 +33,7 @@ export const cli = (args: string[], stdin = "", env: Record<string, string> = {}
       Effect.provide(io),
       Effect.provide([NodeServices.layer, FetchHttpClient.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord(env))]),
     );
-    [out, err] = [out.replace(/\n$/, ""), err.replace(/\n$/, "")];
+    [out, err] = [out.replace(/\n$/u, ""), err.replace(/\n$/u, "")];
     const last = err.split("\n").at(-1) ?? "";
     const failure = last.startsWith('{"error"')
       ? (JSON.parse(last) as { error: { tag: string; message: string; next?: { say: string; run?: string[] }[] } }).error

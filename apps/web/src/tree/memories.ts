@@ -26,7 +26,7 @@ export function counts(items: readonly MemoryItem[]): Record<MemoryKind | "fadin
 }
 
 export function newest(items: readonly MemoryItem[], limit: number): MemoryItem[] {
-  return [...items].sort((a, b) => b.at - a.at).slice(0, limit);
+  return [...items].toSorted((a, b) => b.at - a.at).slice(0, limit);
 }
 
 export function lastRecalled(items: readonly MemoryItem[]): MemoryItem | undefined {

@@ -44,7 +44,7 @@ export function entries(modules: readonly Stories[], order: readonly string[] = 
   const seen = new Set<string>();
   const compare = compareTitles(order);
   return [...modules]
-    .sort((a, b) => compare(a.title, b.title))
+    .toSorted((a, b) => compare(a.title, b.title))
     .flatMap((m) => {
       if (seen.has(m.title)) throw new Error(`two stories files are titled ${m.title}`);
       seen.add(m.title);
@@ -60,7 +60,7 @@ export function entries(modules: readonly Stories[], order: readonly string[] = 
 }
 
 export function search(list: readonly Entry[], q: string): Entry[] {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = q.toLowerCase().split(/\s+/u).filter(Boolean);
   return list.filter((e) => words.every((w) => e.key.toLowerCase().includes(w)));
 }
 

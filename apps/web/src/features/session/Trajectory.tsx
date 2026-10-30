@@ -52,7 +52,7 @@ const lightInk = "#fffaf0";
 const darkInk = "#2f1f13";
 
 const luminance = (hex: string) => {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex);
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/iu.exec(hex);
   if (!m) return 1;
   const [r = 0, g = 0, b = 0] = m.slice(1).map((h) => parseInt(h, 16) / 255);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -61,7 +61,7 @@ const luminance = (hex: string) => {
 
 /** The words on a fill: whichever ink stands out more from it (WCAG's ratio), so a mid-tone fill gets the readable one. */
 function inkOn(fill: string) {
-  if (!/^#[0-9a-f]{6}$/i.test(fill)) return "var(--wb-ink)";
+  if (!/^#[0-9a-f]{6}$/iu.test(fill)) return "var(--wb-ink)";
   const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   const l = luminance(fill);
   return ratio(l, luminance(lightInk)) >= ratio(l, luminance(darkInk)) ? lightInk : darkInk;

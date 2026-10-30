@@ -324,7 +324,7 @@ export function speakPieces(text: string, max = 480): string[] {
     let used = 0;
     while (fit < chars.length && used + bytes(chars[fit]!) <= max) used += bytes(chars[fit++]!);
     const head = chars.slice(0, fit).join("");
-    const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/g)].map((m) => m.index));
+    const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/gu)].map((m) => m.index));
     const cut = end > 0 ? [...head.slice(0, end + 1)].length : fit;
     out.push(chars.slice(0, cut).join("").trim());
     rest = chars.slice(cut).join("").trim();
@@ -343,7 +343,7 @@ export interface VoiceOptions {
   readonly moss?: MossTransport;
 }
 
-const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
 
 /** A tunnel's public address and how to close it. */
 export interface Tunnel {
@@ -454,7 +454,7 @@ export const make = (options: VoiceOptions = {}) =>
       log: (l) => logs.info(l),
       now: () => clock.currentTimeMillisUnsafe(),
     });
-    const route = /^\/llm\/([\w-]+)\/chat\/completions$/;
+    const route = /^\/llm\/([\w-]+)\/chat\/completions$/u;
     // A call's own key on its own path; anything else is not there or not let in.
     const lineHandler = (request: Request): Promise<Response> => {
       const m = route.exec(new URL(request.url).pathname);
@@ -502,7 +502,7 @@ export const make = (options: VoiceOptions = {}) =>
     const opening = yield* Semaphore.make(1);
     const lineClosed = () => new LineFailed({ message: t("server.voice.lineClosed") });
     const base = Effect.suspend(() => {
-      if (config.voice.line.url) return Effect.succeed(config.voice.line.url.replace(/\/+$/, ""));
+      if (config.voice.line.url) return Effect.succeed(config.voice.line.url.replace(/\/+$/u, ""));
       closing?.();
       closing = undefined;
       return opening.withPermits(1)(
@@ -834,7 +834,7 @@ export const make = (options: VoiceOptions = {}) =>
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
         if (d.via === "moss" && d.key === "") return yield* Effect.fail(unavailable(t("server.voice.dictation.noMossKey"), "dictation"));
         const { url, model } = d.via === "moss" ? mossTranscription : d;
-        const format = given.trim().replace(/^\./, "").toLowerCase();
+        const format = given.trim().replace(/^\./u, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
           return yield* Effect.fail<ApiError>({
@@ -842,7 +842,7 @@ export const make = (options: VoiceOptions = {}) =>
             reason: t("server.voice.dictation.format", { format: JSON.stringify(format) }),
           });
         const audio = Buffer.from(audio64, "base64");
-        if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
+        if (audio.length === 0 || audio.toString("base64").replace(/=+$/u, "") !== audio64.replace(/=+$/u, "").replace(/\s/gu, ""))
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
             reason: t("server.voice.dictation.empty"),

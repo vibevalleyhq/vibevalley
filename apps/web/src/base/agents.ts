@@ -16,7 +16,7 @@ export function useOrchestrators() {
   return (): Agent[] =>
     ready(all, [])
       .filter((a) => a.role === "orchestrator")
-      .sort((a, b) => (a.id === defaultOrchestrator ? -1 : b.id === defaultOrchestrator ? 1 : 0));
+      .toSorted((a, b) => (a.id === defaultOrchestrator ? -1 : b.id === defaultOrchestrator ? 1 : 0));
 }
 
 /** An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. */

@@ -46,7 +46,7 @@ it.effect("the defaults, then the file, then the environment", () =>
 it.effect("what it cannot read is refused", () =>
   Effect.gen(function* () {
     expect(yield* refused(join(temp(), "missing.yaml"), { VIBEVALLEY_HOME: temp() })).toContain("没有这个文件");
-    expect(yield* refused("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_PORT: "eighty" })).toMatch(/port/);
+    expect(yield* refused("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_PORT: "eighty" })).toMatch(/port/u);
     expect(yield* refused("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_LAN_PORT: "70000" })).toContain("lan.port 不是端口");
   }).pipe(Effect.provide(NodeServices.layer)),
 );

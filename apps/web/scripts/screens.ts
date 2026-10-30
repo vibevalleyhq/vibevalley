@@ -25,7 +25,7 @@ for (const path of pages) {
   await page.waitForLoadState("load");
   if (path === "/") await page.locator("canvas").first().waitFor();
   await page.waitForTimeout(3000);
-  const name = path === "/" ? "farm" : path.replace(/^\//, "").replace(/[/?=&]/g, "-");
+  const name = path === "/" ? "farm" : path.replace(/^\//u, "").replace(/[/?=&]/gu, "-");
   const file = join(out, `${name}-${width}x${height}.png`);
   await page.screenshot({ path: file });
   console.log(file);

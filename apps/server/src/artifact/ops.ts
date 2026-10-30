@@ -132,7 +132,7 @@ export class Page {
 
   /** The children of parent ("" is the top), tombstones included, in order. */
   children(parent: string): Block[] {
-    return [...this.blocks.values()].filter((b) => parentOf(b) === parent).sort((a, b) => or(compare(a.orderKey, b.orderKey), compare(a.id, b.id)));
+    return [...this.blocks.values()].filter((b) => parentOf(b) === parent).toSorted((a, b) => or(compare(a.orderKey, b.orderKey), compare(a.id, b.id)));
   }
 
   /** Where a block goes under parent: a deleted parent hands it to the level that parent was at. */

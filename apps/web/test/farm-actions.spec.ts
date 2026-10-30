@@ -63,7 +63,7 @@ test("the harvest tool and its open confirmation follow the latest issue", async
   const soil = await bed(page);
   await page.keyboard.press("5");
   await page.mouse.move(soil.x, soil.y);
-  await expect(village).toHaveCSS("cursor", /harvest-ok/);
+  await expect(village).toHaveCSS("cursor", /harvest-ok/u);
   await page.mouse.click(soil.x, soil.y);
   const review = page.getByTestId("harvest");
   const take = review.locator('[data-act="complete"]');

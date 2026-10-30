@@ -14,7 +14,7 @@ export interface SearchQuery {
 
 const filterPattern = /(?:^|\s)(from|in|has|before|after):(\S+)/giu;
 
-const dayPattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+const dayPattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/u;
 
 /** A filter that does not read stays among the words. */
 export function parseSearch(text: string): SearchQuery {
@@ -29,10 +29,10 @@ export function parseSearch(text: string): SearchQuery {
       const at = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : undefined;
       switch (key.toLowerCase()) {
         case "from":
-          from = chatNamed[value.replace(/^@/, "")] ?? value.replace(/^@/, "");
+          from = chatNamed[value.replace(/^@/u, "")] ?? value.replace(/^@/u, "");
           return " ";
         case "in":
-          inName = value.replace(/^#/, "");
+          inName = value.replace(/^#/u, "");
           return " ";
         case "has":
           if (value === "file" || value === "image" || value === "link") {
@@ -52,7 +52,7 @@ export function parseSearch(text: string): SearchQuery {
           return whole;
       }
     })
-    .replace(/\s+/g, " ")
+    .replace(/\s+/gu, " ")
     .trim();
   return {
     words,

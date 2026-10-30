@@ -79,7 +79,7 @@ export function nextForgotten(memories: readonly Memory[], coming: number): stri
   if (over <= 0) return [];
   const used = (m: Memory) => m.recalledAt ?? m.at;
   return [...memories]
-    .sort((a, b) => compare(used(a), used(b)))
+    .toSorted((a, b) => compare(used(a), used(b)))
     .slice(0, over)
     .map((m) => m.id);
 }
@@ -93,7 +93,7 @@ const noteLine =
 
 /** s on one line (each run of white space one space, trimmed), at most max units with the ellipsis. */
 export const clip = (s: string, max: number) => {
-  const flat = s.replace(/\s+/g, " ").trim();
+  const flat = s.replace(/\s+/gu, " ").trim();
   return flat.length > max ? flat.slice(0, max - 1) + "…" : flat;
 };
 

@@ -483,7 +483,7 @@ function Runs(props: { issue: string; version: string }) {
     <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">{t("web.issue.detail.noRuns")}</p>}>
       <div>
         <div class="mb-2 text-xs text-muted">{t("web.issue.detail.runCount", { n: runs().length })}</div>
-        <For each={[...runs()].reverse()}>
+        <For each={[...runs()].toReversed()}>
           {(r) => (
             <div class="flex gap-3 pb-2 text-sm">
               <span class="w-20 shrink-0 text-muted">{wallClockText(r.startedAt)}</span>

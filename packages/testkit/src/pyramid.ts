@@ -15,13 +15,13 @@ export const layers: readonly Layer[] = ["rule", "module", "flow"];
 export const budgetMs: Record<Layer, number> = { rule: 20, module: 300, flow: 2_000 };
 
 /** Imports that leave the process: the database, child processes, the network. */
-const outside = /^(node:child_process|node:net|node:http|node:https|@electric-sql\/pglite|@effect\/sql-pglite|@effect\/platform-node)$/;
+const outside = /^(node:child_process|node:net|node:http|node:https|@electric-sql\/pglite|@effect\/sql-pglite|@effect\/platform-node)$/u;
 
 /** What a file imports for its values: import and export … from, side-effect and dynamic imports, not type-only ones. */
 export function importsOf(source: string): string[] {
   const out: string[] = [];
-  for (const m of source.matchAll(/^\s*(?:import|export)\s+(type\s+)?(?:[^;'"]*?\s+from\s+)?"([^"]+)"/gms)) if (!m[1]) out.push(m[2]!);
-  for (const m of source.matchAll(/\bimport\(\s*"([^"]+)"\s*\)/g)) out.push(m[1]!);
+  for (const m of source.matchAll(/^\s*(?:import|export)\s+(type\s+)?(?:[^;'"]*?\s+from\s+)?"([^"]+)"/gmsu)) if (!m[1]) out.push(m[2]!);
+  for (const m of source.matchAll(/\bimport\(\s*"([^"]+)"\s*\)/gu)) out.push(m[1]!);
   return out;
 }
 

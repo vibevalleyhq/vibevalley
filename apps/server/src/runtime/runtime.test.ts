@@ -521,8 +521,8 @@ describe("runtime", () => {
       expect(byId.claude!.installation.status).toBe("unsupported");
       expect(byId.claude!.preset.label).toBe("Claude Code");
       expect(byId.claude!.facts.capabilities).toEqual(factsOf("claude").capabilities);
-      expect(JSON.stringify(byId.claude)).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/);
-      expect(JSON.stringify(byId.claude)).toMatch(/"facts":\{"steer":true,"refused":\{\}/);
+      expect(JSON.stringify(byId.claude)).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/u);
+      expect(JSON.stringify(byId.claude)).toMatch(/"facts":\{"steer":true,"refused":\{\}/u);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -574,7 +574,7 @@ describe("runtime", () => {
       r.spend("pi", 3);
       expect((yield* r.info("pi"))!.spentToday).toBe(3);
       r.spend("pi", 9);
-      expect((yield* r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/);
+      expect((yield* r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 

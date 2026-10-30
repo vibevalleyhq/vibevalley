@@ -13,7 +13,7 @@ const htmlLang = { zh: "zh-Hans", en: "en" } as const;
 /** index.html with the locale on its <html>. */
 const withLocale = (html: string) => {
   const locale = currentLocale();
-  return html.replace(/<html[^>]*>/, `<html lang="${htmlLang[locale]}" data-locale="${locale}">`);
+  return html.replace(/<html[^>]*>/u, `<html lang="${htmlLang[locale]}" data-locale="${locale}">`);
 };
 
 export const page = (dir: string) =>

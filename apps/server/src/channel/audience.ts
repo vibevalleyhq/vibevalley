@@ -36,7 +36,7 @@ export class Audience {
 
   /** By id. */
   followers(channel: string): string[] {
-    return [...(this.follows.get(channel) ?? [])].sort();
+    return [...(this.follows.get(channel) ?? [])].toSorted();
   }
 
   /** The owner's words start the count of agents waking agents there again: only what is said

@@ -24,7 +24,7 @@ export function TemplatesPage() {
   const client = useQueryClient();
   const [path, setPath] = createSignal("");
   const [adding, setAdding] = createSignal(false);
-  const sorted = () => [...ready(templates, [])].sort((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
+  const sorted = () => [...ready(templates, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
   const add = async () => {
     setAdding(true);
     try {

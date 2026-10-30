@@ -9,10 +9,10 @@ test.beforeEach(async ({ page }) => {
 test("the farm's tree button opens the tree, and its farm button comes back", async ({ page }) => {
   await page.goto("/farm/");
   await page.getByTestId("hud-tree").click();
-  await expect(page).toHaveURL(/\/tree$/);
+  await expect(page).toHaveURL(/\/tree$/u);
   await expect(page.getByTestId("tree-panel")).toBeVisible();
   await page.getByTestId("tree-home").click();
-  await expect(page).toHaveURL(/\/farm$/);
+  await expect(page).toHaveURL(/\/farm$/u);
 });
 
 test("the tree's counts follow a helper's filter, the slider goes back in time, and the sky opens and closes, without errors", async ({ page }) => {

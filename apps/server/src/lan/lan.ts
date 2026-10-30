@@ -88,7 +88,7 @@ export class Lan extends Context.Service<
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-export const hostName = () => hostname().replace(/\.local$/, "") || "vibevalley";
+export const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
 export function lanAddress(): string {
@@ -97,7 +97,7 @@ export function lanAddress(): string {
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
     const r = ["en", "eth", "wlan", "wl"].some((p) => name.startsWith(p)) ? 1 : 2;
     if (r >= rank) continue;
-    const found = (addrs ?? []).find((a) => a.family === "IPv4" && !a.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address));
+    const found = (addrs ?? []).find((a) => a.family === "IPv4" && !a.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/u.test(a.address));
     if (found) {
       best = found.address;
       rank = r;
@@ -106,7 +106,7 @@ export function lanAddress(): string {
   return best;
 }
 
-const deviceName = (name: string) => [...name.split(/\s+/).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
+const deviceName = (name: string) => [...name.split(/\s+/u).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
 
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
 export const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
@@ -352,7 +352,7 @@ export const make = (options: LanOptions = {}) =>
       }
       const p = livePairing();
       if (p && addr) s.pairing = { code: p.code, link: pairLink(addr, p.code), expiresAt: p.expires, ...(p.asking ? { asking: p.asking } : {}) };
-      s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).sort((a, b) => a.pairedAt - b.pairedAt);
+      s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).toSorted((a, b) => a.pairedAt - b.pairedAt);
       return s;
     };
 

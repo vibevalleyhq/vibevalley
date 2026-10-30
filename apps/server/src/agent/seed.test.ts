@@ -6,7 +6,7 @@ import catalogEn from "./template_catalog.en.json";
 
 /** Every leaf but the words: the two languages must agree on ids, numbers, flags, commands and the template holes. */
 function shape(v: unknown): unknown {
-  if (typeof v === "string") return [...v.matchAll(/\{\w+\}|〔/g)].map((m) => m[0]).join("");
+  if (typeof v === "string") return [...v.matchAll(/\{\w+\}|〔/gu)].map((m) => m[0]).join("");
   if (Array.isArray(v)) return v.map(shape);
   if (typeof v === "object" && v !== null)
     return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "id" || k === "runtime" || k === "model" ? x : shape(x)]));

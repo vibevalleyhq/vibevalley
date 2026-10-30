@@ -23,7 +23,7 @@ const test = base.extend<object, { stories: string }>({
     async ({ farm: _farm }, use) => {
       const root = join(process.env.VIBEVALLEY_TEST_OUT!, "stories");
       const server = createServer((req, res) => {
-        const path = normalize(decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname)).replace(/^(\.\.[/\\])+/, "");
+        const path = normalize(decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname)).replace(/^(\.\.[/\\])+/u, "");
         let file = join(root, path);
         if (!existsSync(file) || statSync(file).isDirectory()) file = join(root, "index.html");
         res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
@@ -60,7 +60,7 @@ test("the viewer opens a story from the address, in folders, and keeps the view 
   await page.getByTestId("story-theme").locator('[data-value="both"]').click();
   await expect(page.getByTestId("story-frame")).toHaveCount(2);
   await page.locator(key("组件/工作台/Button:Playground")).click();
-  await expect(page).toHaveURL(new RegExp(`s=${encodeURIComponent("组件/工作台/Button:Playground")}&theme=both&w=400`));
+  await expect(page).toHaveURL(new RegExp(`s=${encodeURIComponent("组件/工作台/Button:Playground")}&theme=both&w=400`, "u"));
 
   const label = page.locator('[data-testid="story-arg"][data-name="label"] input');
   await label.fill("go");
@@ -92,7 +92,7 @@ test("a state grid draws every combination, and a forced state looks as the real
   await page.getByTestId("story-mode").locator('[data-value="single"]').click();
   await page.getByTestId("story-state").locator('[data-value="hover"]').click();
   await expect(page.getByTestId("story-frame")).toHaveAttribute("data-pseudo", "hover");
-  await expect(page).toHaveURL(/view=single&state=hover/);
+  await expect(page).toHaveURL(/view=single&state=hover/u);
 
   await expect(page.getByTestId("story-a11y")).toHaveAttribute("data-count", "0");
   await page.getByTestId("story-a11y").click();
@@ -109,7 +109,7 @@ test("the language comes from the address, before the parts draw", async ({ page
 // loaded here.
 const titles = readdirSync(join(import.meta.dirname, "..", "src"), { recursive: true, encoding: "utf8" })
   .filter((f) => f.endsWith(".stories.tsx"))
-  .map((f) => /title: "([^"]+)"/.exec(readFileSync(join(import.meta.dirname, "..", "src", f), "utf8"))?.[1] ?? f);
+  .map((f) => /title: "([^"]+)"/u.exec(readFileSync(join(import.meta.dirname, "..", "src", f), "utf8"))?.[1] ?? f);
 
 for (const title of titles)
   test(`${title}: each story draws in each of its themes with nothing for axe to find`, async ({ page }) => {

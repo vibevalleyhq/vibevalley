@@ -478,7 +478,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         place: JSON.stringify(h.place),
         oar_session: oar || null,
         last_text: h.lastText || null,
-        recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].sort()) : null,
+        recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].toSorted()) : null,
       };
     };
     const keepHands = Effect.suspend(() =>
@@ -1007,7 +1007,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       hired = Math.max(
         0,
         ...[...(yield* db(qs.sessionIDs())).map((r) => r.id), ...core.state().sessions.map((s) => s.id)]
-          .map((id) => Number.parseInt(id.replace(/^w/, ""), 10))
+          .map((id) => Number.parseInt(id.replace(/^w/u, ""), 10))
           .filter((n) => Number.isFinite(n)),
       );
       for (const session of core.state().sessions) {
@@ -1278,7 +1278,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       }, admission.withPermits(1)),
       roster: () =>
         [...hands.values()]
-          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+          .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
           .flatMap((h) => {
             const r = view(h);
             return r ? [r] : [];
@@ -1295,7 +1295,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const runs = yield* db(qr.runsOfEndedSessions());
         const bySession = Map.groupBy(runs, (r) => r.session);
         for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
-        return out.sort((a, b) => b.hiredAt - a.hiredAt);
+        return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
       }),
       get: Effect.fn("Sessions.get")(function* (id) {
         const live = core.session(id);

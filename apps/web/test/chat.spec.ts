@@ -31,7 +31,7 @@ test("the direct channel with the orchestrator: listed apart, talked in alone, w
   await page.goto("/chat");
   const side = page.getByTestId("channels-side");
   await side.locator('[data-testid="channel-row"][data-type="direct"]').first().click();
-  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/u);
   const direct = decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1)!);
   await expect(page.getByRole("tab")).toHaveCount(1);
   const box = await composerOn(page, direct);
@@ -76,7 +76,7 @@ test("a channel made in the dialog is shown at its own address, and a refused na
   await dialog.getByTestId("channel-description").fill("the clock-in app");
   await dialog.getByTestId("submit").click();
   await expect(dialog).toBeHidden();
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/u);
   const id = page.url().split("/").at(-1)!;
   await expect(page.getByTestId("channel-head")).toHaveAttribute("data-key", id);
   await expect(page.getByTestId("channels-side").locator(`[data-testid="channel-row"][data-key="${id}"]`)).toHaveAttribute("aria-current", "page");

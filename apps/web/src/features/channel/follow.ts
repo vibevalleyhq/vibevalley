@@ -25,7 +25,7 @@ export function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]
     const had = by.get(m.number);
     if (!had || m.revision > had.revision) by.set(m.number, m);
   }
-  return [...by.values()].sort((a, b) => a.number - b.number);
+  return [...by.values()].toSorted((a, b) => a.number - b.number);
 }
 
 /** Where a channel's follower goes on from: the newest change it has. */

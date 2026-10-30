@@ -57,7 +57,7 @@ export function tiesOf(links: readonly MemoryLink[], id: string): Ties {
       if (l.a === id) grew.push(l.b);
     } else if (l.a === id || l.b === id) together.push({ id: l.a === id ? l.b : l.a, times: l.times });
   }
-  return { from, grew, together: together.sort((x, y) => y.times - x.times) };
+  return { from, grew, together: together.toSorted((x, y) => y.times - x.times) };
 }
 
 /**

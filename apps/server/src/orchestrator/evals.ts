@@ -128,7 +128,7 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
     return [];
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- cases are written by orchestrator.eval.create, in this file's EvalCase
-  return names.sort().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
+  return names.toSorted().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
 }
 
 export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
@@ -138,7 +138,7 @@ export const committed = join(import.meta.dirname, "testdata", "evals");
 /** Arguments as one string whatever order their keys came in. */
 const argsKey = (args: unknown): string =>
   JSON.stringify(args, (_, v: unknown) =>
-    typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v,
+    typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v,
   );
 
 /** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once,

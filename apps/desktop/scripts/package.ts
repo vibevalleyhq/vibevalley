@@ -25,7 +25,7 @@ const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--sh
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(server, { recursive: true });
-const skip = (path: string) => !/\.test\.ts$|\/testdata(\/|$)|\/testing(\/|$)/.test(path);
+const skip = (path: string) => !/\.test\.ts$|\/testdata(\/|$)|\/testing(\/|$)/u.test(path);
 for (const dir of ["src", "db"]) cpSync(join(repo, "apps/server", dir), join(server, dir), { recursive: true, filter: skip });
 // Each workspace package the server runs on sits beside it as stage/<folder>, its src only: the code runs from source.
 const packages = workspaceClosure(repo, join(repo, "apps/server"));
@@ -87,13 +87,13 @@ writeFileSync(
 );
 sh(server, "npm", "install", "--omit=dev", "--install-links", "--no-audit", "--no-fund", "--no-package-lock");
 
-const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/, "");
+const version = execFileSync("git", ["describe", "--tags", "--always"], { cwd: repo, encoding: "utf8" }).trim().replace(/^v/u, "");
 await build({
   targets: Platform.MAC.createTarget(["dmg"]),
   config: {
     appId: "dev.vibevalley.app",
     productName: "VibeValley",
-    extraMetadata: { version: /^\d+\.\d+\.\d+/.test(version) ? version : "0.0.0" },
+    extraMetadata: { version: /^\d+\.\d+\.\d+/u.test(version) ? version : "0.0.0" },
     directories: { output: join(desktop, "dist"), buildResources: join(desktop, "resources") },
     files: ["build/**", "package.json"],
     extraResources: [

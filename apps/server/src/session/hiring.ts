@@ -33,5 +33,5 @@ export function whoMakesRoom(sessions: readonly Session[], max: number): Session
   if (sessions.length < max) return undefined;
   // Idle since its last run ended, or since it came when it has not run.
   const idleSince = (s: Session) => s.lastRun?.at ?? s.hiredAt;
-  return sessions.filter((s) => !isBusy(s)).sort((a, b) => idleSince(a) - idleSince(b))[0];
+  return sessions.filter((s) => !isBusy(s)).toSorted((a, b) => idleSince(a) - idleSince(b))[0];
 }

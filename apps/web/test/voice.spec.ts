@@ -21,7 +21,7 @@ test("` opens the debug console over the farm, and its level-up shows the banner
   const debug = page.getByTestId("debug");
   await expect(debug).toBeVisible();
   await debug.getByTestId("debug-level-up").click();
-  await expect(page.getByTestId("level-up")).toHaveAttribute("data-level", /^\d+$/);
+  await expect(page.getByTestId("level-up")).toHaveAttribute("data-level", /^\d+$/u);
   const stopped = debug.locator('[data-key="0"]');
   await stopped.click();
   await expect(stopped).toHaveAttribute("aria-pressed", "true");

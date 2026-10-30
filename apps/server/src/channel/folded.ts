@@ -27,11 +27,11 @@ export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   let all = base.channels.filter((x) => x.id !== c.id);
   all.push(c);
   const byID = (a: Channel, b: Channel) => compareText(a.id, b.id);
-  if (all.length <= keepChannels) return { ...base, channels: all.sort(byID) };
+  if (all.length <= keepChannels) return { ...base, channels: all.toSorted(byID) };
   const top = (x: Channel) => (isTop(x) ? 1 : 0);
-  const ranked = [...all].sort((a, b) => or(top(b) - top(a), (b.lastNumber ?? 0) - (a.lastNumber ?? 0)));
+  const ranked = [...all].toSorted((a, b) => or(top(b) - top(a), (b.lastNumber ?? 0) - (a.lastNumber ?? 0)));
   const keep = new Set(ranked.slice(0, keepChannels).map((x) => x.id));
-  all = all.filter((x) => keep.has(x.id)).sort(byID);
+  all = all.filter((x) => keep.has(x.id)).toSorted(byID);
   return { ...base, channels: all };
 }
 

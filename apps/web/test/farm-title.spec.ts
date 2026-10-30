@@ -19,7 +19,7 @@ test("a new farm: continue is off, start asks for the key first, settings leaves
   await page.keyboard.press("Enter");
   await expect(title.getByRole("status")).toBeVisible();
   await title.locator('[data-key="settings"]').click();
-  await expect(page).toHaveURL(/\/settings\/models$/);
+  await expect(page).toHaveURL(/\/settings\/models$/u);
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await expect(title).toHaveCount(0);

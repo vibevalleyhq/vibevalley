@@ -29,7 +29,7 @@ test("while the village's pictures come in, a bar says how far; drawn, it goes",
   await page.goto("/farm/", { waitUntil: "domcontentloaded" });
   const bar = page.getByTestId("village-loading");
   await expect(bar).toBeVisible();
-  await expect(bar).toHaveAttribute("aria-valuenow", /^\d+$/);
+  await expect(bar).toHaveAttribute("aria-valuenow", /^\d+$/u);
   pictures.open();
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect(bar).toHaveCount(0);
@@ -38,8 +38,8 @@ test("while the village's pictures come in, a bar says how far; drawn, it goes",
 test("the farm links to the workbench, and the workbench back to the farm", async ({ page }) => {
   await page.goto("/farm/");
   await page.getByTestId("to-workbench").click();
-  await expect(page).toHaveURL(/\/issues$/);
+  await expect(page).toHaveURL(/\/issues$/u);
   await page.getByTestId("rail").locator('[data-place="farm"]').first().click();
-  await expect(page).toHaveURL(/\/farm$/);
+  await expect(page).toHaveURL(/\/farm$/u);
   await expect(page.getByTestId("farm").locator("canvas")).toBeVisible();
 });

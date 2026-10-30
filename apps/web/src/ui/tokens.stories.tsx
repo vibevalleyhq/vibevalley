@@ -79,7 +79,7 @@ function Grid(props: { children: JSX.Element }) {
 
 /** cubic-bezier(a, b, c, d) as its four numbers. */
 const bezier = (v: string) => {
-  const n = v.match(/-?[\d.]+/g)?.map(Number) ?? [];
+  const n = v.match(/-?[\d.]+/gu)?.map(Number) ?? [];
   return n.length === 4 ? (n as [number, number, number, number]) : undefined;
 };
 

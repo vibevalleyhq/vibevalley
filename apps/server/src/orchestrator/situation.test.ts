@@ -45,7 +45,7 @@ describe("the orchestrator's rules", () => {
   });
 
   it("give every source its head", () => {
-    for (const s of Object.values(intake)) expect(s.head).toMatch(/^\[来源：.+\]/);
+    for (const s of Object.values(intake)) expect(s.head).toMatch(/^\[来源：.+\]/u);
   });
 
   it("word the patrol's finds", () => {

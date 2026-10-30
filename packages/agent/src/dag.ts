@@ -7,7 +7,7 @@ export interface DagNode {
 }
 
 /** Ids are ASCII only. */
-export const dagIDValid = (id: string) => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/.test(id);
+export const dagIDValid = (id: string) => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/u.test(id);
 
 /** id is the node at fault; other the id it names (a missing one); circle the nodes waiting on one another. */
 export type DagProblem =

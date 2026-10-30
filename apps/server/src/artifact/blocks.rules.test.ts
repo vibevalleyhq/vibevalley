@@ -78,7 +78,7 @@ describe("order keys", () => {
       const [at, a, b] = next(keys);
       keys.splice(at, 0, keyBetween(a, b));
     }
-    expect([...keys].sort()).toEqual(keys);
+    expect([...keys].toSorted()).toEqual(keys);
     if (name !== "same gap") expect(Math.max(...keys.map((k) => k.length))).toBeLessThanOrEqual(12);
   });
 
@@ -258,7 +258,7 @@ describe("ops", () => {
           block: block({ id: "", orderKey: "", type: "" as BlockType }),
           newBlock: block({ id: "", orderKey: "", type: "" as BlockType }),
         } as never).reason ?? "",
-      ).not.toMatch(/^不认识的改动/);
+      ).not.toMatch(/^不认识的改动/u);
   });
 
   it("code has no marks", () => {
@@ -295,7 +295,7 @@ const attrsText = (a: BlockAttrs) => {
   ] as const)
     if (v !== undefined) parts.push(`${name}=${v}`);
   if (a.width !== undefined) parts.push(`size=${a.width}x${a.height}`);
-  return parts.sort().join(",");
+  return parts.toSorted().join(",");
 };
 
 const spansText = (spans: readonly TextSpan[]) =>

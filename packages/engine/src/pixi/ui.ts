@@ -56,7 +56,7 @@ export function wrapLines(text: string, style: TextStyle, maxWidth: number, maxL
   const width = (s: string) => CanvasTextMetrics.measureText(s, style).width;
   const lines: string[] = [];
   let line = "";
-  for (const ch of text.replace(/\s+/g, " ")) {
+  for (const ch of text.replace(/\s+/gu, " ")) {
     if (line && width(line + ch) > maxWidth) {
       lines.push(line.trimEnd());
       line = ch === " " ? "" : ch;

@@ -335,7 +335,7 @@ function Shown(props: { artifact: Artifact }) {
             <div class="flex flex-col gap-1.5">
               <h2 class="text-xs font-semibold text-muted">{t("web.artifact.page.versions")}</h2>
               <ol data-testid="artifact-versions" class="flex flex-col gap-0.5">
-                <For each={[...props.artifact.versions].reverse()} keyed={(v) => v.version}>
+                <For each={[...props.artifact.versions].toReversed()} keyed={(v) => v.version}>
                   {(v) => (
                     <li>
                       <button

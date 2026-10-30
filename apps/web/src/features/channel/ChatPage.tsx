@@ -61,7 +61,7 @@ function Chat() {
       router
         .path()
         .split("?")[0]!
-        .replace(/^\/chat\/?/, ""),
+        .replace(/^\/chat\/?/u, ""),
     ) || undefined;
   const chat = () => core()?.chat;
   const shown = createMemo(() => channelOf(chat(), id()));
@@ -331,7 +331,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           class="mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2.5 text-left text-sm text-muted hover:bg-hover"
         >
           <span class="flex-1">{t("web.channel.switcher.open")}</span>
-          <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/.test(navigator.userAgent) })}</span>
+          <span class="text-xs text-faint">{t("web.channel.switcher.keys", { mac: /Mac|iPhone|iPad/u.test(navigator.userAgent) })}</span>
         </button>
         <Section
           item="channels"
@@ -414,7 +414,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
  * first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();
-  const agents = () => [...ready(all, [])].sort((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
+  const agents = () => [...ready(all, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
   const open = (agent: string) =>
     api.channel.direct
       .create({ agent })

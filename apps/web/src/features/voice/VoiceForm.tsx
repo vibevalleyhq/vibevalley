@@ -173,7 +173,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
         class="font-mono"
         inputmode="numeric"
         value={String(draft()[k])}
-        onInput={(e) => set({ ...draft(), [k]: Number(e.currentTarget.value.replace(/\D/g, "")) })}
+        onInput={(e) => set({ ...draft(), [k]: Number(e.currentTarget.value.replace(/\D/gu, "")) })}
       />
     </Labeled>
   );

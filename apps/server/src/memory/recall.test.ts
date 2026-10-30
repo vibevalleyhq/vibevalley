@@ -16,7 +16,7 @@ test("the recorded recalls: the terms, each memory's relevance, the pick", () =>
     const cue: PickCue = { ...input.cue, skip: new Set(input.cue.skip ?? []) };
     const terms = termsOf(cue.text);
     return {
-      terms: [...terms].sort(),
+      terms: [...terms].toSorted(),
       relevance: input.memories.map((m, i) => {
         const got = relevance(m, cue, terms) ?? null;
         return near(got, want[i] ?? null) ? (want[i] ?? null) : got;
@@ -42,7 +42,7 @@ const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session
 const ids = (ms: readonly Memory[]) => ms.map((m) => m.id);
 
 test("terms leave out the too common", () => {
-  expect([...termsOf("用 pnpm test 跑测试")].sort()).toEqual(["pnpm", "test", "测试"].sort());
+  expect([...termsOf("用 pnpm test 跑测试")].toSorted()).toEqual(["pnpm", "test", "测试"].toSorted());
   expect(termsOf("我们需要一个接口").has("一个")).toBe(false);
 });
 

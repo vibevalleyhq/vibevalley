@@ -24,7 +24,7 @@ const int64Max = 9223372036854775807n;
 export function parseChatTarget(target: string): ChatTarget | undefined {
   const direct = chatDirectTarget.exec(target.trim());
   if (direct) return { kind: "direct", peer: chatNamed[direct[1]!] ?? direct[1]! };
-  const text = target.trim().replace(/^#/, "");
+  const text = target.trim().replace(/^#/u, "");
   const m = chatThreadTarget.exec(text);
   if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
   return channelNamePattern.test(text) ? { kind: "channel", name: text } : undefined;

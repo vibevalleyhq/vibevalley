@@ -3,20 +3,20 @@
 // redact.
 
 const shapes = [
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
-  /\bsk-[A-Za-z0-9_-]{16,}/g,
-  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g,
-  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
-  /\bAKIA[0-9A-Z]{16}\b/g,
-  /\bAIza[0-9A-Za-z_-]{30,}/g,
-  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
+  /\bsk-[A-Za-z0-9_-]{16,}/gu,
+  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/gu,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/gu,
+  /\bAKIA[0-9A-Z]{16}\b/gu,
+  /\bAIza[0-9A-Za-z_-]{30,}/gu,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gu,
   // The farm's own session tokens (session/tokens.ts).
-  /\bhb_[A-Za-z0-9]+_[A-Za-z0-9_-]{16,}/g,
+  /\bhb_[A-Za-z0-9]+_[A-Za-z0-9_-]{16,}/gu,
 ];
 
 // The name and what joins it stay, so what was there can still be read: api_key=[redacted], "token": "[redacted]".
-const bearer = /(\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi;
-const named = /(\b[a-z0-9_.-]*(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|certificate)[a-z0-9_]*["']?\s*[=:]\s*["']?)([^\s"',;]{6,})/gi;
+const bearer = /(\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}/giu;
+const named = /(\b[a-z0-9_.-]*(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|certificate)[a-z0-9_]*["']?\s*[=:]\s*["']?)([^\s"',;]{6,})/giu;
 
 const redacted = "[redacted]";
 

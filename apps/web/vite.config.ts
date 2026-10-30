@@ -30,7 +30,7 @@ const opening = (): Plugin => ({
   name: "vibevalley-opening",
   transformIndexHtml(html) {
     const source = readFileSync(join(import.meta.dirname, "public/opening.html"), "utf8");
-    const part = /<!-- opening -->([\s\S]*?)<!-- \/opening -->/.exec(source)?.[1];
+    const part = /<!-- opening -->([\s\S]*?)<!-- \/opening -->/u.exec(source)?.[1];
     if (part === undefined || !html.includes("<!-- opening -->")) throw new Error("opening: public/opening.html and index.html each need the opening marker");
     return html.replace("<!-- opening -->", withOpeningWords(part.trim()));
   },

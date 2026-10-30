@@ -72,14 +72,14 @@ describe("memory", () => {
       const report = yield* w.nextReport;
       expect(report.outcome).toBe("completed");
       const text = lastText(report.id, report.summary);
-      expect(text).toMatch(/｜人设：[\s\S]*「记住：」/);
-      expect(text).toMatch(/\n记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文$/);
+      expect(text).toMatch(/｜人设：[\s\S]*「记住：」/u);
+      expect(text).toMatch(/\n记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文$/u);
 
       const mine = yield* kept("scribe", 3);
       expect(mine).toHaveLength(3);
       const job = mine.find((m) => m.kind === "issue")!;
-      expect(job.text).toMatch(/^写上班打卡，记一笔 → /);
-      const rows = (ms: Memory[]) => ms.map((m) => [m.kind, m.text, m.project ?? "所有项目", m.session ?? ""].join("|")).sort();
+      expect(job.text).toMatch(/^写上班打卡，记一笔 → /u);
+      const rows = (ms: Memory[]) => ms.map((m) => [m.kind, m.text, m.project ?? "所有项目", m.session ?? ""].join("|")).toSorted();
       expect(rows(mine)).toEqual(
         [
           ["note", "这个项目用 pnpm test 跑测试", "memo", first.id],
@@ -87,7 +87,7 @@ describe("memory", () => {
           ["issue", job.text, "memo", first.id],
         ]
           .map((r) => r.join("|"))
-          .sort(),
+          .toSorted(),
       );
       expect(yield* memories.list(first.id)).toEqual([]);
 
@@ -95,8 +95,8 @@ describe("memory", () => {
       const second = mustHire(yield* issues.hire(scribe(), "再加一个下班打卡", "memo"));
       let [recalled, asked] = reminded(yield* nextPrompt(f, next, 1));
       expect(asked).toBe("再加一个下班打卡");
-      expect([...recalled].sort()).toEqual(
-        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + job.text].sort(),
+      expect([...recalled].toSorted()).toEqual(
+        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + job.text].toSorted(),
       );
       yield* w.nextReport;
       const steps = sessions.events(second.id)!;

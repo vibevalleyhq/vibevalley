@@ -20,9 +20,9 @@ export const quotaLevel = (left: number | undefined): QuotaLevel => (left === un
 export function windowLabel(label: string) {
   if (label === "Current session") return t("web.runtime.quota.session");
   if (label === "Weekly included usage") return t("web.runtime.quota.weekly");
-  const week = /^Current week \((.+)\)$/.exec(label);
+  const week = /^Current week \((.+)\)$/u.exec(label);
   if (week) return t("web.runtime.quota.week", { models: week[1]! });
-  return label.replace(/·\s*1 week/, t("web.runtime.quota.oneWeek"));
+  return label.replace(/·\s*1 week/u, t("web.runtime.quota.oneWeek"));
 }
 
 export function resetText(at: number, now = Date.now()) {

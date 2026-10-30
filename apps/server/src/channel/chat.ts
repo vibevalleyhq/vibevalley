@@ -92,7 +92,7 @@ export const logKeep = 80;
 const threadTitleMax = 24;
 /** How much of a channel's newest message a list shows. */
 const lastMax = 80;
-const oneLine = (text: string, n: number) => head(text.replace(/\s+/g, " ").trim(), n);
+const oneLine = (text: string, n: number) => head(text.replace(/\s+/gu, " ").trim(), n);
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
@@ -579,7 +579,7 @@ export const make = Effect.gen(function* () {
     model
       .channels()
       .flatMap((c) => (c.name !== null ? [c] : []))
-      .sort((a, b) => (a.id < b.id ? -1 : 1))
+      .toSorted((a, b) => (a.id < b.id ? -1 : 1))
       .map((c) => "#" + c.name);
   const channelOfSession = (h: Session) => (h.channel && channelName(h.channel) !== undefined ? h.channel : defaultId);
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? row.parent_id! : row.id);
@@ -1157,7 +1157,7 @@ export const make = Effect.gen(function* () {
         ? t("server.channel.dispatch.split", { graph: h.graph.id })
         : h.refining
           ? t("server.channel.dispatch.draft")
-          : head(h.brief.replace(/\s+/g, " "), 80);
+          : head(h.brief.replace(/\s+/gu, " "), 80);
     // The dispatch note is the farm's, under the name of the orchestrator that looks after the channel.
     const by = orchestratorOfRow(model.channel(channel));
     yield* seat(by);
@@ -1229,7 +1229,7 @@ export const make = Effect.gen(function* () {
       yield* db(qd.rollbackAll());
       open.load(yield* db(qd.allOpenDeliveries()));
       const recent = yield* db(qc.recentChannels({ n: keepChannels }));
-      for (const c of [...recent].reverse()) yield* core.apply({ type: "channel", channel: yield* counted(c) });
+      for (const c of [...recent].toReversed()) yield* core.apply({ type: "channel", channel: yield* counted(c) });
       yield* publishOwnerMentions;
     }),
   );
@@ -1282,7 +1282,7 @@ export const make = Effect.gen(function* () {
       return direct.id;
     }
     let channel = defaultId;
-    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
+    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/u, "").split(":")[0]!;
     if (name) {
       const found = model.channelByName(name);
       if (!found) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]));
@@ -1405,7 +1405,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const live = yield* PubSub.subscribe(said);
           const missed =
-            after === undefined ? [...(yield* db(qm.recentReports({ n: logKeep })))].reverse() : yield* db(qm.reportsAfter({ after, n: catchUpMax + 1 }));
+            after === undefined ? [...(yield* db(qm.recentReports({ n: logKeep })))].toReversed() : yield* db(qm.reportsAfter({ after, n: catchUpMax + 1 }));
           if (missed.length > catchUpMax) return Stream.succeed<ChannelEvent>({ _tag: "Reset" });
           const upto = missed.at(-1)?.id ?? after ?? "";
           const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.kind === "report" && m.id > upto)), "chat.reports");
@@ -1621,7 +1621,7 @@ export const make = Effect.gen(function* () {
             }
             const newest = shown.at(-1);
             if (newest && shown.length === unseen.length) yield* setRead(from, channel, newest.number, now);
-            return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length };
+            return { kind: "held", target, shown: shown.toReversed(), more: unseen.length - shown.length };
           }
           // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
           const caller = !agents.isOrchestrator(from) ? (yield* one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
@@ -1699,7 +1699,7 @@ export const make = Effect.gen(function* () {
           const rows =
             opt.unread === true
               ? yield* db(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
-              : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].reverse();
+              : [...(yield* db(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].toReversed();
           const newest = rows.at(-1);
           if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
           lastRead.set(who, target);
@@ -1717,7 +1717,7 @@ export const make = Effect.gen(function* () {
     list: () => Effect.forEach([...model.channels("channel"), ...model.channels("direct")], counted),
     history: (channel, before, limit) =>
       Effect.map(db(qm.messagesBefore({ channel_id: channel, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) })), (rows) =>
-        [...rows].reverse().map(toMessage),
+        [...rows].toReversed().map(toMessage),
       ),
     markRead: (channel, seq) =>
       locked(
@@ -1750,7 +1750,7 @@ export const make = Effect.gen(function* () {
     openChannel: (name, description, project) =>
       locked(
         Effect.gen(function* () {
-          const clean = name.trim().replace(/^#/, "");
+          const clean = name.trim().replace(/^#/u, "");
           const rows = model.channels();
           const problem = channelNameProblem(
             clean,
@@ -1803,7 +1803,7 @@ export const make = Effect.gen(function* () {
           if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(t("server.channel.threadOnlyTitle")));
           let name = row.name;
           if (upd.name !== undefined) {
-            const clean = upd.name.trim().replace(/^#/, "");
+            const clean = upd.name.trim().replace(/^#/u, "");
             if (row.type === "thread") name = clean ? head(clean, threadTitleMax * 2) : null;
             else {
               const problem = channelNameProblem(
@@ -1935,7 +1935,7 @@ export const make = Effect.gen(function* () {
         const row = model.channel(channel);
         if (!row) return [];
         const target = targetOfChannel(row);
-        return [...(yield* db(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].reverse().map((m) => inboxOf(m, target));
+        return [...(yield* db(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => inboxOf(m, target));
       }),
     notifyOf: (id) => {
       const c = model.channel(id);
@@ -1984,7 +1984,7 @@ export const make = Effect.gen(function* () {
       }),
     channelByName: (name) =>
       Effect.sync(() => {
-        const found = model.channelByName(name.trim().replace(/^#/, ""));
+        const found = model.channelByName(name.trim().replace(/^#/u, ""));
         return found ? infoOf(found) : undefined;
       }),
     useHelpers: (h) => void (helpers = h),

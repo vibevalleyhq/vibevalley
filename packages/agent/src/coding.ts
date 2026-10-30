@@ -199,7 +199,7 @@ export function codingTools(o: CodingOptions): Tool[] {
       const depth = p.depth ?? 1;
       const out: string[] = [];
       const walk = (dir: string, level: number) => {
-        const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => localeLess(a.name, b.name));
+        const entries = readdirSync(dir, { withFileTypes: true }).toSorted((a, b) => localeLess(a.name, b.name));
         for (const e of entries) {
           if (out.length >= 500) return;
           if (e.name === ".git" || e.name === "node_modules") continue;
@@ -292,17 +292,17 @@ export function codingTools(o: CodingOptions): Tool[] {
 
 export function htmlText(html: string): string {
   return html
-    .replace(/<(script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|h[1-6]|li|tr|section|article|header|footer)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<(script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1>/giu, "")
+    .replace(/<br\s*\/?>/giu, "\n")
+    .replace(/<\/(p|div|h[1-6]|li|tr|section|article|header|footer)>/giu, "\n")
+    .replace(/<[^>]+>/gu, "")
     .replaceAll("&nbsp;", " ")
     .replaceAll("&amp;", "&")
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">")
     .replaceAll("&quot;", '"')
     .replaceAll("&#39;", "'")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/gu, "\n")
+    .replace(/\n{3,}/gu, "\n\n")
     .trim();
 }

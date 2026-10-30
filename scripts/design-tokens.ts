@@ -15,15 +15,15 @@ const layers = new Set([0, 10, 20, 30, 40]);
 // A class starts the string, follows a space, or follows a variant (hover:, md:, aria-[…]:).
 const start = String.raw`(?:^|[\s:])`;
 const checks: readonly { readonly kind: TokenKind; readonly pattern: RegExp; readonly off?: (m: RegExpExecArray) => boolean }[] = [
-  { kind: "radius", pattern: new RegExp(`${start}rounded(?:-[a-z]+)?-\\[`, "g") },
-  { kind: "type", pattern: new RegExp(`${start}text-\\[\\d`, "g") },
-  { kind: "motion", pattern: new RegExp(`${start}(?:ease|duration|delay)-\\[`, "g") },
-  { kind: "motion", pattern: new RegExp(`${start}duration-(\\d+)\\b`, "g"), off: (m) => !durations.has(Number(m[1])) },
-  { kind: "layer", pattern: new RegExp(`${start}-?z-(\\d+)\\b`, "g"), off: (m) => !layers.has(Number(m[1])) },
-  { kind: "layer", pattern: new RegExp(`${start}z-\\[`, "g") },
-  { kind: "disabled", pattern: new RegExp(`${start}disabled:opacity-(\\d+)\\b`, "g"), off: (m) => m[1] !== "50" },
+  { kind: "radius", pattern: new RegExp(`${start}rounded(?:-[a-z]+)?-\\[`, "gu") },
+  { kind: "type", pattern: new RegExp(`${start}text-\\[\\d`, "gu") },
+  { kind: "motion", pattern: new RegExp(`${start}(?:ease|duration|delay)-\\[`, "gu") },
+  { kind: "motion", pattern: new RegExp(`${start}duration-(\\d+)\\b`, "gu"), off: (m) => !durations.has(Number(m[1])) },
+  { kind: "layer", pattern: new RegExp(`${start}-?z-(\\d+)\\b`, "gu"), off: (m) => !layers.has(Number(m[1])) },
+  { kind: "layer", pattern: new RegExp(`${start}z-\\[`, "gu") },
+  { kind: "disabled", pattern: new RegExp(`${start}disabled:opacity-(\\d+)\\b`, "gu"), off: (m) => m[1] !== "50" },
   // A shadow of its own is drawn with the palette's variables (an inset accent line), never a colour written in.
-  { kind: "shadow", pattern: new RegExp(`${start}shadow-\\[([^\\]]*)\\]`, "g"), off: (m) => !m[1]!.includes("var(") },
+  { kind: "shadow", pattern: new RegExp(`${start}shadow-\\[([^\\]]*)\\]`, "gu"), off: (m) => !m[1]!.includes("var(") },
 ];
 
 /** Each token a class string writes off its ladder, in order. */
@@ -33,7 +33,7 @@ export function offTokens(classes: string): TokenKind[] {
     c.pattern.lastIndex = 0;
     for (let m = c.pattern.exec(classes); m; m = c.pattern.exec(classes)) if (!c.off || c.off(m)) found.push({ at: m.index, kind: c.kind });
   }
-  return found.sort((a, b) => a.at - b.at).map((f) => f.kind);
+  return found.toSorted((a, b) => a.at - b.at).map((f) => f.kind);
 }
 
 /** What to write instead, by kind. */
@@ -47,4 +47,4 @@ export const tokenAdvice: Record<TokenKind, string> = {
 };
 
 /** A colour written into a class anywhere inside its brackets (bg-[#e3efd2], shadow-[0_1px_2px_#2f1f1326]). */
-export const hexClass = /-\[[^\]]*#[0-9a-fA-F]{3,8}\b[^\]]*\]/;
+export const hexClass = /-\[[^\]]*#[0-9a-fA-F]{3,8}\b[^\]]*\]/u;

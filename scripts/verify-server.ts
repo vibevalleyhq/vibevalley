@@ -213,7 +213,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     throw new Error(`${String(error)}\nevidence: ${evidence}`, { cause: error });
   } finally {
     const failures: unknown[] = [];
-    for (const child of [...owned].reverse()) {
+    for (const child of [...owned].toReversed()) {
       try {
         await stop(child);
       } catch (error) {

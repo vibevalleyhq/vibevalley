@@ -63,7 +63,7 @@ function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): string {
   return provider || piSettings().provider;
 }
 
-const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/;
+const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
 
 /**
  * A value from pi's config as pi reads it: the environment variable it names when one is set (DEEPSEEK_API_KEY,
@@ -85,7 +85,7 @@ export function piDeepseek(): { key: string; base: string } {
   const p = readJson("models.json", ModelsFile)?.providers?.deepseek;
   if (!key && p?.apiKey) key = piValue(p.apiKey);
   if (p?.baseUrl) base = p.baseUrl;
-  base = base.replace(/\/$/, "").replace(/\/v1$/, "").replace(/\/$/, "");
+  base = base.replace(/\/$/u, "").replace(/\/v1$/u, "").replace(/\/$/u, "");
   return { key, base };
 }
 

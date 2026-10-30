@@ -35,7 +35,7 @@ function parse(text: string): Part[] {
     return out;
   };
   const placeholderAt = (start: number): Part | undefined => {
-    const m = /^\{\s*([A-Za-z_$][\w$]*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/.exec(text.slice(start));
+    const m = /^\{\s*([A-Za-z_$][\w$]*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/u.exec(text.slice(start));
     if (!m) return undefined;
     i = start + m[0].length;
     const kind = kinds.find((k) => k === m[2]);
@@ -46,7 +46,7 @@ function parse(text: string): Part[] {
     }
     const cases: Record<string, Part[]> = {};
     while (true) {
-      const c = /^\s*([^\s{}]+)\s*\{/.exec(text.slice(i));
+      const c = /^\s*([^\s{}]+)\s*\{/u.exec(text.slice(i));
       if (!c) break;
       i += c[0].length;
       cases[c[1]!] = parts("}");
@@ -66,7 +66,7 @@ const ordinal = new Intl.PluralRules("en", { type: "ordinal" });
 function render(parts: readonly Part[], params: Params, count?: number): string {
   let out = "";
   for (const p of parts) {
-    if (typeof p === "string") out += count === undefined ? p : p.replace(/#/g, String(count));
+    if (typeof p === "string") out += count === undefined ? p : p.replace(/#/gu, String(count));
     else if (!p.kind) out += p.name in params ? String(params[p.name]) : `{${p.name}}`;
     else {
       const v = params[p.name];

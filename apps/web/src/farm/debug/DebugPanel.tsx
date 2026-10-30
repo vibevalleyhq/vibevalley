@@ -286,7 +286,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           }
         >
           <ol class="flex flex-col gap-0.5">
-            <For each={props.log.entries().slice(-200).reverse()} keyed={(e) => e.seq}>
+            <For each={props.log.entries().slice(-200).toReversed()} keyed={(e) => e.seq}>
               {(e) => (
                 <li data-testid="debug-frame" data-type={e().type} class="flex gap-2">
                   <span class="w-8 shrink-0 text-right text-ink-500">{e().seq}</span>

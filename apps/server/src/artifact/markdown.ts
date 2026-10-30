@@ -86,7 +86,7 @@ const specials = "\\*_`~[]";
 const escape = (t: string) => Array.from(t, (c) => (specials.includes(c) ? "\\" + c : c)).join("");
 
 /** An ASCII letter or digit. */
-const wordy = (c: string | undefined) => c !== undefined && /^[A-Za-z0-9]$/.test(c);
+const wordy = (c: string | undefined) => c !== undefined && /^[A-Za-z0-9]$/u.test(c);
 
 function inlineOf(spans: readonly TextSpan[]): string {
   const all = normal(spans);
@@ -108,17 +108,17 @@ function inlineOf(spans: readonly TextSpan[]): string {
 
 const codeSpan = (t: string) => (t.includes("`") ? "`` " + t + " ``" : "`" + t + "`");
 
-const headingLine = /^(#{1,3}) (.*)$/s;
-const todoLine = /^[-*+] \[( |x|X)\] ?(.*)$/s;
-const bulletLine = /^[-*+] (.*)$/s;
-const numberLine = /^\d+[.)] (.*)$/s;
-const dividerLine = /^(-{3,}|\*{3,}|_{3,})$/;
-const imageLine = /^!\[((?:\\.|[^\]])*)\]\(([^)\s]*)(?: "(\d+)x(\d+)")?\)$/s;
-const issueLine = /^<!-- issue:(\S+) -->$/;
-const memoryLine = /^<!-- memory:(\S+) -->(?: (.*))?$/s;
-const fenceLine = /^```(\S*)$/;
-const quoteLine = /^> ?(.*)$/s;
-const indentOf = (s: string) => /^ */.exec(s)![0].length;
+const headingLine = /^(#{1,3}) (.*)$/su;
+const todoLine = /^[-*+] \[( |x|X)\] ?(.*)$/su;
+const bulletLine = /^[-*+] (.*)$/su;
+const numberLine = /^\d+[.)] (.*)$/su;
+const dividerLine = /^(-{3,}|\*{3,}|_{3,})$/u;
+const imageLine = /^!\[((?:\\.|[^\]])*)\]\(([^)\s]*)(?: "(\d+)x(\d+)")?\)$/su;
+const issueLine = /^<!-- issue:(\S+) -->$/u;
+const memoryLine = /^<!-- memory:(\S+) -->(?: (.*))?$/su;
+const fenceLine = /^```(\S*)$/u;
+const quoteLine = /^> ?(.*)$/su;
+const indentOf = (s: string) => /^ */u.exec(s)![0].length;
 
 /** One line (its indent taken off) read as the start of a block; the text is still Markdown. */
 interface LineKind {
@@ -163,7 +163,7 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
     const spaces = indentOf(raw);
     const depth = Math.min(Math.floor(spaces / 2), open);
     const line = raw.slice(spaces);
-    const strip = (l: string): [string, boolean] => (indentOf(l) < spaces ? [l.replace(/^ +/, ""), false] : [l.slice(spaces), true]);
+    const strip = (l: string): [string, boolean] => (indentOf(l) < spaces ? [l.replace(/^ +/u, ""), false] : [l.slice(spaces), true]);
     const k = classify(line);
     if (k.type === "code") {
       const body: string[] = [];

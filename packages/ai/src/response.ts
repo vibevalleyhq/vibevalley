@@ -42,7 +42,7 @@ export class SseData {
     if (l.startsWith(":")) return undefined;
     const colon = l.indexOf(":");
     const field = colon < 0 ? l : l.slice(0, colon);
-    if (field === "data") this.data.push(colon < 0 ? "" : l.slice(colon + 1).replace(/^ /, ""));
+    if (field === "data") this.data.push(colon < 0 ? "" : l.slice(colon + 1).replace(/^ /u, ""));
     return undefined;
   }
 }
@@ -324,7 +324,7 @@ export function repairJson(json: string): string {
         out += "\\\\";
         continue;
       }
-      if (next === "u" && /^[0-9a-fA-F]{4}$/.test(json.slice(i + 2, i + 6))) {
+      if (next === "u" && /^[0-9a-fA-F]{4}$/u.test(json.slice(i + 2, i + 6))) {
         out += `\\u${json.slice(i + 2, i + 6)}`;
         i += 5;
         continue;

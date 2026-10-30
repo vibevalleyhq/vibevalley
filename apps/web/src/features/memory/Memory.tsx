@@ -100,7 +100,7 @@ export function MemoryPanel(props: { agent: string }) {
   const sources = () => new Map((view()?.sources ?? []).map((s) => [s.name, s]));
   const notes = () => all().filter((m) => m.kind === "note");
   const jobs = () => all().filter((m) => m.kind === "issue");
-  const projects = () => [...new Set(all().flatMap((m) => (m.project ? [m.project] : [])))].sort();
+  const projects = () => [...new Set(all().flatMap((m) => (m.project ? [m.project] : [])))].toSorted();
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.project === undefined : m.project === shown()));
   const whose = (m: Memory) =>
     m.author === "owner"

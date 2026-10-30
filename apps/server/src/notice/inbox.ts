@@ -24,7 +24,7 @@ export interface InboxEntry {
 export const inbox = (state: WorkspaceState): InboxItem[] =>
   inboxEntries(state)
     .map((e) => e.item)
-    .sort((a, b) => b.at - a.at);
+    .toSorted((a, b) => b.at - a.at);
 
 type Unworded = Omit<InboxEntry, "item"> & { readonly item: Omit<InboxItem, "who" | "words"> };
 
@@ -234,7 +234,7 @@ function wantOf(h: Session, state: WorkspaceState): Want | undefined {
 }
 
 function clipLine(text: string, max = 140) {
-  const one = text.replace(/\s+/g, " ").trim();
+  const one = text.replace(/\s+/gu, " ").trim();
   return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 }
 

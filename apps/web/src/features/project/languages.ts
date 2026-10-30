@@ -79,7 +79,7 @@ export function languageShares(counts: readonly LanguageCount[], top: number | u
     const e = merged.get(language.label);
     merged.set(language.label, { language, lines: (e?.lines ?? 0) + c.code + c.comments, files: (e?.files ?? 0) + c.files });
   }
-  const all = [...merged.values()].filter((e) => e.lines > 0).sort((a, b) => or(b.lines - a.lines, compareText(a.language.label, b.language.label)));
+  const all = [...merged.values()].filter((e) => e.lines > 0).toSorted((a, b) => or(b.lines - a.lines, compareText(a.language.label, b.language.label)));
   const total = all.reduce((n, e) => n + e.lines, 0);
   const cut = top;
   const rest = all.length > cut ? all.slice(cut) : [];

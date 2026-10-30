@@ -38,7 +38,7 @@ test("the archive and the orchestrator's voice", async ({ page }) => {
   await page.goto("/orchestrator/archive");
   await expect(page.getByTestId("archive")).toHaveAttribute("data-count", "0");
   await tab(page, "voice").click();
-  await expect(page).toHaveURL(/\/orchestrator\/voice$/);
+  await expect(page).toHaveURL(/\/orchestrator\/voice$/u);
   const greeting = page.getByTestId("greeting");
   const before = await greeting.inputValue();
   await greeting.fill("Here I am, what shall we grow?");

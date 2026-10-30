@@ -83,7 +83,7 @@ describe("memory", () => {
       });
       yield* m.keep({ agent: "lab", session: "w2", project: "clock", job: "不算", outcome: "interrupted", said: "记住：停下的不算", summary: "" });
       const all = yield* m.list("lab");
-      expect(all.map((x) => `${x.kind}:${x.text}`).sort()).toEqual([
+      expect(all.map((x) => `${x.kind}:${x.text}`).toSorted()).toEqual([
         "issue:加分页 → 没做成：测试没过",
         "note:提交信息写中文",
         "note:这个项目用 pnpm test 跑测试",
@@ -132,7 +132,7 @@ describe("memory", () => {
       expect(carried > 0 && carried < 100).toBe(true);
       rewriteMemory(folder, "# header\n- first\n* second\nplain third\n");
       expect((yield* m.memoriesOf("orchestrator")).carried).toBe(3);
-      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/) });
+      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/u) });
     }).pipe(Effect.provide(world(config)));
   });
 

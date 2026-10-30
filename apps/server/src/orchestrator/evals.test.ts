@@ -40,7 +40,7 @@ describe("the orchestrator's evals", () => {
       expect({ e, passes: check([e], on).length === 0 }).toEqual({ e, passes: pass });
       if (pass) passed.add(e.kind);
     }
-    expect([...passed].sort()).toEqual([...kinds].sort());
+    expect([...passed].toSorted()).toEqual([...kinds].toSorted());
   });
 
   // Each committed case is red on the turn it recorded: its expect catches the error it was saved for.

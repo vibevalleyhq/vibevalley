@@ -6,14 +6,14 @@ const sections = ["general", "appearance", "models", "about", "memory", "skills"
 
 test("settings lists its sections, opens on general, and the search narrows them", async ({ page }) => {
   await page.goto("/settings");
-  await expect(page).toHaveURL(/\/settings\/general$/);
+  await expect(page).toHaveURL(/\/settings\/general$/u);
   const nav = page.getByTestId("settings-nav");
   const links = nav.locator("a[data-key]");
   await expect(links).toHaveCount(sections.length);
   for (const id of sections) await expect(nav.locator(`[data-key="${id}"]`)).toBeVisible();
   await expect(nav.locator('[data-key="general"]')).toHaveAttribute("aria-current", "page");
   await nav.locator('[data-key="github"]').click();
-  await expect(page).toHaveURL(/\/settings\/github$/);
+  await expect(page).toHaveURL(/\/settings\/github$/u);
   await expect(page.getByTestId("github-recheck")).toBeVisible();
   // What a search matches is base/search.test.ts's; here it narrows the sections and lights the rows.
   await page.getByTestId("settings-search").fill("MOSS");
@@ -41,11 +41,11 @@ test("appearance and general keep this device's choices", async ({ page }) => {
   await page.goto("/settings/general");
   await page.getByTestId("start").locator('[data-key="farm"]').click();
   await page.goto("/");
-  await expect(page).toHaveURL(/\/farm/);
+  await expect(page).toHaveURL(/\/farm/u);
   await page.goto("/settings/general");
   await page.getByTestId("start").locator('[data-key="workbench"]').click();
   await page.goto("/");
-  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page).toHaveURL(/\/chat$/u);
 });
 
 test("a DeepSeek key is saved, shown by its end and removed", async ({ page }) => {
@@ -61,7 +61,7 @@ test("a DeepSeek key is saved, shown by its end and removed", async ({ page }) =
   await page.getByTestId("save").click();
   await expect(key).toHaveValue("");
   await expect(mark).toHaveAttribute("data-state", "settings");
-  await expect(mark).toHaveAttribute("data-hint", /cdef/);
+  await expect(mark).toHaveAttribute("data-hint", /cdef/u);
   await row.getByTestId("remove-key").click();
   await expect(mark).toHaveAttribute("data-state", "removing");
   await page.getByTestId("save").click();
@@ -93,7 +93,7 @@ test("a skill of VibeValley's own is written, listed and deleted", async ({ page
   await page.getByTestId("skill-description").fill("Before changing behaviour, add a failing test.");
   await page.getByTestId("skill-body").fill("Write a test that reproduces the problem before changing anything.");
   await save.click();
-  await expect(page).toHaveURL(/\/settings\/skills\/(?!new).+/);
+  await expect(page).toHaveURL(/\/settings\/skills\/(?!new).+/u);
   const path = new URL(page.url()).pathname;
   const entry = page.getByTestId("skills-book").locator(`[data-testid="skill-entry"][href="${path}"]`);
   await expect(entry).toHaveAttribute("aria-current", "page");
@@ -103,7 +103,7 @@ test("a skill of VibeValley's own is written, listed and deleted", async ({ page
   await page.getByTestId("skills-search").fill("");
   await page.getByTestId("delete").click();
   await page.getByTestId("delete-sure").click();
-  await expect(page).toHaveURL(/\/settings\/skills$/);
+  await expect(page).toHaveURL(/\/settings\/skills$/u);
   await expect(entry).toBeHidden();
 });
 
@@ -113,7 +113,7 @@ test("the connectors show how each one connects", async ({ page }) => {
   await expect(list.locator('[data-key="weixin"]')).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("connector-login")).toBeEnabled();
   await list.locator('[data-key="qq"]').click();
-  await expect(page).toHaveURL(/\/settings\/chat\/qq$/);
+  await expect(page).toHaveURL(/\/settings\/chat\/qq$/u);
   const connect = page.getByTestId("connector-login");
   await expect(connect).toBeDisabled();
   await page.getByTestId("qq-app-id").fill("102000000");
@@ -124,12 +124,12 @@ test("the connectors show how each one connects", async ({ page }) => {
 test("connecting to this machine opens, shows a pairing code and closes", async ({ page }) => {
   await page.goto("/settings/devices");
   await page.getByTestId("lan-allow").click();
-  await expect(page.getByTestId("lan-url")).toHaveText(/^http:\/\/[\d.]+:\d+$/);
+  await expect(page.getByTestId("lan-url")).toHaveText(/^http:\/\/[\d.]+:\d+$/u);
   await page.getByTestId("lan-add").click();
   const pairing = page.getByTestId("pairing");
   await expect(pairing.getByTestId("pairing-qr")).toBeVisible();
-  await expect(pairing.getByTestId("pairing-link")).toHaveText(/^http:\/\/[\d.]+:\d+\/pair\?c=/);
-  await expect(pairing).toHaveAttribute("data-left", /^[1-9]\d*$/);
+  await expect(pairing.getByTestId("pairing-link")).toHaveText(/^http:\/\/[\d.]+:\d+\/pair\?c=/u);
+  await expect(pairing).toHaveAttribute("data-left", /^[1-9]\d*$/u);
   await pairing.getByTestId("pairing-stop").click();
   await page.getByTestId("lan-close").click();
   await expect(page.getByTestId("lan-allow")).toBeVisible();

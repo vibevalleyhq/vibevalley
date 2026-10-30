@@ -84,7 +84,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
 
   /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
   const post = (path: string, body: unknown, closing = false) => {
-    const request = HttpClientRequest.post(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`).pipe(
+    const request = HttpClientRequest.post(`${c.url.replace(/\/+$/u, "")}/api/v2/memory/${path}`).pipe(
       HttpClientRequest.bodyJsonUnsafe(body),
       c.key ? HttpClientRequest.bearerToken(c.key) : (r) => r,
     );
@@ -141,7 +141,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   const find = (agent: string, query: string, limit: number, kind: MemoryKind, project: string) =>
     Effect.map(
       Effect.forEach(project ? [project, ""] : [""], (p) => findIn(agent, query, limit, kind, p), { concurrency: "unbounded" }),
-      (all) => all.flat().sort((a, b) => b.score - a.score),
+      (all) => all.flat().toSorted((a, b) => b.score - a.score),
     );
 
   return {

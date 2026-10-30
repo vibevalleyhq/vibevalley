@@ -48,6 +48,6 @@ export const runtimeLabel: Record<string, string> = { claude: "Claude", codex: "
 
 /** A profile's duty up to its first stop, at most 18 characters. */
 export function dutyShort(duty: string) {
-  const first = duty.split(/[，。,.]/)[0] ?? "";
+  const first = duty.split(/[，。,.]/u)[0] ?? "";
   return first.length > 18 ? first.slice(0, 18) : first;
 }

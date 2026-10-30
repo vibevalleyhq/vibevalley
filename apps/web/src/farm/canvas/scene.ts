@@ -551,7 +551,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const counts = new Map<string, number>();
     const crowd = (key: string) => counts.get(key) ?? 0;
     let queued = 0;
-    for (const s of [...state.sessions].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    for (const s of [...state.sessions].toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
       const station = stationOfSession(s);
       const crop = cropOf(s);
       const pose = poseOf(s, crop);

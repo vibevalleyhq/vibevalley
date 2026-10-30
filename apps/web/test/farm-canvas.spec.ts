@@ -76,15 +76,15 @@ test("the cursor is the tool's, and says whether it can be used where it points"
   await page.goto("/farm/");
   const village = page.getByTestId("village");
   await expect(village).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  await expect(village).toHaveCSS("cursor", /hand\.png/);
+  await expect(village).toHaveCSS("cursor", /hand\.png/u);
   // An empty plot (the top left bed) can be sowed with the hand.
   const box = (await village.locator("canvas").boundingBox())!;
   const scale = box.width / 384;
   await page.mouse.move(box.x + 128 * scale, box.y + 117 * scale);
-  await expect(village).toHaveCSS("cursor", /hand-point/);
+  await expect(village).toHaveCSS("cursor", /hand-point/u);
   // The watering can on an empty plot: nothing to water.
   await page.keyboard.press("2");
-  await expect(village).toHaveCSS("cursor", /water-no/);
+  await expect(village).toHaveCSS("cursor", /water-no/u);
 });
 
 test("helpers walk in, work their plots and the library, and light lanterns at night", async ({ page, server }) => {

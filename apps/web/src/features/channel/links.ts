@@ -5,7 +5,7 @@ export interface LinkedMessage {
   readonly number: number;
 }
 
-const farmLink = /https?:\/\/([^/\s]+)\/chat(?:\/([0-9a-f-]{36}))?\?m=(\d+)/g;
+const farmLink = /https?:\/\/([^/\s]+)\/chat(?:\/([0-9a-f-]{36}))?\?m=(\d+)/gu;
 
 /** The farm messages a text links to, once each, at most three: a link to a channel the chat knows, from any address the
  * farm is reached at (a phone has its own); the default channel's, which names none, only at the page's own host. */

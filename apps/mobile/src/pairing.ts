@@ -23,7 +23,7 @@ export function parsePairLink(text: string): PairLink | undefined {
   if (!code) return undefined;
   if (u.protocol === "vibevalley:") {
     const farm = parseFarm(u.searchParams.get("u") ?? "");
-    return farm && (u.host === "pair" || u.pathname.replace(/^\/+/, "") === "pair") ? { url: farm, code } : undefined;
+    return farm && (u.host === "pair" || u.pathname.replace(/^\/+/u, "") === "pair") ? { url: farm, code } : undefined;
   }
   if ((u.protocol === "http:" || u.protocol === "https:") && u.pathname === "/pair") return { url: u.origin, code };
   return undefined;

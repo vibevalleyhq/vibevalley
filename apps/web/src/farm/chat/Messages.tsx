@@ -52,7 +52,7 @@ function DispatchNote(props: { text: string }) {
       class="group flex w-full cursor-pointer items-start gap-1.5 text-left"
     >
       <span class="min-w-0 flex-1">
-        <Show when={open()} fallback={<span class="block truncate">{props.text.replace(/\s+/g, " ").trim()}</span>}>
+        <Show when={open()} fallback={<span class="block truncate">{props.text.replace(/\s+/gu, " ").trim()}</span>}>
           <PxMarkdown text={props.text} mentions />
         </Show>
       </span>

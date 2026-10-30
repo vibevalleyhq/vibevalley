@@ -330,7 +330,7 @@ export interface Endpoint {
 export { pathOf };
 
 /** How the command line writes a word of an op: previewDelete is preview-delete. */
-export const kebab = (word: string) => word.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
+export const kebab = (word: string) => word.replace(/[A-Z]/gu, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
 
 export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: unknown): string[] => [
   ...op.split(".").map(kebab),
@@ -339,7 +339,7 @@ export const commandOf = (op: keyof Handlers, about: readonly string[] = [], inp
 ];
 
 /** Only get, list, check, recall and preview read; every other verb may change something. */
-export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/.test(op.split(".").at(-1) ?? "");
+export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/u.test(op.split(".").at(-1) ?? "");
 
 /** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
 export const fieldsOf = (e: Endpoint): readonly string[] => {

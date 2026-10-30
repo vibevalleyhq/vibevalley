@@ -618,7 +618,7 @@ function Runs(props: { issue: string; version: string }) {
     <Show when={runs().length > 0} fallback={<p class={xs}>{t("web.farm.plot.noRuns")}</p>}>
       <FarmSection title={t("web.farm.plot.runs")}>
         <p class={xs}>{t("web.farm.plot.runCount", { n: runs().length })}</p>
-        <For each={[...runs()].reverse()} keyed={(r) => r.id}>
+        <For each={[...runs()].toReversed()} keyed={(r) => r.id}>
           {(r) => (
             <Row label={wallClockText(r().startedAt)}>
               <p class={body}>{runText(r(), now(), tookText)}</p>

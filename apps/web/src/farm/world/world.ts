@@ -65,7 +65,7 @@ export class VillageWorld {
     this.queue = level.theThing("Queue").at;
     this.orchestrator = level.theThing("Manager").at;
     this.dog = level.theThing("Dog").at;
-    this.lawn = [...level.thingsOf("Rest")].sort((a, b) => Number(a.field("n")) - Number(b.field("n"))).map((t) => t.at);
+    this.lawn = [...level.thingsOf("Rest")].toSorted((a, b) => Number(a.field("n")) - Number(b.field("n"))).map((t) => t.at);
     this.lights = level.thingsOf("Light").map((t) => ({ at: t.at, r: Number(t.field("r")) }));
     this.props = level.thingsOf("Prop").map((t) => ({ spot: String(t.field("spot")), sprite: String(t.field("sprite")), at: t.at, box: t.box }));
     const fxOf = (kind: FxKind) =>

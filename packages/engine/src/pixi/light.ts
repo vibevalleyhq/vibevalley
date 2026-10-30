@@ -225,7 +225,7 @@ export function pixelLighting(stage: PixelStage, { normalsOf }: LightingOptions)
       u.uTime = time;
       const shown = lights
         .filter((l) => l.intensity > 0.01 && l.radius > 0)
-        .sort((a, b) => b.intensity * b.radius - a.intensity * a.radius)
+        .toSorted((a, b) => b.intensity * b.radius - a.intensity * a.radius)
         .slice(0, MAX_LIGHTS);
       // Lights are in the world; the filter works on the canvas, where the camera has moved the world.
       shown.forEach((l, i) => {

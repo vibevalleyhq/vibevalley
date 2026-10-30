@@ -228,7 +228,7 @@ describe("memory sources", () => {
       release();
       yield* Effect.promise(() => until(() => events.includes("old:stop")));
       expect(events).toEqual(["old:first", "old:stop", "new:third"]);
-      expect((yield* m.list("lab")).map((m) => m.text).sort()).toEqual(["first", "second", "third"]);
+      expect((yield* m.list("lab")).map((m) => m.text).toSorted()).toEqual(["first", "second", "third"]);
     }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => sourceOf(c.url === nowledgeOn.url ? old : fresh))));
   });
 
@@ -288,7 +288,7 @@ describe("memory sources", () => {
         const local = got.ids.filter((id) => !id.includes(":"));
         expect([got.ids.length, local.length]).toEqual([recallCount, recallCount / 2]);
         const marked = (yield* m.list("lab")).filter((x) => x.recalled > 0 && !x.id.includes(":"));
-        expect(marked.map((x) => x.id).sort()).toEqual([...local].sort());
+        expect(marked.map((x) => x.id).toSorted()).toEqual([...local].toSorted());
       }),
     );
   });

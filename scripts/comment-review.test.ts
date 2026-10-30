@@ -65,7 +65,7 @@ test("the rule is docs/style/code.md's 注释 section, both tables and nothing a
   expect(rule.startsWith("## 注释")).toBe(true);
   expect(rule).toContain("### 建议写");
   expect(rule).toContain("### 不建议写");
-  expect(rule).not.toMatch(/\n## /);
+  expect(rule).not.toMatch(/\n## /u);
   expect(() => rubric("# 代码风格\n\n## 格式\n")).toThrow("no 注释 section");
 });
 
@@ -97,7 +97,7 @@ test("comments go to the model in batches, each answered by its own ids, the fin
   const asked: Message[][] = [];
   const findings = await review("## 注释", comments, async (messages) => {
     asked.push(messages);
-    const ids = [...messages[1]!.content.matchAll(/^## (\d+) a\.ts:(\d+)$/gm)];
+    const ids = [...messages[1]!.content.matchAll(/^## (\d+) a\.ts:(\d+)$/gmu)];
     return JSON.stringify({
       verdicts: ids.map(([, id, line]) => ({ id: Number(id), verdict: Number(line) % 10 === 0 ? "delete" : "keep", rule: "r", reason: "x" })),
     });

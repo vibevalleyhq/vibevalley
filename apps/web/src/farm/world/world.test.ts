@@ -18,7 +18,7 @@ describe("the level", () => {
   test("is 384 by 256 with its nine plots, the places helpers walk to and the yard's spots", () => {
     expect([world.width, world.height]).toEqual([384, 256]);
     expect(farmFraming.picture).toEqual({ w: world.width, h: world.height });
-    expect([...world.plots.keys()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect([...world.plots.keys()].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
     expect(beds.map((b) => world.plotAt(b.index))).toHaveLength(9);
     expect(level.thingsOf("Place")).toHaveLength(4);
     expect(world.places.has("library")).toBe(true);

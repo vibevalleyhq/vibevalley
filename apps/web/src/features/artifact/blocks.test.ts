@@ -21,7 +21,7 @@ test("keys between, as the server makes them", () => {
     keys.unshift(keyBetween("", keys[0]!));
     keys.splice(1, 0, keyBetween(keys[0]!, keys[1]!));
   }
-  expect([...keys].sort()).toEqual(keys);
+  expect([...keys].toSorted()).toEqual(keys);
   expect(keys.every(validKey)).toBe(true);
 });
 

@@ -62,10 +62,10 @@ describe("an agent's own tasks", () => {
     g = update(g, "read", { state: "waiting", brief: "用 sudo 读" });
     expect([g[0]!.tries, g[0]!.brief]).toEqual([1, "用 sudo 读"]);
     g = update(g, "read", { state: "done" });
-    expect(() => update(g, "read", { brief: "再读" })).toThrow(/做完了/);
+    expect(() => update(g, "read", { brief: "再读" })).toThrow(/做完了/u);
     expect(() => update(g, "read", { state: "waiting" })).toThrow(AgentTaskError);
     expect(() => update(g, "nope", { state: "done" })).toThrow(AgentTaskError);
-    expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/);
+    expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/u);
   });
 
   it("the graph as the model reads it", () => {

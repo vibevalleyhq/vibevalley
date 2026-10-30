@@ -60,7 +60,7 @@ export const nodeTransport: MossTransport = {
     return { send: (text) => ws.send(text), close: () => ws.close() };
   },
   status: (key) =>
-    fetch(mossUrl.replace(/^wss:/, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
+    fetch(mossUrl.replace(/^wss:/u, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
       r.text().then((body) => ({ code: r.status, body })),
     ),
 };
