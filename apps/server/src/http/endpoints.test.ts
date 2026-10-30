@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect";
 
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 
+import { newId } from "@/base/ids.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
 
@@ -62,11 +63,11 @@ describe("the endpoints the agents' tools stand on", () => {
       const api = yield* farm;
       const before = Date.now();
       const made = yield* call(() => api.artifact.create({ title: "插入" }));
-      const inserted = crypto.randomUUID();
+      const inserted = newId();
       yield* call(() =>
         api.artifact.submit({
           id: made.id,
-          batchId: crypto.randomUUID(),
+          batchId: newId(),
           lastSeq: 0,
           ops: [{ op: "insert_block", block: { id: inserted, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
         }),
@@ -78,11 +79,11 @@ describe("the endpoints the agents' tools stand on", () => {
 
       const imported = yield* call(() => api.artifact.create({ title: "拆分", kind: "markdown", content: "你好世界" }));
       const source = (yield* call(() => api.artifact.block.list({ id: imported.id }))).blocks[0]!;
-      const split = crypto.randomUUID();
+      const split = newId();
       yield* call(() =>
         api.artifact.submit({
           id: imported.id,
-          batchId: crypto.randomUUID(),
+          batchId: newId(),
           lastSeq: imported.seq,
           ops: [
             {

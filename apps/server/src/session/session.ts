@@ -12,7 +12,6 @@ import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
-  Cause,
   Clock,
   Context,
   Data,
@@ -141,7 +140,7 @@ interface Allocation {
   attached: boolean;
   failure?: string;
   /** Keep the failure too: oar's next close may be a no-op after a failed dispose. */
-  closing?: Deferred.Deferred<void, unknown>;
+  closing?: Deferred.Deferred<void, NotClosed>;
 }
 
 interface OarSession extends Allocation {
@@ -271,6 +270,11 @@ const running = Metric.gauge("vibevalley.sessions.running", { description: "Exec
 
 /** A write of a session's own records (a run, the issue it works) that did not go through. */
 export class NotRecorded extends Data.TaggedError("NotRecorded")<{ readonly message: string; readonly cause?: unknown }> {}
+
+/** oar's runtime session or its subagents did not close. */
+class NotClosed extends Data.TaggedError("NotClosed")<{ readonly message: string; readonly cause: unknown }> {}
+
+const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause), cause });
 
 /** Work that did not go in (see handOver); the session stays. */
 export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
@@ -713,23 +717,24 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     /** Closes once, on the service's fibers: a caller that stops waiting does not stop the close, and every later call
      * waits for it and gets its outcome. */
-    const closeAllocation = (allocation: Allocation): Effect.Effect<void, unknown> =>
+    const closeAllocation = (allocation: Allocation): Effect.Effect<void, NotClosed> =>
       Effect.suspend(() => {
         if (allocation.closing) return Deferred.await(allocation.closing);
-        const closing = Deferred.makeUnsafe<void, unknown>();
+        const closing = Deferred.makeUnsafe<void, NotClosed>();
         allocation.closing = closing;
         const close = Effect.gen(function* () {
-          const crew = yield* Effect.exit(Effect.tryPromise(() => allocation.subagents.close()));
+          const crew = yield* Effect.exit(Effect.tryPromise({ try: () => allocation.subagents.close(), catch: notClosed }));
           // A failed prompt may have made oar close its Subagent already. Its no-op close is not proof that dispose succeeded.
-          const resources = yield* Effect.forEach([...allocation.resources], (session) => Effect.exit(Effect.tryPromise(() => session.dispose())), {
-            concurrency: "unbounded",
-          });
+          const resources = yield* Effect.forEach(
+            [...allocation.resources],
+            (session) => Effect.exit(Effect.tryPromise({ try: () => session.dispose(), catch: notClosed })),
+            { concurrency: "unbounded" },
+          );
           const failed = [crew, ...resources].find(Exit.isFailure);
           if (failed) return yield* failed;
         });
         forkHere(
           close.pipe(
-            Effect.mapError((e) => (Cause.isUnknownError(e) ? e.cause : e)),
             Effect.onExit((exit) => Deferred.done(closing, exit)),
             Effect.ignore,
           ),

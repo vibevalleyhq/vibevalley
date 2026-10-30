@@ -3,7 +3,6 @@
 // what it was handed back to pending: given twice rather than lost. Everything that changes the chat runs one at a time.
 
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
@@ -48,12 +47,13 @@ import { Agents } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
+import { writeOnce } from "@/base/files.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, errnoOf, refused, lookIn, messageOf as errorText, missing, Inconsistent } from "@/errors.ts";
+import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qa from "../../db/generated/channel_attachment.sql.ts";
@@ -1554,16 +1554,7 @@ const make = Effect.gen(function* () {
         if (bytes.length === 0) return yield* Effect.fail(refused(t("server.channel.emptyFile")));
         if (bytes.length > attachmentMax) return yield* Effect.fail(refused(t("server.channel.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) })));
         const id = createHash("sha256").update(bytes).digest("hex");
-        yield* Effect.tryPromise({
-          try: async () => {
-            await mkdir(filesDir, { recursive: true });
-            // The same bytes are the same file: a second upload leaves the first.
-            await writeFile(filesAt(id), bytes, { flag: "wx" }).catch((e: unknown) => {
-              if (errnoOf(e) !== "EEXIST") throw e;
-            });
-          },
-          catch: (e) => refused(errorText(e)),
-        });
+        yield* writeOnce(filesAt(id), bytes).pipe(Effect.mapError((e) => refused(e.message)));
         const type = upload.type.trim() || "application/octet-stream";
         yield* db(qa.insertAttachment({ id, name, type, size: bytes.length, created_at: yield* Clock.currentTimeMillis }));
         return { id, name, type, size: bytes.length };

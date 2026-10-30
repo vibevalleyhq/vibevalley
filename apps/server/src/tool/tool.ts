@@ -411,21 +411,15 @@ const make = Effect.gen(function* () {
       if (file === undefined || file.trim() === "") return yield* Effect.fail(refused(answers.artifact.noContent));
       const cwd = c.session ? run.find(c.session)?.place.cwd : undefined;
       if (!cwd) return yield* Effect.fail(refused(answers.artifact.noPlace));
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const root = await realpath(cwd);
-          const full = await realpath(resolve(root, file)).catch(() => {
-            throw new Error(answers.artifact.notFile(file));
-          });
-          if (full !== root && !full.startsWith(root + sep)) throw new Error(answers.artifact.outside(file));
-          const info = await stat(full);
-          if (!info.isFile()) throw new Error(answers.artifact.notFile(file));
-          // Read whole only when it may be kept; a bigger one is refused by its size as artifact.create would.
-          if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
-          return readFile(full, "utf8");
-        },
-        catch: (e) => refused(messageOf(e)),
-      });
+      const unread = (e: unknown) => refused(messageOf(e));
+      const root = yield* Effect.tryPromise({ try: () => realpath(cwd), catch: unread });
+      const full = yield* Effect.tryPromise({ try: () => realpath(resolve(root, file)), catch: () => refused(answers.artifact.notFile(file)) });
+      if (full !== root && !full.startsWith(root + sep)) return yield* Effect.fail(refused(answers.artifact.outside(file)));
+      const info = yield* Effect.tryPromise({ try: () => stat(full), catch: unread });
+      if (!info.isFile()) return yield* Effect.fail(refused(answers.artifact.notFile(file)));
+      // Read whole only when it may be kept; a bigger one is refused by its size as artifact.create would.
+      if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
+      return yield* Effect.tryPromise({ try: () => readFile(full, "utf8"), catch: unread });
     });
 
   const artifactList = (who: Who) =>

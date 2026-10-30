@@ -12,6 +12,8 @@ const clockAt = (at: () => number): Clock.Clock => ({
   monotonicTimeNanos: Effect.sync(() => process.hrtime.bigint()),
   sleep: (duration) =>
     Effect.callback<void>((resume) => {
+      // This is the Clock itself, so its sleep cannot be Effect.sleep (that asks this Clock again): the real timer is the door.
+      // @effect-diagnostics-next-line globalTimersInEffect:off
       const timer = setTimeout(() => resume(Effect.void), Duration.toMillis(duration));
       return Effect.sync(() => clearTimeout(timer));
     }),

@@ -24,8 +24,12 @@ function severity(value: unknown): Severity | undefined {
   return undefined;
 }
 
-/** anyUnknownInErrorContext is oxlint's any-unknown-in-error-context. */
-const ruleOf = (diagnostic: string) => `effecttsgo/${diagnostic.replace(/[A-Z]/gu, (c) => `-${c.toLowerCase()}`)}`;
+/** anyUnknownInErrorContext is oxlint's any-unknown-in-error-context; a run of capitals is one word (cryptoRandomUUIDInEffect is crypto-random-uuid-in-effect). */
+const ruleOf = (diagnostic: string) =>
+  `effecttsgo/${diagnostic
+    .replace(/([A-Z]+)([A-Z][a-z])/gu, "$1-$2")
+    .replace(/([a-z\d])([A-Z])/gu, "$1-$2")
+    .toLowerCase()}`;
 
 export function effectRules(): Record<string, Severity> {
   const rules: Record<string, Severity> = {};

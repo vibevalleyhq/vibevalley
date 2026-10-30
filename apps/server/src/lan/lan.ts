@@ -15,7 +15,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+import { Cause, Clock, Context, Data, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -37,7 +37,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
 import { callbackLog } from "@/base/log.ts";
-import { missing, lookIn } from "@/errors.ts";
+import { lookIn, messageOf, missing } from "@/errors.ts";
 
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
@@ -51,6 +51,11 @@ const seenEveryMs = 60_000;
 export const deviceHeader = "x-vibevalley-lan-device";
 
 const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
+
+/** The loopback server could not be reached, or its answer could not be streamed back to the device. */
+class ForwardFailed extends Data.TaggedError("ForwardFailed")<{ readonly message: string; readonly cause: unknown }> {}
+
+const forwardFailed = (cause: unknown) => new ForwardFailed({ message: messageOf(cause), cause });
 
 interface Device extends LanDevice {
   readonly keyHash: string;
@@ -235,14 +240,19 @@ const make = (options: LanOptions = {}) =>
         for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
         if (device) headers.set(deviceHeader, device);
         const body = req.method === "GET" || req.method === "HEAD" ? undefined : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
-        const answer = yield* Effect.tryPromise((signal) =>
-          fetch(`http://${upstream}${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(body ? { body, duplex: "half" } : {}), signal }),
-        );
+        const answer = yield* Effect.tryPromise({
+          try: (signal) =>
+            fetch(`http://${upstream}${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(body ? { body, duplex: "half" } : {}), signal }),
+          catch: forwardFailed,
+        });
         res.writeHead(answer.status, Object.fromEntries(answer.headers));
         const streamed = answer.body;
         if (!streamed) return void res.end();
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same web stream: the DOM's and Node's types name it apart
-        yield* Effect.tryPromise((signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }));
+        yield* Effect.tryPromise({
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same web stream: the DOM's and Node's types name it apart
+          try: (signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }),
+          catch: forwardFailed,
+        });
       });
 
     /** One request on the listener, on the service's fibers: the client leaving, or its device being forgotten, interrupts

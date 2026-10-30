@@ -412,6 +412,12 @@ export default defineConfig({
         rules: { "vibevalley/promise-boundary": "error" },
       },
       {
+        // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/oxlint-plugin.ts, try-promise-catch).
+        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**"],
+        excludeFiles: ["**/*.test.ts"],
+        rules: { "vibevalley/try-promise-catch": "error" },
+      },
+      {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
         // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
         // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).

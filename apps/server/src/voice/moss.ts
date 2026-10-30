@@ -111,8 +111,8 @@ export const verifyMoss = (key: string, transport: MossTransport = nodeTransport
     if (got === "attached") return { kind: "ok" } as const;
     if (got === "silent") return { kind: "silent" } as const;
     if ("error" in got) return { kind: "failed", why: got.error } as const;
-    const asked = yield* Effect.tryPromise(() => transport.status(key)).pipe(Effect.result);
-    if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || String(asked.failure.cause) } as const;
+    const asked = yield* Effect.tryPromise({ try: () => transport.status(key), catch: (e) => String(e) }).pipe(Effect.result);
+    if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || asked.failure } as const;
     const { code, body } = asked.success;
     if (code === 401 || code === 403) return { kind: "refused", why: refusal(body) } as const;
     return { kind: "failed", why: got.down || `HTTP ${code}` } as const;

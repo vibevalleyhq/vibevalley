@@ -402,9 +402,10 @@ const tunnelAnswers = (url: string) =>
   Effect.gen(function* () {
     const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
     while ((yield* Clock.currentTimeMillis) < deadline) {
-      const res = yield* Effect.tryPromise((signal) =>
-        fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) }),
-      ).pipe(Effect.option);
+      const res = yield* Effect.tryPromise({
+        try: (signal) => fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) }),
+        catch: callStepFailed,
+      }).pipe(Effect.option);
       if (res._tag === "Some" && res.value.status === 401) return true;
       yield* Effect.sleep(2_000);
     }
@@ -763,13 +764,13 @@ const make = (options: VoiceOptions = {}) =>
               // An agent that joins after its start was given up on is stopped; one that never joined has nothing to stop.
               if (pending && agora)
                 forkHere(
-                  Effect.tryPromise(() => pending).pipe(
+                  Effect.tryPromise({ try: () => pending, catch: callStepFailed }).pipe(
                     Effect.option,
                     Effect.flatMap((joined) =>
                       joined._tag === "None"
                         ? Effect.void
-                        : Effect.tryPromise(() => agora.stopAgent(joined.value)).pipe(
-                            Effect.catch((e) => Effect.logWarning("vibevalley: voice: the late agent could not be stopped: " + messageOf(e.cause))),
+                        : Effect.tryPromise({ try: () => agora.stopAgent(joined.value), catch: callStepFailed }).pipe(
+                            Effect.catch((e) => Effect.logWarning("vibevalley: voice: the late agent could not be stopped: " + e.message)),
                           ),
                     ),
                   ),

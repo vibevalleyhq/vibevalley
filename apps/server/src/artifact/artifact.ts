@@ -4,7 +4,7 @@
 // replies to that message, nothing of their own.
 
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Clock, Context, Effect, Layer, Semaphore } from "effect";
@@ -31,6 +31,7 @@ import {
 
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
+import { writeOnce } from "@/base/files.ts";
 import { newId } from "@/base/ids.ts";
 import { Channels } from "@/channel/chat.ts";
 import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
@@ -95,19 +96,13 @@ const make = (options: ArtifactOptions = {}) =>
     const dir = join(config.home, "artifacts");
     const fileOf = (sha: string) => join(dir, sha);
 
-    const keep = (bytes: Buffer) =>
-      Effect.tryPromise({
-        try: async () => {
-          const sha = createHash("sha256").update(bytes).digest("hex");
-          await mkdir(dir, { recursive: true });
-          // The same bytes are the same file: a second one leaves the first.
-          await writeFile(fileOf(sha), bytes, { flag: "wx" }).catch((e: NodeJS.ErrnoException) => {
-            if (e.code !== "EEXIST") throw e;
-          });
-          return sha;
-        },
-        catch: (e) => refused(t("server.artifact.notKept", { why: String(e) })),
-      });
+    const keep = (bytes: Buffer) => {
+      const sha = createHash("sha256").update(bytes).digest("hex");
+      return writeOnce(fileOf(sha), bytes).pipe(
+        Effect.as(sha),
+        Effect.mapError((e) => refused(t("server.artifact.notKept", { why: String(e.cause) }))),
+      );
+    };
 
     const assemble = Effect.fnUntraced(function* (row: qa.ArtifactsResult) {
       const versions = row.body === "html" ? yield* db(qv.artifactVersions({ artifact_id: row.id })) : [];

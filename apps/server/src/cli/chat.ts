@@ -21,6 +21,7 @@ import { t, currentLocale } from "@vibevalley/i18n";
 import { modelClient } from "@/agent/model.ts";
 import { loadConfig } from "@/base/config.ts";
 import { wallTime } from "@/base/time.ts";
+import { messageOf } from "@/errors.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
 import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
@@ -213,18 +214,20 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
         if (!runtime) return yield* Effect.fail(t("server.cli.chat.noRuntime", { id }));
         const installation = runtime.installation;
         if (!installation) return yield* Effect.fail(t("server.cli.chat.unknownInstall", { id }));
-        const found = yield* Effect.tryPromise(() => installation());
+        const found = yield* Effect.tryPromise({ try: () => installation(), catch: messageOf });
         if (found.kind !== "available") return yield* Effect.fail(t("server.cli.chat.unusable", { id, kind: found.kind }));
         const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
         const session: Session = yield* Effect.acquireRelease(
-          Effect.tryPromise(() =>
-            runtime.session(found, {
-              cwd,
-              ...(values.model ? { model: values.model } : {}),
-              ...(values.effort ? { effort: values.effort } : {}),
-              ...(values.resume ? { resume: values.resume } : {}),
-            }),
-          ),
+          Effect.tryPromise({
+            try: () =>
+              runtime.session(found, {
+                cwd,
+                ...(values.model ? { model: values.model } : {}),
+                ...(values.effort ? { effort: values.effort } : {}),
+                ...(values.resume ? { resume: values.resume } : {}),
+              }),
+            catch: messageOf,
+          }),
           (s) => Effect.promise(() => s.dispose()),
         );
         console.log(dim(`${id} · ${session.id}${values.resume ? t("server.cli.chat.resumed") : ""}\n` + t("server.cli.chat.direct")));
@@ -242,7 +245,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
         // One turn at a time: a line typed while it runs is steered into it or queued after it. Interrupting the turn's
         // fiber aborts the prompt (its signal).
         const turnOf = (text: string) =>
-          Effect.tryPromise((signal) => promptAndWait(session, text, { signal })).pipe(
+          Effect.tryPromise({ try: (signal) => promptAndWait(session, text, { signal }), catch: messageOf }).pipe(
             Effect.map((run) => said(run, "rejected")),
             Effect.ensuring(Effect.sync(() => write("› "))),
           );
@@ -265,7 +268,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
             if (!text) return busy ? undefined : write("› ");
             if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text)), { onlyIfMissing: false });
             const steering = session.steer ? session.steer(text) : session.queue(text);
-            yield* Effect.tryPromise(() => steering).pipe(
+            yield* Effect.tryPromise({ try: () => steering, catch: messageOf }).pipe(
               Effect.map((r) => said(r, "notSent")),
               Effect.ignore,
             );

@@ -23,7 +23,7 @@ import { jsonOrNone } from "@/base/json.ts";
 import { callbackLog } from "@/base/log.ts";
 import { timeHere, withinRealTime } from "@/base/time.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, refused } from "@/errors.ts";
+import { type ApiError, messageOf, refused } from "@/errors.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
@@ -227,10 +227,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
     const usageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) =>
-      Effect.orElseSucceed(
-        Effect.tryPromise(() => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings)),
-        () => null,
-      );
+      Effect.orElseSucceed(Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }), () => null);
 
     const cache = new Map<string, Observation>();
     const relabeling = new Set<string>();

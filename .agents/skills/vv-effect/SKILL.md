@@ -24,7 +24,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 | 库 | 经 `Db` 服务（`run`、`attempt`、`one`、`inTx`、`attemptTx`），模块不自己 `provideService(SqlClient)`、`withTransaction`（lint `vibevalley/db-door`）；SQL 只写在 `db/queries/<表>.sql` | [地基](docs/subsystems/foundation.md) |
 | 文件、进程、外面的 HTTP | `FileSystem`、`ChildProcessSpawner`、`HttpClient`；不用 `node:fs/promises`、`fetch` | [地基](docs/subsystems/foundation.md) |
 | 时间 | `Clock`、`Effect.sleep`、`TestClock`；类里用它拿到的 `Time`（`apps/server/src/base/time.ts`）；lint `vibevalley/no-wall-clock` | [地基](docs/subsystems/foundation.md) |
-| Promise | 只在外面的库的一次调用上：`Effect.tryPromise({ try: (signal) => lib.call(…, { signal }), catch: (e) => new XError({ cause: e }) })`。不写 `catch` 的形式失败时只剩 `UnknownError`，原因丢了；lint `vibevalley/promise-boundary` | [地基](docs/subsystems/foundation.md) |
+| Promise | 只在外面的库的一次调用上：`Effect.tryPromise({ try: (signal) => lib.call(…, { signal }), catch: (e) => new XError({ cause: e }) })`。不写 `catch` 的形式失败时只剩 `UnknownError`，原因丢了；lint `vibevalley/promise-boundary`、`vibevalley/try-promise-catch` | [地基](docs/subsystems/foundation.md) |
 | 错误 | 预期的错误打标签（`Data.TaggedError` / `Schema.TaggedError`），按 `catchTag`、`catchTags` 接，不用 `instanceof` 分；抛错写 `return yield*`；`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch` 在逃生口的棘轮上（`vp run health:verify`），要丢弃一个失败就 `Effect.ignore({ log: "Warn" })` | [地基](docs/subsystems/foundation.md)、`packages/health/README.md` |
 | 命名和追踪 | 服务的方法用 `Effect.fn("Issues.create")`，热路径和库函数用 `Effect.fnUntraced`；不写只 `return Effect.gen(…)` 的函数 | 官方指南「Writing Effect code」 |
 | 并发 | `Effect.all`、`forEach` 默认一个接一个；要并发写明 `{ concurrency: n }`，用户给的数量不用 `"unbounded"` | 官方指南 |
@@ -35,8 +35,8 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 写的时候不用记，撞上了照报错改；报错不懂时看这里对应的那一行。
 
-- **`vp run effect:check`**（`@effect/tsgo` 的语言服务，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）和 **`vp check` 里的 `effecttsgo/*`**（同一张表，`scripts/effect-lint.ts`）：漂着没运行的 Effect、少了 `return yield*`、`yield` 少了 `*`、v3 的旧 API、gen 里的 `try/catch`、Effect 里再 `run*` 一个 Effect、方法签名里漏出的依赖、服务没写成类、`Math.random`、`process.env`、`fetch`……开着哪些、为什么关着哪些，看那张表和[地基](docs/subsystems/foundation.md)的说明。真要在一行上违反一条时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。
-- **`vibevalley/*` lint**：`promise-boundary`（async 和 `new Promise` 只在 `Effect.tryPromise`、`Effect.promise` 里）、`db-door`（`SqlClient`、`withTransaction` 只在 `base/db.ts`）、`no-wall-clock`、`no-test-sleep`。
+- **`vp run effect:check`**（`@effect/tsgo` 的语言服务，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）和 **`vp check` 里的 `effecttsgo/*`**（同一张表，`scripts/effect-lint.ts`）：漂着没运行的 Effect、少了 `return yield*`、`yield` 少了 `*`、v3 的旧 API、gen 里的 `try/catch`、Effect 里再 `run*` 一个 Effect、方法签名里漏出的依赖、服务没写成类、`Math.random`、`crypto.randomUUID`、`process.env`、`setTimeout`、`fetch`……开着哪些、为什么关着哪些，看那张表和[地基](docs/subsystems/foundation.md)的说明。真要在一行上违反一条时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。
+- **`vibevalley/*` lint**：`promise-boundary`（async 和 `new Promise` 只在 `Effect.tryPromise`、`Effect.promise` 里，那里的 async 函数最多一个 `await`）、`try-promise-catch`（`Effect.tryPromise` 写 `{ try, catch }`，不只传函数）、`db-door`（`SqlClient`、`withTransaction` 只在 `base/db.ts`）、`no-wall-clock`、`no-test-sleep`。
 - **逃生口的棘轮**：`as`、`!`、关 lint 的注释、`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch`，按区只许减。
 
 ## 4. 评审一段 Effect 代码

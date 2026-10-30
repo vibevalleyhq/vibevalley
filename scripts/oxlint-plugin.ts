@@ -43,8 +43,16 @@
  *
  *   promise-boundary: the server is Effect; a Promise is only the one call into an outside library, made inside
  *   Effect.tryPromise or Effect.promise (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上"). An async
- *   function or a new Promise anywhere else is a loop, a wait or a queue written by hand. Where a library's own interface
- *   is Promises (oar's runtimes, the MCP SDK's handlers), vite.config.ts turns the rule off for that file and says why.
+ *   function or a new Promise anywhere else is a loop, a wait or a queue written by hand. The async function such a
+ *   wrapper is given holds at most one await: a second is a step that the first one's result decides, so the checks,
+ *   branches and errors between them sit where interruption and typed errors do not reach. Counting awaits is the whole
+ *   test; a body with one await and logic around it passes, and is the reviewer's to see. Where a library's own
+ *   interface is Promises (oar's runtimes, the MCP SDK's handlers), vite.config.ts turns the rule off for that file and
+ *   says why.
+ *
+ *   try-promise-catch: Effect.tryPromise is given { try, catch }, never a bare function. Given only the function, a
+ *   rejection becomes Cause.UnknownError, whose message says nothing of what went wrong; catch makes it the module's
+ *   own error from the real one.
  *
  *   one-absent: a type that admits null and undefined at once carries two words for one thing. Outside's null is taken in
  *   at the door (docs/style/code.md, "没有值"); vite.config.ts says where a door is.
@@ -397,6 +405,19 @@ const pageLayersRule = defineRule({
   },
 });
 
+const functionTypes = new Set(["FunctionExpression", "ArrowFunctionExpression", "FunctionDeclaration"]);
+
+/** The function an await belongs to (the nearest one around it), whether it is async, and what it is passed to. */
+function ownerOf(node: { parent?: unknown }): { fn: object; async: boolean; parent: unknown } | undefined {
+  let at: unknown = node.parent;
+  while (typeof at === "object" && at !== null) {
+    const parent = "parent" in at ? at.parent : undefined;
+    if ("type" in at && typeof at.type === "string" && functionTypes.has(at.type)) return { fn: at, async: "async" in at && at.async === true, parent };
+    at = parent;
+  }
+  return undefined;
+}
+
 /** Effect.tryPromise(async …), Effect.tryPromise({ try: async … }) and Effect.promise(async …): the one place an async body is the boundary. */
 function inEffectPromise(node: { parent?: unknown }): boolean {
   const isWrapper = (n: unknown): boolean => {
@@ -431,6 +452,11 @@ const promiseBoundary = defineRule({
         "`Effect.callback((resume) => …)` for a callback API, a `Deferred` for one value handed over later, a `Queue` for many",
         "docs/subsystems/foundation.md",
       ),
+      steps: says(
+        "this async function awaits more than once inside Effect.tryPromise or Effect.promise, so the steps between its awaits (checks, branches, errors) run where interruption and typed errors do not reach",
+        "keep one library call per wrapper and write the steps in the Effect around them: `const a = yield* Effect.tryPromise({ try: () => lib.first(…), catch })`, check `a` there (`return yield* Effect.fail(…)`), then `yield* Effect.tryPromise({ try: () => lib.next(a), catch })`",
+        "apps/server/src/tool/tool.ts",
+      ),
     },
   },
   create(context) {
@@ -438,12 +464,49 @@ const promiseBoundary = defineRule({
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
       if (node.async === true && !inEffectPromise(node)) context.report({ node: node as never, messageId: "async" });
     };
+    const awaits = new Map<unknown, number>();
     return {
       FunctionDeclaration: check,
       FunctionExpression: check,
       ArrowFunctionExpression: check,
+      AwaitExpression(node) {
+        const owner = ownerOf(node);
+        if (owner === undefined || !owner.async || !inEffectPromise(owner)) return;
+        const n = (awaits.get(owner.fn) ?? 0) + 1;
+        awaits.set(owner.fn, n);
+        if (n === 2) context.report({ node, messageId: "steps" });
+      },
       NewExpression(node) {
         if (node.callee.type === "Identifier" && node.callee.name === "Promise") context.report({ node, messageId: "promise" });
+      },
+    };
+  },
+});
+
+const tryPromiseCatch = defineRule({
+  meta: {
+    messages: {
+      thunk: says(
+        "Effect.tryPromise given only a function fails with Cause.UnknownError, and what really went wrong (the library's error and its message) is lost",
+        "`Effect.tryPromise({ try: (signal) => lib.call(…, { signal }), catch: (e) => new XError({ message: messageOf(e), cause: e }) })`, with the module's own error or refusal in catch",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        const arg = node.arguments[0];
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "Effect" &&
+          c.property.type === "Identifier" &&
+          c.property.name === "tryPromise" &&
+          (arg?.type === "ArrowFunctionExpression" || arg?.type === "FunctionExpression")
+        )
+          context.report({ node, messageId: "thunk" });
       },
     };
   },
@@ -602,6 +665,7 @@ export default definePlugin({
     "parent-import": parentImportRule,
     "db-door": dbDoor,
     "promise-boundary": promiseBoundary,
+    "try-promise-catch": tryPromiseCatch,
     "one-absent": oneAbsent,
     "global-doors": globalDoors,
     "native-control": nativeControl,

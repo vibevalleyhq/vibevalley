@@ -3,11 +3,29 @@
 
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { Clock, Effect } from "effect";
+import { Clock, Data, Effect } from "effect";
 
-import { messageOf } from "@/errors.ts";
+import { errnoOf, messageOf } from "@/errors.ts";
+
+export class NotWritten extends Data.TaggedError("NotWritten")<{ readonly message: string; readonly cause: unknown }> {}
+
+const notWritten = (cause: unknown) => new NotWritten({ message: messageOf(cause), cause });
+
+/** Writes a file named by its bytes (their hash), making its folder: the same bytes are the same file, so one already
+ * there is left as it is. */
+export const writeOnce = (path: string, bytes: Uint8Array): Effect.Effect<void, NotWritten> =>
+  Effect.gen(function* () {
+    yield* Effect.tryPromise({ try: () => mkdir(dirname(path), { recursive: true }), catch: notWritten });
+    yield* Effect.tryPromise({ try: () => writeFile(path, bytes, { flag: "wx" }), catch: notWritten }).pipe(
+      Effect.catchIf(
+        (e) => errnoOf(e.cause) === "EEXIST",
+        () => Effect.void,
+      ),
+    );
+  });
 
 /**
  * An owner's file (config.json, settings.json, state.json) read by read. One that does not read (not JSON, or not the

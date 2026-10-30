@@ -80,6 +80,10 @@ describe("projects", () => {
     );
     const was = process.env.GIT_CONFIG_GLOBAL;
     process.env.GIT_CONFIG_GLOBAL = config;
+    const putBack = () => {
+      if (was === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+      else process.env.GIT_CONFIG_GLOBAL = was;
+    };
     return projects(
       root,
       Effect.gen(function* () {
@@ -91,7 +95,7 @@ describe("projects", () => {
         expect((yield* p.list()).some((x) => x.name === "retry")).toBe(false);
         yield* p.create({ name: "retry" });
       }),
-    ).pipe(Effect.ensuring(Effect.sync(() => (was === undefined ? delete process.env.GIT_CONFIG_GLOBAL : (process.env.GIT_CONFIG_GLOBAL = was)))));
+    ).pipe(Effect.ensuring(Effect.sync(putBack)));
   });
 
   it.effect("a graph's branch: a step merges into it, it merges into main", () => {

@@ -64,7 +64,7 @@ export type Resolve = (host: string) => Effect.Effect<readonly string[]>;
 const resolveAll: Resolve = (host) =>
   isIP(host) !== 0
     ? Effect.succeed([host])
-    : Effect.tryPromise(() => lookup(host, { all: true })).pipe(
+    : Effect.tryPromise({ try: () => lookup(host, { all: true }), catch: (e) => String(e) }).pipe(
         Effect.map((all) => all.map((a) => a.address)),
         Effect.orElseSucceed(() => []),
       );

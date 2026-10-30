@@ -146,12 +146,33 @@ tester.run("promise-boundary", rule("promise-boundary"), {
     { code: "const a = Effect.tryPromise({ try: async (signal) => f(signal), catch: e });", filename: "/repo/apps/server/src/a.ts" },
     { code: "const a = Effect.promise(async () => g());", filename: "/repo/apps/server/src/a.ts" },
     { code: "const a = () => fetch(u).then((r) => r.text());", filename: "/repo/apps/server/src/a.ts" },
+    { code: "const a = Effect.tryPromise({ try: async () => (await f()).text, catch: e });", filename: "/repo/apps/server/src/a.ts" },
   ],
   invalid: [
     { code: "async function a() {}", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
     { code: "const a = async () => { await b(); };", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
     { code: "const a = Effect.tryPromise(() => run(async () => 1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
     { code: "const a = new Promise((r) => r(1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "promise" }] },
+    {
+      code: "const a = Effect.tryPromise({ try: async () => { const r = await realpath(d); if (bad(r)) throw e; return await stat(r); }, catch: e });",
+      filename: "/repo/apps/server/src/a.ts",
+      errors: [{ messageId: "steps" }],
+    },
+    { code: "const a = Effect.promise(async () => { await a(); await b(); });", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "steps" }] },
+  ],
+});
+
+tester.run("try-promise-catch", rule("try-promise-catch"), {
+  valid: [
+    {
+      code: "const a = Effect.tryPromise({ try: (signal) => fetch(u, { signal }), catch: (e) => new E({ cause: e }) });",
+      filename: "/repo/apps/server/src/a.ts",
+    },
+    { code: "const a = Effect.promise(() => db.close());", filename: "/repo/apps/server/src/a.ts" },
+  ],
+  invalid: [
+    { code: "const a = Effect.tryPromise(() => lookup(host));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "thunk" }] },
+    { code: "const a = Effect.tryPromise(function (signal) { return f(signal); });", filename: "/repo/packages/ai/src/a.ts", errors: [{ messageId: "thunk" }] },
   ],
 });
 
