@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "vp config --hooks --no-agent",
+    "prepare": "vp config --hooks --no-agent && effect-tsgo patch --typescript --oxlint",
     "golden:update": "vpx scripts/golden-update.ts",
     "desktop:dev": "vp run --filter @vibevalley/desktop dev",
     "notes:catalog": "vpx scripts/agent-notes.ts --write",

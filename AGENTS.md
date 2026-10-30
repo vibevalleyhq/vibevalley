@@ -70,7 +70,7 @@ vp run --filter @vibevalley/desktop update-check                 # 改了桌面�
 vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
 vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键
-vp run effect:check                                             # 改了 Effect 代码：Effect 自己的诊断（@effect/tsgo，规则在 tsconfig.base.json 的 plugins），警告也算失败；在 server:check 和 CI 里
+vp run effect:check                                             # 改了 Effect 代码：Effect 自己的诊断（@effect/tsgo，规则在 tsconfig.base.json 的 plugins，vp check 的 oxlint 也跑同一批），警告也算失败；在 server:check 和 CI 里
 vp run health                                                   # 看先改哪里：热点和逃生口；vp run health:verify 对棘轮（逃生口变少了跑 vp run health:write 降下来）
 vp run deadcode                                                 # 改完代码：knip 查没人用的文件、导出和依赖（knip.ts 写什么在跑），报出的照它说的删
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
