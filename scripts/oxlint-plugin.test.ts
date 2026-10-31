@@ -15,8 +15,11 @@ const rule = (name: string) => plugin.rules[name]!;
 const page = (path: string) => `/repo/apps/web/src/${path}`;
 
 tester.run("no-wall-clock", rule("no-wall-clock"), {
-  valid: ["new Date(0)", "Clock.currentTimeMillis", "time.now()"],
+  valid: ["new Date(0)", "Clock.currentTimeMillis", "time.now()", "function f(Date) { Date.now() }", "const timers = {setTimeout() {}}; timers.setTimeout()"],
   invalid: [
+    { code: "globalThis.Date.now()", errors: [{ messageId: "wallClock" }] },
+    { code: "import * as timers from 'node:timers'; timers.setTimeout(f, 1)", errors: [{ messageId: "wallClock" }] },
+    { code: "import {setTimeout as delay} from 'node:timers'; delay(f, 1)", errors: [{ messageId: "wallClock" }] },
     { code: "Date.now()", errors: [{ messageId: "wallClock" }] },
     { code: "new Date()", errors: [{ messageId: "wallClock" }] },
     { code: "setTimeout(f, 10)", errors: [{ messageId: "wallClock" }] },
@@ -27,6 +30,11 @@ tester.run("no-wall-clock", rule("no-wall-clock"), {
 tester.run("no-test-sleep", rule("no-test-sleep"), {
   valid: ["until(() => done)", "TestClock.adjust('1 second')", "other.sleep(10)"],
   invalid: [
+    { code: "import * as effect from 'effect'; effect.Effect.sleep(1)", errors: [{ messageId: "sleep" }] },
+    { code: "import {Effect as E} from 'effect'; E.sleep(1)", errors: [{ messageId: "sleep" }] },
+    { code: "import {sleep as pause} from 'effect/Effect'; pause(1)", errors: [{ messageId: "sleep" }] },
+    { code: "import {setTimeout as pause} from 'node:timers/promises'; pause(1)", errors: [{ messageId: "sleep" }] },
+    { code: "globalThis.setTimeout(f, 1)", errors: [{ messageId: "sleep" }] },
     { code: "Effect.sleep('1 second')", errors: [{ messageId: "sleep" }] },
     { code: "page.waitForTimeout(500)", errors: [{ messageId: "sleep" }] },
     { code: "setTimeout(f, 10)", errors: [{ messageId: "sleep" }] },
