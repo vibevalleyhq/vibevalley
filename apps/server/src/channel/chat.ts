@@ -31,7 +31,7 @@ import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 import { channelAttachments } from "./attachments.ts";
-import { agentWakeCooldownMs, chatAudience, type Delivery, hopLimit, hopLimitText, Audience } from "./audience.ts";
+import { agentWakeCooldownMs, brakes, type Delivery, hopLimit, hopLimitText, Audience, whoHears } from "./audience.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
@@ -486,7 +486,7 @@ const make = (sessions: ChannelSessions) =>
         if (now - last < agentWakeCooldownMs) cooling.push(h.id);
       }
       const audience = sessionsNow.filter((h) => ch.type === "thread" || channelOfSession(h) === ch.id).map((h) => h.id);
-      const deliveries = chatAudience({
+      const heard = {
         from: row.sender_id,
         fromKind: senderKind(row.sender_kind),
         kind: messageKind(row.kind),
@@ -504,7 +504,8 @@ const make = (sessions: ChannelSessions) =>
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
         forTask: !(meta.forTask !== true),
         spoken: !(meta.spoken !== true),
-      });
+      };
+      const deliveries = brakes(whoHears(heard), heard);
       yield* Effect.forEach(
         deliveries,
         (d) =>
@@ -567,7 +568,7 @@ const make = (sessions: ChannelSessions) =>
       return written;
     });
 
-    const write = Effect.fnUntraced(function* (w: Write): Effect.fn.Return<Written> {
+    const post = Effect.fnUntraced(function* (w: Write, heard: (row: MsgRow) => Effect.Effect<Written>): Effect.fn.Return<Written> {
       const written = yield* tx(
         Effect.gen(function* () {
           if (w.sendKey) {
@@ -618,7 +619,7 @@ const make = (sessions: ChannelSessions) =>
             pinned_at: null,
             reactions: null,
           };
-          const out: Written = yield* settle(row);
+          const out: Written = yield* heard(row);
           if (w.readBy) yield* readUpTo(w.readBy, w.channel, number);
           if (w.follow) yield* follow(w.channel, w.follow, "owner", number);
           if (w.thread) out.thread = yield* threadFor({ id, number, channel: w.channel }, w.thread);
@@ -628,6 +629,9 @@ const make = (sessions: ChannelSessions) =>
       if (!written.again) yield* after(w.channel, written, w.answers);
       return written;
     });
+
+    /** The ordinary write: the message and its deliveries in one transaction. */
+    const write = (w: Write) => post(w, settle);
 
     /** The previews of a message's links, read after it is out (the server's own requests take seconds) and then put on
      * it as a change. */

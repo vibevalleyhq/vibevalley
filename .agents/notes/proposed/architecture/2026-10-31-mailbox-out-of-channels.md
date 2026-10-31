@@ -20,7 +20,7 @@ Status: proposed
 
 ## 进度
 
-第 1 个 PR 的形状和结构已经落地：`Delivered`、`LaunchActivity`、`InputConsumed`、`SessionNews` 在 `session/shapes.ts`；`Session` 给出 `present`、`runOf`、`reportOf`、`onIssue`；模块顺序换成 Agent Sessions → Collaboration；`Channel` 直接 `yield* Session` 并订阅它的流，`Helpers`、`useHelpers`、`helpersBack`、`activity`、`consumed`、`sessionNews` 都删了；`channelStart` 排在 `agentSessionsStart` 后面，给接回来的帮工开串、送出等着的话。`chat.test.ts` 用一个 played Session（`Channel.layerWith`）跑，不再靠注入。剩下第 2–4 个 PR：`post(w, heard)` 接缝、`Mailbox` 模块搬家、表改名。
+第 1 个 PR 的形状和结构已经落地：`Delivered`、`LaunchActivity`、`InputConsumed`、`SessionNews` 在 `session/shapes.ts`；`Session` 给出 `present`、`runOf`、`reportOf`、`onIssue`；模块顺序换成 Agent Sessions → Collaboration；`Channel` 直接 `yield* Session` 并订阅它的流，`Helpers`、`useHelpers`、`helpersBack`、`activity`、`consumed`、`sessionNews` 都删了；`channelStart` 排在 `agentSessionsStart` 后面，给接回来的帮工开串、送出等着的话。`chat.test.ts` 用一个 played Session（`Channel.layerWith`）跑，不再靠注入。第 2 个 PR 的接缝也有了：`chatAudience` 拆成 `whoHears`（谁该听到）和 `brakes`（三道刹车），`post(w, heard)` 在同一个事务里写消息、调 `heard`，现在的 `write` 就是 `post(w, settle)`；调用方和表都没动。剩下第 3、4 个 PR：`Mailbox` 模块搬家、表改名。
 
 ## Proposal
 ## Proposal
