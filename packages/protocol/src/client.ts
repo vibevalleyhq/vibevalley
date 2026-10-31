@@ -304,6 +304,15 @@ export class VibeValleyApi {
       delete: (a: { id: T.ArtifactId } & T.BlockDelete): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/delete", a),
       previewDelete: (a: { id: T.ArtifactId } & T.BlockDelete): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/block/previewDelete", a),
     },
+    suggestion: {
+      /** The open and resolved suggestions on an artifact, oldest first. */
+      list: (a: { id: T.ArtifactId }): Promise<T.Suggestion[]> => this.call<T.Suggestion[]>("/api/v1/artifact/suggestion/list", a),
+      /** A change an agent proposes to a block the owner wrote. */
+      create: (a: { id: T.ArtifactId } & T.SuggestionCreate): Promise<T.Suggestion> => this.call<T.Suggestion>("/api/v1/artifact/suggestion/create", a),
+      /** The owner takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+      accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }): Promise<T.Suggestion> => this.call<T.Suggestion>("/api/v1/artifact/suggestion/accept", a),
+      reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }): Promise<T.Suggestion> => this.call<T.Suggestion>("/api/v1/artifact/suggestion/reject", a),
+    },
     markdown: {
       /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
       get: (a: { id: T.ArtifactId }): Promise<T.ArtifactMarkdown> => this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a),

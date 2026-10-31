@@ -107,3 +107,53 @@ test("the canvas keeps the same artifact open after a reload, in the owner's the
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.getByTestId("artifact-canvas").locator('[data-type="heading"]')).toContainText("Dark");
 });
+
+test("a suggestion shows its diff, and accepting it changes the block", async ({ page, api }) => {
+  const made = await api.artifact.create({ title: `suggestion ${Date.now() % 100000}`, kind: "markdown", content: "owner line" });
+  const block = (await api.artifact.block.list({ id: made.id })).blocks[0]!;
+  await api.artifact.suggestion.create({
+    id: made.id,
+    block: block.id,
+    baseRev: block.rev,
+    change: { text: [{ t: "agent line", marks: {} }] },
+  });
+  await page.goto(`/artifacts/${made.id}`);
+  const panel = page.getByTestId("artifact-suggestions");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("agent line");
+  await page.getByTestId("suggestion-accept").click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("artifact-blocks")).toContainText("agent line");
+});
+
+test("a suggestion whose block moved on is stale and cannot be accepted", async ({ page, api }) => {
+  const made = await api.artifact.create({ title: `stale ${Date.now() % 100000}`, kind: "markdown", content: "first" });
+  const block = (await api.artifact.block.list({ id: made.id })).blocks[0]!;
+  await api.artifact.suggestion.create({
+    id: made.id,
+    block: block.id,
+    baseRev: block.rev,
+    change: { text: [{ t: "too late", marks: {} }] },
+  });
+  await api.artifact.block.update({ id: made.id, block: block.id, baseRev: block.rev, text: "owner moved on" });
+  await page.goto(`/artifacts/${made.id}`);
+  const suggestion = page.getByTestId("artifact-suggestion");
+  await expect(suggestion).toHaveAttribute("data-status", "stale");
+  await expect(page.getByTestId("suggestion-accept")).toBeDisabled();
+  await page.getByTestId("suggestion-reject").click();
+  await expect(page.getByTestId("artifact-suggestions")).toHaveCount(0);
+});
+
+test("on a phone a suggestion is readable and can be accepted from the keyboard", async ({ page, api }) => {
+  const made = await api.artifact.create({ title: `phone ${Date.now() % 100000}`, kind: "markdown", content: "phone block" });
+  const block = (await api.artifact.block.list({ id: made.id })).blocks[0]!;
+  await api.artifact.suggestion.create({ id: made.id, block: block.id, baseRev: block.rev, change: { text: [{ t: "phone suggestion", marks: {} }] } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/artifacts/${made.id}`);
+  const panel = page.getByTestId("artifact-suggestions");
+  await expect(panel).toBeVisible();
+  await page.getByTestId("suggestion-accept").focus();
+  await page.keyboard.press("Enter");
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("artifact-blocks")).toContainText("phone suggestion");
+});

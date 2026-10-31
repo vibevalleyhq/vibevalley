@@ -208,6 +208,13 @@ export interface Handlers<R = never> {
   /** One block and its children put in their tombstones. */
   readonly "artifact.block.delete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Effect.Effect<T.BlockOpResult, ApiError, R>;
   readonly "artifact.block.previewDelete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Effect.Effect<T.Preview, ApiError, R>;
+  /** The open and resolved suggestions on an artifact, oldest first. */
+  readonly "artifact.suggestion.list": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Suggestion[], ApiError, R>;
+  /** A change an agent proposes to a block the owner wrote. */
+  readonly "artifact.suggestion.create": (a: { readonly id: T.ArtifactId } & T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError, R>;
+  /** The owner takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+  readonly "artifact.suggestion.accept": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Effect.Effect<T.Suggestion, ApiError, R>;
+  readonly "artifact.suggestion.reject": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Effect.Effect<T.Suggestion, ApiError, R>;
   /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
   readonly "artifact.markdown.get": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.ArtifactMarkdown, ApiError, R>;
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
@@ -371,6 +378,7 @@ const skillDeleteInput = input({ id: Schema.String });
 const lanDeviceDeleteInput = input({ id: Schema.String });
 const artifactDeleteInput = input({ id: S.ArtifactId });
 const artifactBlockDeleteInput = input({ id: S.ArtifactId }, S.BlockDelete);
+const artifactSuggestionInput = input({ id: S.ArtifactId, suggestion: S.SuggestionId });
 
 export const endpoints: readonly Endpoint[] = [
   {
@@ -905,6 +913,34 @@ export const endpoints: readonly Endpoint[] = [
     input: artifactBlockDeleteInput,
     result: S.Preview,
     can: ["owner", "remote", "session", "orchestrator"],
+  },
+  {
+    op: "artifact.suggestion.list",
+    about: ["id"],
+    input: input({ id: S.ArtifactId }),
+    result: Schema.mutable(Schema.Array(S.Suggestion)),
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.suggestion.create",
+    about: ["id"],
+    input: input({ id: S.ArtifactId }, S.SuggestionCreate),
+    result: S.Suggestion,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.suggestion.accept",
+    about: ["id"],
+    input: artifactSuggestionInput,
+    result: S.Suggestion,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "artifact.suggestion.reject",
+    about: ["id"],
+    input: artifactSuggestionInput,
+    result: S.Suggestion,
+    can: ["owner", "remote"],
   },
   {
     op: "artifact.markdown.get",

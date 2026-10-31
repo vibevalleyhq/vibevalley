@@ -71,6 +71,33 @@
     "openPage": "Open its page",
     "quote": "Speak about it"
   },
+  "suggestions": {
+    "title": "Suggestions ({n})",
+    "by": "From {name}",
+    "rev": "on rev {rev}",
+    "stale": "The block changed since; this suggestion is stale",
+    "accept": "Accept",
+    "reject": "Dismiss",
+    "delete": "Delete this block",
+    "type": "Change to {type}",
+    "types": {
+      "paragraph": "paragraph",
+      "heading": "heading",
+      "bulleted": "bulleted list",
+      "numbered": "numbered list",
+      "todo": "todo",
+      "quote": "quote",
+      "code": "code",
+      "divider": "divider",
+      "image": "image",
+      "issueRef": "issue reference",
+      "memoryItem": "memory"
+    },
+    "attrLevel": "level",
+    "attrChecked": "checked",
+    "attrLanguage": "language",
+    "attrs": "Change attrs: {attrs}"
+  },
   "body": {
     "blocks": "Written together",
     "html": "Web page"

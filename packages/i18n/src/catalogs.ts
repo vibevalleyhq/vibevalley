@@ -151,6 +151,15 @@ export const catalogs = {
       parentDeleted: "父块 {id} 已经删掉了",
       afterNotSibling: "没有块 {id}，或它不在这一层",
       nothingToChange: "没说要改什么",
+      suggestion: {
+        empty: "建议里没有要改的东西",
+        deleteAlone: "删块的建议不能再带别的改动",
+        noBlock: "没有块 {id}，或它已经删掉了",
+        beyond: "建议对着第 {rev} 版，可这一块现在才第 {now} 版",
+        missing: "没有建议 {id}",
+        stale: "这一块从第 {rev} 版起改过了，现在是第 {now} 版；建议作废，让它重看再提",
+        suggested: "主人写过的块不直接改，已经提了建议〔{id}〕，等主人接受",
+      },
       op: {
         deleted: "这一块已经删掉了",
         noAttr: "没有属性 {name}",
@@ -1401,6 +1410,33 @@ export const catalogs = {
         start: "从这里开始写……",
       },
       canvas: { label: "打开的产出", close: "关掉", openPage: "在产出页打开", quote: "带话" },
+      suggestions: {
+        title: "建议（{n}）",
+        by: "{name} 提的",
+        rev: "对着第 {rev} 版",
+        stale: "这一块后来改过，建议作废",
+        accept: "接受",
+        reject: "不要",
+        delete: "删掉这一块",
+        type: "改成 {type}",
+        types: {
+          paragraph: "段落",
+          heading: "标题",
+          bulleted: "无序列表",
+          numbered: "有序列表",
+          todo: "待办",
+          quote: "引用",
+          code: "代码",
+          divider: "分隔线",
+          image: "图片",
+          issueRef: "工单引用",
+          memoryItem: "记性",
+        },
+        attrLevel: "级别",
+        attrChecked: "勾选",
+        attrLanguage: "语言",
+        attrs: "改属性：{attrs}",
+      },
       body: { blocks: "一起写的", html: "网页" },
     },
     "web.base": {
@@ -3763,6 +3799,15 @@ export const catalogs = {
       parentDeleted: "The parent block {id} was deleted",
       afterNotSibling: "There is no block {id}, or it is not at that level",
       nothingToChange: "Nothing was said to change",
+      suggestion: {
+        empty: "The suggestion changes nothing",
+        deleteAlone: "A delete suggestion cannot carry another change",
+        noBlock: "There is no block {id}, or it was deleted",
+        beyond: "The suggestion is for rev {rev}, but the block is only at rev {now}",
+        missing: "There is no suggestion {id}",
+        stale: "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
+        suggested: "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner",
+      },
       op: {
         deleted: "This block was deleted",
         noAttr: "There is no attribute {name}",
@@ -5070,6 +5115,33 @@ export const catalogs = {
         start: "Start writing here…",
       },
       canvas: { label: "Open artifact", close: "Close", openPage: "Open its page", quote: "Speak about it" },
+      suggestions: {
+        title: "Suggestions ({n})",
+        by: "From {name}",
+        rev: "on rev {rev}",
+        stale: "The block changed since; this suggestion is stale",
+        accept: "Accept",
+        reject: "Dismiss",
+        delete: "Delete this block",
+        type: "Change to {type}",
+        types: {
+          paragraph: "paragraph",
+          heading: "heading",
+          bulleted: "bulleted list",
+          numbered: "numbered list",
+          todo: "todo",
+          quote: "quote",
+          code: "code",
+          divider: "divider",
+          image: "image",
+          issueRef: "issue reference",
+          memoryItem: "memory",
+        },
+        attrLevel: "level",
+        attrChecked: "checked",
+        attrLanguage: "language",
+        attrs: "Change attrs: {attrs}",
+      },
       body: { blocks: "Written together", html: "Web page" },
     },
     "web.base": {
@@ -7552,6 +7624,13 @@ export interface Messages {
   "server.artifact.preview.removeBlock": { readonly id: string | number };
   "server.artifact.preview.removeBlocks": { readonly n: string | number; readonly title: string | number };
   "server.artifact.preview.removeChildren": { readonly n: string | number };
+  "server.artifact.suggestion.beyond": { readonly now: string | number; readonly rev: string | number };
+  "server.artifact.suggestion.deleteAlone": undefined;
+  "server.artifact.suggestion.empty": undefined;
+  "server.artifact.suggestion.missing": { readonly id: string | number };
+  "server.artifact.suggestion.noBlock": { readonly id: string | number };
+  "server.artifact.suggestion.stale": { readonly now: string | number; readonly rev: string | number };
+  "server.artifact.suggestion.suggested": { readonly id: string | number };
   "server.artifact.tooBig": { readonly mb: string | number };
   "server.artifact.untitled": undefined;
   "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
@@ -8781,6 +8860,29 @@ export interface Messages {
   "web.artifact.page.versions": undefined;
   "web.artifact.place.hint": undefined;
   "web.artifact.place.label": undefined;
+  "web.artifact.suggestions.accept": undefined;
+  "web.artifact.suggestions.attrChecked": undefined;
+  "web.artifact.suggestions.attrLanguage": undefined;
+  "web.artifact.suggestions.attrLevel": undefined;
+  "web.artifact.suggestions.attrs": { readonly attrs: string | number };
+  "web.artifact.suggestions.by": { readonly name: string | number };
+  "web.artifact.suggestions.delete": undefined;
+  "web.artifact.suggestions.reject": undefined;
+  "web.artifact.suggestions.rev": { readonly rev: string | number };
+  "web.artifact.suggestions.stale": undefined;
+  "web.artifact.suggestions.title": { readonly n: string | number };
+  "web.artifact.suggestions.type": { readonly type: string | number };
+  "web.artifact.suggestions.types.bulleted": undefined;
+  "web.artifact.suggestions.types.code": undefined;
+  "web.artifact.suggestions.types.divider": undefined;
+  "web.artifact.suggestions.types.heading": undefined;
+  "web.artifact.suggestions.types.image": undefined;
+  "web.artifact.suggestions.types.issueRef": undefined;
+  "web.artifact.suggestions.types.memoryItem": undefined;
+  "web.artifact.suggestions.types.numbered": undefined;
+  "web.artifact.suggestions.types.paragraph": undefined;
+  "web.artifact.suggestions.types.quote": undefined;
+  "web.artifact.suggestions.types.todo": undefined;
   "web.artifact.talk.atMessage": undefined;
   "web.artifact.talk.reply": undefined;
   "web.artifact.talk.replyHint": undefined;

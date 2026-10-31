@@ -71,6 +71,33 @@
     "openPage": "在产出页打开",
     "quote": "带话"
   },
+  "suggestions": {
+    "title": "建议（{n}）",
+    "by": "{name} 提的",
+    "rev": "对着第 {rev} 版",
+    "stale": "这一块后来改过，建议作废",
+    "accept": "接受",
+    "reject": "不要",
+    "delete": "删掉这一块",
+    "type": "改成 {type}",
+    "types": {
+      "paragraph": "段落",
+      "heading": "标题",
+      "bulleted": "无序列表",
+      "numbered": "有序列表",
+      "todo": "待办",
+      "quote": "引用",
+      "code": "代码",
+      "divider": "分隔线",
+      "image": "图片",
+      "issueRef": "工单引用",
+      "memoryItem": "记性"
+    },
+    "attrLevel": "级别",
+    "attrChecked": "勾选",
+    "attrLanguage": "语言",
+    "attrs": "改属性：{attrs}"
+  },
   "body": {
     "blocks": "一起写的",
     "html": "网页"

@@ -5,7 +5,7 @@ import { Context, Effect, Layer, ManagedRuntime, Stream } from "effect";
 import { RpcClient, type RpcClientError, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
 
-import type { ArtifactEvent, ChannelEvent } from "@vibevalley/protocol";
+import type { ArtifactEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
 import type { ApiError } from "@vibevalley/protocol/api";
 import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 
@@ -60,3 +60,7 @@ export const followReports = (after: string | undefined, on: (e: ChannelEvent) =
 /** A blocks artifact's changes after this seq, then each batch from now on. */
 export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent) => void, ended: () => void) =>
   run((c) => c["artifact.follow"]({ id, after }), on, ended);
+
+/** An artifact's suggestions as they now are, then the whole list after each change. */
+export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended: () => void) =>
+  run((c) => c["artifact.suggestion.follow"]({ id }), on, ended);

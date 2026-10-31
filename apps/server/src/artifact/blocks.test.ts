@@ -90,6 +90,7 @@ describe("a blocks artifact", () => {
           yield* submit(s, d.artifact.id, "b1", { op: "insert_block", block: para("a", "V", "你好世界") });
           yield* submit(s, d.artifact.id, "b2", { op: "split_block", blockId: "a", baseRev: 1, offset: 2, newBlock: para("b", "W", "") });
           yield* submit(s, d.artifact.id, "b3", { op: "update_text", blockId: "b", baseRev: 1, text: [bold("世界🌾")] });
+          yield* s.suggest(d.artifact.id, "lab", { block: blockId("b"), baseRev: 2, change: { text: [span("留到重启以后")] } });
           return d.artifact.id;
         }),
       ).pipe(Effect.provide(on(config)));
@@ -101,6 +102,7 @@ describe("a blocks artifact", () => {
           const b = snap.blocks[1]!;
           expect([b.rev, b.text[0]!.marks.bold, b.updatedBy, b.artifactId]).toEqual([2, true, "owner", id]);
           expect((yield* s.list()).map((d) => d.id)).toEqual([id]);
+          expect((yield* s.suggestions(id)).map((x) => [x.blockId, x.status, x.change.text?.[0]?.t])).toEqual([["b", "open", "留到重启以后"]]);
         }),
       ).pipe(Effect.provide(on(config)));
     });
@@ -310,6 +312,63 @@ describe("a blocks artifact", () => {
           expect(event!._tag).toBe("Blocks");
           if (event!._tag === "Blocks") expect(event!.seq).toBe(101 + i);
         }
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+  it.effect("suggestions wait for the owner, apply once, and go stale when the block moved", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("建议")).artifact.id;
+        const a = yield* s.insertBlock(id, "owner", { text: "主人写的" });
+        const made = yield* s.suggest(id, "lab", { block: a.blockId, baseRev: a.rev!, change: { text: [span("帮工改的")] } });
+        expect([made.status, made.author, made.baseRev]).toEqual(["open", "lab", a.rev]);
+        const accepted = yield* s.acceptSuggestion(id, made.id, "owner");
+        expect(accepted.status).toBe("accepted");
+        expect(
+          (yield* s.get(id)).blocks
+            .find((b) => b.id === a.blockId)!
+            .text.map((x) => x.t)
+            .join(""),
+        ).toBe("帮工改的");
+        expect((yield* s.acceptSuggestion(id, made.id, "owner")).status).toBe("accepted");
+
+        const b = yield* s.insertBlock(id, "owner", { text: "再写一块" });
+        const stale = yield* s.suggest(id, "lab", { block: b.blockId, baseRev: b.rev!, change: { text: [span("晚到的")] } });
+        yield* s.updateBlock(id, "owner", { block: b.blockId, baseRev: b.rev!, text: "主人先改了" });
+        expect((yield* Effect.flip(s.acceptSuggestion(id, stale.id, "owner")))._tag).toBe("Refused");
+        expect((yield* s.suggestions(id)).find((x) => x.id === stale.id)!.status).toBe("open");
+        expect((yield* s.rejectSuggestion(id, stale.id, "owner")).status).toBe("rejected");
+        expect((yield* s.rejectSuggestion(id, stale.id, "owner")).status).toBe("rejected");
+
+        const c = yield* s.insertBlock(id, "owner", { text: "两块建议" });
+        const first = yield* s.suggest(id, "lab", { block: c.blockId, baseRev: c.rev!, change: { text: [span("第一份")] } });
+        const second = yield* s.suggest(id, "lab", { block: c.blockId, baseRev: c.rev!, change: { text: [span("第二份")] } });
+        yield* s.acceptSuggestion(id, first.id, "owner");
+        expect((yield* Effect.flip(s.acceptSuggestion(id, second.id, "owner")))._tag).toBe("Refused");
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+
+  it.effect("an agent's edit of the owner's block becomes a suggestion, and a suggestion stream brings the list", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("自动建议")).artifact.id;
+        const a = yield* s.insertBlock(id, "owner", { text: "主人的字" });
+        const made = yield* s.updateBlock(id, "lab", { block: a.blockId, baseRev: a.rev!, text: "帮工想改" });
+        expect([made.status, made.suggestion !== undefined]).toEqual(["rejected", true]);
+        expect(
+          (yield* s.get(id)).blocks
+            .find((b) => b.id === a.blockId)!
+            .text.map((x) => x.t)
+            .join(""),
+        ).toBe("主人的字");
+        const first = yield* Stream.runCollect(Stream.take(s.suggestionStream(id), 1));
+        expect(first.map((e) => (e._tag === "Suggestions" ? e.suggestions.length : -1))).toEqual([1]);
+        const deleted = yield* s.deleteBlock(id, "lab", { block: a.blockId });
+        expect([deleted.status, deleted.suggestion !== undefined]).toEqual(["rejected", true]);
+        expect((yield* s.suggestions(id)).filter((x) => x.status === "open")).toHaveLength(2);
       }),
     ).pipe(Effect.provide(on())),
   );

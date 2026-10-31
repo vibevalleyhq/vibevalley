@@ -28,6 +28,15 @@
   "parentDeleted": "The parent block {id} was deleted",
   "afterNotSibling": "There is no block {id}, or it is not at that level",
   "nothingToChange": "Nothing was said to change",
+  "suggestion": {
+    "empty": "The suggestion changes nothing",
+    "deleteAlone": "A delete suggestion cannot carry another change",
+    "noBlock": "There is no block {id}, or it was deleted",
+    "beyond": "The suggestion is for rev {rev}, but the block is only at rev {now}",
+    "missing": "There is no suggestion {id}",
+    "stale": "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
+    "suggested": "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner"
+  },
   "op": {
     "deleted": "This block was deleted",
     "noAttr": "There is no attribute {name}",

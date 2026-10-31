@@ -29,6 +29,7 @@ const handlers = Subscriptions.toLayer(
       "channel.follow": ({ id, after }) => chat.follow(id, after),
       "channel.reports": ({ after }) => chat.reports(after),
       "artifact.follow": ({ id, after }) => artifacts.follow(S.artifactId(id), after),
+      "artifact.suggestion.follow": ({ id }) => artifacts.suggestionStream(S.artifactId(id)),
     });
   }),
 );

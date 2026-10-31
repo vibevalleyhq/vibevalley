@@ -11,6 +11,8 @@ export type SessionId = string & Brand.Brand<"SessionId">;
 export type ArtifactId = string & Brand.Brand<"ArtifactId">;
 /** A block's id, within its artifact: a block op names the block it is for, never its artifact. */
 export type BlockId = string & Brand.Brand<"BlockId">;
+/** A suggested change to a block. */
+export type SuggestionId = string & Brand.Brand<"SuggestionId">;
 export type MessageId = string & Brand.Brand<"MessageId">;
 
 /** The built-in orchestrator's profile id: it cannot be deleted or made a helper, so a farm always has an orchestrator, and
@@ -2749,6 +2751,46 @@ export interface ArtifactEventBlocks {
   readonly blocks: Block[];
 }
 
+export const SuggestionStatusValues = ["open", "accepted", "rejected"] as const;
+export type SuggestionStatus = (typeof SuggestionStatusValues)[number];
+
+/** What a suggestion would do to its block: a change of words, of type or attrs, or a deletion. At least one is set. */
+export interface SuggestionChange {
+  readonly text?: TextSpan[];
+  readonly type?: BlockType;
+  readonly attrs?: BlockAttrs;
+  readonly unset?: string[];
+  readonly delete?: boolean;
+}
+
+/** A change an agent proposed to a block the owner wrote; the owner accepts or rejects it. */
+export interface Suggestion {
+  readonly id: SuggestionId;
+  readonly artifactId: ArtifactId;
+  readonly blockId: BlockId;
+  /** The agent's profile id. */
+  readonly author: string;
+  /** The block's rev the agent read. */
+  readonly baseRev: number;
+  readonly change: SuggestionChange;
+  readonly status: SuggestionStatus;
+  readonly createdAt: number;
+  readonly resolvedAt?: number;
+  readonly resolvedBy?: string;
+}
+
+export interface SuggestionCreate {
+  readonly block: BlockId;
+  readonly baseRev: number;
+  readonly change: SuggestionChange;
+}
+
+/** Each change to the open suggestions, the whole list as it now is. */
+export interface SuggestionEvent {
+  readonly _tag: "Suggestions";
+  readonly suggestions: Suggestion[];
+}
+
 export interface BlockOpResult {
   status: BlockOpStatus;
   blockId: BlockId;
@@ -2756,6 +2798,8 @@ export interface BlockOpResult {
   text?: TextSpan[];
   yours?: TextSpan[];
   reason?: string;
+  /** When an agent changed a block the owner wrote: the suggestion it made instead. */
+  suggestion?: SuggestionId;
 }
 
 export interface BlockAck {

@@ -5,7 +5,7 @@
 import { Clock, Duration, Effect, Option, PubSub, Schedule, Schema, Semaphore, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
-import { dayMs } from "@vibevalley/protocol";
+import { dayMs, ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
@@ -21,6 +21,7 @@ import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qb from "../../db/generated/artifact_block.sql.ts";
 import * as qr from "../../db/generated/artifact_block_revision.sql.ts";
 import * as qc from "../../db/generated/artifact_change.sql.ts";
+import * as qs from "../../db/generated/artifact_suggestion.sql.ts";
 import { demoJitter, demoPieces } from "./demo.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { ordered, Page, wire } from "./ops.ts";
@@ -30,6 +31,7 @@ const attrsOf = jsonOf(S.BlockAttrs);
 const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.TextSpan))));
 const idsOf = jsonOf(Schema.mutable(Schema.Array(Schema.String)));
 const resultsOf = jsonOf(Schema.mutable(Schema.Array(S.BlockOpResult)));
+const changeOf = jsonOf(S.SuggestionChange);
 
 /** The demo's three sections, each a heading and three paragraphs in the catalog. */
 const demoSections = [0, 1, 2] as const;
@@ -69,6 +71,15 @@ export interface BlockStore {
   readonly previewDeleteBlock: (id: T.ArtifactId, req: T.BlockDelete) => Effect.Effect<T.Preview, ApiError>;
   /** Each batch after seq, then each from now on (artifact.follow). */
   readonly follow: (id: T.ArtifactId, after: number) => Stream.Stream<T.ArtifactEvent, ApiError>;
+  /** An artifact's suggestions, oldest first. */
+  readonly suggestions: (id: T.ArtifactId) => Effect.Effect<T.Suggestion[], ApiError>;
+  /** An agent proposes a change to a block the owner wrote. */
+  readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError>;
+  /** The owner takes a suggestion, if the block still stands at the rev it was read at. */
+  readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
+  readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
+  /** The whole list now, then after each change (artifact.suggestion.follow). */
+  readonly suggestionStream: (id: T.ArtifactId) => Stream.Stream<T.SuggestionEvent, ApiError>;
   /** Starts the demo and returns at once (demo.ts). */
   readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   readonly demoRunning: () => boolean;
@@ -115,6 +126,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
     const tick = options.tickMs ?? 1000;
     // Every batch that commits, for pages following an artifact; the database is the catch-up, this is only the live tail.
     const changes = yield* scopedPubSub<{ readonly artifact: T.ArtifactId; readonly ack: T.BlockAck }>();
+    const suggestionChanges = yield* scopedPubSub<{ readonly artifactId: T.ArtifactId; readonly suggestions: T.Suggestion[] }>();
     yield* Effect.forkScoped(
       Effect.repeat(
         Effect.gen(function* () {
@@ -321,6 +333,27 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       const block = S.blockId(req.block.trim());
       const now = (yield* blocksOf(artifact)).find((b) => b.id === block);
       if (!now) return yield* Effect.fail(refused(t("server.artifact.op.noBlock", { id: block })));
+      if (actor !== ownerId && now.updatedBy === ownerId) {
+        const wanted = req.type?.trim();
+        if (wanted !== undefined && !isAppendType(wanted)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
+        const attrs: T.BlockAttrs = {};
+        if (req.level !== undefined) attrs.level = req.level;
+        if (req.checked !== undefined) attrs.checked = req.checked;
+        if (req.language !== undefined) attrs.language = req.language;
+        const change: T.SuggestionChange = {
+          ...(req.text !== undefined ? { text: spansOf(wanted ?? now.type, req.text) } : {}),
+          ...(wanted !== undefined && isAppendType(wanted) ? { type: wanted } : {}),
+          ...(Object.keys(attrs).length > 0 ? { attrs } : {}),
+        };
+        const made = yield* suggest(artifact, actor, { block, baseRev: req.baseRev, change });
+        return {
+          status: "rejected" as const,
+          blockId: block,
+          rev: now.rev,
+          reason: t("server.artifact.suggestion.suggested", { id: made.id }),
+          suggestion: made.id,
+        };
+      }
       const ops: T.BlockOp[] = [];
       let type = now.type;
       if (req.type !== undefined) {
@@ -343,6 +376,17 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
 
     const deleteBlock = Effect.fn("Artifact.deleteBlock")(function* (artifact: T.ArtifactId, actor: string, req: T.BlockDelete) {
       const block = S.blockId(req.block.trim());
+      const now = (yield* blocksOf(artifact)).find((b) => b.id === block);
+      if (now && actor !== ownerId && now.updatedBy === ownerId) {
+        const made = yield* suggest(artifact, actor, { block, baseRev: now.rev, change: { delete: true } });
+        return {
+          status: "rejected" as const,
+          blockId: block,
+          rev: now.rev,
+          reason: t("server.artifact.suggestion.suggested", { id: made.id }),
+          suggestion: made.id,
+        };
+      }
       const ack = yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "delete_block", blockId: block }] });
       return ack.results[0] ?? (yield* Effect.fail(refused(t("server.artifact.notApplied"))));
     });
@@ -388,6 +432,119 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
         }),
       );
 
+    const suggestionOf = (r: qs.ArtifactSuggestionByIDResult): T.Suggestion => ({
+      id: S.suggestionId(r.id),
+      artifactId: S.artifactId(r.artifact_id),
+      blockId: S.blockId(r.block_id),
+      author: r.author,
+      baseRev: r.at_rev,
+      change: changeOf(r.change) ?? {},
+      status: r?.status ?? "missing",
+      createdAt: r.created_at,
+      ...(r.resolved_at !== null ? { resolvedAt: r.resolved_at } : {}),
+      ...(r.resolved_by !== null ? { resolvedBy: r.resolved_by } : {}),
+    });
+
+    const suggestionList = Effect.fn("Artifact.suggestions")(function* (id: T.ArtifactId) {
+      yield* found(id);
+      return (yield* db.run(qs.artifactSuggestions({ artifact_id: id, n: 500n }))).map(suggestionOf);
+    });
+
+    const publishSuggestions = Effect.fnUntraced(function* (id: T.ArtifactId) {
+      const suggestions = yield* suggestionList(id);
+      yield* PubSub.publish(suggestionChanges, { artifactId: id, suggestions });
+      return suggestions;
+    });
+
+    const changeProblem = (change: T.SuggestionChange): string | undefined => {
+      const set = change.text !== undefined || change.type !== undefined || change.attrs !== undefined || change.unset !== undefined || change.delete === true;
+      if (!set) return t("server.artifact.suggestion.empty");
+      if (change.delete === true && (change.text !== undefined || change.type !== undefined || change.attrs !== undefined || change.unset !== undefined)) {
+        return t("server.artifact.suggestion.deleteAlone");
+      }
+      if (change.type !== undefined && !isAppendType(change.type)) return t("server.artifact.badBlockType", { types: list(appendTypes) });
+      return undefined;
+    };
+
+    const suggest = Effect.fn("Artifact.suggest")(function* (artifact: T.ArtifactId, actor: string, req: T.SuggestionCreate) {
+      yield* found(artifact);
+      const block = (yield* blocksOf(artifact)).find((b) => b.id === req.block);
+      if (!block || block.deleted === true) return yield* Effect.fail(refused(t("server.artifact.suggestion.noBlock", { id: req.block })));
+      const problem = changeProblem(req.change);
+      if (problem) return yield* Effect.fail(refused(problem));
+      if (req.baseRev > block.rev) return yield* Effect.fail(refused(t("server.artifact.suggestion.beyond", { rev: req.baseRev, now: block.rev })));
+      const now = yield* Clock.currentTimeMillis;
+      const id = newId();
+      yield* db.run(
+        qs.addArtifactSuggestion({
+          id,
+          artifact_id: artifact,
+          block_id: req.block,
+          author: actor,
+          at_rev: Math.trunc(req.baseRev),
+          change: JSON.stringify(req.change),
+          created_at: now,
+        }),
+      );
+      const made = yield* db.one(qs.artifactSuggestionByID({ id }));
+      if (!made) return yield* Effect.fail(refused(t("server.artifact.suggestion.missing", { id })));
+      yield* publishSuggestions(artifact);
+      return suggestionOf(made);
+    });
+
+    const acceptSuggestion = Effect.fn("Artifact.acceptSuggestion")(function* (artifact: T.ArtifactId, suggestion: string, actor: string) {
+      const row = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
+      if (!row || row.artifact_id !== artifact) return yield* Effect.fail(refused(t("server.artifact.suggestion.missing", { id: suggestion })));
+      if (row.status !== "open") return suggestionOf(row);
+      const block = (yield* blocksOf(artifact)).find((b) => b.id === row.block_id);
+      if (!block || block.deleted === true) return yield* Effect.fail(refused(t("server.artifact.suggestion.noBlock", { id: row.block_id })));
+      if (block.rev !== row.at_rev) return yield* Effect.fail(refused(t("server.artifact.suggestion.stale", { rev: row.at_rev, now: block.rev })));
+      const change = changeOf(row.change) ?? {};
+      const ops: T.BlockOp[] = [];
+      if (change.delete === true) ops.push({ op: "delete_block", blockId: block.id });
+      else {
+        if (change.type !== undefined) ops.push({ op: "set_type", blockId: block.id, type: change.type, attrs: change.attrs ?? {} });
+        else if (change.attrs !== undefined || change.unset !== undefined) {
+          ops.push({ op: "set_attrs", blockId: block.id, attrs: change.attrs ?? {}, ...(change.unset ? { unset: change.unset } : {}) });
+        }
+        if (change.text !== undefined) ops.push({ op: "update_text", blockId: block.id, baseRev: row.at_rev, text: change.text });
+      }
+      const ack = yield* submitLocked(artifact, actor, { batchId: `suggestion:${suggestion}`, ops });
+      const bad = ack.results.find((r) => r.status !== "applied" && r.status !== "noop");
+      if (bad) return yield* Effect.fail(refused(bad.reason ?? t("server.artifact.notApplied")));
+      yield* db.run(qs.resolveArtifactSuggestion({ id: suggestion, status: "accepted", resolved_at: yield* Clock.currentTimeMillis, resolved_by: actor }));
+      const updated = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
+      yield* publishSuggestions(artifact);
+      return suggestionOf(updated!);
+    }, lock.withPermits(1));
+
+    const rejectSuggestion = Effect.fn("Artifact.rejectSuggestion")(function* (artifact: T.ArtifactId, suggestion: string, actor: string) {
+      const row = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
+      if (!row || row.artifact_id !== artifact) return yield* Effect.fail(refused(t("server.artifact.suggestion.missing", { id: suggestion })));
+      if (row.status !== "open") return suggestionOf(row);
+      yield* db.run(qs.resolveArtifactSuggestion({ id: suggestion, status: "rejected", resolved_at: yield* Clock.currentTimeMillis, resolved_by: actor }));
+      const updated = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
+      yield* publishSuggestions(artifact);
+      return suggestionOf(updated!);
+    }, lock.withPermits(1));
+
+    const suggestionStream = (id: T.ArtifactId): Stream.Stream<T.SuggestionEvent, ApiError> =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          yield* found(id);
+          const live = yield* PubSub.subscribe(suggestionChanges);
+          const now = yield* suggestionList(id);
+          const here = bounded(
+            Stream.fromSubscription(live).pipe(
+              Stream.filter((change) => change.artifactId === id),
+              Stream.map((change): T.SuggestionEvent => ({ _tag: "Suggestions", suggestions: change.suggestions })),
+            ),
+            "artifact.suggestion.follow",
+          );
+          return Stream.concat(Stream.succeed<T.SuggestionEvent>({ _tag: "Suggestions", suggestions: now }), here);
+        }),
+      );
+
     const fill = Effect.fn("BlockStore.fill")(function* (id: T.ArtifactId, markdown: string, actor: string) {
       const parents: T.BlockId[] = [];
       const last = new Map<string, string>();
@@ -425,16 +582,20 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       let before = "";
       if (at && at.section + 1 < at.headings.length) {
         const i = top.findIndex((x) => x.id === at.headings[at.section + 1]);
-        if (i >= 0) {
-          before = top[i]!.orderKey;
-          after = i > 0 ? top[i - 1]!.orderKey : "";
+        const here = top[i];
+        if (here) {
+          before = here.orderKey;
+          const prev = i > 0 ? top[i - 1] : undefined;
+          after = prev?.orderKey ?? "";
         }
       }
       const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
       const ack = yield* submitLocked(artifact, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
       const r = ack.results[0];
-      if (r?.status !== "applied") return yield* Effect.fail(refused(t("server.artifact.demoNotInserted", { status: String(r?.status) })));
-      return blockIn(ack, b.id)!.rev;
+      if (r?.status !== "applied") return yield* Effect.fail(refused(t("server.artifact.demoNotInserted", { status: r?.status ?? "missing" })));
+      const inserted = blockIn(ack, b.id);
+      if (!inserted) return yield* Effect.fail(refused(t("server.artifact.demoNotInserted", { status: r?.status ?? "missing" })));
+      return inserted.rev;
     }, lock.withPermits(1));
 
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
@@ -510,6 +671,11 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       deleteBlock,
       previewDeleteBlock,
       follow,
+      suggestions: suggestionList,
+      suggest,
+      acceptSuggestion,
+      rejectSuggestion,
+      suggestionStream,
       demo,
     };
     return shape;

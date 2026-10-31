@@ -2,11 +2,10 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（29 篇）
+## proposed（28 篇）
 
 ### feature
 
-- 2026-10-30 [产出画布：边聊边改、指块带话、按位置插删块](.agents/notes/proposed/feature/2026-10-30-artifact-canvas.md)
 - 2026-10-27 [自己的实时模型经本机 WebSocket 接电话，其余照旧走声网](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [管家给主人报告：早报、项目健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)
