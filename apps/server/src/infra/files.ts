@@ -47,14 +47,18 @@ export const readOrSetAside = <A>(file: string, read: (text: string) => A, start
       Effect.orDie,
     );
     if (text === undefined) return undefined;
-    const got = yield* Effect.result(Effect.try({ try: () => read(text), catch: messageOf }));
-    if (got._tag === "Success") return got.success;
-    const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
-    yield* fs
-      .rename(file, aside)
-      .pipe(Effect.catch((moved) => Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${moved.message}`))));
-    yield* Effect.logWarning(`${file} could not be read (${got.failure}): kept as ${aside}, ${startsFrom}`);
-    return undefined;
+    return yield* Effect.try({ try: () => read(text), catch: messageOf }).pipe(
+      Effect.catch(
+        Effect.fnUntraced(function* (failure) {
+          const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
+          yield* fs
+            .rename(file, aside)
+            .pipe(Effect.catch((moved) => Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${moved.message}`))));
+          yield* Effect.logWarning(`${file} could not be read (${failure}): kept as ${aside}, ${startsFrom}`);
+          return undefined;
+        }),
+      ),
+    );
   });
 
 /** A file kept by the server: one write at a time, the last asked for wins. */

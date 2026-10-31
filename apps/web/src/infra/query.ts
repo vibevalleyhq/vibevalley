@@ -61,8 +61,6 @@ export function useQuery<TQueryFnData, TError = Error, TData = TQueryFnData, TQu
 export const ready = <T, F>(q: { readonly isSuccess: boolean; readonly data: T | undefined }, fallback: F): T | F =>
   q.isSuccess && q.data !== undefined ? q.data : fallback;
 
-export type Sprites = Record<string, { w: number; h: number; ax?: number; ay?: number }>;
-
 export const useSprites = () =>
   useQuery(() => ({
     queryKey: ["sprites"],

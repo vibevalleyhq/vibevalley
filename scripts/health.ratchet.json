@@ -227,7 +227,7 @@
     "orDie": 4,
     "ignored": 0,
     "swallowed": 3,
-    "resultBranch": 1
+    "resultBranch": 0
   },
   "server: Source Control": {
     "nonNull": 35,
