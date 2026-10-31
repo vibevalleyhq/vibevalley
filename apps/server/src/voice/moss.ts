@@ -136,17 +136,21 @@ export const relay = (page: Socket.Socket, key: string, transport: MossTransport
     const writer = yield* page.writer;
     let open = false;
     const waiting: (string | Uint8Array)[] = [];
-    const link = transport.connect(key, {
-      open: () => {
-        open = true;
-        for (const f of waiting.splice(0)) link.send(f);
-      },
-      text: (data) => Queue.offerUnsafe(down, data),
-      binary: (data) => Queue.offerUnsafe(down, data),
-      // 1011: MOSS went away; its reason, when it gave one, goes to the page.
-      down: (why) => Queue.offerUnsafe(down, new Socket.CloseEvent(1011, why.slice(0, 120))),
-    });
-    yield* Effect.addFinalizer(() => Effect.sync(() => link.close()));
+    const link: MossLink = yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        transport.connect(key, {
+          open: () => {
+            open = true;
+            for (const f of waiting.splice(0)) link.send(f);
+          },
+          text: (data) => Queue.offerUnsafe(down, data),
+          binary: (data) => Queue.offerUnsafe(down, data),
+          // 1011: MOSS went away; its reason, when it gave one, goes to the page.
+          down: (why) => Queue.offerUnsafe(down, new Socket.CloseEvent(1011, why.slice(0, 120))),
+        }),
+      ),
+      (l) => Effect.sync(() => l.close()),
+    );
     const toPage = Effect.gen(function* () {
       for (;;) {
         const frame = yield* Queue.take(down);

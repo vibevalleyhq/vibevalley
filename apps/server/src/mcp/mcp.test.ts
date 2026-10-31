@@ -34,12 +34,18 @@ interface Answer {
 const client = (mcp: Mcp["Service"], token: string) => {
   let id = 0;
   const post = async (body: unknown) => {
-    const res = await mcp.handle(
-      new Request("http://127.0.0.1/mcp", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(token ? { authorization: "Bearer " + token } : {}) },
-        body: JSON.stringify(body),
-      }),
+    const res = await Effect.runPromise(
+      mcp.handle(
+        new Request("http://127.0.0.1/mcp", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            ...(token ? { authorization: "Bearer " + token } : {}),
+          },
+          body: JSON.stringify(body),
+        }),
+      ),
     );
     const raw = await res.text();
     return raw ? (JSON.parse(raw) as Answer) : {};

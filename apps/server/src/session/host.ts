@@ -21,7 +21,7 @@ import { newId } from "@/base/ids.ts";
 import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 
 import type { ToolStart } from "./facts.ts";
-import { InProcessRun, type RunInput } from "./inProcessRun.ts";
+import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
@@ -146,7 +146,7 @@ export interface AgentHost<R> {
 export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore): Effect.Effect<AgentHost<R>, never, Scope.Scope> =>
   Effect.gen(function* () {
     const owner = yield* Effect.scope;
-    const inProcess = new InProcessRun(o.name, journal, o.toolStart, runs);
+    const inProcess = yield* makeInProcessRun(o.name, journal, o.toolStart, runs);
     const transcript = join(o.home, o.name + ".jsonl");
     const local = new WeakMap<BrainMessage, Hosted<R>>();
     let input: Hosted<R> = { route: o.first, run: { by: { kind: "" } } };
@@ -385,7 +385,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         yield* Scope.close(b.scope, Exit.void);
         yield* Fiber.await(b.following);
       }
-      yield* inProcess.close().pipe(Effect.catch((err) => log(`in-process run: ${err.message}`)));
+      yield* inProcess.close.pipe(Effect.catch((err) => log(`in-process run: ${err.message}`)));
     });
 
     const close = Effect.suspend(() => {
