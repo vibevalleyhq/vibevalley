@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import type { BridgeMessage } from "@vibevalley/bridge";
 import { VibeValleyApi } from "@vibevalley/protocol";
 
 const platform = process.argv[2] === "ios" ? "ios" : "android";
@@ -153,8 +154,9 @@ try {
 
   // The page is the phone's host: it has installed the bridge's receiver, and a notice posted over the bridge is answered
   // and shown by the phone.
-  const bridgeNotice = (body: string) =>
-    phone.evaluate(`new Promise((resolve) => {
+  const bridgeNotice = (body: string) => {
+    const message: BridgeMessage = { id: 9001, call: "notify", input: { title: "VibeValley", body } };
+    return phone.evaluate(`new Promise((resolve) => {
       if (typeof window.vibevalleyFromHost !== "function") return resolve("no host");
       const page = window.vibevalleyFromHost;
       window.vibevalleyFromHost = (m) => {
@@ -162,8 +164,9 @@ try {
         window.vibevalleyFromHost = page;
         resolve(m);
       };
-      window.ReactNativeWebView.postMessage(JSON.stringify({ id: 9001, call: "notify", notice: { title: "VibeValley", body: ${JSON.stringify(body)} } }));
+      window.ReactNativeWebView.postMessage(JSON.stringify(${JSON.stringify(message)}));
     })`);
+  };
   const bridged = await bridgeNotice("桥通了：端到端");
   if (bridged !== undefined) {
     if (JSON.stringify(bridged) !== JSON.stringify({ id: 9001, ok: true })) throw new Error("the bridge answered " + JSON.stringify(bridged));

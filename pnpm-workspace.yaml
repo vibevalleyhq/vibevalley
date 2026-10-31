@@ -13,6 +13,10 @@ packages:
 catalogMode: strict
 
 catalog:
+  "@formatjs/intl-getcanonicallocales": "3.3.0"
+  "@formatjs/intl-locale": "5.4.1"
+  "@formatjs/intl-pluralrules": "6.4.0"
+  base64-js: "1.5.1"
   "@effect/tsgo": "0.63.0"
   "@axe-core/playwright": "^4.14.0"
   "@botiverse/oar": "0.69.0"
@@ -80,6 +84,7 @@ catalogs:
     react-native-webview: "14.0.1"
 
 overrides:
+  "react-native-agora@4.6.4>base64-js": "catalog:"
   vite@*: "catalog:"
   vitest@*: "catalog:"
 
@@ -106,6 +111,10 @@ allowBuilds:
 enableGlobalVirtualStore: true
 
 packageExtensions:
+  # Agora imports this at runtime from its React Native entry, but does not declare it.
+  "react-native-agora@4.6.4":
+    dependencies:
+      base64-js: "*"
   # @solidjs/web's jsx.d.ts imports csstype's CSSProperties: without it every style={{…}} is a type error.
   "@solidjs/web":
     dependencies:
@@ -125,3 +134,5 @@ minimumReleaseAgeExclude:
   - "@effect/tsgo-win32-x64@0.63.0"
   - "@effect/tsgo@0.63.0"
   - knip@6.44.0
+  - "@formatjs/intl-locale@5.4.1"
+  - "@formatjs/intl-supportedvaluesof@2.5.0"

@@ -191,6 +191,15 @@ catalogs:
     '@floating-ui/dom':
       specifier: ^1.8.0
       version: 1.8.0
+    '@formatjs/intl-getcanonicallocales':
+      specifier: 3.3.0
+      version: 3.3.0
+    '@formatjs/intl-locale':
+      specifier: 5.4.1
+      version: 5.4.1
+    '@formatjs/intl-pluralrules':
+      specifier: 6.4.0
+      version: 6.4.0
     '@larksuiteoapi/node-sdk':
       specifier: ^1.76.0
       version: 1.76.0
@@ -347,10 +356,11 @@ catalogs:
       version: 14.0.1
 
 overrides:
+  react-native-agora@4.6.4>base64-js: 1.5.1
   vite@*: npm:@voidzero-dev/vite-plus-core@1.4.0
   vitest@*: 5.0.5
 
-packageExtensionsChecksum: sha256-1Byqhg05e5RH1BOnf97wwzSKYgBSLxwq05E5hG3qSKE=
+packageExtensionsChecksum: sha256-zp+bFSU1D+o23bFmDNGVi7EdVovwlJoujn5FnVtwOG4=
 
 importers:
 
@@ -424,6 +434,15 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@formatjs/intl-getcanonicallocales':
+        specifier: 'catalog:'
+        version: 3.3.0
+      '@formatjs/intl-locale':
+        specifier: 'catalog:'
+        version: 5.4.1
+      '@formatjs/intl-pluralrules':
+        specifier: 'catalog:'
+        version: 6.4.0
       '@vibevalley/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
@@ -1922,6 +1941,27 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@formatjs/bigdecimal@0.2.7':
+    resolution: {integrity: sha512-B4+XY/e4u5v261r3a37Kq2ax91gPZSKGyVpx8X5dygAggLlUz+6MeBpmAhaBFGB8WQ4JB1qD+QtKHk9aJkEb9Q==}
+
+  '@formatjs/fast-memoize@3.1.7':
+    resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
+
+  '@formatjs/intl-getcanonicallocales@3.3.0':
+    resolution: {integrity: sha512-ndj9jw/LHAftSe34D/A6+lj3Y7GHVfPEZ6FZP2wjd8/beYeh3d1sjlSpZSBlzegSKS3U3mUEIzLCpI0+jKNT6w==}
+
+  '@formatjs/intl-locale@5.4.1':
+    resolution: {integrity: sha512-whv9X0efjqLE6VJGXVr5+mwFfCTiPYDq6/jw5aZEwBJIlTyHJjKLGzXEzyjwmarzYCzLMFhepKYf/XeTR/Z8qA==}
+
+  '@formatjs/intl-localematcher@0.10.0':
+    resolution: {integrity: sha512-OvfBelurObm02D1+4BsuHSt3Xkn49RZPo7uJXt/1Z0dNET3EN39kY1rKMV3kG0tn0p4gyGWrcFx9HyeF07cq5g==}
+
+  '@formatjs/intl-pluralrules@6.4.0':
+    resolution: {integrity: sha512-dPsgM2WeLIRPzH8wqv9mnq2sdnAeyz7n7gqv/JSK6jFVvJEEZIyZX0XalFZsuuNQ8U2CQQ5RxCy0h9U/nirJIQ==}
+
+  '@formatjs/intl-supportedvaluesof@2.5.0':
+    resolution: {integrity: sha512-0nL6a4aMrBVwFZX7udcuxxUtxldY/Q4KoGuQVNx4/roQqnZmOwDvzRb4DkEvtJZ3b76mk+V7zfJmm3nJycOFHQ==}
 
   '@google/genai@2.21.0':
     resolution: {integrity: sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q==}
@@ -8634,6 +8674,30 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
+  '@formatjs/bigdecimal@0.2.7': {}
+
+  '@formatjs/fast-memoize@3.1.7': {}
+
+  '@formatjs/intl-getcanonicallocales@3.3.0': {}
+
+  '@formatjs/intl-locale@5.4.1':
+    dependencies:
+      '@formatjs/intl-getcanonicallocales': 3.3.0
+      '@formatjs/intl-supportedvaluesof': 2.5.0
+
+  '@formatjs/intl-localematcher@0.10.0':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
+  '@formatjs/intl-pluralrules@6.4.0':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.10.0
+
+  '@formatjs/intl-supportedvaluesof@2.5.0':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
   '@google/genai@2.21.0(@modelcontextprotocol/sdk@1.32.1(supports-color@8.1.1)(zod@4.6.7))(supports-color@8.1.1)':
     dependencies:
       google-auth-library: 10.9.1(supports-color@8.1.1)
@@ -12983,6 +13047,7 @@ snapshots:
 
   react-native-agora@4.6.4(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
     dependencies:
+      base64-js: 1.5.1
       buffer: 6.0.3
       eventemitter3: 5.0.4
       json-bigint: 1.0.0

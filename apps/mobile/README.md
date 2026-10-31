@@ -6,10 +6,11 @@ whose page end is `mobileHost` there). How it fits with the desktop and the brow
 pairing and keys: [连接到本机](docs/subsystems/lan.md).
 
 ```
+src/intl.ts          loads the Intl dependencies and English plural data before the shared formatter
 App.tsx              follows the current farm choice; a vibevalley://pair link asks the choice owner to pair again
 src/PairScreen.tsx   camera and form: selects a link, names the phone, asks to pair or cancels
 src/FarmScreen.tsx   the WebView: the key as the page's cookie; loading another page or leaving closes its host
-src/infra/host.ts         one loaded page's native host: answers bridge calls, keeps each call's identity, closes its line
+src/host.ts         one loaded page's native host: answers bridge calls, keeps each call's identity, closes its line
 src/farm.ts          FarmConnection owns the current choice, pending pairing and serialized keychain commits
 src/rtc.ts           the call on Agora's native SDK: owns pending microphone permission, the engine and release
 src/notify.ts        the page's notices as the phone's own (expo-notifications)
@@ -23,6 +24,12 @@ notice posted by the page shown by the phone); stop the Gradle daemon first (`./
 environment it started with. On iOS it also takes the pair link as a launch argument (`-vibevalleyPair <link>`), as
 `simctl openurl` stops at the system's "Open in VibeValley?"; the simulator build is signed ad hoc, or it cannot load
 Agora's frameworks.
+
+The entry loads `src/intl.ts` before `App`: the shared formatter constructs English cardinal and ordinal rules at
+import time. The [FormatJS polyfills](https://formatjs.github.io/docs/polyfills/intl-pluralrules/) provide the same
+rules when Hermes lacks them; only English rule data is needed, independently of the selected catalog language.
+Agora's React Native entry imports `base64-js` without declaring it. The root package extension supplies that edge,
+and its override uses the catalog pin, so Metro does not rely on another package's hoisted dependency.
 
 ## Commands
 
