@@ -12,6 +12,7 @@ import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready } from "@/infra/query";
 import { useRouter, useSearch } from "@/infra/router";
+import { defineAtom } from "@/state/atom";
 import { type IntentType, sendOnce, useIntents } from "@/state/intent";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
@@ -36,7 +37,7 @@ const messageHref = (at: { readonly channel: string; readonly number?: number })
   at.number !== undefined ? `/chat/${at.channel}?m=${at.number}` : `/chat/${at.channel}`;
 
 /** The one just made with 新建: its title is selected to be typed over when it opens. */
-const [justMade, setJustMade] = createSignal<string>();
+const justMade = defineAtom<string | undefined>(undefined);
 
 /** `rest` is the path after /artifacts/. */
 /** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
@@ -59,7 +60,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const create = () =>
     making.run(async () => {
       const made = await api.artifact.create({ title: t("web.artifact.page.untitled") });
-      setJustMade(made.id);
+      justMade.set(made.id);
       await queries.invalidateQueries({ queryKey: ["artifacts"] });
       router.navigate(artifactHref(made.id));
     });
@@ -176,7 +177,7 @@ function Opened(props: { id: string; say: ChatSay }) {
 function Title(props: { artifact: Artifact }) {
   const [text, setText] = createSignal(untrack(() => props.artifact.title));
   // Taken while the component is made: a ref runs where the props may not be read yet.
-  const initialFresh = untrack(justMade) === untrack(() => props.artifact.id);
+  const initialFresh = untrack(justMade.get) === untrack(() => props.artifact.id);
   let field!: HTMLInputElement;
   const act = createAct();
   const save = async () => {
@@ -199,7 +200,7 @@ function Title(props: { artifact: Artifact }) {
         field = el;
         if (initialFresh)
           queueMicrotask(() => {
-            setJustMade(undefined);
+            justMade.set(undefined);
             field.focus();
             field.select();
           });

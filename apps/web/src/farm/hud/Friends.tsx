@@ -13,9 +13,9 @@ import { useFarm } from "@/farm/ui";
 import { webRoutes } from "@/farm/world/places";
 import { bottleSprite, quotaOf } from "@/features/runtime";
 import { useCore, useFrames } from "@/infra/frame";
-import { setPick, usePrefs } from "@/infra/prefs";
 import { ready, useAgents, useRuntimes } from "@/infra/query";
 import { useRouter } from "@/infra/router";
+import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
 

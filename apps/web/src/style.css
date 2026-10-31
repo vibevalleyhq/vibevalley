@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (infra/appearance.ts sets
+/* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets
    <html data-theme>). Light is the farm's colours, so the two skins stay one place. The pixel skin (the farm, the
    memory tree, ui/pixel) is drawn and keeps its colours: its root sets data-theme="light" again. A colour written into
    a class instead (bg-[#…]) would not follow: vibevalley/no-hex-color refuses it. */

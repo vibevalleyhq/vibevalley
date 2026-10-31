@@ -69,6 +69,15 @@
  *   Atom is fixed in one folder. An import of effect/reactivity anywhere else under apps/web/src is reported, a type-only
  *   one too: a type names the API as much as a call does; vite.config.ts says where the rule runs.
  *
+ *   page-store: a value the page keeps for its life (a dialog opened from two places, the farm's overlays, a draft) is
+ *   an atom of the page's, made with state/'s helpers (defineAtom; defineStored for one kept on the machine), so it is
+ *   kept one way: read in Solid, heard by plain code, reset by a test. A createSignal or createStore made outside any
+ *   function, in apps/web/src/features, farm or ui, is reported; one made in a component or a function is its own.
+ *
+ *   stored-door: the browser's storage is reached only through state/stored.ts (defineStored), which decodes what it
+ *   reads with a Schema, survives a storage that throws, keeps every key under one namespace and tells every reader of a
+ *   change, this tab's and the others'. localStorage or sessionStorage named anywhere else under apps/web/src is reported.
+ *
  *   act-door: what the owner does on the page goes through its middle layer: an Act (apps/web/src/ui/act.ts: busy until
  *   it ends, a refusal in the error tone, nothing sent while the state stream is lost) or an intent (state/intent.ts, a
  *   change shown before the server has it). In a component (a .tsx under features/ or farm/) a call of the API client
@@ -670,7 +679,7 @@ const atomDoor = defineRule({
       atom: says(
         "Atom's API is marked unstable, and only apps/web/src/state may stand on it, so that a change in it is fixed in one folder",
         "read through state: `useAtom`, `useRegistry` (state/atom.ts), `defineIntent`, `useIntents` (state/intent.ts); a primitive state lacks goes into state",
-        ".agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md",
+        "docs/subsystems/app.md",
       ),
     },
   },
@@ -680,6 +689,60 @@ const atomDoor = defineRule({
     return {
       ImportDeclaration(node) {
         if (node.source.value === "effect/reactivity" || node.source.value.startsWith("effect/reactivity/")) context.report({ node, messageId: "atom" });
+      },
+    };
+  },
+});
+
+const solidStores = new Set(["createSignal", "createStore"]);
+
+const pageStore = defineRule({
+  meta: {
+    messages: {
+      store: says(
+        "`{{call}}` outside any function is a store of the page's kept by hand: plain code cannot hear it, a test cannot reset it, and it is a second way of keeping what the page keeps in atoms",
+        "make it an atom of the page's: `const x = defineAtom(initial)` (state/atom.ts), read `x.get()` (it follows in Solid), write `x.set(v)` or `x.update(f)`; a choice kept on this machine is `defineStored(name, schema, fallback)` (state/stored.ts); a value one component owns is made in that component",
+        "apps/web/src/state/atom.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "Identifier" || !solidStores.has(c.name) || ownerOf(node)) return;
+        context.report({ node, messageId: "store", data: { call: c.name } });
+      },
+    };
+  },
+});
+
+const storages = new Set(["localStorage", "sessionStorage"]);
+
+const storedDoor = defineRule({
+  meta: {
+    messages: {
+      storage: says(
+        "`{{name}}` reached by hand: what it reads is not decoded, a storage that throws (a private window, a full one) breaks the page, the key is outside the page's namespace, and no other reader hears the change",
+        "keep the choice with `defineStored(name, schema, fallback)` (state/stored.ts) and read and set it like any page value; a struct whose fields fall back one by one uses `orFallback`",
+        "apps/web/src/state/stored.ts",
+      ),
+    },
+  },
+  create(context) {
+    const file = context.filename.replaceAll("\\", "/");
+    if (file.endsWith("/apps/web/src/state/stored.ts")) return {};
+    return {
+      Identifier(node) {
+        if (!storages.has(node.name)) return;
+        const parent = node.parent;
+        // A property named so on some other object (`x.localStorage` off window or globalThis still counts) or a key.
+        if (parent?.type === "MemberExpression" && parent.property === node && !parent.computed) {
+          const owner = parent.object;
+          if (!(owner.type === "Identifier" && (owner.name === "window" || owner.name === "globalThis" || owner.name === "self"))) return;
+        }
+        if (parent?.type === "Property" && parent.key === node && !parent.computed) return;
+        context.report({ node, messageId: "storage", data: { name: node.name } });
       },
     };
   },
@@ -1109,6 +1172,8 @@ export default definePlugin({
     "parent-import": parentImportRule,
     "db-door": dbDoor,
     "atom-door": atomDoor,
+    "page-store": pageStore,
+    "stored-door": storedDoor,
     "act-door": actDoor,
     "failure-tone": failureTone,
     "promise-boundary": promiseBoundary,

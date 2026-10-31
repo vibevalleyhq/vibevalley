@@ -17,8 +17,8 @@ import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/fea
 import { orchestratorLookOf } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
-import { setPet, usePrefs } from "@/infra/prefs";
 import { ready, useAgents } from "@/infra/query";
+import { setPet, usePrefs } from "@/state/prefs";
 import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
 
 import { Achievements } from "./Achievements";

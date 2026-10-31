@@ -11,6 +11,7 @@ import { useWorkAgents } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { ready, queries, useProjects } from "@/infra/query";
 import { useIntents } from "@/state/intent";
+import { rememberPick } from "@/state/prefs";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
@@ -22,7 +23,6 @@ import { isRefined } from "./issue";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 import { newIssueTitle } from "./titles";
-import { rememberPick } from "./write";
 
 interface Draft {
   title: string;

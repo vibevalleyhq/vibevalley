@@ -3,23 +3,18 @@ import { type Accessor, createMemo } from "solid-js";
 import type { StateFrame } from "@vibevalley/protocol";
 import { farmOf } from "@vibevalley/protocol/rules";
 
-import { createExternal } from "@/base/external";
+import { rawFrame } from "@/infra/frame";
 import { type Frames, frames } from "@/infra/frames";
 
 import { farmCommands } from "./commands";
 import { farmFrameOf } from "./scope";
-import { subscribeFarm } from "./store";
-import { farmProject } from "./ui";
+import { farmProject } from "./store";
+
 /** The frame as sent, with only this farm's sessions: for the canvas, the sounds and the effects (scope.ts). */
-export const rawFarmFrame = (): Accessor<StateFrame | undefined> =>
-  createExternal(
-    (l) => {
-      const offFrames = frames.subscribe(l);
-      const offFarm = subscribeFarm(l);
-      return () => (offFrames(), offFarm());
-    },
-    () => farmFrameOf(frames.get().frame, farmProject()),
-  );
+export function rawFarmFrame(): Accessor<StateFrame | undefined> {
+  const raw = rawFrame();
+  return createMemo(() => farmFrameOf(raw(), farmProject()));
+}
 
 /**
  * The frames store with only this farm's sessions, for the farm's DOM (FarmPage provides it to the parts that draw the

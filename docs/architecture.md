@@ -109,7 +109,7 @@ flowchart LR
 | `artifacts/<sha256>` | 产出每一版的内容，同样的内容只存一份（[产出](docs/subsystems/artifact.md)） |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 
-页面的偏好（宠物、静音、看板的样子……）存在浏览器里（`localStorage`），只在这台机器上。
+页面的偏好（宠物、静音、看板的样子……）存在浏览器里（`localStorage`，只经 `apps/web/src/state/stored.ts`），只在这台机器上。
 
 ## 配置
 

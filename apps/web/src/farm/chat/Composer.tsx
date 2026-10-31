@@ -9,14 +9,14 @@ import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
 import { aria } from "@/base/util";
-import { chatSay, createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
+import { chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "@/features/channel";
 import { DictationButton } from "@/features/voice";
 import { useAgent } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
-import { setPick, usePrefs } from "@/infra/prefs";
 import { useRouter } from "@/infra/router";
 import { useIntents } from "@/state/intent";
+import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { createPixelAct, SpriteIcon } from "@/ui/pixel";
 import { toasts } from "@/ui/pixel/toasts";
@@ -66,9 +66,10 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
 
   const router = useRouter();
 
+  const replying = useReplying(() => props.channel?.id);
   const box = createComposer(core, () => input, {
     target: () => {
-      const reply = draftOf(props.channel?.id).reply;
+      const reply = replying();
       const agent = props.thread || pick() === "auto" ? undefined : pick();
       return { id: props.channel?.id ?? "", ...(agent ? { agent } : {}), ...(reply ? { replyTo: reply.number } : {}) };
     },
@@ -82,7 +83,6 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
       if (id) drafts.reply(id, undefined);
     },
   });
-  const replying = () => draftOf(props.channel?.id).reply;
   const stopping = createPixelAct();
   const stop = () => {
     const agent = box.here();

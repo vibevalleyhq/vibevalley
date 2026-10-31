@@ -489,6 +489,17 @@ export default defineConfig({
         rules: { "vibevalley/atom-door": "error" },
       },
       {
+        // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/oxlint-plugin.ts, page-store).
+        files: ["apps/web/src/features/**", "apps/web/src/farm/**", "apps/web/src/ui/**"],
+        excludeFiles: ["apps/web/src/**/*.test.ts"],
+        rules: { "vibevalley/page-store": "error" },
+      },
+      {
+        // The browser's storage only through state/stored.ts (scripts/oxlint-plugin.ts, stored-door).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/stored-door": "error" },
+      },
+      {
         // What the owner does from a component goes through an Act or an intent (scripts/oxlint-plugin.ts, act-door).
         files: ["apps/web/src/features/**/*.tsx", "apps/web/src/farm/**/*.tsx"],
         excludeFiles: ["apps/web/src/**/*.stories.tsx"],

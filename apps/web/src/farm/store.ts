@@ -1,10 +1,15 @@
 // The farm page's own state: what is open, what is held, what the canvas shows the overlays. The farm itself is the
 // server's (useFrames/useCore); nothing here copies it: the overlays, the tool held, the chat window (open, large,
-// shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are infra/prefs.ts.
+// shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are state/prefs.ts.
+
+import { Schema } from "effect";
 
 import { dayClock } from "@vibevalley/engine/clock";
 import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { defineAtom } from "@/state/atom";
+import { defineStored } from "@/state/stored";
 
 import type { BedFxKind, Tool } from "./tools";
 import type { Rect } from "./world/framing";
@@ -77,31 +82,15 @@ export interface FarmUi {
   /** Rewards shown in the FX layer for a few seconds each. */
   readonly rewards: readonly GameEffectReward[];
   readonly screen: VillageScreen | undefined;
-  /** The project whose farm is on the page ("" for the sessions without one), and the one `/` opens next; this machine's. */
-  readonly project: string | undefined;
 }
 
-const titleSeenKey = "vibevalley.title.seen";
+/** The title screen was closed once on this machine: it does not open by itself again (Playwright sets it to start past it). */
+const titleSeen = defineStored("title.seen", Schema.Boolean, false);
 
-const projectKey = "vibevalley.farm.project";
+/** The project whose farm was on the page last ("" for the sessions without one), the one `/farm` opens; null before any. */
+const lastFarm = defineStored("farm.project", Schema.NullOr(Schema.String), null);
 
-const savedProject = () => {
-  try {
-    return localStorage.getItem(projectKey) ?? undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const titleSeen = () => {
-  try {
-    return localStorage.getItem(titleSeenKey) === "true";
-  } catch {
-    return false;
-  }
-};
-
-let state: FarmUi = {
+const farmUi = defineAtom<FarmUi>({
   overlays: [],
   tool: "hand",
   hoverBed: undefined,
@@ -113,28 +102,28 @@ let state: FarmUi = {
   phoneOpen: false,
   friendsOpen: false,
   graphShown: undefined,
-  titleOpen: !titleSeen(),
+  titleOpen: !titleSeen.get(),
   bedFx: [],
   rewards: [],
   screen: undefined,
-  project: savedProject(),
-};
+});
 
-const listeners = new Set<() => void>();
+const set = (patch: Partial<FarmUi> | ((s: FarmUi) => Partial<FarmUi>)) =>
+  farmUi.update((state) => {
+    const next = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
+    return Object.entries(next).every(([k, v]) => v === Reflect.get(state, k)) ? state : next;
+  });
 
-const set = (patch: Partial<FarmUi> | ((s: FarmUi) => Partial<FarmUi>)) => {
-  const next = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
-  if (Object.entries(next).every(([k, v]) => v === Reflect.get(state, k))) return;
-  state = next;
-  for (const l of listeners) l();
-};
+/** The farm page's state now; read in a computation or a component, it follows it. */
+export const farmState = farmUi.get;
 
-export const farmState = () => state;
+export const subscribeFarm = farmUi.subscribe;
 
-export const subscribeFarm = (l: () => void) => {
-  listeners.add(l);
-  return () => listeners.delete(l);
-};
+/** The project whose farm is on the page ("" for the sessions without one): the route sets it. */
+export const farmProject = () => lastFarm.get() ?? "";
+
+/** The farm `/farm` opens: the one entered last on this machine, if any. */
+export const lastFarmProject = () => lastFarm.get() ?? undefined;
 
 const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | undefined) =>
   set((s) => ({
@@ -160,7 +149,7 @@ export const farm = {
   menu: (open: boolean) => replace("menu", open ? { kind: "menu" } : undefined),
   /** Closes the top layer; false when none was open. */
   closeTop: () => {
-    const top = state.overlays.at(-1);
+    const top = farmUi.get().overlays.at(-1);
     if (!top) return false;
     replace(top.kind, undefined);
     return true;
@@ -183,11 +172,7 @@ export const farm = {
   /** Leaves the title screen; it does not show again on this machine. */
   closeTitle: () => {
     set({ titleOpen: false });
-    try {
-      localStorage.setItem(titleSeenKey, "true");
-    } catch {
-      // No storage: it shows again next time.
-    }
+    titleSeen.set(true);
   },
   showTitle: () => set({ titleOpen: true }),
   /** Plays a bed's effect for a moment: the canvas draws it, the sounds hear it. */
@@ -201,14 +186,7 @@ export const farm = {
     setTimeout(() => set((s) => ({ rewards: s.rewards.filter((x) => x !== r) })), rewardLinger);
   },
   setScreen: (screen: VillageScreen | undefined) => set({ screen }),
-  setProject: (project: string) => {
-    set({ project });
-    try {
-      localStorage.setItem(projectKey, project);
-    } catch {
-      // No storage: remembered until the page closes.
-    }
-  },
+  setProject: (project: string) => lastFarm.set(project),
 };
 
 /** For tests and leaving the page: everything but the title's seen flag back to the start. */

@@ -3,11 +3,12 @@
 // settle when the frame's channel has its read where it was put. A failure is said in the error tone; a mark unread
 // that failed also lets go of its hold, so the channel reads as read again rather than looking marked when it is not.
 
-import { type Accessor, createEffect, createSignal } from "solid-js";
+import { type Accessor, createEffect } from "solid-js";
 
 import type { Channel, StateFrame } from "@vibevalley/protocol";
 
 import { api } from "@/infra/api";
+import { defineAtom } from "@/state/atom";
 import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/state/intent";
 
 import { newestUnread } from "./unread";
@@ -39,12 +40,12 @@ export const unreadMark = defineIntent<ReadMark, void>({
 const sameChannel = (a: ReadMark, b: ReadMark) => a.channel === b.channel;
 
 // Channels the owner marked unread while looking at them: they stay unread until the owner leaves and comes back.
-const [held, setHeld] = createSignal<ReadonlySet<string>>(new Set());
-const release = (channel: string) => setHeld((h) => new Set([...h].filter((c) => c !== channel)));
+const held = defineAtom<ReadonlySet<string>>(new Set());
+const release = (channel: string) => held.update((h) => new Set([...h].filter((c) => c !== channel)));
 
 /** The owner's read in a channel goes back to just before this message, and the shown list leaves it so. */
 export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say: (reason: string) => void) {
-  setHeld((h) => new Set([...h, mark.channel]));
+  held.update((h) => new Set([...h, mark.channel]));
   void sendReplacing(intents, mark, sameChannel).done.then((end) => {
     if (end?.status !== "failed") return;
     intents.drop(end.key);
@@ -73,7 +74,7 @@ export function useMarkRead(channel: Accessor<Channel | undefined>, say: (reason
   createEffect(
     () => {
       const c = channel();
-      const number = c && !held().has(c.id) ? newestUnread(c) : undefined;
+      const number = c && !held.get().has(c.id) ? newestUnread(c) : undefined;
       // A string, so the same channel and number again is equal and posts nothing.
       return c && number !== undefined ? `${c.id}\n${number}` : undefined;
     },

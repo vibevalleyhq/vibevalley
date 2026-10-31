@@ -11,15 +11,15 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { aria } from "@/base/util";
 import { commands } from "@/farm/frames";
-import { useFarm } from "@/farm/ui";
+import { farmProject } from "@/farm/store";
 import { issueOf } from "@/farm/world/plots";
 import { createWriteKey, writeIssue } from "@/features/issue";
 import { useWorkAgents } from "@/infra/agents";
 import { api, reasonOf, newSendKey } from "@/infra/api";
 import { useCore } from "@/infra/frame";
-import { usePrefs } from "@/infra/prefs";
 import { ready, useProjects, useQuery } from "@/infra/query";
 import { useRouter } from "@/infra/router";
+import { usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
@@ -70,7 +70,6 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   const projectsQuery = useProjects();
   const projects = () => ready(projectsQuery, []).map((p) => p.name);
   // Every plot here is sown in this farm's project.
-  const farmProject = useFarm((s) => s.project);
   const project = () => farmProject() || undefined;
   const pick = usePrefs((p) => p.pick);
   const agents = useWorkAgents(true);

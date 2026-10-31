@@ -7,7 +7,7 @@ import { Match, Show, Switch, untrack } from "solid-js";
 import { Keyed } from "@/base/util";
 import { FarmPage } from "@/farm/FarmPage";
 import { projectMap } from "@/farm/map/ProjectMap";
-import { farmState } from "@/farm/store";
+import { lastFarmProject } from "@/farm/store";
 import { AgentsRoute } from "@/features/agent";
 import { ArtifactsPage } from "@/features/artifact";
 import { CatalogPage } from "@/features/catalog";
@@ -19,9 +19,9 @@ import { OrchestratorPage } from "@/features/orchestrator";
 import { ProjectsPage, sortProjects } from "@/features/project";
 import { RuntimesPage } from "@/features/runtime";
 import { SettingsPage } from "@/features/setting";
-import { prefsNow } from "@/infra/prefs";
 import { ready, useProjects } from "@/infra/query";
 import { useRouter } from "@/infra/router";
+import { prefsNow } from "@/state/prefs";
 import { TreePage } from "@/tree/TreePage";
 import { Navigate } from "@/ui/A";
 import { WindowStrip } from "@/ui/TitleBar";
@@ -55,7 +55,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
  */
 function FarmHome() {
   const projects = useProjects();
-  const last = farmState().project;
+  const last = lastFarmProject();
   const list = () => ready(projects, undefined);
   const enter = (name: string) => <Navigate href={`/farm/${encodeURIComponent(name)}`} />;
   return (

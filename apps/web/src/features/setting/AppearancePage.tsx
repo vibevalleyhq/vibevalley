@@ -3,7 +3,7 @@
 import { t } from "@vibevalley/i18n";
 import { ThemeChoiceValues } from "@vibevalley/protocol/host";
 
-import { ScaleValues, setScale, setTheme, usePrefs } from "@/infra/prefs";
+import { ScaleValues, setScale, setTheme, usePrefs } from "@/state/prefs";
 import { Segmented } from "@/ui/Segmented";
 import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
 

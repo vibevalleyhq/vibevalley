@@ -1,8 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show, untrack } from "solid-js";
 
-import { createExternal } from "@/base/external";
-
 import { SpriteIcon } from "./icons";
 import { pxDrop, pxText } from "./style";
 import { type ToastData, type ToastStore, toasts } from "./toasts";
@@ -21,7 +19,6 @@ export function ToastViewport(props: {
 }) {
   // Which store is fixed for the viewport's life.
   const store = untrack(() => props.store) ?? toasts;
-  const list = createExternal(store.subscribe, store.snapshot);
   return (
     // Only the cards take the pointer: around them (and with none shown) clicks go through to the page below.
     <div class="pointer-events-none fixed inset-x-0 z-50 flex justify-center" style={{ top: `${props.top ?? 12}px` }}>
@@ -32,7 +29,7 @@ export function ToastViewport(props: {
         onMouseEnter={() => store.pause()}
         onMouseLeave={() => store.resume()}
       >
-        <For each={list()} keyed={(t) => t.id}>
+        <For each={store.toasts} keyed={(t) => t.id}>
           {(t, i) => (
             <ToastCard
               toast={t()}

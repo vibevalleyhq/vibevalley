@@ -105,7 +105,7 @@
     "lintOff": 4,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 0
+    "swallowed": 1
   },
   "packages/stories": {
     "nonNull": 3,
@@ -240,7 +240,7 @@
     "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 1
   },
   "web: features/agent": {
     "nonNull": 3,
@@ -276,7 +276,7 @@
     "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1
+    "swallowed": 0
   },
   "web: features/connector": {
     "nonNull": 0,
@@ -303,7 +303,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 0
   },
   "web: features/lan": {
     "nonNull": 1,
@@ -393,7 +393,7 @@
     "lintOff": 2,
     "orDie": 0,
     "ignored": 1,
-    "swallowed": 2
+    "swallowed": 1
   },
   "web: state": {
     "nonNull": 0,
@@ -420,6 +420,6 @@
     "lintOff": 5,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 2
   }
 }

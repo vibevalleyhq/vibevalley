@@ -20,7 +20,7 @@ import { toast } from "@/ui/toasts";
 
 import { HelperFace } from "./bits";
 import { chatSay, createComposer } from "./composing";
-import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
+import { attachFiles, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 
@@ -33,6 +33,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   let emojiButton: HTMLButtonElement | undefined;
   const draft = () => draftOf(props.channel?.id);
   const uploading = () => uploadsIn(props.channel?.id);
+  const replying = useReplying(() => props.channel?.id);
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
   const at = untrack(() => props.channel?.id);
   const router = useRouter();
@@ -41,9 +42,10 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     says: useIntents(chatSay),
     target: () => {
       const d = draft();
+      const reply = replying();
       return {
         id: props.channel?.id ?? "",
-        ...(d.reply ? { replyTo: d.reply.number } : {}),
+        ...(reply ? { replyTo: reply.number } : {}),
         ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
       };
     },
@@ -89,7 +91,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           return;
         }
       }
-      if (e.key === "Escape" && draft().reply) {
+      if (e.key === "Escape" && replying()) {
         e.preventDefault();
         e.stopPropagation();
         drafts.reply(id, undefined);
@@ -148,7 +150,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </p>
         )}
       </Show>
-      <Show when={draft().reply}>
+      <Show when={replying()}>
         {(m) => (
           <div data-testid="replying" data-key={m().number} class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />

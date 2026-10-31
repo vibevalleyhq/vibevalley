@@ -5,6 +5,7 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { farmProject } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
 import { useRouter } from "@/infra/router";
 import { playSound } from "@/ui/pixel/sound";
@@ -14,7 +15,7 @@ const signFoot = { x: 44, y: 104 };
 
 export function ProjectSign() {
   const screen = useFarm((s) => s.screen);
-  const project = useFarm((s) => s.project);
+  const project = farmProject;
   const router = useRouter();
   const foot = () => screen()?.toScreen(signFoot);
   return (

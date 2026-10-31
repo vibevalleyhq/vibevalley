@@ -47,7 +47,7 @@ import {
 } from "@/farm/world/world";
 import { orchestratorSprite } from "@/features/orchestrator";
 import { orchestratorMood } from "@/infra/frame";
-import { prefsNow } from "@/infra/prefs";
+import { prefsNow } from "@/state/prefs";
 import { castPrefix } from "@/ui/cast";
 import { playSound } from "@/ui/pixel/sound";
 

@@ -8,6 +8,7 @@ import { useWorkAgents } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
+import { defineAtom } from "@/state/atom";
 import { createAct } from "@/ui/act";
 import { Dialog } from "@/ui/Dialog";
 
@@ -15,16 +16,16 @@ import { Count } from "./bits";
 import { channelOf, chatPath } from "./places";
 import { type SwitchTarget, switchTargets } from "./switcher";
 
-const [shown, setShown] = createSignal(false);
+const shown = defineAtom(false);
 
 /** One switcher for the page: the shell's Ctrl+K and the chat sidebar's bar open the same one. */
-export const switcher = { show: () => setShown(true), toggle: () => setShown((s) => !s) };
+export const switcher = { show: () => shown.set(true), toggle: () => shown.update((s) => !s) };
 
 /** Ctrl+K: a channel, thread or direct channel by its name; a profile not yet talked with gets its direct channel. */
 export function QuickSwitcher() {
   return (
-    <Dialog open={shown()} onClose={() => setShown(false)} title={t("web.channel.switcher.title")} testid="switcher">
-      <SwitcherBody onClose={() => setShown(false)} />
+    <Dialog open={shown.get()} onClose={() => shown.set(false)} title={t("web.channel.switcher.title")} testid="switcher">
+      <SwitcherBody onClose={() => shown.set(false)} />
     </Dialog>
   );
 }

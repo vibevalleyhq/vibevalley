@@ -210,6 +210,32 @@ tester.run("atom-door", rule("atom-door"), {
   ],
 });
 
+tester.run("page-store", rule("page-store"), {
+  valid: [
+    { code: "function Box() { const [open, setOpen] = createSignal(false); }", filename: page("features/channel/Composer.tsx") },
+    { code: "const make = () => { const [s, set] = createStore({}); return s; };", filename: page("farm/support.ts") },
+    { code: "const shown = defineAtom(false);", filename: page("features/channel/QuickSwitcher.tsx") },
+    { code: "class Line { private readonly words = defineAtom(''); }", filename: page("ui/pixel/toasts.ts") },
+  ],
+  invalid: [
+    { code: "const [shown, setShown] = createSignal(false);", filename: page("features/channel/QuickSwitcher.tsx"), errors: [{ messageId: "store" }] },
+    { code: "export const [all, setAll] = createStore({ items: [] });", filename: page("farm/store.ts"), errors: [{ messageId: "store" }] },
+  ],
+});
+
+tester.run("stored-door", rule("stored-door"), {
+  valid: [
+    { code: "const storage = KeyValueStore.layerStorage(() => localStorage);", filename: page("state/stored.ts") },
+    { code: "const look = defineStored('board.look', Look, fallback);", filename: page("features/issue/look.ts") },
+    { code: "const o = { localStorage: 1 }; o.localStorage;", filename: page("features/issue/look.ts") },
+  ],
+  invalid: [
+    { code: 'localStorage.getItem("vibevalley.prefs");', filename: page("state/prefs.ts"), errors: [{ messageId: "storage" }] },
+    { code: 'window.sessionStorage.setItem("k", "v");', filename: page("farm/store.ts"), errors: [{ messageId: "storage" }] },
+    { code: "const s = globalThis.localStorage;", filename: page("ui/pixel/sound.ts"), errors: [{ messageId: "storage" }] },
+  ],
+});
+
 tester.run("act-door", rule("act-door"), {
   valid: [
     { code: "act.run(() => api.issue.update({ id }));", filename: page("features/issue/IssueDetail.tsx") },

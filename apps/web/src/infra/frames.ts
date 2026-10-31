@@ -27,7 +27,8 @@ function set(next: Frames) {
   for (const l of listeners) l();
 }
 
-// One stream while anyone listens; it reconnects a second after it drops and closes with the last listener.
+// One stream while anyone listens; it reconnects a second after it drops, or after it went silent past the server's
+// heartbeat (readStream), and closes with the last listener.
 function connect(signal: AbortSignal) {
   readStream("", statePath, (frame) => set({ frame, link: "open", count: current.count + 1 }), signal).catch(() => {
     if (signal.aborted) return;

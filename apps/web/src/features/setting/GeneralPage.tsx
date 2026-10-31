@@ -2,7 +2,7 @@
 
 import { t } from "@vibevalley/i18n";
 
-import { setStart, StartValues, usePrefs } from "@/infra/prefs";
+import { setStart, StartValues, usePrefs } from "@/state/prefs";
 import { Segmented } from "@/ui/Segmented";
 import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
 

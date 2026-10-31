@@ -1,4 +1,4 @@
-// The orchestrators' looks (an orchestrator's profile keeps its own) and the pets the owner can pick (infra/prefs.ts
+// The orchestrators' looks (an orchestrator's profile keeps its own) and the pets the owner can pick (state/prefs.ts
 // keeps the choice), and their sprites.
 
 import { t } from "@vibevalley/i18n";

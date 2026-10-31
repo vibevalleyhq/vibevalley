@@ -10,9 +10,10 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceView } from "@vibevalley/protocol";
 
 import { useOrchestrators } from "@/infra/agents";
-import { api, reasonOf } from "@/infra/api";
+import { api } from "@/infra/api";
 import { orchestratorMood } from "@/infra/frame";
 import { defineIntent, type Intent, type Intents } from "@/state/intent";
+import { createAct } from "@/ui/act";
 
 import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
 import { followed } from "./follow";
@@ -80,11 +81,14 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
   const [closed, setClosed] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
   let sending = false;
   let disposed = false;
   onSettled(() => () => {
     disposed = true;
+  });
+  // A slash command is an Act: busy until it ends, and while the state stream is lost it is refused, not sent.
+  const commanding = createAct((reason) => {
+    if (!disposed) ways.failed(reason);
   });
   const intent = (): Said => ({ ...ways.target(), text: text().trim() });
   const channelOf = (id: string | undefined): Channel | undefined => {
@@ -128,18 +132,14 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   // A line that is a command runs it: the box empties once it went through, and keeps the line when it did not.
   const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
     sending = true;
-    setBusy(true);
     try {
-      const done = await runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() });
-      if (disposed) return;
+      const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here() }));
+      if (disposed || !done) return;
       edit("", 0);
       if ("open" in done) ways.opened?.(done.open);
       else ways.told?.(done.say);
-    } catch (e) {
-      if (!disposed) ways.failed(reasonOf(e));
     } finally {
       sending = false;
-      if (!disposed) setBusy(false);
     }
   };
 
@@ -188,7 +188,7 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
 
   return {
     text,
-    busy,
+    busy: commanding.busy,
     active,
     setActive,
     offered,
@@ -201,7 +201,7 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
     /** The menu closes when the box loses the focus and comes back with it. */
     blur: () => setClosed(true),
     focus: () => setClosed(false),
-    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
+    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !commanding.busy(),
     here,
     /** The place's orchestrator is in a round the owner may stop. */
     stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),

@@ -2,30 +2,27 @@ import type { JSX } from "@solidjs/web";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Loading, onSettled } from "solid-js";
 
-import { createFarmUi, FarmUiContext } from "@/farm/ui";
 import { createFrames, FramesContext } from "@/infra/frame";
 import { frames } from "@/infra/frames";
 import { reveal } from "@/infra/opening";
 import { queries, refetchOnRelink } from "@/infra/query";
 import { createRouter, RouterContext } from "@/infra/router";
-import { createRegistry, RegistryContext } from "@/state/atom";
+import { pageRegistry, RegistryContext } from "@/state/atom";
 
-/** What every page has around it: the router, the state frames, the atoms' registry (intents), the farm's own state, the
- * query cache. */
+/** What every page has around it: the router, the state frames, the atoms' registry (intents, the page's own values),
+ * the query cache. */
 export function Root(props: { children: JSX.Element }) {
   return (
     <RouterContext value={createRouter()}>
       <FramesContext value={createFrames()}>
-        <RegistryContext value={createRegistry()}>
-          <FarmUiContext value={createFarmUi()}>
-            <QueryClientProvider client={queries}>
-              {/* A read nobody guarded with ready() waits here rather than leaving the page blank forever. */}
-              <Loading>
-                <Opened />
-                {props.children}
-              </Loading>
-            </QueryClientProvider>
-          </FarmUiContext>
+        <RegistryContext value={pageRegistry}>
+          <QueryClientProvider client={queries}>
+            {/* A read nobody guarded with ready() waits here rather than leaving the page blank forever. */}
+            <Loading>
+              <Opened />
+              {props.children}
+            </Loading>
+          </QueryClientProvider>
         </RegistryContext>
       </FramesContext>
     </RouterContext>

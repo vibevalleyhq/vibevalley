@@ -10,7 +10,7 @@ import type { RtcLine } from "@vibevalley/protocol/host";
 
 import { api, reasonOf } from "@/infra/api";
 import { currentHost } from "@/infra/host";
-import { prefsNow } from "@/infra/prefs";
+import { prefsNow } from "@/state/prefs";
 
 import { webRtc } from "./agora";
 import { LiveCaptions } from "./captions";

@@ -1,6 +1,6 @@
 import { type Accessor, createSignal } from "solid-js";
 
-import { setWidth, usePrefs } from "@/infra/prefs";
+import { setWidth, usePrefs } from "@/state/prefs";
 
 /** A pane's width: the one the owner dragged it to on this machine, else its default, kept between min and max. */
 export function usePaneWidth(pane: string, fallback: number, min: number, max: number): Accessor<number> {

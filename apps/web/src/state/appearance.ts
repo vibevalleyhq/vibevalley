@@ -1,9 +1,10 @@
-// How the workbench looks on this machine (设置 › 外观, infra/prefs.ts): the theme as <html data-theme> (light or dark,
+// How the workbench looks on this machine (设置 › 外观, state/prefs.ts): the theme as <html data-theme> (light or dark,
 // "system" worked out from the system's own and followed when it changes), told to the host so its own parts follow;
 // and the interface size as --workbench-zoom, which only the workbench's shell reads (the farm keeps its whole-number
 // scaling).
 
-import { currentHost } from "./host";
+import { currentHost } from "@/infra/host";
+
 import { prefsNow, subscribePrefs } from "./prefs";
 
 const dark = () => window.matchMedia("(prefers-color-scheme: dark)");

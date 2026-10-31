@@ -1,81 +1,72 @@
-// Kept on this device (localStorage), so a reload finds it; without storage it lasts until the page closes.
+// What the owner is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. The message
+// answered is kept by its id and place, not as a copy: what the box shows is the message as it is now, and one deleted
+// meanwhile is answered no more.
 
-import { Option, Schema } from "effect";
-import { createSignal } from "solid-js";
+import { Schema } from "effect";
+import { type Accessor, createMemo } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { recordOf } from "@/base/util";
 import { reasonOf } from "@/infra/api";
+import { defineAtom } from "@/state/atom";
+import { defineStored, orFallback } from "@/state/stored";
 
-export interface Draft {
-  readonly text?: string;
-  readonly reply?: ChatMessage;
-  readonly files: readonly Attachment[];
-}
+import { useMessage } from "./follow";
+
+const DraftSchema = Schema.Struct({
+  text: Schema.optionalKey(Schema.String),
+  reply: Schema.optionalKey(Schema.Struct({ id: Schema.String, number: Schema.Int })),
+  files: orFallback(Schema.Array(S.Attachment), []),
+});
+
+export type Draft = typeof DraftSchema.Type;
 
 const none: Draft = { files: [] };
-const key = "vibevalley.chat.drafts";
 
-// Kept on this device by an older page, so read as anything: what does not fit is left out.
-const replyOf = Schema.decodeUnknownOption(S.ChatMessage);
-const filesOf = Schema.decodeUnknownOption(Schema.Array(S.Attachment));
-
-function load(): Record<string, Draft> {
-  try {
-    const raw = recordOf(JSON.parse(localStorage.getItem(key) ?? "{}")) ?? {};
-    return Object.fromEntries(
-      Object.entries(raw).flatMap(([channel, v]) => {
-        const d = recordOf(v);
-        if (!d) return [];
-        const reply = Option.getOrUndefined(replyOf(d.reply));
-        const draft: Draft = {
-          ...(typeof d.text === "string" ? { text: d.text } : {}),
-          ...(reply ? { reply } : {}),
-          files: Option.getOrElse(filesOf(d.files), () => []),
-        };
-        return [[channel, draft]];
-      }),
-    );
-  } catch {
-    return {};
-  }
-}
-
-const [all, setAll] = createSignal<Readonly<Record<string, Draft>>>(load());
+const all = defineStored("chat.drafts", Schema.Record(Schema.String, DraftSchema), {});
 
 const empty = (d: Draft) => !d.text && !d.reply && d.files.length === 0;
 
-function save(next: Readonly<Record<string, Draft>>) {
-  try {
-    localStorage.setItem(key, JSON.stringify(Object.fromEntries(Object.entries(next).filter(([, d]) => !empty(d)))));
-  } catch {
-    // No storage, or it is full: the draft lasts until the page closes.
-  }
-}
-
-export const draftOf = (channel: string | undefined): Draft => (channel ? all()[channel] : undefined) ?? none;
+export const draftOf = (channel: string | undefined): Draft => (channel ? all.get()[channel] : undefined) ?? none;
 
 const put = (channel: string, change: (d: Draft) => Draft) =>
-  setAll((a) => {
-    const next = { ...a, [channel]: change(a[channel] ?? none) };
-    save(next);
-    return next;
+  all.update((a) => {
+    const { [channel]: was, ...rest } = a;
+    const next = change(was ?? none);
+    return empty(next) ? rest : { ...rest, [channel]: next };
   });
 
 export const drafts = {
   text: (channel: string, text: string) => put(channel, (d) => ({ ...d, text })),
-  reply: (channel: string, m: ChatMessage | undefined) => put(channel, ({ reply: _, ...d }) => (m ? { ...d, reply: m } : d)),
+  reply: (channel: string, m: ChatMessage | undefined) => put(channel, ({ reply: _, ...d }) => (m ? { ...d, reply: { id: m.id, number: m.number } } : d)),
   add: (channel: string, file: Attachment) => put(channel, (d) => ({ ...d, files: [...d.files.filter((f) => f.id !== file.id), file] })),
   drop: (channel: string, id: string) => put(channel, (d) => ({ ...d, files: d.files.filter((f) => f.id !== id) })),
   clear: (channel: string) => put(channel, () => none),
 };
 
+/** The message a channel's draft answers, as it is now; undefined when there is none, or it was deleted. */
+export function useReplying(channel: Accessor<string | undefined>): Accessor<ChatMessage | undefined> {
+  const at = createMemo(
+    () => {
+      const id = channel();
+      const reply = draftOf(id).reply;
+      return id && reply ? { channel: id, ...reply } : undefined;
+    },
+    { equals: (a, b) => a?.channel === b?.channel && a?.id === b?.id && a?.number === b?.number },
+  );
+  const message = useMessage(at);
+  return () => {
+    const m = message();
+    return m && m.id === at()?.id && m.deleted === undefined ? m : undefined;
+  };
+}
+
 /** The message the owner is changing in place, one at a time across the page (↑ in an empty box picks the last). */
-const [editingId, setEditingId] = createSignal<string>();
-export { editingId, setEditingId };
+const editing = defineAtom<string | undefined>(undefined);
+export const editingId = editing.get;
+export const setEditingId = editing.set;
 
 /** fetch over XMLHttpRequest, which tells how much of the body has gone up. */
 const sending =
@@ -114,23 +105,23 @@ export interface Upload {
   readonly percent: number;
 }
 
-const [uploads, setUploads] = createSignal<readonly Upload[]>([]);
+const uploads = defineAtom<readonly Upload[]>([]);
 let lastUpload = 0;
 
-export const uploadsIn = (channel: string | undefined) => uploads().filter((u) => u.channel === channel);
+export const uploadsIn = (channel: string | undefined) => uploads.get().filter((u) => u.channel === channel);
 
 /** Files picked, pasted or dropped: each goes up in turn and joins the channel's draft. */
 export async function attachFiles(channel: string, files: readonly File[], failed: (reason: string) => void) {
   for (const file of files) {
     const key = ++lastUpload;
-    setUploads((u) => [...u, { key, channel, name: file.name || "file", percent: 0 }]);
+    uploads.update((u) => [...u, { key, channel, name: file.name || "file", percent: 0 }]);
     try {
       // oxlint-disable-next-line eslint/no-await-in-loop -- one upload at a time, in the order picked: the drafts keep the files' order
-      drafts.add(channel, await upload(file, (percent) => setUploads((u) => u.map((x) => (x.key === key ? { ...x, percent } : x)))));
+      drafts.add(channel, await upload(file, (percent) => uploads.update((u) => u.map((x) => (x.key === key ? { ...x, percent } : x)))));
     } catch (e) {
       failed(reasonOf(e));
     } finally {
-      setUploads((u) => u.filter((x) => x.key !== key));
+      uploads.update((u) => u.filter((x) => x.key !== key));
     }
   }
 }

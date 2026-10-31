@@ -4,7 +4,7 @@ export { createChannelForm } from "./channelForm";
 export { chatSay, createComposer, pendingLines } from "./composing";
 export { useMarkRead } from "./reading";
 export { reactionSet, sameReaction, setMark, useMarkedFollowed } from "./marks";
-export { draftOf, drafts } from "./draft";
+export { drafts, useReplying } from "./draft";
 export { quickReactions, reactionOn } from "./emoji";
 export { EmojiPicker } from "./EmojiPicker";
 export { followed, useFollowed, useMessage, useReports } from "./follow";

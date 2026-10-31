@@ -2,8 +2,12 @@
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
 
+import { Schema } from "effect";
+
 import { createSynth, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 import { t } from "@vibevalley/i18n";
+
+import { defineStored } from "@/state/stored";
 
 function grains(
   pen: Pen,
@@ -223,46 +227,11 @@ export const SOUND_LABEL: Readonly<Record<SoundName, string>> = {
   ring: t("web.ui.pixel.sound.label.ring"),
 };
 
-const mutedKey = "vibevalley.farm.muted";
-const muteListeners = new Set<() => void>();
-let muted: boolean | undefined;
+/** Whether the sounds are off, kept on this machine; another tab turning them off turns them off here too. */
+const muted = defineStored("farm.muted", Schema.Boolean, false);
 
-export function isMuted(): boolean {
-  if (muted === undefined) {
-    try {
-      muted = localStorage.getItem(mutedKey) === "true";
-    } catch {
-      muted = false;
-    }
-  }
-  return muted;
-}
-
-export function setMuted(next: boolean) {
-  if (next === isMuted()) return;
-  muted = next;
-  try {
-    localStorage.setItem(mutedKey, String(next));
-  } catch {
-    // No storage: muted for this page only.
-  }
-  for (const l of muteListeners) l();
-}
-
-export function subscribeMuted(listener: () => void) {
-  muteListeners.add(listener);
-  // Another tab on this machine changed it.
-  const onStorage = (e: StorageEvent) => {
-    if (e.key !== mutedKey) return;
-    muted = e.newValue === "true";
-    listener();
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    muteListeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-  };
-}
+export const isMuted = muted.get;
+export const setMuted = muted.set;
 
 let synth: Synth | undefined;
 

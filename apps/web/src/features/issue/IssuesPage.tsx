@@ -10,6 +10,7 @@ import { useOrchestrators } from "@/infra/agents";
 import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
+import { useSearchParam } from "@/state/atom";
 import { useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Select } from "@/ui/Field";
@@ -20,35 +21,18 @@ import { toast } from "@/ui/toasts";
 import { IssueBoard } from "./Board";
 import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
-import { type BoardLook, boardViews, defaultLook, lookFromList, lookToList, viewLabel } from "./display";
+import { type BoardLook, boardViews, viewLabel } from "./display";
 import { DisplayMenu } from "./DisplayMenu";
 import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { type Lane } from "./lanes";
+import { boardLook } from "./look";
 import { issueMove, movedCards, sendMove } from "./moves";
 import { useIssueHistory, useGraphs, useNameOf } from "./queries";
 import { TaskDetail } from "./TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
-
-const lookKey = "vibevalley.board.look";
-
-function loadLook(): BoardLook {
-  try {
-    return lookFromList(JSON.parse(localStorage.getItem(lookKey) ?? "null"));
-  } catch {
-    return defaultLook;
-  }
-}
-
-function saveLook(look: BoardLook) {
-  try {
-    localStorage.setItem(lookKey, JSON.stringify(lookToList(look)));
-  } catch {
-    // No storage: the look lasts for this visit.
-  }
-}
 
 type Closing = { issue: Issue; session: Session; review: boolean; lane?: Lane };
 
@@ -58,18 +42,30 @@ export function IssuesPage(props: { rest: string }) {
   const core = useCore();
   const graphs = useGraphs();
   const id = () => props.rest || undefined;
-  const [filter, setFilter] = createSignal<BoardFilter>(noFilter);
+  // The project and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
+  // are not, being half a thought.
+  const [project, setProject] = useSearchParam("project");
+  const [agent, setAgent] = useSearchParam("agent");
+  const [query, setQuery] = createSignal("");
+  const filter = (): BoardFilter => ({ query: query(), project: project(), agent: agent() });
+  const setFilter = (f: BoardFilter) => {
+    setQuery(f.query);
+    setProject(f.project);
+    setAgent(f.agent);
+  };
   const [older, setOlder] = createSignal(false);
-  const [look, setLookState] = createSignal(loadLook());
   const [closing, setClosing] = createSignal<Closing>();
   const [reopening, setReopening] = createSignal<{ issue: Issue; lane: Lane }>();
   const history = useIssueHistory(older);
 
-  const setLook = (l: BoardLook) => {
-    setLookState(l);
-    saveLook(l);
+  const look = boardLook.get;
+  const setLook = boardLook.set;
+  // The filter's part of the address goes along, so closing an issue comes back to the board as filtered.
+  const kept = () => {
+    const search = new URLSearchParams(Object.entries({ project: project(), agent: agent() }).filter(([, v]) => v !== "")).toString();
+    return search ? `?${search}` : "";
   };
-  const open = (to: string | undefined) => router.navigate(to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`);
+  const open = (to: string | undefined) => router.navigate((to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`) + kept());
   const notice = dispatchedNotice(open);
 
   const orchestrators = useOrchestrators();

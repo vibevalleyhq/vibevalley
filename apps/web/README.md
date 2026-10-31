@@ -12,13 +12,16 @@ src/app/            the wiring: App (the routes, each place a feature's page), R
 src/base/           the pure ground, touching nothing outside: times and money in words (format.ts), ordering, matching
                     (search.ts), the shortcut table, small Solid helpers (util.tsx; external.ts: a framework-free store as
                     a signal)
-src/infra/          what talks to the outside: the state stream (frames.ts, framework-free; frame.ts, its Solid store), the
-                    API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
-                    agents.ts), saving settings, the host, the app's updates, the router, prefs and the look (the
-                    browser's history and storage), the opening cover (opening.ts), the stories' fake server (storyApi.ts)
-src/state/          the middle layer on Effect's Atom: atom.ts (the registry, useAtom, the frames as an atom), intent.ts
-                    (what the owner asked for until the frame shows it), the newest answer of a read asked again
-                    (latest.ts), the tests' registry (testing.ts)
+src/infra/          what talks to the outside: the state stream (frames.ts, framework-free, opened again when even the
+                    server's heartbeat stops coming; frame.ts, its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
+                    agents.ts), saving settings, the host, the app's updates, the router (the browser's history), the
+                    opening cover (opening.ts), the stories' fake server (storyApi.ts)
+src/state/          the middle layer on Effect's Atom: atom.ts (the page's registry, useAtom, the page's values as
+                    defineAtom, a choice in the address as useSearchParam, the frames as an atom), stored.ts (a choice
+                    kept on this machine: defineStored, the only door to the browser's storage), prefs.ts and
+                    appearance.ts (this machine's choices and the look they give), intent.ts (what the owner asked for
+                    until the frame shows it), the newest answer of a read asked again (latest.ts), the tests' registry
+                    (testing.ts)
 src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
                     (a link), an owner's act (act.ts), the window strip, the list-and-detail layout (layout.tsx), a
                     helper's look (cast.ts); each with its X.stories.tsx beside it
@@ -61,7 +64,19 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   asked again as the owner types or the place changes (a search, a channel's pins) shows only the answer to the newest
   ask, a failure as a failure (`useLatest`, `state/latest.ts`); the REST reads are read again when the state stream comes
   back (`refetchOnRelink`). Only `src/state` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is
-  unstable, so a change in it is fixed there. Why: .agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md.
+  unstable, so a change in it is fixed there. Why: docs/subsystems/app.md, 为什么这样.
+- **What the page keeps, it keeps one way.** A value that outlives a component (a dialog two places open, the farm's
+  overlays, a draft, the toasts) is an atom of the page's: `const x = defineAtom(initial)` (`state/atom.ts`), read with
+  `x.get()` anywhere (inside Solid it follows), written with `x.set`/`x.update`, heard from plain code with
+  `x.subscribe`. A choice kept on this machine is `defineStored(name, schema, fallback)` (`state/stored.ts`, on Atom's
+  `kvs`): the key is `vibevalley.<name>`, what does not decode reads as the fallback (`orFallback` per field of a
+  struct), a storage that throws keeps it for the page's life, and every reader, in this tab and the others, hears a
+  change. A choice worth a link or a reload goes in the address (`useSearchParam`, on `Atom.searchParam`: the board's
+  project and helper); a passing one (the words in a search box) stays a signal in its component. A `createSignal` or
+  `createStore` made outside any function in `features/`, `farm/` or `ui/` is reported (lint `vibevalley/page-store`),
+  and so is `localStorage` or `sessionStorage` anywhere but `state/stored.ts` (`vibevalley/stored-door`). What moves on
+  its own (the state stream's source, the live stream, the day clock, the textures loading, the phone's calls, the
+  call, dictation, the MOSS line, the block editor's queue) stays a framework-free store read through `createExternal`.
 - **Layers, one way.** `base` → `infra` → `state` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`:
   a file imports from its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in
   `scripts/oxlint-plugin.ts`). A file goes by what it is: pure (no server, host, browser history or storage) in `base`;
@@ -105,7 +120,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
     settling then (a query in the branch) halts every update on the page. A branch holding queries is keyed by a plain
     value (`<Show when={x()?.id} keyed>`) and looks its object up itself, keeping the last one found.
   - A `ref` callback does not read a `<For>` item's accessor; read the key once (`untrack`) before.
-  - A framework-free store (the frames, the farm's store, toasts, the call) comes in through `createExternal`. Code that
+  - A framework-free store (the frames, the call, dictation) comes in through `createExternal`. Code that
     compares one frame with the one before (sounds, the canvas, the phone's calls) reads `rawFrame()`; the UI reads the
     store, reconciled by id, which updates only what changed.
   - A component runs once: what changes on its own (the window's size, the time) needs a signal (`useViewport`, `useNow`).

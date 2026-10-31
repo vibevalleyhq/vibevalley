@@ -168,8 +168,8 @@
       document.querySelector("#opening .bar").setAttribute("aria-label", said.label);
       document.querySelector("#opening .words").textContent = said.waking;
       // Which page this is and how it looks, before any of its scripts: the farm's paths (and / when the owner opens on
-      // the farm, 设置 › 通用) or the workbench in its theme. The choices are infra/prefs.ts's, under the same key; the
-      // theme goes on <html> now as infra/appearance.ts would, so the page under the cover is already in it.
+      // the farm, 设置 › 通用) or the workbench in its theme. The choices are state/prefs.ts's, under the same key; the
+      // theme goes on <html> now as state/appearance.ts would, so the page under the cover is already in it.
       const openingPrefs = (() => {
         try {
           return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {};

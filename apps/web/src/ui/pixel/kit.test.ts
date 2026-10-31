@@ -12,8 +12,6 @@ const wait = (ms: number) => vi.advanceTimersByTime(ms);
 test("toasts come newest first and close after their timeout", () => {
   vi.useFakeTimers();
   const store = new ToastStore();
-  let heard = 0;
-  store.subscribe(() => heard++);
   const a = store.add({ title: "一", timeout: 20 });
   const b = store.add({ title: "二", type: "warn", timeout: 0 });
   expect(store.toasts.map((t) => t.id)).toEqual([b, a]);
@@ -22,7 +20,6 @@ test("toasts come newest first and close after their timeout", () => {
   expect(store.toasts.map((t) => t.id)).toEqual([b]);
   store.close(b);
   expect(store.toasts).toEqual([]);
-  expect(heard).toBe(4);
 });
 
 test("a paused toast keeps what was left of its timeout", () => {
