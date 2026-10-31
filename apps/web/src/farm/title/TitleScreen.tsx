@@ -12,6 +12,7 @@ import { useCore } from "@/base/frame";
 import { ready, useSettings } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { farm } from "@/farm/store";
+import { createPixelAct } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 
 import { hasFarm, orchestratorReady } from "./ready";
@@ -36,6 +37,7 @@ export function TitleScreen() {
   ];
   const [picked, setPicked] = createSignal<Item>();
   const [note, setNote] = createSignal<string>();
+  const act = createPixelAct();
   const at = () => picked() ?? (canContinue() ? "continue" : "start");
 
   const choose = (item: Item) => {
@@ -45,7 +47,7 @@ export function TitleScreen() {
         // The orchestrator cannot think without DeepSeek's key: say so under the menu, where 设置 is.
         if (!orchestratorReady(ready(settings, undefined))) return setNote(t("web.farm.title.keyFirst"));
         farm.closeTitle();
-        return void api.orchestrator.open().catch(() => {});
+        return void act.run(() => api.orchestrator.open());
       case "continue":
         return canContinue() ? farm.closeTitle() : undefined;
       case "settings":

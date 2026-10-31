@@ -11,12 +11,13 @@ src/app/            the wiring: App (the routes, each place a feature's page), R
                     the query cache, <Loading>), the shell, places
 src/base/           what every layer stands on: the state stream (frames.ts, framework-free; frame.ts, its Solid store), the
                     middle layer on Effect's Atom (atom.ts: the registry, useAtom, the frames as an atom; intent.ts: what
-                    the owner asked for until the frame shows it), the
-                    API client (api.ts), rooms (gateway.ts), the live stream, REST queries (query.ts, agents.ts), external.ts,
-                    the router, prefs, the host, saving settings, times and money in words (format.ts), the shared words
+                    the owner asked for until the frame shows it), the API client (api.ts, with request keys), the newest
+                    answer of a read asked again (latest.ts), rooms (gateway.ts), the live stream, REST queries (query.ts,
+                    agents.ts), external.ts, the router, prefs, the host, saving settings, times and money in words
+                    (format.ts), the shared words
 src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
-                    (a link), the window strip, the list-and-detail layout (layout.tsx), a helper's look (cast.ts); each with its
-                    X.stories.tsx beside it
+                    (a link), an owner's act (act.ts), the window strip, the list-and-detail layout (layout.tsx), a
+                    helper's look (cast.ts); each with its X.stories.tsx beside it
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the project map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, task, channel, session, agent, memory,
@@ -46,9 +47,17 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   never on the reply or a timer; a timeout or a refusal leaves it `failed`, to retry with the same key or let go; while
   the state stream is lost a keyed kind queues and sends once it is back. A feature shows its intents through a pure
   overlay of its own that sets only the field the owner set (`features/issue/moves.ts`'s `movedCards`), with its test.
-  A change with nothing to show before the server has it is `createAct()` (`ui/act.ts`: busy until it ends, a refusal in
-  the error tone). Only `src/base` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is unstable, so a
-  change in it is fixed there. Why: .agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md.
+  A setting changed again before the first showed replaces it (`sendReplacing`). A change with nothing to show before
+  the server has it is an Act (`createAct()` in `ui/act.ts`, `createPixelAct()` in `ui/pixel` for the skins): busy until
+  it ends however it ends, a refusal in the error tone, and while the state stream is lost it is not sent but refused
+  with that reason. A thing the owner may send again (a form's create) keeps one request key until it went through
+  (`createRequestKey`, `base/api.ts`). In a component (a `.tsx` under `features/` or `farm/`) a call of the client that
+  changes something is made inside an Act's `run` or through an intent defined in the feature's `.ts` (lint
+  `vibevalley/act-door`), and a refusal toast without the error tone is reported (`vibevalley/failure-tone`). A read
+  asked again as the owner types or the place changes (a search, a channel's pins) shows only the answer to the newest
+  ask, a failure as a failure (`useLatest`, `base/latest.ts`); the REST reads are read again when the state stream comes
+  back (`refetchOnRelink`). Only `src/base` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is
+  unstable, so a change in it is fixed there. Why: .agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md.
 - **Layers, one way.** `base` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`: a file imports from
   its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in `scripts/oxlint-plugin.ts`). A
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle

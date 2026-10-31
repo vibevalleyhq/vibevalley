@@ -26,6 +26,7 @@ import { momentText, wallClockText, yuan } from "@/base/format";
 import { ready, useRuntimes } from "@/base/query";
 import { variant, Keyed } from "@/base/util";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { KeyValueEditor } from "@/ui/Chips";
 import { AgentFace } from "@/ui/Face";
@@ -36,7 +37,6 @@ import { SpriteIcon } from "@/ui/pixel";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { Segmented } from "@/ui/Segmented";
 import { Hint } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
@@ -150,19 +150,12 @@ export function RuntimesPage(props: { rest: string }) {
 
 export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   const client = useQueryClient();
-  const [refreshing, setRefreshing] = createSignal(false);
+  const refreshing = createAct();
   const inst = () => props.info.installation;
   const keep = (got: RuntimeInfo) => client.setQueryData<RuntimeInfo[]>(["runtimes"], (all) => all?.map((r) => (r.id === got.id ? got : r)));
-  const refresh = async () => {
+  const refresh = () => {
     const id = props.info.id;
-    setRefreshing(true);
-    try {
-      keep(await api.runtime.refresh({ id }));
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setRefreshing(false);
-    }
+    return refreshing.run(async () => keep(await api.runtime.refresh({ id })));
   };
   return (
     <div class="flex max-w-4xl flex-col gap-3">
@@ -203,8 +196,8 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
             </Show>
           </div>
         </div>
-        <Button disabled={refreshing()} onClick={() => void refresh()}>
-          {refreshing() ? t("web.runtime.checking") : t("web.runtime.recheck")}
+        <Button disabled={refreshing.busy()} onClick={() => void refresh()}>
+          {refreshing.busy() ? t("web.runtime.checking") : t("web.runtime.recheck")}
         </Button>
       </div>
       <div class="grid gap-3 md:grid-cols-2">
@@ -413,14 +406,12 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
   const refusedEffort = () => props.info.facts.refused[sessionEffort];
   const refusedEnv = () => props.info.facts.refused[sessionEnv];
   const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : t("web.runtime.noEffort"));
-  const save = async () => {
+  const saving = createAct();
+  const save = () => {
     const id = props.info.id;
     const body = draft();
-    try {
-      props.onSaved(await api.runtime.setting.update({ id, ...body }));
-    } catch (e) {
-      toast(reasonOf(e));
-    }
+    const saved = props.onSaved;
+    return saving.run(async () => saved(await api.runtime.setting.update({ id, ...body })));
   };
   const budgeted = () => props.info.id === "pi" || props.info.id === "vibevalley";
   return (
@@ -432,7 +423,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
             <Button data-testid="discard" onClick={() => setDraft(props.info.settings)}>
               {t("web.runtime.discard")}
             </Button>
-            <Button tone="primary" data-testid="save" onClick={() => void save()}>
+            <Button tone="primary" data-testid="save" disabled={saving.busy()} onClick={() => void save()}>
               {t("web.runtime.save")}
             </Button>
           </span>

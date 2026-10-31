@@ -11,11 +11,10 @@ import { api } from "@/base/api";
 import { useCore, useFrames } from "@/base/frame";
 import { ready, useQuery } from "@/base/query";
 import { aria, useClickAway } from "@/base/util";
-import { fire } from "@/farm/commands";
 import { commands } from "@/farm/frames";
 import { thousands } from "@/farm/hud/readout";
 import { beds } from "@/farm/world/plots";
-import { numberText, SpriteIcon } from "@/ui/pixel";
+import { createPixelAct, numberText, SpriteIcon } from "@/ui/pixel";
 
 import { tint, Tinted } from "./bits";
 
@@ -196,6 +195,7 @@ function Standing(props: { catalog: readonly Achievement[] }) {
 /** Any tier reached can be worn, not a starter task's. */
 function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
   const [open, setOpen] = createSignal(false);
+  const act = createPixelAct();
   const box = useClickAway(open, () => setOpen(false));
   const title = () => props.p.title;
   const worn = () => {
@@ -244,7 +244,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
                   type="button"
                   role="menuitem"
                   onClick={() => {
-                    fire(commands.chooseTitle(e.a.id, e.tier));
+                    void act.run(() => commands.chooseTitle(e.a.id, e.tier));
                     setOpen(false);
                   }}
                   class="flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left hover:bg-cream-100"
@@ -263,7 +263,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
               type="button"
               role="menuitem"
               onClick={() => {
-                fire(commands.chooseTitle());
+                void act.run(() => commands.chooseTitle());
                 setOpen(false);
               }}
               class="w-full cursor-pointer px-2 py-1.5 text-left text-[13px] text-bark-600 hover:bg-cream-100"

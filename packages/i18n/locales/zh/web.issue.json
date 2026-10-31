@@ -69,7 +69,12 @@
     "reopened": "工单重开了",
     "goesOn": "{helper} 接着做。",
     "rejectWith": "打回，照上面修",
-    "carry": "带过去"
+    "carry": "带过去",
+    "moving": "正在改状态…",
+    "sending": "发送中…",
+    "sayAgain": "再说一次",
+    "takeBack": "放回输入框",
+    "notSaid": "没说出去"
   },
   "close": {
     "title": "关上「{issue}」",

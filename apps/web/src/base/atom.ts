@@ -7,7 +7,7 @@ import { Atom, AtomRegistry } from "effect/reactivity";
 import { type Accessor, createContext, useContext } from "solid-js";
 
 import { createExternal } from "./external";
-import { type Frames, frames } from "./frames";
+import { type Frames, frames, type Link } from "./frames";
 
 /** Every atom's value lives in one registry for the page, given at Root (stories and tests make their own). */
 export const RegistryContext = createContext<AtomRegistry.AtomRegistry>();
@@ -31,6 +31,9 @@ export interface FramesSource {
 }
 
 export const framesSource: Atom.Writable<FramesSource> = Atom.keepAlive(Atom.make<FramesSource>(frames));
+
+/** Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. */
+export const linkIn = (registry: AtomRegistry.AtomRegistry): Link => registry.get(framesSource).get().link;
 
 /** The state stream as an atom: subscribed to its source while anything reads it, so the stream stays open meanwhile. */
 export const framesAtom: Atom.Atom<Frames> = Atom.readable((get) => {

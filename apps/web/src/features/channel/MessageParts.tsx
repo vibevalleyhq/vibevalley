@@ -6,10 +6,12 @@ import { Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
+import { useIntents } from "@/base/intent";
 import { useRouter } from "@/base/router";
 import { aria, autofocus } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { fileKind, sizeText } from "@/ui/AttachmentTile";
 import { Icon } from "@/ui/Icon";
 import { Lightbox } from "@/ui/Lightbox";
@@ -23,12 +25,19 @@ import { EmojiPicker } from "./EmojiPicker";
 import { workbenchClock } from "./feed";
 import { useMessage } from "./follow";
 import { type LinkedMessage, linkedMessages } from "./links";
+import { pinSet, reactionSet, sameMessage, sameReaction, setMark } from "./marks";
 import { channelLabel, channelOf, messagePath } from "./places";
-import { markUnread } from "./reading";
+import { markUnread, unreadMark } from "./reading";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 
-const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(reasonOf(e), "bad"));
+const bad = (reason: string) => toast(reason, "bad");
+
+/** The owner's reaction set on a message, shown at once (marks.ts); a refusal is said and the reaction goes back. */
+function useReact() {
+  const reactions = useIntents(reactionSet);
+  return (m: ChatMessage, emoji: string, on: boolean) => setMark(reactions, { channel: m.channel, id: m.id, emoji, on }, sameReaction, bad);
+}
 
 export function ReplyQuote(props: { channel: string; number: number }) {
   const answered = useMessage(() => ({ channel: props.channel, number: props.number }));
@@ -216,6 +225,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
 }
 
 export function Reactions(props: { m: ChatMessage; names: (id: string) => string }) {
+  const react = useReact();
   return (
     <div class="mt-1 flex flex-wrap gap-1">
       <For each={props.m.reactions} keyed={(r) => r.emoji}>
@@ -229,7 +239,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
               data-count={r().by.length}
               aria-pressed={aria(mine())}
               title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: list(r().by.map(props.names)) })}
-              onClick={() => run(() => api.channel.reaction.set({ id: props.m.id, emoji: r().emoji, on: !mine() }))}
+              onClick={() => react(props.m, r().emoji, !mine())}
               class={[
                 "flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
                 mine() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover",
@@ -248,6 +258,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
 
 /** A reaction picked from every emoji, for a message that has some already. */
 function AddReaction(props: { m: ChatMessage }) {
+  const react = useReact();
   const [open, setOpen] = createSignal(false);
   let button: HTMLButtonElement | undefined;
   return (
@@ -275,7 +286,7 @@ function AddReaction(props: { m: ChatMessage }) {
           onPick={(emoji) => {
             setOpen(false);
             const m = untrack(() => props.m);
-            run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
+            react(m, emoji, reactionOn(m, emoji));
           }}
         />
       </Show>
@@ -293,13 +304,17 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   let moreEmoji: HTMLButtonElement | undefined;
   const [sure, setSure] = createSignal(false);
   const [more, setMore] = createSignal(false);
+  const react = useReact();
+  const pins = useIntents(pinSet);
+  const unreads = useIntents(unreadMark);
+  const act = createAct();
   const unread = () => {
     const { channel, number } = props.m;
-    run(() => markUnread(channel, number));
+    markUnread(unreads, { channel, number }, bad);
   };
   const copyLink = () => {
     const link = location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number);
-    run(async () => {
+    void act.run(async () => {
       await navigator.clipboard.writeText(link);
       toast(t("web.channel.more.copied"));
     });
@@ -327,7 +342,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
                 onClick={() => {
                   setPicking(false);
                   const m = props.m;
-                  run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
+                  react(m, emoji, reactionOn(m, emoji));
                 }}
               >
                 {emoji}
@@ -355,7 +370,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
             setEveryEmoji(false);
             setPicking(false);
             const m = untrack(() => props.m);
-            run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
+            react(m, emoji, reactionOn(m, emoji));
           }}
         />
       </Show>
@@ -388,7 +403,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           title={t("web.channel.tools.thread")}
           onClick={() => {
             const id = props.m.id;
-            run(async () => {
+            void act.run(async () => {
               const thread = await api.channel.thread.create({ id });
               router.navigate(`/chat/${thread}`);
             });
@@ -406,7 +421,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         aria-pressed={aria(props.m.pinned !== undefined)}
         onClick={() => {
           const m = props.m;
-          run(() => api.channel.pin.set({ id: m.id, on: m.pinned === undefined }));
+          setMark(pins, { channel: m.channel, id: m.id, on: m.pinned === undefined, at: Date.now() }, sameMessage, bad);
         }}
       >
         <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />
@@ -448,7 +463,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           if (!sure()) return void setSure(true);
           setSure(false);
           const id = props.m.id;
-          run(() => api.channel.message.delete({ id }));
+          void act.run(() => api.channel.message.delete({ id }));
         }}
       >
         <Icon name="delete" size={14} />
@@ -463,12 +478,13 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
   const done = () => untrack(() => props.onDone)();
   const [text, setText] = createSignal(was);
   const [kept, setKept] = createSignal<readonly string[]>(files.map((f) => f.id));
+  const act = createAct();
   const save = () => {
     const words = text().trim();
     const fewer = kept().length < files.length;
     if ((!words && kept().length === 0) || (words === was && !fewer)) return done();
     const keep = [...kept()];
-    run(async () => {
+    void act.run(async () => {
       await api.channel.message.update({ id, text: words, ...(fewer ? { attachments: keep } : {}) });
       done();
     });

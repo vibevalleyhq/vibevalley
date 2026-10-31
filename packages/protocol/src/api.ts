@@ -119,7 +119,7 @@ export interface Handlers<R = never> {
   /** A line heard on the call that is on, without its id: refused unless one call is. */
   readonly "voice.hear": (a: { readonly text: string; readonly agent?: string; readonly sendKey?: string }) => Effect.Effect<void, ApiError, R>;
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-  readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<void, ApiError, R>;
+  readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<T.Applied, ApiError, R>;
   readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   /** Stops a session's turn; it stays, and a comment starts the next. */
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
@@ -485,7 +485,7 @@ export const endpoints: readonly Endpoint[] = [
     op: "issue.comment.create",
     about: ["id"],
     input: input({ id: Schema.String }, S.CommentRequest),
-    result: undefined,
+    result: S.Applied,
     can: ["owner", "remote", "orchestrator"],
   },
   {

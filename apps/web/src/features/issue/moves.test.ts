@@ -2,11 +2,12 @@ import { expect, test } from "vite-plus/test";
 
 import type { AppliedIssue } from "@vibevalley/protocol";
 
-import type { Intent } from "@/base/intent";
+import { bySeq, defineIntent, type Intent, intentsIn } from "@/base/intent";
+import { frameAt, testFrames, testRegistry } from "@/base/testing";
 
 import type { BoardCard } from "./cards";
 import { sampleIssue as issue } from "./issue.samples";
-import { type IssueMove, movedCards } from "./moves";
+import { type IssueMove, issueMoveOf, movedCards, movedIssue, sendMove } from "./moves";
 
 const todo = (n: number): BoardCard => ({ kind: "todo", id: `i${n}`, lane: "todo", issue: issue(n, `第 ${n} 件`, "todo", "medium") });
 
@@ -38,4 +39,43 @@ test("of two moves of one card, the newer is shown", () => {
   const older = move("i1", { key: "old", input: { id: "i1", status: "todo", lane: "working" } });
   const newer = move("i1", { key: "new", input: { id: "i1", status: "todo", lane: "todo" } });
   expect(movedCards([a], [older, newer])[0]).toMatchObject({ lane: "todo", move: { key: "new" } });
+});
+
+test("a move made off the board (a button on the issue's page) keeps the card in its lane, moving", () => {
+  const [a] = [todo(1)];
+  const offBoard: Intent<IssueMove, AppliedIssue> = { key: "k", input: { id: "i1", status: "backlog" }, status: "pending", queued: false };
+  expect(movedCards([a], [offBoard])[0]).toMatchObject({ lane: "todo", move: { key: "k", state: "moving" } });
+});
+
+test("the issue's page shows the status moved to while it is on its way, and the frame's once it failed", () => {
+  const i = issue(1, "第 1 件", "in_review", "medium");
+  const going = move("i1", { input: { id: "i1", status: "canceled" } });
+  expect(movedIssue(i, [going]).status).toBe("canceled");
+  expect(movedIssue(i, [{ ...going, status: "failed", reason: "不行" }]).status).toBe("in_review");
+  expect(issueMoveOf("i1", [going])).toEqual({ key: "k-i1", state: "moving" });
+  expect(issueMoveOf("i2", [going])).toBeUndefined();
+});
+
+test("the same move again is the kept one, sent again with its key if it failed; another move lets it go", async () => {
+  const frames = testFrames({ frame: frameAt(0) });
+  const sent: string[] = [];
+  const type = defineIntent<IssueMove, AppliedIssue>({
+    send: (_m, key) => {
+      sent.push(key);
+      return Promise.reject(new Error("没连上"));
+    },
+    confirmed: bySeq,
+    whileLost: "queue",
+    timeoutMs: 1000,
+  });
+  const moves = intentsIn(testRegistry(frames), type);
+  const first = sendMove(moves, { id: "i1", status: "done" });
+  await first.done;
+  const again = sendMove(moves, { id: "i1", status: "done" });
+  await again.done;
+  expect(again.key).toBe(first.key);
+  expect(sent).toEqual([first.key, first.key]);
+  const other = sendMove(moves, { id: "i1", status: "canceled" });
+  await other.done;
+  expect(moves.all().map((m) => m.key)).toEqual([other.key]);
 });

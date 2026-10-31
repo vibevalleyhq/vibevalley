@@ -6,12 +6,13 @@ import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type { Channel } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { useIntents } from "@/base/intent";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
 import { DictationButton } from "@/features/voice";
+import { createAct } from "@/ui/act";
 import { AttachmentTile } from "@/ui/AttachmentTile";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
@@ -98,7 +99,11 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     box.onKey(e);
   };
   let picker: HTMLInputElement | undefined;
-  const stop = () => api.orchestrator.stop({ agent: box.here() }).catch((e) => toast(reasonOf(e), "bad"));
+  const stopping = createAct();
+  const stop = () => {
+    const agent = box.here();
+    return stopping.run(() => api.orchestrator.stop({ agent }));
+  };
 
   return (
     <div data-testid="composer" data-key={props.channel?.id} class="border-t border-line px-4 pt-3 pb-4">

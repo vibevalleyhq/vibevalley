@@ -68,6 +68,16 @@
  *   Atom is fixed in one folder. An import of effect/reactivity anywhere else under apps/web/src is reported, a type-only
  *   one too: a type names the API as much as a call does; vite.config.ts says where the rule runs.
  *
+ *   act-door: what the owner does on the page goes through its middle layer: an Act (apps/web/src/ui/act.ts: busy until
+ *   it ends, a refusal in the error tone, nothing sent while the state stream is lost) or an intent (base/intent.ts, a
+ *   change shown before the server has it). In a component (a .tsx under features/ or farm/) a call of the API client
+ *   that changes something is reported unless it is made inside a function handed to some `x.run(…)`, an Act's. A call
+ *   changes something unless its method is a read: list, get, search, recall, validate or preview… (the client's verbs,
+ *   packages/protocol/src/client.ts). An intent's send is written in the feature's .ts, where the rule does not look.
+ *
+ *   failure-tone: a refusal is said in the error tone. toast(…) given a reason (reasonOf) without "bad" as its tone, and
+ *   the pixel toasts.add({ … }) given one without the error type, are reported; ui/act.ts says refusals so already.
+ *
  *   db-door: the server reaches the database through the Db service (apps/server/src/base/db.ts), which says what a
  *   failed query becomes: run and inTx make it a defect, attempt and attemptTx keep it for a caller that tells or retries
  *   it. A module that takes the SqlClient itself, or opens its own withTransaction, decides that again by hand, and
@@ -674,6 +684,98 @@ const atomDoor = defineRule({
   },
 });
 
+/** The client's methods that only read: everything else changes something on the server. */
+const readVerbs = new Set(["list", "get", "search", "recall", "validate"]);
+
+/** api.a.b.verb(…): the verb, when the chain starts at the identifier `api`. */
+function apiVerb(callee: ESTree.Node): string | undefined {
+  if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return undefined;
+  let at: ESTree.Node = callee.object;
+  while (at.type === "MemberExpression") at = at.object;
+  return at.type === "Identifier" && at.name === "api" ? callee.property.name : undefined;
+}
+
+/** A call x.run(…) given `fn` among its arguments. */
+const isRunOf = (call: unknown, fn: object): boolean => {
+  if (typeof call !== "object" || call === null || !("type" in call) || call.type !== "CallExpression") return false;
+  if (!("arguments" in call) || !Array.isArray(call.arguments) || !call.arguments.includes(fn) || !("callee" in call)) return false;
+  const callee = call.callee;
+  if (typeof callee !== "object" || callee === null || !("type" in callee) || callee.type !== "MemberExpression" || !("property" in callee)) return false;
+  const property = callee.property;
+  return typeof property === "object" && property !== null && "name" in property && property.name === "run";
+};
+
+/** Some function around the node is handed to x.run(…). */
+function insideRun(node: { parent?: unknown }): boolean {
+  for (let owner = ownerOf(node); owner; owner = ownerOf(owner.fn)) if (isRunOf(owner.parent, owner.fn)) return true;
+  return false;
+}
+
+const actDoor = defineRule({
+  meta: {
+    messages: {
+      act: says(
+        "`api.{{call}}` changes something on the server straight from a component: it has no busy, no refusal in the error tone, and goes out while the state stream is lost",
+        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, base/intent.ts) with an overlay of its own",
+        "apps/web/src/ui/act.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const verb = apiVerb(node.callee);
+        if (verb === undefined || readVerbs.has(verb) || verb.startsWith("preview") || insideRun(node)) return;
+        context.report({
+          node,
+          messageId: "act",
+          data: {
+            call: context.sourceCode
+              .getText(node.callee)
+              .replaceAll(/\s+/gu, "")
+              .replace(/^api\./u, ""),
+          },
+        });
+      },
+    };
+  },
+});
+
+const failureTone = defineRule({
+  meta: {
+    messages: {
+      tone: says(
+        "a refusal said in the plain tone reads like news, and the owner misses that it did not happen",
+        'give the workbench\'s toast the error tone (`toast(reasonOf(e), "bad")`), the pixel one the error type (`toasts.add({ type: ToastType.error, … })`); or run the call through an Act (ui/act.ts), which says refusals so',
+        "apps/web/src/ui/act.ts",
+      ),
+    },
+  },
+  create(context) {
+    const saysReason = (n: ESTree.Node | undefined) => n !== undefined && /\breasonOf\(/u.test(context.sourceCode.getText(n));
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        const [first, second] = node.arguments;
+        if (c.type === "Identifier" && c.name === "toast") {
+          if (saysReason(first) && !(second?.type === "Literal" && second.value === "bad")) context.report({ node, messageId: "tone" });
+          return;
+        }
+        const pixel =
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "toasts" &&
+          c.property.type === "Identifier" &&
+          c.property.name === "add";
+        if (!pixel || first?.type !== "ObjectExpression" || !saysReason(first)) return;
+        const type = first.properties.find((p) => p.type === "Property" && p.key.type === "Identifier" && p.key.name === "type");
+        const error = type?.type === "Property" && /^(?:ToastType\.error|"error")$/u.test(context.sourceCode.getText(type.value));
+        if (!error) context.report({ node, messageId: "tone" });
+      },
+    };
+  },
+});
+
 const parentImportRule = defineRule({
   meta: {
     messages: {
@@ -1006,6 +1108,8 @@ export default definePlugin({
     "parent-import": parentImportRule,
     "db-door": dbDoor,
     "atom-door": atomDoor,
+    "act-door": actDoor,
+    "failure-tone": failureTone,
     "promise-boundary": promiseBoundary,
     "try-promise-catch": tryPromiseCatch,
     "one-absent": oneAbsent,

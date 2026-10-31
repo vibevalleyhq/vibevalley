@@ -3,35 +3,40 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
 import { useCore } from "@/base/frame";
+import { useIntents } from "@/base/intent";
 import { ready } from "@/base/query";
 import { aria, autofocus } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { highlight, type Tokens } from "@/ui/code/highlight";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea } from "@/ui/Field";
 
-import { actionOf, perform, run } from "./acts";
+import { actionOf, perform } from "./acts";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
+import { type Lane } from "./lanes";
+import { issueMove, sendMove } from "./moves";
 import { useIssueChanges } from "./queries";
 import { Note } from "./Sheet";
 import { issueTitle } from "./titles";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
-export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {
+export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue.id);
   const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
+  const presses = createPresses(() => props.lane);
   const cancel = async () => {
-    if (await pressed(live(), "close")) props.onClose();
+    if (await presses.press(live(), "close")) props.onClose();
   };
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
-      <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} onDone={props.onClose} />}>
+      <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} lane={props.lane} onDone={props.onClose} />}>
         <div>
           <p class="text-base">
             {working()
@@ -59,23 +64,41 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
   );
 }
 
-/** False when the issue does not offer it or the press did not go through. */
-async function pressed(issue: Issue | undefined, act: IssueAct) {
-  const a = issue && actionOf(issue, act);
-  return a !== undefined && (await run(() => perform(issue!, a).then(() => true))) === true;
+/**
+ * The dialog's buttons. A move is an intent: the dialog closes once it is sent, and the board and the issue's page show it
+ * moving, or refused with a retry. Anything else runs through the Act, the dialog waiting for it.
+ */
+function createPresses(lane: () => Lane | undefined) {
+  const moves = useIntents(issueMove);
+  const act = createAct();
+  return {
+    /** False when the issue does not offer it or the press did not go through. */
+    press: async (issue: Issue | undefined, pressed: IssueAct) => {
+      const a = issue && actionOf(issue, pressed);
+      if (!issue || !a) return false;
+      if (a.does === "move") {
+        // The lane it was dropped on is where closing puts it; a resolve sends it back to work instead.
+        const to = pressed === "resolve" ? undefined : lane();
+        void sendMove(moves, { id: issue.id, status: a.status, ...(to ? { lane: to } : {}) });
+        return true;
+      }
+      return (await act.run(async () => (await perform(issue, a), true))) === true;
+    },
+  };
 }
 
 /** What the branch brings before it is merged. */
-function ChangesReview(props: { issue: string; onDone: () => void }) {
+function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: () => void }) {
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue);
   const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
+  const presses = createPresses(() => props.lane);
   const take = async () => {
-    if (await pressed(live(), "complete")) props.onDone();
+    if (await presses.press(live(), "complete")) props.onDone();
   };
   const resolve = async () => {
-    if (await pressed(live(), "resolve")) props.onDone();
+    if (await presses.press(live(), "resolve")) props.onDone();
   };
   return (
     <Switch>
@@ -313,14 +336,16 @@ function Patch(props: { text: string; path: string }) {
 }
 
 /** Reopening a closed issue: a new helper of the same profile goes on with it. */
-export function ReopenDialog(props: { issue: Issue; onClose: () => void; onReopened: () => void }) {
+export function ReopenDialog(props: { issue: Issue; lane?: Lane | undefined; onClose: () => void; onReopened: () => void }) {
   const [text, setText] = createSignal("");
-  const reopen = async () => {
-    const id = props.issue.id;
+  const moves = useIntents(issueMove);
+  // The card shows in the lane it was dropped on, moving, from the press on; the issue opens once the server took it.
+  const reopen = () => {
     const words = text().trim();
-    const got = await run(() => api.issue.status.update({ id, status: "todo", text: words }));
+    const done = sendMove(moves, { id: props.issue.id, status: "todo", text: words, ...(props.lane ? { lane: props.lane } : {}) }).done;
+    const reopened = props.onReopened;
     props.onClose();
-    if (got) props.onReopened();
+    void done.then((d) => d?.replied !== undefined && reopened());
   };
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.reopen.title")}>
@@ -336,7 +361,7 @@ export function ReopenDialog(props: { issue: Issue; onClose: () => void; onReope
       />
       <div class="mt-5 flex justify-end gap-2">
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
-        <Button tone="primary" onClick={() => void reopen()}>
+        <Button tone="primary" onClick={() => reopen()}>
           {t("web.issue.reopen.reopen")}
         </Button>
       </div>

@@ -210,7 +210,7 @@ export class VibeValleyApi {
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-      create: (a: { id: string } & T.CommentRequest): Promise<void> => this.call<void>("/api/v1/issue/comment/create", a),
+      create: (a: { id: string } & T.CommentRequest): Promise<T.Applied> => this.call<T.Applied>("/api/v1/issue/comment/create", a),
     },
     diff: {
       get: (a: { id: string }): Promise<T.Changes> => this.call<T.Changes>("/api/v1/issue/diff/get", a),

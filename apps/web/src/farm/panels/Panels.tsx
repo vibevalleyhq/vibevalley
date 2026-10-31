@@ -10,7 +10,7 @@ import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
 import { orchestratorLookOf } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { setPet, usePrefs } from "@/base/prefs";
 import { ready, useAgents } from "@/base/query";
@@ -19,8 +19,7 @@ import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
 import { useVillage } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
-import { FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
-import { toast } from "@/ui/toasts";
+import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
 
 import { Achievements } from "./Achievements";
 import { tint } from "./bits";
@@ -162,16 +161,16 @@ function OrchestratorLooks() {
   const agents = useAgents();
   const client = useQueryClient();
   const current = () => orchestratorLookOf(ready(agents, []));
-  const choose = async (look: OrchestratorLook) => {
-    const me = ready(agents, []).find((a) => a.id === defaultOrchestrator);
-    if (!me) return;
-    try {
+  const act = createPixelAct();
+  // The API saves a whole profile, and the cached one may be older than an edit made since (on the profile's page): it
+  // is read fresh just before, and only the look is changed.
+  const choose = (look: OrchestratorLook) =>
+    act.run(async () => {
+      const me = (await api.agent.list()).find((a) => a.id === defaultOrchestrator);
+      if (!me) return;
       await api.agent.update({ ...me, look: { ...me.look, orchestrator: look } });
       await client.invalidateQueries({ queryKey: ["agents"] });
-    } catch (e) {
-      toast(reasonOf(e));
-    }
-  };
+    });
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (

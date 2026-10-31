@@ -13,11 +13,11 @@ import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
 import { ready, useQuery } from "@/base/query";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { Quiet } from "@/ui/layout";
 import { Markdown } from "@/ui/Markdown";
-import { toast } from "@/ui/toasts";
 
 import { createSessionEvents } from "./events";
 import {
@@ -441,23 +441,18 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
 /** 这一轮做错了 floats over a message it heard. */
 function Markable(props: { step: number; send: MarkWrong; file?: string | undefined; onMarked: (file: string) => void; children: JSX.Element }) {
   const [writing, setWriting] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct();
+  const busy = act.busy;
   const [want, setWant] = createSignal("");
   const submit = async () => {
     const w = want().trim();
     if (!w || busy()) return;
     const step = props.step;
     const send = props.send;
-    setBusy(true);
-    try {
-      const got = await send(step, w);
-      setWriting(false);
-      props.onMarked(got.file);
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    const got = await act.run(() => send(step, w));
+    if (!got) return;
+    setWriting(false);
+    props.onMarked(got.file);
   };
   return (
     <div data-testid="round" data-key={props.step} data-marked={props.file ? "" : undefined} class="group relative">

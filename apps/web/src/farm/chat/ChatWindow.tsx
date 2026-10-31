@@ -31,12 +31,12 @@ import {
   useMarkRead,
   followed,
   useMessage,
-  useFollowed,
+  useMarkedFollowed,
 } from "@/features/channel";
 import { RunSteps } from "@/features/session";
 import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
 import { OrchestratorFace } from "@/ui/Face";
-import { PxButton, SpriteIcon } from "@/ui/pixel";
+import { noticeTitle, PxButton, SpriteIcon, ToastType, toasts } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 
 import { ChannelMenu } from "./ChannelMenu";
@@ -135,8 +135,8 @@ export function ChatWindow() {
   const thread = () => (shown()?.type === "thread" ? shown() : undefined);
   const call = createCall();
   const phase = () => phaseOf(call(), core());
-  const said = useFollowed(() => shown()?.id);
-  useMarkRead(shown);
+  const said = useMarkedFollowed(() => shown()?.id);
+  useMarkRead(shown, (reason) => toasts.add({ type: ToastType.error, title: noticeTitle.error ?? reason, description: reason }));
 
   const toggleLarge = () => farm.chatLarge(!large());
   const fold = () => {
@@ -321,10 +321,12 @@ export function ChatWindow() {
             </Show>
           </div>
         </div>
-        <Show when={problem()}>
-          <p role="alert" data-testid="chat-problem" class="px-3 py-0.5 text-[12px] text-berry">
-            {problem()}
-          </p>
+        <Show when={problem() ?? (said().error === undefined ? undefined : t("web.farm.chat.unread", { why: said().error ?? "" }))}>
+          {(line) => (
+            <p role="alert" data-testid="chat-problem" class="px-3 py-0.5 text-[12px] text-berry">
+              {line()}
+            </p>
+          )}
         </Show>
         <Show when={showSuggestions()}>
           <div class="flex shrink-0 scroll-fade-x gap-1.5 overflow-x-auto px-3 pb-2">

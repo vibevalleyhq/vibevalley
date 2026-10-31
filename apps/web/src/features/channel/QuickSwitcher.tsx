@@ -4,12 +4,12 @@ import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { useWorkAgents } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { useRouter } from "@/base/router";
 import { autofocus } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { Dialog } from "@/ui/Dialog";
-import { toast } from "@/ui/toasts";
 
 import { Count } from "./bits";
 import { channelOf, chatPath } from "./places";
@@ -37,13 +37,13 @@ function SwitcherBody(props: { onClose: () => void }) {
   const targets = createMemo(() =>
     switchTargets(core()?.chat, query(), { issues: core()?.issues ?? [], sessions: core()?.sessions ?? [], profiles: profiles() }),
   );
+  // Made here, not in go: the dialog closes as the owner picks, and the act outlives it.
+  const act = createAct();
   const go = (t: SwitchTarget) => {
     untrack(() => props.onClose)();
     if (t.kind !== "profile") return router.navigate(chatPath(channelOf(untrack(core)?.chat, t.id)));
-    api.channel.direct
-      .create({ agent: t.id })
-      .then((id) => router.navigate(`/chat/${id}`))
-      .catch((e) => toast(reasonOf(e), "bad"));
+    const agent = t.id;
+    void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
   };
   return (
     <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>

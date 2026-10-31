@@ -14,6 +14,7 @@ import { queries, ready } from "@/base/query";
 import { useRouter, useSearch } from "@/base/router";
 import { Keyed, useNow } from "@/base/util";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Empty } from "@/ui/Empty";
 import { TextArea } from "@/ui/Field";
@@ -54,16 +55,14 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   };
   const id = () => (props.rest ? decodeURIComponent(props.rest) : undefined);
   const open = () => id() ?? list()[0]?.id;
-  const create = async () => {
-    try {
+  const making = createAct();
+  const create = () =>
+    making.run(async () => {
       const made = await api.artifact.create({ title: t("web.artifact.page.untitled") });
       setJustMade(made.id);
       await queries.invalidateQueries({ queryKey: ["artifacts"] });
       router.navigate(artifactHref(made.id));
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    }
-  };
+    });
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 p-3 lg:flex-row">
       <nav
@@ -83,7 +82,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
-          <Button tone="primary" icon="add" data-testid="new-artifact" onClick={() => void create()}>
+          <Button tone="primary" icon="add" data-testid="new-artifact" disabled={making.busy()} onClick={() => void create()}>
             {t("web.artifact.page.new")}
           </Button>
         </div>
@@ -140,7 +139,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
               <Empty
                 icon="artifacts"
                 action={
-                  <Button icon="add" onClick={() => void create()}>
+                  <Button icon="add" disabled={making.busy()} onClick={() => void create()}>
                     {t("web.artifact.page.new")}
                   </Button>
                 }
@@ -179,19 +178,20 @@ function Title(props: { artifact: Artifact }) {
   // Taken while the component is made: a ref runs where the props may not be read yet.
   const initialFresh = untrack(justMade) === untrack(() => props.artifact.id);
   let field!: HTMLInputElement;
+  const act = createAct();
   const save = async () => {
     const title = text().trim();
+    const id = props.artifact.id;
     if (!title || title === props.artifact.title) {
       setText(props.artifact.title);
       return;
     }
-    try {
-      await api.artifact.update({ id: props.artifact.id, title });
+    const done = await act.run(async () => {
+      await api.artifact.update({ id, title });
       void queries.invalidateQueries({ queryKey: ["artifacts"] });
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-      setText(props.artifact.title);
-    }
+      return true;
+    });
+    if (done !== true) setText(props.artifact.title);
   };
   return (
     <input
@@ -240,17 +240,16 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
     await navigator.clipboard.writeText(location.origin + artifactHref(props.artifact.id));
     toast(t("web.artifact.page.copied"));
   };
-  const remove = async () => {
-    try {
-      const title = props.artifact.title;
-      await api.artifact.delete({ id: props.artifact.id });
+  const removing = createAct();
+  const remove = () => {
+    const { id, title } = props.artifact;
+    return removing.run(async () => {
+      await api.artifact.delete({ id });
       // Away first: refreshed, this view's own read fails and it is gone before it could move on.
       router.navigate("/artifacts");
       toast(t("web.artifact.page.deleted", { title }));
       void queries.invalidateQueries({ queryKey: ["artifacts"] });
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    }
+    });
   };
   const openTab = () => {
     const v = version();

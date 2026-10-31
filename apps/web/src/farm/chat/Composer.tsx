@@ -18,7 +18,7 @@ import { aria } from "@/base/util";
 import { chatSay, createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
 import { DictationButton } from "@/features/voice";
 import { AgentFace } from "@/ui/Face";
-import { SpriteIcon } from "@/ui/pixel";
+import { createPixelAct, SpriteIcon } from "@/ui/pixel";
 import { toasts } from "@/ui/pixel/toasts";
 
 /** Who the next line goes to, with a button to stop picking. */
@@ -83,6 +83,11 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
     },
   });
   const replying = () => draftOf(props.channel?.id).reply;
+  const stopping = createPixelAct();
+  const stop = () => {
+    const agent = box.here();
+    return stopping.run(() => api.orchestrator.stop({ agent }));
+  };
 
   return (
     <div data-testid="composer" data-key={props.channel?.id} class="relative flex flex-col border-t border-cream-200 p-1.5">
@@ -151,7 +156,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
               data-testid="stop"
               aria-label={t("web.farm.chat.stop")}
               title={t("web.farm.chat.stopHint")}
-              onClick={() => void api.orchestrator.stop({ agent: box.here() }).catch(() => {})}
+              onClick={() => void stop()}
               class="cursor-pointer p-1"
             >
               <SpriteIcon name="button-stop" size={24} />

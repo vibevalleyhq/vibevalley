@@ -63,7 +63,15 @@
     "ticked": "看过了",
     "noRuns": "还没有干过。",
     "runCount": "{n} 次",
-    "conflict": "合进 {base} 会冲突：{files}"
+    "conflict": "合进 {base} 会冲突：{files}",
+    "moving": "正在改状态…",
+    "notMoved": "没改成",
+    "moveAgain": "再试",
+    "letGo": "算了",
+    "sending": "发送中…",
+    "notSaid": "没说出去",
+    "sayAgain": "再说一次",
+    "takeBack": "放回输入框"
   },
   "graph": {
     "name": "种植计划",
@@ -369,7 +377,8 @@
     "replyToText": "回复 {name}：{text}",
     "notSentLine": "没发出去",
     "retrySend": "再发",
-    "dropSend": "不发了"
+    "dropSend": "不发了",
+    "unread": "消息没读到：{why}，稍后再试"
   },
   "tool": {
     "hand": {

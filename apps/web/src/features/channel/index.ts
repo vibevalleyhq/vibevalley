@@ -3,6 +3,7 @@ export { QuickSwitcher, switcher } from "./QuickSwitcher";
 export { createChannelForm } from "./channelForm";
 export { chatSay, createComposer, pendingLines } from "./composing";
 export { useMarkRead } from "./reading";
+export { reactionSet, sameReaction, setMark, useMarkedFollowed } from "./marks";
 export { draftOf, drafts } from "./draft";
 export { quickReactions, reactionOn } from "./emoji";
 export { EmojiPicker } from "./EmojiPicker";

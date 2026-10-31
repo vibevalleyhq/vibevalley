@@ -7,8 +7,9 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { ready, useAgentTemplates } from "@/base/query";
+import { createAct } from "@/ui/act";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { toast } from "@/ui/toasts";
 
@@ -22,15 +23,16 @@ export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => voi
     const f = from();
     return t && f && t.version > f.version ? t.version : undefined;
   };
-  const update = async () => {
-    try {
-      const got = await api.agent.template.update({ agent: props.agent.id });
+  const act = createAct();
+  const update = () => {
+    const agent = props.agent.id;
+    const updated = props.onUpdated;
+    return act.run(async () => {
+      const got = await api.agent.template.update({ agent });
       await client.invalidateQueries({ queryKey: ["agents"] });
-      props.onUpdated(got);
+      updated(got);
       toast(t("web.agent.templates.updated"));
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    }
+    });
   };
   return (
     <Show when={from()}>

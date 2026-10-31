@@ -30,15 +30,15 @@ Status: proposed
 
 ### 服务端和契约
 
-- `StateFrame.seq`：`Core.apply` 每次真改了状态加一；帧带着和它的状态同时读的 seq。`issue.create`、`issue.update`、`issue.status.update` 答 `AppliedIssue`（工单加 `seq`，处理函数在服务返回后读 `Core.seq()`）。
+- `StateFrame.seq`：`Core.apply` 每次真改了状态加一；帧带着和它的状态同时读的 seq。`issue.create`、`issue.update`、`issue.status.update` 答 `AppliedIssue`（工单加 `seq`，处理函数在服务返回后读 `Core.seq()`）。`issue.comment.create` 答 `Applied`（只有 `seq`）。
 - 请求键 `requestKey`：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create`，网关里每个操作一份（`apps/server/src/http/requestKey.ts`）：同键并发的等第一个，只记成功、失败就忘（重试会真的再做），每个操作最近 500 把，在内存里，重启就没了。
 - 开关改成显式的设值：`channel.reaction.set`、`channel.pin.set`、`channel.archive.set`（`on`），设成已经是的值什么也不变。
 
 ### 分阶段
 
 1. **地基加两个原型（本次）**：上面的地基；原型 A，看板把卡从待办拖到进行中（`features/issue/moves.ts`：`issueMove` 意图、`movedCards` 叠加；卡在目标栏 `data-state="moving"`，失败 `failed` 带重试和放回）；看板和列表的开着的工单改从帧读，REST 历史只补走了的帮工和「更早的」（`features/issue/rows.ts`），历史只在某张工单多了帮工或帮工离开时重读，diff 跟着帧里的工单变；动作后不再整个失效。原型 B，工作台和农场输入框说一句话（`chatSay` 意图，键就是 `sendKey`），两边都画「发送中」和「没发出去」，ProjectMap、ArtifactsPage 的回复、农场的建议走同一条路（`sendOnce`）。
-2. **铺开**：其余拖动（关闭、重开）、详情页的按钮、`issue.comment.create`、表情和置顶走意图；10 个包装换成 `createAct`；lint 拦 `.tsx` 里直接调会改东西的接口、拦没有色调的错误 toast；`localStorage` 的 7 个键收进一个经 atom 的偏好；断线时禁用该禁用的。
-3. **收口**：`frame.ts` 的 store 从 `framesAtom` 读；Solid Query 的读取看是否也收到 atom；`reading.ts` 的已读、`draft.ts` 的草稿、`follow.ts` 的泄漏一并整理；状态流的心跳（半开连接）。
+2. **铺开（已做）**：工单的每次挪动走 `issueMove`（关闭、重开、详情页和农场的按钮、对话框、备选开工），对帮工说的话走 `issueSay`（`issue.comment.create` 改答 `Applied`，只有 `seq`），交付方式走 `issueDeliver`；表情、置顶、归档、提醒级别、标已读和标未读各是意图（`features/channel/marks.ts`、`reading.ts`，标未读失败时放开「留着未读」）；其余动作走 `createAct`（皮里 `createPixelAct`；busy 是计数，断线时不发、说没连上），10 个包装和 15 处普通色的失败都没了，吞掉的错误说出来；会再发的建一把键用到成功（`createRequestKey`）；档案的启用和农场的样子没有按字段改的接口，发之前先读最新的那份、只改那一栏；搜索和置顶只显示最新一次的答复、失败显示失败（`base/latest.ts`）；状态流连回来时 REST 全部重读；`follow.ts` 只留 8 个闲着的频道、单条缓存跟着改；`farm/frames.ts` 不再每次读都给新对象。lint `vibevalley/act-door`（组件里直接调会改东西的接口）、`vibevalley/failure-tone`（带原因的 toast 不是错误色）。
+3. **收口**：`frame.ts` 的 store 从 `framesAtom` 读；Solid Query 的读取看是否也收到 atom；`localStorage` 的 7 个键收进一个经 atom 的偏好；`draft.ts` 的草稿（回复存的整条消息、输入框的斜杠命令也走 `createAct`）；状态流的心跳（半开连接）；语音通话和听写自己的状态机看是否收进意图。
 
 ## Alternatives considered
 
@@ -54,6 +54,7 @@ Status: proposed
 - `base/intent.test.ts`：拒绝后失败并留着、重试同键；帧先到答复后到时只结算一次；答复先到等帧；超时失败、迟到的答复照算；断线排队、连回来发一次，另一种拒绝；`sendOnce`；放手。`features/issue/moves.test.ts`、`rows.test.ts`、`features/channel/composing.test.ts` 查叠加和行。
 - 服务端：`core.test.ts` 的 seq；`http/requestKey.test.ts`；`flows/request.test.ts`（同键只做一次、答复的 seq 不超过之后第一帧且那帧有这个改动、设两次只变一次）。
 - `vibevalley/atom-door` 在 `base/` 外报 `effect/reactivity` 的 import。
+- 第二阶段：`base/latest.test.ts`（迟到的旧答复丢掉、失败是失败）、`base/query.test.ts`（连回来重读）、`features/channel/marks.test.ts`、`features/issue/moves.test.ts`、`say.test.ts`；`test/chat-unread-rollback.spec.ts`（标未读被拒：读的位置回去、错误色）、`test/chat-search-order.spec.ts`（第一次的答复扣住、晚到也不显示）、`issue-moves.spec.ts` 的详情页挪动、`issue-page.spec.ts` 的话被拒后同一把键重试；`act-door`、`failure-tone` 的 RuleTester。
 
 ## Risks
 

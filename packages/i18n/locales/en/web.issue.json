@@ -69,7 +69,12 @@
     "reopened": "Ticket reopened",
     "goesOn": "{helper} carries on.",
     "rejectWith": "Send back, fix what is above",
-    "carry": "Pass it on"
+    "carry": "Pass it on",
+    "moving": "Changing the status…",
+    "sending": "Sending…",
+    "sayAgain": "Say it again",
+    "takeBack": "Back into the box",
+    "notSaid": "Not said"
   },
   "close": {
     "title": "Close \"{issue}\"",

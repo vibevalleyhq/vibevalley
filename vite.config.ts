@@ -489,6 +489,17 @@ export default defineConfig({
         rules: { "vibevalley/atom-door": "error" },
       },
       {
+        // What the owner does from a component goes through an Act or an intent (scripts/oxlint-plugin.ts, act-door).
+        files: ["apps/web/src/features/**/*.tsx", "apps/web/src/farm/**/*.tsx"],
+        excludeFiles: ["apps/web/src/**/*.stories.tsx"],
+        rules: { "vibevalley/act-door": "error" },
+      },
+      {
+        // A refusal is said in the error tone (scripts/oxlint-plugin.ts, failure-tone).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/failure-tone": "error" },
+      },
+      {
         // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],

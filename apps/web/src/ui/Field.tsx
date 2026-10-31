@@ -50,6 +50,8 @@ export function Select<V extends string>(props: {
   /** control: 28px, for a toolbar row; field (default): 32px, beside inputs. */
   size?: "control" | "field";
   disabled?: boolean | undefined;
+  /** A choice on its way to the server (shown already) or refused (the value is the server's again). */
+  state?: "pending" | "failed" | undefined;
 }) {
   const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false }] : []), ...props.options];
   const offered = (v: string): v is V => all().some((o) => o.value === v);
@@ -58,6 +60,8 @@ export function Select<V extends string>(props: {
       <Base.Trigger
         data-testid={props.testid}
         data-value={props.value}
+        data-state={props.state}
+        aria-busy={props.state === "pending" ? "true" : undefined}
         aria-label={props.label}
         class={[
           "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left text-sm outline-none disabled:cursor-default disabled:opacity-50",

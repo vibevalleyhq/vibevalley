@@ -1,16 +1,19 @@
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type SessionView } from "@vibevalley/protocol";
 
 import { useAgent, useOrchestrators } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { tookText } from "@/base/format";
 import { orchestratorMood, useCore } from "@/base/frame";
+import { useIntents } from "@/base/intent";
+import { useLatest } from "@/base/latest";
 import { ready, useAgents } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { Dialog } from "@/ui/Dialog";
 import { OrchestratorFace } from "@/ui/Face";
 import { Select } from "@/ui/Field";
@@ -24,6 +27,7 @@ import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer, FileDrop } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
 import { workbenchClock } from "./feed";
+import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
 import {
   archivedOf,
@@ -46,6 +50,8 @@ import { Crons, Sessions } from "./Tabs";
 import { sessionThreadOf, threadOwnerOf, threadTitle } from "./threads";
 import { unreadIn, unreadUnder } from "./unread";
 
+const bad = (reason: string) => toast(reason, "bad");
+
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
 const iconButton =
@@ -58,7 +64,6 @@ export function ChatPage() {
 
 function Chat() {
   const router = useRouter();
-  const core = useCore();
   const id = () =>
     decodeURIComponent(
       router
@@ -66,7 +71,7 @@ function Chat() {
         .split("?")[0]!
         .replace(/^\/chat\/?/u, ""),
     ) || undefined;
-  const chat = () => core()?.chat;
+  const chat = useMarkedChat();
   const shown = createMemo(() => channelOf(chat(), id()));
   const channel = createMemo(() => topOf(chat(), shown()) ?? topsOf(chat())[0]);
   const thread = createMemo(() => (shown()?.type === "thread" ? shown() : undefined));
@@ -282,7 +287,8 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
 function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefined; onNew: () => void; onSearch: () => void; onPick: () => void }) {
   const core = useCore();
   const router = useRouter();
-  const chat = () => core()?.chat;
+  const chat = useMarkedChat();
+  const act = createAct();
   const channels = () => topsOf(chat());
   const archived = () => archivedOf(chat());
   const sessions = () => core()?.sessions ?? [];
@@ -297,7 +303,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
     const id = dragged();
     setDragged(undefined);
     if (!id || id === onto.id || onto.default || onto.type !== "channel") return;
-    api.channel.update({ id, before: onto.id, category: onto.category }).catch((e) => toast(reasonOf(e), "bad"));
+    void act.run(() => api.channel.update({ id, before: onto.id, category: onto.category }));
   };
   const row = (c: Channel) => (
     <ChannelRow
@@ -418,11 +424,11 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();
   const agents = () => [...ready(all, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
-  const open = (agent: string) =>
-    api.channel.direct
-      .create({ agent })
-      .then((id) => props.onPicked(id))
-      .catch((e) => toast(reasonOf(e), "bad"));
+  const act = createAct();
+  const open = async (agent: string) => {
+    const id = await act.run(() => api.channel.direct.create({ agent }));
+    if (id !== undefined) props.onPicked(id);
+  };
   return (
     <div
       role="menu"
@@ -587,11 +593,18 @@ const mood: Record<OrchestratorState, string> = {
 function Pins(props: { channel: Channel; onPick: () => void }) {
   const core = useCore();
   const router = useRouter();
-  const [pinned, setPinned] = createSignal<readonly ChatMessage[] | undefined>();
-  createEffect(
+  const answer = useLatest(
     () => props.channel.id,
-    (id) => void api.channel.pin.list({ id }).then(setPinned, () => setPinned([])),
+    (id) => api.channel.pin.list({ id }),
   );
+  const pinned = (): readonly ChatMessage[] | undefined => {
+    const a = answer();
+    return a?.state === "done" ? a.value : undefined;
+  };
+  const failed = () => {
+    const a = answer();
+    return a?.state === "failed" ? a.reason : undefined;
+  };
   return (
     <div
       role="dialog"
@@ -602,6 +615,13 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
       <p class="px-1 text-xs font-semibold text-muted">{t("web.channel.pins.title")}</p>
       <Show when={pinned()?.length === 0}>
         <p class="px-1 py-2 text-sm text-muted">{t("web.channel.pins.none")}</p>
+      </Show>
+      <Show when={failed()}>
+        {(why) => (
+          <p data-testid="pins-failed" class="px-1 py-2 text-sm text-berry">
+            {t("web.channel.pins.failed", { why: why() })}
+          </p>
+        )}
       </Show>
       <For each={pinned() ?? []} keyed={(m) => m.id}>
         {(m) => (
@@ -630,6 +650,7 @@ function Pins(props: { channel: Channel; onPick: () => void }) {
 function Members(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
+  const act = createAct();
   const now = useNow();
   const orchestrators = useOrchestrators();
   const here = () => props.channel.orchestrator ?? defaultOrchestrator;
@@ -672,12 +693,10 @@ function Members(props: { channel: Channel }) {
               class={[iconButton, "size-6"]}
               aria-label={t("web.channel.direct.open", { name: h().name })}
               title={t("web.channel.direct.open", { name: h().name })}
-              onClick={() =>
-                void api.channel.direct
-                  .create({ agent: h().agent })
-                  .then((id) => router.navigate(`/chat/${id}`))
-                  .catch((e) => toast(reasonOf(e), "bad"))
-              }
+              onClick={() => {
+                const agent = h().agent;
+                void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
+              }}
             >
               <Icon name="thread" size={14} />
             </button>
@@ -720,6 +739,7 @@ function OrchestratorLine(props: { agent: string }) {
 
 function ThreadPane(props: { thread: Channel; point: number | undefined; onClose: () => void }) {
   const core = useCore();
+  const notifies = useIntents(notifySet);
   const now = useNow();
   const sessions = () => core()?.sessions ?? [];
   const session = () => threadOwnerOf(props.thread, sessions());
@@ -751,9 +771,10 @@ function ThreadPane(props: { thread: Channel; point: number | undefined; onClose
           value={props.thread.notify ?? "all"}
           options={notifyOptions()}
           class="w-28 text-xs"
+          testid="thread-notify"
+          state={markState(notifies.list(), (n) => n.id === props.thread.id)}
           onChange={(v) => {
-            if (v === "all" || v === "mentions" || v === "none")
-              api.channel.notify.set({ id: props.thread.id, notify: v }).catch((e) => toast(reasonOf(e), "bad"));
+            if (v === "all" || v === "mentions" || v === "none") setMark(notifies, { id: props.thread.id, notify: v }, sameMessage, bad);
           }}
         />
         <button type="button" class={iconButton} aria-label={t("web.channel.closeThread")} title={t("web.channel.closeThread")} onClick={() => props.onClose()}>
@@ -773,8 +794,9 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
   const core = useCore();
   const router = useRouter();
   const [showArchived, setShowArchived] = createSignal(false);
-  const live = () => threadsIn(core()?.chat, props.channel);
-  const archived = () => threadsIn(core()?.chat, props.channel, true);
+  const chat = useMarkedChat();
+  const live = () => threadsIn(chat(), props.channel);
+  const archived = () => threadsIn(chat(), props.channel, true);
   const title = (channel: Channel) => threadTitle(channel, core()?.issues, core()?.sessions ?? []);
   const item = (channel: Channel) => (
     <ThreadItem thread={channel} title={title(channel)} onOpen={() => (router.navigate(chatPath(channel)), untrack(() => props.onPick)())} />
@@ -815,12 +837,13 @@ function ThreadList(props: { channel: Channel; onPick: () => void }) {
 function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void }) {
   const [renaming, setRenaming] = createSignal(false);
   const [name, setName] = createSignal("");
-  const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(reasonOf(e), "bad"));
+  const act = createAct();
+  const archives = useIntents(archiveSet);
   const save = () => {
     setRenaming(false);
     const next = name().trim();
     const id = untrack(() => props.thread.id);
-    if (next !== untrack(() => props.title)) run(() => api.channel.update({ id, name: next }));
+    if (next !== untrack(() => props.title)) void act.run(() => api.channel.update({ id, name: next }));
   };
   return (
     <div
@@ -893,7 +916,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             ? t("web.channel.threadList.unarchive", { title: props.title })
             : t("web.channel.threadList.archive", { title: props.title })
         }
-        onClick={() => run(() => api.channel.archive.set({ id: props.thread.id, on: props.thread.archived === undefined }))}
+        onClick={() => setMark(archives, { id: props.thread.id, on: props.thread.archived === undefined, at: Date.now() }, sameMessage, bad)}
       >
         <Icon name="archive" size={14} />
       </button>
@@ -914,16 +937,19 @@ function FarmSearchBody(props: { onClose: () => void }) {
   const core = useCore();
   const router = useRouter();
   const [text, setText] = createSignal("");
-  const [hits, setHits] = createSignal<readonly MessageHit[] | undefined>([]);
-  createEffect(
-    () => text().trim(),
-    (q) => {
-      if (!q) return void setHits([]);
-      setHits(undefined);
-      const wait = setTimeout(() => void api.channel.message.search({ text: q }).then(setHits, () => setHits([])), 200);
-      return () => clearTimeout(wait);
-    },
+  const search = useLatest(
+    () => text().trim() || undefined,
+    (q) => api.channel.message.search({ text: q }),
+    200,
   );
+  const hits = (): readonly MessageHit[] | undefined => {
+    const a = search();
+    return a === undefined ? [] : a.state === "done" ? a.value : undefined;
+  };
+  const failed = () => {
+    const a = search();
+    return a?.state === "failed" ? a.reason : undefined;
+  };
   return (
     <div class="flex flex-col gap-3">
       <label class="flex h-9 items-center gap-2 rounded-md border border-line px-2 focus-within:border-focus">
@@ -939,8 +965,15 @@ function FarmSearchBody(props: { onClose: () => void }) {
         />
       </label>
       <p class="text-xs text-faint">{t("web.channel.farmSearch.filters")}</p>
-      <Show when={hits() === undefined}>
+      <Show when={search()?.state === "waiting"}>
         <p class="text-sm text-muted">{t("web.channel.farmSearch.searching")}</p>
+      </Show>
+      <Show when={failed()}>
+        {(why) => (
+          <p data-testid="search-failed" class="text-sm text-berry">
+            {t("web.channel.farmSearch.failed", { why: why() })}
+          </p>
+        )}
       </Show>
       <Show when={hits()?.length === 0 && text().trim() !== ""}>
         <p class="text-sm text-muted">{t("web.channel.farmSearch.none")}</p>

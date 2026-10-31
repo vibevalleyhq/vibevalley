@@ -7,10 +7,11 @@ import { t } from "@vibevalley/i18n";
 import type { Channel, Notify } from "@vibevalley/protocol";
 
 import { useOrchestrators } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { ready, useProjects } from "@/base/query";
 import { autofocus } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Field, Select, TextArea, TextInput } from "@/ui/Field";
@@ -202,12 +203,13 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
 function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: () => void }) {
   const [does, setDoes] = createSignal<readonly string[]>();
   const [error, setError] = createSignal<string>();
-  const [busy, setBusy] = createSignal(false);
-  const act = async (step: "archive" | "preview" | "delete") => {
+  // The refusal is said under the buttons, where the owner pressed.
+  const steps = createAct(setError);
+  const busy = steps.busy;
+  const act = (step: "archive" | "preview" | "delete") => {
     const { id, archived } = untrack(() => props.channel);
-    setBusy(true);
     setError(undefined);
-    try {
+    return steps.run(async () => {
       if (step === "archive") {
         await api.channel.archive.set({ id, on: archived === undefined });
         untrack(() => props.onDone)();
@@ -216,11 +218,7 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
         await api.channel.delete({ id });
         untrack(() => props.onGone)();
       }
-    } catch (e) {
-      setError(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
   return (
     <div class="flex flex-col gap-2 border-t border-line pt-4">

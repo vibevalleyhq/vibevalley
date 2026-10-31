@@ -1376,6 +1376,12 @@ export interface Issue {
   attention: IssueAttention;
 }
 
+/** A change with nothing to answer but when it shows (issue.comment.create): the seq of the core's fold read once it was
+ * made, so the first frame whose seq is at least this one shows whatever it changed. */
+export interface Applied {
+  seq: number;
+}
+
 /** An issue as a change left it (issue.create, issue.update, issue.status.update), with the seq of the core's fold that
  * includes the change: the first frame whose seq is at least this one shows it. */
 export interface AppliedIssue extends Issue {

@@ -7,16 +7,19 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { useWorkAgents } from "@/base/agents";
 import { api } from "@/base/api";
 import { ago, wallClockText } from "@/base/format";
+import { useIntents } from "@/base/intent";
 import { ready, queries, useProjects } from "@/base/query";
 import { autofocus } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { TextArea, TextInput } from "@/ui/Field";
 import { toast } from "@/ui/toasts";
 
-import { run } from "./acts";
+import { ActLines } from "./ActLines";
 import { isRefined } from "./issue";
+import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 import { newIssueTitle } from "./titles";
 import { rememberPick } from "./write";
@@ -59,7 +62,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const [d, setD] = createSignal(untrack(() => draftOf(props.item)));
   // Until the owner edits a field, a draft coming back fills them.
   const [edited, setEdited] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct();
+  const moves = useIntents(issueMove);
+  const move = () => issueMoveOf(props.item.id, moves.list());
+  const busy = () => act.busy() || move()?.state === "moving";
   const [word, setWord] = createSignal("");
   const [newProject, setNewProject] = createSignal(false);
   const agents = useWorkAgents(true);
@@ -105,12 +111,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     return got;
   };
 
-  async function busyWith(act: () => Promise<unknown>) {
-    setBusy(true);
-    await run(act);
-    setBusy(false);
-  }
-
   const backlog = () => props.item.status === "backlog";
   const drafting = () => props.item.refining;
   const refined = () => isRefined(props.item);
@@ -134,7 +134,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const id = props.item.id;
     const text = word().trim();
     const edit = unsaved();
-    return busyWith(async () => {
+    return act.run(async () => {
       saved(await api.issue.refine(omitUndefined({ id, text, edit })));
       setWord("");
     });
@@ -144,18 +144,19 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const x = d();
     rememberPick(x.agent, x.project);
     const told = dispatchedNotice(props.onDone);
-    return busyWith(async () => {
-      told(saved(await api.issue.status.update({ id, status: "todo", edit: update(x) })));
+    // A start the server refused shows on the board's card with why; the same start again is sent with the same key.
+    return sendMove(moves, { id, status: "todo", edit: update(x) }).done.then((done) => {
+      if (done?.replied) told(saved(done.replied.reply));
     });
   };
   const unqueue = () => {
     const id = props.item.id;
-    return busyWith(() => api.issue.status.update({ id, status: "backlog" }));
+    return sendMove(moves, { id, status: "backlog" }).done;
   };
   const remove = () => {
     const id = props.item.id;
     const done = props.onDone;
-    return busyWith(async () => {
+    return act.run(async () => {
       await api.issue.delete({ id });
       done(undefined);
     });
@@ -347,7 +348,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </Note>
         )}
       </Show>
-      <div class="mt-4 flex flex-wrap gap-2">
+      <div class="mt-4">
+        <ActLines issue={props.item.id} />
+      </div>
+      <div class="flex flex-wrap gap-2">
         <Show when={backlog()}>
           <Button
             tone={written() ? "primary" : "plain"}
@@ -366,7 +370,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             onClick={() => {
               const id = props.item.id;
               const edit = unsaved();
-              if (edit) void busyWith(async () => saved(await api.issue.update({ id, ...edit })));
+              if (edit) void act.run(async () => saved(await api.issue.update({ id, ...edit })));
             }}
           >
             {t("web.issue.todo.save")}
@@ -392,9 +396,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 
 function NewProjectDialog(props: { onClose: () => void; onMade: (name: string) => void }) {
   const [name, setName] = createSignal("");
+  const act = createAct();
   const make = async () => {
     const wanted = name().trim();
-    const made = await run(() => api.project.create({ name: wanted }));
+    const made = await act.run(() => api.project.create({ name: wanted }));
     if (!made) return;
     await queries.invalidateQueries({ queryKey: ["projects"] });
     props.onMade(made.name);
@@ -411,7 +416,7 @@ function NewProjectDialog(props: { onClose: () => void; onMade: (name: string) =
       />
       <div class="mt-5 flex justify-end gap-2">
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
-        <Button tone="primary" disabled={!name().trim()} onClick={() => void make()}>
+        <Button tone="primary" disabled={!name().trim() || act.busy()} onClick={() => void make()}>
           {t("web.issue.todo.create")}
         </Button>
       </div>

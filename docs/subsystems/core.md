@@ -60,7 +60,7 @@
 - 三条 SSE 每个连接都有容量 64 的有界 relay。正常顺序不变；积压到上限的连接明确结束并记警告，源订阅释放，不静默丢帧，也不把发布者挡住。客户端重连取快照。内部的事实和 Transition 订阅不能靠重连补齐，不走这条会断开的 relay；Core 关闭时 shutdown 四个 PubSub。
 - 断线不补发：重连从一帧（或快照）重新开始。页面的状态流断了 1 秒后重连。
 - 命令的结果不走流：要么是 HTTP 的答复，要么是之后的事实或提醒。
-- **答复带 `seq`，帧对上它才算看见**：改帧里东西的接口在服务施加完事实以后读 `Core.seq()`，随答复带回；现在是工单的 `issue.create`、`issue.update`、`issue.status.update`，答复是 `AppliedIssue`（`Issue` 加 `seq`）。拥有者在返回前就施加了事实（同一个 Effect 里，不 fork），所以第一帧 `seq` 不小于答复的 `seq` 时就看得见这次改动：页面的意图照「`frame.seq ≥ reply.seq`」落定，不按答复、不按时钟（[客户端](docs/subsystems/app.md)）。号可能比改动本身大（中间别人也改了），只会多等一帧，不会早。
+- **答复带 `seq`，帧对上它才算看见**：改帧里东西的接口在服务施加完事实以后读 `Core.seq()`，随答复带回；现在是工单的 `issue.create`、`issue.update`、`issue.status.update`，答复是 `AppliedIssue`（`Issue` 加 `seq`）；`issue.comment.create` 没有别的可答，答 `Applied`（只有 `seq`）。拥有者在返回前就施加了事实（同一个 Effect 里，不 fork），所以第一帧 `seq` 不小于答复的 `seq` 时就看得见这次改动：页面的意图照「`frame.seq ≥ reply.seq`」落定，不按答复、不按时钟（[客户端](docs/subsystems/app.md)）。号可能比改动本身大（中间别人也改了），只会多等一帧，不会早。
 
 **接口和能力表**
 

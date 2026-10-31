@@ -11,8 +11,8 @@ test.use({ farm: "composer-intent" });
 async function openFarmChat(page: Page) {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto("/farm/");
-  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  // The farm chat is the farm phone's right screen: take the phone out and unfold it.
+  // The farm chat is the farm phone's right screen: take the phone out and unfold it. The phone is the HUD's, drawn
+  // without the canvas, so the village's loading (seconds under a parallel run) is not waited for.
   await page.getByTestId("phone-button").click();
   await page.getByTestId("phone-chat").click();
   return page.getByTestId("farm-chat").getByTestId("composer-input");

@@ -7,11 +7,12 @@ import { createSignal, For, Show } from "solid-js";
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { ready, useAgentTemplates, useRuntimes } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
@@ -25,20 +26,16 @@ export function TemplatesPage() {
   const runtimes = useRuntimes();
   const client = useQueryClient();
   const [path, setPath] = createSignal("");
-  const [adding, setAdding] = createSignal(false);
+  const adding = createAct();
   const sorted = () => [...ready(templates, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
-  const add = async () => {
-    setAdding(true);
-    try {
-      const got = await api.agent.template.add({ path: path().trim() });
+  const add = () => {
+    const at = path().trim();
+    return adding.run(async () => {
+      const got = await api.agent.template.add({ path: at });
       await client.invalidateQueries({ queryKey: ["agent-templates"] });
       setPath("");
       toast(t("web.agent.templates.added", { name: got.name }));
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    } finally {
-      setAdding(false);
-    }
+    });
   };
   return (
     <div class="h-full overflow-y-auto">
@@ -67,7 +64,7 @@ export function TemplatesPage() {
             onInput={(e) => setPath(e.currentTarget.value)}
             class="min-w-0 flex-1"
           />
-          <Button type="submit" data-testid="template-add" disabled={adding() || !path().trim()}>
+          <Button type="submit" data-testid="template-add" disabled={adding.busy() || !path().trim()}>
             {t("web.agent.templates.add")}
           </Button>
         </form>
@@ -85,32 +82,27 @@ export function TemplatesPage() {
 
 function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | undefined; runtimes: readonly RuntimeInfo[] }) {
   const [open, setOpen] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct();
   const router = useRouter();
   const client = useQueryClient();
   const template = () => props.template;
   const orchestrator = () => template().role === "orchestrator";
   // An orchestrator runs in the server itself; a helper's runtime may be missing from this machine.
   const here = () => orchestrator() || props.runtime?.installation.status === "available";
-  const install = async () => {
-    setBusy(true);
-    try {
-      const made = await api.agent.template.install({ id: template().id });
+  const install = () => {
+    const id = template().id;
+    return act.run(async () => {
+      const made = await api.agent.template.install({ id });
       await Promise.all([client.invalidateQueries({ queryKey: ["agents"] }), client.invalidateQueries({ queryKey: ["agent-templates"] })]);
       router.navigate(`/agents/${encodeURIComponent(made.id)}`);
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    } finally {
-      setBusy(false);
-    }
+    });
   };
-  const remove = async () => {
-    try {
-      await api.agent.template.delete({ id: template().id });
+  const remove = () => {
+    const id = template().id;
+    return act.run(async () => {
+      await api.agent.template.delete({ id });
       await client.invalidateQueries({ queryKey: ["agent-templates"] });
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    }
+    });
   };
   return (
     <section
@@ -166,7 +158,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         <Show when={template().source === "added"}>
           <ConfirmButton label={t("web.agent.remove")} confirm={t("web.agent.templates.removeSure")} onConfirm={remove} />
         </Show>
-        <Button tone="primary" data-testid="template-install" disabled={busy()} onClick={() => void install()}>
+        <Button tone="primary" data-testid="template-install" disabled={act.busy()} onClick={() => void install()}>
           {t("web.agent.templates.install")}
         </Button>
       </div>

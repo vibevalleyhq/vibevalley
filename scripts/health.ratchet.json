@@ -240,7 +240,7 @@
     "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 7
+    "swallowed": 3
   },
   "web: features/agent": {
     "nonNull": 3,
@@ -276,7 +276,7 @@
     "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 1
   },
   "web: features/connector": {
     "nonNull": 0,
@@ -297,7 +297,7 @@
     "swallowed": 2
   },
   "web: features/issue": {
-    "nonNull": 20,
+    "nonNull": 19,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0,

@@ -10,6 +10,7 @@ import { api } from "@/base/api";
 import { tookText, spentText } from "@/base/format";
 import { useCore } from "@/base/frame";
 import { useIntents } from "@/base/intent";
+import { useLatest } from "@/base/latest";
 import { useRouter } from "@/base/router";
 import { aria, useNow } from "@/base/util";
 import { ArtifactCard } from "@/features/artifact";
@@ -20,12 +21,14 @@ import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
 import { Tag, type TagTone } from "@/ui/Tag";
+import { toast } from "@/ui/toasts";
 
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
 import { chatSay, pendingLines } from "./composing";
 import { editingId, setEditingId } from "./draft";
 import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
-import { followed, useFollowed, useMessage } from "./follow";
+import { followed, useMessage } from "./follow";
+import { useMarkedFollowed } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { channelOf, messagePath, chatPath, parentAt } from "./places";
 import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
@@ -44,8 +47,11 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const core = useCore();
   const router = useRouter();
   const id = () => props.channel?.id;
-  const said = useFollowed(id);
-  useMarkRead(() => props.channel);
+  const said = useMarkedFollowed(id);
+  useMarkRead(
+    () => props.channel,
+    (reason) => toast(reason, "bad"),
+  );
   let log: HTMLDivElement | undefined;
   // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a
   // while. A string, so a change elsewhere in the list does not scroll again.
@@ -77,16 +83,27 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const readTo = untrack(() => props.channel?.read ?? 0);
   const searching = () => (props.filter ?? "").trim() !== "";
   // A search is the server's, over the whole channel and its threads, not only the pages read here.
-  const [hits, setHits] = createSignal<readonly MessageHit[] | undefined>();
-  createEffect(
-    () => ({ text: (props.filter ?? "").trim(), at: id() }),
-    ({ text, at }) => {
-      setHits(undefined);
-      if (!text || !at) return;
-      const wait = setTimeout(() => void api.channel.message.search({ text, channel: at }).then(setHits, () => setHits([])), searchWaitMs);
-      return () => clearTimeout(wait);
+  const search = useLatest(
+    () => {
+      const text = (props.filter ?? "").trim();
+      const at = id();
+      // A string, so the same words in the same channel again ask nothing.
+      return text && at ? `${at}\n${text}` : undefined;
     },
+    (key) => {
+      const [channel = "", text = ""] = key.split("\n");
+      return api.channel.message.search({ text, channel });
+    },
+    searchWaitMs,
   );
+  const hits = (): readonly MessageHit[] | undefined => {
+    const a = search();
+    return a?.state === "done" ? a.value : undefined;
+  };
+  const searchFailed = () => {
+    const a = search();
+    return a?.state === "failed" ? a.reason : undefined;
+  };
   const items = createMemo(() =>
     searching()
       ? feedOf(
@@ -143,6 +160,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         role="log"
         aria-label={t("web.channel.messages.label")}
         data-testid="messages"
+        data-read={props.channel?.read}
       >
         <div class="flex flex-col px-4 pt-3 pb-4">
           <div class="flex justify-center pb-2">
@@ -151,7 +169,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               fallback={
                 <span class="text-xs text-muted">
                   {searching()
-                    ? hits() === undefined
+                    ? search()?.state !== "done" && searchFailed() === undefined
                       ? t("web.channel.messages.searching")
                       : t("web.channel.messages.containing", { text: (props.filter ?? "").trim() })
                     : t("web.channel.messages.start")}
@@ -170,7 +188,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               </div>
             )}
           </Show>
-          <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
+          <Show when={searching() ? searchFailed() : said().error}>
+            {(why) => (
+              <p data-testid="messages-failed" class="py-8 text-center text-sm text-berry">
+                {searching() ? t("web.channel.messages.searchFailed", { why: why() }) : t("web.channel.messages.readFailed", { why: why() })}
+              </p>
+            )}
+          </Show>
+          <Show when={items().length === 0 && (searching() ? hits() !== undefined : !said().error)}>
             <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
               {searching() ? t("web.channel.messages.notFound") : props.emptyText}
             </p>

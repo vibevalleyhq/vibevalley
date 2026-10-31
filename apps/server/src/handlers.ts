@@ -230,7 +230,8 @@ export const handlers = Effect.gen(function* () {
           ),
         ),
       ),
-    "issue.comment.create": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.comment(id, body.text, body.sendKey ?? "")),
+    "issue.comment.create": ({ id: ref, ...body }) =>
+      Effect.flatMap(issues.idOf(ref), (id) => Effect.map(issues.comment(id, body.text, body.sendKey ?? ""), (): T.Applied => ({ seq: core.seq() }))),
     "issue.diff.get": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, owner)),
     "project.template.list": ({ id }) => issues.templates(id),
     "graph.split": (body) => tasks.split(body.goal, body.project, body.agent ?? "", owner),

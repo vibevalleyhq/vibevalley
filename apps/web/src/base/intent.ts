@@ -94,6 +94,15 @@ export function sendOnce<I, R>(intents: Intents<I, R>, input: I): Promise<Intent
   return kept.status === "failed" ? intents.retry(kept.key) : Promise.resolve(kept);
 }
 
+/**
+ * A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice): the
+ * newer is the one kept, and the older is let go, so the overlay shows the last choice and one failure at most.
+ */
+export function sendReplacing<I, R>(intents: Intents<I, R>, input: I, sameTarget: (a: I, b: I) => boolean): Sent<I, R> {
+  for (const kept of intents.all()) if (sameTarget(kept.input, input)) intents.drop(kept.key);
+  return intents.send(input);
+}
+
 /** A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. */
 export function intentsIn<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<I, R>): Intents<I, R> {
   const made = type.runners.get(registry);

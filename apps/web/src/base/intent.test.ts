@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
 
-import { bySeq, defineIntent, intentsIn, sendOnce } from "./intent";
+import { bySeq, defineIntent, intentsIn, sendOnce, sendReplacing } from "./intent";
 import { deferred, frameAt, testFrames, testRegistry } from "./testing";
 
 afterEach(() => vi.useRealTimers());
@@ -125,4 +125,15 @@ test("letting one go drops it from the list and answers whoever waits", async ()
   expect(intents.drop(key)).toMatchObject({ key });
   expect(intents.all()).toEqual([]);
   expect(await done).toBeUndefined();
+});
+
+test("a setting changed again before the first showed keeps only the newer", () => {
+  const { intents, sent } = setup();
+  sendReplacing(intents, { id: "12" }, (a, b) => a.id === b.id);
+  const { key } = sendReplacing(intents, { id: "12" }, (a, b) => a.id === b.id);
+  sendReplacing(intents, { id: "13" }, (a, b) => a.id === b.id);
+  expect(intents.all().map((i) => [i.key, i.input.id])).toEqual([
+    [key, "12"],
+    [sent[2]?.key, "13"],
+  ]);
 });

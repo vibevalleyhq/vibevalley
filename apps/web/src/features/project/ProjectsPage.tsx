@@ -12,6 +12,7 @@ import { api, reasonOf } from "@/base/api";
 import { ready, useProjects, useQuery } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { autofocus, useNow } from "@/base/util";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { AgentFace } from "@/ui/Face";
@@ -495,15 +496,17 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
   const [github, setGithub] = createSignal("");
   const [name, setName] = createSignal("");
   const [named, setNamed] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
+  // A refusal shows in the form, beside what was typed.
+  const act = createAct(setError);
+  const busy = act.busy;
   const canSubmit = () => !busy() && name().trim() !== "" && (importing() === "new" || github().trim() !== "");
   const submit = async () => {
     if (!canSubmit()) return;
     const request = { name: name().trim(), ...(importing() === "github" ? { github: github().trim() } : {}) };
-    setBusy(true);
+    const done = props.onDone;
     setError(undefined);
-    try {
+    await act.run(async () => {
       const problem = (await api.project.validate(request)).problem;
       if (problem) {
         setError(problem);
@@ -511,12 +514,8 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
       }
       const made = await api.project.create(request);
       await client.invalidateQueries({ queryKey: ["projects"] });
-      props.onDone(made);
-    } catch (e) {
-      setError(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+      done(made);
+    });
   };
   return (
     <form

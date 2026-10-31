@@ -759,6 +759,8 @@ const issueFields = {
 
 export const Issue: Codec<T.Issue> = Schema.Struct(issueFields);
 
+export const Applied: Codec<T.Applied> = Schema.Struct({ seq: Schema.Finite });
+
 export const AppliedIssue: Codec<T.AppliedIssue> = Schema.Struct({ ...issueFields, seq: Schema.Finite });
 
 export const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);

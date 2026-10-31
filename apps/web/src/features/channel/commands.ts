@@ -5,7 +5,7 @@
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
+import { api, createRequestKey } from "@/base/api";
 
 import type { Nameable } from "./mentions";
 export const CommandNames = ["issue", "remember", "stop", "dm"] as const;
@@ -23,13 +23,25 @@ export type CommandDone = { readonly say: string } | { readonly open: string };
 /** Whether a command needs words after it (a title, a note, a profile). */
 const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true };
 
+// A command that makes something keeps its request key per line until it went through: the box keeps a refused line,
+// and Enter on it again (its reply lost, the change made) makes the one thing, not a second.
+const keys = new Map<string, ReturnType<typeof createRequestKey>>();
+async function once<T>(line: string, make: (requestKey: string) => Promise<T>): Promise<T> {
+  const key = keys.get(line) ?? createRequestKey();
+  keys.set(line, key);
+  const made = await make(key.now());
+  keys.delete(line);
+  return made;
+}
+
 const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<CommandDone>> = {
   issue: async (title, at) => {
-    const made = await api.issue.create({ title, ...(at.channel?.project ? { project: at.channel.project } : {}) });
+    const project = at.channel?.project;
+    const made = await once(`issue\n${project ?? ""}\n${title}`, (requestKey) => api.issue.create({ title, requestKey, ...(project ? { project } : {}) }));
     return { say: t("web.channel.commands.done.issue", { n: made.number }) };
   },
   remember: async (text, at) => {
-    await api.memory.create({ agent: at.orchestrator, text });
+    await once(`remember\n${at.orchestrator}\n${text}`, (requestKey) => api.memory.create({ agent: at.orchestrator, text, requestKey }));
     return { say: t("web.channel.commands.done.remember") };
   },
   stop: async (_text, at) => {

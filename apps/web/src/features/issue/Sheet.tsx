@@ -129,6 +129,7 @@ export function Pick<V extends string>(props: {
   onChange: (v: V) => void;
   disabled?: boolean;
   testid?: string;
+  state?: "pending" | "failed" | undefined;
 }) {
   return (
     <Select
@@ -142,6 +143,7 @@ export function Pick<V extends string>(props: {
       onChange={props.onChange}
       disabled={props.disabled}
       testid={props.testid}
+      state={props.state}
     />
   );
 }

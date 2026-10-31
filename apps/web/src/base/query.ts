@@ -4,9 +4,23 @@ import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, t
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
 
 import { api } from "./api";
+import type { Frames } from "./frames";
 
 /** REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. */
 export const queries = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
+
+/**
+ * What changed while the state stream was lost reached no REST read either (they are invalidated by frames): each is
+ * read again once the stream is back, whether or not the browser thought it was offline (navigator.onLine).
+ */
+export function refetchOnRelink(source: { readonly get: () => Frames; readonly subscribe: (l: () => void) => () => void }, client: QueryClient = queries) {
+  let was = source.get().link;
+  return source.subscribe(() => {
+    const now = source.get().link;
+    if (now === "open" && was === "lost") void client.invalidateQueries();
+    was = now;
+  });
+}
 
 /** REST reads never hold the state stream's frame: pending and failures are result values, and ready() selects data. */
 export function useQuery<TQueryFnData, TError = Error, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(

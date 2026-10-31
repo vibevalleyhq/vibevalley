@@ -9,7 +9,7 @@ import { clockText } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
 import type { Session, StateFrame } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { createExternal } from "@/base/external";
 import { orchestratorMood, useCore, useFrames, rawFrame } from "@/base/frame";
 import { subscribeLive } from "@/base/live";
@@ -18,7 +18,7 @@ import { aria } from "@/base/util";
 import { localEffects } from "@/farm/effects";
 import { clock, farm } from "@/farm/store";
 import { typing } from "@/farm/tools";
-import { toasts, ToastType } from "@/ui/pixel";
+import { createPixelAct } from "@/ui/pixel";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
 
 const keep = 2000;
@@ -97,17 +97,11 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const achievementsQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievement.list() }));
   const achievements = () => ready(achievementsQuery, []);
   const [next, setNext] = createSignal(0);
-  const run = async (f: () => Promise<unknown>) => {
-    try {
-      await f();
-    } catch (e) {
-      toasts.add({ type: ToastType.error, title: t("web.farm.debug.title"), description: reasonOf(e), timeout: 4500 });
-    }
-  };
+  const act = createPixelAct(t("web.farm.debug.title"));
   const sessions = () => core()?.sessions ?? [];
   const issueOf = (h: Session) => h.issue ?? h.id;
   const everyone = (action: "stop" | "dismiss") =>
-    run(async () => {
+    act.run(async () => {
       await Promise.all(
         sessions().map((h) => (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status.update({ id: issueOf(h), status: "canceled" }))),
       );
@@ -135,7 +129,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           }
         >
           <div class="flex gap-1.5">
-            <button type="button" class={btn("hat")} onClick={() => void run(() => api.orchestrator.open())}>
+            <button type="button" class={btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
               {t("web.farm.debug.open")}
             </button>
             <button type="button" class={btn()} onClick={() => void everyone("dismiss")}>
@@ -220,14 +214,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
-                  <button type="button" class={btn("hat")} onClick={() => void run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
+                  <button type="button" class={btn("hat")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
                     {t("web.farm.tool.harvest.label")}
                   </button>
                 </Show>
-                <button type="button" class={btn()} onClick={() => void run(() => api.session.stop({ id: h.id }))}>
+                <button type="button" class={btn()} onClick={() => void act.run(() => api.session.stop({ id: h.id }))}>
                   {t("web.farm.debug.halt")}
                 </button>
-                <button type="button" class={btn("bad")} onClick={() => void run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
+                <button type="button" class={btn("bad")} onClick={() => void act.run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
                   {t("web.farm.debug.dismiss")}
                 </button>
               </div>

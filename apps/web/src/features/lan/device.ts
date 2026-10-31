@@ -4,6 +4,8 @@
 import { t } from "@vibevalley/i18n";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
+import { api } from "@/base/api";
+
 const loopback = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 
 /** The page came through the lan listener, not from this computer's own server. */
@@ -23,4 +25,14 @@ export function deviceGuess(userAgent: string): string {
   if (/Macintosh/u.test(userAgent)) return "Mac";
   if (/Windows/u.test(userAgent)) return t("web.lan.devices.windows");
   return t("web.lan.devices.device");
+}
+
+/**
+ * Pairs this device and keeps its key. Not an Act (ui/act.ts): an unpaired device has no state stream to lose, the
+ * listener answers it nothing until this has gone through, so an Act would refuse the one call that makes the link.
+ * The refusal is the caller's to show, in the form.
+ */
+export async function pair(code: string, name: string) {
+  const paired = await api.lan.pair({ code, name });
+  document.cookie = keyCookie(paired.key);
 }

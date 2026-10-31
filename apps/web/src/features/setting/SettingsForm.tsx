@@ -19,6 +19,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "@/base/api";
 import { ready, useQuery, useSettings } from "@/base/query";
 import { saveSettings } from "@/base/settings";
+import { createAct } from "@/ui/act";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { IconButton } from "@/ui/IconButton";
@@ -99,7 +100,8 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
   const [removing, setRemoving] = createSignal(false);
   const [sources, setSources] = createSignal(draftsOf(start));
   const [error, setError] = createSignal<string>();
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct(setError);
+  const busy = act.busy;
 
   const setSource = (kind: MemorySourceKind, change: Partial<SourceDraft>, touched = true) =>
     setSources((all) => all.map((d) => (d.kind === kind ? { ...d, ...change, changed: d.changed || touched } : d)));
@@ -130,20 +132,15 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
               ...(d.key.trim() ? { key: d.key.trim() } : d.keyCleared ? { key: "" } : {}),
             })),
     });
-    setBusy(true);
     setError(undefined);
-    try {
+    await act.run(async () => {
       const now = await saveSettings(update);
       setStatus(now);
       setDeepseek("");
       setRemoving(false);
       setSources(draftsOf(now));
       toast(t("web.setting.keys.saved"));
-    } catch (e) {
-      setError(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   return (
@@ -300,20 +297,15 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
 /** What the server found of gh (github.status); the refresh asks it to look again. */
 export function GitHub() {
   const [refreshed, setRefreshed] = createSignal<GitHubStatus>();
-  const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
+  // A refusal shows under the status it was asked about.
+  const act = createAct(setError);
+  const busy = act.busy;
   const status = useQuery(() => ({ queryKey: ["github"], queryFn: () => api.github.get() }));
   const now = () => refreshed() ?? ready(status, undefined);
-  const recheck = async () => {
-    setBusy(true);
+  const recheck = () => {
     setError(undefined);
-    try {
-      setRefreshed(await api.github.refresh());
-    } catch (e) {
-      setError(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    return act.run(async () => setRefreshed(await api.github.refresh()));
   };
   return (
     <div class="flex flex-col gap-2">
@@ -345,18 +337,12 @@ export function GitHub() {
  * Saved, the page opens again in it: its words are read once, when it loads (protocol words/locale.ts). */
 export function LanguageChoice() {
   const [error, setError] = createSignal<string>();
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct(setError);
+  const busy = act.busy;
   const choose = async (locale: Locale) => {
     if (locale === currentLocale() || busy()) return;
-    setBusy(true);
     setError(undefined);
-    try {
-      await saveSettings({ locale });
-      location.reload();
-    } catch (e) {
-      setError(reasonOf(e));
-      setBusy(false);
-    }
+    if (await act.run(() => saveSettings({ locale }))) location.reload();
   };
   return (
     <>

@@ -108,3 +108,22 @@ test("a failed move put back is the frame's card again", async ({ page, api }) =
   await expect(card(page, "todo", made.id)).toBeVisible();
   await expect(card(page, "todo", made.id)).not.toHaveAttribute("data-state");
 });
+
+test("a status button on the issue's page shows the move on its way until the server has it", async ({ page, api }) => {
+  const made = await startable(api, "detail");
+  const server = gate();
+  await page.route(`**${pathOf("issue.status.update")}`, async (route) => {
+    await server.opened;
+    await route.continue();
+  });
+  const sent = statusUpdates(page);
+  await page.goto(`/issues/${made.id}`);
+  await page.getByTestId("issue-start").click();
+  const move = page.getByTestId("issue-move");
+  await expect(move).toHaveAttribute("data-state", "moving");
+  await expect(page.getByTestId("issue-start")).toBeDisabled();
+  server.open();
+  await expect(move).toHaveCount(0, { timeout: 20_000 });
+  expect(sent).toHaveLength(1);
+  expect(sent[0]?.requestKey).toBeTruthy();
+});

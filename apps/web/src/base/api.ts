@@ -18,3 +18,16 @@ export const reasonOf = (e: unknown) => (e instanceof VibeValleyApiError ? e.rea
 
 /** A client's key for one send: a retry with the same key is the same message, said once. */
 export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * The request key of one thing the owner may send again (a form's create, a button's): the same key until a send went
+ * through, so a retry after a lost reply is the same request; a new one after.
+ */
+export function createRequestKey() {
+  let key = newSendKey();
+  return {
+    now: () => key,
+    /** It went through: the next send is another thing. */
+    used: () => void (key = newSendKey()),
+  };
+}

@@ -1654,6 +1654,8 @@ export const catalogs = {
         notSent: "没发出去",
         retrySend: "再发一次",
         dropSend: "不发了",
+        searchFailed: "没搜成：{why}",
+        readFailed: "消息没读到：{why}，稍后再试",
       },
       tools: {
         label: "这条消息能做的",
@@ -1668,7 +1670,7 @@ export const catalogs = {
         pick: "选一个回应",
         editHint: "回车存下 · Esc 不改了",
       },
-      pins: { open: "置顶的消息", title: "置顶", none: "这里还没有置顶的消息" },
+      pins: { open: "置顶的消息", title: "置顶", none: "这里还没有置顶的消息", failed: "置顶没读到：{why}" },
       members: { open: "成员", title: "成员", owner: "主人", none: "这里还没有帮工", looksAfter: "照看这里的管家" },
       composer: {
         notSent: "没发出去：{why}",
@@ -1731,6 +1733,7 @@ export const catalogs = {
         filters: "from:主人  in:#频道  has:file / image / link  before: / after:2026-10-01",
         none: "没有找到",
         searching: "在找…",
+        failed: "没搜成：{why}",
       },
       direct: { add: "开一个私聊", pick: "和谁私聊", none: "还没有档案", open: "和{name}私聊" },
       emoji: { open: "表情", groups: { frequent: "常用", faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" }, more: "更多表情" },
@@ -1890,6 +1893,14 @@ export const catalogs = {
         noRuns: "还没有干过。",
         runCount: "{n} 次",
         conflict: "合进 {base} 会冲突：{files}",
+        moving: "正在改状态…",
+        notMoved: "没改成",
+        moveAgain: "再试",
+        letGo: "算了",
+        sending: "发送中…",
+        notSaid: "没说出去",
+        sayAgain: "再说一次",
+        takeBack: "放回输入框",
       },
       graph: {
         name: "种植计划",
@@ -2159,6 +2170,7 @@ export const catalogs = {
         notSentLine: "没发出去",
         retrySend: "再发",
         dropSend: "不发了",
+        unread: "消息没读到：{why}，稍后再试",
       },
       tool: {
         hand: { label: "手", hint: "点一块地看详情，点空地播种" },
@@ -2499,7 +2511,17 @@ export const catalogs = {
       },
       marks: { priority: "优先级：{word}" },
       sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
-      acts: { reopened: "工单重开了", goesOn: "{helper} 接着做。", rejectWith: "打回，照上面修", carry: "带过去" },
+      acts: {
+        reopened: "工单重开了",
+        goesOn: "{helper} 接着做。",
+        rejectWith: "打回，照上面修",
+        carry: "带过去",
+        moving: "正在改状态…",
+        sending: "发送中…",
+        sayAgain: "再说一次",
+        takeBack: "放回输入框",
+        notSaid: "没说出去",
+      },
       close: {
         title: "关上「{issue}」",
         working: "{who} 还在干这张工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
@@ -5313,6 +5335,8 @@ export const catalogs = {
         notSent: "Not sent",
         retrySend: "Send again",
         dropSend: "Drop it",
+        searchFailed: "The search failed: {why}",
+        readFailed: "Could not read the messages: {why}; trying again shortly",
       },
       tools: {
         label: "What this message offers",
@@ -5327,7 +5351,7 @@ export const catalogs = {
         pick: "Pick a reaction",
         editHint: "Enter saves · Esc cancels",
       },
-      pins: { open: "Pinned messages", title: "Pinned", none: "Nothing is pinned here yet" },
+      pins: { open: "Pinned messages", title: "Pinned", none: "Nothing is pinned here yet", failed: "Could not read the pins: {why}" },
       members: { open: "Members", title: "Members", owner: "Owner", none: "No helpers here yet", looksAfter: "The manager looking after this" },
       composer: {
         notSent: "Not sent: {why}",
@@ -5390,6 +5414,7 @@ export const catalogs = {
         filters: "from:owner  in:#channel  has:file / image / link  before: / after:2026-10-01",
         none: "Nothing found",
         searching: "Searching…",
+        failed: "The search failed: {why}",
       },
       direct: { add: "New direct message", pick: "Talk with", none: "No profiles yet", open: "Talk with {name}" },
       emoji: {
@@ -5560,6 +5585,14 @@ export const catalogs = {
         noRuns: "No work yet.",
         runCount: "{n, plural, one {# round} other {# rounds}}",
         conflict: "Merging into {base} would conflict: {files}",
+        moving: "Changing the status…",
+        notMoved: "Not changed",
+        moveAgain: "Again",
+        letGo: "Let it go",
+        sending: "Sending…",
+        notSaid: "Not said",
+        sayAgain: "Say it again",
+        takeBack: "Back into the box",
       },
       graph: {
         name: "Planting plans",
@@ -5840,6 +5873,7 @@ export const catalogs = {
         notSentLine: "Not sent",
         retrySend: "Send again",
         dropSend: "Drop it",
+        unread: "Could not read the messages: {why}; trying again shortly",
       },
       tool: {
         hand: { label: "Hand", hint: "Click a plot for its details, an empty one to sow" },
@@ -6220,7 +6254,17 @@ export const catalogs = {
       },
       marks: { priority: "Priority: {word}" },
       sheet: { less: "Less", more: "More", at: 'At "{stage}"', stageDone: "{stage}: done" },
-      acts: { reopened: "Ticket reopened", goesOn: "{helper} carries on.", rejectWith: "Send back, fix what is above", carry: "Pass it on" },
+      acts: {
+        reopened: "Ticket reopened",
+        goesOn: "{helper} carries on.",
+        rejectWith: "Send back, fix what is above",
+        carry: "Pass it on",
+        moving: "Changing the status…",
+        sending: "Sending…",
+        sayAgain: "Say it again",
+        takeBack: "Back into the box",
+        notSaid: "Not said",
+      },
       close: {
         title: 'Close "{issue}"',
         working: "{who} is still working on this ticket. Canceling stops it and lets it go; the changes on its branch are not merged into main.",
@@ -8998,6 +9042,7 @@ export interface Messages {
   "web.channel.emoji.more": undefined;
   "web.channel.emoji.open": undefined;
   "web.channel.empty": { readonly label: string | number };
+  "web.channel.farmSearch.failed": { readonly why: string | number };
   "web.channel.farmSearch.filters": undefined;
   "web.channel.farmSearch.hint": undefined;
   "web.channel.farmSearch.none": undefined;
@@ -9060,9 +9105,11 @@ export interface Messages {
   "web.channel.messages.owner": undefined;
   "web.channel.messages.pinned": undefined;
   "web.channel.messages.reactedBy": { readonly emoji: string | number; readonly names: string | number };
+  "web.channel.messages.readFailed": { readonly why: string | number };
   "web.channel.messages.replyGone": undefined;
   "web.channel.messages.retrySend": undefined;
   "web.channel.messages.roundFor": { readonly took: string | number; readonly what: string | number };
+  "web.channel.messages.searchFailed": { readonly why: string | number };
   "web.channel.messages.searching": undefined;
   "web.channel.messages.sending": undefined;
   "web.channel.messages.sentTo": { readonly who: string | number };
@@ -9096,6 +9143,7 @@ export interface Messages {
   "web.channel.noHelpers": undefined;
   "web.channel.nobodyOnIt": undefined;
   "web.channel.orchestrator": undefined;
+  "web.channel.pins.failed": { readonly why: string | number };
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
@@ -9334,6 +9382,7 @@ export interface Messages {
   "web.farm.chat.toOrchestrator": undefined;
   "web.farm.chat.toOrchestratorAlone": undefined;
   "web.farm.chat.unfoldDispatch": undefined;
+  "web.farm.chat.unread": { readonly why: string | number };
   "web.farm.chat.what": undefined;
   "web.farm.chat.who": undefined;
   "web.farm.command.cannot": { readonly act: string | number };
@@ -9708,14 +9757,19 @@ export interface Messages {
   "web.farm.plot.graph": undefined;
   "web.farm.plot.history": undefined;
   "web.farm.plot.job": undefined;
+  "web.farm.plot.letGo": undefined;
   "web.farm.plot.made": undefined;
   "web.farm.plot.madeFiles": { readonly n: string | number };
   "web.farm.plot.madeNothing": undefined;
   "web.farm.plot.model": undefined;
   "web.farm.plot.moreFiles": { readonly n: string | number };
+  "web.farm.plot.moveAgain": undefined;
+  "web.farm.plot.moving": undefined;
   "web.farm.plot.next": { readonly line: string | number };
   "web.farm.plot.noCriteria": { readonly answer: boolean };
   "web.farm.plot.noRuns": undefined;
+  "web.farm.plot.notMoved": undefined;
+  "web.farm.plot.notSaid": undefined;
   "web.farm.plot.now": undefined;
   "web.farm.plot.onBoard": undefined;
   "web.farm.plot.opened": undefined;
@@ -9733,9 +9787,12 @@ export interface Messages {
   "web.farm.plot.reviewed": { readonly clock: string | number };
   "web.farm.plot.runCount": { readonly n: number };
   "web.farm.plot.runs": undefined;
+  "web.farm.plot.sayAgain": undefined;
   "web.farm.plot.sayIt": undefined;
+  "web.farm.plot.sending": undefined;
   "web.farm.plot.steps": undefined;
   "web.farm.plot.story": undefined;
+  "web.farm.plot.takeBack": undefined;
   "web.farm.plot.tell": { readonly who: string | number };
   "web.farm.plot.tellIdle": undefined;
   "web.farm.plot.tellWorking": undefined;
@@ -9834,8 +9891,13 @@ export interface Messages {
   "web.inbox.tray.working": { readonly n: number };
   "web.issue.acts.carry": undefined;
   "web.issue.acts.goesOn": { readonly helper: string | number };
+  "web.issue.acts.moving": undefined;
+  "web.issue.acts.notSaid": undefined;
   "web.issue.acts.rejectWith": undefined;
   "web.issue.acts.reopened": undefined;
+  "web.issue.acts.sayAgain": undefined;
+  "web.issue.acts.sending": undefined;
+  "web.issue.acts.takeBack": undefined;
   "web.issue.board.add": undefined;
   "web.issue.board.addLabel": undefined;
   "web.issue.board.earlier": { readonly n: string | number };

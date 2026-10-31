@@ -4,8 +4,9 @@ import { Loading, onSettled } from "solid-js";
 
 import { createRegistry, RegistryContext } from "@/base/atom";
 import { createFrames, FramesContext } from "@/base/frame";
+import { frames } from "@/base/frames";
 import { reveal } from "@/base/opening";
-import { queries } from "@/base/query";
+import { queries, refetchOnRelink } from "@/base/query";
 import { createRouter, RouterContext } from "@/base/router";
 import { createFarmUi, FarmUiContext } from "@/farm/ui";
 
@@ -31,8 +32,12 @@ export function Root(props: { children: JSX.Element }) {
   );
 }
 
-/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (base/opening.ts). */
+/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (base/opening.ts).
+ * From then on the REST reads are read again whenever the state stream comes back. */
 function Opened() {
-  onSettled(() => void reveal());
+  onSettled(() => {
+    void reveal();
+    return refetchOnRelink(frames);
+  });
   return null;
 }

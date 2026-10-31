@@ -35,6 +35,7 @@ import { MemoryPanel } from "@/features/memory";
 import { useSkills } from "@/features/runtime";
 import { TrajectoryList } from "@/features/session";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "@/ui/cast";
 import { ChipsInput, KeyValueEditor } from "@/ui/Chips";
@@ -49,7 +50,6 @@ import { runtimeName } from "@/ui/runtimes";
 import { Segmented } from "@/ui/Segmented";
 import { Tabs } from "@/ui/Tabs";
 import { Hint } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
 
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
@@ -129,7 +129,8 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   const isNew = untrack(() => !props.saved);
   const [draft, setDraft] = createSignal(untrack(() => props.start));
   const [pose, setPose] = createSignal<Pose>("idle");
-  const [saving, setSaving] = createSignal(false);
+  const saving = createAct();
+  const talking = createAct();
   const [trajectories, setTrajectories] = createSignal(false);
   const router = useRouter();
   const client = useQueryClient();
@@ -140,21 +141,16 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   const dirty = () => isNew || !same(props.saved, draft());
   const nameTaken = () => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim());
 
-  const save = async () => {
-    setSaving(true);
+  const save = () => {
     const d = draft();
     const body = { ...d, name: d.name.trim() || t("web.agent.unnamedAgent") };
-    try {
+    return saving.run(async () => {
       const got = isNew ? await api.agent.create(body) : await api.agent.update(body);
       client.setQueryData<Agent[]>(["agents"], (list) => (list ? [...list.filter((a) => a.id !== got.id), got] : list));
       await client.invalidateQueries({ queryKey: ["agents"] });
       setDraft(got);
       if (isNew) router.navigate(`/agents/${encodeURIComponent(got.id)}`);
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const bar = () => (
@@ -181,12 +177,11 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
               <Button
                 icon="thread"
                 data-testid="talk"
-                onClick={() =>
-                  void api.channel.direct
-                    .create({ agent: saved().id })
-                    .then((id) => router.navigate(`/chat/${id}`))
-                    .catch((e) => toast(reasonOf(e), "bad"))
-                }
+                disabled={talking.busy()}
+                onClick={() => {
+                  const agent = saved().id;
+                  void talking.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
+                }}
               >
                 {t("web.agent.talk")}
               </Button>
@@ -198,8 +193,8 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
             </>
           )}
         </Show>
-        <Button tone="primary" data-testid="save" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
-          {saving() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
+        <Button tone="primary" data-testid="save" disabled={!dirty() || saving.busy() || nameTaken()} onClick={() => void save()}>
+          {saving.busy() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
         </Button>
       </span>
     </div>
@@ -269,15 +264,14 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
 function DeleteButton(props: { agent: Agent }) {
   const router = useRouter();
   const client = useQueryClient();
-  const remove = async () => {
+  const act = createAct();
+  const remove = () => {
     const id = props.agent.id;
-    try {
+    return act.run(async () => {
       await api.agent.delete({ id });
       await client.invalidateQueries({ queryKey: ["agents"] });
       router.navigate("/agents");
-    } catch (e) {
-      toast(reasonOf(e));
-    }
+    });
   };
   return <ConfirmButton label={t("web.agent.remove")} question={t("web.agent.removeWhich", { name: props.agent.name })} testid="delete" onConfirm={remove} />;
 }

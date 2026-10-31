@@ -9,16 +9,16 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { spentText } from "@/base/format";
 import { useCore } from "@/base/frame";
+import { useIntents } from "@/base/intent";
 import { aria, autofocus } from "@/base/util";
 import { artifactHref } from "@/features/artifact";
-import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, useMessage } from "@/features/channel";
+import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
 import { A } from "@/ui/A";
 import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
-import { PxMarkdown, SpriteIcon } from "@/ui/pixel";
-import { toast } from "@/ui/toasts";
+import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "@/ui/pixel";
 
 import { farmClock, readsLong } from "./labels";
 
@@ -135,10 +135,21 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
   const [sure, setSure] = createSignal(false);
   const [every, setEvery] = createSignal(false);
   let plus: HTMLButtonElement | undefined;
-  const run = (call: () => Promise<unknown>) => {
+  const act = createPixelAct();
+  const reactions = useIntents(reactionSet);
+  const close = () => {
     setOpen(false);
     setEvery(false);
-    void call().catch((e) => toast(reasonOf(e), "bad"));
+  };
+  const run = (call: () => Promise<unknown>) => {
+    close();
+    void act.run(call);
+  };
+  const react = (m: ChatMessage, emoji: string) => {
+    close();
+    setMark(reactions, { channel: m.channel, id: m.id, emoji, on: reactionOn(m, emoji) }, sameReaction, (reason) =>
+      toasts.add({ type: ToastType.error, title: noticeTitle.error ?? reason, description: reason }),
+    );
   };
   const editable = () => props.m.from === ownerId && props.m.kind === "chat";
   return (
@@ -173,7 +184,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
                   data-key={emoji}
                   aria-label={emoji}
                   class="cursor-pointer px-1 text-[14px] hover:bg-leaf-300/40"
-                  onClick={() => run(() => api.channel.reaction.set({ id: props.m.id, emoji, on: reactionOn(props.m, emoji) }))}
+                  onClick={() => react(props.m, emoji)}
                 >
                   {emoji}
                 </button>
@@ -190,7 +201,16 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
               <SpriteIcon name="button-add" size={12} />
             </button>
           </div>
-          <button type="button" role="menuitem" data-key="reply" class={menuItem} onClick={() => run(async () => drafts.reply(props.m.channel, props.m))}>
+          <button
+            type="button"
+            role="menuitem"
+            data-key="reply"
+            class={menuItem}
+            onClick={() => {
+              close();
+              drafts.reply(props.m.channel, props.m);
+            }}
+          >
             {t("web.farm.chat.actions.reply")}
           </button>
           <button
@@ -201,7 +221,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             onClick={() =>
               run(async () => {
                 await navigator.clipboard.writeText(location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number));
-                toast(t("web.farm.chat.actions.copied"));
+                toasts.add({ title: t("web.farm.chat.actions.copied") });
               })
             }
           >
@@ -227,7 +247,12 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             data-key="delete"
             data-sure={sure() ? "" : undefined}
             class={[menuItem, "text-berry"]}
-            onClick={() => (sure() ? run(() => api.channel.message.delete({ id: props.m.id })) : setSure(true))}
+            onClick={() => {
+              if (!sure()) return void setSure(true);
+              const id = props.m.id;
+              close();
+              void act.run(() => api.channel.message.delete({ id }));
+            }}
           >
             {sure() ? t("web.farm.chat.actions.sure") : t("web.farm.chat.actions.remove")}
           </button>
@@ -238,8 +263,10 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
           anchor={plus}
           onClose={() => setEvery(false)}
           onPick={(emoji) => {
-            const m = untrack(() => props.m);
-            run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
+            react(
+              untrack(() => props.m),
+              emoji,
+            );
           }}
         />
       </Show>
@@ -251,13 +278,14 @@ function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
   const { id, text: was } = untrack(() => props.m);
   const done = () => untrack(() => props.onDone)();
   const [text, setText] = createSignal(was);
+  const act = createPixelAct();
   const save = () => {
     const words = text().trim();
     if (!words || words === was) return done();
-    void api.channel.message
-      .update({ id, text: words })
-      .then(done)
-      .catch((e) => toast(reasonOf(e), "bad"));
+    void act.run(async () => {
+      await api.channel.message.update({ id, text: words });
+      done();
+    });
   };
   return (
     <div class="flex flex-col gap-1">

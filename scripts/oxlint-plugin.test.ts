@@ -206,6 +206,43 @@ tester.run("atom-door", rule("atom-door"), {
   ],
 });
 
+tester.run("act-door", rule("act-door"), {
+  valid: [
+    { code: "act.run(() => api.issue.update({ id }));", filename: page("features/issue/IssueDetail.tsx") },
+    { code: "void act.run(async () => { const got = await api.skill.create(body); keep(got); });", filename: page("features/runtime/SkillsPage.tsx") },
+    { code: "act.run(() => Promise.all(xs.map((x) => api.session.stop({ id: x }))));", filename: page("farm/debug/DebugPanel.tsx") },
+    {
+      code: "api.channel.message.list({ id }); api.issue.diff.get({ id }); api.channel.previewDelete({ id }); api.memory.recall({ agent });",
+      filename: page("features/channel/ChatPage.tsx"),
+    },
+    { code: "client.issue.update({ id });", filename: page("features/issue/IssueDetail.tsx") },
+  ],
+  invalid: [
+    { code: "api.issue.update({ id, deliver });", filename: page("features/issue/IssueDetail.tsx"), errors: [{ messageId: "act" }] },
+    { code: "const run = (f) => f(); run(() => api.cron.delete({ id }));", filename: page("features/channel/Tabs.tsx"), errors: [{ messageId: "act" }] },
+    { code: "api.orchestrator.stop({ agent }).catch(() => {});", filename: page("farm/chat/Composer.tsx"), errors: [{ messageId: "act" }] },
+  ],
+});
+
+tester.run("failure-tone", rule("failure-tone"), {
+  valid: [
+    { code: 'toast(reasonOf(e), "bad");', filename: page("features/lan/LanPage.tsx") },
+    { code: 'toast(t("web.channel.more.copied"));', filename: page("features/channel/MessageParts.tsx") },
+    { code: "toasts.add({ type: ToastType.error, title, description: reasonOf(e) });", filename: page("farm/issue/IssueView.tsx") },
+    { code: "toasts.add({ type: ToastType.info, title: said });", filename: page("farm/chat/Composer.tsx") },
+  ],
+  invalid: [
+    { code: "toast(reasonOf(e));", filename: page("features/lan/LanPage.tsx"), errors: [{ messageId: "tone" }] },
+    { code: 'toast(t("x", { why: reasonOf(e) }), "info");', filename: page("features/lan/LanPage.tsx"), errors: [{ messageId: "tone" }] },
+    {
+      code: "toasts.add({ type: ToastType.warn, title, description: reasonOf(e) });",
+      filename: page("farm/issue/IssueView.tsx"),
+      errors: [{ messageId: "tone" }],
+    },
+    { code: "toasts.add({ title, description: reasonOf(e) });", filename: page("farm/panels/Panels.tsx"), errors: [{ messageId: "tone" }] },
+  ],
+});
+
 tester.run("one-absent", rule("one-absent"), {
   valid: [
     { code: "let a: string | undefined;", filename: "/repo/apps/server/src/a.ts" },

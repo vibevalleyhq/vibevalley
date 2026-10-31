@@ -16,13 +16,12 @@ import { usePrefs } from "@/base/prefs";
 import { ready, useProjects, useQuery } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
-import { fire } from "@/farm/commands";
 import { commands } from "@/farm/frames";
 import { useFarm } from "@/farm/ui";
 import { issueOf } from "@/farm/world/plots";
-import { writeIssue } from "@/features/issue";
+import { createWriteKey, writeIssue } from "@/features/issue";
 import { AgentFace } from "@/ui/Face";
-import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
+import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 
 const xs = "text-[12px] text-bark-600";
@@ -80,6 +79,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   const [selection, setSelection] = createSignal<readonly [number, number]>();
   const [who, setWho] = createSignal<string>();
   const [refused, setRefused] = createSignal<string>();
+  const act = createPixelAct();
+  // The form's: it closes once it sowed, so a sowing sent again is only ever this one.
+  const sowKey = newSendKey();
+  const writeKey = createWriteKey();
   let words: HTMLTextAreaElement | undefined;
 
   const templates = useQuery(() => ({
@@ -100,14 +103,19 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     const p = project();
     if (!canSow() || !p) return;
     playSound("plant");
-    fire(commands.plant(text(), omitUndefined({ station: props.station, agent: agentOf(sower()), project: p })));
+    // The form closes at once; a refusal is said in a toast.
+    const sowing = omitUndefined({ station: props.station, agent: agentOf(sower()), project: p });
+    const said = text();
+    void act.run(() => commands.plant(said, sowKey, sowing));
     props.onDone();
   };
   const write = async () => {
     const p = project();
     if (!canSow() || !p) return;
     try {
-      const got = await writeIssue(text(), agentOf(sower()) ?? "", p);
+      const words = text().trim();
+      const got = await writeIssue(text(), agentOf(sower()) ?? "", p, writeKey.for(words));
+      writeKey.used();
       if (got.refused) toasts.add({ type: ToastType.info, title: t("web.farm.sow.notDrafted"), description: got.refused });
       props.onDone();
       router.navigate(`/issues/${encodeURIComponent(got.issue.id)}`);

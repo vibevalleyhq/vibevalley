@@ -8,7 +8,6 @@ import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { useAgent } from "@/base/agents";
-import { api } from "@/base/api";
 import { useRouter } from "@/base/router";
 import { ArchivePanel, OrchestratorMemoryPanel } from "@/features/memory";
 import { TrajectoryLog } from "@/features/session";
@@ -17,6 +16,7 @@ import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Tabs } from "@/ui/Tabs";
 
+import { markWrongOf } from "./evals";
 import { orchestratorLooks } from "./looks";
 
 const tabs = [
@@ -99,7 +99,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
               empty={t("web.orchestrator.orchestrator.quiet")}
               title={t("web.orchestrator.orchestrator.trajectory")}
               about={t("web.orchestrator.orchestrator.about")}
-              onMarkWrong={(on, want) => api.orchestrator.eval.create({ agent: props.agent, on, want })}
+              onMarkWrong={markWrongOf(props.agent)}
             />
           </div>
         </div>

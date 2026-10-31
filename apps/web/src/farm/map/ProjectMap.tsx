@@ -9,7 +9,7 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 
-import { reasonOf } from "@/base/api";
+import { createRequestKey } from "@/base/api";
 import { useCore, useFrames } from "@/base/frame";
 import { sendOnce, useIntents } from "@/base/intent";
 import { ready, useAgents, useProjects } from "@/base/query";
@@ -18,6 +18,7 @@ import { variant, autofocus } from "@/base/util";
 import { chatSay, defaultOf } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
 import { type ProjectsSkin, since } from "@/features/project";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { castOf, castSprite, cropSprite } from "@/ui/cast";
 import { Dialog } from "@/ui/Dialog";
@@ -462,7 +463,9 @@ function NoProjects() {
 /** Work for this project: sent now (the orchestrator sends a helper), or written down as a todo to fill in. */
 function SowHere(props: { project: string; onDone: () => void }) {
   const [text, setText] = createSignal("");
-  const [busy, setBusy] = createSignal(false);
+  const [sending, setSending] = createSignal(false);
+  const writing = createAct();
+  const busy = () => sending() || writing.busy();
   const router = useRouter();
   const core = useCore();
   const says = useIntents(chatSay);
@@ -470,25 +473,25 @@ function SowHere(props: { project: string; onDone: () => void }) {
   const send = async () => {
     const id = defaultOf(core()?.chat)?.id;
     if (!id) return;
-    setBusy(true);
+    setSending(true);
     const end = await sendOnce(says, { id, text: text().trim(), project: props.project });
-    setBusy(false);
+    setSending(false);
     if (end?.status === "failed") toast(end.reason ?? "", "bad");
     else props.onDone();
   };
-  const write = async () => {
+  // The same key until the issue went in: a retry after a lost reply is that issue, not a second.
+  const key = createRequestKey();
+  const write = () => {
     const project = props.project;
-    setBusy(true);
-    try {
-      const got = await writeIssue(text(), "", project);
+    const words = text();
+    const done = props.onDone;
+    return writing.run(async () => {
+      const got = await writeIssue(words, "", project, key.now());
+      key.used();
       if (got.refused) toast(t("web.farm.map.notDrafted", { why: got.refused }));
-      props.onDone();
+      done();
       go(router.navigate, got.issue.id);
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
   return (
     <div class="flex flex-col gap-3">

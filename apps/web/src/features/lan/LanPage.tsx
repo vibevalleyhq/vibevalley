@@ -2,7 +2,7 @@
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
 import { useQueryClient } from "@tanstack/solid-query";
-import { For, Show } from "solid-js";
+import { For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
@@ -11,6 +11,7 @@ import { api, reasonOf } from "@/base/api";
 import { momentText } from "@/base/format";
 import { ready, useQuery } from "@/base/query";
 import { useNow } from "@/base/util";
+import { type Act, createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Card, Quiet } from "@/ui/layout";
 import { Qr } from "@/ui/Qr";
@@ -18,19 +19,13 @@ import { toast } from "@/ui/toasts";
 
 const notes = [0, 1, 2, 3] as const;
 
-type Act = (call: () => Promise<LanStatus>) => Promise<void>;
-
 export function LanPage() {
   const client = useQueryClient();
   // Polled: a device asking to pair shows up without a reload.
   const status = useQuery(() => ({ queryKey: ["lan"], queryFn: () => api.lan.get(), refetchInterval: 1500 }));
-  const act: Act = async (call) => {
-    try {
-      client.setQueryData(["lan"], await call());
-    } catch (e) {
-      toast(reasonOf(e));
-    }
-  };
+  const act = createAct();
+  /** The status an action answers with is the newest: shown at once rather than at the next poll. */
+  const keep = (status: LanStatus) => void client.setQueryData(["lan"], status);
   const s = () => ready(status, undefined);
   return (
     <div class="flex max-w-3xl flex-col gap-3">
@@ -47,7 +42,12 @@ export function LanPage() {
                   <>
                     <p class="text-sm">{t("web.lan.lan.intro")}</p>
                     <div>
-                      <Button tone="primary" data-testid="lan-allow" onClick={() => void act(() => api.lan.update({ open: true }))}>
+                      <Button
+                        tone="primary"
+                        data-testid="lan-allow"
+                        disabled={act.busy()}
+                        onClick={() => void act.run(async () => keep(await api.lan.update({ open: true })))}
+                      >
                         {t("web.lan.lan.allow")}
                       </Button>
                     </div>
@@ -64,16 +64,25 @@ export function LanPage() {
                   when={s().pairing}
                   fallback={
                     <div class="flex flex-wrap gap-2">
-                      <Button tone="primary" data-testid="lan-add" disabled={!s().url} onClick={() => void act(() => api.lan.pairing.start())}>
+                      <Button
+                        tone="primary"
+                        data-testid="lan-add"
+                        disabled={!s().url || act.busy()}
+                        onClick={() => void act.run(async () => keep(await api.lan.pairing.start()))}
+                      >
                         {t("web.lan.lan.add")}
                       </Button>
-                      <Button data-testid="lan-close" onClick={() => void act(() => api.lan.update({ open: false }))}>
+                      <Button
+                        data-testid="lan-close"
+                        disabled={act.busy()}
+                        onClick={() => void act.run(async () => keep(await api.lan.update({ open: false })))}
+                      >
                         {t("web.lan.lan.close")}
                       </Button>
                     </div>
                   }
                 >
-                  {(pairing) => <Pairing pairing={pairing()} act={act} />}
+                  {(pairing) => <Pairing pairing={pairing()} act={act} keep={keep} />}
                 </Show>
               </Show>
               <Show when={s().problem}>
@@ -110,7 +119,7 @@ export function LanPage() {
                   <Button
                     tone="danger"
                     aria-label={t("web.lan.lan.removeWhich", { name: d.name })}
-                    onClick={() => void act(() => api.lan.device.delete({ id: d.id }))}
+                    onClick={() => void act.run(async () => keep(await api.lan.device.delete({ id: d.id })))}
                   >
                     {t("web.lan.lan.remove")}
                   </Button>
@@ -133,7 +142,9 @@ async function copy(link: string) {
   }
 }
 
-function Pairing(props: { pairing: LanPairing; act: Act }) {
+function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatus) => void }) {
+  // The same function for the page's life: read once, not inside each action.
+  const keep = untrack(() => props.keep);
   const now = useNow(1000);
   const left = () => Math.min(999, Math.max(0, Math.ceil((props.pairing.expiresAt - now()) / 1000)));
   return (
@@ -154,8 +165,10 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
                 {t("web.lan.lan.copy")}
               </Button>
-              <Button onClick={() => void props.act(() => api.lan.pairing.start())}>{t("web.lan.lan.newCode")}</Button>
-              <Button data-testid="pairing-stop" onClick={() => void props.act(() => api.lan.pairing.stop())}>
+              <Button disabled={props.act.busy()} onClick={() => void props.act.run(async () => keep(await api.lan.pairing.start()))}>
+                {t("web.lan.lan.newCode")}
+              </Button>
+              <Button data-testid="pairing-stop" disabled={props.act.busy()} onClick={() => void props.act.run(async () => keep(await api.lan.pairing.stop()))}>
                 {t("web.lan.lan.stop")}
               </Button>
             </div>
@@ -167,10 +180,18 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
         <div class="flex flex-col gap-3">
           <p class="text-sm">{t("web.lan.lan.asking", { name: asking() })}</p>
           <div class="flex gap-2">
-            <Button tone="primary" onClick={() => void props.act(() => api.lan.pairing.answer({ allow: true }))}>
+            <Button
+              tone="primary"
+              disabled={props.act.busy()}
+              onClick={() => void props.act.run(async () => keep(await api.lan.pairing.answer({ allow: true })))}
+            >
               {t("web.lan.lan.letIn")}
             </Button>
-            <Button tone="danger" onClick={() => void props.act(() => api.lan.pairing.answer({ allow: false }))}>
+            <Button
+              tone="danger"
+              disabled={props.act.busy()}
+              onClick={() => void props.act.run(async () => keep(await api.lan.pairing.answer({ allow: false })))}
+            >
               {t("web.lan.lan.refuse")}
             </Button>
           </div>

@@ -10,17 +10,17 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentTally, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
 import { ready, useRuntimes } from "@/base/query";
 import { orchestratorHref } from "@/features/orchestrator";
 import { useSkills } from "@/features/runtime";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { hexColor } from "@/ui/cast";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import { Hint } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
 
 import { AgentPage } from "./AgentPage";
 import { TemplatesPage } from "./TemplatesPage";
@@ -182,14 +182,16 @@ export function AgentCard(props: {
 }) {
   const client = useQueryClient();
   const available = () => props.runtime?.installation.status === "available";
-  const toggle = async () => {
-    const a = props.agent;
-    try {
-      await api.agent.update({ ...a, enabled: !a.enabled });
+  const act = createAct();
+  // The API saves a whole profile, and the cached one may be older than an edit made since (in another window): the
+  // profile is read fresh just before, and only enabled is changed.
+  const toggle = () => {
+    const { id, enabled } = props.agent;
+    return act.run(async () => {
+      const latest = (await api.agent.list()).find((a) => a.id === id);
+      if (latest) await api.agent.update({ ...latest, enabled: !enabled });
       await client.invalidateQueries({ queryKey: ["agents"] });
-    } catch (e) {
-      toast(reasonOf(e));
-    }
+    });
   };
   return (
     <CardShell
@@ -202,6 +204,8 @@ export function AgentCard(props: {
           type="button"
           data-testid="toggle"
           data-state={props.agent.enabled ? "on" : "off"}
+          disabled={act.busy()}
+          aria-busy={act.busy() ? "true" : undefined}
           onClick={() => void toggle()}
           aria-label={t("web.agent.list.toggle", {
             act: props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"),
