@@ -25,8 +25,8 @@ const on = (config: ServerConfig["Service"] = testConfig()) =>
 /** The blocks of artifacts made straight in the table: the rest of the Artifact service (channels, cards) is artifact.test.ts's. */
 const make = (options: BlockStoreOptions = {}) =>
   Effect.gen(function* () {
-    const { run: db, one } = yield* Db;
-    const row = (id: string) => one(qa.artifact({ id })).pipe(orMissing(id, []));
+    const db = yield* Db;
+    const row = (id: string) => db.one(qa.artifact({ id })).pipe(orMissing(id, []));
     const blocks = yield* makeBlockStore(row, options);
     const get = (id: string) =>
       Effect.gen(function* () {
@@ -37,7 +37,7 @@ const make = (options: BlockStoreOptions = {}) =>
     const create = (title: string) =>
       Effect.gen(function* () {
         const id = newId();
-        yield* db(
+        yield* db.run(
           qa.addArtifact({
             id,
             title: title.trim() || t("server.artifact.untitled"),
@@ -52,7 +52,7 @@ const make = (options: BlockStoreOptions = {}) =>
         );
         return yield* get(id);
       });
-    const list = () => db(qa.artifacts({ limit_n: 100n }));
+    const list = () => db.run(qa.artifacts({ limit_n: 100n }));
     const importMarkdown = (title: string, markdown: string, actor: string) =>
       Effect.gen(function* () {
         const made = yield* create(title);

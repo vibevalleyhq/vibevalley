@@ -117,7 +117,7 @@ it("attempt and attemptTx are used only where a failed query is told or retried,
   const src = join(import.meta.dirname, "..");
   const using = readdirSync(src, { recursive: true, encoding: "utf8" })
     .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-    .filter((f) => /\{[^}]*\battempt(?:Tx)?\b[^}]*\}\s*=\s*yield\*\s*Db\b|\bDb\b[^;]*\.attempt(?:Tx)?\(/u.test(readFileSync(join(src, f), "utf8")))
+    .filter((f) => /\bdb\s*\.attempt(?:Tx)?\(/u.test(readFileSync(join(src, f), "utf8")))
     .map((f) => f.split("\\").join("/"))
     .toSorted();
   expect(using).toEqual(Object.keys(attempting).toSorted());

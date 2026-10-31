@@ -74,7 +74,7 @@ const make = (options: ArtifactOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const chat = yield* Channel;
-    const { run: db, one } = yield* Db;
+    const db = yield* Db;
     const fs = yield* FileSystem.FileSystem;
     // One change of an artifact's row at a time: a version's number is the latest's plus one.
     const lock = yield* Semaphore.make(1);
@@ -91,7 +91,7 @@ const make = (options: ArtifactOptions = {}) =>
     };
 
     const assemble = Effect.fnUntraced(function* (row: qa.ArtifactsResult) {
-      const versions = row.body === "html" ? yield* db(qv.artifactVersions({ artifact_id: row.id })) : [];
+      const versions = row.body === "html" ? yield* db.run(qv.artifactVersions({ artifact_id: row.id })) : [];
       return {
         id: row.id,
         title: row.title,
@@ -119,7 +119,7 @@ const make = (options: ArtifactOptions = {}) =>
     });
 
     const found = Effect.fnUntraced(function* (id: string) {
-      const row = yield* one(qa.artifact({ id }));
+      const row = yield* db.one(qa.artifact({ id }));
       if (!row) return yield* Effect.fail(missingArtifact(id));
       return row;
     });
@@ -139,7 +139,7 @@ const make = (options: ArtifactOptions = {}) =>
       const id = newId();
       const now = yield* Clock.currentTimeMillis;
       const name = maker.by === ownerId ? t("server.channel.name.owner") : maker.by;
-      yield* db(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
+      yield* db.run(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
       return yield* assemble(yield* found(id));
     });
 
@@ -164,12 +164,12 @@ const make = (options: ArtifactOptions = {}) =>
       // Said first: the name it goes by is the one the channel knows its maker by.
       const said = yield* chat.announce(maker.from, channel, words(t("server.artifact.made", { title }), note), card);
       const now = yield* Clock.currentTimeMillis;
-      yield* db(
+      yield* db.run(
         qa.addArtifact({ id, title, body, channel_id: said.channel, issue: req.issue ?? null, by_id: maker.by, by_name: said.name, version, created_at: now }),
       );
-      yield* db(qa.artifactSaid({ id, message_id: said.id }));
+      yield* db.run(qa.artifactSaid({ id, message_id: said.id }));
       if (body === "html") {
-        yield* db(
+        yield* db.run(
           qv.addArtifactVersion({
             artifact_id: id,
             version: 1,
@@ -181,7 +181,7 @@ const make = (options: ArtifactOptions = {}) =>
             created_at: now,
           }),
         );
-        yield* db(qv.artifactVersionAnnounced({ artifact_id: id, version: 1, message_id: said.id }));
+        yield* db.run(qv.artifactVersionAnnounced({ artifact_id: id, version: 1, message_id: said.id }));
       } else yield* blocks.fill(id, req.content, maker.by);
       return yield* assemble(yield* found(id));
     });
@@ -204,7 +204,7 @@ const make = (options: ArtifactOptions = {}) =>
         card,
       );
       const now = yield* Clock.currentTimeMillis;
-      yield* db(
+      yield* db.run(
         qv.addArtifactVersion({
           artifact_id: row.id,
           version: next,
@@ -216,15 +216,15 @@ const make = (options: ArtifactOptions = {}) =>
           created_at: now,
         }),
       );
-      yield* db(qv.artifactVersionAnnounced({ artifact_id: row.id, version: next, message_id: said.id }));
-      yield* db(qa.artifactVersioned({ id: row.id, version: next, updated_at: now }));
+      yield* db.run(qv.artifactVersionAnnounced({ artifact_id: row.id, version: next, message_id: said.id }));
+      yield* db.run(qa.artifactVersioned({ id: row.id, version: next, updated_at: now }));
       return yield* assemble(yield* found(row.id));
     });
 
     const versionOf = Effect.fnUntraced(function* (id: string, version: number | undefined) {
       const row = yield* found(id);
       const n = version ?? row.version;
-      const v = yield* one(qv.artifactVersion({ artifact_id: id, version: n }));
+      const v = yield* db.one(qv.artifactVersion({ artifact_id: id, version: n }));
       if (!v) return yield* Effect.fail(missing(t("server.artifact.noVersion", { title: row.title, version: n, latest: row.version }), []));
       return { row, v };
     });
@@ -232,10 +232,10 @@ const make = (options: ArtifactOptions = {}) =>
     const shape = Artifact.of({
       list: Effect.fn("Artifact.list")(function* (q) {
         const rows = q.issue
-          ? yield* db(qa.artifactsForIssue({ issue: q.issue }))
+          ? yield* db.run(qa.artifactsForIssue({ issue: q.issue }))
           : q.channel
-            ? yield* db(qa.artifactsInChannel({ channel_id: q.channel }))
-            : yield* db(qa.artifacts({ limit_n: BigInt(listedMax) }));
+            ? yield* db.run(qa.artifactsInChannel({ channel_id: q.channel }))
+            : yield* db.run(qa.artifacts({ limit_n: BigInt(listedMax) }));
         const out: T.Artifact[] = [];
         // Both given: the issue's, in that channel.
         for (const r of rows) if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
@@ -255,8 +255,8 @@ const make = (options: ArtifactOptions = {}) =>
         return { version: v.version, content, body: "html" as const };
       }),
       file: Effect.fn("Artifact.file")(function* (id, version) {
-        const row = yield* one(qa.artifact({ id }));
-        const v = row?.body === "html" ? yield* one(qv.artifactVersion({ artifact_id: id, version })) : undefined;
+        const row = yield* db.one(qa.artifact({ id }));
+        const v = row?.body === "html" ? yield* db.one(qv.artifactVersion({ artifact_id: id, version })) : undefined;
         return v ? fileOf(v.sha) : undefined;
       }),
       create: Effect.fn("Artifact.create")(function* (maker, req) {
@@ -269,7 +269,7 @@ const make = (options: ArtifactOptions = {}) =>
         yield* found(id);
         const problem = artifactProblem({ title });
         if (problem) return yield* Effect.fail(refused(problem));
-        yield* db(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
+        yield* db.run(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
         return yield* assemble(yield* found(id));
       }, lock.withPermits(1)),
       previewRemove: Effect.fn("Artifact.previewRemove")(function* (id) {
@@ -282,10 +282,10 @@ const make = (options: ArtifactOptions = {}) =>
       }),
       remove: Effect.fn("Artifact.remove")(function* (id) {
         yield* found(id);
-        const versions = yield* db(qv.artifactVersions({ artifact_id: id }));
-        yield* db(qa.deleteArtifact({ id }));
+        const versions = yield* db.run(qv.artifactVersions({ artifact_id: id }));
+        yield* db.run(qa.deleteArtifact({ id }));
         for (const sha of new Set(versions.map((v) => v.sha))) {
-          const users = yield* one(qv.artifactShaUsers({ sha }));
+          const users = yield* db.one(qv.artifactShaUsers({ sha }));
           if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
         }
       }, lock.withPermits(1)),

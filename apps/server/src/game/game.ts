@@ -56,10 +56,10 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const core = yield* Core;
   const projects = yield* Project;
-  const { attempt: db, run } = yield* Db;
+  const db = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.
-  const rows = yield* run(q.ledgerEntries());
+  const rows = yield* db.run(q.ledgerEntries());
   const entries: LedgerEntry[] = [];
   for (const row of rows) {
     const fields = payloadOf(row.payload);
@@ -77,7 +77,7 @@ const make = Effect.gen(function* () {
       const at = yield* Clock.currentTimeMillis;
       const entry = { ...input, at };
       const { kind, at: _, ...payload } = entry;
-      yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
+      yield* db.attempt(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
       const [next, news] = progressStep(folded, entry);
       folded = next;
       yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });

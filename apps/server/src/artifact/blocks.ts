@@ -101,7 +101,7 @@ export interface BlockStoreOptions {
 /** found: the artifact's row, failing when there is none or it is not a blocks one. */
 export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactResult, ApiError>, options: BlockStoreOptions = {}) =>
   Effect.gen(function* () {
-    const { run: db, inTx } = yield* Db;
+    const db = yield* Db;
     const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
     const tick = options.tickMs ?? 1000;
@@ -109,14 +109,14 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
       Effect.repeat(
         Effect.gen(function* () {
           const before = (yield* Clock.currentTimeMillis) - keptDays * dayMs;
-          yield* db(qc.pruneArtifactChanges({ before }));
-          yield* db(qr.pruneArtifactBlockRevisions({ before }));
+          yield* db.run(qc.pruneArtifactChanges({ before }));
+          yield* db.run(qr.pruneArtifactBlockRevisions({ before }));
         }),
         Schedule.spaced(Duration.days(1)),
       ),
     );
 
-    const blocksOf = (id: string) => db(Effect.map(qb.artifactBlocks({ artifact_id: id }), (rows) => rows.map(blockOf)));
+    const blocksOf = (id: string) => db.run(Effect.map(qb.artifactBlocks({ artifact_id: id }), (rows) => rows.map(blockOf)));
 
     const blocks = Effect.fn("BlockStore.blocks")(function* (id: string) {
       yield* found(id);
@@ -139,10 +139,10 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     /** One batch, under the lock the caller holds. */
     const submitLocked = (id: string, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">): Effect.Effect<T.BlockAck, ApiError> => {
       if (!body.batchId.trim()) return Effect.fail(refused(t("server.artifact.noBatch")));
-      return inTx(
+      return db.inTx(
         Effect.gen(function* () {
           const row = yield* found(id);
-          const seen = yield* db(Effect.catchNoSuchElement(qc.artifactChangeByBatch({ batch_id: body.batchId })));
+          const seen = yield* db.run(Effect.catchNoSuchElement(qc.artifactChangeByBatch({ batch_id: body.batchId })));
           if (Option.isSome(seen)) return yield* again(id, seen.value);
           const now = yield* Clock.currentTimeMillis;
           const p = new Page(id, actor, now, yield* blocksOf(id));
@@ -157,20 +157,20 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
               revisions.set(`${b.id}@${op.baseRev}`, b.text);
               continue;
             }
-            const raw = yield* db(Effect.catchNoSuchElement(qr.artifactBlockRevision({ block_id: b.id, rev: op.baseRev })));
+            const raw = yield* db.run(Effect.catchNoSuchElement(qr.artifactBlockRevision({ block_id: b.id, rev: op.baseRev })));
             if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
           }
           const taken = new Set<string>();
           for (const op of body.ops) {
             const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
-            if (fresh && Option.isSome(yield* db(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
+            if (fresh && Option.isSome(yield* db.run(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
           }
           p.base = (block, rev) => revisions.get(`${block}@${rev}`);
           p.taken = (block) => taken.has(block);
           const results = body.ops.map((op) => p.apply(op));
           const changed = p.changedBlocks();
           for (const b of changed)
-            yield* db(
+            yield* db.run(
               qb.putArtifactBlock({
                 id: b.id,
                 artifact_id: id,
@@ -186,7 +186,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
               }),
             );
           for (const r of p.revisions)
-            yield* db(
+            yield* db.run(
               qr.addArtifactBlockRevision({
                 id: newId(),
                 block_id: r.block,
@@ -198,7 +198,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
               }),
             );
           const seq = row.seq + 1;
-          yield* db(
+          yield* db.run(
             qc.addArtifactChange({
               artifact_id: id,
               seq,
@@ -209,7 +209,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
               created_at: now,
             }),
           );
-          yield* db(qa.artifactAccepted({ id, seq, updated_at: now }));
+          yield* db.run(qa.artifactAccepted({ id, seq, updated_at: now }));
           return { batchId: body.batchId, seq, results, blocks: changed };
         }),
       );

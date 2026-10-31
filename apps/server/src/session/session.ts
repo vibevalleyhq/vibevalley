@@ -393,13 +393,13 @@ export const make = (options: SessionOptionsIn = {}) =>
     const chat = yield* Channel;
     const projects = yield* Project;
     const runtimes = yield* Runtime;
-    const { run: db, attempt } = yield* Db;
+    const db = yield* Db;
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const run = yield* FiberSet.makeRuntimePromise();
     const forkHere = yield* FiberSet.makeRuntime();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      attempt(e).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+      db.attempt(e).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
     const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
@@ -466,7 +466,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const keepHands = Effect.suspend(() =>
       Effect.forEach(
         [...hands.values()],
-        (h) => attempt(qs.keepHand(handRow(h))).pipe(bestEffort(`vibevalley: session ${h.id}: what brings it back not kept`)),
+        (h) => db.attempt(qs.keepHand(handRow(h))).pipe(bestEffort(`vibevalley: session ${h.id}: what brings it back not kept`)),
         { discard: true },
       ),
     );
@@ -477,22 +477,24 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
 
     const keep = (s: T.Session) =>
-      attempt(
-        qs.keepSession({
-          id: s.id,
-          agent: s.agent,
-          name: s.name,
-          runtime: s.runtime,
-          brief: s.brief,
-          project: s.project ?? null,
-          issue: s.issue ?? null,
-          graph: s.graph ? JSON.stringify(s.graph) : null,
-          hired_at: s.hiredAt,
-        }),
-      ).pipe(bestEffort(`vibevalley: session ${s.id} not kept`));
+      db
+        .attempt(
+          qs.keepSession({
+            id: s.id,
+            agent: s.agent,
+            name: s.name,
+            runtime: s.runtime,
+            brief: s.brief,
+            project: s.project ?? null,
+            issue: s.issue ?? null,
+            graph: s.graph ? JSON.stringify(s.graph) : null,
+            hired_at: s.hiredAt,
+          }),
+        )
+        .pipe(bestEffort(`vibevalley: session ${s.id} not kept`));
 
     const ended = (id: string, closed: T.SessionClose) =>
-      attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
+      db.attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
 
     /** The session kept, with its log. */
     const logOf = (s: T.Session, journal: Journal) => Effect.as(keep(s), journal);
@@ -983,20 +985,20 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const expireLogs = Effect.fn("Session.expireLogs")(function* (days: number) {
       if (days <= 0) return;
-      const ids = yield* db(qs.sessionsEndedBefore({ before: (yield* Clock.currentTimeMillis) - days * dayMs }));
+      const ids = yield* db.run(qs.sessionsEndedBefore({ before: (yield* Clock.currentTimeMillis) - days * dayMs }));
       yield* Effect.forEach(ids, (r) => trajectories.forget(r.id), { discard: true });
     });
 
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db(qr.openRuns()))
+      for (const r of yield* db.run(qr.openRuns()))
         yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted")).pipe(bestEffort(`vibevalley: run ${r.id}`));
-      const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
+      const kept = new Map((yield* db.run(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
         0,
-        (yield* db(qs.highestSessionNumber())).n ?? 0,
+        (yield* db.run(qs.highestSessionNumber())).n ?? 0,
         ...core
           .state()
           .sessions.map((s) => Number.parseInt(s.id.replace(/^w/u, ""), 10))
@@ -1287,8 +1289,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       changes: changesOf,
       list: Effect.fn("Session.list")(function* (agent) {
         const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
-        const rows = yield* db(qs.endedSessions({ agent, n: endedListed }));
-        const runs = yield* db(qr.runsOfSessions({ sessions: rows.map((r) => r.id) }));
+        const rows = yield* db.run(qs.endedSessions({ agent, n: endedListed }));
+        const runs = yield* db.run(qr.runsOfSessions({ sessions: rows.map((r) => r.id) }));
         const bySession = Map.groupBy(runs, (r) => r.session);
         for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
         return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
@@ -1296,12 +1298,12 @@ export const make = (options: SessionOptionsIn = {}) =>
       get: Effect.fn("Session.get")(function* (id) {
         const live = core.session(id);
         if (live) return live;
-        const r = yield* db(Effect.catchNoSuchElement(qs.sessionByID({ id })));
+        const r = yield* db.run(Effect.catchNoSuchElement(qs.sessionByID({ id })));
         if (Option.isNone(r) || r.value.ended_at === null) return undefined;
-        return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
+        return endedSession(r.value, yield* db.run(qr.runsOfSession({ session: id })));
       }),
       runs: Effect.fn("Session.runs")(function* (issue) {
-        const rows = yield* db(qr.runsOfIssue({ issue_id: issue }));
+        const rows = yield* db.run(qr.runsOfIssue({ issue_id: issue }));
         return rows.map(runOf);
       }),
       events: (id, r) => trajectories.events(id, r),

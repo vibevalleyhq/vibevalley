@@ -68,7 +68,7 @@ const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agent;
   const chat = yield* Channel;
-  const { run: db, attempt } = yield* Db;
+  const db = yield* Db;
   // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
   const clock = yield* Clock.Clock;
   const now = () => clock.currentTimeMillisUnsafe();
@@ -76,7 +76,7 @@ const make = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1);
   const dueHub = yield* scopedPubSub<Due>();
 
-  for (const row of yield* db(q.crons())) {
+  for (const row of yield* db.run(q.crons())) {
     const when = jsonOrNone(S.CronWhen)(row.spec);
     // A cron whose time or owner this code cannot read any more is left out.
     if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
@@ -103,7 +103,7 @@ const make = Effect.gen(function* () {
     return s ? Effect.succeed(s) : Effect.fail(missing(t("server.cron.noCron", { id }), [lookIn.cron]));
   };
 
-  const ran = (id: string, at: number, enabled: boolean) => db(q.cronRan({ last_run: at, enabled, id }));
+  const ran = (id: string, at: number, enabled: boolean) => db.run(q.cronRan({ last_run: at, enabled, id }));
 
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
@@ -111,7 +111,7 @@ const make = Effect.gen(function* () {
       for (const s of dueCrons(core.state().crons, at)) {
         const missed = isMissed(s, at);
         const after = afterRun(s, at);
-        const written = yield* Effect.result(attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })));
+        const written = yield* Effect.result(db.attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })));
         if (written._tag === "Failure") {
           const failure = written.failure;
           yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`);
@@ -156,7 +156,7 @@ const make = Effect.gen(function* () {
         by: by.kind,
         pending,
       };
-      yield* db(
+      yield* db.run(
         q.addCron({
           id: s.id,
           name: s.name,
@@ -183,13 +183,13 @@ const make = Effect.gen(function* () {
         const at = now();
         s = { ...s, lastRun: at };
         yield* ran(id, at, enabled);
-      } else yield* db(q.enableCron({ enabled, id }));
+      } else yield* db.run(q.enableCron({ enabled, id }));
       yield* core.apply({ type: "cron", cron: s });
       return s;
     }, lock.withPermits(1)),
     remove: Effect.fn("Cron.remove")(function* (id) {
       const was = yield* find(id);
-      yield* db(q.removeCron({ id }));
+      yield* db.run(q.removeCron({ id }));
       yield* core.apply({ type: "cronGone", id });
       return was;
     }, lock.withPermits(1)),

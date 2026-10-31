@@ -182,7 +182,7 @@ tester.run("try-promise-catch", rule("try-promise-catch"), {
 
 tester.run("db-door", rule("db-door"), {
   valid: [
-    { code: "const { run, attemptTx } = yield* Db;", filename: "/repo/apps/server/src/issue/issue.ts" },
+    { code: "function* f() { const db = yield* Db; yield* Effect.result(db.attempt(q.x())); }", filename: "/repo/apps/server/src/issue/issue.ts" },
     { code: 'import type { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/merge.ts" },
     { code: 'import { type SqlClient, SqlError } from "effect/sql";', filename: "/repo/apps/server/src/session/session.ts" },
     {
@@ -194,6 +194,12 @@ tester.run("db-door", rule("db-door"), {
     { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
     { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/store.ts", errors: [{ messageId: "transaction" }] },
     { code: 'import * as Sql from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
+    { code: "function* f() { const { attempt: db, run } = yield* Db; }", filename: "/repo/apps/server/src/game/game.ts", errors: [{ messageId: "whole" }] },
+    {
+      code: "function* f() { const db = yield* Db; yield* Effect.result(db.run(q.x())); }",
+      filename: "/repo/apps/server/src/game/game.ts",
+      errors: [{ messageId: "runCaught" }],
+    },
     { code: 'import * as Sql from "effect/sql/SqlClient";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
   ],
 });

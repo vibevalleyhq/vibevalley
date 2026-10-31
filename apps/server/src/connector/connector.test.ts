@@ -137,16 +137,26 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
 
 /** The orchestrator, played: what it hears goes into the channel, and it answers 收到 at once. */
 const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
-  Connector.layer({
-    weixin: script.weixin,
-    feishu: script.feishu,
-    qq: script.qq,
-    ...retry,
-    say: (text, channel, sendKey, chat) =>
-      Effect.flatMap(chat.say(text, channel, sendKey), ({ message, again }) =>
-        again ? Effect.void : chat.orchestratorSays(message.channel, "收到：**" + text + "**", "", defaultOrchestrator),
-      ),
-  }).pipe(Layer.provideMerge(Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
+  Connector.layer({ weixin: script.weixin, feishu: script.feishu, qq: script.qq, ...retry }).pipe(
+    Layer.provideMerge(echoing.pipe(Layer.provide(Orchestrator.layer({ listen: false })))),
+    Layer.provideMerge(world({ config })),
+  );
+
+/** The orchestrator as the chat apps meet it here: what the owner says is written, and answered at once. */
+const echoing = Layer.effect(
+  Orchestrator,
+  Effect.gen(function* () {
+    const real = yield* Orchestrator;
+    const chat = yield* Channel;
+    return Orchestrator.of({
+      ...real,
+      say: (text, _pick, channel, sendKey) =>
+        Effect.flatMap(chat.say(text, channel, sendKey), ({ message, again }) =>
+          again ? Effect.void : chat.orchestratorSays(message.channel, "收到：**" + text + "**", "", defaultOrchestrator),
+        ),
+    });
+  }),
+);
 
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {

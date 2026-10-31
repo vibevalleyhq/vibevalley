@@ -174,7 +174,7 @@ export const make = (options: TaskOptions = {}) =>
       handOver: live.handOver,
     };
     const projects: TaskGit = options.git ?? (yield* Project);
-    const { run: db, attempt } = yield* Db;
+    const db = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
     const newsHub = yield* scopedPubSub<string>();
@@ -208,17 +208,19 @@ export const make = (options: TaskOptions = {}) =>
             ...(c.changes && c.changes.length > 0 ? { changes: c.changes } : {}),
             ...(c.commits && c.commits.length > 0 ? { commits: c.commits } : {}),
           };
-          return attempt(
-            q.addGraphEvent({
-              id: newId(),
-              graph_id: c.graph,
-              task_id: c.task ?? null,
-              kind: c.kind,
-              actor,
-              payload: JSON.stringify(payload),
-              created_at: clock.currentTimeMillisUnsafe(),
-            }),
-          ).pipe(bestEffort("vibevalley: a task graph event was not kept"));
+          return db
+            .attempt(
+              q.addGraphEvent({
+                id: newId(),
+                graph_id: c.graph,
+                task_id: c.task ?? null,
+                kind: c.kind,
+                actor,
+                payload: JSON.stringify(payload),
+                created_at: clock.currentTimeMillisUnsafe(),
+              }),
+            )
+            .pipe(bestEffort("vibevalley: a task graph event was not kept"));
         },
         { discard: true },
       );
@@ -695,7 +697,7 @@ export const make = (options: TaskOptions = {}) =>
         };
       }),
       events: Effect.fn("Task.events")(function* (id) {
-        const rows = yield* db(q.graphEvents({ graph_id: id, n: readLimit }));
+        const rows = yield* db.run(q.graphEvents({ graph_id: id, n: readLimit }));
         const graph = get(id);
         const titleOf = (node: string) => (graph ? (taskOf(graph, node)?.title ?? node) : node);
         return rows.flatMap((row): T.GraphEvent[] => {

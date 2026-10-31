@@ -645,7 +645,17 @@ const dbDoor = defineRule({
     messages: {
       client: says(
         "a module that takes the SqlClient itself decides again what a failed query becomes, outside the Db service",
-        '`const { run, attempt, one, inTx, attemptTx } = yield* Db` and pass the generated query to it (`run(q.x(…))`); a type in a signature is `import type { SqlClient } from "effect/sql"`',
+        '`const db = yield* Db` and pass the generated query to it (`db.run(q.x(…))`); a type in a signature is `import type { SqlClient } from "effect/sql"`',
+        "apps/server/src/infra/db.ts",
+      ),
+      whole: says(
+        "Db taken apart can be renamed, and then run (a failure is a defect) and attempt (a failure stays) read alike",
+        "`const db = yield* Db` and `db.run(…)`, `db.attempt(…)`, `db.one(…)`, `db.inTx(…)`, `db.attemptTx(…)`",
+        "apps/server/src/infra/db.ts",
+      ),
+      runCaught: says(
+        "db.run turns the database's failure into a defect, so {{catcher}} around it never sees one",
+        "`db.attempt(…)` when the failure is told or retried, and catch its SqlError; keep db.run when a failure is a bug",
         "apps/server/src/infra/db.ts",
       ),
       transaction: says(
@@ -673,10 +683,37 @@ const dbDoor = defineRule({
           )
             context.report({ node: s, messageId: "client" });
       },
+      VariableDeclarator(node) {
+        const init = node.init;
+        if (
+          node.id.type === "ObjectPattern" &&
+          init?.type === "YieldExpression" &&
+          init.delegate &&
+          init.argument?.type === "Identifier" &&
+          init.argument.name === "Db"
+        )
+          context.report({ node, messageId: "whole" });
+      },
       CallExpression(node) {
         const c = node.callee;
         if (c.type === "MemberExpression" && c.property.type === "Identifier" && c.property.name === "withTransaction")
           context.report({ node, messageId: "transaction" });
+        // Effect.result(db.run(…)) and its kin: a catcher around what cannot fail.
+        const first = node.arguments[0];
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "Effect" &&
+          c.property.type === "Identifier" &&
+          ["result", "catch", "catchTag", "orElseSucceed", "option", "exit"].includes(c.property.name) &&
+          first?.type === "CallExpression" &&
+          first.callee.type === "MemberExpression" &&
+          first.callee.object.type === "Identifier" &&
+          first.callee.object.name === "db" &&
+          first.callee.property.type === "Identifier" &&
+          first.callee.property.name === "run"
+        )
+          context.report({ node, messageId: "runCaught", data: { catcher: `Effect.${c.property.name}` } });
       },
     };
   },
