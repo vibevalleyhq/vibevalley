@@ -72,7 +72,7 @@ const giveBack = (pglite: PGlite) =>
         pglite.query<{ name: string }>("SELECT sequencename AS name FROM pg_sequences WHERE schemaname = 'public'"),
       );
       emptyAll = [
-        "SET session_replication_role = replica;",
+        "RESET ALL; SET session_replication_role = replica;",
         ...tables.rows.map((t) => `DELETE FROM "${t.name}";`),
         "SET session_replication_role = origin;",
         ...sequences.rows.map((q) => `ALTER SEQUENCE "${q.name}" RESTART;`),
