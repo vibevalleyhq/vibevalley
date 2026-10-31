@@ -10,7 +10,6 @@ import { join, resolve } from "node:path";
 
 import type { Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
-import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   Clock,
   Context,
@@ -38,11 +37,9 @@ import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { newId } from "@/base/ids.ts";
-import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channel, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 import { Core, type FactIn } from "@/core/core.ts";
@@ -278,109 +275,17 @@ export class NotTakenIn extends Schema.TaggedError<NotTakenIn, { readonly brand:
 /** A failure's words, whatever it is. */
 const reasonText = (e: unknown): string => (e instanceof Error ? e.message : Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : String(e));
 
-const triggerOf = jsonOrNone(S.RunTrigger);
-const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
-const spentOf = jsonOrNone(S.Spent);
-const graphOf = jsonOrNone(S.SessionGraph);
-const placeOf = jsonOrNone(
-  Schema.Struct({ project: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
-);
-
-export function runOf(r: qr.RunsOfSessionResult): T.Run {
-  const run: T.Run = {
-    id: r.id,
-    session: sessionId(r.session),
-    triggeredBy: triggerOf(r.triggered_by) ?? { kind: "runtime" },
-    heard: heardOf(r.heard) ?? [],
-    startedAt: r.started_at,
-    summary: r.summary ?? "",
-  };
-  if (r.issue !== null) run.issue = issueId(r.issue);
-  if (r.ended_at !== null) run.endedAt = r.ended_at;
-  if (r.outcome !== null) run.outcome = r.outcome;
-  const spent = spentOf(r.spent);
-  if (spent) run.spent = spent;
-  return run;
-}
-
-/** An ended session as the core state would have had it: its runs counted, its last one's word, what it spent in all. */
-
+import { runOf, endedSession, placeOf, heardOf } from "./history.ts";
+export { runOf } from "./history.ts";
 /** A turn submitted and not opened yet, counted from since: its slot is taken, as one thinking. */
 const reserved = (since: number): T.Session["phase"] => ({ _tag: "working", since, doing: { action: "thinking", label: "" } });
-function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): T.Session {
-  const s: T.Session = {
-    id: sessionId(r.id),
-    name: r.name,
-    agent: r.agent,
-    runtime: r.runtime,
-    brief: r.brief,
-    hiredAt: r.hired_at,
-    runs: runs.length,
-    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
-    refining: false,
-    ...(r.project !== null ? { project: r.project } : {}),
-    ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
-  };
-  const graph = graphOf(r.graph);
-  if (graph) s.graph = graph;
-  let tokens = 0;
-  let cny = 0;
-  let priced = false;
-  for (const run of runs) {
-    const one = spentOf(run.spent);
-    if (!one) continue;
-    tokens += one.tokens;
-    if (one.cny !== undefined) {
-      cny += one.cny;
-      priced = true;
-    }
-  }
-  if (tokens > 0 || priced) s.spent = { tokens, ...(priced ? { cny } : {}) };
-  const last = runs.at(-1);
-  if (last?.outcome) s.lastRun = { outcome: last.outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
-  return s;
-}
-
 export interface SessionOptionsIn {
   /** The time a session may be quiet before it is said to be; tests make it short. */
   readonly stallMs?: number;
 }
 
-/** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are:
- * oar's observeStalls hears only records from when it subscribes, and misses a turn that went quiet before that. */
-export function watchStalls(
-  session: RuntimeSession,
-  stallMs: number,
-  onStall: (silentForMs: number, at: number) => void,
-  timer: (wait: Effect.Effect<void>) => void,
-  now: () => number,
-) {
-  let status = initialStatus;
-  // The timer is one keyed fiber of the service's: arming again replaces it, Effect.void disarms it.
-  const disarm = () => timer(Effect.void);
-  const stop = session.rawEvents(
-    (record) => {
-      status = reduceStatus(status, record, session.id);
-      if (status.kind !== "running") return disarm();
-      timer(
-        Effect.sleep(stallMs).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              const at = now();
-              const stall = stallOf(status, at, stallMs);
-              if (stall !== null) onStall(stall.silentForMs, at);
-            }),
-          ),
-        ),
-      );
-    },
-    { sessionId: session.id, afterSeq: -1 },
-  );
-  return () => {
-    disarm();
-    stop();
-  };
-}
+import { watchStalls } from "./stalls.ts";
+export { watchStalls } from "./stalls.ts";
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {

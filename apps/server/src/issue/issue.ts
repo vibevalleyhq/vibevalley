@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, type Scope, Semaphore, Stream } from "effect";
 import type { SqlError } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
@@ -6,14 +6,14 @@ import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, ownerId } from "@vibevalley/protocol";
 import { commandOf } from "@vibevalley/protocol/api";
 import { closedText, shortTitle, isOneOf, isBusy, cut } from "@vibevalley/protocol/rules";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
 import { newId } from "@/base/ids.ts";
-import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channel } from "@/channel/chat.ts";
 import { inboxLines } from "@/channel/prompts.ts";
@@ -35,15 +35,15 @@ import { graphIssues } from "@/task/issues.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
-import { attentionIn } from "./attention.ts";
 import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
 import { pickIssues } from "./filter.ts";
 import { merging } from "./merge.ts";
-import { nextSteps, statusMove, statusMoves } from "./moves.ts";
+import { nextSteps, statusMove } from "./moves.ts";
 import { needsOwner, talkBrief } from "./prompts.ts";
 import { kept, openQuestions, refinement } from "./refinement.ts";
+import { issueRows, column } from "./rows.ts";
 import { IssueSessions } from "./sessions.ts";
-import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues, isClosed } from "./status.ts";
+import { isForOrchestrator, issueOrder, keepClosedIssues, isClosed } from "./status.ts";
 import { nextTaskId, jsonOrNull, nullText } from "./stored.ts";
 import { filledKinds, sentTitles } from "./templates.ts";
 import { milestonesOf } from "./timeline.ts";
@@ -134,21 +134,7 @@ export interface IssueReviewRequest {
   readonly text?: string;
 }
 
-type Row = q.GetIssueResult;
-
 // The issue's JSON columns, read by their Schemas; one that does not read is none.
-const strings = Schema.mutable(Schema.Array(Schema.String));
-const column = {
-  graph: jsonOrNone(S.IssueGraph),
-  task: jsonOrNone(S.IssueTask),
-  strings: jsonOrNone(strings),
-  checks: jsonOrNone(Schema.mutable(Schema.Array(S.CriterionCheck))),
-  pullRequest: jsonOrNone(S.PullRequest),
-  run: jsonOrNone(S.IssueRun),
-  answer: jsonOrNone(S.IssueAnswer),
-  findings: jsonOrNone(Schema.mutable(Schema.Array(S.Finding))),
-  questions: jsonOrNone(Schema.mutable(Schema.Array(S.Question))),
-};
 const triggerOf = jsonOf(S.RunTrigger);
 
 /** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves,
@@ -210,58 +196,7 @@ const make = (options: IssueOptions = {}) =>
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
-    function issueOf(row: Row, runs: readonly string[] | undefined): T.Issue {
-      const state = core.state();
-      const graph = column.graph(row.graph);
-      const task = column.task(row.task);
-      const blockedBy = column.strings(row.blocked_by);
-      const criteria = column.strings(row.criteria);
-      const checks = column.checks(row.checks);
-      const pullRequest = column.pullRequest(row.pull_request);
-      const lastRun = column.run(row.last_run);
-      const answer = column.answer(row.answer);
-      const out: T.Issue = {
-        id: issueId(row.id),
-        number: row.number,
-        title: row.title,
-        description: row.description,
-        ...(row.project !== null ? { project: row.project } : {}),
-        ...(row.assignee !== null ? { assignee: row.assignee } : {}),
-        priority: row.priority,
-        createdAt: row.created_at,
-        ...(row.queued_at !== null ? { queuedAt: row.queued_at } : {}),
-        sessions: (runs ?? []).map((s) => sessionId(s)),
-        ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
-        ...(row.delivered !== null ? { delivered: row.delivered } : {}),
-        ...(row.canceled !== null ? { canceled: row.canceled } : {}),
-        ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
-        blockedBy: blockedBy ?? [],
-        ...(graph ? { graph } : {}),
-        ...(task ? { task } : {}),
-        ...(row.cron !== null ? { cron: row.cron } : {}),
-        status: "backlog",
-        moves: [],
-        ...(pullRequest ? { pullRequest } : {}),
-        deliver: row.deliver,
-        ...(row.talk !== null ? { talk: row.talk } : {}),
-        ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
-        findings: column.findings(row.findings) ?? [],
-        questions: column.questions(row.questions) ?? [],
-        criteria: criteria ?? [],
-        checks: checks ?? [],
-        ...(lastRun ? { lastRun } : {}),
-        ...(answer ? { answer } : {}),
-        attention: { state: "draft", acts: [] },
-      };
-      if ((out.sessions.length === 0 || out.task) && row.rank !== 0) out.rank = row.rank;
-      out.status = issueStatusOf(out, state);
-      const refiner = issueRefiningOf(out, state);
-      if (refiner) out.refining = refiner;
-      // The moves read the attention: a round that failed is not completed.
-      out.attention = attentionIn(out, state);
-      out.moves = statusMoves(out);
-      return out;
-    }
+    const issueOf = issueRows(core);
 
     const everyIssue = Effect.gen(function* () {
       const rows = yield* db.run(q.listIssues());
