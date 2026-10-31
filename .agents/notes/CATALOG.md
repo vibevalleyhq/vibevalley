@@ -34,7 +34,7 @@
 
 ### process
 
-- 2026-10-30 [白皮书里还没做的：扩展点只填空、共用帮手的清单、契约的 diff、I/O 次数，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
+- 2026-10-30 [白皮书里还没做的：骨架、重复 lint、流切片、常驻集合和体检，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
 - 2026-10-30 [代码治理范围：先修边界与生命周期，再按证据收回复杂度](.agents/notes/proposed/process/2026-10-30-code-quality-ratchets-and-boundaries.md)
 - 2026-10-29 [给仓库做体检：按复杂度的三种症状读数，只有类型逃生口是棘轮](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)
 - 2026-10-25 [PR Review：日常评审看证据，同题比较再评分](.agents/notes/proposed/process/2026-10-25-pr-review-scoring.md)
