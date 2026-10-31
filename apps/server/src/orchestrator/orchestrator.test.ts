@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer, Stream } from "effect";
+import { Clock, Effect, Fiber, Layer, Stream } from "effect";
+import { TestClock } from "effect/testing";
 
 import { messageText } from "@vibevalley/agent/messages";
 import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
@@ -76,13 +77,12 @@ const respond = (c: Request): Answer => {
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
 /** The patrol runs by hand: heartbeatMinutes 0 leaves nothing to the timer. */
-const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig(), clock?: () => number) => {
+const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig()) => {
   const { llm, requests } = scriptedLLM(Array.from({ length: 100 }, () => f));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
     runtimes: [pi],
     repos: ["demo", "notes"],
-    ...(clock ? { clock } : {}),
   });
   return { requests, layer: Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
@@ -483,28 +483,23 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("lets a cron it sets unasked wait for the owner", () => {
+  it.effect("lets a cron it sets unasked wait for the owner", () => {
     const daily = { name: "每日测试", text: "跑一遍测试", when: { kind: "daily", time: "09:00" } };
-    let offset = 0;
-    const f = farm(
-      (c) => {
-        const result = answeredWith(c);
-        if (result !== undefined) return answer("定时任务：" + result);
-        const line = lastLine(c);
-        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
-        return respond(c);
-      },
-      testConfig(),
-      () => Date.now() + offset,
-    );
+    const f = farm((c) => {
+      const result = answeredWith(c);
+      if (result !== undefined) return answer("定时任务：" + result);
+      const line = lastLine(c);
+      if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
+      return respond(c);
+    }, testConfig());
     return Effect.gen(function* () {
       const crons = yield* Cron;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
       // Woken by a cron, not the owner: what it sets to come back daily waits.
-      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
+      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
-      offset = 100;
+      yield* TestClock.adjust(100);
       yield* crons.tick;
       yield* until(() => words().some((w) => w.startsWith("定时任务：定好了，等主人同意才生效")), "the orchestrator told it waits");
       const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
@@ -517,15 +512,14 @@ describe("the orchestrator", () => {
   });
 
   // However its turn ends, the orchestrator's issue waits on the owner: a turn that did not fail is not an answer taken.
-  it.live("leaves its issue for the owner to take as done", () => {
-    let offset = 0;
-    const f = farm(respond, testConfig(), () => Date.now() + offset);
+  it.effect("leaves its issue for the owner to take as done", () => {
+    const f = farm(respond, testConfig());
     return Effect.gen(function* () {
       const crons = yield* Cron;
       const issues = yield* Issue;
-      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
+      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
-      offset = 100;
+      yield* TestClock.adjust(100);
       yield* crons.tick;
       const core = yield* Core;
       const handed = yield* until(() => core.state().issues.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
@@ -540,9 +534,8 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("hears the patrol once", () => {
-    let offset = 0;
-    const f = farm(respond, testConfig(), () => Date.now() + offset);
+  it.effect("hears the patrol once", () => {
+    const f = farm(respond, testConfig());
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const inbox = yield* Inbox;
@@ -554,11 +547,11 @@ describe("the orchestrator", () => {
       yield* inbox.patrol;
       yield* marked(f);
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
-      offset = 3 * 3_600_000;
+      yield* TestClock.adjust(3 * 3_600_000);
       yield* inbox.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
       expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#general 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/u);
-      offset = 3.5 * 3_600_000;
+      yield* TestClock.adjust(0.5 * 3_600_000);
       yield* inbox.patrol;
       yield* marked(f);
       // Each request carries the whole channel: count this work's patrol lines in the latest.

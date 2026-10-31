@@ -145,42 +145,46 @@ describe("crons", () => {
 
   it.effect("a run that cannot be written is not published, and runs on the next tick", () => {
     const now = 1_800_000_000_000;
-    return Effect.gen(function* () {
-      yield* TestClock.setTime(now);
-      const s = yield* Cron;
-      const core = yield* Core;
-      const sql = yield* SqlClient.SqlClient;
-      const made = yield* s.add(req("retry", "work", { kind: "once", at: now + 1 }), owner);
-      const due = yield* collect;
-      yield* sql.unsafe(`create function fail_run() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`).pipe(Effect.orDie);
-      yield* sql.unsafe(`create trigger fail_run before update of last_run on cron for each row execute function fail_run()`).pipe(Effect.orDie);
-      yield* TestClock.adjust(1);
-      yield* s.tick;
-      yield* drained;
-      const after = core.state().crons.find((x) => x.id === made.id)!;
-      expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
-      yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
-      yield* s.tick;
-      yield* drained;
-      expect(due.map((d) => d.cron.id)).toEqual([made.id]);
-    }).pipe(Effect.scoped, Effect.provide(farm(testConfig())));
+    return Effect.andThen(
+      TestClock.setTime(now),
+      Effect.gen(function* () {
+        const s = yield* Cron;
+        const core = yield* Core;
+        const sql = yield* SqlClient.SqlClient;
+        const made = yield* s.add(req("retry", "work", { kind: "once", at: now + 1 }), owner);
+        const due = yield* collect;
+        yield* sql.unsafe(`create function fail_run() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`).pipe(Effect.orDie);
+        yield* sql.unsafe(`create trigger fail_run before update of last_run on cron for each row execute function fail_run()`).pipe(Effect.orDie);
+        yield* TestClock.adjust(1);
+        yield* s.tick;
+        yield* drained;
+        const after = core.state().crons.find((x) => x.id === made.id)!;
+        expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
+        yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
+        yield* s.tick;
+        yield* drained;
+        expect(due.map((d) => d.cron.id)).toEqual([made.id]);
+      }).pipe(Effect.scoped, Effect.provide(farm(testConfig()))),
+    );
   });
 
   it.effect("weekly days are integers from zero to six", () => {
     const now = 1_800_000_000_000;
-    return Effect.gen(function* () {
-      yield* TestClock.setTime(now);
-      const s = yield* Cron;
-      const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
-      expect((yield* Effect.flip(s.add(bad, owner)))._tag).toBe("Refused");
-      expect(s.list()).toEqual([]);
-      expect(Schema.decodeUnknownExit(CronWhenWeekly)(bad.when)._tag).toBe("Failure");
-      expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), owner)).when).toEqual({
-        kind: "weekly",
-        days: [0, 6],
-        time: "09:00",
-      });
-    }).pipe(Effect.scoped, Effect.provide(farm(testConfig())));
+    return Effect.andThen(
+      TestClock.setTime(now),
+      Effect.gen(function* () {
+        const s = yield* Cron;
+        const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
+        expect((yield* Effect.flip(s.add(bad, owner)))._tag).toBe("Refused");
+        expect(s.list()).toEqual([]);
+        expect(Schema.decodeUnknownExit(CronWhenWeekly)(bad.when)._tag).toBe("Failure");
+        expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), owner)).when).toEqual({
+          kind: "weekly",
+          days: [0, 6],
+          time: "09:00",
+        });
+      }).pipe(Effect.scoped, Effect.provide(farm(testConfig()))),
+    );
   });
 
   it.effect("a cron cron is kept, and a bad one is refused", () => {
