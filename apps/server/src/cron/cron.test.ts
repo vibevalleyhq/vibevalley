@@ -143,7 +143,7 @@ describe("crons", () => {
     });
   });
 
-  it.effect("a run that cannot be written is not published, and runs on the next tick", () => {
+  it.effect("regression: a failed run write retries while a failed notice neither loses nor repeats the run", () => {
     const now = 1_800_000_000_000;
     return Effect.andThen(
       TestClock.setTime(now),
@@ -161,6 +161,10 @@ describe("crons", () => {
         const after = core.state().crons.find((x) => x.id === made.id)!;
         expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
         yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
+        yield* sql.unsafe(`create trigger fail_notice before insert on channel_message for each row execute function fail_run()`).pipe(Effect.orDie);
+        yield* s.tick;
+        yield* drained;
+        expect(due.map((d) => d.cron.id)).toEqual([made.id]);
         yield* s.tick;
         yield* drained;
         expect(due.map((d) => d.cron.id)).toEqual([made.id]);
