@@ -19,7 +19,7 @@ import type {
   Progress,
   Session,
 } from "@vibevalley/protocol";
-import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
+import { needOf, omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
 import { openFindings } from "@/issue/status.ts";
@@ -58,10 +58,10 @@ function growth(h: Session): Crop {
   const play = playOf(h);
   const since = play.runStartedAt ?? h.hiredAt;
   let crop: Crop = "sprout";
-  for (const step of play.history) {
-    if (step.at < since) continue;
-    if (step.action === "edit_file" && crop === "sprout") crop = "leafy";
-    else if (step.action === "run_command" && crop === "leafy") crop = "flowering";
+  for (const played of play.history) {
+    if (played.at < since) continue;
+    if (played.action === "edit_file" && crop === "sprout") crop = "leafy";
+    else if (played.action === "run_command" && crop === "leafy") crop = "flowering";
   }
   return crop;
 }
@@ -174,10 +174,17 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
   return [];
 }
 
+/** A plot is its issue, so a reopened issue's new session draws on the same one; if two are here, the later hired. */
 export function viewOf(state: WorkspaceState): FarmView {
+  const latest = new Map<string, Session>();
+  for (const h of state.sessions) {
+    const key = plotKeyOf(h);
+    const was = latest.get(key);
+    if (!was || h.hiredAt >= was.hiredAt) latest.set(key, h);
+  }
   const plots: Record<string, PlotView> = {};
-  for (const h of state.sessions)
-    plots[h.id] = plotOf(
+  for (const [key, h] of latest)
+    plots[key] = plotOf(
       h,
       state.issues.find((item) => item.id === h.issue),
     );

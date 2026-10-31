@@ -23,7 +23,7 @@ import {
   type Sky,
 } from "@vibevalley/engine/pixi";
 import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
 import { orchestratorMood } from "@/base/frame";
 import { prefsNow } from "@/base/prefs";
@@ -518,7 +518,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     // What is under a still pointer is found again as things move under it.
     if (pointerAt && !downOn) setHover(hitAt(pointerAt));
     const hovered = store.hoverBed;
-    const cropOf = (s: Session): Crop => view.plots[s.id]?.crop ?? "sprout";
+    const cropOf = (s: Session): Crop => view.plots[plotKeyOf(s)]?.crop ?? "sprout";
 
     for (const p of plots) {
       const { bed } = p;

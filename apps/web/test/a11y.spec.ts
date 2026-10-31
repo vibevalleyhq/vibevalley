@@ -12,7 +12,7 @@ for (const theme of ["light", "dark"] as const)
   test(`no workbench page has an accessibility violation in the ${theme} theme`, async ({ page, api }) => {
     await page.addInitScript((t) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: t })), theme);
     const issue = await api.issue.create({ title: "an issue to look at" });
-    const agent = (await api.agent.list()).find((a) => a.role === "worker")!;
+    const agent = (await api.agent.list()).find((a) => a.role === "helper")!;
     const paths = [
       "/chat",
       "/issues",

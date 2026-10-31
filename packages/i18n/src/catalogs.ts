@@ -1264,7 +1264,7 @@ export const catalogs = {
       ownMcpTip: "农机自己报告的，和上面加的叠在一起。",
       unreported: "这台农机 不报告这一项。",
       none: "没有。",
-      role: { orchestrator: "管家", worker: "帮工" },
+      role: { orchestrator: "管家", helper: "帮工" },
       templates: {
         title: "模板",
         intro:
@@ -1310,7 +1310,7 @@ export const catalogs = {
         intro:
           "每份档案是一个 agent。管家常驻、带队、自己不干活，可以有好几个；帮工是配置好的农机：用哪台农机和模型、带什么人设和技能，在农场里是哪种小动物。管家派活时派的就是帮工。",
         orchestrators: "管家",
-        workers: "帮工",
+        helpers: "帮工",
         make: "捏一个新帮工",
         makeOrchestrator: "添一个管家",
         orchestratorLine: "不当帮工：派活、盯进度、转告结果。",
@@ -4887,7 +4887,7 @@ export const catalogs = {
       ownMcpTip: "Reported by the runtime, together with those added above.",
       unreported: "This runtime does not report this.",
       none: "None.",
-      role: { orchestrator: "Manager", worker: "Helper" },
+      role: { orchestrator: "Manager", helper: "Helper" },
       templates: {
         title: "Templates",
         intro:
@@ -4933,7 +4933,7 @@ export const catalogs = {
         intro:
           "Each profile is an agent. Managers stay, lead and do no work themselves, and there may be several; helpers are runtimes set up: which runtime and model, what persona and skills, and which little animal they are on the farm. When a manager sends work, it sends a helper.",
         orchestrators: "Managers",
-        workers: "Helpers",
+        helpers: "Helpers",
         make: "Make a new helper",
         makeOrchestrator: "Add a manager",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
@@ -8495,6 +8495,7 @@ export interface Messages {
   "web.agent.libraryTip": undefined;
   "web.agent.list.disable": undefined;
   "web.agent.list.enable": undefined;
+  "web.agent.list.helpers": undefined;
   "web.agent.list.here": { readonly n: string | number };
   "web.agent.list.hired": undefined;
   "web.agent.list.intro": undefined;
@@ -8508,7 +8509,6 @@ export interface Messages {
   "web.agent.list.title": undefined;
   "web.agent.list.toggle": { readonly act: string | number; readonly name: string | number };
   "web.agent.list.voice": undefined;
-  "web.agent.list.workers": undefined;
   "web.agent.loading": undefined;
   "web.agent.looksAs": undefined;
   "web.agent.looksHint": undefined;
@@ -8568,8 +8568,8 @@ export interface Messages {
   "web.agent.remove": undefined;
   "web.agent.removeNamed": { readonly name: string | number };
   "web.agent.removeWhich": { readonly name: string | number };
+  "web.agent.role.helper": undefined;
   "web.agent.role.orchestrator": undefined;
-  "web.agent.role.worker": undefined;
   "web.agent.roleHint": undefined;
   "web.agent.runtimeDefault": undefined;
   "web.agent.runtimeDefaultModel": { readonly model: string | number };

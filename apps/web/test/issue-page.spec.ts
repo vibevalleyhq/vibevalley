@@ -72,7 +72,7 @@ async function openIssue(
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts).

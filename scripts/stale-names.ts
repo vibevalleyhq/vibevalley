@@ -93,8 +93,14 @@ const RULES: readonly Rule[] = [
   {
     name: "an old protocol name",
     // The browser's Worker (new Worker, a value typed : Worker) is not the old name.
-    pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|CanMerge|Foreman|(?<!new |: )Worker)\b/u,
-    says: "CoreState, StateFrame, SideEvent, Agent, Activity, canHarvest, Manager, Session; a Web Worker stays (new Worker)",
+    pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|ActionStep\w*|CanMerge|Foreman|(?<!new |: )Worker)\b/u,
+    says: "CoreState, StateFrame, SideEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
+  },
+  {
+    name: "a helper profile under the worker role",
+    // Playwright's per-worker fixtures ({ scope: "worker" }) and the browser's Worker are not the role.
+    pattern: /(?<!scope: )["'`]worker["'`]|\bagent\.role\.worker\b|\bagent\.list\.workers\b/u,
+    says: 'a profile\'s role is "orchestrator" or "helper" (AgentRoleValues); its words are web.agent.role.helper, web.agent.list.helpers',
   },
   {
     name: "an old home file or its mover",
@@ -293,8 +299,8 @@ const RULES: readonly Rule[] = [
   {
     name: "an agent's own todo under the task name",
     pattern:
-      /\b(AgentTask|AgentTaskStore|AgentTaskRunner|AgentTaskError|makeTaskRunner|taskTools|tasks_changed)\b|agentTask(Store|Tools)?(\.ts)?["']|agent\/taskStore\b|"vibevalley\/tasks"/u,
-    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in runtime/todoStore.ts; a task is only a plan's (Task)",
+      /\b(AgentTask|AgentTaskStore|AgentTaskRunner|AgentTaskError|makeTaskRunner|taskTools|tasks_changed)\b|agentTask(Store|Tools)?(\.ts)?["']|agent\/taskStore\b|"vibevalley\/tasks"|\bagent_task\w*|\b\w*AgentTasks?\b/u,
+    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in runtime/todoStore.ts, table runtime_todo (queries OpenTodos, AddTodo, FinishTodos); a task is only a plan's (Task)",
   },
   {
     name: "the text given to a helper as a task",

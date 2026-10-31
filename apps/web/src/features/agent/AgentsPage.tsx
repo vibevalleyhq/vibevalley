@@ -1,5 +1,5 @@
-// 档案: every profile as a card, the orchestrators first and then the workers; an orchestrator's card opens its page, a
-// worker's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
+// 档案: every profile as a card, the orchestrators first and then the helpers; an orchestrator's card opens its page, a
+// helper's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
 // new worker, /agents/new?role=orchestrator a new orchestrator.
 
 import type { JSX } from "@solidjs/web";
@@ -83,7 +83,7 @@ function AgentsPage() {
             {t("web.agent.list.makeOrchestrator")}
           </A>
         </div>
-        <h2 class="text-sm font-semibold text-muted">{t("web.agent.list.workers")}</h2>
+        <h2 class="text-sm font-semibold text-muted">{t("web.agent.list.helpers")}</h2>
         {/* The default orchestrator is always there: once it shows, the profiles are read. */}
         <Show when={orchestrators().length > 0 && agents().length === 0}>
           <p class="text-sm text-muted">

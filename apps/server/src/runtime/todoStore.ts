@@ -1,4 +1,4 @@
-// The agents' own todos (packages/agent todo.ts) in the farm's database, table agent_task, one open graph per keeper
+// The agents' own todos (packages/agent todo.ts) in the farm's database, table runtime_todo, one open graph per keeper
 // (a session of the vibevalley runtime).
 
 import { Clock, Effect, Schema } from "effect";
@@ -11,10 +11,10 @@ import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 
-import * as q from "../../db/generated/agent_task.sql.ts";
+import * as q from "../../db/generated/runtime_todo.sql.ts";
 
 const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
-const fromRow = (r: q.OpenAgentTasksResult): Todo => ({
+const fromRow = (r: q.OpenTodosResult): Todo => ({
   id: r.id,
   title: r.title,
   brief: r.brief,
@@ -29,20 +29,20 @@ const fromRow = (r: q.OpenAgentTasksResult): Todo => ({
 export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, Db> = Effect.gen(function* () {
   const db = yield* Db;
   return (keeper) => ({
-    load: Effect.map(db.run(q.openAgentTasks({ keeper })), (rows) => rows.map(fromRow)),
+    load: Effect.map(db.run(q.openTodos({ keeper })), (rows) => rows.map(fromRow)),
     change: <G extends Todo[] | undefined>(f: (g: Todo[]) => G) =>
       db.inTx(
         Effect.gen(function* () {
-          const rows = yield* db.run(q.openAgentTasks({ keeper }));
+          const rows = yield* db.run(q.openTodos({ keeper }));
           const g = yield* Effect.try({ try: () => f(rows.map(fromRow)), catch: toolFailed });
           if (g === undefined) return g;
           // The graph keeps its id while it is open; a new one starts when the keeper had none.
           const graph = rows[0]?.graph ?? newId();
-          yield* db.run(q.clearOpenAgentTasks({ keeper }));
+          yield* db.run(q.clearOpenTodos({ keeper }));
           const at = yield* Clock.currentTimeMillis;
           for (const [position, t] of g.entries())
             yield* db.run(
-              q.addAgentTask({
+              q.addTodo({
                 graph,
                 keeper,
                 id: t.id,
@@ -57,7 +57,7 @@ export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, D
                 updated_at: at,
               }),
             );
-          if (finished(g)) yield* db.run(q.finishAgentTasks({ finished_at: at, keeper }));
+          if (finished(g)) yield* db.run(q.finishTodos({ finished_at: at, keeper }));
           return g;
         }),
       ),

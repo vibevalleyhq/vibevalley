@@ -8,7 +8,7 @@ export type IssueId = string & Brand.Brand<"IssueId">;
 /** A session's id: w1, w2…, for the whole life of the farm. */
 export type SessionId = string & Brand.Brand<"SessionId">;
 
-/** The built-in orchestrator's profile id: it cannot be deleted or made a worker, so a farm always has an orchestrator, and
+/** The built-in orchestrator's profile id: it cannot be deleted or made a helper, so a farm always has an orchestrator, and
  * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
 export const defaultOrchestrator = "orchestrator";
 
@@ -476,17 +476,17 @@ export interface SessionGraph {
   task?: string;
 }
 
-export interface ActionStep extends Doing {
+export interface PlayAction extends Doing {
   at: number;
 }
 
-export interface ActionStepView extends ActionStep {
+export interface PlayActionView extends PlayAction {
   actionText: string;
 }
 
 export interface SessionPlay {
   station: number;
-  history: ActionStep[];
+  history: PlayAction[];
   toolsThisRun: number;
   counts: Record<string, number>;
   files: string[];
@@ -530,7 +530,7 @@ export interface PhaseWorkingView extends Omit<PhaseWorking, "doing"> {
 }
 
 export interface SessionPlayView extends Omit<SessionPlay, "history"> {
-  history: ActionStepView[];
+  history: PlayActionView[];
 }
 
 export interface CommitCount {
@@ -851,7 +851,7 @@ export interface PlotView {
 
 export interface FarmView {
   level: FarmLevel;
-  /** Each session's plot, by the session's id. */
+  /** Each issue's plot, by the issue's id (`plotKeyOf`): a reopened issue's new session draws on the same one. */
   plots: Record<string, PlotView>;
   achievements: AchievementStanding[];
 }
@@ -1181,8 +1181,8 @@ export interface MemorySourceInfo {
   transcripts: boolean;
 }
 
-/** What a profile is: an orchestrator (管家) stays, leads and does no work itself; a worker (帮工) is sent on an issue. */
-export const AgentRoleValues = ["orchestrator", "worker"] as const;
+/** What a profile is: an orchestrator (管家) stays, leads and does no work itself; a helper (帮工) is sent on an issue. */
+export const AgentRoleValues = ["orchestrator", "helper"] as const;
 export type AgentRole = (typeof AgentRoleValues)[number];
 
 export interface Agent {
@@ -1245,7 +1245,7 @@ export interface AgentTemplate {
 export interface Look {
   species?: Species;
   outfit?: Outfit;
-  /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A worker has none. */
+  /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has none. */
   orchestrator?: OrchestratorLook;
   build: Build;
   head: Head;

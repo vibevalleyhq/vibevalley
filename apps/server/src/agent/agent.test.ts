@@ -18,7 +18,7 @@ const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Ag
 const draft = (change: Partial<Agent> = {}): Agent => ({
   id: "",
   name: "同名",
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   runtime: "pi",
@@ -191,8 +191,8 @@ describe("profiles", () => {
         expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
         expect([s.isOrchestrator(lead.id), s.isOrchestrator("backend")]).toEqual([true, false]);
         expect(s.agents().some((a) => a.role === "orchestrator")).toBe(false);
-        expect((yield* Effect.flip(s.save({ ...s.agent(defaultOrchestrator)!, role: "worker" })))._tag).toBe("Refused");
-        yield* s.save({ ...lead, role: "worker" });
+        expect((yield* Effect.flip(s.save({ ...s.agent(defaultOrchestrator)!, role: "helper" })))._tag).toBe("Refused");
+        yield* s.save({ ...lead, role: "helper" });
         expect(s.agents().some((a) => a.id === lead.id)).toBe(true);
         yield* s.remove(lead.id);
       }),
@@ -244,7 +244,7 @@ describe("profiles", () => {
     writeFileSync(join(folder, "notes.txt"), "not a template's");
     const broken = join(config.home, "broken-template");
     mkdirSync(broken);
-    writeFileSync(join(broken, "agent.json"), JSON.stringify({ id: "Bad Id", version: 1, role: "worker", name: "坏的", runtime: "pi" }));
+    writeFileSync(join(broken, "agent.json"), JSON.stringify({ id: "Bad Id", version: 1, role: "helper", name: "坏的", runtime: "pi" }));
     return run(
       config,
       Effect.gen(function* () {

@@ -4,7 +4,7 @@ import type { Agent } from "@vibevalley/protocol";
 
 export const sampleAgent = (a: Partial<Agent> & Pick<Agent, "id">): Agent => ({
   name: a.id,
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   runtime: "pi",

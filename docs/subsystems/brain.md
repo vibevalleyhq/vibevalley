@@ -103,7 +103,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 - **技能**：扫 `skills` 给的目录（默认 `~/.agents/skills`、`~/.claude/skills`、工作目录的 `.agents/skills`），每个子目录一份 `SKILL.md`，读它 frontmatter 的 `name`、`description`，同名的取先扫到的。系统提示只列名字和说明（每条最多 160 字），正文等模型调 `load_skill` 时才读。档案在技能书里勾的技能不走这里，由帮工的说明带进去（[帮工](docs/subsystems/session.md)）。
 - **记性**：`remember` 往 `MEMORY.md` 加一行（带日期），`rewrite_memory` 整份重写，`search_archive` 在旧账里搜。
 - **帮手**（`spawn_agent`）：起一个同样配置的大脑，不带记性、对话文件和提醒，不能再派帮手，最多 30 步，把它最后说的话交回。
-- **自己的任务**（`Todo`，和计划里的一件不是一回事）：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `subagent`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。一张图最多 30 件；`todo_add` 整批收或整批不收，回给模型的话说清是哪一条；只有没开始和没做成的能改正文和先后。交给帮手的在它等的都做完以后自动派，最多三个同时做，结果交回；失败重来 1 次；叫回或进程没了，在做的退回等着。一轮停下时还有能做的，提醒它，图不变时最多提醒 3 次。存储：农机 `vibevalley` 的会话存在表 `agent_task`，按会话（`keeper`）分开，做完的盖上 `finished_at`；命令行的在内存里。它不进工单、不进核心状态。
+- **自己的任务**（`Todo`，和计划里的一件不是一回事）：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `subagent`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。一张图最多 30 件；`todo_add` 整批收或整批不收，回给模型的话说清是哪一条；只有没开始和没做成的能改正文和先后。交给帮手的在它等的都做完以后自动派，最多三个同时做，结果交回；失败重来 1 次；叫回或进程没了，在做的退回等着。一轮停下时还有能做的，提醒它，图不变时最多提醒 3 次。存储：农机 `vibevalley` 的会话存在表 `runtime_todo`，按会话（`keeper`）分开，做完的盖上 `finished_at`；命令行的在内存里。它不进工单、不进核心状态。
 - **提醒**：`reminders.json`，一次（`at`）、每隔几分钟（`every_minutes`）或 cron（本机时区）。每 20 秒看一次，到点的以 `custom` 消息经 `later` 交进来；不在的时候错过的，回来只跑一次。
 - **MCP**：照 Claude Code、Cursor 的 `mcpServers` 写法（`command`/`args`/`env` 或 `url`/`headers`），只用 `initialize`、`tools/list`、`tools/call`。连不上的那台不带，原因由 `mcpStatus` 说，别的照样带。工具名是 `<服务>__<工具>`（非字母数字换成 `_`，最多 64 字），说明前面写着来自哪台服务。
 
@@ -124,7 +124,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 - **宿主**：管家经 `AgentHost`（[帮工](docs/subsystems/session.md)），农机 `vibevalley` 经 oar，命令行经 `standaloneOwner`。宿主给说明、工具、MCP、家目录和工作目录，订阅事件（`subscribe`），决定输入怎么交、什么时候 `resume`。
 - **`@vibevalley/ai`**：`Llm` 服务。钥匙每次请求前现取（`ModelClient.apiKey`）。
 - **农场的工具**：管家的来自 `tool`；帮工的经 MCP 从 `/mcp` 来，和别的农机上的帮工一样。
-- **库**：只有自己的任务（`agent_task`）。对话、记性、提醒是家目录里的文件。
+- **库**：只有自己的任务（`runtime_todo`）。对话、记性、提醒是家目录里的文件。
 
 ## 为什么这样
 

@@ -6,10 +6,10 @@ import { api } from "./api";
 import { ready, useAgents, useQuery } from "./query";
 import { createSettled } from "./util";
 
-/** The profiles work is sent to, the workers; enabled, only those not switched off. */
+/** The profiles work is sent to, the helpers; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
   const all = useAgents();
-  return (): Agent[] => ready(all, []).filter((a) => a.role === "worker" && (!enabled || a.enabled));
+  return (): Agent[] => ready(all, []).filter((a) => a.role === "helper" && (!enabled || a.enabled));
 }
 
 /** The orchestrators' profiles, the default one first. */

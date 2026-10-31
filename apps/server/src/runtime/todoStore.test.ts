@@ -7,7 +7,7 @@ import { memoryStore } from "@vibevalley/agent/todoStore";
 import { Db } from "@/base/db.ts";
 import { testDatabase } from "@/testing/layers.ts";
 
-import * as q from "../../db/generated/agent_task.sql.ts";
+import * as q from "../../db/generated/runtime_todo.sql.ts";
 import { dbTodoStores } from "./todoStore.ts";
 
 describe("an agent's own todos, kept", () => {
@@ -49,7 +49,7 @@ describe("an agent's own todos, kept", () => {
         ["good", 1, `["bad"]`],
       ] as const)
         yield* Effect.orDie(
-          q.addAgentTask({
+          q.addTodo({
             graph: "g1",
             keeper: "s1",
             id,

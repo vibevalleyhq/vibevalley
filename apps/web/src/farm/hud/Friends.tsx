@@ -137,7 +137,7 @@ export function Friends(props: { height: number }) {
   const frames = useFrames();
   const open = useFarm((s) => s.friendsOpen);
   const sorted = () => {
-    const work = ready(agents, []).filter((a) => a.role === "worker");
+    const work = ready(agents, []).filter((a) => a.role === "helper");
     return [...work.filter((a) => a.enabled), ...work.filter((a) => !a.enabled)];
   };
   const statuses = () => {

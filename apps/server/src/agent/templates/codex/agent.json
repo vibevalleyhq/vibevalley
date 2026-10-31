@@ -1,7 +1,7 @@
 {
   "id": "codex",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "Codex 老匠",
   "duty": "照工单把功能做出来，改到测试通过",
   "tags": ["实现", "功能", "修复", "改到通过", "codex"],

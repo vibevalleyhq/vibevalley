@@ -51,7 +51,7 @@
 - **完成工单、合进主分支、计划开工要这一轮最新那条输入有主人的话**：管家的工具带着 `Actor`（管家，`forOwner` 是这一轮有没有主人的话），由工单和计划自己判断（`actsForOwner`）：改工单和挪状态（`issue_update`、`issue_status_update`，完成也是挪状态）否则回「改工单、挪状态要主人说一声。……」；计划合进主分支回「合进主分支要主人说一声。……」，计划开工回「计划开工要主人点头。……」，要它在频道里问主人。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时任务要不要等主人同意，也看它（[定时任务](docs/subsystems/cron.md)的「等主人同意」）。
 - **挑档案**（`Runtimes.choose`，`runtime/fit.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status_update`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentProblems` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。挑中以后的检查见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **管家的状态**在 `WorkspaceState.orchestrators`，按档案 id：`state` 是 `listening`、`thinking`（一轮开始）、`speaking`（字开始长），一轮停下回到 `listening`；`channel` 是它在想、在写的频道，`since` 是这一轮从开始想起的时刻（写的时候留着，听着时没有）。歇着（`idle`）又不在哪个频道里想的不在表里，表空了整个字段不写。
-- **自己的恢复数据按形状读**：`readMcpConfig` 只在文件不存在时返回空配置，文件读不了、JSON 解析不了或形状不对都会报错；`agent_task.after` 必须是字符串数组，坏值只回退这个字段；`reminders.json` 的每项按 `Reminder` 解码，坏文件不被覆盖，也不触发任务。
+- **自己的恢复数据按形状读**：`readMcpConfig` 只在文件不存在时返回空配置，文件读不了、JSON 解析不了或形状不对都会报错；`runtime_todo.after` 必须是字符串数组，坏值只回退这个字段；`reminders.json` 的每项按 `Reminder` 解码，坏文件不被覆盖，也不触发任务。
 
 ## 怎么走
 

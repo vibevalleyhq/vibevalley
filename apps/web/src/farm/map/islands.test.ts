@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import type { Issue, Phase, ProjectSummary, Session } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { growthOf, type Island, islandScale, islandsOf, islandText, homeless, mapPose, mapTally, plotsIn } from "./islands";
 
@@ -36,12 +37,12 @@ describe("islands", () => {
       projects,
       sessions: [
         hired("w2", "clock-in", { _tag: "done" }, 2),
-        hired("w1", "clock-in", working, 1),
+        hired("w1", "clock-in", working, 1, { issue: issueId("t1") }),
         hired("w4", "clock-in", { _tag: "resting" }, 4),
         hired("w5", "docs", working),
         hired("w3", undefined, { _tag: "failed" }),
       ],
-      plots: { w1: { crop: "leafy" } },
+      plots: { t1: { crop: "leafy" } },
       issues: [todo("b2", "docs", 8), todo("b1", "docs", 3), todo("b3", "clock-in")],
     });
     expect(islands.map((i) => i.project)).toEqual(["clock-in", "docs", "task-smoke"]);

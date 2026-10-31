@@ -3,7 +3,7 @@
 
 import { t } from "@vibevalley/i18n";
 import { type Crop, type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
-import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
+import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
 
 import { compareText, or } from "@/base/order";
 import { type Recency, recencyOf } from "@/features/project";
@@ -53,7 +53,7 @@ export function islandsOf({
     const room = Math.max(0, Math.min(maxSessions > 0 ? left.project : 0, maxRunning - mine.length));
     const open = Math.min(room, left.farm);
     const spots: Spot[] = [
-      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[h.id] ?? { crop: "seeded" } })),
+      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[plotKeyOf(h)] ?? { crop: "seeded" } })),
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),
       ...Array.from({ length: room - open }, (): Spot => ({ kind: "shut" })),
     ];

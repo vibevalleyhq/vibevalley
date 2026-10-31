@@ -34,7 +34,7 @@ export interface Recalled {
 export class Memories extends Context.Service<
   Memories,
   {
-    /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a worker's are rows and its sources'. */
+    /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a helper's are rows and its sources'. */
     readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
     readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
     readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
@@ -101,7 +101,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
     // What an older cut left is cut again in the background.
     yield* Effect.forkScoped(local.recutTerms);
-    // An orchestrator carries its whole MEMORY.md into every turn; a worker is reminded of rows by its runs' cues.
+    // An orchestrator carries its whole MEMORY.md into every turn; a helper is reminded of rows by its runs' cues.
     const inFile = (agent: string) => agents.isOrchestrator(agent);
     const homeOf = (agent: string) => agentHome(config, agent);
 

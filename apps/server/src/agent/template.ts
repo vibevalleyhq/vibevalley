@@ -80,7 +80,7 @@ export function readTemplate(dir: string, source: AgentTemplateSource): AgentTem
   // An orchestrator always runs on VibeValley's own agent: its template names no other runtime.
   if (item.role === "orchestrator" && item.runtime !== undefined && item.runtime !== orchestratorRuntime)
     throw new TemplateProblem({ message: t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime }) });
-  if (item.role === "worker" && !item.runtime) throw new TemplateProblem({ message: t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }) });
+  if (item.role === "helper" && !item.runtime) throw new TemplateProblem({ message: t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }) });
   const en = currentLocale() === "en";
   const words = en ? readJson(WordsFile, dir, "agent.en.json") : undefined;
   const persona = (en ? readText(dir, "persona.en.md") : undefined) ?? readText(dir, "persona.md") ?? "";
@@ -96,7 +96,7 @@ export function readTemplate(dir: string, source: AgentTemplateSource): AgentTem
     model: item.model ?? "",
     effort: item.effort ?? "",
     personaMode: item.personaMode ?? "append",
-    worktree: item.worktree ?? item.role === "worker",
+    worktree: item.worktree ?? item.role === "helper",
     look: {
       ...look,
       build: look.build ?? "biped",

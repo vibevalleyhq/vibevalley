@@ -115,7 +115,7 @@
   "none": "没有。",
   "role": {
     "orchestrator": "管家",
-    "worker": "帮工"
+    "helper": "帮工"
   },
   "templates": {
     "title": "模板",
@@ -159,7 +159,7 @@
     "title": "档案",
     "intro": "每份档案是一个 agent。管家常驻、带队、自己不干活，可以有好几个；帮工是配置好的农机：用哪台农机和模型、带什么人设和技能，在农场里是哪种小动物。管家派活时派的就是帮工。",
     "orchestrators": "管家",
-    "workers": "帮工",
+    "helpers": "帮工",
     "make": "捏一个新帮工",
     "makeOrchestrator": "添一个管家",
     "orchestratorLine": "不当帮工：派活、盯进度、转告结果。",

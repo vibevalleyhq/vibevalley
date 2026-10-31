@@ -565,7 +565,7 @@ const make = Effect.gen(function* () {
     if (!row) return defaultOrchestrator;
     if (row.type === "thread") return orchestratorOfRow(row.parent_id !== null ? model.channel(row.parent_id) : undefined);
     const own = row.type === "direct" ? row.peer_id : row.orchestrator;
-    // One no longer an orchestrator (its profile gone or made a worker) looks after nothing: the default one does.
+    // One no longer an orchestrator (its profile gone or made a helper) looks after nothing: the default one does.
     return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
   };
 

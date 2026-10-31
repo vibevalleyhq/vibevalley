@@ -599,10 +599,7 @@ describe("an issue", () => {
         "its question kept",
       );
       expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？", options: [] }]);
-      const crop = () => {
-        const s = core.state().sessions.findLast((h) => h.issue === issue.id);
-        return s && viewOf(core.state()).plots[s.id]?.crop;
-      };
+      const crop = () => viewOf(core.state()).plots[issue.id]?.crop;
       yield* until(() => crop() === "dry", "the plot waiting on an answer");
 
       yield* issues.comment(issue.id, "用 8797");

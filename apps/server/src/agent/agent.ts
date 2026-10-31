@@ -1,4 +1,4 @@
-// The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
+// The profiles (orchestrators and helpers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
@@ -86,7 +86,7 @@ export function withCast(a: Agent): Agent {
 export class Agents extends Context.Service<
   Agents,
   {
-    /** The profiles work is sent to: the workers. */
+    /** The profiles work is sent to: the helpers. */
     readonly agents: () => Agent[];
     /** All the profiles, the orchestrators too. */
     readonly all: () => Agent[];
@@ -190,7 +190,7 @@ const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
-  const sendable = () => all().filter((a) => a.role === "worker");
+  const sendable = () => all().filter((a) => a.role === "helper");
 
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
    * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */

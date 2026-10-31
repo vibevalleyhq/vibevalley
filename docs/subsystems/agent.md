@@ -1,6 +1,6 @@
 # 档案、农机和技能书
 
-档案（profile，代码里是 `Agent`）是一份 agent 的配置：用哪台农机、哪个模型、思考强度、人设、技能、MCP、禁用的工具、环境变量、默认项目、适合什么活、长什么样。档案有角色（`role`）：管家（`orchestrator`）常驻、带队、自己不干活，可以有好几个（[管家](docs/subsystems/orchestrator.md)）；帮工（`worker`）是派活派的那种，一个帮工的档案可以同时派出好几个帮工。档案可以自己捏，也可以从模板（`AgentTemplate`）装：模板是一份 agent 的配方，一个文件夹里一份 `agent.json` 加一份人设 `persona.md`，内置的随包发，主人也能把本机的文件夹加进来。农机（runtime）是机器上的一种编码 agent 程序，农场经 oar 探测它装没装、有哪些模型、额度和清单，派活前照它能接受什么查档案。技能书（`Skill`）分两份：各农机自己装的，只读地列出来；VibeValley 自己的技能库，档案勾上的跟人设一起交给帮工。农场里档案是小动物的长相和名字，农机是「农具」，技能书在「设置」里。
+档案（profile，代码里是 `Agent`）是一份 agent 的配置：用哪台农机、哪个模型、思考强度、人设、技能、MCP、禁用的工具、环境变量、默认项目、适合什么活、长什么样。档案有角色（`role`）：管家（`orchestrator`）常驻、带队、自己不干活，可以有好几个（[管家](docs/subsystems/orchestrator.md)）；帮工（`helper`）是派活派的那种，一个帮工的档案可以同时派出好几个帮工。档案可以自己捏，也可以从模板（`AgentTemplate`）装：模板是一份 agent 的配方，一个文件夹里一份 `agent.json` 加一份人设 `persona.md`，内置的随包发，主人也能把本机的文件夹加进来。农机（runtime）是机器上的一种编码 agent 程序，农场经 oar 探测它装没装、有哪些模型、额度和清单，派活前照它能接受什么查档案。技能书（`Skill`）分两份：各农机自己装的，只读地列出来；VibeValley 自己的技能库，档案勾上的跟人设一起交给帮工。农场里档案是小动物的长相和名字，农机是「农具」，技能书在「设置」里。
 
 ## 管什么，不管什么
 
@@ -27,7 +27,7 @@
 
 ## 模型和不变量
 
-- **角色（`role`）是封闭的两种**（`AgentRoleValues`）：`orchestrator`、`worker`，新建默认是帮工。派活用的档案（`agents()`、`named`、`chooseAgent`）只有帮工；全部档案（`all()`）和按 id 取的含管家。管家只在 `vibevalley` 上跑：保存、新建一份管家档案时农机不是它就拒绝（`roleProblem`）；默认管家（`defaultOrchestrator`）改成帮工拒绝。
+- **角色（`role`）是封闭的两种**（`AgentRoleValues`）：`orchestrator`、`helper`，新建默认是帮工。派活用的档案（`agents()`、`named`、`chooseAgent`）只有帮工；全部档案（`all()`）和按 id 取的含管家。管家只在 `vibevalley` 上跑：保存、新建一份管家档案时农机不是它就拒绝（`roleProblem`）；默认管家（`defaultOrchestrator`）改成帮工拒绝。
 - **职责（`duty`）和适合的活（`tags`）是两个字段，用法不同。**
   - `duty` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Duty>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Duty>；适合的活：<Tags>」（`session/report.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
   - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时任务，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。

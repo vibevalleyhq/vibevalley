@@ -76,11 +76,12 @@ describe("the atlas", () => {
 });
 
 describe("the plots", () => {
-  const view = { level: { level: 6, xp: 0, need: 60 }, plots: { s1: { crop: "leafy" as const } }, achievements: [] };
+  const view = { level: { level: 6, xp: 0, need: 60 }, plots: { i1: { crop: "leafy" as const } }, achievements: [] };
   const session = { id: "s1", issue: "i1", play: { station: 2 } } as never;
-  test("keyed by the session; a bed shows its session's crop, a sprout before the view has it, cleared beds flower", () => {
+  test("keyed by the issue; a bed shows its issue's crop, a reopened issue's new session too, a sprout before the view has it, cleared beds flower", () => {
     expect(cropOfBed(beds[2]!, [session], view as never)).toBe("leafy");
-    expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s2" } as never], view as never)).toBe("sprout");
+    expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s2" } as never], view as never)).toBe("leafy");
+    expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s3", issue: "i2" } as never], view as never)).toBe("sprout");
     expect(cropOfBed(beds[0]!, [session], view as never)).toBe("empty");
     expect(cropOfBed(beds[6]!, [], view as never)).toBe("flowering");
     expect(cropOfBed(beds[7]!, [], view as never)).toBe("locked");
