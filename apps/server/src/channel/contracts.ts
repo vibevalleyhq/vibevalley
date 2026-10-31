@@ -228,8 +228,6 @@ export interface Write {
 }
 
 export interface Written {
-  id: string;
-  number: number;
   recipients: string[];
   resetWake: string[];
   absent: string[];
