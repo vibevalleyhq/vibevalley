@@ -31,6 +31,7 @@ import { villageHitAt, type VillageHit } from "@/farm/world/hits";
 import type { Box, Point } from "@/farm/world/level";
 import type { Village } from "@/farm/world/load";
 import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "@/farm/world/plots";
+import { PoseHold } from "@/farm/world/pose";
 import {
   placeOfAction,
   plotCalls,
@@ -133,6 +134,7 @@ interface Actor {
   hopAt: number;
   where: Whereabouts | undefined;
   stroll: Stroll | undefined;
+  pose: PoseHold | undefined;
 }
 
 const toLifeBox = (b: Box): LifeBox => [b.x0, b.y0, b.x1, b.y1];
@@ -440,6 +442,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       hopAt: -10,
       where: undefined,
       stroll: undefined,
+      pose: undefined,
     };
   };
 
@@ -587,7 +590,8 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       actor.goal = goal;
       actor.walker.go(goal.at);
       actor.walker.step(dt);
-      draw(actor, pose, station);
+      actor.pose ??= new PoseHold(pose, t);
+      draw(actor, actor.pose.next(pose, t), station);
     }
     for (const [id, actor] of [...actors]) {
       if (present.has(id)) continue;
@@ -601,7 +605,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       actor.goal = { key: "gate", at: v.gate };
       actor.walker.go(v.gate);
       actor.walker.step(dt);
-      draw(actor, "idle", actor.station);
+      draw(actor, actor.pose?.next("idle", t) ?? "idle", actor.station);
       if (!actor.walker.walking) actor.goneFor += dt;
     }
     for (const a of actors.values()) a.node.alpha = Math.max(0, 1 - a.goneFor / fadeS);

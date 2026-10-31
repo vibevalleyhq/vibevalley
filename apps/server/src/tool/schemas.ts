@@ -51,6 +51,33 @@ const channelRead = Schema.Struct({
   unread: Schema.optionalKey(Schema.Boolean),
 });
 
+const blockCreateParameters = Schema.Struct({
+  id: artifactId,
+  afterBlock: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.afterBlock })),
+  checked: Schema.optionalKey(Schema.Boolean.annotate({ description: params.blockCreate.checked })),
+  language: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.language })),
+  level: Schema.optionalKey(Schema.Int.annotate({ description: params.blockCreate.level })),
+  parentId: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.parentId })),
+  text: Schema.String.annotate({ description: params.blockCreate.text }),
+  type: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.type })),
+}).annotate({ requiredOrder: ["id", "text"] });
+
+const blockUpdateParameters = Schema.Struct({
+  baseRev: Schema.Int.annotate({ description: params.blockUpdate.baseRev }),
+  block: Schema.String.annotate({ description: params.blockUpdate.block }),
+  checked: Schema.optionalKey(Schema.Boolean.annotate({ description: params.blockUpdate.checked })),
+  id: artifactId,
+  language: Schema.optionalKey(Schema.String.annotate({ description: params.blockUpdate.language })),
+  level: Schema.optionalKey(Schema.Int.annotate({ description: params.blockUpdate.level })),
+  text: Schema.optionalKey(Schema.String.annotate({ description: params.blockUpdate.text })),
+  type: Schema.optionalKey(Schema.String.annotate({ description: params.blockUpdate.type })),
+}).annotate({ requiredOrder: ["id", "block", "baseRev"] });
+
+const blockDeleteParameters = Schema.Struct({
+  block: Schema.String.annotate({ description: params.blockDelete.block }),
+  id: artifactId,
+}).annotate({ requiredOrder: ["id", "block"] });
+
 /** The orchestrator's, by endpoint. */
 export const parameters = {
   "artifact.content.get": artifactRead,
@@ -67,6 +94,9 @@ export const parameters = {
     issue: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.issue })),
   }),
   "artifact.version.create": Schema.Struct({ ...artifactText, id: artifactId }),
+  "artifact.block.create": blockCreateParameters,
+  "artifact.block.update": blockUpdateParameters,
+  "artifact.block.delete": blockDeleteParameters,
   "channel.create": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
     name: Schema.String,
@@ -229,18 +259,9 @@ export const sessionParameters = {
     text: Schema.String,
   }),
   "channel.unread.list": Schema.Struct({}),
-  "artifact.block.create": Schema.Struct({
-    id: artifactId,
-    level: Schema.optionalKey(Schema.Int.annotate({ description: params.blockCreate.level })),
-    text: Schema.String.annotate({ description: params.blockCreate.text }),
-    type: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.type })),
-  }),
-  "artifact.block.update": Schema.Struct({
-    baseRev: Schema.Int.annotate({ description: params.blockUpdate.baseRev }),
-    block: Schema.String.annotate({ description: params.blockUpdate.block }),
-    id: artifactId,
-    text: Schema.String.annotate({ description: params.blockUpdate.text }),
-  }).annotate({ requiredOrder: ["id", "block", "baseRev", "text"] }),
+  "artifact.block.create": blockCreateParameters,
+  "artifact.block.update": blockUpdateParameters,
+  "artifact.block.delete": blockDeleteParameters,
   "issue.split": Schema.Struct({
     tasks: Schema.mutable(
       Schema.Array(

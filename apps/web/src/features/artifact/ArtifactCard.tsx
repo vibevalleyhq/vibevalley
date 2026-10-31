@@ -3,6 +3,7 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { ArtifactBody, ArtifactCard as Card } from "@vibevalley/protocol";
 
+import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
@@ -14,9 +15,18 @@ export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", h
 
 /** The card a message announces an artifact with: the whole card opens that version. */
 export function ArtifactCard(props: { card: Card }) {
+  const router = useRouter();
+  // In a chat the card opens the artifact beside the talk; anywhere else it goes to the artifact's page.
+  const href = () => {
+    const [path = ""] = router.path().split("?");
+    if (!path.startsWith("/chat")) return artifactHref(props.card.id, props.card.body === "html" ? props.card.version : undefined);
+    const params = new URLSearchParams(router.path().split("?")[1] ?? "");
+    params.set("artifact", props.card.id);
+    return `${path}?${params}`;
+  };
   return (
     <A
-      href={artifactHref(props.card.id, props.card.body === "html" ? props.card.version : undefined)}
+      href={href()}
       data-testid="artifact-card"
       data-key={props.card.id}
       data-version={props.card.version}

@@ -21,7 +21,7 @@
 谁画哪一块、store 的动作、画布怎么告诉 DOM 东西在哪，在 [农场的 README](apps/web/src/farm/README.md)。
 
 - **像素村** `apps/web/src/farm/canvas/`（PixiJS）：`VillageCanvas.tsx` 挂画布，`scene.ts` 每帧把核心状态画成画面、按脚底的 y 排前后；`dog.ts`、`life.ts`、`fx.ts` 院子的动静和地上的效果。
-- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`）；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`hits.ts` 点到了什么；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
+- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），`pose.ts` 的 `PoseHold` 让一个姿势至少停 800ms；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`hits.ts` 点到了什么；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
 - **引擎** `packages/engine`：`nav`（寻路）、`pixi`（光、天色、法线、粒子、小虫、节奏）、`audio`（合成器和响度）、`clock.ts`（一天的钟）。
 - **HUD 和面板** `farm/hud/`、`farm/panels/`：农场卡、额度、特效层，右上角的「记忆树」到 `/tree`（`src/tree`，[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）；收获、播种袋（`SeedForms.tsx`）、成就、仓库、计划板、菜单。
 - **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/places.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
@@ -58,7 +58,7 @@
   - 手上的事决定去处（`placeOfAction`）：读、搜去书屋，跑命令和 MCP 去工坊，查网页去电台，等着坐长椅，改文件和别的在自己的地边。
   - 换去处要节流（`Whereabouts`）：想去新地方够 1.2 秒、在原地待够 2 秒才动身；地熟了、枯萎、干裂（`plotCalls`）时马上回到地前面、面朝外。
   - 在地边时隔一阵换个位置（`spotsFor`、`Stroll`）：干活时每 5–11 秒，别的时候 7–15 秒；改文件、跑命令时进地里，歇着时可能去草坪；同一个地点人多了往两边排开。
-  - 姿势（`poseOf`）：熟了「欢呼」，枯萎或干裂「发愁」，改文件、跑命令、MCP 是「干活」，读、搜这些是「琢磨」，没在做事是站着。
+  - 姿势（`poseOf`）：熟了「欢呼」，枯萎或干裂「发愁」，改文件、跑命令、MCP 是「干活」，读、搜这些是「琢磨」，没在做事是站着。换姿势前至少停 800ms；一串动作只保留最新的一个，停下后 800ms 内追上。
   - 地都占满时（`station` 为 -1）帮工在院门外排队；不在场的从大门进来。
 - **世界坐标只有一套：384×256 个像素格。** 素材画成两倍密，`ui/pixel/atlas.ts` 用地图图片的宽除以 384 得出密度，把 `sprites.json` 里的宽高和落脚点都除以它；关卡、点击区、HUD 的坐标都按格子写，不随密度改。
 - **放大只用整数倍**（`frameVillage`）：从能盖满窗口的倍数往下找，第一个满足「左右每边裁掉不超过村子宽度的 5%（`villageCutAcross`），上下每边不超过高度的 8%（`villageCutDown`）」的就用。1152×768 正好放下，所以桌面窗口默认是这么大、拖动时保持 3:2；拖完松手时落在会留边的尺寸，窗口自己调到最近的不留边的尺寸（`filledNear`，最小 768×512、最大是屏幕的可用区，最大化和全屏不调；[客户端](docs/subsystems/app.md)）；1440×900 放大 4 倍、左右各裁 48、上下各裁 62 屏幕像素；1920×1080 放大 5 倍、只裁上下；竖着的手机放大 1 倍。盖不满的地方留边，边上垫一张放大、压暗的农场。最外一圈至多左右各 19 格、上下各 20 格可能看不到，能点的东西应放在这圈里面。
@@ -143,7 +143,6 @@
 
 ## 还没做的
 
-- 每个动作至少播完一小段，快速的工具调用一个个看得清：[提案](.agents/notes/proposed/feature/2026-10-09-action-queue.md)。
 - 手机竖屏布局：[提案](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)。
 - 商店能买东西：[提案](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)。
 - 除草农具还没接上（现在杂草是没过验收的意见，点下去只有提示）；肥料袋和稻草人的农具也没有（[工单](docs/subsystems/issue.md)「还没做的」）。

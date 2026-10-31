@@ -13,12 +13,14 @@ export const IssueId: Codec<T.IssueId> = Schema.String.pipe(Schema.brand("IssueI
 export const SessionId: Codec<T.SessionId> = Schema.String.pipe(Schema.brand("SessionId"));
 export const ArtifactId: Codec<T.ArtifactId> = Schema.String.pipe(Schema.brand("ArtifactId"));
 export const BlockId: Codec<T.BlockId> = Schema.String.pipe(Schema.brand("BlockId"));
+export const SuggestionId: Codec<T.SuggestionId> = Schema.String.pipe(Schema.brand("SuggestionId"));
 export const MessageId: Codec<T.MessageId> = Schema.String.pipe(Schema.brand("MessageId"));
 /** An id minted, or taken from where the kind is known (a route, a row, a tool's argument for it). */
 export const issueId = Brand.nominal<T.IssueId>();
 export const sessionId = Brand.nominal<T.SessionId>();
 export const artifactId = Brand.nominal<T.ArtifactId>();
 export const blockId = Brand.nominal<T.BlockId>();
+export const suggestionId = Brand.nominal<T.SuggestionId>();
 export const messageId = Brand.nominal<T.MessageId>();
 
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
@@ -286,6 +288,23 @@ export const ArtifactReadRequest: Codec<T.ArtifactReadRequest> = Schema.Struct({
 
 export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Finite, content: Schema.String });
 
+export const BlockRef: Codec<T.BlockRef> = Schema.Struct({
+  artifactId: ArtifactId,
+  blockId: BlockId,
+  rev: Schema.Finite,
+});
+
+export const QuotedBlock: Codec<T.QuotedBlock> = Schema.Struct({
+  artifactId: ArtifactId,
+  blockId: BlockId,
+  rev: Schema.Finite,
+  title: Schema.String,
+  type: Schema.optionalKey(Schema.String),
+  text: Schema.optionalKey(Schema.String),
+  nowRev: Schema.optionalKey(Schema.Finite),
+  deleted: Schema.optionalKey(Schema.Boolean),
+});
+
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: MessageId,
   number: Schema.Finite,
@@ -313,6 +332,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   attachments: Schema.mutable(Schema.Array(Attachment)),
   embeds: Schema.mutable(Schema.Array(Embed)),
   artifact: Schema.optionalKey(ArtifactCard),
+  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(QuotedBlock))),
 });
 
 export const ChannelType: Codec<T.ChannelType> = Schema.Literals(T.ChannelTypeValues);
@@ -1515,6 +1535,7 @@ export const CommentRequest: Codec<T.CommentRequest> = Schema.Struct({
 export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
+  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(BlockRef))),
   replyTo: Schema.optionalKey(Schema.Finite),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   station: Schema.optionalKey(Schema.Finite),
@@ -2239,14 +2260,24 @@ export const BlockOpStatus: Codec<T.BlockOpStatus> = Schema.Literals(T.BlockOpSt
 export const BlockCreate: Codec<T.BlockCreate> = Schema.Struct({
   type: Schema.optionalKey(Schema.String),
   level: Schema.optionalKey(Schema.Finite),
+  checked: Schema.optionalKey(Schema.Boolean),
+  language: Schema.optionalKey(Schema.String),
   text: Schema.String,
+  afterBlock: Schema.optionalKey(BlockId),
+  parentId: Schema.optionalKey(BlockId),
 });
 
 export const BlockUpdate: Codec<T.BlockUpdate> = Schema.Struct({
   block: BlockId,
   baseRev: Schema.Finite,
-  text: Schema.String,
+  text: Schema.optionalKey(Schema.String),
+  type: Schema.optionalKey(Schema.String),
+  level: Schema.optionalKey(Schema.Finite),
+  checked: Schema.optionalKey(Schema.Boolean),
+  language: Schema.optionalKey(Schema.String),
 });
+
+export const BlockDelete: Codec<T.BlockDelete> = Schema.Struct({ block: BlockId });
 
 export const BlockOpResult: Codec<T.BlockOpResult> = Schema.Struct({
   status: BlockOpStatus,
@@ -2255,6 +2286,7 @@ export const BlockOpResult: Codec<T.BlockOpResult> = Schema.Struct({
   text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
   yours: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
   reason: Schema.optionalKey(Schema.String),
+  suggestion: Schema.optionalKey(SuggestionId),
 });
 
 export const BlockAck: Codec<T.BlockAck> = Schema.Struct({
@@ -2262,6 +2294,44 @@ export const BlockAck: Codec<T.BlockAck> = Schema.Struct({
   seq: Schema.Finite,
   results: Schema.mutable(Schema.Array(BlockOpResult)),
   blocks: Schema.mutable(Schema.Array(Block)),
+});
+
+export const ArtifactEvent: Codec<T.ArtifactEvent> = Schema.Union([
+  Schema.TaggedStruct("Blocks", { seq: Schema.Finite, blocks: Schema.mutable(Schema.Array(Block)) }),
+  Schema.TaggedStruct("Reset", {}),
+]);
+
+export const SuggestionStatus: Codec<T.SuggestionStatus> = Schema.Literals(T.SuggestionStatusValues);
+
+export const SuggestionChange: Codec<T.SuggestionChange> = Schema.Struct({
+  text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
+  type: Schema.optionalKey(BlockType),
+  attrs: Schema.optionalKey(BlockAttrs),
+  unset: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  delete: Schema.optionalKey(Schema.Boolean),
+});
+
+export const Suggestion: Codec<T.Suggestion> = Schema.Struct({
+  id: SuggestionId,
+  artifactId: ArtifactId,
+  blockId: BlockId,
+  author: Schema.String,
+  baseRev: Schema.Finite,
+  change: SuggestionChange,
+  status: SuggestionStatus,
+  createdAt: Schema.Finite,
+  resolvedAt: Schema.optionalKey(Schema.Finite),
+  resolvedBy: Schema.optionalKey(Schema.String),
+});
+
+export const SuggestionCreate: Codec<T.SuggestionCreate> = Schema.Struct({
+  block: BlockId,
+  baseRev: Schema.Finite,
+  change: SuggestionChange,
+});
+
+export const SuggestionEvent: Codec<T.SuggestionEvent> = Schema.TaggedStruct("Suggestions", {
+  suggestions: Schema.mutable(Schema.Array(Suggestion)),
 });
 
 export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({

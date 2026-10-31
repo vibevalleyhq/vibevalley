@@ -19,14 +19,15 @@ import { dbQueries, Database, Db } from "@/infra/db.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
-import { newsOf } from "@/session/session.ts";
+import { newsOf, type SessionNews } from "@/session/session.ts";
+import type { InputConsumed } from "@/session/shapes.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Said, said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";
 
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { wakeBreaker } from "./audience.ts";
-import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
+import { Channel, catchUpMax, type ChannelSessions, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { channelOf, defaultOf } from "./folded.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
@@ -46,6 +47,9 @@ class FakeSessions {
   n = 0;
   core!: Core["Service"];
   launches!: PubSub.PubSub<LaunchActivity>;
+  news!: PubSub.PubSub<SessionNews>;
+  inputsConsumedHub!: PubSub.PubSub<InputConsumed>;
+  consumed = (c: InputConsumed) => void PubSub.publishUnsafe(this.inputsConsumedHub, c);
 
   runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
   steersOf = (id: string) => [...(this.steers.get(id) ?? [])];
@@ -93,45 +97,56 @@ class FakeSessions {
   }
 }
 
-/** The fake sessions as the channels' helpers, registered the way Agent Sessions registers the real ones. */
-const fakeHelpers = (x: FakeSessions) =>
-  Layer.effectDiscard(
+/** The chat over played sessions: the pubs exist before the chat subscribes to them. */
+const channelLayer = (x: FakeSessions) =>
+  Layer.unwrap(
     Effect.gen(function* () {
       x.core = yield* Core;
-      const chat = yield* Channel;
       x.launches = yield* PubSub.unbounded<LaunchActivity>();
+      x.news = yield* PubSub.unbounded<SessionNews>();
+      x.inputsConsumedHub = yield* PubSub.unbounded<InputConsumed>();
+      const sessions: ChannelSessions = {
+        present: (id) => x.core.session(id) !== undefined,
+        sessionOf: (id) => x.core.session(id),
+        presentSessions: () => x.core.state().sessions,
+        deliver: (id, text) => Effect.sync(() => x.deliver(id, text)),
+        runOf: () => undefined,
+        reportOf: (id) => summaryOf(x.last.get(id) ?? ""),
+        onIssue: (issue) => sessionOnIssue(x.core.state(), issue)?.id,
+        launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
+        inputsConsumed: Effect.map(PubSub.subscribe(x.inputsConsumedHub), Stream.fromSubscription),
+        news: Effect.map(PubSub.subscribe(x.news), Stream.fromSubscription),
+      };
+      return Channel.layerWith(sessions);
+    }),
+  );
+
+/** The played sessions' own facts reach the chat, and the chats start once they are back. */
+const fakeNews = (x: FakeSessions) =>
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const chat = yield* Channel;
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => {
           x.stopped = true;
           x.release();
         }),
       );
-      chat.useHelpers({
-        present: (id) => x.core.session(id) !== undefined,
-        deliver: (id, text) => Effect.sync(() => x.deliver(id, text)),
-        currentRun: () => undefined,
-        report: (id) => summaryOf(x.last.get(id) ?? ""),
-        onIssue: (issue) => sessionOnIssue(x.core.state(), issue)?.id,
-        sessionOf: (id) => x.core.session(id),
-        presentSessions: () => x.core.state().sessions,
-      });
-      yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(x.launches)), chat.activity));
-      // As the sessions tell the chat of their own facts.
       const [, moves] = yield* x.core.transitions;
       yield* Effect.forkScoped(
         Stream.runForEach(moves, ({ fact, after }) => {
           const n = newsOf(fact, after);
-          return n ? chat.sessionNews(n) : Effect.void;
+          return n ? PubSub.publish(x.news, n) : Effect.void;
         }),
       );
-      yield* chat.helpersBack;
+      yield* chat.start;
     }),
   );
 
 const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) => {
   const c: ServerConfig["Service"] = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
-  return fakeHelpers(x).pipe(
-    Layer.provideMerge(Channel.layer),
+  return fakeNews(x).pipe(
+    Layer.provideMerge(channelLayer(x)),
     Layer.provideMerge(said),
     Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Core.layer.pipe(Layer.provide(projection))),
@@ -600,7 +615,7 @@ describe("the chat", () => {
         expect(digest.map((d) => [d.from, d.target])).toEqual([["w12", `#general:${thread.rootNumber}`]]);
         expect(yield* f.chat.orchestratorDigest(defaultOrchestrator)).toHaveLength(1);
         // Taken as input by the orchestrator's run, as its execution says once it took it.
-        yield* f.chat.consumed({ session: defaultOrchestrator, messages: [digest[0]!.id] });
+        x.consumed({ session: defaultOrchestrator, messages: [digest[0]!.id] });
         expect(yield* f.chat.orchestratorDigest(defaultOrchestrator)).toEqual([]);
         yield* f.chat.say("大家看一下", f.chat.defaultChannel(), "");
         const unread = yield* f.chat.unread("w12");

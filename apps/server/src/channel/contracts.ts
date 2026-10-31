@@ -12,6 +12,8 @@ import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
 import { type InboxMessage, type Picked } from "./wake.ts";
 
+export type { Delivered, InputConsumed, LaunchActivity, SessionNews } from "@/session/shapes.ts";
+
 export interface Info {
   readonly id: string;
   readonly name: string;
@@ -42,6 +44,9 @@ export interface SayMore {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
+  /** The blocks the owner pointed at, to be read as they are now before the message is stored. */
+  readonly blockRefs?: readonly T.BlockRef[];
+  readonly blocks?: readonly T.QuotedBlock[];
 }
 
 export interface ReadOptions {
@@ -81,6 +86,8 @@ export interface Meta {
   embeds?: T.Embed[];
   /** The artifact it announces, as it was then (artifact/). */
   artifact?: T.ArtifactCard;
+  /** The blocks it points at, as they read when it was sent. */
+  blocks?: readonly T.QuotedBlock[];
   picked?: Picked;
 }
 
@@ -96,6 +103,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
   artifact: Schema.optionalKey(S.ArtifactCard),
+  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
   picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
 });
 
@@ -154,6 +162,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     attachments: meta.attachments ?? [],
     embeds: meta.embeds ?? [],
     ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
+    ...(meta.blocks && meta.blocks.length > 0 && row.deleted_at === null ? { blocks: meta.blocks } : {}),
   };
 }
 
@@ -173,6 +182,7 @@ export const inboxMore = (
     ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
       ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
       : {}),
+    ...(meta.blocks && meta.blocks.length > 0 && (row.deleted_at == null || row.deleted_at === 0) ? { blocks: meta.blocks } : {}),
     ...(meta.picked ? { picked: meta.picked } : {}),
   };
 };
@@ -328,59 +338,6 @@ export interface ChannelService {
   /** How the orchestrator writes the place it answers in: a direct channel's own address, else its channel's. */
   readonly addressOf: (channel: string) => Effect.Effect<{ readonly direct: boolean; readonly target: string }>;
   readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
-  /** Agent Sessions registers the helpers; until then a message for one waits. */
-  readonly useHelpers: (helpers: Helpers) => void;
-  /** Once the helpers on the farm are back: what waited for each goes to it now. */
-  readonly helpersBack: Effect.Effect<void>;
-  /** What a helper's launch did. */
-  readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
-  /** Messages a helper took as input. */
-  readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
-  /** A helper hired, reported or gone: its thread opens, the report is posted in it, its thread closes. */
-  readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
-}
-
-/** What came of handing a helper a message. */
-export interface Delivered {
-  readonly kind: "run" | "steered" | "queued" | "refused";
-  readonly launch?: string;
-  readonly woke?: boolean;
-  readonly reason?: string;
-}
-
-/** What a helper's launch did, as the channels hear it: it spoke, its turn ended or closed, it compacts. */
-export type LaunchActivity =
-  | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
-  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: T.Outcome; readonly spoke: boolean }
-  | { readonly kind: "closed"; readonly id: string; readonly launch: string }
-  | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
-
-/** The messages a helper took as input: they are seen. */
-/** What happened to a helper, as the sessions tell it: the fact, and the session as it stood after it (none once it
- * left). */
-export type SessionNews =
-  | { readonly _tag: "hired"; readonly session: T.Session }
-  | { readonly _tag: "reported"; readonly report: T.FactReport; readonly session: T.Session | undefined }
-  | { readonly _tag: "left"; readonly left: T.FactLeft };
-
-export interface InputConsumed {
-  readonly session: string;
-  readonly messages: string[];
-}
-
-/** The participants that work: the channels hand them what is said to them and hear what they did. The channels know a
- * helper by its id and nothing of how it works. */
-export interface Helpers {
-  /** On the farm now: it can be handed a message. */
-  readonly present: (id: string) => boolean;
-  readonly deliver: (id: string, text: string, by: T.RunTrigger) => Effect.Effect<Delivered>;
-  /** The run a participant is in now (a helper's, the orchestrator's), for what it says; undefined between runs. */
-  readonly currentRun: (id: string) => string | undefined;
-  /** A helper's report, from what it last said in full. */
-  readonly report: (id: string) => string;
-  /** The helper working the issue now, if one is. */
-  readonly onIssue: (issue: string) => string | undefined;
-  /** A helper on the farm now, and all of them. */
-  readonly sessionOf: (id: string) => T.Session | undefined;
-  readonly presentSessions: () => readonly T.Session[];
+  /** The chat's startup, after the sessions came back: their threads, and what waited for them. */
+  readonly start: Effect.Effect<void, ApiError>;
 }

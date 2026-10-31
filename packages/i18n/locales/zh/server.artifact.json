@@ -14,6 +14,8 @@
   "preview": {
     "remove": "删掉「{title}」和它的 {n} 版",
     "cards": "对话里的卡片还在，点开说已经删掉了",
+    "removeBlock": "删掉块 {id}",
+    "removeChildren": "连同 {n} 个子块",
     "removeBlocks": "删掉「{title}」和它的 {n} 块"
   },
   "untitled": "没起名的产出",
@@ -22,6 +24,19 @@
   "noWriter": "没有能写的帮工：先在档案里打开一个",
   "demoRunning": "演示正在写，写完再点",
   "notApplied": "这一块没写进去",
+  "attrNotForType": "这一块是 {type}，不用 {attr}",
+  "parentDeleted": "父块 {id} 已经删掉了",
+  "afterNotSibling": "没有块 {id}，或它不在这一层",
+  "nothingToChange": "没说要改什么",
+  "suggestion": {
+    "empty": "建议里没有要改的东西",
+    "deleteAlone": "删块的建议不能再带别的改动",
+    "noBlock": "没有块 {id}，或它已经删掉了",
+    "beyond": "建议对着第 {rev} 版，可这一块现在才第 {now} 版",
+    "missing": "没有建议 {id}",
+    "stale": "这一块从第 {rev} 版起改过了，现在是第 {now} 版；建议作废，让它重看再提",
+    "suggested": "主人写过的块不直接改，已经提了建议〔{id}〕，等主人接受"
+  },
   "op": {
     "deleted": "这一块已经删掉了",
     "noAttr": "没有属性 {name}",

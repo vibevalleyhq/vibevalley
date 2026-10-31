@@ -11,7 +11,6 @@
   "channelName": "A channel name has only letters, digits, - and _, up to 24 characters",
   "channelTaken": "There is already a channel called {name}",
   "hopLimit": "The helpers have gone back and forth {limit} times: they pause here until you say something.",
-  "notBack": "The helpers have not come back yet",
   "breaker": "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
   "dispatch": {
     "step": "task \"{task}\" of the plan {graph}",

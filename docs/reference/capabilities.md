@@ -146,8 +146,14 @@
 | `artifact.previewDelete` | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
 | `artifact.block.list` | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
 | `artifact.submit` | `/api/v1/artifact/submit` | ✓ | ✓ |   |   |
-| `artifact.block.create` | `/api/v1/artifact/block/create` | ✓ | ✓ |   | ✓ |
-| `artifact.block.update` | `/api/v1/artifact/block/update` | ✓ | ✓ |   | ✓ |
+| `artifact.block.create` | `/api/v1/artifact/block/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.block.update` | `/api/v1/artifact/block/update` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.block.delete` | `/api/v1/artifact/block/delete` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.block.previewDelete` | `/api/v1/artifact/block/previewDelete` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.suggestion.list` | `/api/v1/artifact/suggestion/list` | ✓ | ✓ |   |   |
+| `artifact.suggestion.create` | `/api/v1/artifact/suggestion/create` | ✓ | ✓ |   |   |
+| `artifact.suggestion.accept` | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
+| `artifact.suggestion.reject` | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
 | `artifact.markdown.get` | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
 | `artifact.demo` | `/api/v1/artifact/demo` | ✓ |   |   |   |
 

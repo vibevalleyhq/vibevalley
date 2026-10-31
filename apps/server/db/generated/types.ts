@@ -10,6 +10,9 @@ export type Pg_public_artifact_block_type_ca97145941a5 = typeof Pg_public_artifa
 export const Pg_public_artifact_body_64de845bf79d = Schema.Literals(["blocks","html"])
 export type Pg_public_artifact_body_64de845bf79d = typeof Pg_public_artifact_body_64de845bf79d.Type
 
+export const Pg_public_artifact_suggestion_status_9958f8a80968 = Schema.Literals(["open","accepted","rejected"])
+export type Pg_public_artifact_suggestion_status_9958f8a80968 = typeof Pg_public_artifact_suggestion_status_9958f8a80968.Type
+
 export const Pg_public_channel_delivery_held_by_26c61b671014 = Schema.Literals(["hop_limit","cooldown","wake_breaker"])
 export type Pg_public_channel_delivery_held_by_26c61b671014 = typeof Pg_public_channel_delivery_held_by_26c61b671014.Type
 

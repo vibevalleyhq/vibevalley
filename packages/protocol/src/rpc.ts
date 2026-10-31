@@ -15,4 +15,8 @@ export class Subscriptions extends RpcGroup.make(
   /** The turn reports in any channel after the one with this id (by message id, which sorts by time), or the newest
    * when absent, then each report from now on. */
   Rpc.make("channel.reports", { payload: { after: Schema.optionalKey(Schema.String) }, success: S.ChannelEvent, error: ApiError, stream: true }),
+  /** A blocks artifact's changes after this seq, then each batch from now on. */
+  Rpc.make("artifact.follow", { payload: { id: Schema.String, after: Schema.Finite }, success: S.ArtifactEvent, error: ApiError, stream: true }),
+  /** An artifact's suggestions as they now are, then the whole list after each change. */
+  Rpc.make("artifact.suggestion.follow", { payload: { id: Schema.String }, success: S.SuggestionEvent, error: ApiError, stream: true }),
 ) {}

@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，频道模块只为这张工单开工单串 |
-| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（帮工经 `Helpers.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
+| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（帮工经 `Session.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session/report.ts` 的 `summaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_message_send`、`channel_message_list`、`channel_unread_list`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Session.who`） |
 | 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`orchestrator`）；连接器把话交给 `Orchestrator.say`，管家照频道的规则被叫醒 |
@@ -128,7 +128,7 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：频道模块不 import 帮工模块，也不读核心状态里的帮工。它定义帮工这类参与者的端口 `Helpers`（在不在地里、地里的帮工、交一句话、现在是哪一轮、汇报的摘要、一张工单现在谁在做），帮工模块建的时候用 `useHelpers` 登记，并把每一轮的开口、结束、关掉、压缩上下文交给 `activity`，一轮实际读进去的消息交给 `consumed`，雇了、交回、走了交给 `sessionNews`（`SessionNews`，带着那一刻的 Session），据此开串、贴汇报、推进送达。帮工接回以后帮工模块调 `helpersBack`：这时才给地里的每个帮工开好工单串、送出等着的话；接回以前它看不到帮工。
+- **帮工（`session`）**：频道模块在帮工模块上面，直接读 `Session` 的查询（`sessionOf`、`presentSessions`、`runOf`、`reportOf`、`onIssue`、`present`），订阅它的 `launches`、`inputsConsumed`、`news`，据此开串、贴汇报、推进送达；交一句话走 `Session.deliver`。不再有 `Helpers` 端口。帮工接回以后 `channelStart` 给地里的每个帮工开好工单串、送出等着的话；接回以前它看不到帮工。
 - **核心状态（`core`）**：频道模块施加 `message`、`channel` 事实；读 `WorkspaceState.sessions` 知道谁在地里、谁在忙。
 - **管家（`orchestrator`）**：订阅 `forOrchestrator`（叫醒它的话，按频道分批）和 `orchestratorDigest`（只让它知道的汇报）；用 `orchestratorSays` 说话、`spoken` 记下通话里的话。主人的话经 `Orchestrator.say` 进频道，管家照频道的规则被叫醒。
 - **主人在串里的话**：`ownerInThread` 把主人在任何一个串里说完的话（不管经哪条路进来）告诉订阅的人；工单靠它知道主人在工单串里说了话。

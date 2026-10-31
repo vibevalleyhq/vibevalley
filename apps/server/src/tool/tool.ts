@@ -75,8 +75,21 @@ const make = Effect.gen(function* () {
     findIssue,
   } = yield* issueTools;
   const { channelList, messageSend, messageList, unreadList, channelCreate, channelUpdate } = yield* channelTools;
-  const { artifactList, sessionArtifactList, artifactGet, artifactContent, artifactCreate, sessionArtifactCreate, artifactVersion, blockCreate, blockUpdate } =
-    yield* artifactTools(findIssue);
+  const {
+    artifactList,
+    sessionArtifactList,
+    artifactGet,
+    artifactContent,
+    artifactCreate,
+    sessionArtifactCreate,
+    artifactVersion,
+    blockCreate,
+    orchestratorBlockCreate,
+    blockUpdate,
+    orchestratorBlockUpdate,
+    blockDelete,
+    orchestratorBlockDelete,
+  } = yield* artifactTools(findIssue);
   const { graphSplit, graphList, graphGet, taskUpdate, taskDelete, graphAct, taskAct, issueSplit } = yield* graphTools;
   const { memorySearch, memoryCreate } = yield* memoryTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
@@ -123,6 +136,9 @@ const make = Effect.gen(function* () {
       artifactContent("orchestrator")(who),
       artifactCreate(who),
       artifactVersion("orchestrator")(who),
+      orchestratorBlockCreate(who),
+      orchestratorBlockUpdate(who),
+      orchestratorBlockDelete(who),
     ],
     session: (who) => [
       messageSend(who),
@@ -133,6 +149,7 @@ const make = Effect.gen(function* () {
       memoryCreate(who, false),
       blockCreate(who),
       blockUpdate(who),
+      blockDelete(who),
       issueSplit(who),
       sessionArtifactList(who),
       artifactGet("session")(who),

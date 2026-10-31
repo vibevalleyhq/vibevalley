@@ -5,6 +5,7 @@
 import { t } from "@vibevalley/i18n";
 import {
   type Block,
+  type BlockAck,
   type BlockAttrs,
   type BlockId,
   type BlockType,
@@ -107,6 +108,8 @@ export class BlockEditor {
   private max: ReturnType<typeof setTimeout> | undefined = undefined;
   private poll?: ReturnType<typeof setTimeout>;
   private disposed = false;
+  // Following the farm over the socket instead of asking every few seconds.
+  private live = false;
   // Questions made for what others wrote, and the one that last brought another writer's change.
   private polls = 0;
   private heardAt?: number;
@@ -161,8 +164,25 @@ export class BlockEditor {
 
   private cron() {
     clearTimeout(this.poll);
-    if (this.disposed) return;
+    if (this.disposed || this.live) return;
     this.poll = setTimeout(() => void this.refresh().then(() => this.cron()), this.othersWriting ? pollFastMs : pollEveryMs);
+  }
+
+  /** A batch another page or agent took, pushed over the subscription. */
+  receive(ack: Pick<BlockAck, "seq" | "blocks">) {
+    if (this.disposed) return;
+    this.polls++;
+    this.seq = Math.max(this.seq, ack.seq);
+    for (const b of ack.blocks) this.put(b, true);
+    this.reorder();
+    this.changed();
+  }
+
+  /** Follow the farm over the socket (true), or go back to asking every few seconds. */
+  setLive(on: boolean) {
+    this.live = on;
+    clearTimeout(this.poll);
+    if (!on) this.cron();
   }
 
   private async refresh() {

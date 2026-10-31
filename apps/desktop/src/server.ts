@@ -107,14 +107,18 @@ function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Prom
 }
 
 /** stop waits for a start still under way, so that server is stopped rather than left running. */
-export function serverKeeper(files: ServerFiles, env: NodeJS.ProcessEnv) {
+export function serverKeeper(
+  files: ServerFiles,
+  env: NodeJS.ProcessEnv,
+  start: (files: ServerFiles, env: NodeJS.ProcessEnv, port?: number) => Promise<RunningServer> = startServer,
+) {
   let running: RunningServer | undefined;
   let starting: Promise<RunningServer> | undefined;
   return {
     /** Where the running one answers; undefined until it is up. */
     url: () => running?.url,
     start: async () => {
-      starting = startServer(files, env);
+      starting = start(files, env);
       try {
         running = await starting;
         return running.url;
@@ -127,8 +131,15 @@ export function serverKeeper(files: ServerFiles, env: NodeJS.ProcessEnv) {
       const was = running;
       if (!was) return undefined;
       await was.stop();
-      running = await startServer(files, env, Number(new URL(was.url).port));
-      return running.url;
+      // The old one is gone before the new one starts: a stop now has to reach the start under way, not the stopped server.
+      running = undefined;
+      starting = start(files, env, Number(new URL(was.url).port));
+      try {
+        running = await starting;
+        return running.url;
+      } finally {
+        starting = undefined;
+      }
     },
     stop: async () => {
       const it = running ?? (await starting?.catch(() => undefined));

@@ -13,7 +13,7 @@ import { Llm } from "@vibevalley/ai/llm";
 
 import { Agent } from "./agent/agent.ts";
 import { Artifact, type ArtifactOptions } from "./artifact/artifact.ts";
-import { Channel } from "./channel/chat.ts";
+import { Channel, start as channelStart } from "./channel/chat.ts";
 import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Cron, start as cronStart } from "./cron/cron.ts";
@@ -128,6 +128,8 @@ const gateway =
 const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
+/** Collaboration's startup, after the sessions came back: their threads, and what waited for them. */
+const collaborationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(channelStart));
 /** Issues' startup, after the sessions came back: the task graphs cut off by the stop are settled, then the crons start
  * coming due. */
 const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
@@ -143,8 +145,8 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
   platform(config).pipe(
     agents(options),
     sourceControl(options),
-    collaboration(options),
     agentSessions(options),
+    collaboration(options),
     issues(options),
     inbox,
     orchestrator(options),
@@ -152,6 +154,7 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     gateway(options),
     sourceControlStart,
     agentSessionsStart,
+    collaborationStart,
     issuesStart,
     inboxStart,
     gamificationStart,

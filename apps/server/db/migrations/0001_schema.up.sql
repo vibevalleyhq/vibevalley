@@ -453,6 +453,25 @@ CREATE TABLE artifact_change (
 );
 
 -- Postgres does not index a foreign key; a delete that cascades and a lookup by it scan without one.
+-- A change an agent proposed to a block the owner wrote (artifact/blocks.ts): once open, then accepted or rejected by the
+-- owner. A block that moved on since base_rev comes back stale instead of being changed.
+CREATE TYPE artifact_suggestion_status AS ENUM ('open', 'accepted', 'rejected');
+CREATE TABLE artifact_suggestion (
+  id          text primary key,
+  artifact_id text not null references artifact (id) on delete cascade,
+  block_id    text not null references artifact_block (id) on delete cascade,
+  author      text not null,
+  at_rev      integer not null,
+  change      text not null, -- JSON: protocol.SuggestionChange
+  status      artifact_suggestion_status not null default 'open',
+  created_at  double precision not null,
+  resolved_at double precision,
+  resolved_by text
+);
+CREATE INDEX artifact_suggestion_by_artifact on artifact_suggestion (artifact_id, created_at);
+CREATE INDEX artifact_suggestion_open on artifact_suggestion (artifact_id, status);
+CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
+
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
 CREATE INDEX channel_follow_by_participant on channel_follow (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);

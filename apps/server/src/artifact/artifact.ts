@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Clock, Context, Effect, FileSystem, Layer, Semaphore } from "effect";
+import { Clock, Context, Effect, FileSystem, Layer, Semaphore, type Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -55,8 +55,17 @@ export class Artifact extends Context.Service<
     readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
     /** A batch of ops from actor (the owner, or a helper's profile id): blocks.ts. */
     readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
-    readonly appendBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
+    readonly insertBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
     readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
+    readonly deleteBlock: (id: T.ArtifactId, actor: string, req: T.BlockDelete) => Effect.Effect<T.BlockOpResult, ApiError>;
+    readonly previewDeleteBlock: (id: T.ArtifactId, req: T.BlockDelete) => Effect.Effect<T.Preview, ApiError>;
+    /** Each batch after seq, then each from now on, for a page following an open blocks artifact. */
+    readonly follow: (id: T.ArtifactId, after: number) => Stream.Stream<T.ArtifactEvent, ApiError>;
+    readonly suggestions: (id: T.ArtifactId) => Effect.Effect<T.Suggestion[], ApiError>;
+    readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError>;
+    readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
+    readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Effect.Effect<T.Suggestion, ApiError>;
+    readonly suggestionStream: (id: T.ArtifactId) => Stream.Stream<T.SuggestionEvent, ApiError>;
     /** Starts the demo and returns at once (blocks.ts). */
     readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   }
@@ -308,8 +317,16 @@ const make = (options: ArtifactOptions = {}) =>
       }),
       markdown: blocks.markdown,
       submit: blocks.submit,
-      appendBlock: blocks.appendBlock,
+      insertBlock: blocks.insertBlock,
       updateBlock: blocks.updateBlock,
+      deleteBlock: blocks.deleteBlock,
+      previewDeleteBlock: blocks.previewDeleteBlock,
+      follow: blocks.follow,
+      suggestions: blocks.suggestions,
+      suggest: blocks.suggest,
+      acceptSuggestion: blocks.acceptSuggestion,
+      rejectSuggestion: blocks.rejectSuggestion,
+      suggestionStream: blocks.suggestionStream,
       demo: blocks.demo,
     });
     return shape;

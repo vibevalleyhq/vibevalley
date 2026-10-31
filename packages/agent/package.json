@@ -3,7 +3,21 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./brain": "./src/brain.ts",
+    "./coding": "./src/coding.ts",
+    "./core/errors": "./src/core/errors.ts",
+    "./core/loop": "./src/core/loop.ts",
+    "./core/tool": "./src/core/tool.ts",
+    "./dag": "./src/dag.ts",
+    "./mcp": "./src/mcp.ts",
+    "./mcpTransport": "./src/mcpTransport.ts",
+    "./memory": "./src/memory.ts",
+    "./messages": "./src/messages.ts",
+    "./self": "./src/self.ts",
+    "./session": "./src/session.ts",
+    "./testing": "./src/testing.ts",
+    "./todo": "./src/todo.ts",
+    "./todoStore": "./src/todoStore.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",

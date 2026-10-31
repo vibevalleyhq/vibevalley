@@ -1,11 +1,13 @@
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type SessionView } from "@vibevalley/protocol";
+import { artifactId as brandArtifactId, blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
 import { tookText } from "@/base/format";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { ArtifactCanvas, type QuoteTarget } from "@/features/artifact";
 import { useAgent, useOrchestrators } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { orchestratorMood, useCore } from "@/infra/frame";
@@ -24,7 +26,7 @@ import { Tabs } from "@/ui/Tabs";
 import { toast } from "@/ui/toasts";
 
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
-import { Composer, FileDrop } from "./Composer";
+import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
 import { workbenchClock } from "./feed";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
@@ -81,6 +83,28 @@ function Chat() {
   const [searching, setSearching] = createSignal(false);
   // A message's address (?m=) lights it up in the pane it is in: the thread's, or the channel's.
   const point = () => pointedAt(router.path());
+  // An artifact opened beside the talk that made it (?artifact=), and the block the owner is about to speak about.
+  const [quoted, setQuoted] = createSignal<QuotedBlockDraft[]>([]);
+  const artifact = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("artifact");
+  createEffect(
+    () => channel()?.id,
+    () => {
+      setQuoted([]);
+    },
+  );
+  const closeArtifact = () => {
+    const [path, query] = router.path().split("?");
+    const params = new URLSearchParams(query ?? "");
+    params.delete("artifact");
+    router.navigate(`${path}${params.toString() ? `?${params}` : ""}`, { replace: true });
+  };
+  const quote = (id: string, block: QuoteTarget) =>
+    setQuoted((had) =>
+      had.some((q) => q.ref.blockId === block.id)
+        ? had
+        : [...had, { ref: { artifactId: brandArtifactId(id), blockId: brandBlockId(block.id), rev: block.rev }, text: block.text }],
+    );
+  const unquote = (blockId: string) => setQuoted((had) => had.filter((q) => q.ref.blockId !== blockId));
 
   const sidebar = () => (
     <Sidebar channel={channel()} thread={thread()} onNew={() => setCreating(true)} onSearch={() => setSearching(true)} onPick={() => setDrawer(false)} />
@@ -97,7 +121,16 @@ function Chat() {
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
       <Show when={chat()}>
         <Keyed key={channel()?.id ?? ""}>
-          {() => <ChannelMain channel={channel()} point={thread() ? undefined : point()} onDrawer={() => setDrawer(!drawer())} />}
+          {() => (
+            <ChannelMain
+              channel={channel()}
+              point={thread() ? undefined : point()}
+              onDrawer={() => setDrawer(!drawer())}
+              quoted={quoted()}
+              onClearQuote={() => setQuoted([])}
+              onRemoveQuote={unquote}
+            />
+          )}
         </Keyed>
       </Show>
       <Show when={thread()}>
@@ -110,6 +143,13 @@ function Chat() {
               <Splitter pane="thread" side="left" width={threadWidth()} min={320} max={720} label={t("web.channel.threadWidth")} />
             </div>
             <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
+          </div>
+        )}
+      </Show>
+      <Show when={artifact()}>
+        {(id) => (
+          <div class="absolute inset-0 z-20 flex border-l border-line bg-page lg:relative lg:z-auto lg:w-[520px] lg:shrink-0">
+            <ArtifactCanvas id={id()} onClose={closeArtifact} onQuote={(block) => quote(id(), block)} />
           </div>
         )}
       </Show>
@@ -128,7 +168,14 @@ const tabs: { tab: Tab; icon: IconName; label: string }[] = [
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
-function ChannelMain(props: { channel: Channel | undefined; point: number | undefined; onDrawer: () => void }) {
+function ChannelMain(props: {
+  channel: Channel | undefined;
+  point: number | undefined;
+  onDrawer: () => void;
+  quoted: readonly QuotedBlockDraft[];
+  onClearQuote: () => void;
+  onRemoveQuote: (blockId: string) => void;
+}) {
   const router = useRouter();
   const [tab, setTab] = createSignal<Tab>("chat");
   const [threadsOpen, setThreadsOpen] = createSignal(false);
@@ -262,7 +309,13 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               point={props.point}
               emptyText={t("web.channel.empty", { label: channelLabel(props.channel) })}
             />
-            <Composer channel={props.channel} placeholder={t("web.channel.sendTo", { label: channelLabel(props.channel) })} />
+            <Composer
+              channel={props.channel}
+              placeholder={t("web.channel.sendTo", { label: channelLabel(props.channel) })}
+              quoted={props.quoted}
+              onClearQuote={props.onClearQuote}
+              onRemoveQuote={props.onRemoveQuote}
+            />
           </FileDrop>
           <Show when={membersOpen() ? props.channel : undefined}>{(c) => <Members channel={c()} />}</Show>
         </div>

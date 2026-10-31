@@ -69,6 +69,8 @@
     "refuse": "不要"
   },
   "messages": {
+    "quotedBlock": "指着「{title}」的一块：{text}",
+    "quotedGone": "已经删掉了",
     "label": "消息",
     "containing": "含「{text}」的消息",
     "start": "消息的开头",
@@ -138,6 +140,8 @@
     "send": "发送",
     "sendHint": "回车发送 · Shift+回车换行",
     "replying": "回复 {name}",
+    "quotedBlock": "指着这一块：{text}",
+    "cancelQuote": "不指着这块了",
     "cancelReply": "不回复了",
     "attach": "附上文件",
     "uploadFailed": "没传上去：{why}"

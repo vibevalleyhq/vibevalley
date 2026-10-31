@@ -14,6 +14,8 @@
   "preview": {
     "remove": "Delete \"{title}\" and its {n} versions",
     "cards": "Its cards stay in the conversation and say it was deleted when opened",
+    "removeBlock": "Delete block {id}",
+    "removeChildren": "and its {n} child blocks",
     "removeBlocks": "Delete “{title}” and its {n} blocks"
   },
   "untitled": "Untitled",
@@ -22,6 +24,19 @@
   "noWriter": "No helper can write: turn one on in the profiles first",
   "demoRunning": "The demo is writing: try again when it is done",
   "notApplied": "The block was not written",
+  "attrNotForType": "A {type} block does not take {attr}",
+  "parentDeleted": "The parent block {id} was deleted",
+  "afterNotSibling": "There is no block {id}, or it is not at that level",
+  "nothingToChange": "Nothing was said to change",
+  "suggestion": {
+    "empty": "The suggestion changes nothing",
+    "deleteAlone": "A delete suggestion cannot carry another change",
+    "noBlock": "There is no block {id}, or it was deleted",
+    "beyond": "The suggestion is for rev {rev}, but the block is only at rev {now}",
+    "missing": "There is no suggestion {id}",
+    "stale": "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
+    "suggested": "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner"
+  },
   "op": {
     "deleted": "This block was deleted",
     "noAttr": "There is no attribute {name}",
