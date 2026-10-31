@@ -13,11 +13,13 @@ export const IssueId: Codec<T.IssueId> = Schema.String.pipe(Schema.brand("IssueI
 export const SessionId: Codec<T.SessionId> = Schema.String.pipe(Schema.brand("SessionId"));
 export const ArtifactId: Codec<T.ArtifactId> = Schema.String.pipe(Schema.brand("ArtifactId"));
 export const BlockId: Codec<T.BlockId> = Schema.String.pipe(Schema.brand("BlockId"));
+export const MessageId: Codec<T.MessageId> = Schema.String.pipe(Schema.brand("MessageId"));
 /** An id minted, or taken from where the kind is known (a route, a row, a tool's argument for it). */
 export const issueId = Brand.nominal<T.IssueId>();
 export const sessionId = Brand.nominal<T.SessionId>();
 export const artifactId = Brand.nominal<T.ArtifactId>();
 export const blockId = Brand.nominal<T.BlockId>();
+export const messageId = Brand.nominal<T.MessageId>();
 
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,
@@ -285,7 +287,7 @@ export const ArtifactReadRequest: Codec<T.ArtifactReadRequest> = Schema.Struct({
 export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Finite, content: Schema.String });
 
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
-  id: Schema.String,
+  id: MessageId,
   number: Schema.Finite,
   channel: Schema.String,
   from: Schema.String,
@@ -328,7 +330,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   position: Schema.optionalKey(Schema.Finite),
   archived: Schema.optionalKey(Schema.Finite),
   notify: Schema.optionalKey(Notify),
-  root: Schema.optionalKey(Schema.String),
+  root: Schema.optionalKey(MessageId),
   rootNumber: Schema.optionalKey(Schema.Finite),
   name: Schema.optionalKey(Schema.String),
   description: Schema.String,
@@ -2263,14 +2265,14 @@ export const BlockAck: Codec<T.BlockAck> = Schema.Struct({
 });
 
 export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({
-  id: Schema.String,
+  id: MessageId,
   text: Schema.String,
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
 export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.String, notify: Notify });
 
-export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: Schema.String, emoji: Schema.String, on: Schema.Boolean });
+export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: MessageId, emoji: Schema.String, on: Schema.Boolean });
 
 export const OnSet: Codec<T.OnSet> = Schema.Struct({ id: Schema.String, on: Schema.Boolean });
 

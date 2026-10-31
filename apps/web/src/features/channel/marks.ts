@@ -18,14 +18,14 @@ import { markedRead, type ReadMark, unreadMark } from "./reading";
 export interface ReactionMark {
   /** The message's channel: the copy that shows the reaction is followed there. */
   readonly channel: string;
-  readonly id: string;
+  readonly id: ChatMessage["id"];
   readonly emoji: string;
   readonly on: boolean;
 }
 
 export interface PinMark {
   readonly channel: string;
-  readonly id: string;
+  readonly id: ChatMessage["id"];
   readonly on: boolean;
   /** When it was pressed: the pin's time until the server's copy has its own. */
   readonly at: number;

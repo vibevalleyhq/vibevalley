@@ -118,9 +118,9 @@ export class VibeValleyApi {
       /** The owner's own words, changed; nobody is told again. */
       update: (a: T.MessageEdit): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/message/update", a),
       /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
-      delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/message/delete", a),
+      delete: (a: { id: T.MessageId }): Promise<void> => this.call<void>("/api/v1/channel/message/delete", a),
       /** What channel.message.delete would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/channel/message/previewDelete", a),
+      previewDelete: (a: { id: T.MessageId }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/channel/message/previewDelete", a),
       search: (a: T.MessageSearch): Promise<T.MessageHit[]> => this.call<T.MessageHit[]>("/api/v1/channel/message/search", a),
     },
     default: {
@@ -133,13 +133,13 @@ export class VibeValleyApi {
     },
     pin: {
       /** The message pinned or not; as it already is, nothing changes. */
-      set: (a: T.OnSet): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/set", a),
+      set: (a: { id: T.MessageId; on: boolean }): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/set", a),
       /** A channel's pinned messages, newest pinned first. */
       list: (a: { id: string }): Promise<T.ChatMessage[]> => this.call<T.ChatMessage[]>("/api/v1/channel/pin/list", a),
     },
     thread: {
       /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
-      create: (a: { id: string; requestKey?: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
+      create: (a: { id: T.MessageId; requestKey?: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
     },
     archive: {
       /** Out of the sidebar and the thread lists (on), or back; its messages and address stay. The default channel stays. As

@@ -191,7 +191,7 @@ const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind ==
 function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
   return {
-    id: row.id,
+    id: S.messageId(row.id),
     number: row.number,
     channel: row.channel_id,
     from: row.sender_id,
@@ -306,17 +306,17 @@ export class Channel extends Context.Service<
       more?: SayMore,
     ) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
     /** The owner's own chat words, changed. Changes tell and wake nobody. */
-    readonly edit: (id: string, text: string, keep?: readonly string[]) => Effect.Effect<T.ChatMessage, ApiError>;
+    readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Effect.Effect<T.ChatMessage, ApiError>;
     /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
-    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly remove: (id: T.MessageId) => Effect.Effect<void, ApiError>;
+    readonly previewRemove: (id: T.MessageId) => Effect.Effect<T.Preview, ApiError>;
     /** A participant's reaction on or off; as it already is, the message is returned unchanged. */
-    readonly react: (id: string, who: string, emoji: string, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
+    readonly react: (id: T.MessageId, who: string, emoji: string, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
     /** Pinned or not; as it already is, the message is returned unchanged. */
-    readonly pin: (id: string, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
+    readonly pin: (id: T.MessageId, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
     readonly pins: (channel: string) => Effect.Effect<T.ChatMessage[], ApiError>;
     /** The thread under a channel's message, opened if it has none. */
-    readonly threadUnder: (id: string) => Effect.Effect<string, ApiError>;
+    readonly threadUnder: (id: T.MessageId) => Effect.Effect<string, ApiError>;
     readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
     readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
     readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
@@ -343,7 +343,7 @@ export class Channel extends Context.Service<
     readonly list: () => Effect.Effect<T.Channel[]>;
     readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[]>;
     /** A message's durable location; the recent state may hold neither the message nor its thread. */
-    readonly messageLocation: (id: string) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
+    readonly messageLocation: (id: T.MessageId) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
     readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
     /** The thread of the issue the session works (a talk thread of its own when it works none). */
     readonly threadOfSession: (session: string) => Effect.Effect<string | undefined>;
@@ -611,7 +611,7 @@ const make = Effect.gen(function* () {
       ...(row.position !== null ? { position: row.position } : {}),
       ...(row.archived_at !== null ? { archived: row.archived_at } : {}),
       ...(row.notify !== "all" ? { notify: notifyOf(row.notify) } : {}),
-      ...(row.root_id !== null ? { root: row.root_id } : {}),
+      ...(row.root_id !== null ? { root: S.messageId(row.root_id) } : {}),
       ...(row.root_number !== null ? { rootNumber: row.root_number } : {}),
       ...(row.name !== null ? { name: row.name } : {}),
       description: row.description ?? "",
@@ -1353,7 +1353,7 @@ const make = Effect.gen(function* () {
   const filesDir = join(config.home, "attachments");
   const filesAt = (id: string) => join(filesDir, id);
   const inboxOf = (row: MsgRow, target: string): InboxMessage => ({
-    id: row.id,
+    id: S.messageId(row.id),
     number: row.number,
     target,
     from: row.sender_id,

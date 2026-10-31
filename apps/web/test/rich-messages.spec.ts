@@ -1,6 +1,8 @@
 // What a message's words become (ui/richText.ts): code with its language, colours, a copy button and a fold; Mermaid
 // drawn by Pele with nothing in it that runs; only safe links; #12 to its issue; task lists; long messages folded.
 
+import { messageId } from "@vibevalley/protocol/schema";
+
 import { expect, test } from "./fixtures";
 
 const ts = ["```ts", ...Array.from({ length: 24 }, (_, i) => `const n${i}: number = ${i};`), "```"].join("\n");
@@ -63,7 +65,7 @@ test("regression: an opened code block stays open when its message changes witho
   await expect(code).not.toHaveAttribute("data-folded", "");
   const message = await code.locator("xpath=ancestor::*[@data-key][1]").getAttribute("data-key");
   // A reaction gives the page a new copy of the message with the same words.
-  await api.channel.reaction.set({ id: message ?? "", emoji: "👍", on: true });
+  await api.channel.reaction.set({ id: messageId(message ?? ""), emoji: "👍", on: true });
   await expect(page.locator(`[data-key="${message}"] [data-testid="reaction"]`).first()).toBeVisible();
   await expect(code).not.toHaveAttribute("data-folded", "");
 });

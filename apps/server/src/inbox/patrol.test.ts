@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { type ChatMessage, ownerId, type WorkspaceState } from "@vibevalley/protocol";
+import { messageId } from "@vibevalley/protocol/schema";
 
 import { emptyWorkspaceState } from "@/core/core.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
@@ -32,7 +33,7 @@ describe("the patrol", () => {
 
 describe("what reaches the owner off the farm", () => {
   const said = (more: Partial<ChatMessage>): ChatMessage => ({
-    id: "m",
+    id: messageId("m"),
     number: 1,
     channel: "c",
     from: "orchestrator",

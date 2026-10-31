@@ -34,6 +34,7 @@ import type { SqlClient, SqlError } from "effect/sql";
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type ConnectorID, type ConnectorLogin, type ConnectorStatus, dayMs } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
+import { messageId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/chat.ts";
@@ -273,7 +274,7 @@ const make = (options: ConnectorOptions = {}) =>
         const rows = yield* tried(outboxQ.messageOfExt({ connector: id, ext_id: ext }));
         const message = rows[0]?.message_id;
         if (!message) return undefined;
-        return (yield* Effect.mapError(chat.messageLocation(message), bridgeError))?.channel.id;
+        return (yield* Effect.mapError(chat.messageLocation(messageId(message)), bridgeError))?.channel.id;
       });
 
       // The outbox: one drain at a time, in order, never cut off halfway (a message sent and not marked would go twice).

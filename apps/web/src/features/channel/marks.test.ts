@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
 import { type Channel, type ChatMessage, ownerId, VibeValleyApiError } from "@vibevalley/protocol";
+import { messageId } from "@vibevalley/protocol/schema";
 
 import { api } from "@/infra/api";
 import { frameAt, testFrames } from "@/infra/testing";
@@ -28,7 +29,7 @@ beforeEach(() => void vi.spyOn(followed, "subscribe").mockReturnValue(() => {}))
 afterEach(() => vi.restoreAllMocks());
 
 const message = (id: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
-  id,
+  id: messageId(id),
   number: 1,
   channel: "c",
   from: "a",
@@ -63,7 +64,7 @@ const channel = (over: Partial<Channel> = {}): Channel => ({
 test("a reaction on its way shows as the owner's at once, beside the others', and only on its message", () => {
   const m = message("m", { reactions: [{ emoji: "👍", by: ["b"] }] });
   const other = message("n");
-  const [shown, untouched] = markedMessages([m, other], [kept<ReactionMark>({ channel: "c", id: "m", emoji: "👍", on: true })], []);
+  const [shown, untouched] = markedMessages([m, other], [kept<ReactionMark>({ channel: "c", id: messageId("m"), emoji: "👍", on: true })], []);
   expect(shown?.reactions).toEqual([{ emoji: "👍", by: ["b", ownerId] }]);
   expect(untouched).toBe(other);
 });
@@ -75,16 +76,19 @@ test("a reaction taken back goes, and the emoji with it when nobody else had it"
       { emoji: "🎉", by: [ownerId, "b"] },
     ],
   });
-  const marks = [kept<ReactionMark>({ channel: "c", id: "m", emoji: "👍", on: false }), kept<ReactionMark>({ channel: "c", id: "m", emoji: "🎉", on: false })];
+  const marks = [
+    kept<ReactionMark>({ channel: "c", id: messageId("m"), emoji: "👍", on: false }),
+    kept<ReactionMark>({ channel: "c", id: messageId("m"), emoji: "🎉", on: false }),
+  ];
   expect(markedMessages([m], marks, [])[0]?.reactions).toEqual([{ emoji: "🎉", by: ["b"] }]);
 });
 
 test("a pin on its way sets pinned and nothing else; with no marks the list is the same object", () => {
   const m = message("m");
-  const [shown] = markedMessages([m], [], [kept<PinMark>({ channel: "c", id: "m", on: true, at: 9 })]);
+  const [shown] = markedMessages([m], [], [kept<PinMark>({ channel: "c", id: messageId("m"), on: true, at: 9 })]);
   expect(shown).toEqual({ ...m, pinned: 9 });
   const pinned = message("p", { pinned: 3 });
-  expect(markedMessages([pinned], [], [kept<PinMark>({ channel: "c", id: "p", on: false, at: 9 })])[0]?.pinned).toBeUndefined();
+  expect(markedMessages([pinned], [], [kept<PinMark>({ channel: "c", id: messageId("p"), on: false, at: 9 })])[0]?.pinned).toBeUndefined();
   const list = [m];
   expect(markedMessages(list, [], [])).toBe(list);
 });
@@ -117,7 +121,7 @@ test("a reaction settles when the channel's copy shows it, not when the reply co
   });
   vi.spyOn(followed, "get").mockImplementation(() => ({ messages: [copy], complete: true, ready: true }));
   const intents = intentsIn(testRegistry(), reactionSet);
-  const { done } = intents.send({ channel: "c", id: "m", emoji: "👍", on: true });
+  const { done } = intents.send({ channel: "c", id: messageId("m"), emoji: "👍", on: true });
   reply.resolve(copy);
   await done;
   expect(intents.all()).toHaveLength(1);
@@ -151,6 +155,6 @@ test("a level picked again before the first showed replaces it, and settles on t
 });
 
 test("two reactions on one message are two marks; the same emoji again is one", () => {
-  expect(sameReaction({ channel: "c", id: "m", emoji: "👍", on: true }, { channel: "c", id: "m", emoji: "👍", on: false })).toBe(true);
-  expect(sameReaction({ channel: "c", id: "m", emoji: "👍", on: true }, { channel: "c", id: "m", emoji: "🎉", on: true })).toBe(false);
+  expect(sameReaction({ channel: "c", id: messageId("m"), emoji: "👍", on: true }, { channel: "c", id: messageId("m"), emoji: "👍", on: false })).toBe(true);
+  expect(sameReaction({ channel: "c", id: messageId("m"), emoji: "👍", on: true }, { channel: "c", id: messageId("m"), emoji: "🎉", on: true })).toBe(false);
 });

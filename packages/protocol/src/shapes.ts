@@ -11,6 +11,7 @@ export type SessionId = string & Brand.Brand<"SessionId">;
 export type ArtifactId = string & Brand.Brand<"ArtifactId">;
 /** A block's id, within its artifact: a block op names the block it is for, never its artifact. */
 export type BlockId = string & Brand.Brand<"BlockId">;
+export type MessageId = string & Brand.Brand<"MessageId">;
 
 /** The built-in orchestrator's profile id: it cannot be deleted or made a helper, so a farm always has an orchestrator, and
  * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
@@ -210,7 +211,7 @@ export interface Spent {
 }
 
 export interface ChatMessage {
-  id: string;
+  id: MessageId;
   number: number;
   channel: string;
   from: string;
@@ -395,7 +396,7 @@ export interface Channel {
   /** What of it counts for the owner; absent is all. */
   notify?: Notify;
   /** The message a thread hangs under, and its number there. */
-  root?: string;
+  root?: MessageId;
   rootNumber?: number;
   name?: string;
   description: string;
@@ -2715,7 +2716,7 @@ export interface BlockAck {
 }
 
 export interface MessageEdit {
-  id: string;
+  id: MessageId;
   text: string;
   /** The files it keeps: absent keeps them all, a shorter list takes the others off. */
   attachments?: string[];
@@ -2728,12 +2729,12 @@ export interface NotifyRequest {
 
 /** The owner's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
 export interface ReactionSet {
-  id: string;
+  id: MessageId;
   emoji: string;
   on: boolean;
 }
 
-/** A message pinned or a channel archived (on), or not; setting it as it already is changes nothing. */
+/** A channel archived (on), or not; setting it as it already is changes nothing. */
 export interface OnSet {
   id: string;
   on: boolean;

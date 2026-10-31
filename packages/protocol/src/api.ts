@@ -169,18 +169,18 @@ export interface Handlers<R = never> {
   /** The owner's own words, changed; nobody is told again. */
   readonly "channel.message.update": (a: T.MessageEdit) => Effect.Effect<T.ChatMessage, ApiError, R>;
   /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
-  readonly "channel.message.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  readonly "channel.message.delete": (a: { readonly id: T.MessageId }) => Effect.Effect<void, ApiError, R>;
   /** What channel.message.delete would do, refused as it would be; nothing changes. */
-  readonly "channel.message.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "channel.message.previewDelete": (a: { readonly id: T.MessageId }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "channel.message.search": (a: T.MessageSearch) => Effect.Effect<T.MessageHit[], ApiError, R>;
   /** The owner's reaction on or off; as it already is, nothing changes. */
   readonly "channel.reaction.set": (a: T.ReactionSet) => Effect.Effect<T.ChatMessage, ApiError, R>;
   /** The message pinned or not; as it already is, nothing changes. */
-  readonly "channel.pin.set": (a: T.OnSet) => Effect.Effect<T.ChatMessage, ApiError, R>;
+  readonly "channel.pin.set": (a: { readonly id: T.MessageId; readonly on: boolean }) => Effect.Effect<T.ChatMessage, ApiError, R>;
   /** A channel's pinned messages, newest pinned first. */
   readonly "channel.pin.list": (a: { readonly id: string }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
   /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
-  readonly "channel.thread.create": (a: { readonly id: string; readonly requestKey?: string }) => Effect.Effect<string, ApiError, R>;
+  readonly "channel.thread.create": (a: { readonly id: T.MessageId; readonly requestKey?: string }) => Effect.Effect<string, ApiError, R>;
   readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
   /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
   readonly "artifact.list": (a: T.ArtifactListRequest) => Effect.Effect<T.Artifact[], ApiError, R>;
@@ -357,8 +357,8 @@ const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.
 /** The inputs an op and its dry run share: the dry run takes exactly what the op takes. */
 const cronDeleteInput = input({ id: Schema.String });
 const issueDeleteInput = input({ id: Schema.String });
-/** A message, or a channel, by its id. */
-const messageInput = input({ id: Schema.String });
+const messageInput = input({ id: S.MessageId });
+const channelInput = input({ id: Schema.String });
 const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
 const graphTaskDeleteInput = input({ id: Schema.String, task: Schema.String });
 const agentDeleteInput = input({ id: Schema.String });
@@ -719,21 +719,21 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "channel.pin.set",
     about: ["id"],
-    input: S.OnSet,
+    input: input({ id: S.MessageId, on: Schema.Boolean }),
     result: S.ChatMessage,
     can: ["owner", "remote"],
   },
   {
     op: "channel.pin.list",
     about: ["id"],
-    input: messageInput,
+    input: channelInput,
     result: Schema.mutable(Schema.Array(S.ChatMessage)),
     can: ["owner", "remote"],
   },
   {
     op: "channel.thread.create",
     about: ["id"],
-    input: input({ id: Schema.String, requestKey: Schema.optionalKey(Schema.String) }),
+    input: input({ id: S.MessageId, requestKey: Schema.optionalKey(Schema.String) }),
     result: Schema.String,
     can: ["owner", "remote"],
   },
@@ -747,7 +747,7 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "channel.delete",
     about: ["id"],
-    input: messageInput,
+    input: channelInput,
     result: undefined,
     can: ["owner", "remote"],
     dryRun: "channel.previewDelete",
@@ -755,7 +755,7 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "channel.previewDelete",
     about: ["id"],
-    input: messageInput,
+    input: channelInput,
     result: S.Preview,
     can: ["owner", "remote"],
   },
