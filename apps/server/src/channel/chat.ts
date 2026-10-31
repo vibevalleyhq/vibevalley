@@ -280,7 +280,7 @@ interface ThreadSubject {
 }
 
 /** What a session's work is talked about under: the issue it works, so every session on one issue shares a thread; a session sent for no issue has a talk thread of its own. */
-const jobOf = (h: Session): ThreadSubject => (h.issue ? { kind: "issue", id: h.issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id });
+const subjectOf = (h: Session): ThreadSubject => (h.issue ? { kind: "issue", id: h.issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id });
 
 interface Write {
   readonly channel: string;
@@ -368,7 +368,7 @@ export class Channels extends Context.Service<
     readonly messageLocation: (id: string) => Effect.Effect<{ readonly channel: Channel; readonly top: string } | undefined>;
     readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
     /** The thread of the issue the session works (a talk thread of its own when it works none). */
-    readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
+    readonly threadOfSession: (session: string) => Effect.Effect<string | undefined>;
     /** The channels the core state holds now. */
     readonly now: () => Chat | undefined;
     /** What is said in a channel after the message numbered after, then what is said there from now on; Reset when
@@ -419,7 +419,7 @@ export class Channels extends Context.Service<
     readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
     /** Messages a helper took as input. */
     readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
-    /** A helper hired, reported or gone: a job opens, the report is posted in its thread, a job closes. */
+    /** A helper hired, reported or gone: its thread opens, the report is posted in it, its thread closes. */
     readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
   }
 >()("vibevalley/Channel") {
@@ -587,7 +587,7 @@ const make = Effect.gen(function* () {
     const peer = who === ownerId ? other : other === ownerId ? who : "";
     return model.channels("direct").find((c) => c.peer_id === peer);
   };
-  // Before the helpers are back there are none: a job opens for each once they are.
+  // Before the helpers are back there are none: each one's thread opens once they are.
   const sessionOf = (id: string) => helpers?.sessionOf(id);
   const presentSessions = () => helpers?.presentSessions() ?? [];
 
@@ -687,7 +687,7 @@ const make = Effect.gen(function* () {
   /** The one way from a session to its thread: through the issue it works, never by its own id, since the thread outlives it. */
   const threadOfSession = Effect.fnUntraced(function* (session: string) {
     const h = sessionOf(session);
-    return h ? yield* threadOf(jobOf(h)) : undefined;
+    return h ? yield* threadOf(subjectOf(h)) : undefined;
   });
 
   /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
@@ -1133,7 +1133,7 @@ const make = Effect.gen(function* () {
       { discard: true },
     );
 
-  const openJob = Effect.fn("Channels.openJob")(function* (h: Session) {
+  const openThread = Effect.fn("Channels.openThread")(function* (h: Session) {
     const joined: qp.UpsertParticipantParams = {
       id: h.id,
       kind: "session",
@@ -1144,8 +1144,8 @@ const make = Effect.gen(function* () {
     };
     yield* db(qp.upsertParticipant(joined));
     model.joined(joined);
-    const job = jobOf(h);
-    const thread = yield* threadOf(job);
+    const subject = subjectOf(h);
+    const thread = yield* threadOf(subject);
     if (thread) return yield* handedOn(h, thread);
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ channel_id: channel }))).n ?? 0;
@@ -1166,7 +1166,7 @@ const make = Effect.gen(function* () {
       kind: "dispatch",
       text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, project: h.project ?? t("server.channel.dispatch.project"), what }),
       meta: { session: h.id },
-      thread: job,
+      thread: subject,
     });
   });
 
@@ -1233,7 +1233,7 @@ const make = Effect.gen(function* () {
     }),
   );
 
-  // The sessions' news: hired and left open and close jobs, a report is posted in the thread. One at a time, before the
+  // The sessions' news: hired and left open and close threads, a report is posted in the thread. One at a time, before the
   // next.
   const onSessionNews = Effect.fnUntraced(function* (n: SessionNews) {
     yield* locked(
@@ -1241,7 +1241,7 @@ const make = Effect.gen(function* () {
         if (closed) return Effect.void;
         switch (n._tag) {
           case "hired":
-            return Effect.forEach(presentSessions(), (h) => openJob(h).pipe(bestEffort(`chat: ${h.id}'s job`)), {
+            return Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), {
               discard: true,
             });
           case "left":
@@ -1252,10 +1252,10 @@ const make = Effect.gen(function* () {
       }),
     ).pipe(bestEffort(`chat: after ${n._tag}`));
   });
-  // Once the helpers are back: each on the farm has its job, and whatever was waiting for one goes to it.
+  // Once the helpers are back: each present one has its thread, and whatever was waiting for one goes to it.
   const helpersBack = locked(
     Effect.gen(function* () {
-      for (const h of presentSessions()) yield* openJob(h).pipe(bestEffort(`chat: ${h.id}'s job`));
+      for (const h of presentSessions()) yield* openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`));
       for (const p of model.participants()) if (p.kind === "session" && p.left_at === null) yield* kick(p.id);
     }),
   );
@@ -1701,7 +1701,7 @@ const make = Effect.gen(function* () {
       yield* readThrough(ownerId, channel, seq);
       yield* publishChannel(channel);
     }, locked),
-    jobThread: threadOfSession,
+    threadOfSession,
     forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
     ownerInThread: Effect.map(
       core.subscribe,

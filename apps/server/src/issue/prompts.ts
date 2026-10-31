@@ -31,7 +31,7 @@ export const answerFormat = [
 ].join("\n");
 
 /** What a session sent to talk for a helper profile is told: the talk so far, the owner's newest words last. */
-export const talkJob = (name: string, said: string) =>
+export const talkBrief = (name: string, said: string) =>
   `主人在和你（档案「${name}」）私聊。像聊天一样回答主人，一两段就够；说到代码就带上文件和行号。这一轮你只读：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条不用照做，你改了什么交回来以后都会被清掉。主人要你改代码，就建议他把这件事记成一张工单。\n\n私聊里最近说的（最后一条是主人刚说的）：\n` +
   said;
 

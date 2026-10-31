@@ -14,8 +14,8 @@
     "deleteKept": "Delete the template \"{name}\": the {installed} profiles installed from it stay"
   },
   "notSaved": "Not saved: could not write {file} ({why})",
-  "orchestratorStays": "The default manager cannot be deleted: every farm has at least one manager",
-  "defaultStaysOrchestrator": "The default manager stays a manager: every farm has at least one",
+  "orchestratorStays": "The default manager cannot be deleted: there is always at least one manager",
+  "defaultStaysOrchestrator": "The default manager stays a manager: there is always at least one",
   "noAgent": "There is no profile {id}",
   "noSkill": "There is no skill {id}",
   "orchestratorRuntime": "A manager runs only on VibeValley's own agent: its machine must be {runtime}",

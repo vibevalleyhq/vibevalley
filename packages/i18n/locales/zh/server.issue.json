@@ -24,7 +24,7 @@
   "queuedStarted": "排队的「{title}」开工了：{session}",
   "queuedStuck": "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",
   "queuedBack": "排队的「{title}」开不了工，留在待办里：{why}",
-  "graphRetry": "这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划",
+  "graphRetry": "这是计划里的工单，跟着计划走：在计划里重试这一件，或者重开整个计划",
   "neverStarted": "这张工单还没开过工：直接开工",
   "stillOpen": "这张工单还开着：挪回待办就是再来一轮",
   "stillWorking": "{name} 还在做这张工单：直接给它带话",

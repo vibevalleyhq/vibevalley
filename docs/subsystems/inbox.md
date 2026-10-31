@@ -1,4 +1,4 @@
-# 通知
+# Inbox
 
 要主人处理的事（Inbox）、哪些是刚来的、放久了没人管的（巡查），和它们经哪条路到主人那里：通话里由管家说，没在通话时农场手机响铃、系统通知、菜单栏。农场里画成手机的来电。
 
@@ -13,8 +13,8 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/notice`（`Notices`，属于 Notifications 模块）：`notice.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`patrol.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），`away.ts` 的 `forOwner` 是哪些话送到农场外的主人那里，黄金数据在 `testdata/rules.jsonl.gz`。
-- Inbox 在 `apps/server/src/notice/inbox.ts`（`inbox`、`inboxEntries`，每件的话）；拼帧（`projection/frame.ts`）把它放在 `StateFrame.inbox`，和 `state`、`view` 并排。哪些是刚来的（`freshOf`）页面也要算，留在 `packages/protocol`。
+- 服务端 `apps/server/src/inbox`（`Inbox`，自成 Inbox 模块）：`inbox.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`patrol.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），`away.ts` 的 `forOwner` 是哪些话送到农场外的主人那里，黄金数据在 `testdata/rules.jsonl.gz`。
+- Inbox 在 `apps/server/src/inbox/items.ts`（`inbox`、`inboxEntries`，每件的话）；拼帧（`projection/frame.ts`）把它放在 `StateFrame.inbox`，和 `state`、`view` 并排。哪些是刚来的（`freshOf`）页面也要算，留在 `packages/protocol`。
 - 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/features/notice/Follow.tsx`、`apps/web/src/features/notice/tray.ts`。
 
 ## 模型和不变量
@@ -40,7 +40,7 @@
 
 ## 怎么走
 
-**刚来的**：`Notices` 订阅核心的事实，每次算一遍 Inbox，把刚来的发到 `news`。`voice` 订阅它：正在通话就把每件的 `title：body` 交给管家在电话里说（[语音](docs/subsystems/voice.md)「管家打电话找主人」）；没在通话就不管，手机会照帧里同样的 Inbox 响。
+**刚来的**：`Inbox` 订阅核心的事实，每次算一遍 Inbox，把刚来的发到 `news`。`voice` 订阅它：正在通话就把每件的 `title：body` 交给管家在电话里说（[语音](docs/subsystems/voice.md)「管家打电话找主人」）；没在通话就不管，手机会照帧里同样的 Inbox 响。
 
 **巡查**：每 `patrol.heartbeat_minutes` 分钟（默认 10，0 关掉；开机后等一个间隔才第一次看）不调模型看一遍 Inbox（`patrolStep`）。放久了没人管的才报：`mention`、`ask` 15 分钟，`quiet` 20 分钟，`interrupted`、`task-failed` 30 分钟，`merge` 和 `conflict` 2 小时（`patrolGrace`，从 Inbox 给的时刻算，没有就从第一次看到算）；别的种类不报（没做成的当场就叫醒管家，`cron-ask` 是主人的事）。同一件事报过 4 小时内不再报，不再挂着的忘掉。有的才按频道发一条到 `overdue`；管家订阅它，写成「【巡查】#… 里有几件事放着没人管」叫醒自己，由它决定提不提醒主人。
 
@@ -65,7 +65,7 @@
 ## 怎么验证
 
 - `apps/server/src/core/golden.test.ts`（每种什么时候算、id、截字、先后，和工单站位一致）；`inbox.test.ts`（交回来带着问题、停在半路、每件的话、刚来的）。
-- `apps/server/src/notice/patrol.test.ts`：巡查照黄金数据。
+- `apps/server/src/inbox/patrol.test.ts`：巡查照黄金数据。
 - `apps/server/src/orchestrator/orchestrator.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
 - `apps/server/src/voice/voice.test.ts`「tells what comes together once」：通话里两件刚来的合成一段说。
 - 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/features/notice/tray.test.ts`（菜单栏）。

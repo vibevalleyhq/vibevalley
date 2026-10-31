@@ -2,11 +2,12 @@ import { Result, Schema, SchemaIssue } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type { Task } from "@vibevalley/protocol";
+import { TaskDraft } from "@vibevalley/protocol/schema";
 
 import { lastJsonBlock } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
 
-import { type StepDraft, freshTask } from "./editing.ts";
+import { freshTask } from "./editing.ts";
 import { graphProblems } from "./graph.ts";
 export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly tasks: Task[] } | { readonly ok: false; readonly problems: string[] };
 
@@ -18,19 +19,8 @@ function unparsedJson(e: unknown): string {
 
 const formatIssue = SchemaIssue.makeFormatterDefault();
 
-const StepDraftSchema: Schema.Codec<StepDraft> = Schema.Struct({
-  id: Schema.String,
-  title: Schema.optionalKey(Schema.String),
-  brief: Schema.String,
-  needs: Schema.optionalKey(Schema.Array(Schema.String)),
-  agent: Schema.optionalKey(Schema.String),
-  check: Schema.optionalKey(Schema.String),
-  scope: Schema.optionalKey(Schema.Array(Schema.String)),
-  acceptance: Schema.optionalKey(Schema.Boolean),
-});
-
 /** Optional fields may be missing but never null; other keys are ignored. */
-const SplitDraft = Schema.Struct({ title: Schema.optionalKey(Schema.String), tasks: Schema.Array(StepDraftSchema) });
+const SplitDraft = Schema.Struct({ title: Schema.optionalKey(Schema.String), tasks: Schema.Array(TaskDraft) });
 
 /** The first thing wrong with a split, in the words the model is answered with: where it is (["tasks"][0]["brief"]) and
  * what it should have been. */

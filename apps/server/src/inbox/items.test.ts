@@ -7,7 +7,7 @@ import { freshOf } from "@vibevalley/protocol/rules";
 
 import { emptyWorkspaceState } from "@/core/core.ts";
 
-import { inbox } from "./inbox.ts";
+import { inbox } from "./items.ts";
 
 test("a helper handed back with questions asks the owner to answer, not to complete it", () => {
   const session = {

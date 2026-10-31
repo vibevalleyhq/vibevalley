@@ -59,7 +59,7 @@ export interface Candidate {
   readonly usable: boolean;
 }
 
-/** The profile named (by id or name, else a usable one on the runtime named), else the one picked, else the usable one whose tags the job names most. */
+/** The profile named (by id or name, else a usable one on the runtime named), else the one picked, else the usable one whose tags the brief names most. */
 export function chooseAgent(candidates: readonly Candidate[], task: string, named: string, picked: string): Agent | undefined {
   if (named) {
     const byName = candidates.find((c) => c.agent.id === named || c.agent.name === named) ?? candidates.find((c) => c.agent.runtime === named && c.usable);

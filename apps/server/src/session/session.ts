@@ -73,7 +73,7 @@ import { Projects } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 
-import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
+import { instructions, briefBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
 import { eventFacts, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
@@ -113,7 +113,7 @@ export interface HireOptions {
   readonly worktree?: boolean;
   readonly taskGraph?: SessionGraph;
   readonly channel?: string;
-  /** Empty: Issues writes one from the job before opening its session. */
+  /** Empty: Issues writes one from the issue before opening its session. */
   readonly issue?: string;
   /** What its first run is for; the issue sent out when none. */
   readonly trigger?: RunTrigger;
@@ -237,7 +237,7 @@ export class Sessions extends Context.Service<
   static readonly layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));
 }
 
-/** What execution.ts keeps runs with; a write that fails is an error the run retries. */
+/** What inProcessRun.ts keeps runs with; a write that fails is an error the run retries. */
 export interface RunStore {
   readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, NotRecorded>;
   readonly link: (run: string, issue: string) => Effect.Effect<void, NotRecorded>;
@@ -265,8 +265,8 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
   }
 }
 
-/** The executions open now (a helper's runtime session, the orchestrator's), as a gauge. */
-const running = Metric.gauge("vibevalley.sessions.running", { description: "Executions open now" });
+/** The runtime sessions open now (a helper's, the orchestrator's), as a gauge. */
+const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 
 /** A write of a session's own records (a run, the issue it works) that did not go through. */
 export class NotRecorded extends Schema.TaggedError<NotRecorded, { readonly brand: unique symbol }>()("NotRecorded", {
@@ -518,7 +518,7 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
 
-    // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
+    // A run's record, the helpers' and the in-process agent's alike (inProcessRun.ts): one way to open, hear, link and end it.
     const runs = {
       start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
         tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: clock.currentTimeMillisUnsafe() })),
@@ -649,7 +649,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           agent: session.agent,
           session: h.id,
           project: h.place.project,
-          job: session.brief,
+          brief: session.brief,
           outcome: read.outcome,
           said: read.text,
           summary: read.summary,
@@ -801,7 +801,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       allocations.set(id, allocation);
       yield* Metric.update(running, allocations.size);
       const opening = Effect.gen(function* () {
-        const task = text && agent.personaMode === "prompt" ? text + jobBreak + input : input;
+        const task = text && agent.personaMode === "prompt" ? text + briefBreak + input : input;
         const spawned = yield* Effect.promise(() =>
           subagents
             .spawn({

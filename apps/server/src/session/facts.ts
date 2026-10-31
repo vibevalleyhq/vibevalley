@@ -11,7 +11,7 @@ import { clip } from "@/base/clip.ts";
 import type { FactIn } from "@/core/core.ts";
 import type { Rate } from "@/runtime/price.ts";
 
-import { jobBreak, recalledIn } from "./briefing.ts";
+import { briefBreak, recalledIn } from "./briefing.ts";
 import { failureText } from "./report.ts";
 import { doingOf } from "./roster.ts";
 import { shellCommand } from "./shell.ts";
@@ -126,10 +126,10 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
   switch (event.kind) {
     case "turn_started": {
       next = { ...next, runFrom: session?.spent ? { ...session.spent } : { tokens: 0 } };
-      // A prompt-mode persona and what the turn is reminded of ride on top of the input: the panel shows the job itself,
+      // A prompt-mode persona and what the turn is reminded of ride on top of the input: the panel shows the brief itself,
       // then what was recalled.
-      const at = event.input.lastIndexOf(jobBreak);
-      journal.push({ type: "prompt", text: at >= 0 ? event.input.slice(at + jobBreak.length) : event.input });
+      const at = event.input.lastIndexOf(briefBreak);
+      journal.push({ type: "prompt", text: at >= 0 ? event.input.slice(at + briefBreak.length) : event.input });
       const recalled = recalledIn(event.input);
       if (recalled) journal.push({ type: "note", kind: "memory/recalled", text: recalled });
       facts.push({ type: "run", id });

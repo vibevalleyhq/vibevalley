@@ -68,7 +68,7 @@ import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitB
 import { pickIssues } from "./filter.ts";
 import { merging } from "./merge.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { needsOwner, talkJob } from "./prompts.ts";
+import { needsOwner, talkBrief } from "./prompts.ts";
 import { kept, openQuestions, refinement } from "./refinement.ts";
 import { IssueSessions } from "./sessions.ts";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues, isClosed } from "./status.ts";
@@ -888,7 +888,7 @@ const make = (options: IssueOptions = {}) =>
       const agent = store.agent(item.assignee ?? "");
       if (!agent || !item.talk) return;
       const said = inboxLines(yield* chat.recent(item.talk, talkContext));
-      const hired = yield* hire(agent, talkJob(agent.name, said), item.project ?? (agent.workdir || (yield* lastProject)), {
+      const hired = yield* hire(agent, talkBrief(agent.name, said), item.project ?? (agent.workdir || (yield* lastProject)), {
         channel: item.talk,
         issue: item.id,
         trigger: { kind: "comment" },

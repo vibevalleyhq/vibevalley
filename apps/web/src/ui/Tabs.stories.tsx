@@ -2,7 +2,7 @@ import { stories, story } from "@vibevalley/stories";
 
 import { Tabs, type TabsLook } from "./Tabs";
 
-type Tab = "chat" | "jobs" | "crons" | "files";
+type Tab = "chat" | "issues" | "crons" | "files";
 
 export default stories({
   title: "组件/工作台/Tabs",
@@ -17,7 +17,7 @@ export default stories({
           value="chat"
           items={[
             { value: "chat", label: "聊天", icon: "chat" },
-            { value: "jobs", label: "活", icon: "issues" },
+            { value: "issues", label: "活", icon: "issues" },
           ]}
         />
       ),
@@ -25,7 +25,7 @@ export default stories({
     Playground: story({
       note: "pills 用在窗格里，line 用在页面的头下面。",
       args: { look: "pills", value: "chat", icons: true },
-      controls: { look: { kind: "choice", options: ["pills", "line"] }, value: { kind: "choice", options: ["chat", "jobs", "crons", "files"] } },
+      controls: { look: { kind: "choice", options: ["pills", "line"] }, value: { kind: "choice", options: ["chat", "issues", "crons", "files"] } },
       render: (a, set) => (
         <Tabs<Tab>
           label="群聊里"
@@ -35,7 +35,7 @@ export default stories({
           class={a.look === "line" ? "border-b border-line px-3" : undefined}
           items={[
             { value: "chat", label: "聊天", icon: a.icons ? "chat" : undefined },
-            { value: "jobs", label: "活", icon: a.icons ? "issues" : undefined },
+            { value: "issues", label: "活", icon: a.icons ? "issues" : undefined },
             { value: "crons", label: "定时", icon: a.icons ? "clock" : undefined },
             { value: "files", label: "文件", icon: a.icons ? "file" : undefined },
           ]}

@@ -14,7 +14,7 @@
   "notBack": "The helpers have not come back yet",
   "breaker": "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
   "dispatch": {
-    "step": "step \"{task}\" of the plan {graph}",
+    "step": "task \"{task}\" of the plan {graph}",
     "split": "splitting the plan {graph}",
     "draft": "reading the code and drafting this ticket",
     "project": "the project",
@@ -29,7 +29,7 @@
   "channelGone": "The channel cannot be found",
   "noHelper": "There is no helper {id}",
   "noChannel": "There is no channel {id}",
-  "notOrchestrator": "{id} is not an orchestrator's profile: only an orchestrator can look after a channel",
+  "notOrchestrator": "{id} is not a manager's profile: only a manager can look after a channel",
   "noMessageId": "There is no message {id}",
   "threadOnlyTitle": "A thread can only get a title",
   "defaultStays": "The default channel cannot be archived or deleted: make another one the default first",

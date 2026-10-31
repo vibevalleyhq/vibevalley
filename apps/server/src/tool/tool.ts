@@ -876,7 +876,7 @@ const make = Effect.gen(function* () {
       sessionDescriptions["issue.split"](maxTasks),
       Effect.fn("Tools.issueSplit")(function* (p: Session<"issue.split">) {
         const c = yield* callerOf(who);
-        const steps = p.tasks.map((item) => ({
+        const drafts = p.tasks.map((item) => ({
           id: item.id,
           title: item.title ?? "",
           brief: item.brief,
@@ -886,7 +886,7 @@ const make = Effect.gen(function* () {
           ...(item.scope ? { scope: item.scope } : {}),
           ...(item.acceptance === true ? { acceptance: true } : {}),
         }));
-        return yield* answered(tasks.splitIssue(c.session, p.title ?? "", steps));
+        return yield* answered(tasks.splitIssue(c.session, p.title ?? "", drafts));
       }),
     );
 

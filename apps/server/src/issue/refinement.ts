@@ -128,7 +128,7 @@ export function refinement(d: RefinementDeps) {
     const id = h.issue;
     const r = sessions.find(f.id);
     const said = r?.lastText ?? "";
-    const thread = yield* chat.jobThread(f.id);
+    const thread = yield* chat.threadOfSession(f.id);
     const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);

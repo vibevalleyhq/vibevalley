@@ -10,7 +10,7 @@
 | 帮工走去哪、什么姿势、在哪块地上 | 帮工的阶段和在做什么（[帮工](docs/subsystems/session.md)） |
 | 快捷栏的农具：点一块地做什么、用不上时说为什么 | 农具调的接口背后的规则（`issue.status.update`、`issue.comment.create`，[工单](docs/subsystems/issue.md)） |
 | 地图：每个项目一座岛，地是它的 worktree 和空位 | 项目的上限、worktree（[项目](docs/subsystems/project.md)） |
-| 农场手机：来电响铃、接听去哪、通话记录、小游戏 | 哪些事算来电、怎么说（Inbox，[通知](docs/subsystems/notice.md)） |
+| 农场手机：来电响铃、接听去哪、通话记录、小游戏 | 哪些事算来电、怎么说（Inbox，[Inbox](docs/subsystems/inbox.md)） |
 | 系统通知和菜单栏的说法（[客户端](docs/subsystems/app.md)「通知和菜单栏」） | 通知送到页面没开着的手机上（连接器，[田头](docs/subsystems/channel.md)） |
 | 合成音效、图鉴 | 首页的生命周期（[客户端](docs/subsystems/app.md#怎么走)）和界面（[farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
 | 素材怎么读进页面（`sprites.json`、密度） | 生图和切图的流水线：`design/`（[工程流程](docs/subsystems/process.md#怎么走)） |
@@ -113,7 +113,7 @@
 
 ## 和谁打交道
 
-- **核心状态**：读 `StateFrame`（形状在 `packages/protocol`）的 `state`、`view`、`inbox`、`effects`；地的样子是 `plotOf`（`game/view.ts`），来电是 `inbox`（`notice/inbox.ts`），皮不重写这两条规则。
+- **核心状态**：读 `StateFrame`（形状在 `packages/protocol`）的 `state`、`view`、`inbox`、`effects`；地的样子是 `plotOf`（`game/view.ts`），来电是 `inbox`（`inbox/items.ts`），皮不重写这两条规则。
 - **工单、帮工**：农具按工单的按钮发它带着的请求；播种是经田头发一条带档案和项目（农场的还带地号）的消息。
 - **种子**：播种袋读 `project.template.list`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `apps/server/src/agent/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
 - **项目**：地图读项目列表里的 `maxSessions`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。

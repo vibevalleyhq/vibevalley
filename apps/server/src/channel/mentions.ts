@@ -5,6 +5,8 @@ export const chatNamed: Readonly<Record<string, string>> = {
   管家: defaultOrchestrator,
   主人: ownerId,
   所有人: everyone,
+  // @manager is what the English page says for 管家 (server.channel.mention.orchestrator); @orchestrator already names the
+  // default by its profile id.
   manager: defaultOrchestrator,
   owner: ownerId,
   everyone,

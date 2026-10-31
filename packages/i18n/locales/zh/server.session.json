@@ -9,7 +9,7 @@
     "invalid_request": "请求被服务商拒绝了",
     "overloaded": "服务商太忙",
     "provider": "服务商出错了",
-    "runtime_exited": "runtime 进程中途退出了",
+    "runtime_exited": "农机进程中途退出了",
     "unknown": "出错了"
   },
   "failureNext": {
@@ -32,7 +32,7 @@
   },
   "noRoom": {
     "farm": "已经有 {max} 个帮工在干活了",
-    "runtime": "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在 Runtime 页面可以改）",
+    "runtime": "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在「农机」页可以改）",
     "project": "项目 {project} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件"
   },
   "notTaken": {
@@ -77,7 +77,7 @@
   "host": {
     "stopped": "{label}已经停下",
     "cannotStart": "起不来：{why}",
-    "notRecorded": "{label}的执行没能记下：{why}",
+    "notRecorded": "{label}的这一轮没能记下：{why}",
     "startFailed": "{label}起不来：{why}",
     "callerStart": "我这边起不来：{why}",
     "failed": "{label}出错了：{why}",
@@ -90,13 +90,13 @@
   "life": {
     "stoppedNeedsYou": "{name} 停下了：{why}",
     "quietNotice": "{name} 已经 {span}没动静了{last}：点它的地看看过程，不对就叫停",
-    "notStopped": "农机没能停止，工作区留着：{why}",
-    "notReturned": "上一次农机还没交回工作区",
+    "notStopped": "农机没能停止，工作目录留着：{why}",
+    "notReturned": "上一次农机还没交回工作目录",
     "agentGone": "{name} 的 agent 已经删掉了，叫不醒",
     "cannotWake": "{name} 叫不醒：{why}",
     "noHelper": "没有 {id} 这个帮工",
     "helperRef": "帮工 {id}",
-    "stillClosing": "{name} 的农机没能停止：工作区留着，不能再开一轮",
+    "stillClosing": "{name} 的农机没能停止：工作目录留着，不能再开一轮",
     "noRoom": "{name} 先不接着干：{full}",
     "notReceived": "{name} 没收到：{why}",
     "inGraph": "{name} 在做计划 {graph} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支",
@@ -105,7 +105,7 @@
     "placeGone": "干活的目录不见了（{cwd}）",
     "noRecord": "库里没有它的记录",
     "restartedNotice": "VibeValley 重启过，{name} 那一轮停下了；给它带句话就能接着干",
-    "issueNotReturned": "这张工单的农机还没交回工作区",
+    "issueNotReturned": "这张工单的农机还没交回工作目录",
     "noPlace": "{name} 没地方干活：{why}",
     "cannotSend": "{name} 派不出去：{why}",
     "notRecorded": "{name} 的工单没记下来：{why}",

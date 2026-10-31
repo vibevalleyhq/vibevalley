@@ -1,7 +1,7 @@
 {
   "tab": {
     "chat": "聊天",
-    "jobs": "任务",
+    "issues": "工单",
     "crons": "定时任务"
   },
   "defaultProject": "默认项目 {project}",
@@ -48,8 +48,8 @@
     "settingsOf": "# {name} 的设置",
     "save": "保存"
   },
-  "jobs": {
-    "empty": "这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。",
+  "issues": {
+    "empty": "这个频道里还没有工单。在聊天里跟管家说一件要做的事，它会派帮工，工单就列在这里。",
     "thread": "工单串"
   },
   "crons": {
@@ -183,8 +183,8 @@
     "keys": "{mac, select, true {⌘K} other {Ctrl K}}"
   },
   "farmSearch": {
-    "open": "搜全农场",
-    "title": "搜全农场",
+    "open": "全部搜索",
+    "title": "全部搜索",
     "hint": "找消息…",
     "filters": "from:主人  in:#频道  has:file / image / link  before: / after:2026-10-01",
     "none": "没有找到",

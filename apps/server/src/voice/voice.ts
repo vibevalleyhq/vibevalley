@@ -24,7 +24,7 @@ import { afterRealTime } from "@/base/time.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, errnoOf } from "@/errors.ts";
-import { Notices } from "@/notice/notice.ts";
+import { Inbox } from "@/inbox/inbox.ts";
 import { orchestratorModel } from "@/orchestrator/model.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
@@ -440,7 +440,7 @@ const make = (options: VoiceOptions = {}) =>
     const logs = yield* callbackLog;
     const config = yield* ServerConfig;
     const core = yield* Core;
-    const notices = yield* Notices;
+    const inbox = yield* Inbox;
     const settings = yield* Setting;
     const chat = yield* Channels;
     const orchestrator = yield* Orchestrator;
@@ -665,7 +665,7 @@ const make = (options: VoiceOptions = {}) =>
     // What came into the inbox: with a call on, the orchestrator says it on the call; with none, the page's phone rings
     // with the same items.
     yield* Effect.forkScoped(
-      Stream.runForEach(yield* notices.news, (items) =>
+      Stream.runForEach(yield* inbox.news, (items) =>
         Effect.sync(() => {
           if (liveCall()) tell(items.map((i) => noticeLine(i.words.title, i.words.body)));
         }),

@@ -19,8 +19,8 @@ import { Core } from "@/core/core.ts";
 import { Crons } from "@/cron/cron.ts";
 import { nextRun } from "@/cron/when.ts";
 import type { ApiError } from "@/errors.ts";
+import { Inbox, type Overdue } from "@/inbox/inbox.ts";
 import { Issues, type OrchestratorWork } from "@/issue/issue.ts";
-import { Notices, type Overdue } from "@/notice/notice.ts";
 import { Projects } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
@@ -122,7 +122,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const tasks = yield* Tasks;
     const cron = yield* Crons;
     const tool = yield* Tools;
-    const notices = yield* Notices;
+    const inbox = yield* Inbox;
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const service = yield* Llm;
@@ -401,7 +401,7 @@ const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(Stream.runForEach(yield* chat.forOrchestrator, (n) => logged("a line", heardInChat(n))));
       yield* Effect.forkScoped(Stream.runForEach(yield* issue.forOrchestrator, (w) => logged("an issue", onWork(w))));
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
+        Stream.runForEach(yield* inbox.overdue, (o: Overdue) =>
           logged(
             "the patrol",
             Effect.flatMap(chat.topOf(o.channel), (c) =>

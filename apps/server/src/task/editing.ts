@@ -1,21 +1,10 @@
 import { t } from "@vibevalley/i18n";
-import type { Task, TaskEdit, TaskGraph } from "@vibevalley/protocol";
+import type { Task, TaskDraft, TaskEdit, TaskGraph } from "@vibevalley/protocol";
 
 import { canEditTask, canRemoveTask, graphProblems, taskOf, taskView, withTask } from "./graph.ts";
 
-/** A step as whoever splits writes it: the splitting session in its json block, a helper through issue_split. */
-export interface StepDraft {
-  readonly id: string;
-  readonly title?: string;
-  readonly brief: string;
-  readonly needs?: readonly string[];
-  readonly agent?: string;
-  readonly check?: string;
-  readonly scope?: readonly string[];
-  readonly acceptance?: boolean;
-}
-
-export function freshTask(draft: StepDraft): Task {
+/** A task as whoever splits writes it: the splitting session in its json block, a helper through issue_split. */
+export function freshTask(draft: TaskDraft): Task {
   const id = draft.id.trim();
   const agent = (draft.agent ?? "").trim();
   const check = (draft.check ?? "").trim();

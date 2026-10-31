@@ -17,8 +17,8 @@ import type { ServerConfig } from "@/base/config.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Crons } from "@/cron/cron.ts";
+import { Inbox } from "@/inbox/inbox.ts";
 import { Issues } from "@/issue/issue.ts";
-import { Notices } from "@/notice/notice.ts";
 import { Sessions } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
@@ -438,7 +438,7 @@ describe("the orchestrator", () => {
       number = (yield* issues.get(hired.session!.issue!)).number;
       yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "done"), "the work handed back");
       yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
-      const thread = (yield* chat.jobThread(helper))!;
+      const thread = (yield* chat.threadOfSession(helper))!;
       const refused = yield* until(() => saidIn(thread).find((m) => m.from === defaultOrchestrator && m.text.startsWith("合并：")), "the completion refused");
       expect(refused.text).toBe("合并：没挪：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
@@ -549,21 +549,21 @@ describe("the orchestrator", () => {
     const f = farm(respond, testConfig(), () => Date.now() + offset);
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const notices = yield* Notices;
+      const inbox = yield* Inbox;
       const sessions = yield* Sessions;
       yield* enableLab;
       yield* orchestrator.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "done"), "the work handed back");
       const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/u;
-      yield* notices.patrol;
+      yield* inbox.patrol;
       yield* marked(f);
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
       offset = 3 * 3_600_000;
-      yield* notices.patrol;
+      yield* inbox.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
       expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#general 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/u);
       offset = 3.5 * 3_600_000;
-      yield* notices.patrol;
+      yield* inbox.patrol;
       yield* marked(f);
       // Each request carries the whole channel: count this work's patrol lines in the latest.
       const latest = f.requests.at(-1)!;

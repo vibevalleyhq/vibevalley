@@ -24,7 +24,7 @@ import { Channels } from "@/channel/chat.ts";
 import { channelOf, defaultOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
-import { Notices } from "@/notice/notice.ts";
+import { Inbox } from "@/inbox/inbox.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
@@ -115,7 +115,7 @@ const make = (options: ConnectorOptions = {}) =>
     const { attempt: db, attemptTx } = yield* Db;
     const chat = yield* Channels;
     const core = yield* Core;
-    const notices = yield* Notices;
+    const inbox = yield* Inbox;
     const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
@@ -655,10 +655,10 @@ const make = (options: ConnectorOptions = {}) =>
     for (const b of bridges) yield* Effect.orDie(b.load);
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
-    // What the owner hears off the farm (Notifications says what) goes out on every app the owner has, each checking it is
+    // What the owner hears off the farm (the inbox says what) goes out on every app the owner has, each checking it is
     // its owner's channel.
     yield* Effect.forkScoped(
-      Stream.runForEach(yield* notices.toOwner, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })),
+      Stream.runForEach(yield* inbox.toOwner, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })),
     );
     for (const b of bridges) if (b.hasAccount()) forkHere(b.resume);
     yield* Effect.addFinalizer(() =>

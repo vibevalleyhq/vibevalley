@@ -20,11 +20,11 @@ import { Connectors, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Crons, start as cronStart } from "./cron/cron.ts";
 import { Game, start as gameStart } from "./game/game.ts";
+import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
 import { Issues, type IssueOptions } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memories } from "./memory/memory.ts";
-import { Notices, start as noticeStart } from "./notice/notice.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { Projects, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as projection } from "./projection/projection.ts";
@@ -82,7 +82,7 @@ export const sourceControl =
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     below.pipe(on(Projects.layer(o.project)));
 
-/** Agent Sessions: an agent at work on a job in a workplace. */
+/** Agent Sessions: an agent at work on an issue in a workplace. */
 export const agentSessions =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
@@ -106,8 +106,8 @@ const issues =
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     issuesBelowTaskGraphs(o)(below).pipe(on(Tasks.layer(o.task)));
 
-/** Notifications: what in the inbox is news to the owner, and the patrol. */
-const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Notices.layer));
+/** Inbox: what in it is news to the owner, and the patrol. */
+const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.layer));
 
 /** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
 const orchestrator =
@@ -133,8 +133,8 @@ export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => buil
 const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
 /** Issues' startup without the crons' clock: for a test farm that ticks them by hand. */
 export const taskGraphsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart));
-/** Notifications' startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
-export const notificationsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(noticeStart));
+/** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
+export const inboxStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(inboxReady));
 /** Gamification's startup: commits start being counted. */
 const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(gameStart));
 
@@ -146,13 +146,13 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     collaboration(options),
     agentSessions(options),
     issues(options),
-    notifications,
+    inbox,
     orchestrator(options),
     gamification,
     gateway(options),
     sourceControlStart,
     agentSessionsStart,
     issuesStart,
-    notificationsStart,
+    inboxStart,
     gamificationStart,
   );

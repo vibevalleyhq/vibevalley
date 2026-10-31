@@ -160,7 +160,7 @@ describe("memory sources", () => {
           agent: "lab",
           session: "w1",
           project: "demo",
-          job: "修登录页",
+          brief: "修登录页",
           said: "改好了。\n记住：登录态统一走 refreshSession()",
           summary: "改好了",
           outcome: "completed",

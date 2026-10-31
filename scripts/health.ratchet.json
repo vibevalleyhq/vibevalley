@@ -170,6 +170,15 @@
     "ignored": 5,
     "swallowed": 0
   },
+  "server: Inbox": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
+  },
   "server: Issues": {
     "nonNull": 25,
     "doubleCast": 0,
@@ -178,15 +187,6 @@
     "orDie": 1,
     "ignored": 0,
     "swallowed": 1
-  },
-  "server: Notifications": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0
   },
   "server: Orchestrator": {
     "nonNull": 7,

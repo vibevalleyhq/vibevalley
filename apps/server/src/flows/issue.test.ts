@@ -443,7 +443,7 @@ describe("an issue", () => {
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
       expect((yield* issues.get(issue.id)).attention.acts[0]).toEqual({ act: "cure", does: "move", status: "todo", words: "none" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
-      const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
+      const thread = (yield* chat.threadOfSession((yield* issues.get(issue.id)).sessions.at(-1)!))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
         "the cure said once, by the server",
@@ -541,7 +541,7 @@ describe("an issue", () => {
       expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
       refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner)), "这一轮没做成");
       yield* issues.setStatus(garbled.id, "todo", "", "", owner);
-      const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
+      const thread = (yield* chat.threadOfSession(stuck.sessions.at(-1)!))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
         "what was wrong with it, said",

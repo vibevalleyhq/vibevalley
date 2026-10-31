@@ -11,7 +11,7 @@
 | 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时任务归 `cron`（[定时任务](docs/subsystems/cron.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
 | 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentProblems`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
 | 管家收什么、每种来源怎么进（意图表）、现状、话回到哪个频道 | 跑这个 agent：起大脑、排输入、把回答写进频道、记 run、重启后接着做、做错的一轮存成评测（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
-| 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
+| 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/inbox/items.ts`，[Inbox](docs/subsystems/README.md)） |
 | 档案的存储（`agent`）：内置的默认管家档案、角色的规则、事务 | 捏帮工、技能书、农具这些页面（[界面清单](docs/reference/farm-ui.md#界面清单)） |
 | | 语音线路和电话（[语音](docs/subsystems/voice.md)）；管家只收转来的话 |
 
@@ -83,7 +83,7 @@
 1. 从对话里读回最后那条输入，回答发回它的频道；它是交给管家的工单时，接着做的这一轮记在那张工单上，结束时工单照常等主人点头。
 2. 主人叫停的、做完的不接；最后一条比 30 分钟还旧的不接，日志记「上一轮停在了半路，太久了，没有接着做」。
 
-**巡查**：通知模块按宽限期找出放久了没人管的（[通知](docs/subsystems/notice.md)），每个频道一条经 `Notices.overdue` 给管家；管家写成「【巡查】#… 里有几件事放着没人管」（`patrolText`）叫醒自己，由它决定提不提醒主人。
+**巡查**：通知模块按宽限期找出放久了没人管的（[Inbox](docs/subsystems/inbox.md)），每个频道一条经 `Inbox.overdue` 给管家；管家写成「【巡查】#… 里有几件事放着没人管」（`patrolText`）叫醒自己，由它决定提不提醒主人。
 
 **做错的一轮**（`orchestrator.eval.create`，`POST /api/v1/orchestrator/eval/create`，管家页「轨迹」里点「这一轮做错了」）：
 
@@ -96,7 +96,7 @@
 
 - **频道（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进频道，带 `sendKey` 的重发不再交给管家（[频道](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时任务经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（完成，交付 `none`）（[工单](docs/subsystems/issue.md)）。`issue_list`、`issue_create`、`issue_update`、`issue_status_update`、`issue_review`、`issue_diff_get` 是工单服务的方法（`list`、`add`、`start`、`draft`、`edit`、`setStatus`……）。
-- **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给现状和工具找帮工。挑档案归 `Runtimes.choose`。
+- **帮工（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给现状和工具找帮工。挑档案归 `Runtimes.choose`。
 - **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完）。`brief` 是一个 Effect：打断它只结束这次等回答（通话结束时语音就这样做），不取消大家共享的 run；提交失败时这次 `brief` 失败。
 - **定时任务（`cron`）**：管家的 `cron_create` 工具经 `Cron.Add(req, orchestrator, owner)`；`wakeSoon` 读定时任务决定空闲时压不压。
 - **计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_act`、`graph_task_update`、`graph_task_delete`、`graph_task_act` 调它。
@@ -107,7 +107,7 @@
 
 ## 为什么这样
 
-- **管家叫 orchestrator，跑它的机器归执行。** 它在系统里的位置是编排者（收活、派给帮工、盯进度、转告），「助理」只说了它跟主人说话。起大脑、排输入、写回答、记 run、重启接着做、存评测是任何进程内 agent 都要的，放在执行模块的 `AgentHost`；`orchestrator.ts` 只剩编排的策略，测编排不用碰 agent 的机器。放弃了「只改名」：边界不动，名字说的和代码做的对不上。
+- **管家叫 orchestrator，跑它的机器归帮工模块。** 它在系统里的位置是编排者（收活、派给帮工、盯进度、转告），「助理」只说了它跟主人说话。起大脑、排输入、写回答、记 run、重启接着做、存评测是任何进程内 agent 都要的，放在帮工模块的 `AgentHost`；`orchestrator.ts` 只剩编排的策略，测编排不用碰 agent 的机器。放弃了「只改名」：边界不动，名字说的和代码做的对不上。
 - **每种来源怎么进只在一张表里。** 原来「马上还是排队、算不算主人的话、记成什么触发、开头那行」分在频道、几个入口函数和重启的代码里，加一种来源要改四处。现在是 `intake: Record<Source, …>`，加一种编译器逼你填齐；通话、HTTP、连接器只交「来源 + 话 + 回答到哪」。
 - **管家是有角色的档案，可以有好几个。** 原来只有一个管家，id 写死，二十几个文件按它判断「是不是管家」；想要第二个（比如一个专管某个项目的）没地方加。现在档案是总的东西，管家、帮工是它的角色（`Agent.role`，原来那句「做什么」改叫 `duty`）；默认管家留着，只为「没指明时给谁」。一个频道只有一个照看的管家：一句话叫醒好几个就是好几份钱、好几个回答，别的被 @ 才来。管家只在 `vibevalley` 上：常驻、电话里插话、提示开头不变，外部农机做不到；这条规则只在 `agent` 一处（`roleProblem`），以后放开只改它。按档案上的能力分工具（`Agent.can`）叠在角色上，还没做。
 - **管家的档案页不是捏帮工页。** 模型、记性都按档案走，派活时排除它；管家的大半配置（农机、技能、人设交给农机的方式、worktree）对它没有意义，所以它的档案页只有名字、职责、人设、模型和长相，管家页只放它真有的：记性、轨迹、旧账，默认管家还有声音。长相是档案的（`Look.orchestrator`，画成 `manager-<长相>`），不是本机的偏好：好几个管家各长各的。记性不搬进数据库：`remember`、`rewrite_memory` 和系统提示都写死了 `MEMORY.md`，页面直接读写那个文件。

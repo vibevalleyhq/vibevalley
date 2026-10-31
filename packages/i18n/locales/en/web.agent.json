@@ -17,7 +17,7 @@
   "create": "Done, save it",
   "save": "Save",
   "backToProfile": "← Back to the profile",
-  "trajectoriesHint": "Every helper sent from it, every step since it took the job: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
+  "trajectoriesHint": "Every helper sent from it, every step since it took the ticket: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
   "trajectories": "Trajectories",
   "remove": "Delete",
   "removeWhich": "Delete {name}?",
@@ -169,7 +169,7 @@
     "enable": "Enable",
     "toggle": "{act} {name}",
     "here": "{n} here",
-    "tallyHint": "How many times helpers sent from this profile got work merged into main (the server's ledger)",
+    "tallyHint": "How many times helpers sent from this profile got work merged into main",
     "hired": "Hired",
     "merged": "Merged"
   },

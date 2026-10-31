@@ -9,8 +9,8 @@ import { Agents } from "@/agent/agent.ts";
 import { orchestrator, owner } from "@/base/actor.ts";
 import { clip } from "@/base/clip.ts";
 import { Core } from "@/core/core.ts";
+import { inbox } from "@/inbox/items.ts";
 import { Issues } from "@/issue/issue.ts";
-import { inbox } from "@/notice/inbox.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import { type Hired, type HireOptions, type Roster, NotTakenIn, type Sessions } from "@/session/session.ts";
@@ -281,7 +281,7 @@ describe("task graphs", () => {
         expect(f.news[0]).toMatch(new RegExp("^【计划】" + id + " 拆好了", "u"));
         // A step's removal, tried: what goes and who stops waiting for it, and the graph as it was.
         const preview = yield* f.tasks.previewRemoveTask(id, "b");
-        expect(preview.does).toEqual([`从计划「${draft.title}」删掉「${taskOf(draft, "b")!.title}」这一步`, `「${taskOf(draft, "d")!.title}」不再等它`]);
+        expect(preview.does).toEqual([`从计划「${draft.title}」删掉「${taskOf(draft, "b")!.title}」这一件`, `「${taskOf(draft, "d")!.title}」不再等它`]);
         expect((yield* f.until(id, () => true)).tasks.map((n) => n.id)).toEqual(["a", "b", "c", "d"]);
         // An act the draft does not allow is refused with the ones it does, as commands.
         expect(yield* Effect.flip(f.tasks.act(id, "pause", owner))).toMatchObject({

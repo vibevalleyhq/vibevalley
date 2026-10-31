@@ -10,7 +10,7 @@ import { owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
 import { Issues } from "@/issue/issue.ts";
 import { Memories } from "@/memory/memory.ts";
-import { jobBreak } from "@/session/briefing.ts";
+import { briefBreak } from "@/session/briefing.ts";
 import { recallHead } from "@/session/prompts.ts";
 import { Sessions } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -29,12 +29,12 @@ const prompts = (f: Farm) => {
   };
 };
 
-/** What the input reminded the session of, and its job under it. */
+/** What the input reminded the session of, and its brief under it. */
 const reminded = (input: string): [string[], string] => {
-  const parts = input.split(jobBreak);
+  const parts = input.split(briefBreak);
   if (parts.length === 1) return [[], input];
   const lines = parts[0]!.split("\n");
-  if (parts.length !== 2 || !lines[0]!.startsWith(recallHead)) throw new Error("on top of the job is not just what it was reminded of: " + input);
+  if (parts.length !== 2 || !lines[0]!.startsWith(recallHead)) throw new Error("on top of the brief is not just what it was reminded of: " + input);
   return [lines.slice(1), parts[1]!];
 };
 
@@ -81,14 +81,14 @@ describe("memory", () => {
 
       const mine = yield* kept("scribe", 3);
       expect(mine).toHaveLength(3);
-      const job = mine.find((m) => m.kind === "issue")!;
-      expect(job.text).toMatch(/^写上班打卡，记一笔 → /u);
+      const done = mine.find((m) => m.kind === "issue")!;
+      expect(done.text).toMatch(/^写上班打卡，记一笔 → /u);
       const rows = (ms: Memory[]) => ms.map((m) => [m.kind, m.text, m.project ?? "所有项目", m.session ?? ""].join("|")).toSorted();
       expect(rows(mine)).toEqual(
         [
           ["note", "这个项目用 pnpm test 跑测试", "memo", first.id],
           ["note", "提交信息写中文", "所有项目", first.id],
-          ["issue", job.text, "memo", first.id],
+          ["issue", done.text, "memo", first.id],
         ]
           .map((r) => r.join("|"))
           .toSorted(),
@@ -100,7 +100,7 @@ describe("memory", () => {
       let [recalled, asked] = reminded(yield* nextPrompt(f, next, 1));
       expect(asked).toBe("再加一个下班打卡");
       expect([...recalled].toSorted()).toEqual(
-        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + job.text].toSorted(),
+        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + done.text].toSorted(),
       );
       yield* w.nextReport;
       const steps = sessions.events(second.id)!;

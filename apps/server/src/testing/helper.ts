@@ -1,5 +1,5 @@
 // The helper the farm's tests hire (the flows, and the page's tests through VIBEVALLEY_TEST_RUNTIMES): oar's scripted
-// runtime over a real git worktree, doing what the words of its job say. No binary, login or model.
+// runtime over a real git worktree, doing what the words of its brief say. No binary, login or model.
 
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -13,7 +13,7 @@ import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
 import { factsOf, presetOf } from "@/agent/seed.ts";
 import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
-import { jobBreak } from "@/session/briefing.ts";
+import { briefBreak } from "@/session/briefing.ts";
 
 import { until } from "./until.ts";
 
@@ -101,16 +101,16 @@ async function answer(turn: ScriptedTurn, input: string) {
   turn.say("查过了。\n\n```json\n" + JSON.stringify(found) + "\n```\n\n结论：查清楚了");
 }
 
-/** The helper every flow hires: what it does is in the words of its job (the part after the reminders). 只起草工单 drafts;
+/** The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts;
  * 必败 fails; 发呆 is held (releaseHeld); 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
  * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
- * memories. It answers with its job and persona, and says of each numbered criterion that it was met. */
+ * memories. It answers with its brief and persona, and says of each numbered criterion that it was met. */
 export const helper = (turns: ScriptedTurn[] = []): Runtime =>
   scriptedRuntime({
     id: "pi",
     turn: async (turn) => {
       turns.push(turn);
-      const parts = turn.input.split(jobBreak);
+      const parts = turn.input.split(briefBreak);
       const input = parts[parts.length - 1]!;
       if (input.includes("只起草工单")) return draft(turn, input);
       if (input.includes(answerOpening) || input.includes("结论读不出来")) return answer(turn, input);

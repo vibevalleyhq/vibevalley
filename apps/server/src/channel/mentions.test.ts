@@ -4,7 +4,7 @@ import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { Core } from "@/core/core.ts";
-import { emptyPatrol, patrolStep } from "@/notice/patrol.ts";
+import { emptyPatrol, patrolStep } from "@/inbox/patrol.ts";
 import { frameOf } from "@/projection/frame.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";

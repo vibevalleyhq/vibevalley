@@ -5,7 +5,7 @@ import type { Agent, MCPServer, Skill } from "@vibevalley/protocol";
 import { recallHead, recallIntro } from "./prompts.ts";
 
 /** What the detail panel shows starts after it. */
-export const jobBreak = "\n\n---\n\n";
+export const briefBreak = "\n\n---\n\n";
 
 export const toOarMcp = (server: MCPServer): McpServer =>
   server.type === "http"
@@ -25,10 +25,10 @@ export function instructions(agent: Agent, library: readonly Skill[]): string {
 export const recallBlock = (recalled: readonly string[]) => (recalled.length === 0 ? "" : [recallHead + recallIntro, ...recalled].join("\n"));
 
 /** Set apart, so the detail panel shows the two apart. */
-export const withRecall = (block: string, input: string) => (block ? block + jobBreak + input : input);
+export const withRecall = (block: string, input: string) => (block ? block + briefBreak + input : input);
 
 export function recalledIn(input: string): string {
-  const parts = input.split(jobBreak);
+  const parts = input.split(briefBreak);
   if (parts.length < 2) return "";
   const block = parts[parts.length - 2]!;
   return block.startsWith(recallHead) ? block.split("\n").slice(1).join("\n") : "";

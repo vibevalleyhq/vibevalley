@@ -12,7 +12,7 @@ Workspace（工作目录，一张大地图）
 └── 工单（可以指一个项目）
     ├── 分支和 worktree（代码相关且档案开了 worktree 的工单才有；岛上围着篱笆的那一块，重开还是这一块）
     └── Session（在这块地上干活的帮工；派一次是一个，重开是下一个）
-        └── run（一次干活：一次触发到一次汇报）
+        └── run（一轮：一次触发到一次汇报）
 ```
 
 现在只有一个 Workspace：工作目录 `VIBEVALLEY_WORK_ROOT`（项目在 `projects/`，worktree 在 `worktrees/`）和家目录 `VIBEVALLEY_HOME`。
@@ -36,14 +36,14 @@ Workspace（工作目录，一张大地图）
 
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
-| Workspace | `Config.workRoot`、`Config.home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 |
+| Workspace | `WorkspaceState`（核心状态）；目录是服务端 `ServerConfig` 的 `workRoot`、`home` | 全部项目、工单、频道、档案；同时干活的上限（6）是它的 |
 | 管家 | `Orchestrator` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的开不开 worktree 由档案设置决定；每张都有验收，完成就是通过；关上的能重开 |
 | Session | `Session`（服务是 `Sessions`，派活是 `Issues` 的 `hire`） | 档案为一张工单接的活，在档案配置的项目目录或工单的 worktree 里干，直到工单完成或它收工；跨好几次 run，重启后还是同一个 |
-| Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一次干活：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
+| Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一轮：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
 | 完成 | 动作 `complete`；工单的 `status` 是 `done` | 主人对工单的结论；交付由 `delivered` 另记。合并只是交付的一种，PR 合入后才完成（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
@@ -66,7 +66,7 @@ Workspace（工作目录，一张大地图）
 | 院门外的种子袋 | 排队等空地的工单（待办） |
 | 地里的小动物 | 在这块地上干活的帮工（Session），可以换人 |
 | 庄稼 | 这一轮做到哪了；交回来以后看工单：干裂是缺肥，开花是等验收，杂草是没过验收，结出来是验收过了（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」；叫法见[用语表](docs/README.md#用语)） |
-| 一季庄稼 | 一次干活（run） |
+| 一季庄稼 | 一轮（run） |
 | 小动物走去哪 | 它正在用的工具 |
 | 手、浇水、施肥、杀虫、验收、收获、铲除 | 派活（挪到待办）、带话、回答它问的、让它修、打回（带话挪回待办）、收获（挪到已完成，也就是验收通过）、叫停或请走（挪到已取消） |
 | 等级 | 一共提交了多少次 |

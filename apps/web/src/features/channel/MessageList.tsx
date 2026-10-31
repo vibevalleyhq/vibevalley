@@ -471,7 +471,7 @@ function ThreadPreview(props: { thread: Channel }) {
           {props.thread.replies > 0
             ? t("web.channel.replies", { n: props.thread.replies })
             : props.thread.subjectKind === "issue"
-              ? t("web.channel.jobs.thread")
+              ? t("web.channel.issues.thread")
               : t("web.channel.names.thread")}
         </span>
         <Show when={unread() > 0}>

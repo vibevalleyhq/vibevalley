@@ -74,7 +74,7 @@
 
 **管家打电话找主人**：
 
-1. 什么时候找：Inbox 里刚来一件（[通知](docs/subsystems/notice.md)的 `Notices.news`，开机时已经在的不算，同一个 id 只算一次）；`voice` 订阅它，交给管家的是每件的 `title：body`。
+1. 什么时候找：Inbox 里刚来一件（[Inbox](docs/subsystems/inbox.md)的 `Inbox.news`，开机时已经在的不算，同一个 id 只算一次）；`voice` 订阅它，交给管家的是每件的 `title：body`。
 2. 正在通话：要说的事进一个队列，从不挤着说。队列里第一件到了先等 3 秒（`gatherMs`），这期间到的一起写成一条「【要告诉主人】……这 N 件合成一段说」交给管家（`Orchestrator.brief`，来源是工单，排在管家手上这一轮之后，不打断电话里正在答的那句）；管家照常在默认频道回答，答完整段经 `speak` 念出来，念的请求排在正在说的话之后。这一段交出去以前不再问管家；其间来的事攒着，下一次合成一条。管家答这件事时插进来别的话（主人在电话里又问了一句），这件的回答就此结束，已经说出来的照样念；一个字都没有的放回队列再问，连着三次没字就作罢。队列是 Voice 作用域里的 Effect 循环，等待和 brief 都能被服务关闭中断；挂断会中止这通电话的 brief 等待，但不停管家共享的 run，每段 `say` 前再查通话是否还在。brief 失败记日志并结束这一轮，不盲目重发管家可能已经收到的输入；之后来的事能再开一轮。挂断以后队列清空：这些事还在手机的未接和 Inbox 里。
 3. 没在通话：页面的手机照 Inbox 响铃（工单交回来带着问题的是一种「有问题问你」`ask`）。接听就是开电话：`VoiceCall.start(about)`，`about` 是响的那件事；服务端这通电话不念开场白，agent 进来后经同一个队列把「主人接起了你打的电话，你打电话是为了这件事：……（这期间又有：……）」交给管家，回答念出来作为第一句。通话中手机不响铃，来的事由第 2 步在电话里说。
 
@@ -125,6 +125,6 @@
 - `setting` 的测试：语音设置只存差异、三段的 key 只给提示（`setting/*.test.ts`）。
 - `http/moss.test.ts`：别的页面连不上 MOSS Live 的线路，没存 key 时不升级、说原因，存了以后话和声音两头原样过去、带上 key；`voice/moss.test.ts`：试 key 的几种结果。页面：`moss.spec.ts`（没存 key 时「MOSS Live」页说原因）。
 - 页面：`apps/web/src/features/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮、两边的字都画到频道有了那一句）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等设好：没有 MOSS 的 key、也没选自己的地址时按钮是灰的，看 `SettingsStatus.dictationReady`）。
-- `apps/server/src/notice/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
+- `apps/server/src/inbox/items.test.ts`（交回来带着问题的是「有问题问你」）。
 - 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；点「管家」就拨，打不通时通话屏和田头都说原因）。
 - 真人说话、听到声音要人在桌面版上亲自打一通（`vv-acceptance/references/page.md`）；没有连真的声网的自动测试。`speak` 在真电话上念出来、不打断主人，要在真电话上验。

@@ -13,8 +13,8 @@ values (sqlc.arg(id), 'agent', sqlc.arg(agent), 'note', sqlc.arg(body), sqlc.arg
 -- name: Recalled :exec
 update memory set recalled = recalled + 1, recalled_at = sqlc.arg(recalled_at) where id = sqlc.arg(id);
 
--- name: KeepJob :exec
--- One job memory for each session: written again as the session goes on.
+-- name: KeepIssueMemory :exec
+-- One issue memory for each session: written again as the session goes on.
 insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
 values (sqlc.arg(id), 'agent', sqlc.arg(agent), 'issue', sqlc.arg(body), sqlc.arg(terms), sqlc.arg(terms_of), sqlc.arg(project),
         sqlc.arg(session), 'system', sqlc.arg(created_at), sqlc.arg(created_at))

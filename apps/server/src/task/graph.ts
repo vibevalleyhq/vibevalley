@@ -4,7 +4,7 @@ import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/ag
 import { list, t } from "@vibevalley/i18n";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
 
-/** More steps than this means the job should be split into tasks. */
+/** More steps than this means the issue should be split into tasks. */
 /** A step as the frame shows it before its acts are worked out (graphFrom does that): none yet. */
 export const taskView = (): Pick<Task, "blockedBy" | "actions" | "actionText" | "canEdit" | "canRemove" | "stateText"> => ({
   stateText: "",

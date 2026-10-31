@@ -20,8 +20,8 @@ import type { OrchestratorState } from "@vibevalley/protocol";
 import { newId } from "@/base/ids.ts";
 import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 
-import { AgentExecution, type RunInput } from "./execution.ts";
 import type { ToolStart } from "./facts.ts";
+import { InProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
@@ -146,7 +146,7 @@ export interface AgentHost<R> {
 export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore): Effect.Effect<AgentHost<R>, never, Scope.Scope> =>
   Effect.gen(function* () {
     const owner = yield* Effect.scope;
-    const execution = new AgentExecution(o.name, journal, o.toolStart, runs);
+    const inProcess = new InProcessRun(o.name, journal, o.toolStart, runs);
     const transcript = join(o.home, o.name + ".jsonl");
     const local = new WeakMap<BrainMessage, Hosted<R>>();
     let input: Hosted<R> = { route: o.first, run: { by: { kind: "" } } };
@@ -199,7 +199,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         toCaller = 0;
         const wrote = open;
         open = false;
-        if (text && !o.quiet(at.route)) yield* o.say(at.route, text, execution.currentRun());
+        if (text && !o.quiet(at.route)) yield* o.say(at.route, text, inProcess.currentRun());
         // The run goes on (its tools, another answer) until it settles.
         if (wrote) yield* o.state("thinking", at.route);
       });
@@ -234,7 +234,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
           e.type !== "prefix_changed" &&
           e.type !== "tasks_changed"
         )
-          yield* execution
+          yield* inProcess
             .observe(e, run)
             .pipe(Effect.catch((err) => o.notice("error", t("server.session.host.notRecorded", { label: o.label, why: err.message }))));
         switch (e.type) {
@@ -334,7 +334,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
             if (started._tag === "Failure") {
               if (closing) return closeInput(hosted);
               const why = messageOf(started.failure);
-              const id = yield* execution
+              const id = yield* inProcess
                 .failedStart(run, hosted.run.asked ?? "", t("server.session.host.cannotStart", { why }))
                 .pipe(Effect.catch((e) => Effect.as(o.notice("error", t("server.session.host.notRecorded", { label: o.label, why: e.message })), "")));
               yield* o.notice("error", t("server.session.host.startFailed", { label: o.label, why }));
@@ -368,9 +368,9 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
           const at = current();
           input = at;
           toCaller = 0;
-          execution.resume(o.restored(at.route));
+          inProcess.resume(o.restored(at.route));
           if (yield* b.resume(maxAgeMs)) return;
-          execution.resume(undefined);
+          inProcess.resume(undefined);
           if (!b.busy()) journal.note("run/error", t("server.session.log.staleRun"));
         }),
       );
@@ -383,7 +383,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         yield* Scope.close(b.scope, Exit.void);
         yield* Fiber.await(b.following);
       }
-      yield* execution.close().pipe(Effect.catch((err) => log(`execution: ${err.message}`)));
+      yield* inProcess.close().pipe(Effect.catch((err) => log(`in-process run: ${err.message}`)));
     });
 
     const close = Effect.suspend(() => {

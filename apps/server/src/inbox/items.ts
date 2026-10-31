@@ -86,7 +86,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       case "conflict": {
         const files = (h.conflict?.files ?? []).length;
         push({
-          item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.notice.conflictFiles", { files }), at, target },
+          item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.inbox.conflictFiles", { files }), at, target },
           channel,
           since: at,
           brief: patrolBrief.conflict(who, files),
@@ -135,7 +135,7 @@ function gathered(state: WorkspaceState): Unworded[] {
               id,
               kind: "task-failed",
               from: orchestrator,
-              text: cut(t("server.notice.step", { graph: graph.title, step: task.title }), 40),
+              text: cut(t("server.inbox.step", { graph: graph.title, step: task.title }), 40),
               at: graph.createdAt,
               target,
             },
@@ -240,7 +240,7 @@ function clipLine(text: string, max = 140) {
 }
 
 function worded(item: Omit<InboxItem, "who" | "words">): InboxItem {
-  const who = item.from.kind === "session" ? item.from.name : t("server.notice.orchestrator");
+  const who = item.from.kind === "session" ? item.from.name : t("server.inbox.orchestrator");
   return { ...item, who, words: inboxWords(item.kind, who, clipLine(item.text)) };
 }
 
@@ -249,65 +249,65 @@ function inboxWords(kind: InboxKind, who: string, text: string): InboxWords {
   switch (kind) {
     case "review":
       return {
-        label: t("server.notice.item.review.label"),
-        title: t("server.notice.item.review.title", { who }),
+        label: t("server.inbox.item.review.label"),
+        title: t("server.inbox.item.review.title", { who }),
         body: text,
-        tray: t("server.notice.item.review.tray", { who }),
+        tray: t("server.inbox.item.review.tray", { who }),
       };
     case "ask":
-      return { label: t("server.notice.item.ask.label"), title: t("server.notice.item.ask.title", { who }), body: text, tray: "" };
+      return { label: t("server.inbox.item.ask.label"), title: t("server.inbox.item.ask.title", { who }), body: text, tray: "" };
     case "fix":
       return {
-        label: t("server.notice.item.fix.label"),
-        title: t("server.notice.item.fix.title", { who }),
+        label: t("server.inbox.item.fix.label"),
+        title: t("server.inbox.item.fix.title", { who }),
         body: text,
-        tray: t("server.notice.item.fix.tray", { who }),
+        tray: t("server.inbox.item.fix.tray", { who }),
       };
     case "interrupted":
-      return { label: t("shared.stuck.interrupted"), title: t("server.notice.item.interrupted.title", { who }), body: text, tray: "" };
+      return { label: t("shared.stuck.interrupted"), title: t("server.inbox.item.interrupted.title", { who }), body: text, tray: "" };
     case "conflict":
       return {
-        label: t("server.notice.item.conflict.label"),
-        title: t("server.notice.item.conflict.title", { who }),
+        label: t("server.inbox.item.conflict.label"),
+        title: t("server.inbox.item.conflict.title", { who }),
         body: text,
-        tray: t("server.notice.item.conflict.tray", { who }),
+        tray: t("server.inbox.item.conflict.tray", { who }),
       };
     case "quiet":
       return {
-        label: t("server.notice.item.quiet.label"),
-        title: t("server.notice.item.quiet.title", { who }),
-        body: t("server.notice.item.quiet.body"),
-        tray: t("server.notice.item.quiet.tray", { who }),
+        label: t("server.inbox.item.quiet.label"),
+        title: t("server.inbox.item.quiet.title", { who }),
+        body: t("server.inbox.item.quiet.body"),
+        tray: t("server.inbox.item.quiet.tray", { who }),
       };
     case "graph-draft":
       return {
-        label: t("server.notice.item.graph-draft.label"),
-        title: t("server.notice.item.graph-draft.title", { text }),
-        body: t("server.notice.item.graph-draft.body"),
-        tray: t("server.notice.item.graph-draft.tray", { text }),
+        label: t("server.inbox.item.graph-draft.label"),
+        title: t("server.inbox.item.graph-draft.title", { text }),
+        body: t("server.inbox.item.graph-draft.body"),
+        tray: t("server.inbox.item.graph-draft.tray", { text }),
       };
     case "graph-ready":
       return {
-        label: t("server.notice.item.graph-ready.label"),
-        title: t("server.notice.item.graph-ready.title", { text }),
-        body: t("server.notice.item.graph-ready.body"),
-        tray: t("server.notice.item.graph-ready.tray", { text }),
+        label: t("server.inbox.item.graph-ready.label"),
+        title: t("server.inbox.item.graph-ready.title", { text }),
+        body: t("server.inbox.item.graph-ready.body"),
+        tray: t("server.inbox.item.graph-ready.tray", { text }),
       };
     case "task-failed":
       return {
-        label: t("server.notice.item.task-failed.label"),
-        title: t("server.notice.item.task-failed.title", { text }),
-        body: t("server.notice.item.task-failed.body"),
-        tray: t("server.notice.item.task-failed.tray", { text }),
+        label: t("server.inbox.item.task-failed.label"),
+        title: t("server.inbox.item.task-failed.title", { text }),
+        body: t("server.inbox.item.task-failed.body"),
+        tray: t("server.inbox.item.task-failed.tray", { text }),
       };
     case "mention":
-      return { label: t("server.notice.item.mention.label"), title: t("server.notice.item.mention.title", { who }), body: text, tray: "" };
+      return { label: t("server.inbox.item.mention.label"), title: t("server.inbox.item.mention.title", { who }), body: text, tray: "" };
     case "cron-ask":
       return {
-        label: t("server.notice.item.cron-ask.label"),
-        title: t("server.notice.item.cron-ask.title"),
-        body: t("server.notice.item.cron-ask.body", { text }),
-        tray: t("server.notice.item.cron-ask.tray", { text }),
+        label: t("server.inbox.item.cron-ask.label"),
+        title: t("server.inbox.item.cron-ask.title"),
+        body: t("server.inbox.item.cron-ask.body", { text }),
+        tray: t("server.inbox.item.cron-ask.tray", { text }),
       };
   }
 }

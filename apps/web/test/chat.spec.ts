@@ -120,7 +120,7 @@ test("the crons tab turns a cron off and deletes it on the second press", async 
   const id = await newChannel(api, "timers");
   const made = await api.cron.create({ name: "run tests", text: "run the tests", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } });
   await page.goto(`/chat/${id}`);
-  await tab(page, "jobs").click();
+  await tab(page, "issues").click();
   await expect(page.getByTestId("tab-empty")).toBeVisible();
   await tab(page, "crons").click();
   const card = page.locator(`[data-testid="cron"][data-key="${made.id}"]`);

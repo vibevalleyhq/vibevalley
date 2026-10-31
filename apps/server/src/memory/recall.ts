@@ -10,7 +10,7 @@ import { recallWords } from "./prompts.ts";
 import { termsInCommon, termsOf } from "./terms.ts";
 
 export const recallCount = 8;
-const recallJobs = 3;
+const recallIssues = 3;
 export const recallChars = 1600;
 
 /** What a turn recalls by; matches is how well each memory matched the turn's words in the full-text index, higher better. */
@@ -30,7 +30,7 @@ const recallMatchMost = 5;
 const recallMatchWeight = 0.3;
 const recallSharedWeight = 0.5;
 
-/** Another project's note only when it plainly shares the turn's words; another project's job never. */
+/** Another project's note only when it plainly shares the turn's words; another project's issue never. */
 export function relevance(m: Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
   if (cue.skip?.has(m.id) === true || (m.session !== undefined && m.session === cue.session)) return undefined;
   const shared = termsInCommon(termsOf(m.text), terms);
@@ -63,14 +63,14 @@ export function pick(memories: readonly Memory[], cue: PickCue): Memory[] {
   ranked.sort((a, b) => or(compare(b.score, a.score), compare(b.m.at, a.m.at)));
   const picked: Memory[] = [];
   let chars = 0;
-  let jobs = 0;
+  let issues = 0;
   for (const { m } of ranked) {
     if (picked.length === recallCount) break;
     const length = lineOf(m, cue.project).length + 1;
-    if ((m.kind === "issue" && jobs === recallJobs) || chars + length > recallChars) continue;
+    if ((m.kind === "issue" && issues === recallIssues) || chars + length > recallChars) continue;
     picked.push(m);
     chars += length;
-    if (m.kind === "issue") jobs++;
+    if (m.kind === "issue") issues++;
   }
   return picked;
 }
@@ -118,7 +118,8 @@ export function memoryNotesOf(said: string): MemoryNote[] {
   return notes;
 }
 
-export const memoryJobText = (job: string, summary: string, outcome: Outcome) => recallWords.job(clip(job, 100), outcome !== "completed", clip(summary, 200));
+export const issueMemoryText = (brief: string, summary: string, outcome: Outcome) =>
+  recallWords.issueDone(clip(brief, 100), outcome !== "completed", clip(summary, 200));
 
 export function memoryLikeness(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   const shared = termsInCommon(a, b);

@@ -46,8 +46,8 @@ const RULES: readonly Rule[] = [
   {
     name: "a task graph's task under its old name",
     pattern:
-      /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step)\b|\/steps\/\{/u,
-    says: "a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, IssueTask, graph_task_update, graph_task_act)",
+      /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step|StepDraft\w*|stepNext|stepFailed|actOnStep|stepIssues|stepTone)\b|\/steps\/\{/u,
+    says: "a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, TaskDraft, IssueTask, taskNext, taskFailed, actOnTask, taskIssues, taskTone, graph_task_update, graph_task_act); a step is one event of a trajectory",
   },
   {
     name: "an API path without its version",
@@ -192,7 +192,7 @@ const RULES: readonly Rule[] = [
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|Attention|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
     says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
-    except: /^packages\/protocol\/src\/(rules|words)\//u,
+    except: /^packages\/protocol\/src\/rules\//u,
   },
 
   {
@@ -207,7 +207,7 @@ const RULES: readonly Rule[] = [
       "apps/server/src/orchestrator",
       "apps/server/src/channel",
       "apps/server/src/mcp",
-      "apps/server/src/notice",
+      "apps/server/src/inbox",
       "apps/web/src/features",
       "apps/web/src/base",
       "apps/web/src/ui",
@@ -241,7 +241,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/u,
-    says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
+    says: "presentSessions, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
     // The client's onFarm is the skin it is on.
     dirs: ["apps/server/src", "apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
   },
@@ -263,8 +263,26 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "an issue's text as a job",
-    pattern: /\b(issueJob|splitJob)\b|server\.issue\.job\./u,
-    says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, server.issue.brief.*)",
+    pattern:
+      /\b(issueJob|splitJob|talkJob|jobBreak|memoryJobText|[Kk]eepJob|recallJobs|jobThread|jobThreadOf|openJob|jobOf|Jobs)\b|server\.issue\.job\.|tab\.jobs\b|\bjobs\.(empty|thread)\b|memory\.(jobs|noJobs)\b/u,
+    says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, talkBrief, briefBreak, server.issue.brief.*); a finished issue's memory is issueMemoryText, keepIssueMemory, recallIssues; a session's thread is threadOfSession, sessionThreadOf, subjectOf, openThread; the channel's tab of them is Sessions, tab.issues",
+  },
+  {
+    name: "a run inside the server under the execution name",
+    pattern: /\b(AgentExecution|ExecutionBusy)\b|session\/execution(\.test)?\.ts/u,
+    says: "a run is a Run: the in-process agent's is InProcessRun (session/inProcessRun.ts), refused with RunBusy; 执行 is not a name for a helper (docs/README.md 用语)",
+  },
+  {
+    name: "the inbox module under the notice name",
+    pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\./u,
+    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*); a notice is Core.notice, a one-line word to the owner; the page's features/notice stays",
+  },
+  {
+    name: "the orchestrator in a local called manager",
+    // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face"); the English @manager alias is a
+    // key the owner types (channel/mentions.ts).
+    pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
+    says: "orchestrator (or the profile's id): manager is only the English page's word for 管家",
   },
   {
     name: "a service not in Effect's default class form",
@@ -276,15 +294,15 @@ const RULES: readonly Rule[] = [
   },
 ];
 
-// A word table (and the test that reads the English page) says what the owner reads, in the glossary's English column
+// A catalog (and the test that reads the English page) says what the owner reads, in the glossary's English column
 // (docs/README.md 用语: ticket, plan, manager…); only the rules about Chinese words look into it.
-const wordTable = /(?:^|\/)words(?:\.ts$|\/)|^apps\/web\/test\/english\.spec\.ts$/u;
+const ownerWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
-/** Where a catalog's words were said before they moved to packages/i18n: web.farm.phone is apps/web/src/farm/phone's,
- * web.setting apps/web/src/features/setting's, shared the protocol's. The rules about a place's words look there. */
+/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/
+ * setting's, shared both sides'. The rules about a place's words look there. */
 function placeOf(ns: string): string {
-  if (ns === "shared") return "packages/protocol/src/words/zh.ts";
+  if (ns === "shared") return "packages/i18n/locales/shared.json";
   const [host, ...parts] = ns.split(".");
   const feature = `apps/${host}/src/features/${parts[0]}`;
   return parts.length > 0 && existsSync(resolve(root, feature))
@@ -302,7 +320,7 @@ for (const source of [...files, ...catalogs]) {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
       if (rule.except?.test(file) === true) continue;
-      if (wordTable.test(file) && !han.test(rule.pattern.source)) continue;
+      if (ownerWords(source) && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }

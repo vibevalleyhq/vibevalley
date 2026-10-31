@@ -185,7 +185,7 @@ export function nowledge(c: MemorySourceConfig): Source {
         .filter((h) => cue.skip?.has(hitID(h)) !== true)
         .map((h) => ({ id: hitID(h), line: recallWords.sourceLine("Nowledge", clip(hitText(h), lineMost)), score: h.relevance_score ?? 0 }));
     }),
-    // Its memories are notes; it has no jobs done.
+    // Its memories are notes; it has no issues worked.
     search: Effect.fnUntraced(function* (q) {
       if (c.read !== true || q.kind === "issue") return { found: [] };
       const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));

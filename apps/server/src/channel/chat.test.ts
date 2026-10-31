@@ -183,7 +183,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: strin
         refining: false,
       } as Session,
     });
-    const thread = yield* waitFor(Effect.map(f.chat.jobThread(id), f.channel), (c) => c !== undefined, "a job thread");
+    const thread = yield* waitFor(Effect.map(f.chat.threadOfSession(id), f.channel), (c) => c !== undefined, "an issue thread");
     return thread!;
   });
 
@@ -218,7 +218,7 @@ const run = <A, E>(
 };
 
 describe("the chat", () => {
-  it.live("a job opens a thread under its dispatch", () =>
+  it.live("a dispatched issue opens a thread under its dispatch", () =>
     run((f, x) =>
       Effect.gen(function* () {
         const thread = yield* hireAndRun(f, x, "w1", "写 hello", "chat-a");
@@ -231,7 +231,7 @@ describe("the chat", () => {
         expect([report.from, report.fromKind, report.outcome]).toEqual(["w1", "session", "completed"]);
         expect(report.text).toContain("收到了");
         expect(report.text).not.toContain("结论");
-        expect(yield* f.chat.jobThread("w1")).toBe(thread.id);
+        expect(yield* f.chat.threadOfSession("w1")).toBe(thread.id);
       }),
     ),
   );
@@ -241,15 +241,15 @@ describe("the chat", () => {
       Effect.gen(function* () {
         const talk = yield* hireAndRun(f, x, "w1", "写 hello", "chat-t");
         expect([talk.subjectKind, talk.subjectId]).toEqual(["talk", "w1"]);
-        const job = yield* hire(f, x, "w2", "写 world", "chat-t", undefined, "i1");
-        expect([job.subjectKind, job.subjectId, job.id !== talk.id]).toEqual(["issue", "i1", true]);
+        const dispatched = yield* hire(f, x, "w2", "写 world", "chat-t", undefined, "i1");
+        expect([dispatched.subjectKind, dispatched.subjectId, dispatched.id !== talk.id]).toEqual(["issue", "i1", true]);
         yield* f.chat.say("把输出改成中文", talk.id, "");
         yield* until(() => x.runsOf("w1").length >= 2, "a second turn");
       }),
     ),
   );
 
-  it.live("the owner's words in a job thread wake its session", () =>
+  it.live("the owner's words in an issue thread wake its session", () =>
     run((f, x) =>
       Effect.gen(function* () {
         const thread = yield* hireAndRun(f, x, "w2", "写 hello", "chat-b");
@@ -610,7 +610,7 @@ describe("the chat", () => {
             yield* g.core.apply({ type: "report", questions: [], checks: [], id: sessionId("w14"), outcome: "interrupted", summary: "重启了", runs: 1 });
             yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
             expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
-            expect(yield* g.chat.jobThread("w14")).toBe(thread.id);
+            expect(yield* g.chat.threadOfSession("w14")).toBe(thread.id);
             // The new farm has heard nothing yet: what was said before is in the room's history.
             expect((yield* g.chat.history(thread.id)).some((m) => m.id === said.id)).toBe(true);
           }),
@@ -850,7 +850,7 @@ describe("the chat", () => {
     ),
   );
 
-  it.live("a job whose thread cannot be followed leaves no dispatch, and a second try writes one", () =>
+  it.live("a dispatch whose thread cannot be followed leaves no dispatch, and a second try writes one", () =>
     run((f) =>
       Effect.gen(function* () {
         yield* trigger(f.sql, "fail_owner", "before insert on channel_follow", "when (new.reason = 'owner')");
@@ -871,11 +871,11 @@ describe("the chat", () => {
         yield* waitFor(
           Effect.map(f.sql<{ n: string }>`select last_value::text as n from fail_owner_tries where is_called`.pipe(Effect.orDie), (rows) => rows.length),
           (n) => n > 0,
-          "the job tried and refused",
+          "the dispatch tried and refused",
         );
         expect(yield* f.chat.history(f.chat.defaultChannel())).toEqual([]);
         yield* drop(f.sql, "fail_owner", "channel_follow");
-        // Another hire opens every job on the farm again.
+        // Another hire opens every present session's thread again.
         yield* f.core.apply({
           type: "hired",
           session: {
@@ -891,7 +891,7 @@ describe("the chat", () => {
           } as Session,
         });
         yield* until(() => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
-        const thread = (yield* f.chat.jobThread("w1"))!;
+        const thread = (yield* f.chat.threadOfSession("w1"))!;
         expect((yield* f.sql`select participant_id from channel_follow where channel_id = ${thread}`.pipe(Effect.orDie)).map((r) => r.participant_id)).toEqual([
           "w1",
         ]);

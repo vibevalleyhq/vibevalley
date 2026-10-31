@@ -1,5 +1,5 @@
 // This farm's own memories, rows in the memory table: what each agent noted (its
-// 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
+// 「记住：」 lines and the owner's notes) and one line for each issue it worked. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
 import { Clock, Effect, Schema } from "effect";
@@ -15,7 +15,7 @@ import { newId } from "@/base/ids.ts";
 import { bestEffort } from "@/base/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
+import { clip, memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
@@ -23,7 +23,7 @@ export interface FinishedRun {
   readonly agent: string;
   readonly session: string;
   readonly project: string;
-  readonly job: string;
+  readonly brief: string;
   readonly outcome: Outcome;
   readonly said: string;
   readonly summary: string;
@@ -147,13 +147,13 @@ export const makeMemories = Effect.gen(function* () {
               yield* insertNote(run.agent, note.text, project, run.session, "session");
               known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
             }
-            const job = memoryJobText(run.job, run.summary, run.outcome);
+            const text = issueMemoryText(run.brief, run.summary, run.outcome);
             yield* db(
-              q.keepJob({
+              q.keepIssueMemory({
                 id: newId(),
                 agent: run.agent,
-                body: job,
-                terms: termsText(job),
+                body: text,
+                terms: termsText(text),
                 terms_of: termsVersion,
                 project: run.project,
                 session: run.session,

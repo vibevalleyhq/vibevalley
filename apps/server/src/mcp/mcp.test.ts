@@ -87,7 +87,7 @@ describe("mcp", () => {
       const got = yield* issues.hire(lab(), "写 hello", "chat-j");
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
-      const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
+      const thread = yield* waitFor(chat.threadOfSession(id), (t) => t !== undefined, "the session's thread");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).toSorted()).toEqual([
@@ -139,7 +139,7 @@ describe("mcp", () => {
       const got = yield* issues.hire(lab(), "画两种详情", "chat-j");
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
-      const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
+      const thread = yield* waitFor(chat.threadOfSession(id), (t) => t !== undefined, "the session's thread");
       const cwd = sessions.find(id)!.place.cwd;
       mkdirSync(join(cwd, "out"), { recursive: true });
       writeFileSync(join(cwd, "out", "two.html"), "<p>抽屉和整页</p>");

@@ -12,7 +12,7 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { notificationsStart } from "@/services.ts";
+import { inboxStart } from "@/services.ts";
 import { NotAnswered } from "@/session/host.ts";
 import { Setting } from "@/setting/setting.ts";
 import { defaultVoice } from "@/setting/voice.ts";
@@ -187,7 +187,7 @@ const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
   };
-  const answering = Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)));
+  const answering = Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(inboxStart)));
   const chosen = brief
     ? Layer.unwrap(Effect.map(Orchestrator, (current) => Layer.succeed(Orchestrator, Orchestrator.of({ ...current, brief })))).pipe(
         Layer.provideMerge(answering),

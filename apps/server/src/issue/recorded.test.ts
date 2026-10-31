@@ -20,25 +20,25 @@ test("the recorded cases", () => {
   expect(checkCases(cases, (c) => nextTaskId(graphsOf((c.in as { state: never }).state).map((g) => g.id)))).toEqual([]);
 });
 
-describe("an issue as a job", () => {
-  it("title and job", () => {
+describe("an issue as a brief", () => {
+  it("title and brief", () => {
     expect(splitBrief("\n  写打卡  \n\n细节在 README\n还有测试\n")).toEqual(["写打卡", "细节在 README\n还有测试"]);
     expect(issueBrief({ title: "写打卡", description: "细节在 README\n还有测试", criteria: [] })).toBe("写打卡\n\n细节在 README\n还有测试");
     expect(issueBrief({ title: "只有标题", description: "", criteria: [] })).toBe("只有标题");
     expect(splitBrief("  ")).toEqual(["", ""]);
   });
 
-  it("an answer issue's job is read only and ends with the block its conclusion comes back in", () => {
-    const job = issueBrief({ title: "查一下打卡为什么慢", description: "主人觉得最近慢了", deliver: "answer", criteria: [] });
-    expect(job.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n主人觉得最近慢了\n\n")).toBe(true);
-    expect(job).toContain('"conclusion"');
-    expect(job).toContain('"evidence"');
+  it("an answer issue's brief is read only and ends with the block its conclusion comes back in", () => {
+    const brief = issueBrief({ title: "查一下打卡为什么慢", description: "主人觉得最近慢了", deliver: "answer", criteria: [] });
+    expect(brief.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n主人觉得最近慢了\n\n")).toBe(true);
+    expect(brief).toContain('"conclusion"');
+    expect(brief).toContain('"evidence"');
     expect(issueBrief({ title: "写打卡", description: "", deliver: "change", criteria: [] })).toBe("写打卡");
   });
 
-  it("a job written as one long line keeps a short title and all of it as the description", () => {
-    const job = "通读 vibevalley 项目，给主人一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
-    expect(splitBrief(job)).toEqual(["通读 vibevalley 项目，给主人一份整体架构和当前进度的评估", job]);
+  it("a brief written as one long line keeps a short title and all of it as the description", () => {
+    const brief = "通读 vibevalley 项目，给主人一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
+    expect(splitBrief(brief)).toEqual(["通读 vibevalley 项目，给主人一份整体架构和当前进度的评估", brief]);
   });
 
   it("the story of an issue, newest first", () => {
@@ -96,7 +96,7 @@ describe("an issue as a job", () => {
     expect(spent).toEqual({ tokens: 15, cny: 0.5 });
   });
 
-  it("the job carries its criteria", () => {
+  it("the brief carries its criteria", () => {
     expect(issueBrief({ title: "改拖卡", description: "为什么：\n旧接口", criteria: ["拖到待办就开工", "测试通过"] })).toBe(
       "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过",
     );

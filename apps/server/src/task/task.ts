@@ -14,6 +14,7 @@ import type {
   SessionGraph,
   Task,
   TaskAction,
+  TaskDraft,
   TaskEdit,
   TaskGraph,
 } from "@vibevalley/protocol";
@@ -42,7 +43,7 @@ import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions }
 
 import * as q from "../../db/generated/task_event.sql.ts";
 import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
-import { type EditResult, editTask, freshTask, removeTask, type StepDraft } from "./editing.ts";
+import { type EditResult, editTask, freshTask, removeTask } from "./editing.ts";
 import {
   graphActions,
   graphProblems,
@@ -97,8 +98,8 @@ const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schem
 const graphNext = (graph: TaskGraph): Next[] =>
   graphActions(graph).map((action) => ({ say: t(`server.task.graphAction.${action}`), run: commandOf("graph.act", [graph.id], { action }) }));
 
-/** What the step allows now, as commands. */
-const stepNext = (graph: TaskGraph, task: Task): Next[] =>
+/** What the task allows now, as commands. */
+const taskNext = (graph: TaskGraph, task: Task): Next[] =>
   taskActions(graph, task).map((action) => ({
     say: t("server.task.act.stepAct", { action: t(`server.task.taskAction.${action}`), title: task.title }),
     run: commandOf("graph.task.act", [graph.id, task.id], { action }),
@@ -108,10 +109,10 @@ export class Tasks extends Context.Service<
   Tasks,
   {
     readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
-    /** A helper finds its issue is several people's work: the issue becomes the graph, its steps the issues under it, and they start at once. */
-    readonly splitIssue: (session: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
+    /** A helper finds its issue is several people's work: the issue becomes the graph, its tasks the issues under it, and they start at once. */
+    readonly splitIssue: (session: string, title: string, tasks: readonly TaskDraft[]) => Effect.Effect<string, ApiError>;
     /** The same split, asked of the session working the issue now: it is that session's branch the graph opens from. */
-    readonly splitIssueOf: (issue: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
+    readonly splitIssueOf: (issue: string, title: string, tasks: readonly TaskDraft[]) => Effect.Effect<string, ApiError>;
     readonly act: (id: string, action: GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
     readonly taskAct: (id: string, task: string, action: TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
     readonly editTask: (id: string, task: string, edit: TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
@@ -319,8 +320,8 @@ export const make = (options: TaskOptions = {}) =>
 
     const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
-      yield* notice("warn", t("server.task.notice.stepFailed", { graph: graph.title, step: task.title, why }));
-      yield* tellOrchestrator(graphNews.stepFailed(graph.id, graph.title, task.title, task.id, why));
+      yield* notice("warn", t("server.task.notice.taskFailed", { graph: graph.title, task: task.title, why }));
+      yield* tellOrchestrator(graphNews.taskFailed(graph.id, graph.title, task.title, task.id, why));
     });
 
     const sendBack = Effect.fn("Tasks.sendBack")(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
@@ -489,7 +490,7 @@ export const make = (options: TaskOptions = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
     const shape = Tasks.of({
-      splitIssueOf: Effect.fn("Tasks.splitIssueOf")(function* (issue, title, steps) {
+      splitIssueOf: Effect.fn("Tasks.splitIssueOf")(function* (issue, title, drafts) {
         return yield* shape.splitIssue(
           String(
             core
@@ -498,7 +499,7 @@ export const make = (options: TaskOptions = {}) =>
               ?.sessions.at(-1) ?? "",
           ),
           title,
-          steps,
+          drafts,
         );
       }),
       graphs: () => graphsOf(core.state()),
@@ -543,13 +544,13 @@ export const make = (options: TaskOptions = {}) =>
         splitters.set(graph.id, hired.session.id);
         return t("server.task.act.splittingBy", { name: hired.session.name, id: graph.id });
       }, lock.withPermits(1)),
-      splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
+      splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, drafts) {
         const state = core.state();
         const asked = sessionOf(state, sessionId);
         const split = splittable(asked, asked?.issue ? state.issues.find((item) => item.id === asked.issue) : undefined, store.isOrchestrator);
         if (!split.ok) return yield* Effect.fail(refused(split.problem));
         const { session, issue, project } = split;
-        const tasks = steps.map(freshTask);
+        const tasks = drafts.map(freshTask);
         const problems = graphProblems(tasks);
         if (problems.length > 0) return yield* Effect.fail(refused(t("server.task.act.stepsWrong", { problems: problems.join("\n- ") })));
         let graph: TaskGraph = {
@@ -653,10 +654,10 @@ export const make = (options: TaskOptions = {}) =>
           return yield* Effect.fail(refused(t("server.task.act.graphIs", { state: t(`server.task.graphState.${graph.state}`) }), graphNext(graph)));
         switch (action) {
           case "retry": {
-            if (task.state !== "failed") return yield* Effect.fail(refused(t("server.task.act.notFailed", { title: task.title }), stepNext(graph, task)));
+            if (task.state !== "failed") return yield* Effect.fail(refused(t("server.task.act.notFailed", { title: task.title }), taskNext(graph, task)));
             const session = task.session ? live.sessionOf(task.session) : undefined;
             if (session && !isBusy(session)) {
-              // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
+              // Its session is still there: it goes on in the same session, with the (perhaps changed) brief.
               yield* put(
                 withTask(graph, task.id, (n) => ({ ...n, state: "working", tries: 0 })),
                 by,
@@ -676,7 +677,7 @@ export const make = (options: TaskOptions = {}) =>
               return yield* Effect.fail(
                 refused(
                   task.state === "working" ? t("server.task.act.working", { title: task.title }) : t("server.task.act.finished", { title: task.title }),
-                  stepNext(graph, task),
+                  taskNext(graph, task),
                 ),
               );
             let next = withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "skipped" }));

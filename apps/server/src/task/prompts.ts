@@ -1,4 +1,4 @@
-// What the task graphs say to models: the splitter's brief, a step's job and what its helper is told when it is sent
+// What the task graphs say to models: the splitter's brief, a task's brief and what its helper is told when it is sent
 // back, the orchestrator's news of a task graph and the lines it reads one by, and the refusals of the tools only models call.
 // In Chinese whatever the owner's locale: the models answer in the owner's.
 
@@ -28,14 +28,14 @@ export const graphNews = {
   head: "【计划】",
   notSplit: (id: string, title: string, why: string) => id + "「" + title + "」没拆成：" + why + "。问主人要不要换个说法再拆。",
   drafted: (id: string, graph: string) => id + " 拆好了，等主人看过再开工（graph_act start）。用一两句话告诉主人拆成了哪几步。\n" + graph,
-  stepFailed: (id: string, title: string, step: string, stepId: string, why: string) =>
+  taskFailed: (id: string, title: string, task: string, taskId: string, why: string) =>
     id +
     "「" +
     title +
     "」的「" +
-    step +
+    task +
     "」（" +
-    stepId +
+    taskId +
     "）没做成：" +
     why +
     "。它后面的步骤在等；问主人是重试（graph_task_act retry）、改工单，还是跳过（graph_task_act skip）。",
@@ -56,10 +56,10 @@ export const graphTell = {
     `拆好了：工单「${title}」下面 ${n} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`,
 };
 
-/** What a splitter's job is matched against the profiles' tags by (chooseAgent). */
+/** What a splitter's brief is matched against the profiles' tags by (chooseAgent). */
 export const graphMatch = (goal: string) => "规划 计划 拆分 " + goal;
 
-/** What a step's session is told: the task graph, its job, what came before it, and how it is judged. */
+/** What a step's session is told: the task graph, its brief, what came before it, and how it is judged. */
 export function taskBrief(graph: TaskGraph, task: Task): string {
   const index = graph.tasks.findIndex((n) => n.id === task.id) + 1;
   const lines = [

@@ -5,7 +5,7 @@
     },
     "open": "On",
     "closed": "Off",
-    "intro": "Once on, a phone or another computer on the same local network can scan to pair, then use VibeValley on this computer: see helpers, send work, talk in the farm chat.",
+    "intro": "Once on, a phone or another computer on the same local network can scan to pair, then use VibeValley on this computer: see helpers, send work, talk in the channels.",
     "allow": "Allow connections",
     "address": "Address",
     "add": "Add a device",
@@ -41,7 +41,7 @@
   },
   "pair": {
     "title": "Connect to that computer",
-    "intro": "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the farm chat. Pairing needs the owner's approval on that computer.",
+    "intro": "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the channels. Pairing needs the owner's approval on that computer.",
     "code": "Pairing code",
     "codeHint": "On that computer, press Add a device under Connect to this machine",
     "name": "This device is called",

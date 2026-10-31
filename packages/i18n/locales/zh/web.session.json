@@ -1,7 +1,7 @@
 {
   "log": {
     "heard": "收到",
-    "process": "干活过程",
+    "process": "轨迹",
     "fold": "收起这一轮",
     "unfold": "展开这一轮",
     "steps": "{n} 步 · {took}",
@@ -16,7 +16,7 @@
     "thought": "想了想",
     "subagentSaid": "帮手说",
     "said": "它说",
-    "farm": "群聊",
+    "farm": "频道",
     "running": "进行中",
     "ok": "成功",
     "failed": "失败",
@@ -26,11 +26,11 @@
   },
   "rounds": {
     "farm": {
-      "channel_message_send": "在群聊里说话",
-      "channel_message_list": "读群聊的消息",
+      "channel_message_send": "在频道里说话",
+      "channel_message_list": "读频道的消息",
       "channel_unread_list": "看有没有找它的话",
-      "session_list": "看群聊里都有谁",
-      "other": "群聊：{tool}"
+      "session_list": "看频道里都有谁",
+      "other": "频道：{tool}"
     },
     "span": {
       "heard": "收到",
@@ -40,15 +40,15 @@
       "retry": "重试",
       "cache": "缓存",
       "error": "出错",
-      "farm": "群聊",
+      "farm": "频道",
       "tool": "工具"
     },
-    "earlier": "更早的步骤",
+    "earlier": "更早的几步",
     "subagentGot": "帮手接到",
     "job": "工单",
     "told": "带话",
     "usedTools": "用了 {n} 个工具",
-    "process": "这一轮的干活过程",
+    "process": "这一轮的轨迹",
     "tag": {
       "thought": "想了想",
       "subagentThought": "帮手想了想",
@@ -75,7 +75,7 @@
     "earlier": "更早",
     "search": "搜索轨迹",
     "searchHint": "搜索",
-    "noMatch": "没有对得上的步骤。",
+    "noMatch": "没有对得上的一步。",
     "pending": "还没返回",
     "noOutput": "没有输出",
     "tool": "工具 {name}",

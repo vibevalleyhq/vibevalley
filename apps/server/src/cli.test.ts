@@ -127,7 +127,7 @@ describe("the command line", () => {
       expect(doc(yield* run(["agent", "delete", "docs", "--dry-run"])).does[0]).toContain(`删掉档案「${docs.name}」`);
       expect(JSON.stringify(yield* list(["agent", "list"]))).toContain('"id":"docs"');
       const orchestrator = yield* run(["agent", "delete", "orchestrator", "--dry-run"]);
-      expect([orchestrator.code, orchestrator.failure?.message]).toEqual([3, "默认管家删不了：每个农场至少有一个管家"]);
+      expect([orchestrator.code, orchestrator.failure?.message]).toEqual([3, "默认管家删不了：至少要有一个管家"]);
 
       const memory = doc(yield* run(["memory", "create", "docs"], { text: "主人喜欢短的提交说明" }));
       expect(doc(yield* run(["memory", "delete", "docs", memory.id, "--dry-run"])).does).toEqual([`从 docs 的记性里忘掉：「主人喜欢短的提交说明」`]);

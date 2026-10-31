@@ -100,7 +100,7 @@ export function MemoryPanel(props: { agent: string }) {
   const all = () => view()?.memories ?? [];
   const sources = () => new Map((view()?.sources ?? []).map((s) => [s.name, s]));
   const notes = () => all().filter((m) => m.kind === "note");
-  const jobs = () => all().filter((m) => m.kind === "issue");
+  const done = () => all().filter((m) => m.kind === "issue");
   const projects = () => [...new Set(all().flatMap((m) => (m.project ? [m.project] : [])))].toSorted();
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.project === undefined : m.project === shown()));
   const whose = (m: Memory) =>
@@ -117,9 +117,9 @@ export function MemoryPanel(props: { agent: string }) {
       <Show when={sources().size > 1}>
         <Sources sources={[...sources().values()]} />
       </Show>
-      <Section title={t("web.memory.memory.jobs")} count={jobs().length}>
-        <Show when={jobs().length > 0} fallback={<Quiet>{t("web.memory.memory.noJobs")}</Quiet>}>
-          <For each={jobs()} keyed={(m) => m.id}>
+      <Section title={t("web.memory.memory.issues")} count={done().length}>
+        <Show when={done().length > 0} fallback={<Quiet>{t("web.memory.memory.noIssues")}</Quiet>}>
+          <For each={done()} keyed={(m) => m.id}>
             {(m) => (
               <div class={[item, "flex overflow-hidden"]}>
                 <span class="w-[3px] shrink-0 bg-leaf" />

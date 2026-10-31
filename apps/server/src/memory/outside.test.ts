@@ -237,7 +237,7 @@ describe("Nowledge Mem", () => {
         agent: "lab",
         session: "w1",
         project: "demo",
-        job: "修登录页",
+        brief: "修登录页",
         outcome: "completed",
         summary: "改好了",
         said: "改好了。\n记住：测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234\n记住（所有项目）：提交信息写中文",
@@ -392,13 +392,13 @@ describe("EverOS", () => {
         agent: "lab",
         session: "w1",
         project: "demo",
-        job: "修登录页，token 是 sk-abcdefghijklmnop1234",
+        brief: "修登录页，token 是 sk-abcdefghijklmnop1234",
         outcome: "completed",
         said: "改好了。\n记住：登录态统一走 refreshSession()",
         summary: "改好了",
       });
-      yield* m.keep({ agent: "lab", session: "w1", project: "demo", job: "修登录页", outcome: "failed", said: "测试没过", summary: "测试没过" });
-      yield* m.keep({ agent: "lab", session: "w1", project: "demo", job: "修登录页", outcome: "interrupted", said: "停下了", summary: "" });
+      yield* m.keep({ agent: "lab", session: "w1", project: "demo", brief: "修登录页", outcome: "failed", said: "测试没过", summary: "测试没过" });
+      yield* m.keep({ agent: "lab", session: "w1", project: "demo", brief: "修登录页", outcome: "interrupted", said: "停下了", summary: "" });
       yield* until(() => fake.seen("add").length === 2);
       const adds = fake.seen("add");
       expect(adds[0]!.body).toMatchObject({ session_id: "vibevalley-w1", app_id: "vibevalley", project_id: everosProject("demo") });
@@ -461,7 +461,7 @@ describe("EverOS", () => {
       yield* Effect.gen(function* () {
         yield* save({ kind: "everos", url, enabled: true, read: false, write: true });
         const m = yield* Memories;
-        yield* m.keep({ agent: "lab", session: "w7", project: "demo", job: "写文档", outcome: "completed", said: "写好了", summary: "" });
+        yield* m.keep({ agent: "lab", session: "w7", project: "demo", brief: "写文档", outcome: "completed", said: "写好了", summary: "" });
         yield* until(() => fake.seen("add").length === 1);
       }).pipe(Effect.provide(world()));
       const flushes = fake.seen("flush");

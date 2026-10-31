@@ -36,7 +36,7 @@ describe("an issue's thread", () => {
       const first = sent.session!;
       expect(first).toBeDefined();
       const thread = yield* await_(
-        () => Effect.map(channels.jobThread(first), (id) => (id ? channelOf(core.state().chat, id) : undefined)),
+        () => Effect.map(channels.threadOfSession(first), (id) => (id ? channelOf(core.state().chat, id) : undefined)),
         (c): c is Channel => c !== undefined,
         "the issue's thread",
       );
@@ -61,7 +61,7 @@ describe("an issue's thread", () => {
 
       const second = yield* issues.reopen(issue.id, "接着做", "");
       yield* until(() => reportsBy(second) === 1, "the second session's report in the same thread");
-      expect(yield* channels.jobThread(second)).toBe(thread!.id);
+      expect(yield* channels.threadOfSession(second)).toBe(thread!.id);
       const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
       expect(handed?.text).toContain("@" + second);
       expect(handed?.text).toContain("第 2 次");
@@ -90,7 +90,7 @@ describe("an issue's thread", () => {
       });
       const sent = yield* issues.start(issue.id, "");
       const thread = (yield* await_(
-        () => channels.jobThread(sent.session!),
+        () => channels.threadOfSession(sent.session!),
         (id) => id !== undefined,
         "the issue's thread",
       ))!;

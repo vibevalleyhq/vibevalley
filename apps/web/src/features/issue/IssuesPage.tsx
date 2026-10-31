@@ -215,7 +215,7 @@ function Detail(props: {
     if (c?.kind !== kind) return undefined;
     return c.kind === "issue" ? `issue:${c.sessions[c.sessions.length - 1]!.id}` : c.kind === "task" ? `task:${c.graph.id}` : `${c.kind}:${c.id}`;
   };
-  const steps = (graph: string) => {
+  const taskIssuesOf = (graph: string) => {
     const got: Record<string, string> = {};
     for (const r of props.rows) if (r.issue.parent === graph && r.issue.task && r.issue.sessions.length > 0) got[r.issue.task.key] = r.issue.id;
     return got;
@@ -258,7 +258,7 @@ function Detail(props: {
         )}
       </Match>
       <Match when={shows("task")} keyed>
-        {() => <TaskDetail graph={cardOf("task").graph} stepIssues={steps(cardOf("task").graph.id)} onOpen={props.open} />}
+        {() => <TaskDetail graph={cardOf("task").graph} taskIssues={taskIssuesOf(cardOf("task").graph.id)} onOpen={props.open} />}
       </Match>
     </Switch>
   );

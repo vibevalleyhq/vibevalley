@@ -21,11 +21,11 @@ import { taskLine } from "./titles";
 const spentText = (s: Spent) =>
   [s.cny !== undefined ? `¥${s.cny.toFixed(2)}` : undefined, s.tokens > 0 ? `${Math.round(s.tokens)} token` : undefined].filter(Boolean).join(" · ") || "—";
 
-const stepTone: Record<TaskState, Tone> = { waiting: "faint", working: "water", merged: "leaf", failed: "berry", skipped: "muted" };
+const taskTone: Record<TaskState, Tone> = { waiting: "faint", working: "water", merged: "leaf", failed: "berry", skipped: "muted" };
 
-/** A task (计划 on screen): an issue whose work is split into steps, each its own issue, run in the order their needs
- * allow. `stepIssues` is a step's own issue by the step's id, once a helper has worked it. */
-export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string, string>; onOpen: (id: string) => void }) {
+/** A task graph (计划 on screen): an issue whose work is split into tasks, each its own issue, run in the order their needs
+ * allow. `taskIssues` is a task's own issue by the task's id, once a helper has worked it. */
+export function TaskDetail(props: { graph: TaskGraph; taskIssues: Record<string, string>; onOpen: (id: string) => void }) {
   const [said, setSaid] = createSignal<Answer>();
   const [reviewing, setReviewing] = createSignal(false);
   const [abandoning, setAbandoning] = createSignal(false);
@@ -42,7 +42,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
     const id = g().id;
     setSaid(await graphs.act(id, a));
   };
-  const actOnStep = async (t: Task, a: TaskAction) => {
+  const actOnTask = async (t: Task, a: TaskAction) => {
     const id = g().id;
     setSaid(await graphs.taskAct(id, t.id, a));
   };
@@ -116,17 +116,17 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                   <Show when={byId().get(id)}>
                     {(task) => {
                       const summary = () => {
-                        const step = task();
-                        const waitsOn = step.blockedBy.map((b) => byId().get(b)?.title ?? b);
+                        const one = task();
+                        const waitsOn = one.blockedBy.map((b) => byId().get(b)?.title ?? b);
                         return [
-                          step.stateText || step.state,
-                          ...(step.agent ? [nameOf()(step.agent)] : []),
-                          ...(step.state === "waiting" && waitsOn.length > 0
+                          one.stateText || one.state,
+                          ...(one.agent ? [nameOf()(one.agent)] : []),
+                          ...(one.state === "waiting" && waitsOn.length > 0
                             ? [t("web.issue.task.waitsOn", { steps: waitsOn.join(t("web.issue.task.stepSeparator")) })]
                             : []),
                         ].join(" · ");
                       };
-                      const issue = () => props.stepIssues[task().id];
+                      const issue = () => props.taskIssues[task().id];
                       return (
                         <Fold
                           label={task().title}
@@ -134,7 +134,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                           leading={
                             <Show
                               when={task().state === "merged"}
-                              fallback={<span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${stepTone[task().state]})` }} />}
+                              fallback={<span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${taskTone[task().state]})` }} />}
                             >
                               <Icon name="check" size={12} />
                             </Show>
@@ -168,7 +168,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                                 </Button>
                               )}
                             </Show>
-                            <For each={task().actions}>{(a) => <Button onClick={() => void actOnStep(task(), a)}>{task().actionText[a] ?? a}</Button>}</For>
+                            <For each={task().actions}>{(a) => <Button onClick={() => void actOnTask(task(), a)}>{task().actionText[a] ?? a}</Button>}</For>
                           </div>
                         </Fold>
                       );

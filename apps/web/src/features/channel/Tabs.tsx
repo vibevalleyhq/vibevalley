@@ -15,12 +15,12 @@ import { toast } from "@/ui/toasts";
 import { HelperFace, PhaseGlyph } from "./bits";
 import { chatPath } from "./places";
 import { phaseText } from "./presence";
-import { jobThreadOf } from "./threads";
+import { sessionThreadOf } from "./threads";
 
 const card = "rounded-lg border border-line bg-page p-3";
 
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
-export function Jobs(props: { channel: Channel }) {
+export function Sessions(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
@@ -30,14 +30,14 @@ export function Jobs(props: { channel: Channel }) {
       when={sessions().length > 0}
       fallback={
         <Empty testid="tab-empty" icon="issues">
-          {t("web.channel.jobs.empty")}
+          {t("web.channel.issues.empty")}
         </Empty>
       }
     >
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={sessions()}>
           {(h) => {
-            const thread = () => jobThreadOf(core()?.chat, h);
+            const thread = () => sessionThreadOf(core()?.chat, h);
             return (
               <div class={[card, "flex items-center gap-3"]}>
                 <HelperFace agent={h.agent} runtime={h.runtime} size={36} />
@@ -58,7 +58,7 @@ export function Jobs(props: { channel: Channel }) {
                 <Show when={thread()}>
                   {(shown) => (
                     <Button icon="thread" onClick={() => router.navigate(chatPath(shown()))}>
-                      {t("web.channel.jobs.thread")}
+                      {t("web.channel.issues.thread")}
                     </Button>
                   )}
                 </Show>
