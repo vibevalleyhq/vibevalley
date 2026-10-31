@@ -372,4 +372,86 @@ describe("a blocks artifact", () => {
       }),
     ).pipe(Effect.provide(on())),
   );
+  it.effect("an agent's edit of the owner's block becomes a suggestion for every operation", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("授权矩阵")).artifact.id;
+        const text = yield* s.insertBlock(id, "owner", { text: "主人的字" });
+        const changed = [
+          yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, text: "建议改字" }),
+          yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, type: "heading", level: 2 }),
+          yield* s.updateBlock(id, "lab", { block: text.blockId, baseRev: text.rev!, checked: true }),
+          yield* s.deleteBlock(id, "lab", { block: text.blockId }),
+        ];
+        expect(changed.map((r) => [r.status, r.suggestion !== undefined])).toEqual(Array.from({ length: 4 }, () => ["rejected", true]));
+        const made = yield* s.suggestions(id);
+        expect(made.map((x) => [Boolean(x.change.text), x.change.type, x.change.attrs?.checked, Boolean(x.change.delete)])).toEqual([
+          [true, undefined, undefined, false],
+          [false, "heading", undefined, false],
+          [false, undefined, true, false],
+          [false, undefined, undefined, true],
+        ]);
+        expect((yield* s.updateBlock(id, "owner", { block: text.blockId, baseRev: text.rev!, text: "主人自己改" })).status).toBe("applied");
+        const own = yield* s.insertBlock(id, "lab", { text: "帮工自己的" });
+        expect((yield* s.updateBlock(id, "lab", { block: own.blockId, baseRev: own.rev!, text: "帮工改自己的" })).status).toBe("applied");
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+
+  it.effect("three agents' suggestions on one block survive ten restarts, and accept and reject stay final", () => {
+    const config = { ...testConfig(), db: "" };
+    return Effect.gen(function* () {
+      const { id, block, rev } = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const s = yield* make();
+          const id = (yield* s.create("并发建议")).artifact.id;
+          const b = yield* s.insertBlock(id, "owner", { text: "同一块" });
+          yield* Effect.forEach(
+            ["lab", "qa", "ops"],
+            (actor, i) =>
+              s.suggest(id, actor, {
+                block: b.blockId,
+                baseRev: b.rev!,
+                change: i === 0 ? { text: [span("一")] } : i === 1 ? { type: "heading", attrs: { level: 2 } } : { delete: true },
+              }),
+            { concurrency: 3, discard: true },
+          );
+          return { id, block: b.blockId, rev: b.rev! };
+        }),
+      ).pipe(Effect.provide(on(config)));
+      for (let n = 0; n < 10; n++) {
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const s = yield* make();
+            const list = yield* s.suggestions(id);
+            expect(list.map((x) => [x.blockId, x.status, x.author])).toEqual([
+              [block, "open", "lab"],
+              [block, "open", "qa"],
+              [block, "open", "ops"],
+            ]);
+            expect([list[0]!.change.text?.[0]?.t, list[1]!.change.type, list[2]!.change.delete]).toEqual(["一", "heading", true]);
+            expect(list.map((x) => x.baseRev)).toEqual([rev, rev, rev]);
+          }),
+        ).pipe(Effect.provide(on(config)));
+      }
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const s = yield* make();
+          const [one] = yield* s.suggestions(id);
+          for (let n = 0; n < 20; n++) expect((yield* s.acceptSuggestion(id, one!.id, "owner")).status).toBe("accepted");
+          for (let n = 0; n < 20; n++) expect((yield* s.rejectSuggestion(id, one!.id, "owner")).status).toBe("accepted");
+          const other = (yield* s.suggestions(id))[1]!;
+          for (let n = 0; n < 20; n++) expect((yield* s.rejectSuggestion(id, other.id, "owner")).status).toBe("rejected");
+          expect((yield* s.acceptSuggestion(id, other.id, "owner")).status).toBe("rejected");
+          expect(
+            (yield* s.get(id)).blocks
+              .find((b) => b.id === block)!
+              .text.map((x) => x.t)
+              .join(""),
+          ).toBe("一");
+        }),
+      ).pipe(Effect.provide(on(config)));
+    });
+  });
 });
