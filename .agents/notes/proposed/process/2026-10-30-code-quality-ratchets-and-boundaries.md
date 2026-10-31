@@ -36,6 +36,13 @@ P1.2 发现：最新目标为 `abee3768`（PR #206 已合并），相对原基�
 
 当前目标上的隔离 HTTP 探针确认：外部 Origin 仍返回 200，处理函数执行 1 次；来源修复不是重复工作。Nowledge 旧请求失效、Cron 提示先于派发、whenState 超时回收等仍有静态差异，移植前继续逐项复验。P1.2/P1.3 尚未完成。
 
+P1.2 移植清单已经收敛为 8 组：HTTP/LAN 来源、Nowledge 连接代际、Cron 派发与提示隔离、whenState 定时器、测试库会话设置、工单投影、只读引用解析、lint 调用识别。附带的黄金比较器与 Promise 门闩复用可以保留。新目标已有出站 HttpClient 取消、Deferred 冷初始化、ROLLBACK/清理失败关闭、共享 head、MOSS JSON codec 和 warning 阻断，对应旧补丁不再移植。
+
+移植约束：保留最新请求体上限/指标/Effect 代理；保留 whenState 对 0 和空字符串的成功判定；保留工单写接口新增的 requestKey/Applied/seq；保留 testkit 的退避和合法假值语义；测试按最新 Service、infra、别名路径适配。独立复核未发现阻止这 8 组窄补丁移植的行为冲突。
+
+目标请求体补充探针 `/tmp/vv-upstream-body-probe.mts`：普通请求 200、带 Content-Length 的超限请求 413、chunked 超限请求 ECONNRESET（服务端记录 maxBytes exceeded），业务处理只执行了普通请求一次。限制有效，但两种超限响应不同；P3.1 应包含这个实际路径，不把 PR 的「已限流」当作全部验收完成。
+
+
 ### Phase 2：领域边界的量化核查（3 条，先验证）
 
 归 [深模块](.agents/notes/proposed/architecture/2026-10-31-deep-module-consolidation.md)、[模块边界](.agents/notes/proposed/architecture/2026-10-31-module-boundaries-and-decoupling.md) 与 [目录方案](.agents/notes/proposed/architecture/2026-10-31-monorepo-package-directory-blueprint.md)。已完成的只读引用解析不重复计入。
