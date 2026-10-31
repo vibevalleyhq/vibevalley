@@ -15,8 +15,11 @@ import type {
   BlockOpStatus,
   BlockOpUpdateText,
   TextSpan,
+  ArtifactId,
+  BlockId,
 } from "@vibevalley/protocol";
 import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
+import { artifactId } from "@vibevalley/protocol/schema";
 
 import { or } from "@/base/order.ts";
 import { messageOf } from "@/errors.ts";
@@ -47,12 +50,12 @@ export interface Revision {
 }
 
 /** A result as the wire has it: rev 0, no reason and no texts are left out. */
-function result(status: BlockOpStatus, blockId: string, rev = 0, more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {}): BlockOpResult {
+function result(status: BlockOpStatus, blockId: BlockId, rev = 0, more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {}): BlockOpResult {
   return { status, blockId, ...(rev !== 0 ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
 }
 
 const applied = (b: Block) => result("applied", b.id, b.rev);
-const rejected = (id: string, reason: string) => result("rejected", id, 0, { reason });
+const rejected = (id: BlockId, reason: string) => result("rejected", id, 0, { reason });
 const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: t("server.artifact.op.deleted") });
 
 const parentOf = (b: Block) => b.parentId ?? "";
@@ -96,10 +99,10 @@ export class Page {
   /** A block id another artifact has. */
   taken: (id: string) => boolean = () => false;
 
-  readonly artifact: string;
+  readonly artifact: ArtifactId;
   readonly actor: string;
   readonly now: number;
-  constructor(artifact: string, actor: string, now: number, blocks: readonly Block[]) {
+  constructor(artifact: ArtifactId, actor: string, now: number, blocks: readonly Block[]) {
     this.artifact = artifact;
     this.actor = actor;
     this.now = now;
@@ -133,7 +136,7 @@ export class Page {
   }
 
   /** Where a block goes under parent: a deleted parent hands it to the level that parent was at. */
-  private liveParent(parent: string): string | undefined {
+  private liveParent(parent: string): BlockId | undefined {
     while (parent !== "") {
       const b = this.find(parent);
       if (!b) throw new Error(t("server.artifact.op.noBlock", { id: parent }));
@@ -145,11 +148,11 @@ export class Page {
 
   /** Checks a block the client made, and fills in what the server decides; a string is why it cannot be. */
   private fresh(b: BlockInput): Block | string {
-    if (!b.id) return t("server.artifact.op.noId");
+    if (b.id === "") return t("server.artifact.op.noId");
     if (this.find(b.id) || this.taken(b.id)) return t("server.artifact.op.taken", { id: b.id });
     if (!knownType(b.type)) return t("server.artifact.op.unknownType", { type: b.type });
     if (!validKey(b.orderKey)) return t("server.artifact.op.badKey", { key: b.orderKey });
-    let parent: string | undefined;
+    let parent: BlockId | undefined;
     try {
       parent = this.liveParent(b.parentId ?? "");
     } catch (e) {
@@ -276,7 +279,7 @@ export class Page {
     if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
     if (b.deleted === true) return gone(b);
     if (!validKey(o.orderKey)) return rejected(b.id, t("server.artifact.op.badKey", { key: o.orderKey }));
-    let parent: string | undefined;
+    let parent: BlockId | undefined;
     try {
       parent = this.liveParent(o.parentId ?? "");
     } catch (e) {
@@ -353,7 +356,7 @@ export class Page {
 
 /** The live blocks in artifact order: each block, then its children. */
 export function ordered(blocks: readonly Block[]): Block[] {
-  const p = new Page("", "", 0, blocks);
+  const p = new Page(blocks[0]?.artifactId ?? artifactId(""), "", 0, blocks);
   const out: Block[] = [];
   const walk = (parent: string) => {
     for (const b of p.children(parent)) {

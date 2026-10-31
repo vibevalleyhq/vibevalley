@@ -35,15 +35,15 @@ type DemoSection = (typeof demoSections)[number];
 const demoParagraphs = (section: DemoSection) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section}.paragraphs.${p}`));
 export interface BlockStore {
   /** Every live block (no tombstones), in order. */
-  readonly blocks: (id: string) => Effect.Effect<T.Block[], ApiError>;
+  readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.Block[], ApiError>;
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
-  readonly fill: (id: string, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
-  readonly markdown: (id: string) => Effect.Effect<string, ApiError>;
+  readonly fill: (id: T.ArtifactId, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
+  readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
   /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. A batch id seen before is answered as it was, with its blocks as they are now. */
-  readonly submit: (id: string, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
+  readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
   /** A new block at the end of the top level, as actor; text is inline Markdown (code takes it as it is). */
   readonly append: (
-    id: string,
+    id: T.ArtifactId,
     actor: string,
     type: T.BlockType,
     attrs: T.BlockAttrs,
@@ -51,18 +51,18 @@ export interface BlockStore {
   ) => Effect.Effect<[T.Block | undefined, T.BlockOpResult | undefined], ApiError>;
   /** A block's whole text written against baseRev, as actor; text is inline Markdown (code takes it as it is). */
   readonly updateText: (
-    id: string,
+    id: T.ArtifactId,
     actor: string,
-    block: string,
+    block: T.BlockId,
     baseRev: number,
     text: string,
   ) => Effect.Effect<[T.Block | undefined, T.BlockOpResult | undefined], ApiError>;
   /** A block of one of the kinds an agent writes appended at the end (artifact.block.create); refused for another kind. */
-  readonly appendBlock: (id: string, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
+  readonly appendBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
   /** A block's text against the rev it was read at (artifact.block.update): a newer rev comes back as a conflict, not an error. */
-  readonly updateBlock: (id: string, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
+  readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
   /** Starts the demo and returns at once (demo.ts). */
-  readonly demo: (id: string, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
+  readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   readonly demoRunning: () => boolean;
 }
 
@@ -72,9 +72,9 @@ const isAppendType = (type: string): type is T.BlockType => isOneOf(appendTypes,
 
 const blockOf = (r: qb.ArtifactBlocksResult): T.Block =>
   wire({
-    id: r.id,
-    artifactId: r.artifact_id,
-    ...(r.parent_id !== null ? { parentId: r.parent_id } : {}),
+    id: S.blockId(r.id),
+    artifactId: S.artifactId(r.artifact_id),
+    ...(r.parent_id !== null ? { parentId: S.blockId(r.parent_id) } : {}),
     orderKey: r.order_key,
     // Written only through BlockOp, whose type the wire decodes as a BlockType.
     type: r.type,
@@ -99,7 +99,7 @@ export interface BlockStoreOptions {
 }
 
 /** found: the artifact's row, failing when there is none or it is not a blocks one. */
-export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactResult, ApiError>, options: BlockStoreOptions = {}) =>
+export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.ArtifactResult, ApiError>, options: BlockStoreOptions = {}) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const lock = yield* Semaphore.make(1);
@@ -116,15 +116,15 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
       ),
     );
 
-    const blocksOf = (id: string) => db.run(Effect.map(qb.artifactBlocks({ artifact_id: id }), (rows) => rows.map(blockOf)));
+    const blocksOf = (id: T.ArtifactId) => db.run(Effect.map(qb.artifactBlocks({ artifact_id: id }), (rows) => rows.map(blockOf)));
 
-    const blocks = Effect.fn("BlockStore.blocks")(function* (id: string) {
+    const blocks = Effect.fn("BlockStore.blocks")(function* (id: T.ArtifactId) {
       yield* found(id);
       return ordered(yield* blocksOf(id));
     });
 
     /** A batch already taken: its results then, its blocks now. */
-    const again = Effect.fn("BlockStore.again")(function* (id: string, seen: qc.ArtifactChangeByBatchResult) {
+    const again = Effect.fn("BlockStore.again")(function* (id: T.ArtifactId, seen: qc.ArtifactChangeByBatchResult) {
       if (seen.artifact_id !== id) return yield* Effect.fail(refused(t("server.artifact.otherArtifact", { batch: seen.batch_id })));
       const ids = idsOf(seen.block_ids);
       const all = yield* blocksOf(id);
@@ -137,7 +137,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     });
 
     /** One batch, under the lock the caller holds. */
-    const submitLocked = (id: string, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">): Effect.Effect<T.BlockAck, ApiError> => {
+    const submitLocked = (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">): Effect.Effect<T.BlockAck, ApiError> => {
       if (!body.batchId.trim()) return Effect.fail(refused(t("server.artifact.noBatch")));
       return db.inTx(
         Effect.gen(function* () {
@@ -228,7 +228,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
       );
     };
 
-    const submit = Effect.fn("Artifact.submit")(function* (id: string, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) {
+    const submit = Effect.fn("Artifact.submit")(function* (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) {
       return yield* submitLocked(id, actor, body);
     }, lock.withPermits(1));
 
@@ -236,13 +236,13 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
 
     const one = (ack: T.BlockAck, id: string): [T.Block | undefined, T.BlockOpResult | undefined] => [blockIn(ack, id), ack.results[0]];
 
-    const append = Effect.fn("BlockStore.append")(function* (artifact: string, actor: string, type: T.BlockType, attrs: T.BlockAttrs, text: string) {
+    const append = Effect.fn("BlockStore.append")(function* (artifact: T.ArtifactId, actor: string, type: T.BlockType, attrs: T.BlockAttrs, text: string) {
       const last = new Page(artifact, actor, 0, yield* blocksOf(artifact)).children("").at(-1)?.orderKey ?? "";
-      const b: T.BlockInput = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
+      const b: T.BlockInput = { id: S.blockId(newId()), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
       return one(yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
     }, lock.withPermits(1));
 
-    const updateText = Effect.fn("BlockStore.updateText")(function* (artifact: string, actor: string, block: string, baseRev: number, text: string) {
+    const updateText = Effect.fn("BlockStore.updateText")(function* (artifact: T.ArtifactId, actor: string, block: T.BlockId, baseRev: number, text: string) {
       const type = (yield* blocksOf(artifact)).find((b) => b.id === block)?.type ?? "paragraph";
       return one(
         yield* submitLocked(artifact, actor, { batchId: newId(), ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }] }),
@@ -250,7 +250,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
       );
     }, lock.withPermits(1));
 
-    const appendBlock = Effect.fn("Artifact.appendBlock")(function* (artifact: string, actor: string, req: T.BlockCreate) {
+    const appendBlock = Effect.fn("Artifact.appendBlock")(function* (artifact: T.ArtifactId, actor: string, req: T.BlockCreate) {
       const type = (req.type ?? "").trim() || "paragraph";
       if (!isAppendType(type)) return yield* Effect.fail(refused(t("server.artifact.badBlockType", { types: list(appendTypes) })));
       const level = req.level !== undefined && req.level >= 1 && req.level <= 3 ? Math.trunc(req.level) : 2;
@@ -259,25 +259,25 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
       return r ?? (yield* Effect.fail(refused(t("server.artifact.notApplied"))));
     });
 
-    const updateBlock = Effect.fn("Artifact.updateBlock")(function* (artifact: string, actor: string, req: T.BlockUpdate) {
-      const [, r] = yield* updateText(artifact, actor, req.block.trim(), Math.trunc(req.baseRev), req.text);
+    const updateBlock = Effect.fn("Artifact.updateBlock")(function* (artifact: T.ArtifactId, actor: string, req: T.BlockUpdate) {
+      const [, r] = yield* updateText(artifact, actor, S.blockId(req.block.trim()), Math.trunc(req.baseRev), req.text);
       return r ?? (yield* Effect.fail(refused(t("server.artifact.notApplied"))));
     });
 
-    const fill = Effect.fn("BlockStore.fill")(function* (id: string, markdown: string, actor: string) {
-      const parents: string[] = [];
+    const fill = Effect.fn("BlockStore.fill")(function* (id: T.ArtifactId, markdown: string, actor: string) {
+      const parents: T.BlockId[] = [];
       const last = new Map<string, string>();
       const ops = yield* Effect.forEach(blocksOfMarkdown(markdown), (b) =>
         Effect.gen(function* () {
           parents.length = b.depth;
-          const parent = b.depth > 0 ? parents[b.depth - 1]! : "";
-          const key = yield* keyOrRefuse(last.get(parent) ?? "", "");
-          last.set(parent, key);
-          const blockId = newId();
-          parents.push(blockId);
+          const parent = b.depth > 0 ? parents[b.depth - 1] : undefined;
+          const key = yield* keyOrRefuse(last.get(parent ?? "") ?? "", "");
+          last.set(parent ?? "", key);
+          const id = S.blockId(newId());
+          parents.push(id);
           return {
             op: "insert_block" as const,
-            block: { id: blockId, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
+            block: { id, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
           };
         }),
       );
@@ -290,7 +290,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
 
     /** Inserts b at the end of the top level, or at the end of a section; the key is picked under the batch lock, so two writers cannot pick the same place. */
     const demoInsert = Effect.fn("BlockStore.demoInsert")(function* (
-      artifact: string,
+      artifact: T.ArtifactId,
       writer: string,
       b: Omit<T.BlockInput, "orderKey">,
       at?: { headings: string[]; section: number },
@@ -314,9 +314,9 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     }, lock.withPermits(1));
 
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
-    const demoWrite = Effect.fn("BlockStore.demoWrite")(function* (artifact: string, writer: string, headings: string[], section: DemoSection) {
+    const demoWrite = Effect.fn("BlockStore.demoWrite")(function* (artifact: T.ArtifactId, writer: string, headings: string[], section: DemoSection) {
       for (const text of demoParagraphs(section)) {
-        const b: Omit<T.BlockInput, "orderKey"> = { id: newId(), type: "paragraph", attrs: {}, text: [] };
+        const b: Omit<T.BlockInput, "orderKey"> = { id: S.blockId(newId()), type: "paragraph", attrs: {}, text: [] };
         let rev = yield* demoInsert(artifact, writer, b, { headings, section });
         const chars = Array.from(text);
         for (let n = 1; n <= demoPieces; n++) {
@@ -331,14 +331,14 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     });
 
     const runDemo = Effect.fn("BlockStore.runDemo")(
-      function* (artifact: string, writers: readonly { readonly writer: string; readonly section: DemoSection }[]) {
+      function* (artifact: T.ArtifactId, writers: readonly { readonly writer: string; readonly section: DemoSection }[]) {
         const headings: string[] = [];
         yield* Effect.forEach(
           writers,
           ({ writer: w, section }) =>
             Effect.gen(function* () {
               const b: Omit<T.BlockInput, "orderKey"> = {
-                id: newId(),
+                id: S.blockId(newId()),
                 type: "heading",
                 attrs: { level: 2 },
                 text: spansOf("heading", t(`server.artifact.demo.${section}.heading`)),
@@ -357,7 +357,7 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
       (e) => e.pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false)))),
     );
 
-    const demo = Effect.fn("Artifact.demo")(function* (id: string, helpers: readonly T.Agent[]) {
+    const demo = Effect.fn("Artifact.demo")(function* (id: T.ArtifactId, helpers: readonly T.Agent[]) {
       yield* found(id);
       const enabled = helpers.filter((a) => a.enabled);
       const writers = demoSections.flatMap((section) => {

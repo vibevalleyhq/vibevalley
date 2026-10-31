@@ -5,6 +5,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { ownerId } from "@vibevalley/protocol";
+import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Channel } from "@/channel/chat.ts";
 import { ServerConfig } from "@/infra/config.ts";
@@ -87,7 +88,7 @@ describe("an artifact", () => {
       expect(yield* refusedFor("a", "pdf", page("a"))).toMatchObject({ _tag: "Refused" });
       expect(yield* refusedFor("a", "html", "")).toMatchObject({ _tag: "Refused" });
       expect(yield* refusedFor("a", "html", "x".repeat(artifactMax + 1))).toMatchObject({ _tag: "Refused" });
-      expect(yield* Effect.flip(artifacts.version(owner, { id: "nope", content: "x" }))).toMatchObject({ _tag: "Missing" });
+      expect(yield* Effect.flip(artifacts.version(owner, { id: artifactId("nope"), content: "x" }))).toMatchObject({ _tag: "Missing" });
       expect(yield* Effect.flip(artifacts.create(owner, { title: "a", kind: "html", content: "x", channel: "#nowhere" }))).toMatchObject({
         _tag: "Missing",
       });

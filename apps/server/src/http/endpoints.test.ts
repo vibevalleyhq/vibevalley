@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
+import { blockId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -69,7 +70,7 @@ describe("the endpoints the agents' tools stand on", () => {
           id: made.id,
           batchId: newId(),
           lastSeq: 0,
-          ops: [{ op: "insert_block", block: { id: inserted, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
+          ops: [{ op: "insert_block", block: { id: blockId(inserted), orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
         }),
       );
       const saved = (yield* call(() => api.artifact.block.list({ id: made.id }))).blocks[0]!;
@@ -91,7 +92,7 @@ describe("the endpoints the agents' tools stand on", () => {
               blockId: source.id,
               baseRev: source.rev,
               offset: 2,
-              newBlock: { id: split, orderKey: "W", type: "paragraph", attrs: {}, text: [] },
+              newBlock: { id: blockId(split), orderKey: "W", type: "paragraph", attrs: {}, text: [] },
             },
           ],
         }),

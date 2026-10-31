@@ -24,7 +24,7 @@ describe("the schema in the database", () => {
       expect(queries.length).toBeGreaterThan(100);
       const failed: string[] = [];
       for (const [name, text] of queries) {
-        // PREPARE plans the statement against the schema (tables, columns, types) and runs nothing.
+        // PREPARE checks tables, columns and types without executing the statement.
         const prepared = yield* Effect.exit(sql.unsafe(`PREPARE checked AS ${text.replace(/;\s*$/u, "")}`));
         if (prepared._tag === "Failure") failed.push(name);
         else yield* Effect.orDie(sql.unsafe("DEALLOCATE checked"));

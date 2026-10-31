@@ -12,6 +12,7 @@ import { Clock, Context, Effect, FileSystem, Layer, Semaphore } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/chat.ts";
@@ -36,28 +37,28 @@ export class Artifact extends Context.Service<
   Artifact,
   {
     readonly list: (q: T.ArtifactListRequest) => Effect.Effect<T.Artifact[]>;
-    readonly get: (id: string) => Effect.Effect<T.Artifact, ApiError>;
+    readonly get: (id: T.ArtifactId) => Effect.Effect<T.Artifact, ApiError>;
     /** An html one's version as made; a blocks one's Markdown now, its version its seq. */
-    readonly content: (id: string, version?: number) => Effect.Effect<T.ArtifactContent & { readonly body: T.ArtifactBody }, ApiError>;
+    readonly content: (id: T.ArtifactId, version?: number) => Effect.Effect<T.ArtifactContent & { readonly body: T.ArtifactBody }, ApiError>;
     /** An html version's file on disk, for the route that serves it; undefined when there is none. */
-    readonly file: (id: string, version: number) => Effect.Effect<string | undefined>;
+    readonly file: (id: T.ArtifactId, version: number) => Effect.Effect<string | undefined>;
     /** Without content, an empty blocks one, not announced. With content, a hand-in: html kept whole, Markdown read into
      * blocks, announced with its card. issue is the caller's to give (a helper's own issue), never looked up here. */
     readonly create: (maker: Maker, req: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError>;
     /** An html one's next version; a blocks one is refused, it is changed block by block. */
     readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError>;
-    readonly rename: (id: string, title: string) => Effect.Effect<T.Artifact, ApiError>;
-    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
+    readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
     /** It and its versions or blocks go; a content file goes when no other version keeps it. Its cards stay in the channel. */
-    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-    readonly blocks: (id: string) => Effect.Effect<T.BlockSnapshot, ApiError>;
-    readonly markdown: (id: string) => Effect.Effect<string, ApiError>;
+    readonly remove: (id: T.ArtifactId) => Effect.Effect<void, ApiError>;
+    readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.BlockSnapshot, ApiError>;
+    readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
     /** A batch of ops from actor (the owner, or a helper's profile id): blocks.ts. */
-    readonly submit: (id: string, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
-    readonly appendBlock: (id: string, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
-    readonly updateBlock: (id: string, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
+    readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
+    readonly appendBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError>;
+    readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError>;
     /** Starts the demo and returns at once (blocks.ts). */
-    readonly demo: (id: string, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
+    readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   }
 >()("vibevalley/Artifact") {
   static readonly layer = (options?: ArtifactOptions) => Layer.effect(Artifact, make(options));
@@ -68,7 +69,7 @@ export type ArtifactOptions = BlockStoreOptions;
 /** How many the farm-wide list shows. */
 const listedMax = 200;
 
-const missingArtifact = (id: string) => missing(t("server.artifact.missing", { id }), [lookIn.artifact]);
+const missingArtifact = (id: T.ArtifactId) => missing(t("server.artifact.missing", { id }), [lookIn.artifact]);
 
 const make = (options: ArtifactOptions = {}) =>
   Effect.gen(function* () {
@@ -93,7 +94,7 @@ const make = (options: ArtifactOptions = {}) =>
     const assemble = Effect.fnUntraced(function* (row: qa.ArtifactsResult) {
       const versions = row.body === "html" ? yield* db.run(qv.artifactVersions({ artifact_id: row.id })) : [];
       return {
-        id: row.id,
+        id: S.artifactId(row.id),
         title: row.title,
         body: row.body,
         ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
@@ -118,13 +119,13 @@ const make = (options: ArtifactOptions = {}) =>
       } satisfies T.Artifact;
     });
 
-    const found = Effect.fnUntraced(function* (id: string) {
+    const found = Effect.fnUntraced(function* (id: T.ArtifactId) {
       const row = yield* db.one(qa.artifact({ id }));
       if (!row) return yield* Effect.fail(missingArtifact(id));
       return row;
     });
 
-    const foundBlocks = Effect.fnUntraced(function* (id: string) {
+    const foundBlocks = Effect.fnUntraced(function* (id: T.ArtifactId) {
       const row = yield* found(id);
       if (row.body !== "blocks") return yield* Effect.fail(refused(t("server.artifact.notBlocks", { title: row.title })));
       return row;
@@ -136,7 +137,7 @@ const make = (options: ArtifactOptions = {}) =>
 
     /** An empty blocks one the owner starts on the page: nowhere to announce, nothing to read in. */
     const start = Effect.fn("Artifact.start")(function* (maker: Maker, title: string) {
-      const id = newId();
+      const id = S.artifactId(newId());
       const now = yield* Clock.currentTimeMillis;
       const name = maker.by === ownerId ? t("server.channel.name.owner") : maker.by;
       yield* db.run(qa.addArtifact({ id, title, body: "blocks", channel_id: null, issue: null, by_id: maker.by, by_name: name, version: 0, created_at: now }));
@@ -157,7 +158,7 @@ const make = (options: ArtifactOptions = {}) =>
       const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
       const channel = yield* chat.placeOf(maker.from, req.channel ?? "");
       const sha = body === "html" ? yield* keep(bytes) : "";
-      const id = newId();
+      const id = S.artifactId(newId());
       const note = req.note?.trim() || undefined;
       const version = body === "html" ? 1 : 0;
       const card: T.ArtifactCard = { id, title, body, version, note: note ?? "" };
@@ -195,7 +196,7 @@ const make = (options: ArtifactOptions = {}) =>
       const sha = yield* keep(bytes);
       const next = row.version + 1;
       const note = req.note?.trim() || undefined;
-      const card: T.ArtifactCard = { id: row.id, title: row.title, body: "html", version: next, note: note ?? "" };
+      const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "" };
       // Announced where the first one was: its comments stay in one place.
       const said = yield* chat.announce(
         maker.from,
@@ -218,10 +219,10 @@ const make = (options: ArtifactOptions = {}) =>
       );
       yield* db.run(qv.artifactVersionAnnounced({ artifact_id: row.id, version: next, message_id: said.id }));
       yield* db.run(qa.artifactVersioned({ id: row.id, version: next, updated_at: now }));
-      return yield* assemble(yield* found(row.id));
+      return yield* assemble(yield* found(S.artifactId(row.id)));
     });
 
-    const versionOf = Effect.fnUntraced(function* (id: string, version: number | undefined) {
+    const versionOf = Effect.fnUntraced(function* (id: T.ArtifactId, version: number | undefined) {
       const row = yield* found(id);
       const n = version ?? row.version;
       const v = yield* db.one(qv.artifactVersion({ artifact_id: id, version: n }));

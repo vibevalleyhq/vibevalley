@@ -6,7 +6,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, ownerId, type TextSpan } from "@vibevalley/protocol";
+import { type Agent, type ArtifactId, ownerId, type TextSpan } from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 import { api } from "@/infra/api";
@@ -49,7 +49,7 @@ interface Row {
 
 /** Keyed by the id by its caller: one editor for the page's life, handed to onEditor for what the page's menu does
  * with it (the demo, which polls faster while it runs). */
-export function BlocksView(props: { id: string; onEditor?: (editor: BlockEditor) => void }) {
+export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEditor) => void }) {
   const editor = new BlockEditor(
     api,
     untrack(() => props.id),

@@ -4,6 +4,7 @@ import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { artifactPrefix as prefix } from "@vibevalley/protocol";
+import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "@/artifact/artifact.ts";
 import { artifactHeaders } from "@/artifact/policy.ts";
@@ -18,7 +19,7 @@ export const artifactContent = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const [id = "", version = ""] = new URL(request.url, "http://farm").pathname.slice(prefix.length).split("/");
     if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();
-    const path = yield* artifacts.file(id, Number(version));
+    const path = yield* artifacts.file(artifactId(id), Number(version));
     if (!path) return notFound();
     return yield* HttpServerResponse.file(path, { contentType: artifactHeaders["content-type"]!, headers: artifactHeaders });
   }).pipe(Effect.orElseSucceed(notFound)),

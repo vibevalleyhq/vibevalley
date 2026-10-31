@@ -16,6 +16,7 @@ import type * as T from "@vibevalley/protocol";
 import { DeliverableValues, IssueStatusValues, defaultOrchestrator } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { Artifact } from "@/artifact/artifact.ts";
@@ -469,7 +470,7 @@ const make = Effect.gen(function* () {
       (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.get"],
       Effect.fn("Tool.artifactGet")(function* (p: { readonly id: string }) {
         yield* callerOf(who);
-        return yield* artifactSaid(Effect.map(artifacts.get(p.id.trim()), answers.artifact.detail));
+        return yield* artifactSaid(Effect.map(artifacts.get(S.artifactId(p.id.trim())), answers.artifact.detail));
       }),
     );
   const artifactContent = (table: "orchestrator" | "session") => (who: Who) =>
@@ -479,7 +480,7 @@ const make = Effect.gen(function* () {
       Effect.fn("Tool.artifactContent")(function* (p: { readonly id: string; readonly version?: number }) {
         yield* callerOf(who);
         return yield* artifactSaid(
-          Effect.flatMap(artifacts.get(p.id.trim()), (a) =>
+          Effect.flatMap(artifacts.get(S.artifactId(p.id.trim())), (a) =>
             a.body === "blocks"
               ? Effect.map(artifacts.blocks(a.id), (snap) => [answers.block.header(a.title, snap.blocks.length), ...snap.blocks.map(blockLine)].join("\n"))
               : Effect.map(artifacts.content(a.id, p.version), (c) => answers.artifact.content(a.title, c.version, c.content)),
@@ -548,7 +549,7 @@ const make = Effect.gen(function* () {
             const content = yield* artifactWords(c, p.content, p.file);
             const made = yield* artifacts.version(
               { from: c.session || c.agent, by: c.agent },
-              { id: p.id.trim(), content, ...(p.note ? { note: p.note } : {}) },
+              { id: S.artifactId(p.id.trim()), content, ...(p.note ? { note: p.note } : {}) },
             );
             return answers.artifact.versioned(made);
           }),
@@ -956,7 +957,7 @@ const make = Effect.gen(function* () {
       Effect.fn("Tool.blockCreate")(function* (p: SessionInput<"artifact.block.create">) {
         const c = yield* callerOf(who);
         const { id, ...block } = p;
-        const r = yield* artifacts.appendBlock(id.trim(), writer(c), block);
+        const r = yield* artifacts.appendBlock(S.artifactId(id.trim()), writer(c), block);
         if (r.status !== "applied") return yield* refuse(r.reason ?? "");
         return answers.block.appended(r.blockId, r.rev ?? 0);
       }),
@@ -969,10 +970,10 @@ const make = Effect.gen(function* () {
       Effect.fn("Tool.blockUpdate")(function* (p: SessionInput<"artifact.block.update">) {
         const c = yield* callerOf(who);
         const { id, ...block } = p;
-        const r = yield* artifacts.updateBlock(id.trim(), writer(c), block);
+        const r = yield* artifacts.updateBlock(S.artifactId(id.trim()), writer(c), { ...block, block: S.blockId(block.block) });
         if (r.status === "applied") return answers.block.updated(r.blockId, r.rev);
         if (r.status === "conflict") {
-          const now = yield* Effect.orElseSucceed(artifacts.blocks(id.trim()), () => undefined);
+          const now = yield* Effect.orElseSucceed(artifacts.blocks(S.artifactId(id.trim())), () => undefined);
           const x = now?.blocks.find((b) => b.id === r.blockId);
           return answers.block.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
         }

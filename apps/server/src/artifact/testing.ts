@@ -1,12 +1,13 @@
 // What the blocks tests write artifacts with.
 
 import type { Block, TextSpan } from "@vibevalley/protocol";
+import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 export const span = (t: string): TextSpan => ({ t, marks: {} });
 export const bold = (t: string): TextSpan => ({ t, marks: { bold: true } });
 export const para = (id: string, key: string, text: string): Block => ({
-  id,
-  artifactId: "d",
+  id: blockId(id),
+  artifactId: artifactId("d"),
   orderKey: key,
   type: "paragraph",
   attrs: {},

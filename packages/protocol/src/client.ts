@@ -271,18 +271,18 @@ export class VibeValleyApi {
   readonly artifact = {
     /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
     list: (a: T.ArtifactListRequest): Promise<T.Artifact[]> => this.call<T.Artifact[]>("/api/v1/artifact/list", a),
-    get: (a: { id: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a),
+    get: (a: { id: T.ArtifactId }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a),
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a),
     /** Its title, as the owner renames it. */
-    update: (a: { id: string; title: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a),
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/previewDelete", a),
+    update: (a: { id: T.ArtifactId; title: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/update", a),
+    delete: (a: { id: T.ArtifactId }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a),
+    previewDelete: (a: { id: T.ArtifactId }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/previewDelete", a),
     /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
-    submit: (a: { id: string } & T.BlockSubmit): Promise<T.BlockAck> => this.call<T.BlockAck>("/api/v1/artifact/submit", a),
+    submit: (a: { id: T.ArtifactId } & T.BlockSubmit): Promise<T.BlockAck> => this.call<T.BlockAck>("/api/v1/artifact/submit", a),
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
      * one already running is refused. */
-    demo: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/artifact/demo", a),
+    demo: (a: { id: T.ArtifactId }): Promise<void> => this.call<void>("/api/v1/artifact/demo", a),
     content: {
       /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
        * to make the next one. */
@@ -295,14 +295,14 @@ export class VibeValleyApi {
     },
     block: {
       /** A blocks artifact and every live block (no tombstones), in order. */
-      list: (a: { id: string }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
+      list: (a: { id: T.ArtifactId }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
       /** One block appended, as one batch of one op. */
-      create: (a: { id: string } & T.BlockCreate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a),
-      update: (a: { id: string } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a),
+      create: (a: { id: T.ArtifactId } & T.BlockCreate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a),
+      update: (a: { id: T.ArtifactId } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a),
     },
     markdown: {
       /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
-      get: (a: { id: string }): Promise<T.ArtifactMarkdown> => this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a),
+      get: (a: { id: T.ArtifactId }): Promise<T.ArtifactMarkdown> => this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a),
     },
   };
 
