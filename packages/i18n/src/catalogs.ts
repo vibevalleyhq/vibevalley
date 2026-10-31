@@ -731,6 +731,7 @@ export const catalogs = {
       piNoModel: "pi 没有设默认模型",
       piUnread: "没读到 DeepSeek 余额",
       effort: "{model} 没有 {effort} 这一档，可选：{levels}",
+      piTimedOut: "问 DeepSeek 余额超时了",
     },
     "server.session": {
       failure: {
@@ -4364,6 +4365,7 @@ export const catalogs = {
       piNoModel: "pi has no default model set",
       piUnread: "The DeepSeek balance could not be read",
       effort: "{model} has no {effort} effort; it has: {levels}",
+      piTimedOut: "The DeepSeek balance took too long",
     },
     "server.session": {
       failure: {
@@ -8079,6 +8081,7 @@ export interface Messages {
   "server.runtime.persona": { readonly refused: string | number };
   "server.runtime.piNoBalance": { readonly provider: string | number };
   "server.runtime.piNoModel": undefined;
+  "server.runtime.piTimedOut": undefined;
   "server.runtime.piUnread": undefined;
   "server.runtime.quota.balance": { readonly balances: string | number; readonly provider: string | number };
   "server.runtime.quota.balanceLow": { readonly balances: string | number; readonly provider: string | number };

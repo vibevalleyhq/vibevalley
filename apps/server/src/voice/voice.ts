@@ -10,8 +10,8 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { type Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { HttpBody, HttpClient, type HttpClientError, HttpEffect } from "effect/http";
+import { Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { HttpBody, HttpClient, type HttpClientError, HttpServerRequest, HttpServerResponse } from "effect/http";
 import type { Socket } from "effect/socket";
 
 import { t } from "@vibevalley/i18n";
@@ -476,22 +476,23 @@ const make = (options: VoiceOptions = {}) =>
     let tunnel: Tunnel | undefined;
     /** What cancels closing the tunnel, lineLingerMs after the last call. */
     let closing: (() => void) | undefined;
-    const answer = chatCompletions({
-      answerer: orchestrator.answerer("phone"),
-      misheard: t("server.voice.misheard"),
-      log: (l) => logs.info(l),
-      now: () => clock.currentTimeMillisUnsafe(),
-    });
+    const answer = chatCompletions({ answerer: orchestrator.answerer("phone"), misheard: t("server.voice.misheard") });
     const route = /^\/llm\/([\w-]+)\/chat\/completions$/u;
     // A call's own key on its own path; anything else is not there or not let in.
-    const lineHandler = (request: Request): Promise<Response> => {
-      const m = route.exec(new URL(request.url).pathname);
-      if (request.method !== "POST" || !m) return Promise.resolve(new Response(null, { status: 404 }));
+    const lineHandler = Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const m = route.exec(request.url.split("?")[0] ?? "");
+      if (request.method !== "POST" || !m) return HttpServerResponse.empty({ status: 404 });
       const key = keys.get(m[1]!);
-      if (!key || request.headers.get("authorization") !== "Bearer " + key)
-        return Promise.resolve(Response.json({ error: { message: "unauthorized" } }, { status: 401 }));
-      return answer(request).catch(() => new Response(null, { status: 502 }));
-    };
+      if (!key || request.headers.authorization !== "Bearer " + key)
+        return HttpServerResponse.jsonUnsafe({ error: { message: "unauthorized" } }, { status: 401 });
+      return yield* answer;
+    }).pipe(
+      Effect.catchCauseIf(
+        (cause) => !Cause.hasInterruptsOnly(cause),
+        () => Effect.succeed(HttpServerResponse.empty({ status: 502 })),
+      ),
+    );
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         stopped = true;
@@ -512,7 +513,7 @@ const make = (options: VoiceOptions = {}) =>
     } else {
       const http = listened.success;
       if (http.address._tag !== "UnixPathAddress") linePort = http.address.port;
-      yield* http.serve(HttpEffect.fromWebHandler(lineHandler));
+      yield* http.serve(lineHandler);
       // Its close waits for every socket: an answer still streaming is cut first.
       yield* Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections()));
       line = true;

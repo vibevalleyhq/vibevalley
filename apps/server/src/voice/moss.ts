@@ -5,6 +5,7 @@
 // protocol (JSON actions, and binary frames tagged 0x00 for audio), the server only adds the key.
 
 import { Effect, Queue, type Scope, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Socket } from "effect/socket";
 
 import { jsonOrNone } from "@/base/json.ts";
@@ -43,8 +44,8 @@ export interface MossEvents {
 
 export interface MossTransport {
   readonly connect: (key: string, on: MossEvents) => MossLink;
-  /** The HTTP status of a plain request with the key and its body, or an error when nothing answers. */
-  readonly status: (key: string) => Promise<{ readonly code: number; readonly body: string }>;
+  /** The HTTP status of a plain request with the key and its body, or why nothing answered. */
+  readonly status: (key: string) => Effect.Effect<{ readonly code: number; readonly body: string }, string>;
 }
 
 const nodeTransport: MossTransport = {
@@ -61,8 +62,14 @@ const nodeTransport: MossTransport = {
     return { send: (text) => ws.send(text), close: () => ws.close() };
   },
   status: (key) =>
-    fetch(mossUrl.replace(/^wss:/u, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
-      r.text().then((body) => ({ code: r.status, body })),
+    Effect.gen(function* () {
+      const http = yield* HttpClient.HttpClient;
+      const r = yield* http.execute(HttpClientRequest.get(mossUrl.replace(/^wss:/u, "https:")).pipe(HttpClientRequest.bearerToken(key)));
+      return { code: r.status, body: yield* r.text };
+    }).pipe(
+      Effect.timeoutOrElse({ duration: deadlineMs, orElse: () => Effect.fail("timed out") }),
+      Effect.mapError(String),
+      Effect.provide(FetchHttpClient.layer),
     ),
 };
 
@@ -111,7 +118,7 @@ export const verifyMoss = (key: string, transport: MossTransport = nodeTransport
     if (got === "attached") return { kind: "ok" } as const;
     if (got === "silent") return { kind: "silent" } as const;
     if ("error" in got) return { kind: "failed", why: got.error } as const;
-    const asked = yield* Effect.tryPromise({ try: () => transport.status(key), catch: (e) => String(e) }).pipe(Effect.result);
+    const asked = yield* Effect.result(transport.status(key));
     if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || asked.failure } as const;
     const { code, body } = asked.success;
     if (code === 401 || code === 403) return { kind: "refused", why: refusal(body) } as const;

@@ -1,12 +1,13 @@
+import { Stream } from "effect";
+import { HttpEffect } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
 
-import { wallTime } from "@/infra/time.ts";
+import { type Answer, type ChatCompletions, chatChunk, chatCompletions as handlerOf, newestUserText } from "./openai.ts";
 
-import { type Answer, chatChunk, chatCompletions, newestUserText } from "./openai.ts";
+const said = (...words: string[]) => Stream.make(...words);
 
-async function* said(...words: string[]) {
-  for (const w of words) yield w;
-}
+/** The handler as a web one, as the tests ask it. */
+const chatCompletions = (c: ChatCompletions) => HttpEffect.toWebHandler(handlerOf(c));
 
 const only = (model: string, answer: Answer) => (m: string) => (m === model ? answer : undefined);
 
@@ -63,7 +64,6 @@ describe("chat/completions", () => {
   it("answers whole without a stream", async () => {
     let heard = "";
     const handle = chatCompletions({
-      now: wallTime.now,
       answerer: only("m", (text) => {
         heard = text;
         return said("好，", "这就去。");
@@ -84,7 +84,7 @@ describe("chat/completions", () => {
   });
 
   it("streams its words, then stop and [DONE]", async () => {
-    const handle = chatCompletions({ now: wallTime.now, answerer: only("m", () => said("好，", "这就去。")) });
+    const handle = chatCompletions({ answerer: only("m", () => said("好，", "这就去。")) });
     const res = await ask(handle, {
       model: "m",
       stream: true,
@@ -97,8 +97,8 @@ describe("chat/completions", () => {
 
   it("refuses in OpenAI's shape", async () => {
     const answer: Answer = () => said("在");
-    const strict = chatCompletions({ now: wallTime.now, answerer: only("m", answer) });
-    const lenient = chatCompletions({ now: wallTime.now, answerer: only("m", answer), misheard: "没听清" });
+    const strict = chatCompletions({ answerer: only("m", answer) });
+    const lenient = chatCompletions({ answerer: only("m", answer), misheard: "没听清" });
     const cases: [typeof strict, unknown, number, string][] = [
       [strict, { model: "nope", messages: [{ role: "user", content: "在吗" }] }, 404, "model_not_found"],
       [strict, { model: "m", messages: [] }, 400, "no_user_message"],
@@ -119,7 +119,6 @@ describe("chat/completions", () => {
   it("rejects valid JSON with an invalid request shape before answering", async () => {
     let calls = 0;
     const handle = chatCompletions({
-      now: wallTime.now,
       answerer: only("m", () => {
         calls++;
         return said("不该回答");

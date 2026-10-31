@@ -209,8 +209,7 @@ const inventory = <T>(
       )
     : Effect.succeed(null);
 
-const defaultUsageOf: UsageOf = async (id, runtime, found, settings) => {
-  if (id === "pi") return piBalance(settings);
+const defaultUsageOf: UsageOf = async (_id, runtime, found) => {
   if (!runtime.accountUsage) return null;
   const usage = await withinRealTime(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
   return usage ? fromOar(usage) : null;
@@ -231,7 +230,12 @@ export const make = (options: RuntimeOptions = {}) =>
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
     const usageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) =>
-      Effect.orElseSucceed(Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }), () => null);
+      !options.usageOf && id === "pi"
+        ? piBalance(settings)
+        : Effect.orElseSucceed(
+            Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }),
+            () => null,
+          );
 
     /** pi's own default model, read again whenever pi is looked at: what a quote for pi's default prices. */
     const readPiDefault = Effect.promise(piSettings);

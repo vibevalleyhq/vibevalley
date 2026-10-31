@@ -712,30 +712,30 @@ describe("runtime", () => {
       delete process.env.DEEPSEEK_API_KEY;
       process.env.MY_DEEPSEEK = "sk-from-env";
       piHome(`{"providers":{"deepseek":{"apiKey":"$MY_DEEPSEEK","baseUrl":"${url}/v1/"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual(want);
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
       url = await balance("sk-auth");
       process.env.DEEPSEEK_API_KEY = "sk-env";
       piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, `{"deepseek":{"type":"api_key","key":"sk-auth"}}`);
-      expect(await piBalance({ defaultModel: "" })).toEqual(want);
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
       url = await balance("sk-env");
       piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual(want);
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
       delete process.env.DEEPSEEK_API_KEY;
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual({ status: "login_required" });
-      expect(await piBalance({ defaultModel: "anthropic/claude" })).toEqual({
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({ status: "login_required" });
+      expect(await Effect.runPromise(piBalance({ defaultModel: "anthropic/claude" }))).toEqual({
         status: "unavailable",
         reason: "anthropic 不报余额",
       });
       url = await balance("sk-bad", { is_available: true, balance_infos: {} });
       process.env.DEEPSEEK_API_KEY = "sk-bad";
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual({
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({
         status: "unavailable",
         reason: "没读到 DeepSeek 余额",
       });
       piHome("", "", `{"defaultProvider":{}}`);
-      expect(await piBalance({ defaultModel: "" })).toEqual({
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({
         status: "unavailable",
         reason: "pi 没有设默认模型",
       });

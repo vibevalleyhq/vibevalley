@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer } from "effect";
+import { Effect, Fiber, Layer, Stream } from "effect";
 
 import { messageText } from "@vibevalley/agent/messages";
 import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
@@ -22,7 +22,7 @@ import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
-import { gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
+import { aTurn, gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import type { EvalCase } from "./evals.ts";
@@ -31,7 +31,7 @@ import { deepseekModel, orchestratorModel } from "./model.ts";
 import { Orchestrator } from "./orchestrator.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
-const onPhone = (o: Orchestrator["Service"], text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
+const onPhone = (o: Orchestrator["Service"], text: string) => Stream.toAsyncIterable(o.answerer("phone")(orchestratorModel)!(text));
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
 const lastInput = (c: Request) => c.messages.map(userText).findLast((t) => t !== undefined) ?? "";
@@ -296,14 +296,9 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const words = orchestrator.answerer("api")(orchestratorModel)!("在吗", AbortSignal.abort());
-      const said = yield* Effect.promise(async () => {
-        let out = "";
-        for await (const w of words) out += w;
-        return out;
-      });
-      // Asked with a signal already off, it takes nothing: there is nothing to wait for.
-      expect(said).toBe("");
+      // A caller that left before reading: its answer was never read, so it never started.
+      void orchestrator.answerer("api")(orchestratorModel)!("在吗");
+      yield* aTurn;
       expect(f.requests).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -325,7 +320,7 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const got = yield* Effect.promise(async () => {
         const words = (async () => {
-          for await (const _ of orchestrator.answerer("api")(orchestratorModel)!("在吗", new AbortController().signal)) void _;
+          for await (const _ of Stream.toAsyncIterable(orchestrator.answerer("api")(orchestratorModel)!("在吗"))) void _;
           return "ended";
         })().catch((e: Error) => e.message);
         return within(words, 3000, "the answer");

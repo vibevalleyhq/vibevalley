@@ -33,5 +33,6 @@
   "piNoBalance": "{provider} reports no balance",
   "piNoModel": "pi has no default model set",
   "piUnread": "The DeepSeek balance could not be read",
-  "effort": "{model} has no {effort} effort; it has: {levels}"
+  "effort": "{model} has no {effort} effort; it has: {levels}",
+  "piTimedOut": "The DeepSeek balance took too long"
 }

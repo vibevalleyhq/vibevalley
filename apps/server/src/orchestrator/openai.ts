@@ -5,22 +5,22 @@
 
 import { randomBytes } from "node:crypto";
 
-import { Schema } from "effect";
+import { ByteSize, Cause, Clock, Effect, Schema, Stream } from "effect";
+import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/http";
 
-import { messageOf } from "@/errors.ts";
+/** One turn's words as they come, ending with the turn. Interrupting the stream (the asker went away) ends the turn's
+ * part in it: nothing is said for nobody. */
+export type Answer<E = never> = (text: string) => Stream.Stream<string, E>;
 
-/** One turn's words as they come; done when the turn is over. */
-export type Answer = (text: string, signal: AbortSignal) => AsyncIterable<string>;
-
-export interface ChatCompletions {
+export interface ChatCompletions<E = never> {
   /** Undefined: no such model. */
-  readonly answerer: (model: string) => Answer | undefined;
+  readonly answerer: (model: string) => Answer<E> | undefined;
   /** Said when a request has no user text; absent: such a request is refused. */
   readonly misheard?: string;
-  readonly log?: (line: string) => void;
-  /** The service's Clock: a completion's created time and how long its first words took. */
-  readonly now: () => number;
 }
+
+/** A request's body past this is refused before it is read: a turn's words are small. */
+const bodyMax = 1024 * 1024;
 
 const ContentPart = Schema.Struct({
   type: Schema.optionalKey(Schema.String),
@@ -52,7 +52,7 @@ export function newestUserText(req: ChatRequest): string {
     .trim();
 }
 
-const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const json = (status: number, body: unknown) => HttpServerResponse.jsonUnsafe(body, { status });
 
 const refuse = (status: number, kind: string, code: string, message: string) => json(status, { error: { message, type: kind, code } });
 
@@ -72,75 +72,61 @@ export function chatChunk(id: string, created: number, model: string, content: s
   );
 }
 
-async function* once(text: string) {
-  yield text;
-}
-
-export function chatCompletions(c: ChatCompletions) {
-  return async (request: Request): Promise<Response> => {
+/** The route's handler: the request read as OpenAI's, the answer whole or as server-sent chunks. A client that goes away
+ * while it streams interrupts the response, and with it the answer. */
+export const chatCompletions = <E>(c: ChatCompletions<E>) =>
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     if (request.method !== "POST") return refuse(405, "invalid_request_error", "method_not_allowed", "only POST");
-    const asked = c.now();
-    let req: ChatRequest;
-    try {
-      req = Schema.decodeUnknownSync(ChatRequest)(await request.json());
-    } catch (e) {
-      return refuse(400, "invalid_request_error", "invalid_json", messageOf(e));
-    }
+    const asked = yield* Clock.currentTimeMillis;
+    const length = Number(request.headers["content-length"] ?? 0);
+    if (length > bodyMax) return refuse(413, "invalid_request_error", "request_too_large", `the body is ${length} bytes, at most ${bodyMax}`);
+    const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(bodyMax)).pipe(Effect.option);
+    if (text._tag === "None") return refuse(413, "invalid_request_error", "request_too_large", `the body is more than ${bodyMax} bytes`);
+    const decoded = Schema.decodeResult(Schema.fromJsonString(ChatRequest))(text.value);
+    if (decoded._tag === "Failure") return refuse(400, "invalid_request_error", "invalid_json", decoded.failure.message);
+    const req = decoded.success;
     const model = req.model ?? "";
     const answer = c.answerer(model);
     if (!answer) return refuse(404, "invalid_request_error", "model_not_found", "no model " + model);
-    const text = newestUserText(req);
-    if (!text && !c.misheard) return refuse(400, "invalid_request_error", "no_user_message", "no user message to answer");
-    const ended = new AbortController();
-    // An abort before this line has already fired: it is passed on as it is, so the answer is not started for nobody.
-    if (request.signal.aborted) ended.abort();
-    else request.signal.addEventListener("abort", () => ended.abort(), { once: true });
-    const words = text ? answer(text, ended.signal) : once(c.misheard!);
+    const said = newestUserText(req);
+    if (!said && !c.misheard) return refuse(400, "invalid_request_error", "no_user_message", "no user message to answer");
+    const words = (said ? answer(said) : Stream.succeed(c.misheard!)).pipe(
+      Stream.zipWithIndex,
+      // How long the first words took, in the log.
+      Stream.tap(([, i]) =>
+        i === 0
+          ? Effect.flatMap(Clock.currentTimeMillis, (now) => Effect.logInfo(`vibevalley: ${model}'s first words ${now - asked}ms after it was asked`))
+          : Effect.void,
+      ),
+      Stream.map(([w]) => w),
+    );
     const id = "chatcmpl-" + randomBytes(6).toString("hex");
     const created = Math.floor(asked / 1000);
-    const firstWords = () => c.log?.(`vibevalley: ${model}'s first words ${c.now() - asked}ms after it was asked`);
     if (req.stream !== true) {
-      let all = "";
-      for await (const w of words) {
-        if (all === "") firstWords();
-        all += w;
-      }
+      const all = yield* Effect.option(Stream.mkString(words));
+      if (all._tag === "None") return refuse(502, "server_error", "not_answered", "the answer was cut off");
       return json(200, {
         id,
         object: "chat.completion",
         created,
         model,
-        choices: [{ index: 0, message: { role: "assistant", content: all }, finish_reason: "stop" }],
+        choices: [{ index: 0, message: { role: "assistant", content: all.value }, finish_reason: "stop" }],
       });
     }
-    const encoder = new TextEncoder();
-    const body = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        let first = true;
-        try {
-          for await (const w of words) {
-            if (first) firstWords();
-            controller.enqueue(encoder.encode(chatChunk(id, created, model, w, false, first)));
-            first = false;
-          }
-          controller.enqueue(encoder.encode(chatChunk(id, created, model, "", true, false)));
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch {
-          controller.close();
-        }
-      },
-      cancel() {
-        ended.abort();
-      },
+    const chunks = words.pipe(
+      Stream.zipWithIndex,
+      Stream.map(([w, i]) => chatChunk(id, created, model, w, false, i === 0)),
+      Stream.concat(Stream.make(chatChunk(id, created, model, "", true, false), "data: [DONE]\n\n")),
+      // An answer that fails midway ends the stream there, with no [DONE]: the asker sees it cut off.
+      Stream.catchCauseIf(
+        (cause) => !Cause.hasInterruptsOnly(cause),
+        () => Stream.empty,
+      ),
+      Stream.encodeText,
+    );
+    return HttpServerResponse.stream(chunks, {
+      contentType: "text/event-stream",
+      headers: { "cache-control": "no-cache", connection: "keep-alive" },
     });
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "content-type": "text/event-stream",
-        "cache-control": "no-cache",
-        connection: "keep-alive",
-      },
-    });
-  };
-}
+  });

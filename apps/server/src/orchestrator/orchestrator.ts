@@ -88,7 +88,7 @@ export class Orchestrator extends Context.Service<
     readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
     /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
      * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
-    readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
+    readonly answerer: (on: "phone" | "api") => (model: string) => Answer<NotAnswered> | undefined;
     /** The lines waiting for an orchestrator (the default one when none is named) are dropped with its run; the sessions
      * it sent keep working. */
     readonly stop: (agent?: string) => Effect.Effect<void>;
@@ -358,26 +358,25 @@ const make = (options: OrchestratorOptions = {}) =>
 
     // One answer streams at a time, the call's or chat/completions', from the default orchestrator: a newer line ends the
     // one before.
-    const answer = (line: string, signal: AbortSignal): AsyncIterable<string> => {
-      const me = new Caller();
-      // A caller that already left (the request was cancelled before this ran) is not answered: no run starts for it.
-      if (signal.aborted) {
-        me.end();
-        return Stream.toAsyncIterable(me.words);
-      }
-      latestCall?.end();
-      latestCall = me;
-      signal.addEventListener(
-        "abort",
-        () => {
-          me.end();
-          if (latestCall === me) latestCall = undefined;
-        },
-        { once: true },
+    // The caller is made when the stream is first read: one that left before that starts no run. Its stream ending,
+    // or being interrupted (the caller hung up), ends it.
+    const answer = (line: string): Stream.Stream<string, NotAnswered> =>
+      Stream.unwrap(
+        Effect.sync(() => {
+          const me = new Caller();
+          latestCall?.end();
+          latestCall = me;
+          forkHere(take({ source: "owner", line, channel: chat.defaultChannel(), owner: true, caller: me }));
+          return me.words.pipe(
+            Stream.ensuring(
+              Effect.sync(() => {
+                me.end();
+                if (latestCall === me) latestCall = undefined;
+              }),
+            ),
+          );
+        }),
       );
-      forkHere(take({ source: "owner", line, channel: chat.defaultChannel(), owner: true, caller: me }));
-      return Stream.toAsyncIterable(me.words);
-    };
 
     const logged = <E>(what: string, effect: Effect.Effect<unknown, E>) =>
       effect.pipe(
@@ -451,11 +450,14 @@ const make = (options: OrchestratorOptions = {}) =>
       }),
       answerer: (on) => (model) => {
         if (model !== orchestratorModel) return undefined;
-        if (on === "api") return (text, signal) => answer(lineWords.owner(text), signal);
-        return (text, signal) => {
-          forkHere(Effect.ignore(chat.spoken(ownerId, text, ""), { log: "Warn", message: "vibevalley: voice: the owner's spoken words were not kept" }));
-          return answer(voiceNote + "\n" + lineWords.owner(text), signal);
-        };
+        if (on === "api") return (text) => answer(lineWords.owner(text));
+        return (text) =>
+          Stream.unwrap(
+            Effect.sync(() => {
+              forkHere(Effect.ignore(chat.spoken(ownerId, text, ""), { log: "Warn", message: "vibevalley: voice: the owner's spoken words were not kept" }));
+              return answer(voiceNote + "\n" + lineWords.owner(text));
+            }),
+          );
       },
       stop: Effect.fn("Orchestrator.stop")(function* (agent) {
         const me = yield* target(agent);

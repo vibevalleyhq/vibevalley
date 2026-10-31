@@ -4,7 +4,7 @@ import { Effect } from "effect";
 import { verifyMoss, type MossEvents, type MossTransport } from "./moss.ts";
 
 /** A MOSS that answers the way script says, after the socket opens; status is what plain HTTPS answers. */
-const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTransport["status"] = () => Promise.resolve({ code: 400, body: "" })) => {
+const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTransport["status"] = () => Effect.succeed({ code: 400, body: "" })) => {
   const log = { sent: [] as string[], closed: 0, asked: 0 };
   const transport: MossTransport = {
     connect: (_key, on) => {
@@ -36,7 +36,7 @@ describe("checking a MOSS Live key", () => {
       const body = JSON.stringify({ error: { type: "permission_error", message: "iam api key auth failed" } });
       const { transport } = fake(
         (on) => on.down(""),
-        () => Promise.resolve({ code: 403, body }),
+        () => Effect.succeed({ code: 403, body }),
       );
       expect(yield* verifyMoss("sk-bad", transport)).toEqual({ kind: "refused", why: "iam api key auth failed" });
     }),
@@ -46,7 +46,7 @@ describe("checking a MOSS Live key", () => {
     Effect.gen(function* () {
       const offline = fake(
         (on) => on.down(""),
-        () => Promise.reject(new Error("getaddrinfo ENOTFOUND api.mosi.cn")),
+        () => Effect.fail("Error: getaddrinfo ENOTFOUND api.mosi.cn"),
       );
       expect((yield* verifyMoss("sk-x", offline.transport)).kind).toBe("unreachable");
       const erring = fake((on) => {

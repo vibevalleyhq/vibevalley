@@ -431,16 +431,15 @@ export default defineConfig({
         rules: { "vibevalley/no-object-guard": "error" },
       },
       {
-        // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
-        // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
-        // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).
+        // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls, pi's own
+        // files), the MCP SDK's request handlers, and time.ts, the service's Clock as Promises for the code on those
+        // interfaces (oar's vibevalley runtime, the journal).
         files: [
           "apps/server/src/runtime/vibevalley.ts",
           "apps/server/src/runtime/dsh.ts",
           "apps/server/src/runtime/pi.ts",
           "apps/server/src/runtime/runtime.ts",
           "apps/server/src/mcp/mcp.ts",
-          "apps/server/src/orchestrator/openai.ts",
           "apps/server/src/infra/time.ts",
         ],
         rules: { "vibevalley/promise-boundary": "off" },
