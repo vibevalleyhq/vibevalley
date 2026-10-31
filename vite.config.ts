@@ -517,6 +517,12 @@ export default defineConfig({
         rules: { "vibevalley/db-door": "error" },
       },
       {
+        // Effects over a list go through Effect.forEach (scripts/oxlint-plugin.ts, yield-in-loop).
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
+        rules: { "vibevalley/yield-in-loop": "error" },
+      },
+      {
         // A fiber belongs to a scope, so none outlives its service or a test (scripts/oxlint-plugin.ts, scoped-fibers).
         files: ["apps/server/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],

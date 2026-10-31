@@ -154,11 +154,16 @@ const make = Effect.gen(function* () {
   const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
   const starters: T.Agent[] = [];
-  for (const id of config.agent.starters) {
-    const builtIn = builtInOf(id);
-    if (builtIn) starters.push(installed(builtIn, starters));
-    else yield* Effect.logWarning(`vibevalley: agent.starters names no built-in template: ${id}`);
-  }
+  yield* Effect.forEach(
+    config.agent.starters,
+    (id) =>
+      Effect.gen(function* () {
+        const builtIn = builtInOf(id);
+        if (builtIn) starters.push(installed(builtIn, starters));
+        else yield* Effect.logWarning(`vibevalley: agent.starters names no built-in template: ${id}`);
+      }),
+    { discard: true },
+  );
   const seed: Stored = { agents: starters, skills: [], settings: {} };
   let s: Stored = seed;
   s = (yield* readOrSetAside(file, readStored, "the profiles start from the starters")) ?? seed;
@@ -204,7 +209,7 @@ const make = Effect.gen(function* () {
   // Read again on every ask: an added template is a folder in the home, and copying one in or out changes the list.
   const templates = Effect.fn("Agent.templates")(function* () {
     const added = yield* withFs(addedTemplates(config.home));
-    for (const why of added.problems) yield* Effect.logWarning(`vibevalley: an added template is left out: ${why}`);
+    yield* Effect.forEach(added.problems, (why) => Effect.logWarning(`vibevalley: an added template is left out: ${why}`), { discard: true });
     return [...builtIn, ...added.templates].map((item) => ({
       ...item,
       installed: s.agents.filter((a) => a.from?.template === item.id).map((a) => a.id),

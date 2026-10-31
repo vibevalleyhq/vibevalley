@@ -140,10 +140,15 @@ export const makeTodoRunner = (
             Effect.catch((e) => Effect.as(Effect.logError("agent: cannot move its tasks:", e), false)),
           );
         if (!moved) return;
-        for (const t of picked) {
-          out.add(t.id);
-          yield* FiberSet.run(fibers, send(t));
-        }
+        yield* Effect.forEach(
+          picked,
+          (t) =>
+            Effect.gen(function* () {
+              out.add(t.id);
+              yield* FiberSet.run(fibers, send(t));
+            }),
+          { discard: true },
+        );
       });
     });
 

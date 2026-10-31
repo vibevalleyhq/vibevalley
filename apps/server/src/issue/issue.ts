@@ -901,13 +901,24 @@ const make = (options: IssueOptions = {}) =>
       );
 
     const rows = yield* db.run(q.keptIssues({ closed: keepClosedIssues }));
-    for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) });
+    yield* Effect.forEach(rows, (row) => core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) }), { discard: true });
     // An in-process run on its issues stopped with the server: one still going is lost; one that ended still waits on the owner.
-    for (const o of store.orchestrators())
-      for (const r of yield* db.run(q.openOf({ assignee: o.id }))) {
-        const run = column.run(r.last_run);
-        if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
-      }
+    yield* Effect.forEach(
+      store.orchestrators(),
+      (o) =>
+        Effect.flatMap(db.run(q.openOf({ assignee: o.id })), (open) =>
+          Effect.forEach(
+            open,
+            (r) =>
+              Effect.gen(function* () {
+                const run = column.run(r.last_run);
+                if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
+              }),
+            { discard: true },
+          ),
+        ),
+      { discard: true },
+    );
 
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
@@ -953,17 +964,22 @@ const make = (options: IssueOptions = {}) =>
       const at = order.indexOf(before);
       order.splice(at < 0 ? order.length : at, 0, id);
       yield* db.inTx(Effect.forEach(order, (each, rank) => db.run(q.placeIssue({ rank, id: each })), { discard: true }));
-      for (const each of order) yield* publish(each);
+      yield* Effect.forEach(order, (each) => publish(each), { discard: true });
     });
 
     const timeline = Effect.fn("Issue.timeline")(function* (id: string) {
       const issue = yield* get(id);
       const runs = yield* sessions.runs(issue.id);
       const names = new Map<string, string>();
-      for (const s of new Set(runs.map((r) => r.session))) {
-        const found = yield* sessions.get(s);
-        if (found) names.set(s, found.name);
-      }
+      yield* Effect.forEach(
+        new Set(runs.map((r) => r.session)),
+        (s) =>
+          Effect.gen(function* () {
+            const found = yield* sessions.get(s);
+            if (found) names.set(s, found.name);
+          }),
+        { discard: true },
+      );
       return milestonesOf(issue, runs, names);
     });
 
@@ -1205,30 +1221,40 @@ const make = (options: IssueOptions = {}) =>
         const gone = yield* db
           .attemptTx(
             Effect.gen(function* () {
-              for (const issue of issues)
-                yield* q.putIssue({
-                  id: issue.id,
-                  title: issue.title,
-                  description: issue.description,
-                  project: nullText(issue.project),
-                  assignee: nullText(issue.assignee),
-                  priority: issue.priority,
-                  rank: issue.rank ?? 0,
-                  created_at: issue.createdAt,
-                  closed_at: issue.closedAt ?? null,
-                  delivered: issue.delivered ?? null,
-                  canceled: issue.canceled ?? null,
-                  parent: nullText(issue.parent),
-                  blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
-                  graph: jsonOrNull(issue.graph, !!issue.graph),
-                  task: jsonOrNull(issue.task, !!issue.task),
-                });
+              yield* Effect.forEach(
+                issues,
+                (issue) =>
+                  q.putIssue({
+                    id: issue.id,
+                    title: issue.title,
+                    description: issue.description,
+                    project: nullText(issue.project),
+                    assignee: nullText(issue.assignee),
+                    priority: issue.priority,
+                    rank: issue.rank ?? 0,
+                    created_at: issue.createdAt,
+                    closed_at: issue.closedAt ?? null,
+                    delivered: issue.delivered ?? null,
+                    canceled: issue.canceled ?? null,
+                    parent: nullText(issue.parent),
+                    blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
+                    graph: jsonOrNull(issue.graph, !!issue.graph),
+                    task: jsonOrNull(issue.task, !!issue.task),
+                  }),
+                { discard: true },
+              );
               const out: string[] = [];
-              for (const old of before)
-                if (!issues.some((issue) => issue.id === old.id)) {
-                  yield* q.removeIssue({ id: old.id });
-                  out.push(old.id);
-                }
+              yield* Effect.forEach(
+                before,
+                (old) =>
+                  Effect.gen(function* () {
+                    if (!issues.some((issue) => issue.id === old.id)) {
+                      yield* q.removeIssue({ id: old.id });
+                      out.push(old.id);
+                    }
+                  }),
+                { discard: true },
+              );
               return out;
             }),
           )

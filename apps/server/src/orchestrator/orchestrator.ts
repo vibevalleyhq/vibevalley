@@ -210,15 +210,20 @@ const make = (options: OrchestratorOptions = {}) =>
 
     const agentLines = Effect.gen(function* () {
       const lines: string[] = [];
-      for (const a of store.agents()) {
-        const assessed = yield* runtimes.assess(a);
-        const p = assessed.agent;
-        let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
-        if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
-        else if (assessed.blocking.length > 0) line += situationWords.blocked(assessed.blocking[0]!.text);
-        else line += situationWords.disabled;
-        lines.push(line);
-      }
+      yield* Effect.forEach(
+        store.agents(),
+        (a) =>
+          Effect.gen(function* () {
+            const assessed = yield* runtimes.assess(a);
+            const p = assessed.agent;
+            let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
+            if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
+            else if (assessed.blocking.length > 0) line += situationWords.blocked(assessed.blocking[0]!.text);
+            else line += situationWords.disabled;
+            lines.push(line);
+          }),
+        { discard: true },
+      );
       return lines;
     });
 
@@ -402,10 +407,15 @@ const make = (options: OrchestratorOptions = {}) =>
         Stream.runForEach(yield* tasks.news, (line) => logged("a task graph's line", take({ source: "graph", line, channel: chat.defaultChannel() }))),
       );
       // Each orchestrator goes on with the run a stop cut off.
-      for (const a of store.orchestrators()) {
-        const me = yield* instanceOf(a.id);
-        if ((options.llm || settings.deepseekApiKey()) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
-      }
+      yield* Effect.forEach(
+        store.orchestrators(),
+        (a) =>
+          Effect.gen(function* () {
+            const me = yield* instanceOf(a.id);
+            if ((options.llm || settings.deepseekApiKey()) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
+          }),
+        { discard: true },
+      );
     }
 
     yield* Effect.addFinalizer(() => Effect.forEach([...instances.values()], (me) => me.host.close, { concurrency: "unbounded", discard: true }));

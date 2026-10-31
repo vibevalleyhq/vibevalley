@@ -514,11 +514,15 @@ const make = Effect.gen(function* () {
       { onlyIfMissing: true },
     );
 
-  for (const [id, kind, name] of [
-    [ownerId, "owner", t("server.channel.name.owner")],
-    ["system", "system", "VibeValley"],
-  ] as const)
-    yield* db.run(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
+  yield* Effect.forEach(
+    [
+      [ownerId, "owner", t("server.channel.name.owner")],
+      ["system", "system", "VibeValley"],
+    ] as const,
+    ([id, kind, name]) =>
+      Effect.flatMap(Clock.currentTimeMillis, (now) => db.run(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: now }))),
+    { discard: true },
+  );
   /** An orchestrator is a participant by its profile id, under its profile's name as it is when it speaks. */
   const seat = Effect.fnUntraced(function* (id: string) {
     const name = agents.agent(id)?.name.trim() || t("server.channel.name.orchestrator");
@@ -528,7 +532,7 @@ const make = Effect.gen(function* () {
     model.joined(joined);
   });
   const orchestratorIds = () => agents.orchestrators().map((a) => a.id);
-  for (const id of orchestratorIds()) yield* seat(id);
+  yield* Effect.forEach(orchestratorIds(), (id) => seat(id), { discard: true });
   let defaultId = (yield* db.one(qc.defaultID()))?.id ?? "";
   if (!defaultId) {
     defaultId = newId();
@@ -543,7 +547,13 @@ const make = Effect.gen(function* () {
       }),
     );
   }
-  for (const id of orchestratorIds()) yield* db.run(qc.createDirect({ id: newId(), peer_id: id, created_at: yield* Clock.currentTimeMillis }));
+  yield* Effect.forEach(
+    orchestratorIds(),
+    (id) => Effect.flatMap(Clock.currentTimeMillis, (now) => db.run(qc.createDirect({ id: newId(), peer_id: id, created_at: now }))),
+    {
+      discard: true,
+    },
+  );
   yield* reload;
 
   const orchestratorOfRow = (row: ChannelRow | undefined): string => {
@@ -744,10 +754,15 @@ const make = Effect.gen(function* () {
   const heardLaunch = Effect.fnUntraced(
     function* (who: string, launch: string) {
       const seen = yield* db.run(qd.seenHanded({ seen_at: yield* Clock.currentTimeMillis, recipient_id: who, launch }));
-      for (const r of seen) {
-        open.seen(who, r.message_id);
-        yield* db.run(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
-      }
+      yield* Effect.forEach(
+        seen,
+        (r) =>
+          Effect.gen(function* () {
+            open.seen(who, r.message_id);
+            yield* db.run(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
+          }),
+        { discard: true },
+      );
     },
     (effect) => tx(effect),
   );
@@ -766,11 +781,16 @@ const make = Effect.gen(function* () {
     const present: readonly string[] = sessionsNow.map((h) => h.id);
     const known = new Set(model.participants().map((p) => p.id));
     const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
-    for (const m of mentions) {
-      const how = orchestrators.includes(m) || m === ownerId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
-      named.push({ id: m, how });
-      yield* db.run(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
-    }
+    yield* Effect.forEach(
+      mentions,
+      (m) =>
+        Effect.gen(function* () {
+          const how = orchestrators.includes(m) || m === ownerId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
+          named.push({ id: m, how });
+          yield* db.run(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
+        }),
+      { discard: true },
+    );
     if (mentions.length > 0) {
       row = { ...row, meta: metaText({ ...meta, mentions }) };
       yield* db.run(qm.updateMessageMeta({ meta: row.meta, id: row.id }));
@@ -779,8 +799,14 @@ const make = Effect.gen(function* () {
     if (ch.type === "thread") {
       // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
       if (row.sender_id !== "system" && row.kind !== "dispatch") yield* follow(ch.id, row.sender_id, "replied", row.number);
-      for (const m of named)
-        if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) yield* follow(ch.id, m.id, "mentioned", row.number - 1);
+      yield* Effect.forEach(
+        named,
+        (m) =>
+          Effect.gen(function* () {
+            if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) yield* follow(ch.id, m.id, "mentioned", row.number - 1);
+          }),
+        { discard: true },
+      );
       followers = reach.followers(ch.id);
     }
     const hops = reach.hops(ch.id);
@@ -810,46 +836,51 @@ const make = Effect.gen(function* () {
       forTask: !(meta.forTask !== true),
       spoken: !(meta.spoken !== true),
     });
-    for (const d of deliveries) {
-      yield* db.run(
-        qd.insertDelivery({ recipient_id: d.recipient, message_id: row.id, reason: d.reason, wakes: d.wakes, held_by: d.heldBy ?? null, created_at: now }),
-      );
-      open.inserted(d.recipient, {
-        message_id: row.id,
-        number: row.number,
-        reason: d.reason,
-        wakes: d.wakes,
-        held_by: d.heldBy ?? null,
-        state: "pending",
-        launch: null,
-        channel_id: ch.id,
-        sender_id: row.sender_id,
-        kind: row.kind,
-        body: row.body,
-        meta: row.meta,
-        reply_number: row.reply_number,
-        created_at: row.created_at,
-        name: row.sender_name,
-        sender_kind: row.sender_kind,
-        channel_type: ch.type,
-        root_id: ch.root_id,
-        root_number: ch.root_number,
-        subject_kind: ch.subject_kind,
-        subject_id: ch.subject_id,
-        // As OpenDeliveries reads it: the thread's channel's name, else the channel's own.
-        channel_name: (ch.parent_id !== null ? model.channel(ch.parent_id)?.name : undefined) ?? ch.name ?? "",
-      });
-      reach.delivered({
-        channel: ch.id,
-        message: row.id,
-        recipient: d.recipient,
-        senderKind: row.sender_kind,
-        recipientKind: model.participant(d.recipient)?.kind ?? "",
-        wakes: d.wakes,
-        held: d.heldBy !== undefined,
-        at: now,
-      });
-    }
+    yield* Effect.forEach(
+      deliveries,
+      (d) =>
+        Effect.gen(function* () {
+          yield* db.run(
+            qd.insertDelivery({ recipient_id: d.recipient, message_id: row.id, reason: d.reason, wakes: d.wakes, held_by: d.heldBy ?? null, created_at: now }),
+          );
+          open.inserted(d.recipient, {
+            message_id: row.id,
+            number: row.number,
+            reason: d.reason,
+            wakes: d.wakes,
+            held_by: d.heldBy ?? null,
+            state: "pending",
+            launch: null,
+            channel_id: ch.id,
+            sender_id: row.sender_id,
+            kind: row.kind,
+            body: row.body,
+            meta: row.meta,
+            reply_number: row.reply_number,
+            created_at: row.created_at,
+            name: row.sender_name,
+            sender_kind: row.sender_kind,
+            channel_type: ch.type,
+            root_id: ch.root_id,
+            root_number: ch.root_number,
+            subject_kind: ch.subject_kind,
+            subject_id: ch.subject_id,
+            // As OpenDeliveries reads it: the thread's channel's name, else the channel's own.
+            channel_name: (ch.parent_id !== null ? model.channel(ch.parent_id)?.name : undefined) ?? ch.name ?? "",
+          });
+          reach.delivered({
+            channel: ch.id,
+            message: row.id,
+            recipient: d.recipient,
+            senderKind: row.sender_kind,
+            recipientKind: model.participant(d.recipient)?.kind ?? "",
+            wakes: d.wakes,
+            held: d.heldBy !== undefined,
+            at: now,
+          });
+        }),
+      { discard: true },
+    );
     const written: Written = { id: row.id, number: row.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
     written.ownerMentionsChanged = row.sender_id === ownerId || mentions.includes(ownerId);
     // The breaker is reset only after the message's transaction commits.
@@ -960,7 +991,7 @@ const make = Effect.gen(function* () {
     if (written.ownerMentionsChanged === true) yield* publishOwnerMentions;
     if (written.thread) yield* publishChannel(written.thread);
     if (written.held) yield* write({ channel, from: "system", kind: "notice", text: hopLimitText(hopLimit), meta: { code: "hop_limit" } });
-    for (const r of written.recipients) yield* kick(r);
+    yield* Effect.forEach(written.recipients, (r) => kick(r), { discard: true });
   });
 
   const deliveryTarget = (r: DeliveryRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
@@ -992,15 +1023,20 @@ const make = Effect.gen(function* () {
     const channel = h ? channelOfSession(h) : defaultId;
     const rows = yield* db.run(qc.inboxOf({ participant: who, channel }));
     const out: UnreadRow[] = [];
-    for (const r of rows.slice(0, summaryChannels)) {
-      const latest = yield* db.one(qm.messageByNumber({ channel_id: r.id, number: r.latest ?? 0 }));
-      out.push({
-        target: targetOfRow(r.type, r.root_number, null, null, r.channel_name || null),
-        unread: r.unread ?? 0,
-        mentionsYou: !(r.mentions_you !== true),
-        ...(latest ? { latest: latest.sender_name } : {}),
-      });
-    }
+    yield* Effect.forEach(
+      rows.slice(0, summaryChannels),
+      (r) =>
+        Effect.gen(function* () {
+          const latest = yield* db.one(qm.messageByNumber({ channel_id: r.id, number: r.latest ?? 0 }));
+          out.push({
+            target: targetOfRow(r.type, r.root_number, null, null, r.channel_name || null),
+            unread: r.unread ?? 0,
+            mentionsYou: !(r.mentions_you !== true),
+            ...(latest ? { latest: latest.sender_name } : {}),
+          });
+        }),
+      { discard: true },
+    );
     return out;
   });
 
@@ -1013,15 +1049,25 @@ const make = Effect.gen(function* () {
     if (agents.isOrchestrator(recipient)) {
       const byChannel = Map.groupBy(waking, (r) => r.channel_id);
       const now = yield* Clock.currentTimeMillis;
-      for (const [channel, rs] of byChannel) {
-        const messages = rs.map(asInbox);
-        PubSub.publishUnsafe(orchestratorHub, { agent: recipient, channel, type: channelType(rs[0]!.channel_type), target: messages[0]!.target, messages });
-        for (const r of rs) {
-          yield* db.run(qd.seenOne({ seen_at: now, recipient_id: recipient, message_id: r.message_id }));
-          open.seen(recipient, r.message_id);
-          yield* received(recipient, r.message_id);
-        }
-      }
+      yield* Effect.forEach(
+        byChannel,
+        ([channel, rs]) =>
+          Effect.gen(function* () {
+            const messages = rs.map(asInbox);
+            PubSub.publishUnsafe(orchestratorHub, { agent: recipient, channel, type: channelType(rs[0]!.channel_type), target: messages[0]!.target, messages });
+            yield* Effect.forEach(
+              rs,
+              (r) =>
+                Effect.gen(function* () {
+                  yield* db.run(qd.seenOne({ seen_at: now, recipient_id: recipient, message_id: r.message_id }));
+                  open.seen(recipient, r.message_id);
+                  yield* received(recipient, r.message_id);
+                }),
+              { discard: true },
+            );
+          }),
+        { discard: true },
+      );
       return;
     }
     const session = sessionOf(recipient);
@@ -1040,11 +1086,16 @@ const make = Effect.gen(function* () {
     const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
     if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
     const now = yield* Clock.currentTimeMillis;
-    for (const r of waking) {
-      yield* db.run(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
-      open.handed(recipient, r.message_id, delivered.launch ?? "");
-      yield* received(recipient, r.message_id);
-    }
+    yield* Effect.forEach(
+      waking,
+      (r) =>
+        Effect.gen(function* () {
+          yield* db.run(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
+          open.handed(recipient, r.message_id, delivered.launch ?? "");
+          yield* received(recipient, r.message_id);
+        }),
+      { discard: true },
+    );
   });
 
   const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
@@ -1057,10 +1108,15 @@ const make = Effect.gen(function* () {
     const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
     if (delivered.kind === "refused") return;
     const now = yield* Clock.currentTimeMillis;
-    for (const r of rows) {
-      yield* db.run(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
-      open.announced(recipient, r.message_id, delivered.launch ?? "");
-    }
+    yield* Effect.forEach(
+      rows,
+      (r) =>
+        Effect.gen(function* () {
+          yield* db.run(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
+          open.announced(recipient, r.message_id, delivered.launch ?? "");
+        }),
+      { discard: true },
+    );
   });
 
   const onActivity = Effect.fnUntraced(function* (a: LaunchActivity): Effect.fn.Return<void> {
@@ -1217,7 +1273,9 @@ const make = Effect.gen(function* () {
       yield* db.run(qd.rollbackAll());
       open.load(yield* db.run(qd.allOpenDeliveries()));
       const recent = yield* db.run(qc.recentChannels({ n: keepChannels }));
-      for (const c of [...recent].toReversed()) yield* core.apply({ type: "channel", channel: yield* counted(c) });
+      yield* Effect.forEach([...recent].toReversed(), (c) => Effect.flatMap(counted(c), (channel) => core.apply({ type: "channel", channel })), {
+        discard: true,
+      });
       yield* publishOwnerMentions;
     }),
   );
@@ -1244,8 +1302,15 @@ const make = Effect.gen(function* () {
   // Once the helpers are back: each present one has its thread, and whatever was waiting for one goes to it.
   const helpersBack = locked(
     Effect.gen(function* () {
-      for (const h of presentSessions()) yield* openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`));
-      for (const p of model.participants()) if (p.kind === "session" && p.left_at === null) yield* kick(p.id);
+      yield* Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true });
+      yield* Effect.forEach(
+        model.participants(),
+        (p) =>
+          Effect.gen(function* () {
+            if (p.kind === "session" && p.left_at === null) yield* kick(p.id);
+          }),
+        { discard: true },
+      );
     }),
   );
   yield* Effect.addFinalizer(() =>
@@ -1802,15 +1867,15 @@ const make = Effect.gen(function* () {
           if (name !== row.name) yield* db.run(qc.renameChannel({ name, id }));
           if (category !== row.category) yield* db.run(qc.setCategory({ category, id }));
           if (orchestrator !== row.orchestrator) yield* db.run(qc.setOrchestrator({ orchestrator, id }));
-          for (const [position, each] of (order ?? []).entries()) yield* db.run(qc.placeChannel({ position, id: each }));
+          yield* Effect.forEach((order ?? []).entries(), ([position, each]) => db.run(qc.placeChannel({ position, id: each })), { discard: true });
         }),
       );
       if (row.type === "channel") model.channelUpdated(id, desc, proj);
       model.patched(id, { name, category, orchestrator });
       for (const [position, each] of (order ?? []).entries()) model.patched(each, { position });
-      for (const each of order ?? [id]) yield* publishChannel(each);
+      yield* Effect.forEach(order ?? [id], (each) => publishChannel(each), { discard: true });
       // Its threads are looked after by the same orchestrator: they show the new one too.
-      if (orchestrator !== row.orchestrator) for (const item of model.threadsOf(id)) yield* publishChannel(item.id);
+      if (orchestrator !== row.orchestrator) yield* Effect.forEach(model.threadsOf(id), (item) => publishChannel(item.id), { discard: true });
     }, locked),
     archive: Effect.fn("Channel.archive")(function* (id, on) {
       const row = model.channel(id);

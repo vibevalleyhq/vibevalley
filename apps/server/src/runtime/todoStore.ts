@@ -40,23 +40,27 @@ export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, D
           const graph = rows[0]?.graph ?? newId();
           yield* db.run(q.clearOpenTodos({ keeper }));
           const at = yield* Clock.currentTimeMillis;
-          for (const [position, t] of g.entries())
-            yield* db.run(
-              q.addTodo({
-                graph,
-                keeper,
-                id: t.id,
-                position,
-                title: t.title,
-                brief: t.brief,
-                after: JSON.stringify(t.after),
-                executor: t.by,
-                state: t.state,
-                result: t.result ?? "",
-                tries: t.tries ?? 0,
-                updated_at: at,
-              }),
-            );
+          yield* Effect.forEach(
+            g.entries(),
+            ([position, t]) =>
+              db.run(
+                q.addTodo({
+                  graph,
+                  keeper,
+                  id: t.id,
+                  position,
+                  title: t.title,
+                  brief: t.brief,
+                  after: JSON.stringify(t.after),
+                  executor: t.by,
+                  state: t.state,
+                  result: t.result ?? "",
+                  tries: t.tries ?? 0,
+                  updated_at: at,
+                }),
+              ),
+            { discard: true },
+          );
           if (finished(g)) yield* db.run(q.finishTodos({ finished_at: at, keeper }));
           return g;
         }),

@@ -719,6 +719,36 @@ const dbDoor = defineRule({
   },
 });
 
+const yieldInLoop = defineRule({
+  meta: {
+    messages: {
+      loop: says(
+        "a for…of with yield* in its body runs the effects one by one without saying so, and hides a query per item",
+        "`yield* Effect.forEach(items, (x) => …, { discard: true })` (in order, one at a time, as the loop was), with `{ concurrency: n }` where the items do not wait on each other; a batch query for a query per row. A loop that leaves early (break, continue, return) stays a loop",
+        ".agents/skills/vv-effect/SKILL.md",
+      ),
+    },
+  },
+  create(context) {
+    /** Whether n, not counting functions inside it, holds a node of one of these types. */
+    const holds = (n: unknown, types: readonly string[]): boolean => {
+      if (n === null || typeof n !== "object") return false;
+      const node = n as { type?: unknown };
+      if (typeof node.type === "string") {
+        if (types.includes(node.type)) return true;
+        if (node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression" || node.type === "FunctionDeclaration") return false;
+      }
+      return Object.entries(n).some(([k, v]) => k !== "parent" && (Array.isArray(v) ? v.some((c) => holds(c, types)) : holds(v, types)));
+    };
+    return {
+      ForOfStatement(node) {
+        if (holds(node.body, ["YieldExpression"]) && !holds(node.body, ["BreakStatement", "ContinueStatement", "ReturnStatement"]))
+          context.report({ node, messageId: "loop" });
+      },
+    };
+  },
+});
+
 const scopedFibers = defineRule({
   meta: {
     messages: {
@@ -1349,6 +1379,7 @@ export default definePlugin({
     "sync-fs": syncFs,
     "clock-in-effect": clockInEffect,
     "scoped-fibers": scopedFibers,
+    "yield-in-loop": yieldInLoop,
     "atom-door": atomDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,

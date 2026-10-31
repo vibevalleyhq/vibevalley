@@ -429,7 +429,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       if (alive() && !folded) yield* idleLater;
       const settled = yield* Ref.getAndSet(waiters, []);
       yield* publish({ type: "agent_settled", run: result, progress: accounting.snapshot() });
-      for (const w of settled) yield* Deferred.succeed(w, result);
+      yield* Effect.forEach(settled, (w) => Deferred.succeed(w, result), { discard: true });
       if (todos && !result.aborted && !result.failed && alive()) {
         const text = yield* todos.nudge;
         if (text) yield* later(taskMessage(text, now()));
@@ -578,7 +578,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
               isError: true,
               timestamp: now(),
             }));
-            for (const m of more) yield* save(m);
+            yield* Effect.forEach(more, (m) => save(m), { discard: true });
             yield* Ref.update(brainCore.messages, (all) => [...all, ...more]);
           }
           yield* stopIdle;

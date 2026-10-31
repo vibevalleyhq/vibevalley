@@ -162,7 +162,7 @@ export const makeMemoryStore = Effect.gen(function* () {
                   created_at: yield* Clock.currentTimeMillis,
                 }),
               );
-              for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db.attempt(q.forget({ agent: run.agent, id }));
+              yield* Effect.forEach(nextForgotten(yield* list(run.agent), 0), (id) => db.attempt(q.forget({ agent: run.agent, id })), { discard: true });
             }),
           )
           .pipe(bestEffort(`what ${run.session} learned was not kept`));
@@ -209,7 +209,7 @@ export const makeMemoryStore = Effect.gen(function* () {
   const recutTerms = Effect.gen(function* () {
     for (;;) {
       const rows = yield* db.attempt(q.staleTerms({ version: termsVersion, n: recutBatch }));
-      for (const r of rows) yield* db.attempt(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id }));
+      yield* Effect.forEach(rows, (r) => db.attempt(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id })), { discard: true });
       if (rows.length < recutBatch) return;
     }
   }).pipe(bestEffort("memories were not cut again"));

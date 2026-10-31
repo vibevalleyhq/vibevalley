@@ -428,7 +428,14 @@ export const make = (options: TaskOptions = {}) =>
               if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, t("server.task.notice.helperGone"));
             }
           } else return;
-          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* cron(graph.id);
+          yield* Effect.forEach(
+            graphsOf(core.state()),
+            (graph) =>
+              Effect.gen(function* () {
+                if (graph.state === "running") yield* cron(graph.id);
+              }),
+            { discard: true },
+          );
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
@@ -464,15 +471,34 @@ export const make = (options: TaskOptions = {}) =>
     // Run by the startup, after the sessions came back and marked the runs that stopped with the server.
     const comeBack = lock.withPermits(1)(
       Effect.gen(function* () {
-        for (const graph of graphsOf(core.state())) {
-          if (graph.state === "splitting") {
-            yield* putSystem(withNote({ ...graph, state: "abandoned" }, t("server.task.notice.restartedSplitting")));
-            for (const h of live.presentSessions()) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
-          } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
-            yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.restarted")));
-          }
-        }
-        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* cron(graph.id);
+        yield* Effect.forEach(
+          graphsOf(core.state()),
+          (graph) =>
+            Effect.gen(function* () {
+              if (graph.state === "splitting") {
+                yield* putSystem(withNote({ ...graph, state: "abandoned" }, t("server.task.notice.restartedSplitting")));
+                yield* Effect.forEach(
+                  live.presentSessions(),
+                  (h) =>
+                    Effect.gen(function* () {
+                      if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
+                    }),
+                  { discard: true },
+                );
+              } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
+                yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.restarted")));
+              }
+            }),
+          { discard: true },
+        );
+        yield* Effect.forEach(
+          graphsOf(core.state()),
+          (graph) =>
+            Effect.gen(function* () {
+              if (graph.state === "running") yield* cron(graph.id);
+            }),
+          { discard: true },
+        );
       }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
@@ -611,7 +637,14 @@ export const make = (options: TaskOptions = {}) =>
             const splitter = splitters.get(graph.id);
             splitters.delete(graph.id);
             if (splitter) yield* dismiss(splitter);
-            for (const n of graph.tasks) if (n.state === "working" && n.session) yield* dismiss(n.session);
+            yield* Effect.forEach(
+              graph.tasks,
+              (n) =>
+                Effect.gen(function* () {
+                  if (n.state === "working" && n.session) yield* dismiss(n.session);
+                }),
+              { discard: true },
+            );
             return graph.branch
               ? t("server.task.act.abandonedKept", { title: graph.title, branch: graph.branch })
               : t("server.task.act.abandoned", { title: graph.title });

@@ -118,7 +118,7 @@ const make = Effect.gen(function* () {
   let wanted: { station: number; until: number } | undefined;
 
   const [state, transitions] = yield* core.transitions;
-  for (const e of catchUp(state)) yield* record(e);
+  yield* Effect.forEach(catchUp(state), (e) => record(e), { discard: true });
   yield* Effect.forkScoped(
     Stream.runForEach(transitions, ({ before, fact, after }) =>
       Effect.gen(function* () {
@@ -129,7 +129,7 @@ const make = Effect.gen(function* () {
           wanted = undefined;
           if (wish && wish.until > fact.at) yield* core.apply({ type: "station", id: fact.session.id, station: wish.station });
         }
-        for (const e of entriesFor(before, fact, after)) yield* record(e);
+        yield* Effect.forEach(entriesFor(before, fact, after), (e) => record(e), { discard: true });
       }),
     ),
   );

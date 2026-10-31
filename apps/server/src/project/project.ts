@@ -821,26 +821,31 @@ const make = (hooks: ProjectHooks = {}) =>
       refreshGitHub: Effect.fn("Project.refreshGitHub")(function* () {
         const probed = yield* probeGitHub(gh);
         const next = new Map<string, T.PullRequestCapability>();
-        for (const p of yield* list()) {
-          let c: T.PullRequestCapability = { available: false, reason: probed.reason };
-          if (probed.loggedIn) {
-            const repo = githubOrigin(yield* repository(p.path).origin);
-            if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
-            else {
-              const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-              const permission = view.ok
-                ? Option.getOrUndefined(yield* Effect.option(Effect.try({ try: () => repoView(view.out).viewerPermission, catch: messageOf })))
-                : undefined;
-              c =
-                permission === undefined
-                  ? { available: false, reason: t("server.project.github.noPermission") }
-                  : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
-                    ? { available: true, reason: "" }
-                    : { available: false, reason: t("server.project.github.readOnly") };
-            }
-          }
-          next.set(p.name, c);
-        }
+        yield* Effect.forEach(
+          yield* list(),
+          (p) =>
+            Effect.gen(function* () {
+              let c: T.PullRequestCapability = { available: false, reason: probed.reason };
+              if (probed.loggedIn) {
+                const repo = githubOrigin(yield* repository(p.path).origin);
+                if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
+                else {
+                  const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
+                  const permission = view.ok
+                    ? Option.getOrUndefined(yield* Effect.option(Effect.try({ try: () => repoView(view.out).viewerPermission, catch: messageOf })))
+                    : undefined;
+                  c =
+                    permission === undefined
+                      ? { available: false, reason: t("server.project.github.noPermission") }
+                      : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
+                        ? { available: true, reason: "" }
+                        : { available: false, reason: t("server.project.github.readOnly") };
+                }
+              }
+              next.set(p.name, c);
+            }),
+          { discard: true },
+        );
         status = probed;
         capabilities = next;
         return probed;

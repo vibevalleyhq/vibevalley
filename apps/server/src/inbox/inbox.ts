@@ -73,7 +73,7 @@ const make = Effect.gen(function* () {
       const c = f.channel ?? chat.defaultChannel();
       byChannel.set(c, [...(byChannel.get(c) ?? []), f]);
     }
-    for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
+    yield* Effect.forEach(byChannel, ([channel, notes]) => PubSub.publish(overdueHub, { channel, notes }), { discard: true });
   });
 
   const shape = Inbox.of({

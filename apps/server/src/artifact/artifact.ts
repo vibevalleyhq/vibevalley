@@ -238,7 +238,14 @@ const make = (options: ArtifactOptions = {}) =>
             : yield* db.run(qa.artifacts({ limit_n: BigInt(listedMax) }));
         const out: T.Artifact[] = [];
         // Both given: the issue's, in that channel.
-        for (const r of rows) if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
+        yield* Effect.forEach(
+          rows,
+          (r) =>
+            Effect.gen(function* () {
+              if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
+            }),
+          { discard: true },
+        );
         return out;
       }),
       get: Effect.fn("Artifact.get")(function* (id) {
@@ -284,10 +291,15 @@ const make = (options: ArtifactOptions = {}) =>
         yield* found(id);
         const versions = yield* db.run(qv.artifactVersions({ artifact_id: id }));
         yield* db.run(qa.deleteArtifact({ id }));
-        for (const sha of new Set(versions.map((v) => v.sha))) {
-          const users = yield* db.one(qv.artifactShaUsers({ sha }));
-          if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
-        }
+        yield* Effect.forEach(
+          new Set(versions.map((v) => v.sha)),
+          (sha) =>
+            Effect.gen(function* () {
+              const users = yield* db.one(qv.artifactShaUsers({ sha }));
+              if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
+            }),
+          { discard: true },
+        );
       }, lock.withPermits(1)),
       blocks: Effect.fn("Artifact.blocks")(function* (id) {
         const list = yield* blocks.blocks(id);

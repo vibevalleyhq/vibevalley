@@ -160,7 +160,9 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
     /** Held from building an input to handing it over, so that each input's text follows the one before. */
     const inputs = yield* Semaphore.make(1);
     const stopped = () => t("server.session.host.stopped", { label: o.label });
-    const log = (text: string) => Effect.logError(`vibevalley: ${o.name}: ${text}`);
+    /** Every line this host logs says whose it is. */
+    const own = Effect.annotateLogs({ agent: o.name });
+    const log = (text: string) => own(Effect.logError(`vibevalley: ${text}`));
 
     const current = (): Hosted<R> => {
       const messages = brain?.brain.history() ?? [];
@@ -278,7 +280,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
             if (e.compaction) o.fresh();
             return;
           case "prefix_changed":
-            yield* Effect.logInfo(`vibevalley: ${o.name}'s prompt start changed between compactions: ${e.parts.join(",")}`);
+            yield* Effect.logInfo(`vibevalley: the prompt start changed between compactions: ${e.parts.join(",")}`);
             prefixChanged = e.parts;
             return;
           case "agent_settled":
@@ -316,9 +318,10 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
       const events = yield* Scope.provide(made.events, owner);
       const following = yield* events.pipe(
         Stream.runForEach((e) => event(e).pipe(Effect.catchCause((c) => log(`could not follow its agent: ${Cause.pretty(c)}`)))),
+        own,
         Effect.forkIn(owner),
       );
-      yield* Effect.logInfo(`vibevalley: ${o.name} is on vibevalley's own agent, model ${llm.model.id}`);
+      yield* own(Effect.logInfo(`vibevalley: on vibevalley's own agent, model ${llm.model.id}`));
       brain = { brain: made, scope, following };
       return made;
     });

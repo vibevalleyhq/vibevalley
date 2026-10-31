@@ -161,42 +161,55 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
             if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
           }
           const taken = new Set<string>();
-          for (const op of body.ops) {
-            const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
-            if (fresh && Option.isSome(yield* db.run(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
-          }
+          yield* Effect.forEach(
+            body.ops,
+            (op) =>
+              Effect.gen(function* () {
+                const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
+                if (fresh && Option.isSome(yield* db.run(Effect.catchNoSuchElement(qb.artifactBlockOwner({ id: fresh }))))) taken.add(fresh);
+              }),
+            { discard: true },
+          );
           p.base = (block, rev) => revisions.get(`${block}@${rev}`);
           p.taken = (block) => taken.has(block);
           const results = body.ops.map((op) => p.apply(op));
           const changed = p.changedBlocks();
-          for (const b of changed)
-            yield* db.run(
-              qb.putArtifactBlock({
-                id: b.id,
-                artifact_id: id,
-                parent_id: b.parentId ?? null,
-                order_key: b.orderKey,
-                type: b.type,
-                attrs: JSON.stringify(b.attrs),
-                spans: JSON.stringify(b.text),
-                rev: b.rev,
-                deleted: !(b.deleted !== true),
-                updated_by: b.updatedBy,
-                updated_at: b.updated,
-              }),
-            );
-          for (const r of p.revisions)
-            yield* db.run(
-              qr.addArtifactBlockRevision({
-                id: newId(),
-                block_id: r.block,
-                rev: r.rev,
-                spans: JSON.stringify(r.spans),
-                actor,
-                kind: r.kind,
-                created_at: now,
-              }),
-            );
+          yield* Effect.forEach(
+            changed,
+            (b) =>
+              db.run(
+                qb.putArtifactBlock({
+                  id: b.id,
+                  artifact_id: id,
+                  parent_id: b.parentId ?? null,
+                  order_key: b.orderKey,
+                  type: b.type,
+                  attrs: JSON.stringify(b.attrs),
+                  spans: JSON.stringify(b.text),
+                  rev: b.rev,
+                  deleted: !(b.deleted !== true),
+                  updated_by: b.updatedBy,
+                  updated_at: b.updated,
+                }),
+              ),
+            { discard: true },
+          );
+          yield* Effect.forEach(
+            p.revisions,
+            (r) =>
+              db.run(
+                qr.addArtifactBlockRevision({
+                  id: newId(),
+                  block_id: r.block,
+                  rev: r.rev,
+                  spans: JSON.stringify(r.spans),
+                  actor,
+                  kind: r.kind,
+                  created_at: now,
+                }),
+              ),
+            { discard: true },
+          );
           const seq = row.seq + 1;
           yield* db.run(
             qc.addArtifactChange({
@@ -254,19 +267,20 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     const fill = Effect.fn("BlockStore.fill")(function* (id: string, markdown: string, actor: string) {
       const parents: string[] = [];
       const last = new Map<string, string>();
-      const ops = [];
-      for (const b of blocksOfMarkdown(markdown)) {
-        parents.length = b.depth;
-        const parent = b.depth > 0 ? parents[b.depth - 1]! : "";
-        const key = yield* keyOrRefuse(last.get(parent) ?? "", "");
-        last.set(parent, key);
-        const blockId = newId();
-        parents.push(blockId);
-        ops.push({
-          op: "insert_block" as const,
-          block: { id: blockId, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
-        });
-      }
+      const ops = yield* Effect.forEach(blocksOfMarkdown(markdown), (b) =>
+        Effect.gen(function* () {
+          parents.length = b.depth;
+          const parent = b.depth > 0 ? parents[b.depth - 1]! : "";
+          const key = yield* keyOrRefuse(last.get(parent) ?? "", "");
+          last.set(parent, key);
+          const blockId = newId();
+          parents.push(blockId);
+          return {
+            op: "insert_block" as const,
+            block: { id: blockId, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
+          };
+        }),
+      );
       if (ops.length > 0) yield* submit(id, actor, { batchId: newId(), ops });
     });
 
@@ -319,17 +333,22 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     const runDemo = Effect.fn("BlockStore.runDemo")(
       function* (artifact: string, writers: readonly { readonly writer: string; readonly section: DemoSection }[]) {
         const headings: string[] = [];
-        for (const { writer: w, section } of writers) {
-          const b: Omit<T.BlockInput, "orderKey"> = {
-            id: newId(),
-            type: "heading",
-            attrs: { level: 2 },
-            text: spansOf("heading", t(`server.artifact.demo.${section}.heading`)),
-          };
-          yield* demoInsert(artifact, w, b);
-          headings.push(b.id);
-          yield* wait(0.5);
-        }
+        yield* Effect.forEach(
+          writers,
+          ({ writer: w, section }) =>
+            Effect.gen(function* () {
+              const b: Omit<T.BlockInput, "orderKey"> = {
+                id: newId(),
+                type: "heading",
+                attrs: { level: 2 },
+                text: spansOf("heading", t(`server.artifact.demo.${section}.heading`)),
+              };
+              yield* demoInsert(artifact, w, b);
+              headings.push(b.id);
+              yield* wait(0.5);
+            }),
+          { discard: true },
+        );
         yield* Effect.forEach(writers, ({ writer, section }) => Effect.andThen(wait(section / 3), demoWrite(artifact, writer, headings, section)), {
           concurrency: "unbounded",
           discard: true,

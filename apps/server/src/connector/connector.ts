@@ -315,7 +315,7 @@ const make = (options: ConnectorOptions = {}) =>
                 continue;
               }
               const refused = sent.failure;
-              for (const oid of out.ids) yield* kept(tried(outboxQ.outboxFailed({ error: refused.message || null, id: oid })));
+              yield* Effect.forEach(out.ids, (oid) => kept(tried(outboxQ.outboxFailed({ error: refused.message || null, id: oid }))), { discard: true });
               if (refused.kind === "stale") yield* pause;
               // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
               else if (refused.kind === "restricted") setErr("");
@@ -408,17 +408,22 @@ const make = (options: ConnectorOptions = {}) =>
         inTx(
           Effect.gen(function* () {
             yield* db.attempt(accountQ.connectorAccount({ connector: id }));
-            for (const m of messages) {
-              const withId = m.id ? m : { ...m, id: newId() };
-              yield* db.attempt(
-                inboundQ.acceptInbound({
-                  connector: id,
-                  ext_id: withId.id,
-                  payload: JSON.stringify(withId),
-                  created_at: yield* Clock.currentTimeMillis,
+            yield* Effect.forEach(
+              messages,
+              (m) =>
+                Effect.gen(function* () {
+                  const withId = m.id ? m : { ...m, id: newId() };
+                  yield* db.attempt(
+                    inboundQ.acceptInbound({
+                      connector: id,
+                      ext_id: withId.id,
+                      payload: JSON.stringify(withId),
+                      created_at: yield* Clock.currentTimeMillis,
+                    }),
+                  );
                 }),
-              );
-            }
+              { discard: true },
+            );
             if (cursor) yield* db.attempt(accountQ.accountCursor({ connector: id, cursor }));
           }),
         ).pipe(
@@ -660,7 +665,7 @@ const make = (options: ConnectorOptions = {}) =>
     const bridges = yield* Effect.forEach(adapters, (a) =>
       Effect.map(Effect.all({ outbox: Queue.sliding<void>(1), inbox: Queue.sliding<void>(1) }), (mail) => bridgeOf(a, mail)),
     );
-    for (const b of bridges) yield* Effect.orDie(b.load);
+    yield* Effect.forEach(bridges, (b) => Effect.orDie(b.load), { discard: true });
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
     // What the owner hears off the farm (the inbox says what) goes out on every app the owner has, each checking it is

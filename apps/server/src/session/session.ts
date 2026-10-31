@@ -524,7 +524,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.run = id;
       h.heard = [];
       h.journal.runStarted(id);
-      fire(runs.start(id, h.id, issue, by).pipe(bestEffort(`vibevalley: ${h.id}'s run not kept`)));
+      fire(runs.start(id, h.id, issue, by).pipe(bestEffort("vibevalley: a run not kept"), Effect.annotateLogs({ session: h.id })));
     };
 
     const heardInRun = (h: Hand, message: string) => {
@@ -992,8 +992,11 @@ export const make = (options: SessionOptionsIn = {}) =>
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db.run(qr.openRuns()))
-        yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted")).pipe(bestEffort(`vibevalley: run ${r.id}`));
+      yield* Effect.forEach(
+        yield* db.run(qr.openRuns()),
+        (r) => runs.finish(r.id, "interrupted", t("server.session.log.restarted")).pipe(bestEffort(`vibevalley: run ${r.id}`)),
+        { discard: true },
+      );
       const kept = new Map((yield* db.run(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
@@ -1232,7 +1235,9 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (!s || core.session(id)?.phase._tag !== "working") return false;
         const outcome = yield* Effect.promise(() => s.agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) })));
         if (outcome.kind !== "accepted") {
-          yield* Effect.logWarning(`vibevalley: ${id} did not take the stop: ${"reason" in outcome ? outcome.reason : ""}`);
+          yield* Effect.logWarning(`vibevalley: the stop was not taken: ${"reason" in outcome ? outcome.reason : ""}`).pipe(
+            Effect.annotateLogs({ session: id }),
+          );
           return false;
         }
         return true;

@@ -112,10 +112,15 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
           const agents = q.agent === "" ? profiles() : [q.agent];
           const all: T.Memory[] = [];
           const matches: Record<string, number> = {};
-          for (const agent of agents) {
-            all.push(...(yield* m.list(agent)));
-            Object.assign(matches, yield* m.matches(agent, q.text));
-          }
+          yield* Effect.forEach(
+            agents,
+            (agent) =>
+              Effect.gen(function* () {
+                all.push(...(yield* m.list(agent)));
+                Object.assign(matches, yield* m.matches(agent, q.text));
+              }),
+            { discard: true },
+          );
           return { found: search(all, q, matches) };
         }),
       ),

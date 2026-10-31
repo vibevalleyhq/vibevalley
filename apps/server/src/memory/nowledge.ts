@@ -228,7 +228,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (c.write !== true || run.outcome === "interrupted") return;
-      for (const note of memoryNotesOf(run.said)) yield* add(run.agent, note.text, note.everywhere ? "" : run.project);
+      yield* Effect.forEach(memoryNotesOf(run.said), (note) => add(run.agent, note.text, note.everywhere ? "" : run.project), { discard: true });
     }),
     sessionEnded: () => Effect.void,
     add: Effect.fnUntraced(function* (n) {
