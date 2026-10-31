@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Semaphore, Stream } from "effect";
 // Every message is written to the database first, in one transaction with who it goes to; only then does it become a
 // fact. A delivery goes pending → announced → handed → seen; a session that closes or a turn that ends without a word puts
 // what it was handed back to pending: given twice rather than lost. Everything that changes the chat runs one at a time.
@@ -96,21 +96,13 @@ import {
   type SessionNews,
   type InputConsumed,
 } from "./contracts.ts";
-export type { Info, Spoken, SayMore, OrchestratorNews, Delivered, LaunchActivity, SessionNews, InputConsumed } from "./contracts.ts";
+export type { Info, Spoken, SayMore, OrchestratorNews, Delivered, LaunchActivity } from "./contracts.ts";
 
-/** What the chat asks of the sessions: the real Session on the farm, a played one in tests. */
-export interface ChannelSessions {
-  readonly present: (id: string) => boolean;
-  readonly sessionOf: (id: string) => T.Session | undefined;
-  readonly presentSessions: () => readonly T.Session[];
-  readonly deliver: (id: string, text: string, by: T.RunTrigger) => Effect.Effect<Delivered>;
-  readonly runOf: (id: string) => string | undefined;
-  readonly reportOf: (id: string) => string;
-  readonly onIssue: (issue: string) => string | undefined;
-  readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
-  readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
-  readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
-}
+/** The part of Session the chat uses: the real service on the farm, a played one in tests. */
+export type ChannelSessions = Pick<
+  Session["Service"],
+  "present" | "sessionOf" | "presentSessions" | "deliver" | "runOf" | "reportOf" | "onIssue" | "launches" | "inputsConsumed" | "news"
+>;
 
 export class Channel extends Context.Service<Channel, ChannelService>()("vibevalley/Channel") {
   static readonly layer = Layer.effect(
@@ -559,7 +551,6 @@ const make = (sessions: ChannelSessions) =>
         { discard: true },
       );
       const written: Written = { id: row.id, number: row.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
-      written.ownerMentionsChanged = row.sender_id === ownerId || mentions.includes(ownerId);
       // The breaker is reset only after the message's transaction commits.
       if (row.sender_id === ownerId) written.resetWake = deliveries.filter((d) => d.wakes).map((d) => d.recipient);
       if (deliveries.some((d: Delivery) => d.heldBy === "hop_limit")) written.held = (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0;
@@ -668,7 +659,8 @@ const make = (sessions: ChannelSessions) =>
       yield* publishMessage(written.row, answers);
       embedLater(written.row);
       yield* publishChannel(channel);
-      if (written.ownerMentionsChanged === true) yield* publishOwnerMentions;
+      const meta = metaOf(written.row.meta);
+      if (written.row.sender_id === ownerId || meta.mentions?.includes(ownerId) === true) yield* publishOwnerMentions;
       if (written.thread) yield* publishChannel(written.thread);
       if (written.held) yield* write({ channel, from: "system", kind: "notice", text: hopLimitText(hopLimit), meta: { code: "hop_limit" } });
       yield* Effect.forEach(written.recipients, (r) => kick(r), { discard: true });

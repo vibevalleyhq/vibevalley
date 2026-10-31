@@ -239,7 +239,6 @@ export interface Written {
   again: boolean;
   /** The message as written (its mentions in its meta), or the one sent before with the same key. */
   row: MsgRow;
-  ownerMentionsChanged?: boolean;
 }
 
 export interface ChannelService {
