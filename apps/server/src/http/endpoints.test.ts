@@ -80,9 +80,10 @@ describe("the endpoints the agents' tools stand on", () => {
       const general = channels.find((c) => c.default)!.id;
       const current = (yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.find((b) => b.id === made.blockId)!;
       yield* call(() => api.channel.message.send({ id: general, text: "看这块", blocks: [{ artifactId: doc.id, blockId: made.blockId, rev: 1 }] }));
+      const quotedAfter = (yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.find((b) => b.id === made.blockId)!;
+      expect(quotedAfter.text).toEqual(current.text);
       const allMessages = yield* call(() => api.channel.message.list({ id: general, limit: 5 }));
       const sent = allMessages.find((m) => m.text === "看这块")!;
-      console.log("QUOTED", JSON.stringify(sent));
       expect(sent.blocks).toEqual([
         {
           artifactId: doc.id,

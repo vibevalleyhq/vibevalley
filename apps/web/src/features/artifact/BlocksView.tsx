@@ -211,11 +211,14 @@ function SuggestionsList(props: {
             };
             const agent = () => props.agents.get(s().author);
             const who = () => (s().author === ownerId ? t("web.artifact.blocks.owner") : (agent()?.name ?? s().author));
+            const changeKind = () =>
+              s().change.delete === true ? "delete" : s().change.type !== undefined ? "type" : s().change.attrs !== undefined ? "attrs" : "text";
             return (
               <article
                 data-testid="artifact-suggestion"
                 data-key={s().id}
                 data-status={stale() ? "stale" : "open"}
+                data-change={changeKind()}
                 class="flex flex-col gap-1 border-t border-line px-1 py-1.5 first:border-t-0"
               >
                 <div class="flex items-center gap-1.5 text-xs text-muted">

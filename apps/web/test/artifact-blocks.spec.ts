@@ -157,3 +157,26 @@ test("on a phone a suggestion is readable and can be accepted from the keyboard"
   await expect(panel).toHaveCount(0);
   await expect(page.getByTestId("artifact-blocks")).toContainText("phone suggestion");
 });
+
+test("type, attribute and delete suggestions each show their diff, reject, and survive a reload", async ({ page, api }) => {
+  const made = await api.artifact.create({ title: `kinds ${Date.now() % 100000}`, kind: "markdown", content: "a line\n\n- [ ] task" });
+  const [line, todo] = (await api.artifact.block.list({ id: made.id })).blocks;
+  await api.artifact.suggestion.create({ id: made.id, block: line!.id, baseRev: line!.rev, change: { type: "heading", attrs: { level: 2 } } });
+  await api.artifact.suggestion.create({ id: made.id, block: line!.id, baseRev: line!.rev, change: { delete: true } });
+  await api.artifact.suggestion.create({ id: made.id, block: todo!.id, baseRev: todo!.rev, change: { attrs: { checked: true } } });
+  await page.goto(`/artifacts/${made.id}`);
+  await expect(page.locator('[data-testid="artifact-suggestion"][data-change="type"]')).toBeVisible();
+  await expect(page.locator('[data-testid="artifact-suggestion"][data-change="attrs"]')).toBeVisible();
+  const remove = page.locator('[data-testid="artifact-suggestion"][data-change="delete"]');
+  await expect(remove).toBeVisible();
+  await remove.getByTestId("suggestion-reject").click();
+  await expect(remove).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('[data-testid="artifact-suggestion"][data-change="type"]')).toBeVisible();
+  await expect(page.locator('[data-testid="artifact-suggestion"][data-change="attrs"]')).toBeVisible();
+  await page.locator('[data-testid="artifact-suggestion"][data-change="type"]').getByTestId("suggestion-accept").click();
+  await expect(page.locator('[data-testid="artifact-suggestion"][data-change="type"]')).toHaveCount(0);
+  await expect.poll(async () => (await api.artifact.block.list({ id: made.id })).blocks.find((b) => b.id === line!.id)?.type).toBe("heading");
+  await page.locator('[data-testid="artifact-suggestion"][data-change="attrs"]').getByTestId("suggestion-accept").click();
+  await expect.poll(async () => (await api.artifact.block.list({ id: made.id })).blocks.find((b) => b.id === todo!.id)?.attrs.checked).toBe(true);
+});
