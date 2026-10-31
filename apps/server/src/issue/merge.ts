@@ -39,12 +39,10 @@ export function merging(d: MergeDeps) {
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
     let [owner, line] = [n.owner, n.notice];
     if (n.fix) {
-      const told = yield* Effect.result(chat.tellSession(ownerId, id, n.fix, ""));
-      if (told._tag === "Failure")
-        [owner, line] = [
-          owner + t("server.issue.merge.tellFailed", { why: reasonOf(told.failure) }),
-          line + t("server.issue.merge.tellFailed", { why: reasonOf(told.failure) }),
-        ];
+      const untold = yield* chat
+        .tellSession(ownerId, id, n.fix, "")
+        .pipe(Effect.match({ onSuccess: () => "", onFailure: (e) => t("server.issue.merge.tellFailed", { why: reasonOf(e) }) }));
+      [owner, line] = [owner + untold, line + untold];
     }
     yield* core.notice("warn", line);
     return refused(owner);

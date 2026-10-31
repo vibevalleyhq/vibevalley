@@ -501,9 +501,9 @@ const make = (hooks: ProjectHooks = {}) =>
             if (problem) return yield* fail(problem);
             const path = join(root, req.name);
             // Exclusive creation also refuses existing empty folders and symlinks.
-            const madeDir = yield* Effect.result(fs.makeDirectory(path));
-            if (madeDir._tag === "Failure")
-              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? t("server.project.exists", { name: req.name }) : reason(madeDir.failure));
+            yield* fs
+              .makeDirectory(path)
+              .pipe(Effect.catch((e) => fail(e.reason._tag === "AlreadyExists" ? t("server.project.exists", { name: req.name }) : reason(e))));
             pending.add(req.name);
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
@@ -631,9 +631,10 @@ const make = (hooks: ProjectHooks = {}) =>
         // An issue worked in a profile's own folder has no project, and so no issue branch: none to read.
         if (!project) return undefined;
         const path = join(root, project);
-        const present = yield* Effect.result(repository(path).hasBranch(branch));
-        if (present._tag === "Failure") return yield* fail(t("server.project.noBranchRead", { branch, why: reason(present.failure) }));
-        if (!present.success) return undefined;
+        const present = yield* repository(path)
+          .hasBranch(branch)
+          .pipe(Effect.catch((e) => fail(t("server.project.noBranchRead", { branch, why: reason(e) }))));
+        if (!present) return undefined;
         return yield* describe(project, "", branch);
       }),
       changedFiles: Effect.fn("Project.changedFiles")(

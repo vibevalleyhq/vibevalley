@@ -739,11 +739,16 @@ export const make = (options: SessionOptionsIn = {}) =>
       );
 
     const failedOpening = Effect.fnUntraced(function* (allocation: Allocation, why: string): Effect.fn.Return<OpenFailure> {
-      const stopped = yield* Effect.result(stopOar(allocation));
-      if (stopped._tag === "Success") return { refused: why, retained: false };
-      allocation.failure = t("shared.join.clauses", { a: why, b: reasonOf(stopped.failure) });
-      yield* core.notice("error", allocation.failure);
-      return { refused: allocation.failure, retained: true };
+      return yield* stopOar(allocation).pipe(
+        Effect.matchEffect({
+          onSuccess: () => Effect.succeed({ refused: why, retained: false }),
+          onFailure: (e) => {
+            const failure = t("shared.join.clauses", { a: why, b: reasonOf(e) });
+            allocation.failure = failure;
+            return Effect.as(core.notice("error", failure), { refused: failure, retained: true });
+          },
+        }),
+      );
     });
 
     /** Opens an oar session for the profile in place: its prompt, the farm's MCP server and its own, as a subagent. */
@@ -1099,14 +1104,14 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
     const shape = Session.of({
       noRoom: roomFor,
-      makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, project) {
+      makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, project): Effect.fn.Return<{ readonly refused: string } | { readonly evicted?: string }> {
         const full = roomFor(runtime, project);
         if (full) return { refused: full };
         const oldest = whoMakesRoom(core.state().sessions, maxRunning);
         if (!oldest) return {};
-        const dismissed = yield* Effect.result(shape.dismiss(oldest.id));
-        if (dismissed._tag === "Failure") return { refused: reasonOf(dismissed.failure) };
-        return { evicted: oldest.name };
+        return yield* shape
+          .dismiss(oldest.id)
+          .pipe(Effect.match({ onFailure: (e) => ({ refused: reasonOf(e) }), onSuccess: () => ({ evicted: oldest.name }) }));
       }),
       send: Effect.fn("Session.send")(function* (agent, brief, where, opt) {
         const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);

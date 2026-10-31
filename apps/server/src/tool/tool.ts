@@ -438,10 +438,14 @@ const make = Effect.gen(function* () {
           if (typeof item === "string") return item;
           issueId = item.id;
         }
-        const channel = p.channel ? yield* Effect.result(chat.placeOf("", p.channel)) : undefined;
-        if (channel?._tag === "Failure") return answers.failed(reasonOf(channel.failure));
-        const all = yield* artifacts.list({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel: channel.success } : {}) });
-        return all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n");
+        const listed = (channel?: string) =>
+          Effect.map(artifacts.list({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel } : {}) }), (all) =>
+            all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n"),
+          );
+        if (!p.channel) return yield* listed();
+        return yield* chat
+          .placeOf("", p.channel)
+          .pipe(Effect.matchEffect({ onFailure: (e) => Effect.succeed(answers.failed(reasonOf(e))), onSuccess: listed }));
       }),
     );
   const sessionArtifactList = (who: Who) =>
@@ -451,10 +455,12 @@ const make = Effect.gen(function* () {
       Effect.fn("Tool.artifactList")(function* (p: SessionInput<"artifact.list">) {
         const c = yield* callerOf(who);
         const own = run.sessionOf(c.session)?.issue;
-        const channel = p.channel ? yield* Effect.result(chat.placeOf(c.session, p.channel)) : undefined;
-        if (channel?._tag === "Failure") return answers.failed(reasonOf(channel.failure));
-        const all = yield* artifacts.list(channel ? { channel: channel.success } : own ? { issue: own } : {});
-        return all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n");
+        const listed = (where: { readonly channel?: string; readonly issue?: string }) =>
+          Effect.map(artifacts.list(where), (all) => (all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n")));
+        if (!p.channel) return yield* listed(own ? { issue: own } : {});
+        return yield* chat
+          .placeOf(c.session, p.channel)
+          .pipe(Effect.matchEffect({ onFailure: (e) => Effect.succeed(answers.failed(reasonOf(e))), onSuccess: (channel) => listed({ channel }) }));
       }),
     );
   const artifactGet = (table: "orchestrator" | "session") => (who: Who) =>

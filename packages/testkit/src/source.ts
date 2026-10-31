@@ -18,7 +18,10 @@ interface Node {
   readonly [key: string]: unknown;
 }
 
-const isNode = (v: unknown): v is Node => typeof v === "object" && v !== null && typeof (v as { type?: unknown }).type === "string";
+const isNode = (v: unknown): v is Node => typeof v === "object" && v !== null && "type" in v && typeof v.type === "string";
+/** The nodes of a list field; none when the field is not a list. */
+const nodes = (v: unknown): Node[] => (Array.isArray(v) ? v.filter(isNode) : []);
+const text = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
 /** Every node under n, each with its parent. */
 function* walk(n: Node, parent?: Node): Generator<{ node: Node; parent: Node | undefined }> {
@@ -33,12 +36,14 @@ function* walk(n: Node, parent?: Node): Generator<{ node: Node; parent: Node | u
 
 /** The file's program; path's extension says whether it is TSX. */
 export function programOf(path: string, source: string): Node {
-  return parseSync(path, source, { lang: path.endsWith(".tsx") ? "tsx" : "ts" }).program as unknown as Node;
+  const program: unknown = parseSync(path, source, { lang: path.endsWith(".tsx") ? "tsx" : "ts" }).program;
+  if (!isNode(program)) throw new Error(`${path} parsed to no program`);
+  return program;
 }
 
 const nameOf = (n: unknown): string | undefined => {
   if (!isNode(n)) return undefined;
-  if (n.type === "Identifier") return n.name as string;
+  if (n.type === "Identifier") return text(n.name);
   if (n.type === "Literal" && typeof n.value === "string") return n.value;
   return undefined;
 };
@@ -50,14 +55,14 @@ export function edgesOf(path: string, source: string): Edge[] {
   const out: Edge[] = [];
   for (const { node } of walk(programOf(path, source))) {
     if (node.type === "ImportDeclaration") {
-      const specifiers = node.specifiers as Node[];
+      const specifiers = nodes(node.specifiers);
       const names = specifiers.map((s) =>
         s.type === "ImportNamespaceSpecifier" ? "*" : s.type === "ImportDefaultSpecifier" ? "default" : (nameOf(s.imported) ?? ""),
       );
       // Under verbatimModuleSyntax only `import type` is dropped: `import { type A }` still loads the module.
       out.push({ from: literal(node.source) ?? "", typeOnly: node.importKind === "type", names });
     } else if (node.type === "ExportNamedDeclaration" && isNode(node.source)) {
-      const specifiers = node.specifiers as Node[];
+      const specifiers = nodes(node.specifiers);
       out.push({ from: literal(node.source) ?? "", typeOnly: node.exportKind === "type", names: specifiers.map((s) => nameOf(s.local) ?? "") });
     } else if (node.type === "ExportAllDeclaration") {
       out.push({ from: literal(node.source) ?? "", typeOnly: node.exportKind === "type", names: ["*"] });
@@ -79,10 +84,10 @@ export function exportsOf(path: string, source: string): string[] {
     if (node.type !== "ExportNamedDeclaration" || isNode(node.source)) continue;
     const d = node.declaration;
     if (isNode(d)) {
-      if (d.type === "VariableDeclaration") for (const v of d.declarations as Node[]) out.push(...(nameOf(v.id) ? [nameOf(v.id)!] : []));
-      else if (nameOf(d.id)) out.push(nameOf(d.id)!);
+      const names = d.type === "VariableDeclaration" ? nodes(d.declarations).map((v) => nameOf(v.id)) : [nameOf(d.id)];
+      for (const name of names) if (name !== undefined) out.push(name);
     }
-    for (const s of (node.specifiers as Node[] | undefined) ?? []) out.push(nameOf(s.exported) ?? "");
+    for (const s of nodes(node.specifiers)) out.push(nameOf(s.exported) ?? "");
   }
   return out;
 }
@@ -90,12 +95,13 @@ export function exportsOf(path: string, source: string): string[] {
 /** The values a file declares and exports itself (no types), each with where its export statement starts. */
 export function exportedValuesOf(path: string, source: string): { readonly name: string; readonly start: number }[] {
   const out: { name: string; start: number }[] = [];
-  for (const statement of (programOf(path, source).body as Node[] | undefined) ?? []) {
+  for (const statement of nodes(programOf(path, source).body)) {
     if (statement.type !== "ExportNamedDeclaration" || isNode(statement.source)) continue;
     const d = statement.declaration;
     if (!isNode(d) || d.type === "TSTypeAliasDeclaration" || d.type === "TSInterfaceDeclaration") continue;
-    const names = d.type === "VariableDeclaration" ? (d.declarations as Node[]).map((v) => nameOf(v.id)) : [nameOf(d.id)];
-    for (const name of names) if (name !== undefined) out.push({ name, start: statement.start as number });
+    const names = d.type === "VariableDeclaration" ? nodes(d.declarations).map((v) => nameOf(v.id)) : [nameOf(d.id)];
+    const start = typeof statement.start === "number" ? statement.start : 0;
+    for (const name of names) if (name !== undefined) out.push({ name, start });
   }
   return out;
 }
@@ -125,15 +131,18 @@ export function readsOf(path: string, source: string, object: string, method: st
       const f = fieldOf(parent);
       if (f) out.add(f);
     } else if (parent.type === "VariableDeclarator" && parent.init === node && isNode(parent.id)) {
-      if (parent.id.type === "Identifier") kept.add(parent.id.name as string);
+      const name = nameOf(parent.id);
+      if (parent.id.type === "Identifier" && name !== undefined) kept.add(name);
       else if (parent.id.type === "ObjectPattern")
-        for (const p of parent.id.properties as Node[])
-          if (p.type === "Property" && p.computed !== true && nameOf(p.key) !== undefined) out.add(nameOf(p.key)!);
+        for (const p of nodes(parent.id.properties)) {
+          const key = p.type === "Property" && p.computed !== true ? nameOf(p.key) : undefined;
+          if (key !== undefined) out.add(key);
+        }
     }
   }
   if (kept.size > 0)
     for (const node of parents.keys())
-      if (node.type === "MemberExpression" && isNode(node.object) && node.object.type === "Identifier" && kept.has(node.object.name as string)) {
+      if (node.type === "MemberExpression" && isNode(node.object) && node.object.type === "Identifier" && kept.has(nameOf(node.object) ?? "")) {
         const f = fieldOf(node);
         if (f) out.add(f);
       }

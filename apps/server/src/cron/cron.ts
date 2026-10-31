@@ -108,19 +108,25 @@ const make = Effect.gen(function* () {
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
       const at = now();
-      for (const s of dueCrons(core.state().crons, at)) {
-        const missed = isMissed(s, at);
-        const after = afterRun(s, at);
-        const written = yield* Effect.result(db.attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })));
-        if (written._tag === "Failure") {
-          const failure = written.failure;
-          yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`);
-          continue;
-        }
-        yield* core.apply({ type: "cron", cron: after });
-        yield* chat.notice(s.channel, dueText(s, missed), "cron");
-        PubSub.publishUnsafe(dueHub, { cron: after, missed });
-      }
+      yield* Effect.forEach(
+        dueCrons(core.state().crons, at),
+        (s) => {
+          const missed = isMissed(s, at);
+          const after = afterRun(s, at);
+          return db.attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })).pipe(
+            Effect.matchEffect({
+              onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
+              onSuccess: () =>
+                Effect.gen(function* () {
+                  yield* core.apply({ type: "cron", cron: after });
+                  yield* chat.notice(s.channel, dueText(s, missed), "cron");
+                  PubSub.publishUnsafe(dueHub, { cron: after, missed });
+                }),
+            }),
+          );
+        },
+        { discard: true },
+      );
     }),
   );
 
