@@ -520,10 +520,11 @@ export default defineConfig({
         // The server and the brain read and write files off the event loop (scripts/oxlint-plugin.ts, sync-fs). Before the
         // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
         // starts in; and the evals' cases are read by a tool, not the server.
-        files: ["apps/server/src/**"],
+        files: ["apps/server/src/**", "packages/agent/src/**"],
         excludeFiles: [
           "**/*.test.ts",
           "apps/server/src/testing/**",
+          "packages/agent/src/testing.ts",
           "apps/server/src/infra/lease.ts",
           "apps/server/src/infra/db.ts",
           "apps/server/src/infra/baseline.ts",

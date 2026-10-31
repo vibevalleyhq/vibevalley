@@ -93,13 +93,9 @@ const summaryOf = (plan: CompactionPlan, said: string, where: string, options: C
     return message;
   });
 
-function archived(options: CompactionOptions, text: string): string {
-  try {
-    return archive(options.home, options.session, text, new Date(options.now()));
-  } catch {
-    return "";
-  }
-}
+/** Where the folded part is kept word for word; "" when it could not be: the fold goes on without it. */
+const archived = (options: CompactionOptions, text: string): Effect.Effect<string> =>
+  Effect.promise(() => archive(options.home, options.session, text, new Date(options.now())).catch(() => ""));
 
 export interface Summarized {
   readonly summary?: CompactionSummaryMessage;
@@ -119,7 +115,7 @@ export const compactInPlace = (plan: CompactionPlan, options: CompactionOptions,
     const said = messageText(answer).trim();
     const called = answer.content.some((c) => c.type === "toolCall");
     if (answer.stopReason === "error" || answer.stopReason === "aborted" || said === "" || called) return yield* compact(plan, options);
-    const where = archived(options, transcript(plan.messages.slice(0, plan.cut)));
+    const where = yield* archived(options, transcript(plan.messages.slice(0, plan.cut)));
     const summarized: Summarized = { summary: yield* summaryOf(plan, said, where, options), usage: answer.usage };
     return summarized;
   });
@@ -127,7 +123,7 @@ export const compactInPlace = (plan: CompactionPlan, options: CompactionOptions,
 const compact = (plan: CompactionPlan, options: CompactionOptions) =>
   Effect.gen(function* () {
     const text = transcript(plan.messages.slice(0, plan.cut));
-    const where = archived(options, text);
+    const where = yield* archived(options, text);
     const answer = yield* complete(options.llm, {
       system: summaryInstructions,
       tools: [],

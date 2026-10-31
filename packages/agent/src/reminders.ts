@@ -1,11 +1,13 @@
 // What the agent reminded itself to do later, in reminders.json in its home. One missed while the agent was away runs once
-// when it is back, not once per miss. Cron is in the machine's time zone.
+// when it is back, not once per miss. Cron is in the machine's time zone. The list is held in memory and written when it
+// changes; a fiber sleeps until the next one is due.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Cron, Result, Schema } from "effect";
+import { Cron, Effect, FiberHandle, Option, Result, Schema, type Scope } from "effect";
 
+import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
 import { schemaTool } from "./core/tool.ts";
 import { reminders as reminderWords } from "./prompts.ts";
@@ -38,24 +40,15 @@ const parseDate = (text: string) => {
   return Number.isNaN(d.getTime()) ? undefined : d;
 };
 
-export function parseCron(expr: string): Cron.Cron {
-  const parsed = Cron.parse(expr);
-  if (Result.isFailure(parsed)) throw new Error(reminderWords.badCron(parsed.failure.message));
-  return parsed.success;
-}
+/** The expression as Effect's Cron, or why it is not one, in the model's words. */
+export const parseCron = (expr: string): Result.Result<Cron.Cron, string> => Result.mapError(Cron.parse(expr), (e) => reminderWords.badCron(e.message));
 
 export function nextRun(reminder: Reminder): Date | undefined {
   const from = parseDate(reminder.lastRun || reminder.created) ?? new Date(0);
   if (reminder.at) return reminder.lastRun ? undefined : parseDate(reminder.at);
   if (reminder.everyMinutes != null && reminder.everyMinutes !== 0) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
-  if (reminder.cron) {
-    try {
-      // Effect's Cron starts at the second after from.
-      return Cron.next(parseCron(reminder.cron), from);
-    } catch {
-      return undefined;
-    }
-  }
+  // Effect's Cron starts at the second after from; one that does not parse never comes due.
+  if (reminder.cron) return Option.getOrUndefined(Result.getSuccess(Result.map(parseCron(reminder.cron), (c) => Cron.next(c, from))));
   return undefined;
 }
 
@@ -81,42 +74,79 @@ export function describeReminder(j: Reminder): string {
 
 const dueMessage = (j: Reminder) => reminderWords.due(j.id, j.name, j.message);
 
-export class Reminders {
+const ReminderList = Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderSchema)));
+
+/** How long a claim that could not be stored waits to be tried again. */
+const retryClaimMs = 20_000;
+
+export interface Reminders {
   readonly tools: Tool[];
-  private readonly file: string;
+  /** What is due at now, each stored as run (or gone, once) before it is said, so it comes due at most once. */
+  readonly claimDue: (now: Date) => Effect.Effect<string[], AgentFailed>;
+}
 
-  private readonly home: string;
-  /** The brain's clock: when a reminder is due. */
-  private readonly now: () => number;
+/**
+ * The reminders in home: read once, then held; a fiber of the scope sleeps until the next is due and hands what came due
+ * to wake. What came due while the agent was away is due at once. A file that does not read is left as it is: nothing
+ * runs and the tools refuse, until the owner mends it.
+ */
+export const makeReminders = (home: string, now: () => number, wake: (due: string[]) => Effect.Effect<void>): Effect.Effect<Reminders, never, Scope.Scope> =>
+  Effect.gen(function* () {
+    const file = join(home, "reminders.json");
+    const read = yield* Effect.promise(() =>
+      readFile(file, "utf8").then(
+        (text) => Result.mapError(Schema.decodeResult(ReminderList)(text), (e) => e.message),
+        (e: unknown) => (e instanceof Error && "code" in e && e.code === "ENOENT" ? Result.succeed<Reminder[]>([]) : Result.fail(String(e))),
+      ),
+    );
+    let list: Reminder[] = Result.isSuccess(read) ? read.success : [];
+    const unreadable = Result.isFailure(read) ? read.failure : undefined;
+    const held = () => {
+      if (unreadable !== undefined) throw new Error(unreadable);
+      return list;
+    };
+    const store = async (next: Reminder[]) => {
+      await mkdir(home, { recursive: true });
+      await writeFile(file + ".tmp", JSON.stringify(next));
+      await rename(file + ".tmp", file);
+      list = next;
+    };
 
-  constructor(home: string, now: () => number) {
-    this.home = home;
-    this.now = now;
-    this.file = join(home, "reminders.json");
-    this.tools = this.makeTools();
-  }
+    const claimDue = (at: Date) =>
+      Effect.tryPromise({
+        try: async () => {
+          const reminders = held();
+          const due = dueReminders(reminders, at);
+          if (due.length === 0) return [];
+          const isDue = new Set(due.map((j) => j.id));
+          await store(reminders.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: at.toISOString() }])));
+          return due.map(dueMessage);
+        },
+        catch: agentFailed,
+      });
 
-  private load(): Reminder[] {
-    if (!existsSync(this.file)) return [];
-    return Schema.decodeSync(Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderSchema))))(readFileSync(this.file, "utf8"));
-  }
+    // One sleeping fiber: armed again whenever the list changes or one comes due.
+    const waiting = yield* FiberHandle.make();
+    const start = yield* FiberHandle.runtime(waiting)();
+    const arm = (): void => {
+      if (unreadable !== undefined) return;
+      const next = list
+        .map(nextRun)
+        .reduce<number | undefined>((soonest, d) => (d && (soonest === undefined || d.getTime() < soonest) ? d.getTime() : soonest), undefined);
+      if (next === undefined) return void start(Effect.void);
+      start(
+        Effect.sleep(Math.max(0, next - now())).pipe(
+          Effect.andThen(Effect.suspend(() => claimDue(new Date(now())))),
+          Effect.flatMap(wake),
+          Effect.andThen(Effect.sync(arm)),
+          Effect.catch((e) =>
+            Effect.logError("agent: cannot claim due reminders:", e).pipe(Effect.andThen(Effect.sleep(retryClaimMs)), Effect.andThen(Effect.sync(arm))),
+          ),
+        ),
+      );
+    };
+    arm();
 
-  private store(reminders: readonly Reminder[]) {
-    mkdirSync(this.home, { recursive: true });
-    writeFileSync(this.file + ".tmp", JSON.stringify(reminders));
-    renameSync(this.file + ".tmp", this.file);
-  }
-
-  /** What came due, each claimed in the file first, so it comes due at most once. Throws when it cannot claim them. */
-  tick(now = new Date(this.now())): string[] {
-    const reminders = this.load();
-    const due = dueReminders(reminders, now);
-    const isDue = new Set(due.map((j) => j.id));
-    this.store(reminders.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
-    return due.map(dueMessage);
-  }
-
-  private makeTools(): Tool[] {
     const add = schemaTool({
       name: "reminder",
       description: reminderWords.reminderDescription,
@@ -127,7 +157,7 @@ export class Reminders {
         every_minutes: Schema.optionalKey(Schema.Finite),
         cron: Schema.optionalKey(Schema.String),
       }),
-      run: (p) => {
+      run: async (p) => {
         if ([p.at, p.every_minutes, p.cron].filter((x) => x !== undefined && x !== null).length !== 1) throw new Error(reminderWords.oneOfThree);
         let at: Date | undefined;
         if (p.at != null) {
@@ -135,27 +165,31 @@ export class Reminders {
           if (!at) throw new Error(reminderWords.badAt(p.at));
         }
         if (p.every_minutes != null && !(p.every_minutes >= 1)) throw new Error(reminderWords.badEveryMinutes);
-        if (p.cron != null) parseCron(p.cron);
-        const now = new Date(this.now());
+        if (p.cron != null) {
+          const parsed = parseCron(p.cron);
+          if (Result.isFailure(parsed)) throw new Error(parsed.failure);
+        }
+        const made = new Date(now());
         const reminder: Reminder = {
-          id: "reminder-" + now.getTime().toString(36),
+          id: "reminder-" + made.getTime().toString(36),
           name: p.name,
           message: p.message,
           ...(p.cron != null ? { cron: p.cron } : {}),
           ...(at ? { at: at.toISOString() } : {}),
           ...(p.every_minutes != null ? { everyMinutes: p.every_minutes } : {}),
-          created: now.toISOString(),
+          created: made.toISOString(),
         };
-        this.store([...this.load(), reminder]);
+        await store([...held(), reminder]);
+        arm();
         return reminderWords.set + describeReminder(reminder);
       },
     });
-    const list = schemaTool({
+    const listTool = schemaTool({
       name: "list_reminders",
       description: reminderWords.listDescription,
       parameters: Schema.Struct({}),
       run: () => {
-        const reminders = this.load();
+        const reminders = held();
         return reminders.length === 0 ? reminderWords.none : reminders.map(describeReminder).join("\n");
       },
     });
@@ -163,14 +197,14 @@ export class Reminders {
       name: "cancel_reminder",
       description: reminderWords.cancelDescription,
       parameters: Schema.Struct({ id: Schema.String }),
-      run: (p) => {
-        const reminders = this.load();
+      run: async (p) => {
+        const reminders = held();
         const j = reminders.find((x) => x.id === p.id);
         if (!j) throw new Error(reminderWords.notFound(p.id));
-        this.store(reminders.filter((x) => x !== j));
+        await store(reminders.filter((x) => x !== j));
+        arm();
         return reminderWords.canceled(j.name);
       },
     });
-    return [add, list, cancel];
-  }
-}
+    return { tools: [add, listTool, cancel], claimDue } satisfies Reminders;
+  });

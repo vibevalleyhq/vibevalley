@@ -1,7 +1,7 @@
 // The agent's conversation on disk, a message a line. A compaction is a line too: reading the file back, a
 // `compactionSummary` stands in for everything before it except its `kept` most recent messages.
 
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { Predicate } from "effect";
@@ -38,31 +38,18 @@ function parseLines(text: string): BrainMessage[] {
 }
 
 /** Every line of a session file as written, the compactions among them and what they fold; empty when there is no file. */
-export function readLines(file: string): BrainMessage[] {
-  try {
-    return parseLines(readFileSync(file, "utf8"));
-  } catch {
-    return [];
-  }
+export const readLines = (file: string): Promise<BrainMessage[]> => readFile(file, "utf8").then(parseLines, (): BrainMessage[] => []);
+
+/** The conversation as it stands: the compactions applied. */
+export const loadSession = async (file: string): Promise<BrainMessage[]> => replay(await readLines(file));
+
+/** A message added at the end; the caller waits for one before the next, so the lines keep their order. */
+export async function appendSession(file: string, message: BrainMessage) {
+  await mkdir(dirname(file), { recursive: true });
+  await appendFile(file, JSON.stringify(message) + "\n");
 }
 
-export class SessionFile {
-  readonly file: string;
-  constructor(file: string) {
-    this.file = file;
-  }
-
-  load(): BrainMessage[] {
-    return replay(readLines(this.file));
-  }
-
-  append(message: BrainMessage) {
-    mkdirSync(dirname(this.file), { recursive: true });
-    appendFileSync(this.file, JSON.stringify(message) + "\n");
-  }
-
-  clear() {
-    mkdirSync(dirname(this.file), { recursive: true });
-    writeFileSync(this.file, "");
-  }
+export async function clearSession(file: string) {
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, "");
 }

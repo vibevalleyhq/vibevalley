@@ -1,7 +1,7 @@
 // The system prompt lists only names and when-to-use; the body is read when the model asks for it (load_skill), so a
 // hundred skills cost a hundred lines, not a hundred files.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -45,38 +45,32 @@ export function frontMatter(text: string): Record<string, string> {
 
 export const skillBody = (text: string) => text.replace(frontMatterHead, "").trim();
 
-const isDir = (path: string) => {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
+const isDir = (path: string) =>
+  stat(path).then(
+    (s) => s.isDirectory(),
+    () => false,
+  );
+
+/** One folder's skills, in its order; an unreadable folder or SKILL.md is none. */
+const skillsIn = async (dir: string) => {
+  const entries = await readdir(dir).catch((): string[] => []);
+  const read = await Promise.all(
+    entries.map(async (entry) => {
+      if (!(await isDir(join(dir, entry)))) return undefined;
+      const path = join(dir, entry, "SKILL.md");
+      const data = await readFile(path, "utf8").catch((): undefined => undefined);
+      if (data === undefined) return undefined;
+      const fm = frontMatter(data);
+      return { name: fm.name || entry, description: fm.description ?? "", path };
+    }),
+  );
+  return read.filter((s) => s !== undefined);
 };
 
 /** The first of a name wins. Unreadable folders are skipped. */
-export function scanSkills(dirs: readonly string[]): SkillInfo[] {
+export async function scanSkills(dirs: readonly string[]): Promise<SkillInfo[]> {
   const found = new Map<string, SkillInfo>();
-  for (const dir of dirs) {
-    let entries: string[];
-    try {
-      entries = readdirSync(dir);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (!isDir(join(dir, entry))) continue;
-      const path = join(dir, entry, "SKILL.md");
-      let data: string;
-      try {
-        data = readFileSync(path, "utf8");
-      } catch {
-        continue;
-      }
-      const fm = frontMatter(data);
-      const name = fm.name || entry;
-      if (!found.has(name)) found.set(name, { name, description: fm.description ?? "", path });
-    }
-  }
+  for (const skills of await Promise.all(dirs.map(skillsIn))) for (const s of skills) if (!found.has(s.name)) found.set(s.name, s);
   // localeCompare: case folded first.
   return [...found.values()].toSorted((a, b) => {
     const la = a.name.toLowerCase();
@@ -94,7 +88,7 @@ export function skillIndex(skills: readonly SkillInfo[], max = 160): string {
     .join("\n");
 }
 
-export function readSkill(skills: readonly SkillInfo[], name: string): string {
+export async function readSkill(skills: readonly SkillInfo[], name: string): Promise<string> {
   const s = skills.find((x) => x.name === name);
   if (!s)
     throw new Error(
@@ -103,11 +97,7 @@ export function readSkill(skills: readonly SkillInfo[], name: string): string {
         skills.map((x) => x.name),
       ),
     );
-  let data: string;
-  try {
-    data = readFileSync(s.path, "utf8");
-  } catch {
-    throw new Error(skillWords.cannotRead(s.path));
-  }
+  const data = await readFile(s.path, "utf8").catch((): undefined => undefined);
+  if (data === undefined) throw new Error(skillWords.cannotRead(s.path));
   return skillWords.body(s.name, s.path, skillBody(data));
 }

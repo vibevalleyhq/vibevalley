@@ -53,8 +53,8 @@ export class Memory extends Context.Service<
     readonly list: (agent: string) => Effect.Effect<T.Memory[]>;
     readonly sources: () => T.MemorySourceInfo[];
     /** An orchestrator's archive: what its compactions folded away. */
-    readonly archive: (agent: string, query: string) => T.ArchiveListing;
-    readonly archiveFile: (agent: string, name: string) => string | undefined;
+    readonly archive: (agent: string, query: string) => Effect.Effect<T.ArchiveListing>;
+    readonly archiveFile: (agent: string, name: string) => Effect.Effect<string | undefined>;
   }
 >()("vibevalley/Memory") {
   static readonly layer = Layer.effect(
@@ -122,22 +122,24 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       const body = clip(text.replace(/\s*\n\s*/gu, " "), noteMaxChars);
       if (body === "") return yield* Effect.fail(refused(t("server.memory.empty")));
       const at = yield* Clock.currentTimeMillis;
-      const written = yield* Effect.try({
+      const written = yield* Effect.tryPromise({
         try: () => remember(homeOf(agent), fromOwner + body, new Date(at)),
         catch: () => refused(t("server.memory.fileFailed")),
       });
       return lineMemory(agent, written, at);
     });
 
-    const orchestrator = (agent: string): T.MemoryList => {
-      const snapshot = readMemory(homeOf(agent));
-      return {
-        file: snapshot.file,
-        memories: snapshot.lines.map((l) => lineMemory(agent, l, snapshot.updatedAt)).toReversed(),
-        carried: snapshot.carried,
-        sources: [],
-      };
-    };
+    // The orchestrators' memory is their MEMORY.md, read as they write it.
+    const fileRefused = (e: unknown) => refused(messageOf(e));
+    const orchestrator = (agent: string): Effect.Effect<T.MemoryList, ApiError> =>
+      Effect.tryPromise({ try: () => readMemory(homeOf(agent)), catch: fileRefused }).pipe(
+        Effect.map((snapshot) => ({
+          file: snapshot.file,
+          memories: snapshot.lines.map((l) => lineMemory(agent, l, snapshot.updatedAt)).toReversed(),
+          carried: snapshot.carried,
+          sources: [],
+        })),
+      );
 
     const preview = (agent: string, project: string, text: string) =>
       Effect.map(sources.prefetch({ agent, project, text, peek: true }), (groups): T.RecallPreview => {
@@ -146,11 +148,10 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       });
 
     // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
-    const fileRefused = (e: unknown) => refused(messageOf(e));
     const forgettable = Effect.fn("Memory.forgettable")(function* (agent: string, id: string) {
       const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
-      const listed = inFile(agent) ? yield* Effect.try({ try: () => orchestrator(agent), catch: fileRefused }) : yield* sources.list(agent);
+      const listed = inFile(agent) ? yield* orchestrator(agent) : yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
       if (!m) return yield* Effect.fail(missing(t("server.memory.noMemory", { agent, id }), [memoriesOf(agent)]));
       return m;
@@ -158,14 +159,14 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const shape = Memory.of({
       memoriesOf: Effect.fn("Memory.memoriesOf")(function* (agent) {
-        return inFile(agent) ? orchestrator(agent) : yield* sources.list(agent);
+        return inFile(agent) ? yield* Effect.orDie(orchestrator(agent)) : yield* sources.list(agent);
       }),
       remember: Effect.fn("Memory.remember")(function* (n) {
         return inFile(n.agent) ? yield* writeOrchestrator(n.agent, n.text) : yield* write(n);
       }),
       forget: Effect.fn("Memory.forget")(function* (agent, id) {
         yield* forgettable(agent, id);
-        return inFile(agent) ? yield* Effect.try({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : yield* forget(agent, id);
+        return inFile(agent) ? yield* Effect.tryPromise({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : yield* forget(agent, id);
       }),
       previewForget: Effect.fn("Memory.previewForget")(function* (agent, id) {
         const m = yield* forgettable(agent, id);
@@ -208,11 +209,15 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       write,
       list,
       sources: () => sources.info(),
-      archive: (agent, query) => ({
-        files: archiveFiles(homeOf(agent)),
-        hits: query.trim() ? searchArchive(homeOf(agent), query) : [],
+      archive: Effect.fn("Memory.archive")(function* (agent, query) {
+        return {
+          files: yield* Effect.promise(() => archiveFiles(homeOf(agent))),
+          hits: query.trim() ? yield* Effect.promise(() => searchArchive(homeOf(agent), query)) : [],
+        };
       }),
-      archiveFile: (agent, name) => readArchive(homeOf(agent), name),
+      archiveFile: Effect.fn("Memory.archiveFile")(function* (agent, name) {
+        return yield* Effect.promise(() => readArchive(homeOf(agent), name));
+      }),
     });
     return shape;
   });

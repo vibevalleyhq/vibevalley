@@ -144,12 +144,14 @@ export const handlers = Effect.gen(function* () {
     "memory.create": ({ agent, ...body }) => memoryOnce(body.requestKey, memory.remember({ agent, text: body.text, project: body.project ?? "", by: owner })),
     "memory.delete": ({ agent, memory: id }) => memory.forget(agent, id),
     "memory.previewDelete": ({ agent, memory: id }) => memory.previewForget(agent, id),
-    "orchestrator.archive.list": ({ agent, q }) => Effect.sync(() => memory.archive(agent || defaultOrchestrator, q ?? "")),
+    "orchestrator.archive.list": ({ agent, q }) => memory.archive(agent || defaultOrchestrator, q ?? ""),
     "orchestrator.archive.get": ({ agent, name }) =>
-      Effect.suspend(() => {
-        const text = memory.archiveFile(agent || defaultOrchestrator, name);
-        return text !== undefined ? Effect.succeed(text) : Effect.fail(missing(t("server.archiveRef", { name }), [lookIn.archive]));
-      }),
+      memory.archiveFile(agent || defaultOrchestrator, name).pipe(
+        Effect.filterOrFail(
+          (text) => text !== undefined,
+          () => missing(t("server.archiveRef", { name }), [lookIn.archive]),
+        ),
+      ),
     "runtime.list": () => Effect.sync(runtimes.list),
     "runtime.refresh": ({ id }) => runtimes.refresh(id).pipe(orMissing("runtime " + id, [lookIn.runtime])),
     "runtime.setting.update": ({ id, ...body }) => runtimes.update(id, body).pipe(orMissing("runtime " + id, [lookIn.runtime])),

@@ -14,7 +14,7 @@ import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { stopped, textTool } from "./core/tool.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
-import { SessionFile } from "./session.ts";
+import { loadSession } from "./session.ts";
 import {
   answered,
   lastUser,
@@ -389,13 +389,14 @@ describe("the agent", () => {
     writeFileSync(memoryFile(dir), "- 2026-10-01 主人叫阿周\n- 2026-10-02 用中文\n");
     return withAgent(dir, [answer("一"), answer("二")], (r) =>
       Effect.gen(function* () {
-        expect(r.agent.memoryNews()).toBe("");
+        expect(yield* r.agent.memoryNews).toBe("");
         yield* r.ask("a");
-        remember(dir, "主人喜欢短句", new Date(2026, 9, 18, 9));
-        forgetLine(dir, readMemory(dir).lines.find((l) => l.text === "用中文")!.id);
-        const news = r.agent.memoryNews();
+        yield* Effect.promise(() => remember(dir, "主人喜欢短句", new Date(2026, 9, 18, 9)));
+        const lines = (yield* Effect.promise(() => readMemory(dir))).lines;
+        yield* Effect.promise(() => forgetLine(dir, lines.find((l) => l.text === "用中文")!.id));
+        const news = yield* r.agent.memoryNews;
         expect(news).toBe("【记性有更新】\n+ 2026-10-18 主人喜欢短句\n− 2026-10-02 用中文");
-        expect(r.agent.memoryNews()).toBe("");
+        expect(yield* r.agent.memoryNews).toBe("");
         yield* r.ask(news + "\n\nb");
         expect(systemPrompt(r.requests[1]!)).toBe(systemPrompt(r.requests[0]!));
         expect(systemPrompt(r.requests[0]!)).toMatch(/主人叫阿周\n- 2026-10-02 用中文$/u);
@@ -414,7 +415,7 @@ describe("the agent", () => {
       (r) =>
         Effect.gen(function* () {
           yield* r.ask("第 1 件事");
-          remember(dir, "记在折叠之前", new Date());
+          yield* Effect.promise(() => remember(dir, "记在折叠之前", new Date()));
           const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
           for (let n = 2; n <= 5 && !folded(); n++) yield* r.ask(`第 ${n} 件事`);
           yield* until(folded, "the history folded");
@@ -436,7 +437,7 @@ describe("the agent", () => {
           () => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"),
           'r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta")',
         );
-        yield* r.agent.stop();
+        yield* r.agent.stop;
         yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(settled(r)!.run.aborted).toBe(true);
         const last = r.agent.history().at(-1)!;
@@ -450,7 +451,7 @@ describe("the agent", () => {
       Effect.gen(function* () {
         yield* r.agent.send(userMessage("睡", Date.now()));
         yield* until(() => r.has("tool_execution_start"), 'r.has("tool_execution_start")');
-        yield* r.agent.stop();
+        yield* r.agent.stop;
         yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
         expect(settled(r)!.run.aborted).toBe(true);
         const last = r.agent.history().at(-1)!;
@@ -459,7 +460,7 @@ describe("the agent", () => {
     ),
   );
 
-  it("reads back a session file", () => {
+  it("reads back a session file", async () => {
     const dir = home();
     const lines = [
       `{"role":"user","content":"一","timestamp":1}`,
@@ -469,7 +470,7 @@ describe("the agent", () => {
       `{"role":"user","content":"二","timestamp":5}`,
     ];
     writeFileSync(join(dir, "orchestrator.jsonl"), lines.join("\n") + '\n{"role":"us');
-    const history = new SessionFile(join(dir, "orchestrator.jsonl")).load();
+    const history = await loadSession(join(dir, "orchestrator.jsonl"));
     expect(said(history)).toEqual(["compactionSummary:摘要", "assistant:好", "custom:老周做完了", "user:二"]);
     expect(history.map((m) => JSON.stringify(m))).toEqual([lines[3], lines[1], lines[2], lines[4]]);
   });
@@ -636,7 +637,7 @@ describe("the agent", () => {
           const dir = home();
           const file = join(dir, "test.jsonl");
           writeFileSync(file, lines.map((m) => JSON.stringify(m)).join("\n") + "\n");
-          expect(sessionUnfinished(file)).toBe(isUnfinished);
+          expect(yield* Effect.promise(() => sessionUnfinished(file))).toBe(isUnfinished);
           yield* withAgent(dir, [step((c) => answer(JSON.stringify(results(c))))], (r) =>
             Effect.gen(function* () {
               expect(yield* r.agent.resume(30 * 60_000)).toBe(resumed);

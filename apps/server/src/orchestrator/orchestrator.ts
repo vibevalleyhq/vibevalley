@@ -405,7 +405,7 @@ const make = (options: OrchestratorOptions = {}) =>
       // Each orchestrator goes on with the run a stop cut off.
       for (const a of store.orchestrators()) {
         const me = yield* instanceOf(a.id);
-        if (me.host.unfinished() && (options.llm || settings.deepseekApiKey())) forkHere(me.host.resume(resumeWithinMs));
+        if ((options.llm || settings.deepseekApiKey()) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
       }
     }
 
@@ -467,9 +467,10 @@ const make = (options: OrchestratorOptions = {}) =>
           on,
           want,
           modelId(me.id),
-          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
-            (item) => item.name,
-          ),
+          [
+            ...toolsFor(me.id)(() => me.host.current().route),
+            ...selfTools({ home: me.home, skills: () => Promise.resolve([]), memory: true, now: () => 0 }),
+          ].map((item) => item.name),
         );
       }),
     });

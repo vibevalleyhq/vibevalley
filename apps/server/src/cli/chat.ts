@@ -9,9 +9,9 @@ import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
-import { Clock, Effect, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
+import { Clock, Effect, Fiber, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
 
-import { Brain, type BrainEvent, standaloneOwner } from "@vibevalley/agent/brain";
+import { type BrainEvent, makeBrain, standaloneOwner } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { userMessage } from "@vibevalley/agent/messages";
@@ -116,10 +116,10 @@ export const ownChat = (values: OwnChat) =>
     const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
     const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
     const home = join(homedir(), ".vibevalley", "agent", values.name);
-    const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
+    const servers = yield* Effect.tryPromise({ try: () => readMcpConfig(values.mcp || join(home, "mcp.json")), catch: messageOf });
     const asked = values.p !== undefined;
     // A one-off question keeps no reminders running.
-    const agent = yield* Brain.make({
+    const agent = yield* makeBrain({
       name: values.name,
       instructions: instructions(currentLocale()),
       llm,
@@ -132,14 +132,22 @@ export const ownChat = (values: OwnChat) =>
     });
     for (const why of agent.mcpStatus().failed) console.error(dim(why));
     let prompt = () => {};
-    agent.subscribe((e) => Effect.sync(() => show(e, () => prompt())));
+    const events = yield* agent.events;
+    const shown = (e: BrainEvent) => Effect.sync(() => show(e, () => prompt()));
     const said = (text: string) => Effect.map(Clock.currentTimeMillis, (at) => userMessage(text, at));
     if (values.p !== undefined) {
-      yield* agent.ask(yield* said(values.p));
+      // The answer is shown to its end before the question's command does.
+      const answer = yield* Effect.forkChild(agent.ask(yield* said(values.p)));
+      yield* Stream.runForEach(
+        Stream.takeUntil(events, (e) => e.type === "agent_settled"),
+        shown,
+      );
+      yield* Fiber.join(answer);
       return;
     }
+    yield* Effect.forkScoped(Stream.runForEach(events, shown));
     console.log(
-      dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.cli.chat.hello", { skills: agent.skills().length, tools: agent.mcpStatus().toolCount })),
+      dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.cli.chat.hello", { skills: (yield* agent.skills).length, tools: agent.mcpStatus().toolCount })),
     );
     prompt = () => write("› ");
     prompt();
@@ -150,12 +158,12 @@ export const ownChat = (values: OwnChat) =>
             console.log();
             return yield* new Quit();
           }
-          return yield* agent.stop();
+          return yield* agent.stop;
         }
         const text = typedIn.text;
         if (text === "/exit") return yield* new Quit();
         if (text === "/reset") {
-          yield* agent.reset();
+          yield* agent.reset;
           console.log(dim(t("server.cli.chat.forgot")));
           return prompt();
         }

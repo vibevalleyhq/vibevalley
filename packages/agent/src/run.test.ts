@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Stream } from "effect";
 
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
 import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
 import { until } from "@vibevalley/testkit/until";
 
-import { Brain, type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./brain.ts";
+import { type BrainEvent, type BrainOptions, makeBrain, openBrain, standaloneOwner } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { textTool } from "./core/tool.ts";
 import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
-import { SessionFile } from "./session.ts";
+import { appendSession, loadSession } from "./session.ts";
 import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, withAgent } from "./testing.ts";
 import * as engine from "./todo.ts";
 import { memoryStore } from "./todoStore.ts";
@@ -50,7 +50,7 @@ const echo = textTool<object>({
 const receiptAgent = Effect.fnUntraced(function* (steps: readonly Step[], extra: Partial<BrainOptions> = {}) {
   const { llm } = scriptedLLM(steps);
   const dir = home();
-  const agent = yield* Brain.make({
+  const agent = yield* makeBrain({
     name: "receipt",
     instructions: "",
     llm,
@@ -64,10 +64,12 @@ const receiptAgent = Effect.fnUntraced(function* (steps: readonly Step[], extra:
     ...extra,
   });
   const receipts: RunResult[] = [];
-  agent.subscribe((e) =>
-    Effect.sync(() => {
-      if (e.type === "agent_settled") receipts.push(e.run);
-    }),
+  yield* Effect.forkScoped(
+    Stream.runForEach(yield* agent.events, (e) =>
+      Effect.sync(() => {
+        if (e.type === "agent_settled") receipts.push(e.run);
+      }),
+    ),
   );
   return { agent, receipts };
 });
@@ -206,7 +208,7 @@ describe("a run's receipt", () => {
 });
 
 describe("a compaction", () => {
-  it("replays its whole kept tail", () => {
+  it("replays its whole kept tail", async () => {
     const dir = home();
     const messages: BrainMessage[] = [
       userMessage("old", Date.now()),
@@ -229,10 +231,11 @@ describe("a compaction", () => {
     const plan = planCompaction(messages, options)!;
     expect(plan.cut).toBe(initial.cut);
     const result = applyPlan(plan, cached);
-    const session = new SessionFile(dir + "/session.jsonl");
-    for (const m of messages) session.append(m);
-    session.append(result.summary);
-    expect(session.load()).toEqual(JSON.parse(JSON.stringify(result.messages)));
+    const file = dir + "/session.jsonl";
+    // One after another, as the brain writes them.
+    // oxlint-disable-next-line eslint/no-await-in-loop -- each line after the one before
+    for (const m of [...messages, result.summary]) await appendSession(file, m);
+    expect(await loadSession(file)).toEqual(JSON.parse(JSON.stringify(result.messages)));
     expect(result.summary.kept).toBe(5);
     expect(result.messages.length).toBe(6);
   });
@@ -309,7 +312,7 @@ describe("the agent's own todos", () => {
         Effect.gen(function* () {
           expect(yield* r.ask("查")).toBe("派好了");
           yield* until(() => started, "started");
-          yield* r.agent.stop();
+          yield* r.agent.stop;
           const g = yield* store.load;
           expect(g[0]).toMatchObject({ state: "waiting" });
           expect(g[0]!.tries ?? 0).toBe(0);
