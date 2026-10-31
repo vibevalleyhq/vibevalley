@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
-import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { Clock, Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
@@ -12,6 +13,7 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { notificationsStart } from "@/services.ts";
+import { NotAnswered } from "@/session/host.ts";
 import { Setting } from "@/setting/setting.ts";
 import { defaultVoice } from "@/setting/voice.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -19,24 +21,32 @@ import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { onCallLine } from "./prompts.ts";
-import { Voice, agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, vendorsFor, voiceAgentUid, voiceUnknown } from "./voice.ts";
+import {
+  Voice,
+  agentFor,
+  type CallLine,
+  clientOf,
+  retrying,
+  speakPieces,
+  tokenSeconds,
+  tunnelAnswers,
+  vendorsFor,
+  voiceAgentUid,
+  voiceUnknown,
+} from "./voice.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-/** A dictation upload that never answers: it ends only when its signal aborts (the 120 s timeout is the test's to fire). */
+/** A dictation upload that never answers: it ends only when its signal aborts. The service's HttpClient reaches it as
+ * FetchHttpClient.Fetch, provided to the test. */
 const pendingDictation = () => {
-  const timeout = new AbortController();
   let seen: AbortSignal | undefined;
   let entered!: () => void;
   const started = new Promise<void>((done) => (entered = done));
-  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
-    expect(ms).toBe(120_000);
-    return timeout.signal;
-  });
-  vi.stubGlobal("fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+  const fetch: typeof globalThis.fetch = async (_input, init) => {
     const signal = init?.signal ?? undefined;
     seen = signal;
     entered();
@@ -44,8 +54,8 @@ const pendingDictation = () => {
       if (signal?.aborted === true) reject(signal.reason);
       else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
     });
-  });
-  return { timeout, started, signal: () => seen };
+  };
+  return { fetch, started, signal: () => seen };
 };
 
 const appId = "11111111111111111111111111111111";
@@ -172,7 +182,7 @@ describe("a call's agent", () => {
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture, brief?: (line: string) => Effect.Effect<string, unknown>) => {
+const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
   const config = {
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
@@ -300,6 +310,34 @@ describe("voice", () => {
       yield* step(2_000);
       expect((yield* Fiber.join(downCall)).status).toBe(500);
       expect(down.seen).toEqual([500, 500, 500]);
+    }),
+  );
+
+  it.effect("asks a new tunnel every 2 s until it refuses a keyless request, and starts no ask after a minute", () =>
+    Effect.gen(function* () {
+      const asking = (answer: (n: number) => number) => {
+        const asked: number[] = [];
+        const client = HttpClient.make((request) =>
+          Effect.map(Clock.currentTimeMillis, (at) => {
+            asked.push(at);
+            return HttpClientResponse.fromWeb(request, new Response(null, { status: answer(asked.length) }));
+          }),
+        );
+        return { asked, answers: Effect.forkChild(tunnelAnswers(client, "https://line.example")) };
+      };
+
+      const late = asking((n) => (n < 3 ? 502 : 401));
+      const lateFiber = yield* late.answers;
+      yield* TestClock.adjust(4_000);
+      expect(yield* Fiber.join(lateFiber)).toBe(true);
+      expect(late.asked).toEqual([0, 2_000, 4_000]);
+
+      const start = yield* Clock.currentTimeMillis;
+      const never = asking(() => 404);
+      const neverFiber = yield* never.answers;
+      yield* TestClock.adjust(60_000);
+      expect(yield* Fiber.join(neverFiber)).toBe(false);
+      expect(never.asked.map((at) => at - start)).toEqual(Array.from({ length: 30 }, (_, i) => i * 2_000));
     }),
   );
 
@@ -491,7 +529,7 @@ describe("voice", () => {
     const brief = () =>
       Effect.suspend(() => {
         asks++;
-        return asks === 1 ? Effect.fail("brief failed") : Effect.succeed("第二件说完了");
+        return asks === 1 ? Effect.fail(new NotAnswered({ message: "brief failed", cause: undefined })) : Effect.succeed("第二件说完了");
       });
     return Effect.gen(function* () {
       const voice = yield* Voice;
@@ -712,10 +750,10 @@ describe("voice", () => {
       yield* Effect.promise(() => pending.started);
       yield* Fiber.interrupt(dictating);
       expect(pending.signal()?.aborted).toBe(true);
-    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, pending.fetch));
   });
 
-  it.live("dictation's timeout still aborts its upload", () => {
+  it.effect("dictation's timeout still aborts its upload", () => {
     const pending = pendingDictation();
     return Effect.gen(function* () {
       const voice = yield* Voice;
@@ -723,12 +761,11 @@ describe("voice", () => {
       yield* Effect.orDie(setting.save({ dictation: { via: "own", url: "http://dictation.test/v1", model: "whisper-1" } }));
       const dictating = yield* Effect.forkChild(Effect.flip(voice.dictate("AAAA", "wav")));
       yield* Effect.promise(() => pending.started);
-      const reason = new DOMException("test timeout", "TimeoutError");
-      pending.timeout.abort(reason);
+      yield* TestClock.adjust("120 seconds");
       const failure = yield* Fiber.join(dictating);
-      expect(pending.signal()?.reason).toBe(reason);
-      expect(failure).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("test timeout") });
-    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+      expect(pending.signal()?.aborted).toBe(true);
+      expect(failure).toMatchObject({ _tag: "VoiceUnavailable", settings: "dictation" });
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, pending.fetch));
   });
 
   it.live("says dictation is not set up: MOSS without its key, or an own address left empty", () =>
@@ -750,7 +787,7 @@ describe("voice", () => {
 
   it.live("dictation goes to MOSS's transcription by default, with the MOSS key", () => {
     const sent: { url: string; auth: string | null; model: unknown; format: unknown; file: unknown }[] = [];
-    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+    const fetch: typeof globalThis.fetch = async (input, init) => {
       const form = init?.body as FormData;
       sent.push({
         url: input instanceof Request ? input.url : input.toString(),
@@ -760,7 +797,7 @@ describe("voice", () => {
         file: (form.get("file") as File | null)?.name,
       });
       return new Response(JSON.stringify({ text: " 你好 " }), { status: 200, headers: { "content-type": "application/json" } });
-    });
+    };
     return Effect.gen(function* () {
       const setting = yield* Setting;
       yield* Effect.orDie(setting.save({ mossKey: "sk-moss-test" }));
@@ -785,6 +822,6 @@ describe("voice", () => {
       expect(setting.status().dictation).toEqual({ via: "moss", url: "http://dictation.test/v1", model: "whisper-1" });
       yield* voice.dictate("AAAA", "wav");
       expect(sent[2]).toMatchObject({ url: "https://api.mosi.cn/v1/audio/transcriptions", auth: "Bearer sk-moss-test" });
-    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, fetch));
   });
 });

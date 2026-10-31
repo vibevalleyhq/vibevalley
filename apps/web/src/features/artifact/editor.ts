@@ -22,20 +22,20 @@ import { reasonOf } from "@/base/api";
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
 /** Text edits wait this long after the last key, and no longer than maxWaitMs while typing goes on. */
-export const idleWaitMs = 500;
-export const maxWaitMs = 2000;
+const idleWaitMs = 500;
+const maxWaitMs = 2000;
 
 /** How often an open blocks artifact asks for what others (helpers) wrote while nothing of the owner's waits: every pollFastMs
  * while another writer was heard in the last busyPolls asks (or the demo was just started), else pollEveryMs. */
-export const pollEveryMs = 4000;
-export const pollFastMs = 1000;
+const pollEveryMs = 4000;
+const pollFastMs = 1000;
 const busyPolls = 4;
 
 /** A block another writer changed shows as being written for this many asks after the change was heard. */
 const writingPolls = 3;
 
 /** A uuid (v4) for a block this client inserts: block ids are the inserter's to make. */
-export const newBlockId = () => crypto.randomUUID();
+const newBlockId = () => crypto.randomUUID();
 
 /** One block as the editor holds it: the server's last word on it (rev, who wrote it) and the owner's text as it is now. */
 export class EditBlock {

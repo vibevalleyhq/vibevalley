@@ -9,7 +9,7 @@
 | 「让容易的写法就是对的写法」的四层手段，和新规矩先问能不能写成代码或检查 | 具体的规矩条文（根目录 [AGENTS.md](AGENTS.md#规矩)） |
 | 文档的分层、子系统和 Note 的分工 | 每层放什么的规矩本身（[docs/AGENTS.md](docs/AGENTS.md)）；Note 的位置、类别和格式（[.agents/notes/README.md](.agents/notes/README.md)） |
 | `docs:verify` 的四个检查：Note、skill、链接和路径、旧名字 | 服务端和页面的检查：黄金数据、`schema.test.ts`、`server:check`、`web:check`（[地基](docs/subsystems/foundation.md)、[客户端](docs/subsystems/app.md)） |
-| 体检：热点和类型逃生口的棘轮（`packages/health`），读数为什么不当门槛 | 拦问题的检查本身（lint、测试、`docs:verify`） |
+| 体检：热点和逃生口的棘轮（`packages/health`），读数为什么不当门槛；检查失败时怎么说；死代码和回归测试的检查 | 拦问题的检查本身（lint、测试、`docs:verify`） |
 | 项目自己的 skill 和验证 skill 的格式 | 每个验证 skill 的步骤（[.agents/skills](.agents/skills/README.md)） |
 | 写作规范为什么是现在这样 | 写作规范本身（[style/writing.md](docs/style/writing.md)）、代码怎么写（[style/code.md](docs/style/code.md)） |
 | 素材的生图和切图流水线 | 客户端怎么读图、密度、像素村（[农场的皮](docs/subsystems/farm.md)）；操作步骤（[development.md](docs/development.md#素材音效和官网)） |
@@ -17,8 +17,8 @@
 
 ## 在哪
 
-- **`scripts/`**（`vpx` 直接跑 `.ts`，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `vp run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统、`comment-review.ts`（让模型照 `docs/style/code.md` 审注释，只报不改）。
-- **体检** `packages/health`：读 git 和源码，出热点和类型逃生口的报告（[README](packages/health/README.md)）；这个仓库算哪些文件、怎么分区、哪些文件本来就热写在 `scripts/health.config.ts`，逃生口的棘轮是 `scripts/health.ratchet.json`。`vp run health` 出报告，`vp run health:verify` 在 CI 的 check 里。
+- **`scripts/`**（`vpx` 直接跑 `.ts`，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `vp run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`（`vp run deadcode`：knip 查没人用的文件、导出和依赖，入口写在根目录的 `knip.ts`）、`regression.ts`（CI 查 PR 动了的回归测试）、`commit-msg.ts`（提交和 PR 的格式）、`oxlint-plugin.ts`（仓库自己的 lint 规则）、`verify-server.ts`（验证 skill 起隔离服务端用）、`comment-review.ts`（让模型照 `docs/style/code.md` 审注释，只报不改）。
+- **体检** `packages/health`：读 git 和源码，出热点和逃生口（类型的，和错误通道的：`orDie`、`Effect.ignore`、吞掉的 `catch`）的报告（[README](packages/health/README.md)）；这个仓库算哪些文件、怎么分区、哪些文件本来就热写在 `scripts/health.config.ts`，逃生口的棘轮是 `scripts/health.ratchet.json`。`vp run health` 出报告，`vp run health:verify` 在 CI 的 check 里。
 - **`.agents/`**：`notes/` 是 Agent Notes，`CATALOG.md` 是生成的清单；`skills/` 是项目自己的 skill，`.claude/skills` 是指向它的符号链接。
 - **`docs/`**：分层见 [docs/AGENTS.md](docs/AGENTS.md)；`docs/style/` 是 `writing.md` 和 `code.md`。
 - **`design/`**：`pixel/gen.sh`（codex 生图）、`pixel/process.py`（切图，写 `apps/web/public/pixel/` 和 `sprites.json`）、`pixel/prompts/`（提示词）、`pixel/icons/`（Hugeicons 的 SVG 和排参考图的 `ref.py`）；`assets/` 只留最早一套手绘界面的 `gen.sh`、提示词和原图；`art.sh` 把单独仓库 vibevalley-art 里的原图链接进来；`names.md` 是给档案和人物起名的梗。
@@ -33,7 +33,7 @@
 - **链接从仓库根写**，不写 `../`、`./`，不以 `/` 开头；目标要存在，大小写要和磁盘上的文件一致（macOS 不分大小写，`agents.md` 会打开 `AGENTS.md`）。外链不抓、`#片段` 不查；代码块和反引号里的链接算例子。
 - **反引号里的源文件路径也查**：带一层以上目录、扩展名是 `go`、`dart`、`ts`、`tsx`、`astro`、`sql`、`json`、`yaml`、`sh`、`py`、`gz` 的，要能在仓库里找到；可以从仓库根写、从包里写（`core/core.ts`），或相对文档所在目录。范围是全部受管的 Markdown，除了 `.agents/notes/`（Note 写的是当时的文件）。没目录或扩展名不在表里的（家目录里的 `config.json`）不查；还没 `git add` 的新文件也算在仓库里。类型和函数名不查。
 - **旧名字只在代码里查**：`stale-names.ts` 扫 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 的 TypeScript，命中时报文件、行号和该写成什么。一个名字进这张表，要求改名本身是个决定，而不是这个词还有别的正经意思（测试的 helper、界面上的帮工、游戏里的收获都不算）。
-- **skill 放在 `.agents/skills/<名字>/SKILL.md`**：frontmatter 的 `name` 和目录同名、`description` 不空；`acceptance` 的入口和每份分册（同目录的其他 `.md`）都要有「什么时候用」「准备」「步骤」「证据」「出错时」「收拾」六节，入口的表正好列全分册；README 的表和目录一一对得上；`.claude/skills` 必须是指向 `../.agents/skills` 的符号链接。
+- **skill 放在 `.agents/skills/<名字>/SKILL.md`**：frontmatter 的 `name` 和目录同名、`description` 不空；skill 读的其他文件放在它的 `references/` 下，`SKILL.md` 旁边不放别的 `.md`；`vv-acceptance` 的入口和每份分册（`references/*.md`）都要有「什么时候用」「准备」「步骤」「证据」「出错时」「收拾」六节，入口的表正好列全分册；README 的表和目录一一对得上；`.claude/skills` 必须是指向 `../.agents/skills` 的符号链接。
 - **名字**：给人看的地方用 VibeValley 和码农场物语（窗口、首页、通知、Dock 写码农场物语，文档正文写 VibeValley），代码、命令、目录、环境变量（`VIBEVALLEY_*`）、分支（`vibevalley/…`）、bundle id（`dev.vibevalley.app`）写小写的 `vibevalley`；GitHub 组织是 `vibevalleyhq`，官网 vibevalley.dev。改名以前就删掉的东西（旧 TypeScript 服务端、Electron 应用）讲到时照旧写它当时的名字，只有还在的东西用新名字。代码里不认旧名字。
 
 ## 怎么走
@@ -56,7 +56,7 @@
 - **根目录 `AGENTS.md`**：「怎么让 agent 做对」一节是四层手段的常驻版本，理由链到这里；规矩列表里每条链到它的家。
 - **各子系统**：沉淀的去处；`docs:verify` 查它们的链接和路径。
 - **地基、客户端**：它们的检查（黄金数据、`schema.test.ts`、`db:check`、各包的类型）是第 2 层的另一半，跟着各自的代码住。
-- **验收只有一个 skill**：[acceptance](.agents/skills/acceptance/SKILL.md) 的入口写共同的沙箱（`scripts/verify-server.ts` 起隔离的服务端）、证据和收拾，按「改了什么」指到一份分册（服务端、页面、手机壳、管家的评测，管家的评测归[管家](docs/subsystems/orchestrator.md)）。一个入口，agent 改完不用先猜该找哪个 skill；分册只在用得上时读，验一个接口不带上模拟器和花钱的步骤。
+- **验收只有一个 skill**：[vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 的入口写共同的沙箱（`scripts/verify-server.ts` 起隔离的服务端）、证据和收拾，按「改了什么」指到一份分册（服务端、页面、手机壳、管家的评测，管家的评测归[管家](docs/subsystems/orchestrator.md)）。一个入口，agent 改完不用先猜该找哪个 skill；分册只在用得上时读，验一个接口不带上模拟器和花钱的步骤。
 - **农场的皮**：读 `process.py` 写出的 `apps/web/public/pixel/` 和 `sprites.json`；像素皮的按钮图标只用这条流水线的贴图；工作台的图标是 reicon（[客户端](docs/subsystems/app.md)「图标分两套」）。
 
 ## 为什么这样
@@ -76,10 +76,14 @@
 - **叫 VibeValley（码农场物语）。** 原名 heybro 在 GitHub 上撞了一个同样做 AI agent 的项目，也说不出它是什么。VibeValley 一个词连着 vibe coding、《星露谷物语》的田园感和硅谷；码农场物语是「码农」「农场」的双关，「物语」呼应《牧场物语》。放弃了 vibefarm（域名、游戏、GitHub 名都被占）、viberfarm（VIBER 是注册商标，读音也撞）、只改仓库名（GitHub 和应用两个名字，传不起来）、只改名字不改数据里的 id（看不见的地方永远叫旧名，新代码要记住例外），也放弃了兼容旧名字：每个读环境变量或目录的地方都得记着旧名，而当时没有外部用户，改一次最便宜。
 - **没价值的注释：分隔线交给 lint，其余交给模型审新加的。** 量过 main 上的 4663 条注释：能用模式认准的只有分隔线和给一段代码起的标题（40 处，全中）；换个说法复述名字、文件开头的概述、测试里一步步讲，按词比对只对一半，只比声明的名字又只抓到一处，要读懂注释和它旁边的代码。所以分隔线是 `vibevalley/no-comment-divider`；其余由 `scripts/comment-review.ts` 把新加的注释连同附近的代码、`docs/style/code.md` 的「注释」一节交给 DeepSeek 判，[vv-comments](.agents/skills/vv-comments/SKILL.md) 写怎么对着代码核实。只审新加的：花的和改动一样大，旧的由主人点名一块用 `--all` 清。只报不改：删错一条说为什么的注释，比留一条废话代价大。在 `apps/server/src/issue` 上校准过（174 条）：第一轮判 70 条不留，6 条判错（一致性的约定、元组的先后、把「问题」和「检查」弄混）、5 条改写丢了要紧的；第二轮又在第一轮留下的里报出 13 条该删的。所以只报不改，清一块跑两轮。提 PR 前在本机跑、不进 CI：模型的回答每次不一样，不该挡合并。放弃了全写成 lint（认不准，`error` 误报、`warn` 没人看）和每次审整个仓库（3850 条、近两百次请求）。
 - **检查照更对的写法开，不照现在的写法。** 一条规则只问它拦的东西错不错；报得多只决定怎么分步改，不决定开不开，确实要例外的就地写理由，失效的例外 `reportUnusedDisableDirectives` 会报。照这条开了：条件里的真假值（`[]`、`{}` 永远是真，`0` 是值；#194 的空附件框就是把 `[]` 当成有）、`??`、收窄的 `as`、正则的 `u`、`toSorted`、循环里的 `await`、`erasableSyntaxOnly` 等编译开关，和 oxfmt 的 import、类名排序。放弃了：整类开 `suspicious`、`pedantic`（里面不少规则在对的代码上报）；`prefer-readonly-parameter-types`（库的类型多半不是只读的，在对的代码上报五千多处）；`noPropertyAccessFromIndexSignature`（`noUncheckedIndexedAccess` 已经让读出来的值带上 `undefined`，它只多要一种写法）；`require-post-message-target-origin`（报的都是 Worker、MessagePort 和手机壳的桥，它们没有目标来源）；条件里连字符串也不许（`""` 就是约定的没有，处处写 `!== ""` 说的是同一件事）；只靠棘轮管转型（棘轮只看总数，不看每一处有没有理由，一处新的 `as` 在别处少一处时就混进来了）。测试不查转型和 Playwright 不查循环里的 `await`，是因为在那里它们拦不住错：测试的断言会读到错的值，一页只能一步步点。
-- **体检只指方向，只有逃生口是门槛。** 「文件不超过多少行」这类门槛一设，agent 学会的是把大文件机械地切开凑数；热点（改动次数乘行数）只排出先看哪里，`shapes.ts`、`schema.ts` 这类本来就热的写明理由放在一边。类型逃生口（`x!`、`as T`、`as unknown as`、关掉 lint 的注释；`as const` 不算）做成按区的棘轮：数清楚、意思明确，多一个就该有理由；少了也失败，要求把棘轮降下来，否则省下的余量会被下一个改动悄悄用掉。读数和这个仓库自己的过去比，不和行业的数比。体检做成单独的包、配置留在仓库：它不认识 VibeValley，以后能给主人的项目用。
+- **检查失败时说怎么改。** agent 改代码时读到的只有报错那一句：只说「不许」，它就猜，猜的常常是绕过去（换个写法躲开规则、关掉规则、改断言）。所以每个检查的话写三样：错在哪和为什么、`Fix:` 该怎么写、`See` 仓库里一个文件；规则知道得够多的就算出具体的改法，能机械改对的直接给自动修复。格式由测试查，`See` 的文件挪了测试就报，报错不会指向不存在的地方。放弃了把理由只写在插件顶上的注释里（人读得到，agent 撞上规则时读不到）。
+- **死代码由 knip 查，零容忍。** 「内部不留兼容」加上频繁的改名和改形状，旧导出最容易留下，留下的又被下一个 agent 当成现行的写法照抄；agent 不确定一个导出还有没有人用，就只加不删。接上 knip 时清出 130 个没人用的导出、12 个没人用的类型、拿掉 `export` 以后又成了死代码的 24 处声明、两个整文件（画布上的卡片 UI、离线测电平）和服务端一个从没用过的依赖。被自己文件里的签名用到的类型不报：它是那个导出的形状。放弃了只报不拦（报告没人看，清一次又长回来）和对值也开 `ignoreExportsUsedInFile`（只在自己文件里用的导出正是该收窄的接口）。
+- **回归测试改了要说。** 被告知「让失败的测试通过」的 agent，最短的路是把测试改松；修复补的测试是这段代码怎么坏过的唯一样本。按名字前缀 `regression: ` 认，不另包一层 API（vitest、`@effect/vitest`、Playwright 都能用）；只要求在 PR 正文里点名说明，不锁死（行为有意改了，测试就该跟着改，锁死会逼 agent 绕路）。CI 的检出深两层，合并提交的第一个父提交就是基线，不用另外拉取。
+- **体检只指方向，只有逃生口是门槛。** 「文件不超过多少行」这类门槛一设，agent 学会的是把大文件机械地切开凑数；热点（改动次数乘行数）只排出先看哪里，`shapes.ts`、`schema.ts` 这类本来就热的写明理由放在一边。逃生口做成按区的棘轮：类型的（`x!`、`as T`、`as unknown as`、关掉 lint 的注释；`as const` 不算），和错误通道的（`Effect.orDie`、`Effect.ignore`、什么也不做的 `catch`：错误变成缺陷、被丢掉、被吞掉，类型检查看不出来）：数清楚、意思明确，多一个就该有理由；少了也失败，要求把棘轮降下来，否则省下的余量会被下一个改动悄悄用掉。读数和这个仓库自己的过去比，不和行业的数比。体检做成单独的包、配置留在仓库：它不认识 VibeValley，以后能给主人的项目用。
 
 ## 还没做的
 
+- 白皮书里还没做的几项（扩展点只填空、共用帮手的清单、契约的 diff、I/O 次数）和各自什么时候做：[提案](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)。
 - 体检的后几项：代码存活率（新写的行 14 天后还剩多少）、跨模块一起改的文件、测试超出预算的趋势，和每项读数能不能预测问题的回测：[体检](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)。
 - 用 VibeValley 开发 VibeValley：干活的农场和正在改的代码分开、合并前跑检查、渠道各用各的工作目录：[提案](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)。
 
@@ -89,5 +93,8 @@
 - 在文档里写一个不存在的反引号路径或 `../` 链接，`vpx scripts/doc-links.ts` 报错；删掉一份验收分册的「证据」一节、或入口的表漏了一份，`vpx scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`vpx scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
 - `vp test run scripts/verify-server.test.ts`：`only a machine receipt from the owned process announces readiness`、`sandbox owns isolation, readiness, validation failure and cleanup`。
 - `vp test run scripts/comment-review.test.ts`：只挑新加的注释、连着的 `//` 合成一条、跳过工具的指令、模型漏答或答错格式时报错而不当成 `keep`。
-- `vp run health:verify`：本包的测试（改名跟到今天的名字、机械的改动不计、三种逃生口在 `.ts` 和 `.tsx` 里、棘轮的多和少）；在任何一个算进去的文件里加一个 `x!`，`--check` 报出那一区和多了几个。
+- `vp run health:verify`：本包的测试（改名跟到今天的名字、机械的改动不计、类型的逃生口在 `.ts` 和 `.tsx` 里、错误通道的 `orDie`、`ignore` 和吞掉的 `catch`、棘轮的多和少）；在任何一个算进去的文件里加一个 `x!` 或 `p.catch(() => {})`，`--check` 报出那一区、多了几个和该怎么改。
+- `vp test run scripts/oxlint-plugin.test.ts`：每条 `vibevalley/*` 规则和 `refused` 里的话都有 `Fix:` 和一个存在的 `See` 文件，`vite.config.ts` 里没有别的 `message`；`parent-import` 的自动修复、`catalogOf` 算出的词典。
+- `vp run deadcode`：knip 在 `main` 上报 0 条；加一个没人用的导出，它报出那个导出并打出该怎么处理。
+- `vp test run scripts/regression.test.ts`：按名字认出各种写法的回归测试，删了或改了要在 `## Regression` 里点名，`fix/` 没有新的要说为什么；`vpx scripts/regression.ts --base origin/main --branch fix/x --body "## What changed"` 在没补回归测试的分支上报错。
 - 素材没有自动检查：重跑 `process.py` 后看 `git diff apps/web/public/pixel/`，图鉴页能看全部贴图。

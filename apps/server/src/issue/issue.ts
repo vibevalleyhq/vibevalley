@@ -1,5 +1,5 @@
 import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient, SqlError } from "effect/sql";
+import type { SqlError } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
 import {
@@ -44,6 +44,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
+import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channels } from "@/channel/chat.ts";
 import { inboxLines } from "@/channel/prompts.ts";
@@ -129,8 +130,9 @@ export class Issues extends Context.Service<
     readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
     /** A session starts on an existing issue: open it and link the session in one write. */
     readonly ran: (id: string, session: Session) => Effect.Effect<void, NotRecorded>;
-    /** The issues of a task graph as the graph has them now, published as one commit once written. */
-    readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
+    /** The issues of a task graph as the graph has them now, published as one commit once written; the database refusing
+     * the write is kept, for the task to tell. */
+    readonly putTask: (graph: TaskGraph) => Effect.Effect<void, SqlError.SqlError>;
     readonly nextTaskId: () => Effect.Effect<string>;
     /** Issues for the orchestrator, subscribed before it returns. */
     readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
@@ -182,7 +184,7 @@ const triggerOf = jsonOf(S.RunTrigger);
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
-export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
+function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
   const how = handedOver
     ? t("server.issue.brief.handedOver", { name: last.name, id: last.id })
     : t("server.issue.brief.reopened", { name: last.name, id: last.id });
@@ -216,7 +218,7 @@ export interface IssueOptions {
   readonly talkIdleMs?: number;
 }
 
-export const make = (options: IssueOptions = {}) =>
+const make = (options: IssueOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;
@@ -227,8 +229,7 @@ export const make = (options: IssueOptions = {}) =>
     const sessions = yield* Sessions;
     const chat = yield* Channels;
     const crons = yield* Crons;
-    const sql = yield* SqlClient.SqlClient;
-    const { run: db, one, inTx } = yield* Db;
+    const { run: db, attempt, one, inTx, attemptTx } = yield* Db;
     const worked = new IssueSessions();
     /** After an issue is removed: its sessions' rows went with it, and its children's. */
     const reloadSessions = Effect.suspend(() => Effect.map(db(qs.allSessions()), (rows) => worked.load(rows)));
@@ -316,7 +317,7 @@ export const make = (options: IssueOptions = {}) =>
     const publish = (id: string) =>
       get(id).pipe(
         Effect.flatMap((issue) => core.apply({ type: "issue", issue })),
-        Effect.catch((e) => Effect.logWarning(`vibevalley: issue ${id} changed but could not be read back for the board: ${reasonOf(e)}`)),
+        bestEffort(`vibevalley: issue ${id} changed but could not be read back for the board`),
       );
 
     /** The newest session, the one a merge, changes, comments and cancel act on; a reopen makes another. */
@@ -350,10 +351,11 @@ export const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, cron?: string, talk?: string) {
+    /** add, with the database refusing the row kept as a failure: hire tells it to the owner. */
+    const attemptAdd = Effect.fn("Issues.attemptAdd")(function* (req: IssueRequest, cron?: string, talk?: string) {
       const [title, description] = yield* issueWords(req);
       const id = newId();
-      yield* db(
+      yield* attempt(
         q.addIssue({
           id,
           title,
@@ -371,6 +373,9 @@ export const make = (options: IssueOptions = {}) =>
       yield* publish(id);
       return yield* get(id);
     });
+
+    const add = (req: IssueRequest, cron?: string, talk?: string) =>
+      attemptAdd(req, cron, talk).pipe(Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }));
 
     const complete = (id: string, delivered: Delivery) =>
       Effect.andThen(db(q.completeIssue({ closed_at: clock.currentTimeMillisUnsafe(), delivered, id })), publish(id));
@@ -424,19 +429,14 @@ export const make = (options: IssueOptions = {}) =>
 
     /** The issue already owns its number and workplace before its session starts. */
     const ran = Effect.fn("Issues.ran")(function* (id: string, session: Session) {
-      yield* sql
-        .withTransaction(
-          Effect.gen(function* () {
-            yield* q.reopenIssue({ id });
-            yield* q.assignIssue({ id, assignee: session.agent });
-            yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
-            yield* qq.dequeueIssue({ issue: id });
-          }),
-        )
-        .pipe(
-          Effect.provideService(SqlClient.SqlClient, sql),
-          Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
-        );
+      yield* attemptTx(
+        Effect.gen(function* () {
+          yield* q.reopenIssue({ id });
+          yield* q.assignIssue({ id, assignee: session.agent });
+          yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
+          yield* qq.dequeueIssue({ issue: id });
+        }),
+      ).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
       worked.added(session.id, id);
       yield* publish(id);
     });
@@ -489,10 +489,12 @@ export const make = (options: IssueOptions = {}) =>
       if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";
       const prepared = yield* Effect.result(
-        (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
-          // The database failing (a full disk) is told as a refusal; any other defect is a bug and stays one.
-          Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(causeMessage(d))) : Effect.die(d))),
-        ),
+        opt.issue
+          ? get(opt.issue)
+          : attemptAdd({ title: task, project: where, assignee: agent.id }).pipe(
+              // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
+              Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
+            ),
       );
       if (prepared._tag === "Failure") return { refused: t("server.issue.notRecorded", { name: agent.name, why: reasonOf(prepared.failure) }) };
       const issue = prepared.success;
@@ -673,10 +675,10 @@ export const make = (options: IssueOptions = {}) =>
     /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
     const commitsOf = (issue: Issue) =>
       issue.project
-        ? Effect.map(
-            projects.branchChanges(issue.project, issueBranch(issue.number)).pipe(Effect.mapError((e) => refused(e.message))),
-            (c) => c?.commits.length ?? 0,
-          )
+        ? Effect.mapBoth(projects.branchChanges(issue.project, issueBranch(issue.number)), {
+            onFailure: (e) => refused(e.message),
+            onSuccess: (c) => c?.commits.length ?? 0,
+          })
         : Effect.succeed(0);
 
     /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything
@@ -918,7 +920,7 @@ export const make = (options: IssueOptions = {}) =>
             const s = sessions.sessionOf(session);
             if (!s || isBusy(s)) return;
             yield* sessions.dismiss(session, "discard", "completed");
-          }).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: a talk's session ${session} going home: ${String(c)}`))),
+          }).pipe(bestEffort(`vibevalley: a talk's session ${session} going home`)),
           options.talkIdleMs ?? talkIdleMs,
         ),
       );
@@ -936,10 +938,6 @@ export const make = (options: IssueOptions = {}) =>
     const ownerWords = yield* chat.ownerInThread;
     const finished = yield* sessions.finishedRuns;
     const due = yield* crons.due;
-    const logged =
-      (what: string) =>
-      <A, E>(e: Effect.Effect<A, E>) =>
-        Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
     // One at a time: a report and the owner's word on it do not cross.
     yield* Effect.forkScoped(
       Stream.runForEach(
@@ -949,25 +947,27 @@ export const make = (options: IssueOptions = {}) =>
         ),
         (n) =>
           n._tag === "owner"
-            ? onOwnerInThread(n.thread).pipe(logged(`issues after the owner's words in ${n.thread}`))
-            : onSessionNews(n).pipe(logged(`issues after ${n._tag}`)),
+            ? onOwnerInThread(n.thread).pipe(bestEffort(`vibevalley: issues after the owner's words in ${n.thread}`))
+            : onSessionNews(n).pipe(bestEffort(`vibevalley: issues after ${n._tag}`)),
       ),
     );
     yield* Effect.forkScoped(
       // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>
-        Effect.forEach(run.issues, (id) => endRun(id, run.outcome).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
+        Effect.forEach(run.issues, (id) => endRun(id, run.outcome).pipe(bestEffort(`vibevalley: run ${run.id} finished on issue ${id}`)), {
           discard: true,
         }),
       ),
     );
-    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`cron ${d.cron.id}`))));
+    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(bestEffort(`vibevalley: cron ${d.cron.id}`))));
     if (options.background ?? true) {
       // Each waits a period before its first run, then runs every period.
       const tryEvery = options.tryEveryMs ?? 5000;
-      yield* Effect.forkScoped(tryQueued.pipe(logged("the queue"), Effect.repeat(Schedule.spaced(tryEvery)), Effect.delay(tryEvery)));
+      yield* Effect.forkScoped(tryQueued.pipe(bestEffort("vibevalley: the queue"), Effect.repeat(Schedule.spaced(tryEvery)), Effect.delay(tryEvery)));
       const pollEvery = config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000;
-      yield* Effect.forkScoped(refreshPullRequests.pipe(logged("refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)));
+      yield* Effect.forkScoped(
+        refreshPullRequests.pipe(bestEffort("vibevalley: refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)),
+      );
     }
 
     /** On the board before another unsent issue, or last; only unsent issues have a place. */
@@ -994,15 +994,18 @@ export const make = (options: IssueOptions = {}) =>
 
     const shape = Issues.of({
       onBoard: () => core.state().issues,
-      list: () => Effect.map(everyIssue, (all) => all.filter((item) => !item.talk)),
-      query: (f) =>
-        Effect.gen(function* () {
-          const all = (yield* everyIssue).filter((item) => !item.talk);
-          return pickIssues(all, f, yield* Clock.currentTimeMillis);
-        }),
+      list: Effect.fn("Issues.list")(function* () {
+        return (yield* everyIssue).filter((item) => !item.talk);
+      }),
+      query: Effect.fn("Issues.query")(function* (f) {
+        const all = (yield* everyIssue).filter((item) => !item.talk);
+        return pickIssues(all, f, yield* Clock.currentTimeMillis);
+      }),
       get,
       timeline,
-      add: (req) => add(req),
+      add: Effect.fn("Issues.add")(function* (req) {
+        return yield* add(req);
+      }),
       /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
        * next round goes by them. */
       edit: Effect.fn("Issues.edit")(function* (id, upd, by) {
@@ -1050,9 +1053,16 @@ export const make = (options: IssueOptions = {}) =>
         yield* reloadSessions;
         yield* core.apply({ type: "issueGone", id: issueId(id) });
       }),
-      queue: (id, queued) => queueRow(id, queued, chat.defaultChannel()),
-      start: (id, channel) => start(id, channel),
-      reopen: (id, text, channel) => reopen(id, text, channel),
+      queue: Effect.fn("Issues.queue")(function* (id, queued) {
+        return yield* queueRow(id, queued, chat.defaultChannel());
+      }),
+      // Untraced: they only drop the arguments the service does not take, and the call they make is named Issues.start / Issues.reopen.
+      start: Effect.fnUntraced(function* (id, channel) {
+        return yield* start(id, channel);
+      }),
+      reopen: Effect.fnUntraced(function* (id, text, channel) {
+        return yield* reopen(id, text, channel);
+      }),
       idOf,
       stop: Effect.fn("Issues.stop")(function* (id) {
         yield* sessions.stop(yield* liveSession(id));
@@ -1217,37 +1227,35 @@ export const make = (options: IssueOptions = {}) =>
         });
         const before = yield* family(graph.id);
         const issues = graphIssues(graph, before, yield* Clock.currentTimeMillis);
-        const gone = yield* inTx(
+        const gone = yield* attemptTx(
           Effect.gen(function* () {
             for (const issue of issues)
-              yield* db(
-                q.putIssue({
-                  id: issue.id,
-                  title: issue.title,
-                  description: issue.description,
-                  project: nullText(issue.project),
-                  assignee: nullText(issue.assignee),
-                  priority: issue.priority,
-                  rank: issue.rank ?? 0,
-                  created_at: issue.createdAt,
-                  closed_at: issue.closedAt ?? null,
-                  delivered: issue.delivered ?? null,
-                  canceled: issue.canceled ?? null,
-                  parent: nullText(issue.parent),
-                  blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
-                  graph: jsonOrNull(issue.graph, !!issue.graph),
-                  task: jsonOrNull(issue.task, !!issue.task),
-                }),
-              );
+              yield* q.putIssue({
+                id: issue.id,
+                title: issue.title,
+                description: issue.description,
+                project: nullText(issue.project),
+                assignee: nullText(issue.assignee),
+                priority: issue.priority,
+                rank: issue.rank ?? 0,
+                created_at: issue.createdAt,
+                closed_at: issue.closedAt ?? null,
+                delivered: issue.delivered ?? null,
+                canceled: issue.canceled ?? null,
+                parent: nullText(issue.parent),
+                blocked_by: jsonOrNull(issue.blockedBy, issue.blockedBy.length > 0),
+                graph: jsonOrNull(issue.graph, !!issue.graph),
+                task: jsonOrNull(issue.task, !!issue.task),
+              });
             const out: string[] = [];
             for (const old of before)
               if (!issues.some((issue) => issue.id === old.id)) {
-                yield* db(q.removeIssue({ id: old.id }));
+                yield* q.removeIssue({ id: old.id });
                 out.push(old.id);
               }
             return out;
           }),
-        );
+        ).pipe(Effect.catchTag("SchemaError", Effect.die));
         if (gone.length > 0) yield* reloadSessions;
         // Published in one core.apply, once the transaction has succeeded.
         const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (item) => get(item.id).pipe(Effect.orDie));
@@ -1256,7 +1264,10 @@ export const make = (options: IssueOptions = {}) =>
           ...updated.map((issue) => ({ type: "issue" as const, issue })),
         );
       }),
-      nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
+      nextTaskId: Effect.fn("Issues.nextTaskId")(function* () {
+        const rows = yield* db(q.graphIDs());
+        return nextTaskId(rows.map((r) => r.id));
+      }),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
       ofCron,
       refreshPullRequests,

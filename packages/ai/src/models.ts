@@ -4,7 +4,7 @@
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 /** The order pi-ai clamps a level in: a level a model lacks becomes the next one up, else the next one down. */
-export const thinkingLevels: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const thinkingLevels: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
 export interface Model {
   readonly id: string;

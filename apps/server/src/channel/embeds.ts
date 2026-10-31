@@ -12,7 +12,7 @@ import { FetchHttpClient, HttpClient } from "effect/http";
 
 import type { Embed } from "@vibevalley/protocol";
 /** At most this many links of a message get a preview. */
-export const embedMax = 3;
+const embedMax = 3;
 const timeoutMs = 3000;
 const bodyMax = 512 * 1024;
 const redirectsMax = 3;
@@ -64,7 +64,7 @@ export type Resolve = (host: string) => Effect.Effect<readonly string[]>;
 const resolveAll: Resolve = (host) =>
   isIP(host) !== 0
     ? Effect.succeed([host])
-    : Effect.tryPromise(() => lookup(host, { all: true })).pipe(
+    : Effect.tryPromise({ try: () => lookup(host, { all: true }), catch: (e) => String(e) }).pipe(
         Effect.map((all) => all.map((a) => a.address)),
         Effect.orElseSucceed(() => []),
       );

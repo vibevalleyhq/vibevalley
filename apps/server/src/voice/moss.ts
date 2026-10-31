@@ -10,7 +10,7 @@ import { Socket } from "effect/socket";
 import { jsonOrNone } from "@/base/json.ts";
 import { afterRealTime } from "@/base/time.ts";
 
-export const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
+const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 
 /** MOSS's transcription (platform.mosi.cn/docs/reference/transcriptions): OpenAI's /audio/transcriptions, with the same key
  * as MOSS Live. moss-transcribe-1.0 is the plain one; the diarize model (speakers, streaming) is not needed to dictate. */
@@ -47,7 +47,7 @@ export interface MossTransport {
   readonly status: (key: string) => Promise<{ readonly code: number; readonly body: string }>;
 }
 
-export const nodeTransport: MossTransport = {
+const nodeTransport: MossTransport = {
   connect: (key, on) => {
     const ws = new WebSocket(mossUrl, { headers: { Authorization: `Bearer ${key}` } });
     ws.binaryType = "arraybuffer";
@@ -111,8 +111,8 @@ export const verifyMoss = (key: string, transport: MossTransport = nodeTransport
     if (got === "attached") return { kind: "ok" } as const;
     if (got === "silent") return { kind: "silent" } as const;
     if ("error" in got) return { kind: "failed", why: got.error } as const;
-    const asked = yield* Effect.tryPromise(() => transport.status(key)).pipe(Effect.result);
-    if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || String(asked.failure.cause) } as const;
+    const asked = yield* Effect.tryPromise({ try: () => transport.status(key), catch: (e) => String(e) }).pipe(Effect.result);
+    if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || asked.failure } as const;
     const { code, body } = asked.success;
     if (code === 401 || code === 403) return { kind: "refused", why: refusal(body) } as const;
     return { kind: "failed", why: got.down || `HTTP ${code}` } as const;

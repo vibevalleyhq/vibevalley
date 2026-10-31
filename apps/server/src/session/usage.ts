@@ -8,7 +8,7 @@ export const tokensOf = (u: { input: number; cacheRead: number; output: number }
 });
 
 /** Groups of three digits, split by a space: 41 200. */
-export const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, " ");
+const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, " ");
 
 /** changed is a prefix_changed's parts, none when the prompt's start was as before. */
 export function usageText(tokens: EventTokens, changed: readonly string[] = []): string {

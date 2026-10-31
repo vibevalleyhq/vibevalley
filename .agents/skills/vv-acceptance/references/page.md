@@ -1,6 +1,6 @@
 # 验收页面
 
-[验收](.agents/skills/acceptance/SKILL.md)的一份分册：对着沙箱里的服务端，把要看的页面截成 PNG，拿眼睛看。`apps/web` 的 Playwright 测试点的是真的页面，但只断言接线和状态、不留给人看的图。不开 vite dev，截图由 `apps/web/scripts/screens.ts` 用 Playwright 画。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：对着沙箱里的服务端，把要看的页面截成 PNG，拿眼睛看。`apps/web` 的 Playwright 测试点的是真的页面，但只断言接线和状态、不留给人看的图。不开 vite dev，截图由 `apps/web/scripts/screens.ts` 用 Playwright 画。
 
 ## 什么时候用
 

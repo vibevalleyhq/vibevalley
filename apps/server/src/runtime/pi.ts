@@ -18,7 +18,7 @@ import { messageOf } from "@/errors.ts";
 const readTimeoutMs = 10_000;
 
 /** pi's agent folder, as oar's pi runtime finds it. */
-export const piAgentDir = () => process.env.OAR_PI_AGENT_DIR || process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+const piAgentDir = () => process.env.OAR_PI_AGENT_DIR || process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
 
 const SettingsFile = Schema.Struct({
   defaultProvider: Schema.optionalKey(Schema.String),
@@ -81,7 +81,7 @@ function piValue(value: string): string {
  * The DeepSeek key pi uses and where it sends DeepSeek's requests: the key in its auth.json, else DEEPSEEK_API_KEY, else
  * its models.json's providers.deepseek.apiKey; the base URL in models.json, else DeepSeek's own, without a trailing /v1.
  */
-export function piDeepseek(): { key: string; base: string } {
+function piDeepseek(): { key: string; base: string } {
   const authKey = readJson("auth.json", AuthFile)?.deepseek?.key;
   let key = authKey ? piValue(authKey) : (process.env.DEEPSEEK_API_KEY ?? "");
   let base = "https://api.deepseek.com";
@@ -92,7 +92,7 @@ export function piDeepseek(): { key: string; base: string } {
   return { key, base };
 }
 
-export const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", reason });
+const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", reason });
 
 /** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. */
 export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">): Promise<AccountUsage> {

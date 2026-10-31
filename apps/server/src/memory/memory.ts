@@ -16,7 +16,7 @@ import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors
 import { Setting } from "@/setting/setting.ts";
 
 import { everos } from "./everos.ts";
-import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
+import { type FinishedRun, makeMemories, type Note, type RecallCue } from "./memories.ts";
 import { nowledge } from "./nowledge.ts";
 import { fromOwner } from "./prompts.ts";
 import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
@@ -105,7 +105,9 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const inFile = (agent: string) => agents.isOrchestrator(agent);
     const homeOf = (agent: string) => agentHome(config, agent);
 
-    const list = (agent: string) => Effect.map(sources.list(agent), (r) => r.memories);
+    const list = Effect.fn("Memories.list")(function* (agent: string) {
+      return (yield* sources.list(agent)).memories;
+    });
 
     const write = Effect.fn("Memories.write")(function* (n: Note) {
       const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
@@ -154,18 +156,26 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
 
     const shape = Memories.of({
-      memoriesOf: (agent) => (inFile(agent) ? Effect.sync(() => orchestrator(agent)) : sources.list(agent)),
-      remember: (n) => (inFile(n.agent) ? writeOrchestrator(n.agent, n.text) : write(n)),
-      forget: (agent, id) =>
-        Effect.andThen(
-          forgettable(agent, id),
-          inFile(agent) ? Effect.try({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : forget(agent, id),
-        ),
-      previewForget: (agent, id) =>
-        Effect.map(forgettable(agent, id), (m) => ({
+      memoriesOf: Effect.fn("Memories.memoriesOf")(function* (agent) {
+        return inFile(agent) ? orchestrator(agent) : yield* sources.list(agent);
+      }),
+      remember: Effect.fn("Memories.remember")(function* (n) {
+        return inFile(n.agent) ? yield* writeOrchestrator(n.agent, n.text) : yield* write(n);
+      }),
+      forget: Effect.fn("Memories.forget")(function* (agent, id) {
+        yield* forgettable(agent, id);
+        return inFile(agent) ? yield* Effect.try({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : yield* forget(agent, id);
+      }),
+      previewForget: Effect.fn("Memories.previewForget")(function* (agent, id) {
+        const m = yield* forgettable(agent, id);
+        return {
           does: [inFile(agent) ? t("server.memory.forgetOrchestrator", { text: m.text }) : t("server.memory.forget", { agent, text: m.text })],
-        })),
-      recallOf: (agent, project, text) => (inFile(agent) ? Effect.fail(refused(t("server.memory.orchestratorRecall"))) : preview(agent, project, text)),
+        };
+      }),
+      recallOf: Effect.fn("Memories.recallOf")(function* (agent, project, text) {
+        if (inFile(agent)) return yield* Effect.fail(refused(t("server.memory.orchestratorRecall")));
+        return yield* preview(agent, project, text);
+      }),
       recall: Effect.fn("Memories.recall")(function* (cue) {
         const told = mergeRecalled(yield* sources.prefetch(cue));
         const ids = told.map((l) => l.id).filter((id) => id !== "");
@@ -191,7 +201,9 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         yield* local.keep(r);
         sources.keep(r);
       }),
-      endSession: (s) => Effect.sync(() => sources.endSession(s)),
+      endSession: Effect.fn("Memories.endSession")(function* (s) {
+        yield* Effect.sync(() => sources.endSession(s));
+      }),
       write,
       list,
       sources: () => sources.info(),
@@ -203,5 +215,3 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
     return shape;
   });
-
-export { MemoryRefused };

@@ -39,7 +39,7 @@ const top = 52;
 const bottom = 36;
 
 /** A HUD part: a button with its words as a tooltip and an accessible name. */
-export function HudTap(props: { label: string; testid?: string; onClick: () => void; selected?: boolean; children: JSX.Element }) {
+function HudTap(props: { label: string; testid?: string; onClick: () => void; selected?: boolean; children: JSX.Element }) {
   return (
     <button
       type="button"

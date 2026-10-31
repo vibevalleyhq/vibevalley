@@ -1,11 +1,11 @@
 ---
 name: create-verification-skill
-description: 为 VibeValley 的一类改动写验收的一份分册（.agents/skills/acceptance/<块>.md）：把「怎么证明这次改动真的能用」变成下一个 agent 照着就能做的步骤。用在：一类改动没有现成的验证办法；你刚花了不少工夫才弄清怎么验证一个改动；同一类问题测试和检查都没拦住、到了主人手里才发现；主人说「写个验证 skill」「把这个验证流程固定下来」「加进验收」「create verification skill」。只写改动后的验证，不写怎么实现功能。
+description: 为 VibeValley 的一类改动写验收的一份分册（.agents/skills/vv-acceptance/references/<块>.md）：把「怎么证明这次改动真的能用」变成下一个 agent 照着就能做的步骤。用在：一类改动没有现成的验证办法；你刚花了不少工夫才弄清怎么验证一个改动；同一类问题测试和检查都没拦住、到了主人手里才发现；主人说「写个验证 skill」「把这个验证流程固定下来」「加进验收」「create verification skill」。只写改动后的验证，不写怎么实现功能。
 ---
 
 # 给验收加一份分册
 
-验收（[acceptance](.agents/skills/acceptance/SKILL.md)）只有一个 skill：入口写共同的沙箱、证据和收拾，每一块的做法是同目录的一份分册。分册回答一个问题：**改了这一块，怎么在真的程序上看到它对了**。它补的是测试和检查之后的那一段：服务端真的起来、接口真的返回、客户端真的画出来。
+验收（[vv-acceptance](.agents/skills/vv-acceptance/SKILL.md)）只有一个 skill：入口写共同的沙箱、证据和收拾，每一块的做法是 `references/` 下的一份分册。分册回答一个问题：**改了这一块，怎么在真的程序上看到它对了**。它补的是测试和检查之后的那一段：服务端真的起来、接口真的返回、客户端真的画出来。
 
 这一层是「文字」，排在代码和静态检查后面（[AGENTS.md](AGENTS.md#怎么让-agent-做对)）。所以写之前先过第 1 步。
 
@@ -33,9 +33,9 @@ description: 为 VibeValley 的一类改动写验收的一份分册（.agents/sk
 
 ## 3. 写分册
 
-放在 `.agents/skills/acceptance/<块>.md`，`<块>` 用实际的概念或目录名（`server`、`page`、`mobile`），不用皮的叫法。分册没有 frontmatter：agent 什么时候读它，由入口的表决定。
+放在 `.agents/skills/vv-acceptance/references/<块>.md`，`<块>` 用实际的概念或目录名（`server`、`page`、`mobile`），不用皮的叫法。分册没有 frontmatter：agent 什么时候读它，由入口的表决定。
 
-开头一句指回入口（`[验收](.agents/skills/acceptance/SKILL.md)的一份分册`），说它证明什么。正文用这几节，名字固定，`vp run docs:verify` 会查：
+开头一句指回入口（`[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册`），说它证明什么。正文用这几节，名字固定，`vp run docs:verify` 会查：
 
 - `## 什么时候用`：哪些路径、哪类改动；哪些改动只跑检查就够、不用它。
 - `## 准备`：要先有什么（生成的代码最新、构建、模拟器、钥匙），每条带命令。
@@ -50,11 +50,11 @@ description: 为 VibeValley 的一类改动写验收的一份分册（.agents/sk
 
 ## 4. 从头照着做一遍
 
-开一个新的子 agent（或清掉上下文），只给它 acceptance 和一个改动，让它照着验收。它卡住的地方，就是分册（或入口的表）漏写的地方；补上再试，直到它不问问题就能做完。
+开一个新的子 agent（或清掉上下文），只给它 vv-acceptance 和一个改动，让它照着验收。它卡住的地方，就是分册（或入口的表）漏写的地方；补上再试，直到它不问问题就能做完。
 
 ## 5. 登记
 
-1. 在 [acceptance 的入口](.agents/skills/acceptance/SKILL.md)「什么时候用」的表里加一行：改了什么、读哪份、证明什么；入口的 `description` 补上触发它的路径和说法。
+1. 在 [vv-acceptance 的入口](.agents/skills/vv-acceptance/SKILL.md)「什么时候用」的表里加一行：改了什么、读哪份、证明什么；入口的 `description` 补上触发它的路径和说法。
 2. 跑 `vp run docs:verify`：它查每份分册有那几节，入口的表正好列全分册。
 
 ## 维护

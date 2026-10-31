@@ -11,7 +11,7 @@ import { t } from "@vibevalley/i18n";
 
 import { jsonOrNone } from "@/base/json.ts";
 
-import { type Adapter, AppFailed, failedOf, failedWith } from "./adapter.ts";
+import { type Adapter, type AppFailed, failedOf, failedWith } from "./adapter.ts";
 
 /** A text message's content: {"text": …}. */
 const textContent = jsonOrNone(Schema.Struct({ text: Schema.optionalKey(Schema.String) }));
@@ -78,7 +78,7 @@ export class FeishuClient implements FeishuApi {
       Effect.flatMap((res) => res.json),
       Effect.flatMap(Schema.decodeUnknownEffect(Registration)),
       Effect.timeoutOrElse({ duration: 10_000, orElse: () => Effect.fail(failedWith(t("server.connector.feishu.registerTimeout"))) }),
-      Effect.mapError((e) => (e instanceof AppFailed ? e : failedWith(t("server.connector.feishu.register", { why: e.message })))),
+      Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.feishu.register", { why: e.message })))),
     );
   }
 
@@ -199,7 +199,7 @@ export class FeishuClient implements FeishuApi {
   }
 }
 
-export function text(m: Message): string {
+function text(m: Message): string {
   if (m.messageType !== "text")
     return (
       (

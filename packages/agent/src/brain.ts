@@ -121,7 +121,7 @@ interface Folded {
 
 /** The calls of the last answer that have no result; ok is false when there is nothing to go on with: the model spoke
  * last with nothing left to do, or the run was stopped or failed. */
-export function unfinished(messages: readonly BrainMessage[]): {
+function unfinished(messages: readonly BrainMessage[]): {
   missing: ToolCall[];
   ok: boolean;
 } {

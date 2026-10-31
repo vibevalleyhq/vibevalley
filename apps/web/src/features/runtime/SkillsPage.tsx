@@ -26,7 +26,7 @@ import { toast } from "@/ui/toasts";
 import { type InstalledSkill, installedSkills } from "./skills";
 
 const installedPrefix = "installed:";
-export const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);
+const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);
 
 export const useSkills = () => useQuery(() => ({ queryKey: ["skills"], queryFn: () => api.skill.list() }));
 

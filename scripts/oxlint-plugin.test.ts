@@ -1,7 +1,11 @@
-import { RuleTester } from "vite-plus/lint/plugins-dev";
-import { describe, it } from "vite-plus/test";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-import plugin from "./oxlint-plugin.ts";
+import { RuleTester } from "vite-plus/lint/plugins-dev";
+import { describe, expect, it } from "vite-plus/test";
+
+import { refused } from "../vite.config.ts";
+import plugin, { catalogOf } from "./oxlint-plugin.ts";
 
 RuleTester.describe = describe;
 RuleTester.it = it;
@@ -100,7 +104,7 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from '../features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../../farm/scene';", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
-    { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "layer" }] },
+    { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "sibling" }] },
     { code: "import { a } from '@/features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '@/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '@/features/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
@@ -115,9 +119,24 @@ tester.run("parent-import", rule("parent-import"), {
     { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
   ],
   invalid: [
-    { code: "import { a } from '../base/router';", filename: page("ui/A.tsx"), errors: [{ messageId: "parent" }] },
-    { code: "export * from '../issue/rules.ts';", filename: "/repo/apps/server/src/task/x.ts", errors: [{ messageId: "parent" }] },
-    { code: "const m = import('../../ui/A');", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "parent" }] },
+    {
+      code: "import { a } from '../base/router';",
+      filename: page("ui/A.tsx"),
+      errors: [{ messageId: "parent" }],
+      output: "import { a } from '@/base/router';",
+    },
+    {
+      code: "export * from '../issue/rules.ts';",
+      filename: "/repo/apps/server/src/task/x.ts",
+      errors: [{ messageId: "parent" }],
+      output: "export * from '@/issue/rules.ts';",
+    },
+    {
+      code: "const m = import('../../ui/A');",
+      filename: page("features/issue/Board.tsx"),
+      errors: [{ messageId: "parent" }],
+      output: "const m = import('@/ui/A');",
+    },
   ],
 });
 
@@ -127,12 +146,49 @@ tester.run("promise-boundary", rule("promise-boundary"), {
     { code: "const a = Effect.tryPromise({ try: async (signal) => f(signal), catch: e });", filename: "/repo/apps/server/src/a.ts" },
     { code: "const a = Effect.promise(async () => g());", filename: "/repo/apps/server/src/a.ts" },
     { code: "const a = () => fetch(u).then((r) => r.text());", filename: "/repo/apps/server/src/a.ts" },
+    { code: "const a = Effect.tryPromise({ try: async () => (await f()).text, catch: e });", filename: "/repo/apps/server/src/a.ts" },
   ],
   invalid: [
     { code: "async function a() {}", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
     { code: "const a = async () => { await b(); };", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
     { code: "const a = Effect.tryPromise(() => run(async () => 1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
     { code: "const a = new Promise((r) => r(1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "promise" }] },
+    {
+      code: "const a = Effect.tryPromise({ try: async () => { const r = await realpath(d); if (bad(r)) throw e; return await stat(r); }, catch: e });",
+      filename: "/repo/apps/server/src/a.ts",
+      errors: [{ messageId: "steps" }],
+    },
+    { code: "const a = Effect.promise(async () => { await a(); await b(); });", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "steps" }] },
+  ],
+});
+
+tester.run("try-promise-catch", rule("try-promise-catch"), {
+  valid: [
+    {
+      code: "const a = Effect.tryPromise({ try: (signal) => fetch(u, { signal }), catch: (e) => new E({ cause: e }) });",
+      filename: "/repo/apps/server/src/a.ts",
+    },
+    { code: "const a = Effect.promise(() => db.close());", filename: "/repo/apps/server/src/a.ts" },
+  ],
+  invalid: [
+    { code: "const a = Effect.tryPromise(() => lookup(host));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "thunk" }] },
+    { code: "const a = Effect.tryPromise(function (signal) { return f(signal); });", filename: "/repo/packages/ai/src/a.ts", errors: [{ messageId: "thunk" }] },
+  ],
+});
+
+tester.run("db-door", rule("db-door"), {
+  valid: [
+    { code: "const { run, attemptTx } = yield* Db;", filename: "/repo/apps/server/src/issue/issue.ts" },
+    { code: 'import type { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/merge.ts" },
+    { code: 'import { type SqlClient, SqlError } from "effect/sql";', filename: "/repo/apps/server/src/session/session.ts" },
+    {
+      code: 'import { SqlClient } from "effect/sql";\nconst t = sql.withTransaction(work);',
+      filename: "/repo/apps/server/src/base/db.ts",
+    },
+  ],
+  invalid: [
+    { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
+    { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/memories.ts", errors: [{ messageId: "transaction" }] },
   ],
 });
 
@@ -159,4 +215,101 @@ tester.run("global-doors", rule("global-doors"), {
     { code: "Object.defineProperty(window, 'x', { value: 1 })", errors: [{ messageId: "assign" }] },
     { code: "declare global { interface Window { x?: number } }\nexport {};", filename: "a.ts", errors: [{ messageId: "declare" }] },
   ],
+});
+
+tester.run("no-instanceof-tagged", rule("no-instanceof-tagged"), {
+  valid: [
+    "if (e instanceof Error) f(e.message)",
+    "if (e instanceof TypeError) f()",
+    "if (e instanceof TemplateProblem) f()",
+    'const isMerge = Predicate.isTagged(e, "MergeFailure")',
+    "class Plain extends Error {}\nif (e instanceof Plain) f()",
+  ],
+  invalid: [
+    { code: "const a = e instanceof MergeFailure ? e : wrap(e)", errors: [{ messageId: "tagged" }] },
+    { code: "if (e instanceof SqlError.SqlError) f()", errors: [{ messageId: "tagged" }] },
+    { code: "if (e instanceof Refused) f()", errors: [{ messageId: "tagged" }] },
+    {
+      code: 'if (e instanceof Busy) f()\nexport class Busy extends Data.TaggedError("Busy")<{ readonly message: string }> {}',
+      filename: "a.ts",
+      errors: [{ messageId: "tagged" }],
+    },
+  ],
+});
+
+tester.run("no-object-guard", rule("no-object-guard"), {
+  valid: [
+    "const ok = Predicate.isObject(x)",
+    'const ok = typeof x === "string" && x !== ""',
+    'const ok = typeof x === "object" && y !== null',
+    "const ok = x !== null && x !== undefined",
+  ],
+  invalid: [
+    { code: 'const ok = typeof x === "object" && x !== null', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = x !== null && typeof x === "object"', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = typeof v.a === "object" && v.a !== null && !Array.isArray(v.a)', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = ready && typeof x === "object" && x != null', errors: [{ messageId: "guard" }] },
+  ],
+});
+
+tester.run("service-method-names", rule("service-method-names"), {
+  valid: [
+    'Issues.of({ create: Effect.fn("Issues.create")(function* (req) { return yield* add(req); }) })',
+    "Core.of({ apply: Effect.fnUntraced(function* (fact) { yield* fold(fact); }) })",
+    'const list = Effect.fn("Crons.list")(function* () { return []; });\nCrons.of({ list })',
+    "Core.of({ state: () => state, follow: (id) => Stream.fromPubSub(events), events: Stream.empty, owner: Effect.map(sub, f) })",
+    "Lan.of({ answer: (id) => lookup(id), me: () => Effect.runSync(read) })",
+    "GitError.of(code, stderr)",
+    "const call = (x) => x;\nGame.of({ want: (s) => call(s) })",
+  ],
+  invalid: [
+    { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
+    { code: "Game.of({ count: () => projects.contributions(e).pipe(Effect.map(total)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "Notices.of({ say(text) { if (!text) return Effect.void; return Effect.log(text); } })", errors: [{ messageId: "unnamed" }] },
+    {
+      code: "const apply = (f) => Effect.sync(() => f);\nCore.of({ apply, setCommits: (c) => apply(c) })",
+      errors: [{ messageId: "unnamed" }, { messageId: "unnamed" }],
+    },
+    {
+      code: 'const changesOf = Effect.fn("Sessions.changesOf")(function* (id) { return id; });\nSessions.of({ changes: changesOf })',
+      errors: [{ messageId: "name" }],
+    },
+    { code: "Connectors.of({ login: (id) => bridge(id)?.login() ?? Effect.succeed(off(id)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "const locked = (e) => lock.withPermits(1)(e);\nChannels.of({ pin: (id) => locked(pinning(id)) })", errors: [{ messageId: "unnamed" }] },
+    {
+      code: "Tasks.of({ act: Effect.fn(function* (id) { return id; }) })",
+      errors: [{ messageId: "name", data: { service: "Tasks", method: "act", given: "nothing" } }],
+    },
+  ],
+});
+
+const root = resolve(import.meta.dirname, "..");
+
+describe("what a rule says", () => {
+  const messages = [
+    ...Object.entries(plugin.rules).flatMap(([name, r]) => Object.entries(r.meta?.messages ?? {}).map(([id, text]) => ({ where: `${name}/${id}`, text }))),
+    ...Object.entries(refused).map(([id, text]) => ({ where: `no-restricted-imports/${id}`, text })),
+  ];
+
+  it("says what is wrong, how to fix it, and a file here that shows it", () => {
+    for (const { where, text } of messages) {
+      // A path the rule fills in names one file per value: apps/{{app}}/tsconfig.json is apps/web's and apps/server's.
+      const see = / See (\S+)$/u.exec(text)?.[1]?.replaceAll("{{app}}", "web");
+      expect(text, where).toMatch(/\. Fix: .+\. See \S+$/u);
+      expect(existsSync(resolve(root, see ?? "")), `${where}: ${see}`).toBe(true);
+    }
+  });
+
+  it("leaves no-restricted-imports no message of its own outside refused", () => {
+    expect(readFileSync(resolve(root, "vite.config.ts"), "utf8")).not.toMatch(/message: ["'`]/u);
+  });
+
+  it("names the catalog the file's words belong in", () => {
+    expect(catalogOf("/repo/apps/server/src/issue/issue.ts")).toBe("server.issue");
+    expect(catalogOf("/repo/apps/web/src/features/issue/Board.tsx")).toBe("web.issue");
+    expect(catalogOf("/repo/apps/web/src/farm/phone/screens.tsx")).toBe("web.farm.phone");
+    expect(catalogOf("/repo/apps/web/src/farm/hud/Hud.tsx")).toBe("web.farm");
+    expect(catalogOf("/repo/apps/server/src/flows/farm.ts")).toBe("server");
+    expect(catalogOf("/repo/packages/agent/src/brain.ts")).toBe("shared");
+  });
 });

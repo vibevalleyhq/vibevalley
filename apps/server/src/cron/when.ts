@@ -60,7 +60,7 @@ export function nextRun(s: Cron): number | undefined {
   }
 }
 
-export function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
+function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
   const m = cronTime.exec(at);
   const timeZone = givenZone(tz);
   if (!m || !timeZone) return undefined;
@@ -130,7 +130,7 @@ function atoi(s: string): number | undefined {
 }
 
 /** Go's strings.Fields: split on Unicode white space, as Go's unicode.IsSpace has it. */
-export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/u).filter((f) => f !== "");
+const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/u).filter((f) => f !== "");
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi } = cronFields[i]!;
@@ -187,7 +187,7 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
 }
 
 /** The common shapes in words, the rest as the expression itself. */
-export function cronText(expr: string): string {
+function cronText(expr: string): string {
   const f = fields(expr);
   if (typeof parseCron(expr) === "string") return t("server.cron.when.cron", { expr });
   const mi = atoi(f[0]!);

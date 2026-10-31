@@ -37,6 +37,16 @@ describe("the database", () => {
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
+  it.effect("attemptTx keeps the database's failure as a value, and keeps none of the work", () =>
+    Effect.gen(function* () {
+      const db = yield* Db;
+      const sql = yield* SqlClient.SqlClient;
+      const failed = yield* Effect.flip(db.attemptTx(Effect.andThen(setLanOpen({ open: true }), sql.unsafe("select * from nowhere"))));
+      expect(failed._tag).toBe("SqlError");
+      expect(yield* db.one(lanOpen())).toBeUndefined();
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
+  );
+
   // In memory a farm's database is given back and kept for the next one (db.ts): it must be as good as new.
   it.effect("a database given back is empty for the next farm, its identities from 1 again", () => {
     const seqs = Effect.gen(function* () {
@@ -69,7 +79,7 @@ describe("the database", () => {
   // A new folder on disk starts from the copy of the baseline the first database in memory left (db.ts).
   it.effect("a new database on disk made from the copy keeps what is written, across a reopen", () => {
     const where = join(tempDir("vibevalley-db-"), "db");
-    const open = (f: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
+    const open = <A, E>(f: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
     return Effect.gen(function* () {
       yield* lanDevices().pipe(Effect.provide(testDatabase()), Effect.orDie);
       yield* open(addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1 }));
@@ -92,18 +102,22 @@ describe("the database", () => {
   });
 });
 
-/** Where a failed query is a value, not a defect (Db.attempt), and why. */
+/** Where a failed query is a value, not a defect (Db.attempt, Db.attemptTx), and why. */
 const attempting: Readonly<Record<string, string>> = {
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
+  "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
+  "issue/issue.ts": "an issue or a task graph that is not saved, or a session not linked to its issue, is told as a refusal",
   "memory/memories.ts": "a memory read or write that fails is logged and taken as none",
+  "session/session.ts": "a session's record or run that is not kept is logged or told as NotRecorded, and the run goes on",
+  "task/task.ts": "a task graph event that is not kept is logged, and the graph goes on",
 };
 
-it("attempt is used only where a failed query is told or retried, each with its reason", () => {
+it("attempt and attemptTx are used only where a failed query is told or retried, each with its reason", () => {
   const src = join(import.meta.dirname, "..");
   const using = readdirSync(src, { recursive: true, encoding: "utf8" })
     .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-    .filter((f) => /\{[^}]*\battempt\b[^}]*\}\s*=\s*yield\*\s*Db\b|\bDb\b[^;]*\.attempt\(/u.test(readFileSync(join(src, f), "utf8")))
+    .filter((f) => /\{[^}]*\battempt(?:Tx)?\b[^}]*\}\s*=\s*yield\*\s*Db\b|\bDb\b[^;]*\.attempt(?:Tx)?\(/u.test(readFileSync(join(src, f), "utf8")))
     .map((f) => f.split("\\").join("/"))
     .toSorted();
   expect(using).toEqual(Object.keys(attempting).toSorted());

@@ -12,18 +12,18 @@ const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.pr
 describe("QQ gateway events", () => {
   it("decodes an event and rejects null and wrong field types", () => {
     const raw = `{"op":0,"s":7,"t":"C2C_MESSAGE_CREATE","d":{"id":"m1"}}`;
-    expect(decodeGatewayEvent(raw)).toEqual({
+    expect(Effect.runSync(decodeGatewayEvent(raw))).toEqual({
       op: 0,
       s: 7,
       t: "C2C_MESSAGE_CREATE",
       d: { id: "m1" },
     });
-    expect(() => decodeGatewayEvent("null")).toThrow();
-    expect(() => decodeGatewayEvent(`{"op":"0"}`)).toThrow();
+    expect(() => Effect.runSync(decodeGatewayEvent("null"))).toThrow();
+    expect(() => Effect.runSync(decodeGatewayEvent(`{"op":"0"}`))).toThrow();
   });
 
   it("takes a frame that is not a dispatch, with s and t null", () => {
-    expect(decodeGatewayEvent(`{"op":11,"s":null,"t":null}`)).toEqual({ op: 11, s: null, t: null });
+    expect(Effect.runSync(decodeGatewayEvent(`{"op":11,"s":null,"t":null}`))).toEqual({ op: 11, s: null, t: null });
   });
 });
 

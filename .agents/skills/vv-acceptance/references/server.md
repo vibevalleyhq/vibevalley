@@ -1,6 +1,6 @@
 # 验收服务端
 
-[验收](.agents/skills/acceptance/SKILL.md)的一份分册：在沙箱里调接口，看折好的核心状态；改了工单的走法，用命令行把一张工单派出去、交回来、完成。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：在沙箱里调接口，看折好的核心状态；改了工单的走法，用命令行把一张工单派出去、交回来、完成。
 
 ## 什么时候用
 
@@ -48,7 +48,7 @@
 
    每条命令的 stdout 是一个 JSON 文档：`issue work` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
 
-4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/acceptance/page.md) 的截图命令。
+4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
 
 ## 证据
 

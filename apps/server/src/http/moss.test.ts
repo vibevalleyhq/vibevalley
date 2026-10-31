@@ -80,6 +80,8 @@ describe("a page's line to MOSS Live", () => {
       const moss = echo();
       const address = yield* farm(moss.transport);
       yield* Effect.promise(() =>
+        // The test calls the server as the page does, through the platform's own fetch.
+        // @effect-diagnostics-next-line globalFetchInEffect:off
         fetch(`http://${address}/api/v1/setting/update`, {
           method: "POST",
           headers: { "content-type": "application/json" },

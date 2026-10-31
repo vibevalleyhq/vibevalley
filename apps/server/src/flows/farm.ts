@@ -32,7 +32,6 @@ export interface Farm {
 
 /** The farm with its one runtime, pi: testing/helper.ts's unless the test gives its own. As the server starts it, sessions
  * left on the farm by the last run come back (Agent Sessions' startup), and the game keeps its ledger. */
-export { helper };
 
 export function farm(
   options: Omit<WorldOptions, "runtimes"> & {
@@ -77,7 +76,7 @@ export const watch = Effect.gen(function* () {
 export const until = (ok: () => boolean | Promise<boolean>, what: string) => untilHeld(ok, what, 10_000);
 
 /** The value got once ok says so. */
-export const await_ = <A>(get: () => Effect.Effect<A, unknown> | A, ok: (a: A) => boolean, what: string) =>
+export const await_ = <A, E>(get: () => Effect.Effect<A, E> | A, ok: (a: A) => boolean, what: string) =>
   waitFor(
     Effect.suspend(() => {
       const got = get();

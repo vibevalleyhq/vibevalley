@@ -23,7 +23,7 @@ import { jsonOrNone } from "@/base/json.ts";
 import { callbackLog } from "@/base/log.ts";
 import { timeHere, withinRealTime } from "@/base/time.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, refused } from "@/errors.ts";
+import { type ApiError, messageOf, refused } from "@/errors.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
@@ -227,10 +227,7 @@ export const make = (options: RuntimeOptions = {}) =>
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
     const usageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) =>
-      Effect.orElseSucceed(
-        Effect.tryPromise(() => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings)),
-        () => null,
-      );
+      Effect.orElseSucceed(Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }), () => null);
 
     const cache = new Map<string, Observation>();
     const relabeling = new Set<string>();
@@ -419,11 +416,10 @@ export const make = (options: RuntimeOptions = {}) =>
       );
     });
 
-    const info = (id: string) =>
-      Effect.suspend(() => {
-        const hit = cache.get(id);
-        return hit && hit.locale === currentLocale() ? Effect.succeed(withSpend(hit.info)) : refresh(id);
-      });
+    const info = Effect.fnUntraced(function* (id: string) {
+      const hit = cache.get(id);
+      return hit && hit.locale === currentLocale() ? withSpend(hit.info) : yield* refresh(id);
+    });
 
     const refreshUsage = Effect.fnUntraced(function* (id: string) {
       const runtime = registry.get(id);
@@ -458,11 +454,11 @@ export const make = (options: RuntimeOptions = {}) =>
         return { settings, info: observed ? withSpend({ ...observed, settings }) : undefined };
       });
 
-    const assess = (agent: Agent) =>
-      Effect.map(configuration(agent.runtime), ({ info: i }): Assessment => {
-        const problems = agentProblems(agent, i);
-        return { agent, info: i, problems, blocking: problems.filter((x) => x.level === "error") };
-      });
+    const assess = Effect.fn("Runtimes.assess")(function* (agent: Agent): Effect.fn.Return<Assessment> {
+      const { info: i } = yield* configuration(agent.runtime);
+      const problems = agentProblems(agent, i);
+      return { agent, info: i, problems, blocking: problems.filter((x) => x.level === "error") };
+    });
 
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
 
@@ -500,17 +496,19 @@ export const make = (options: RuntimeOptions = {}) =>
         }),
       refresh,
       info,
-      update: (id, s) =>
-        known(id)
-          ? Effect.andThen(
-              store.saveSettings(id, s).pipe(Effect.catchTag("Refused", (e) => Effect.fail(refused(t("server.runtime.notSaved", { id, why: e.reason }))))),
-              refresh(id),
-            )
-          : Effect.succeed(undefined),
-      problemsOf: (agent) => Effect.map(assess(agent), (a) => a.problems),
+      update: Effect.fn("Runtimes.update")(function* (id, s) {
+        if (!known(id)) return undefined;
+        yield* store.saveSettings(id, s).pipe(Effect.catchTag("Refused", (e) => Effect.fail(refused(t("server.runtime.notSaved", { id, why: e.reason })))));
+        return yield* refresh(id);
+      }),
+      problemsOf: Effect.fn("Runtimes.problemsOf")(function* (agent) {
+        return (yield* assess(agent)).problems;
+      }),
       assess,
       candidates,
-      choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
+      choose: Effect.fn("Runtimes.choose")(function* (task, named, picked) {
+        return chooseAgent(yield* candidates, task, named, picked);
+      }),
       resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);
         if (!runtime) return yield* Effect.fail(refused(t("server.runtime.cannotDrive", { runtime: agent.runtime })));

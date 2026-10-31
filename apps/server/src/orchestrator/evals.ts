@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -141,9 +141,7 @@ export const committed = join(import.meta.dirname, "testdata", "evals");
 
 /** Arguments as one string whatever order their keys came in. */
 const argsKey = (args: unknown): string =>
-  JSON.stringify(args, (_, v: unknown) =>
-    typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v,
-  );
+  JSON.stringify(args, (_, v: unknown) => (Predicate.isObject(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v));
 
 /** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once,
  * and nothing for another: the recorded turn is the wrong one, and its answer to a call the model did not make again (a

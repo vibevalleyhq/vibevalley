@@ -10,9 +10,9 @@
 
 import { createHash, randomInt } from "node:crypto";
 
-import { Cause, Clock, Context, Data, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Schedule, Schema, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Deferred, Duration, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
 import { HttpClient } from "effect/http";
-import { SqlClient } from "effect/sql";
+import type { SqlClient, SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
@@ -30,7 +30,7 @@ import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
-import { type Adapter, AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
+import { type Adapter, type AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
@@ -62,9 +62,14 @@ interface Account {
 const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil > now;
 
 /** Why a step of the bridge did not go through: the database, the orchestrator, or an app. Said as the status's error. */
-class BridgeError extends Data.TaggedError("BridgeError")<{ readonly message: string }> {}
+class BridgeError extends Schema.TaggedError<BridgeError, { readonly brand: unique symbol }>()("BridgeError", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
-const bridgeError = (e: unknown) => (e instanceof BridgeError ? e : new BridgeError({ message: causeMessage(e) }));
+/** A bridge's step that the database or the farm failed, in the words its status says. */
+const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError | ApiError) =>
+  new BridgeError({ message: causeMessage(e), cause: e });
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
@@ -102,13 +107,12 @@ const sleepOrWake = (ms: number, register: (wake: () => void) => void) =>
     );
   });
 
-export const make = (options: ConnectorOptions = {}) =>
+const make = (options: ConnectorOptions = {}) =>
   Effect.gen(function* () {
     // The farm's own waits and times (a pause, a retry, when a message went out) on the service's Clock.
     const clock = yield* Clock.Clock;
     const now = () => clock.currentTimeMillisUnsafe();
-    const sql = yield* SqlClient.SqlClient;
-    const { attempt: db } = yield* Db;
+    const { attempt: db, attemptTx } = yield* Db;
     const chat = yield* Channels;
     const core = yield* Core;
     const notices = yield* Notices;
@@ -123,8 +127,10 @@ export const make = (options: ConnectorOptions = {}) =>
     // it and keep its services (the logger, the Clock).
     const forkHere = yield* FiberSet.makeRuntime();
     /** The database's own failures stay failures here: the status says them. */
-    const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
-    const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);
+    const run = <A>(e: Effect.Effect<A, SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError, SqlClient.SqlClient>) =>
+      Effect.mapError(db(e), bridgeError);
+    const inTx = <A>(work: Effect.Effect<A, SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError>) =>
+      Effect.mapError(attemptTx(work), bridgeError);
     let closing = false;
     const say = (text: string, channel: string | undefined, sendKey: string) =>
       options.say ? options.say(text, channel, sendKey, chat) : orchestrator.say(text, {}, channel, sendKey);
@@ -373,7 +379,10 @@ export const make = (options: ConnectorOptions = {}) =>
           );
           // Told once the owner has the word: the status is not paired before the app's confirmation went out.
           yield* reloadAccount;
-          yield* Effect.ignore(adapter.send(a.secrets, m.from, t("server.connector.paired"), m.reply));
+          yield* Effect.ignore(adapter.send(a.secrets, m.from, t("server.connector.paired"), m.reply), {
+            log: "Warn",
+            message: `vibevalley: ${id}: the pairing confirmation was not sent`,
+          });
           told();
           return;
         }
@@ -386,7 +395,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const channel = (yield* quotedChannel(m.quoted)) ?? snapshot()?.channel;
         // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
         const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
-        yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e) }));
+        yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e), cause: e }));
       });
 
       // The inbox: what the app handed over, delivered to the orchestrator in order.
@@ -448,6 +457,8 @@ export const make = (options: ConnectorOptions = {}) =>
           };
           return yield* adapter.receive(secrets, io).pipe(Effect.ensuring(Effect.sync(() => (sealed = true))));
         });
+      // A loop, not a Schedule: each branch waits its own way (until the pause ends, a breath after a stale login, longer
+      // after every third failure), and only a failure counts toward the longer wait.
       const receiving = Effect.gen(function* () {
         let failures = 0;
         for (;;) {
@@ -464,7 +475,7 @@ export const make = (options: ConnectorOptions = {}) =>
           }
           const stopped = yield* receive(a.secrets).pipe(
             Effect.as(failedWith(t("server.connector.stopped"))),
-            Effect.catch((e) => Effect.succeed(e instanceof AppFailed ? e : failedWith(e.message))),
+            Effect.catch((e) => Effect.succeed(Predicate.isTagged(e, "AppFailed") ? e : failedWith(e.message))),
           );
           if (stopped.kind === "stale") {
             if (!(yield* pause)) yield* Effect.sleep(Math.min(30_000, retryMost));
@@ -482,7 +493,7 @@ export const make = (options: ConnectorOptions = {}) =>
       });
 
       /** Starts work as the account's generation, on the service's fibers: a failure is logged, an interruption is the stop. */
-      const generation = (work: Effect.Effect<unknown, unknown>) =>
+      const generation = <A, E>(work: Effect.Effect<A, E>) =>
         forkHere(
           work.pipe(
             Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.void : Effect.logError(`vibevalley: ${id}: ${Cause.pretty(cause)}`))),
@@ -505,8 +516,8 @@ export const make = (options: ConnectorOptions = {}) =>
           Effect.gen(function* () {
             if (g !== current) return;
             yield* stopGeneration;
-            let failure = result instanceof AppFailed ? result.message : undefined;
-            if (!(result instanceof AppFailed) && !closing) {
+            let failure = Predicate.isTagged(result, "AppFailed") ? result.message : undefined;
+            if (!Predicate.isTagged(result, "AppFailed") && !closing) {
               const linked = result;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
               const at = yield* Clock.currentTimeMillis;
@@ -659,10 +670,21 @@ export const make = (options: ConnectorOptions = {}) =>
 
     const off = (id: ConnectorID): ConnectorStatus => ({ id, state: "off", pending: 0, error: "", qr: "", pairCode: "" });
     return Connectors.of({
-      list: () => Effect.forEach(bridges, (b) => b.status),
-      login: (id, input) => bridge(id)?.login(input) ?? Effect.succeed(off(id)),
-      verify: (id, code) => bridge(id)?.verify(code) ?? Effect.succeed(off(id)),
-      logout: (id) => bridge(id)?.logout ?? Effect.succeed(off(id)),
+      list: Effect.fn("Connectors.list")(function* () {
+        return yield* Effect.forEach(bridges, (b) => b.status);
+      }),
+      login: Effect.fn("Connectors.login")(function* (id, input) {
+        const b = bridge(id);
+        return b ? yield* b.login(input) : off(id);
+      }),
+      verify: Effect.fn("Connectors.verify")(function* (id, code) {
+        const b = bridge(id);
+        return b ? yield* b.verify(code) : off(id);
+      }),
+      logout: Effect.fn("Connectors.logout")(function* (id) {
+        const b = bridge(id);
+        return b ? yield* b.logout : off(id);
+      }),
       setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
         const b = bridge(id);
         if (!b)

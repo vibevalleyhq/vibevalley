@@ -8,7 +8,7 @@
 //	node --import tsx src/cli.ts issue list
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio } from "effect";
+import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio, Predicate } from "effect";
 
 import "./cli/locale.ts";
 
@@ -29,7 +29,7 @@ const some = (o: Option.Option<string>) => Option.getOrUndefined(o);
 const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } : {});
 /** A conversation in the terminal. It takes Ctrl+C itself (stop the turn, again to quit), so the signal that interrupts
  * any other command must not end it: it runs uninterruptible and ends when the conversation does. */
-const chat = (talk: Effect.Effect<void, unknown>) =>
+const chat = <E>(talk: Effect.Effect<void, E>) =>
   // Detached and joined uninterruptibly: the conversation itself stays interruptible inside (a turn Ctrl+C stops).
   Effect.uninterruptible(Effect.flatMap(Effect.forkDetach(talk), Fiber.join)).pipe(
     Effect.mapError((e) => new Failure({ code: exit.other, tag: "Chat", text: typeof e === "string" ? e : messageOf(e) })),
@@ -105,9 +105,9 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
     Effect.provideService(Console.Console, console_),
     Effect.andThen(flush(out)),
     Effect.as(exit.ok as number),
-    Effect.catch((e: unknown) => {
+    Effect.catch((e) => {
       if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.as(flush(out), exit.ok as number);
-      const f = e instanceof Failure ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
+      const f = Predicate.isTagged(e, "Failure") ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
       return flush(err).pipe(Effect.andThen(printFailure(f)), Effect.as(f.code));
     }),
   );

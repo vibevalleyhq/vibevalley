@@ -90,7 +90,7 @@
 1. `on` 是轨迹里那一轮收到的话的 `seq`，`want` 是主人写的「应该怎样」。轨迹里没有这一步是 404；不是收到的话、`want` 为空、这句话没进对话（管家那时没起来）的拒绝。
 2. 在 `orchestrator.jsonl` 的全部行里（`readLines`，压缩前的原文也在）找这一轮的输入：不晚于这一步、字里含这一步的字的 `orchestratorInput` 里最新的一条。
 3. 存成那个管家家目录里的 `evals/<id>.json`（`orchestrator.eval.create` 带 `agent`，不填是默认管家；只有主人能读）：模型这一轮开始时看到的对话 `before`（照算压缩）、这条输入 `input`、这一轮的消息 `did`（到下一条输入为止，去掉轮后的压缩摘要）、标记时的 `MEMORY.md`、工具名、模型，`expect` 空着。时间和现状都在输入里，不另存。
-4. 修的人把 `want` 翻成几条 `expect`（`called`，可带 `argContains`、`argLacks` 查参数里有没有某段字；`notCalled`、`silent`、`says`、`saysNot`），去掉私事后放进 `apps/server/src/orchestrator/testdata/evals/`；用真模型重放照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)。
+4. 修的人把 `want` 翻成几条 `expect`（`called`，可带 `argContains`、`argLacks` 查参数里有没有某段字；`notCalled`、`silent`、`says`、`saysNot`），去掉私事后放进 `apps/server/src/orchestrator/testdata/evals/`；用真模型重放照 [vv-acceptance/references/orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md)。
 
 ## 和谁打交道
 
@@ -136,7 +136,7 @@
 
 - `apps/server/src/orchestrator/orchestrator.test.ts`（照脚本回答的模型，`@vibevalley/ai/testing`）：只接 DeepSeek 的模型；好几个管家各在自己的私聊、照看的频道和被 @ 的地方回答，各有自己的对话文件和提示；派活、在频道听主人的话（电话里的也是）；输入带着从哪来；字流给电话；起不来的原因只说一次；同一个 `sendKey` 只听一次；听到播种袋选的档案；长汇报截了再听；只在主人开口时合并；自己定的定时任务等主人同意；巡查只报一次；主人标做错的一轮存成样例。
 - `orchestrator/situation.test.ts`：现状的差异（大半变了就给全文）；截别人的长话、不截主人的；用量那一行字；每个来源的开头；巡查的说法和黄金数据。
-- 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter @vibevalley/server evals`，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)）。重放时农场的工具只回答样例录下的同一个调用（同一个工具、同样的参数），每个一次，别的调用都回「评测里没有这个工具的结果」（`evals.ts` 的 `stubbed`）：录下的是做错的那一轮，它对一个模型这次没再做的调用的回答（比如没让开工的开工）会让模型以为自己做了。
+- 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter @vibevalley/server evals`，照 [vv-acceptance/references/orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md)）。重放时农场的工具只回答样例录下的同一个调用（同一个工具、同样的参数），每个一次，别的调用都回「评测里没有这个工具的结果」（`evals.ts` 的 `stubbed`）：录下的是做错的那一轮，它对一个模型这次没再做的调用的回答（比如没让开工的开工）会让模型以为自己做了。
 - `tool/tool.test.ts`：管家和帮工每个工具生成的参数逐字节对照 `testdata/parameters.json`；钱的说法；轨迹里工具的名字和说法。
 - 大脑、循环和模型请求的测试见 [VibeValley 自己的 agent](docs/subsystems/brain.md#怎么验证)。
 - `session/host.test.ts`：每个回答整条说一次，Caller 边长边拿到字，状态在拿到输入后带上它的去处；Caller 留着读者来之前的字、失败时把原因交给读者；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 等同一次关闭。

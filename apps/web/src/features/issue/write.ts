@@ -9,7 +9,7 @@ import { newIssueTitle } from "./titles";
 const pickKey = "vibevalley.board.pick";
 
 /** The helper and project last picked on this machine, for the next quick add. */
-export function rememberedPick(): { agent: string; project: string } {
+function rememberedPick(): { agent: string; project: string } {
   try {
     const raw = JSON.parse(localStorage.getItem(pickKey) ?? "null") as unknown;
     if (Array.isArray(raw) && raw.length === 2) return { agent: String(raw[0]), project: String(raw[1]) };

@@ -29,7 +29,7 @@ const why = (e: unknown) => {
   return messageOf(e);
 };
 
-export function withEnv(env: Record<string, string | null> = {}): NodeJS.ProcessEnv {
+function withEnv(env: Record<string, string | null> = {}): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { ...process.env };
   for (const [k, v] of Object.entries(env)) {
     if (v === null) delete out[k];
@@ -49,7 +49,7 @@ const outputCap = 200_000;
 
 /** Past timeout it gets SIGTERM, and SIGKILL 2 s later; when signal aborts it goes at once. The whole process group is
  * killed, so a child left behind does not hold the output open. */
-export function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
+function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
   if (argv.length === 0) return Promise.reject(new Error(words.noCommand));
   if (signal?.aborted === true) return Promise.reject(new Error(stopped));
   return new Promise((resolve, reject) => {

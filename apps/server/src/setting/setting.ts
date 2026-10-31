@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Context, Data, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
@@ -81,7 +81,10 @@ export interface AgoraCredentials {
   readonly appCertificate: string;
 }
 
-export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
+export class SettingRefused extends Schema.TaggedError<SettingRefused, { readonly brand: unique symbol }>()("SettingRefused", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 export class Setting extends Context.Service<
   Setting,
@@ -123,7 +126,7 @@ export function savedLocale(home: string): Locale {
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "settings.json");
   const disk = new FileWriter(file, 0o600);
@@ -194,12 +197,12 @@ export const make = Effect.gen(function* () {
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
-    if (typeof next.voice === "object" && next.voice !== null && Object.keys(next.voice).length === 0) next.voice = undefined;
+    if (Predicate.isObject(next.voice) && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
     yield* Effect.try({
       try: () => disk.write(() => JSON.stringify(kept, null, 2) + "\n"),
-      catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }) }),
+      catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }), cause: e }),
     });
     stored = kept;
     setLocale(kept.locale ?? "zh");

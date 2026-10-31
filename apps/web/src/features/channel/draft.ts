@@ -95,7 +95,7 @@ const sending =
     });
 
 /** A file uploaded for a message; progress is told in whole percents as it goes up. */
-export async function upload(file: File, progress: (percent: number) => void = () => {}): Promise<Attachment> {
+async function upload(file: File, progress: (percent: number) => void = () => {}): Promise<Attachment> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";
   // In pieces: one call with every byte as an argument overflows the stack for a big file.

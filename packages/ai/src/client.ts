@@ -1,6 +1,6 @@
 // A model to talk to: the model, the service that carries the request, and the key, asked for at each request.
 
-import type { Effect } from "effect";
+import { type Effect, Schema } from "effect";
 
 import type { Llm } from "./llm.ts";
 import type { AssistantMessage, Context } from "./messages.ts";
@@ -10,12 +10,7 @@ import type { RequestOptions } from "./request.ts";
 export const defaultModel = "deepseek-flash";
 
 /** No key to ask the model with; the host says where to put one. */
-export class MissingKey extends Error {
-  constructor() {
-    super("no DeepSeek API key");
-    this.name = "MissingKey";
-  }
-}
+export class MissingKey extends Schema.TaggedError<MissingKey, { readonly brand: unique symbol }>()("MissingKey", { message: Schema.String }) {}
 
 export interface ModelClient {
   readonly model: Model;
@@ -27,7 +22,7 @@ export interface ModelClient {
 /** id empty is defaultModel; the key is the caller's to find. */
 export function deepseek(id: string, key: string | (() => string | undefined), service: Llm["Service"]): ModelClient {
   const apiKey = typeof key === "string" ? () => key : key;
-  if (!apiKey()) throw new MissingKey();
+  if (!apiKey()) throw new MissingKey({ message: "no DeepSeek API key" });
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
   const fallback = models.find((m) => m.id === defaultModel);

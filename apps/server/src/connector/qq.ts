@@ -1,7 +1,7 @@
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
-import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream } from "effect";
+import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream, Predicate } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -28,7 +28,7 @@ const GatewayEvent = Schema.Struct({
   t: Schema.optionalKey(Schema.NullOr(Schema.String)),
   d: Schema.optionalKey(Schema.Unknown),
 });
-export const decodeGatewayEvent = Schema.decodeUnknownSync(Schema.fromJsonString(GatewayEvent));
+export const decodeGatewayEvent = Schema.decodeUnknownEffect(Schema.fromJsonString(GatewayEvent));
 
 export interface App {
   readonly appId: string;
@@ -99,7 +99,7 @@ export class QQClient implements QQApi {
         Effect.flatMap((res) => res.json),
         Effect.flatMap(Schema.decodeUnknownEffect(TokenResponse)),
         Effect.timeoutOrElse({ duration: 20_000, orElse: () => Effect.fail(failedWith(t("server.connector.qq.authTimeout"))) }),
-        Effect.mapError((e) => (e instanceof AppFailed ? e : failedWith(t("server.connector.qq.auth", { why: e.message })))),
+        Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.qq.auth", { why: e.message })))),
       );
       if (!body.access_token) return yield* failedWith(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
       const seconds = typeof body.expires_in === "number" ? body.expires_in : numberIn(body.expires_in, 7200);
@@ -152,10 +152,7 @@ export class QQClient implements QQApi {
         let beating = false;
         yield* Stream.runForEach(frames, (frame) =>
           Effect.gen(function* () {
-            const msg = yield* Effect.mapError(
-              Effect.try(() => decodeGatewayEvent(frame)),
-              () => failedWith(t("server.connector.qq.gatewayError")),
-            );
+            const msg = yield* Effect.mapError(decodeGatewayEvent(frame), () => failedWith(t("server.connector.qq.gatewayError")));
             if (typeof msg.s === "number") seq = msg.s;
             switch (msg.op) {
               case 10: {
@@ -210,7 +207,7 @@ export class QQClient implements QQApi {
       );
       const res = yield* this.http.execute(request).pipe(
         Effect.timeoutOrElse({ duration: 25_000, orElse: () => Effect.fail(failedWith(t("server.connector.qq.send", { why: "timed out" }))) }),
-        Effect.mapError((e) => (e instanceof AppFailed ? e : failedWith(t("server.connector.qq.send", { why: e.message })))),
+        Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.qq.send", { why: e.message })))),
       );
       const body = yield* Effect.result(Effect.flatMap(res.json, Schema.decodeUnknownEffect(SendResponse)));
       const read = body._tag === "Success" ? body.success : undefined;

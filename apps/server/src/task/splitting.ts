@@ -3,22 +3,17 @@ import { Result, Schema, SchemaIssue } from "effect";
 import { t } from "@vibevalley/i18n";
 import type { Task } from "@vibevalley/protocol";
 
+import { lastJsonBlock } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
 
 import { type StepDraft, freshTask } from "./editing.ts";
 import { graphProblems } from "./graph.ts";
 export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly tasks: Task[] } | { readonly ok: false; readonly problems: string[] };
 
-const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
-
-/** JSON as Go's decoder reads it; the words for one that does not read say what Go's would where they are the same failure. */
-function parseJson(body: string): unknown {
-  try {
-    return JSON.parse(body);
-  } catch (e) {
-    const message = messageOf(e);
-    throw new Error(body.trim() === "" || /end of JSON input/iu.test(message) ? "unexpected end of JSON input" : message, { cause: e });
-  }
+/** The words for JSON that does not read say what Go's decoder would where they are the same failure. */
+function unparsedJson(e: unknown): string {
+  const message = messageOf(e);
+  return /end of JSON input/iu.test(message) ? "unexpected end of JSON input" : message;
 }
 
 const formatIssue = SchemaIssue.makeFormatterDefault();
@@ -66,33 +61,15 @@ function splitProblem(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = [
   }
 }
 
-function decodeSplitDraft(raw: unknown): { title?: string; tasks: readonly StepDraft[] } | string {
-  const r = Schema.decodeUnknownResult(SplitDraft)(raw);
-  return Result.isSuccess(r) ? r.success : splitProblem(r.failure.issue);
-}
-
 export function parseSplit(text: string): ParsedSplit {
-  const blocks = [...text.matchAll(taskBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { ok: false, problems: [t("server.task.parse.noBlock")] };
-  let last = "";
-  for (let i = blocks.length - 1; i >= 0; i--) {
-    let raw: unknown;
-    try {
-      raw = parseJson(blocks[i]!);
-    } catch (e) {
-      last = t("server.task.parse.unreadable", { why: messageOf(e) });
-      continue;
-    }
-    const draft = decodeSplitDraft(raw);
-    if (typeof draft === "string") {
-      last = t("server.task.parse.shape", { why: draft });
-      continue;
-    }
-    const tasks = draft.tasks.map(freshTask);
-    const problems = graphProblems(tasks);
-    if (problems.length > 0) return { ok: false, problems };
-    const title = (draft.title ?? "").trim();
-    return { ok: true, title: title, tasks };
-  }
-  return { ok: false, problems: [last] };
+  const read = lastJsonBlock(text, SplitDraft, {
+    none: t("server.task.parse.noBlock"),
+    unparsed: (e) => t("server.task.parse.unreadable", { why: unparsedJson(e) }),
+    misfit: (issue) => t("server.task.parse.shape", { why: splitProblem(issue) }),
+  });
+  if (Result.isFailure(read)) return { ok: false, problems: [read.failure] };
+  const tasks = read.success.tasks.map(freshTask);
+  const problems = graphProblems(tasks);
+  if (problems.length > 0) return { ok: false, problems };
+  return { ok: true, title: (read.success.title ?? "").trim(), tasks };
 }

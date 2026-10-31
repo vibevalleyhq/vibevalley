@@ -19,5 +19,8 @@ test("page tests reach the system only through the browser, Playwright and the p
         .filter((spec) => !allowed.test(spec))
         .map((spec) => `${f} imports ${spec}`),
     );
-  expect(crossing).toEqual([]);
+  expect(
+    crossing,
+    "a page test goes in only as a user's browser does: through the fixtures, Playwright and the protocol's shapes. Fix: drive it through the page (fixtures.ts for the server it talks to); a judgement the page makes is a pure function in features/<concept> with its own vitest test. See docs/subsystems/foundation.md",
+  ).toEqual([]);
 });

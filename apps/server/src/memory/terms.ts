@@ -10,7 +10,7 @@ import stopwords from "./stopwords.json";
 export const termsVersion = 1;
 
 /** Words too common to match on, in Chinese and in English (stopwords.json: data, not words to anyone). */
-export const recallStop = new Set<string>(stopwords);
+const recallStop = new Set<string>(stopwords);
 
 const codeWord = /[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/gu;
 const han = /\p{Script=Han}/u;

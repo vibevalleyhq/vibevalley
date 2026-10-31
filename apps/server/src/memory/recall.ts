@@ -10,7 +10,7 @@ import { recallWords } from "./prompts.ts";
 import { termsInCommon, termsOf } from "./terms.ts";
 
 export const recallCount = 8;
-export const recallJobs = 3;
+const recallJobs = 3;
 export const recallChars = 1600;
 
 /** What a turn recalls by; matches is how well each memory matched the turn's words in the full-text index, higher better. */

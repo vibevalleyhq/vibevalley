@@ -29,6 +29,9 @@ const { values: flags } = parseArgs({
   },
 });
 
+// Read here, at the process's door, with the flags: the Effect code below is handed what it says.
+const testRuntimesAsked = process.env.VIBEVALLEY_TEST_RUNTIMES === "1";
+
 // The ready line goes through it too: it holds only the address and the pid.
 redactOutput(process.stdout);
 redactOutput(process.stderr);
@@ -45,7 +48,7 @@ const testRuntimes = Effect.gen(function* () {
 const main = Effect.gen(function* () {
   const loaded = yield* loadConfig(flags.config);
   const config = flags.web ? { ...loaded, web: flags.web } : loaded;
-  const runtime = process.env.VIBEVALLEY_TEST_RUNTIMES === "1" ? yield* testRuntimes : undefined;
+  const runtime = testRuntimesAsked ? yield* testRuntimes : undefined;
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(config.home, { recursive: true });
   yield* fs.makeDirectory(projectsDir(config), { recursive: true });

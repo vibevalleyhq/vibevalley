@@ -1,5 +1,7 @@
 // The model a farm agent talks to: agent/brain's deepseek, with a missing key said to the owner.
 
+import { Schema } from "effect";
+
 import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
 import type { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
@@ -11,7 +13,7 @@ export function modelClient(id: string, key: string | (() => string | undefined)
   try {
     return deepseek(id, key, service);
   } catch (e) {
-    if (e instanceof MissingKey) throw new Error(noDeepSeekKey(), { cause: e });
+    if (Schema.is(MissingKey)(e)) throw new Error(noDeepSeekKey(), { cause: e });
     throw e;
   }
 }

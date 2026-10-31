@@ -123,7 +123,6 @@ function makePen(ac: BaseAudioContext, out: AudioNode, now: number, noiseBuffer:
   return pen;
 }
 
-/** The same limiter live play uses, so offline renders sound like the page. */
 function limiter(ac: BaseAudioContext): DynamicsCompressorNode {
   const c = ac.createDynamicsCompressor();
   c.threshold.value = -10;
@@ -132,45 +131,6 @@ function limiter(ac: BaseAudioContext): DynamicsCompressorNode {
   c.attack.value = 0.003;
   c.release.value = 0.12;
   return c;
-}
-
-/** Renders a recipe offline, for checking levels or saving to a file. */
-export async function renderRecipe(
-  recipe: Recipe,
-  { seconds = 2, sampleRate = 44_100, volume = 0.55 }: { seconds?: number; sampleRate?: number; volume?: number } = {},
-): Promise<AudioBuffer> {
-  const ac = new OfflineAudioContext(1, Math.ceil(seconds * sampleRate), sampleRate);
-  const master = ac.createGain();
-  master.gain.value = volume;
-  master.connect(limiter(ac)).connect(ac.destination);
-  recipe(makePen(ac, master, 0, makeNoise(ac), 1));
-  return ac.startRendering();
-}
-
-/** 16-bit mono WAV bytes of a rendered buffer, cut `tail` seconds after the last audible sample. */
-export function toWav(buffer: AudioBuffer, { tail = 0.05 }: { tail?: number } = {}): Uint8Array {
-  const all = buffer.getChannelData(0);
-  let last = 0;
-  for (let i = 0; i < all.length; i++) if (Math.abs(all[i]!) > 0.001) last = i;
-  const data = all.subarray(0, Math.min(all.length, last + Math.round(buffer.sampleRate * tail)));
-  const bytes = new Uint8Array(44 + data.length * 2);
-  const view = new DataView(bytes.buffer);
-  const text = (at: number, s: string) => [...s].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
-  text(0, "RIFF");
-  view.setUint32(4, 36 + data.length * 2, true);
-  text(8, "WAVE");
-  text(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, buffer.sampleRate, true);
-  view.setUint32(28, buffer.sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  text(36, "data");
-  view.setUint32(40, data.length * 2, true);
-  for (let i = 0; i < data.length; i++) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i]!)) * 0x7fff, true);
-  return bytes;
 }
 
 export interface Synth {

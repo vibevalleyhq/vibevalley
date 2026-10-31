@@ -101,16 +101,16 @@ export const issuesBelowTaskGraphs =
     below.pipe(on(Crons.layer), on(Issues.layer(o.issue)));
 
 /** Issues: the issues, their task graphs and crons. */
-export const issues =
+const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     issuesBelowTaskGraphs(o)(below).pipe(on(Tasks.layer(o.task)));
 
 /** Notifications: what in the inbox is news to the owner, and the patrol. */
-export const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Notices.layer));
+const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Notices.layer));
 
 /** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
-export const orchestrator =
+const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     below.pipe(on(Tools.layer), on(Orchestrator.layer(o.orchestrator)));
@@ -119,24 +119,24 @@ export const orchestrator =
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Game.layer));
 
 /** Gateway: every way in from outside; the HTTP API is mounted on these services by http/app.ts. */
-export const gateway =
+const gateway =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     below.pipe(on(Mcp.layer(o.mcp)), on(Lan.layer(o.lan)), on(Voice.layer(o.voice)), on(Connectors.layer(o.connector)));
 
 /** Source Control's startup: the first look at GitHub. */
-export const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
+const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
 /** Issues' startup, after the sessions came back: the task graphs cut off by the stop are settled, then the crons start
  * coming due. */
-export const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
+const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
 /** Issues' startup without the crons' clock: for a test farm that ticks them by hand. */
 export const taskGraphsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart));
 /** Notifications' startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
 export const notificationsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(noticeStart));
 /** Gamification's startup: commits start being counted. */
-export const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(gameStart));
+const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(gameStart));
 
 /** The whole farm: every module built, then every startup in module order. */
 export const services = (config: ServerConfig["Service"], options: ServiceOptions = {}) =>

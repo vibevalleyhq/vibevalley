@@ -5,7 +5,7 @@ import type { Link } from "@vibevalley/bridge";
 import { type Host, mobileHost } from "@vibevalley/protocol/host";
 
 /** A browser tab: no host around the page. */
-export const browserHost: Host = {
+const browserHost: Host = {
   name: "browser",
 };
 

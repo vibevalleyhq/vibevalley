@@ -79,7 +79,7 @@ export function describeReminder(j: Reminder): string {
   return reminderWords.line(j.id, j.name, when, next ? localeTime(next) : undefined, j.message);
 }
 
-export const dueMessage = (j: Reminder) => reminderWords.due(j.id, j.name, j.message);
+const dueMessage = (j: Reminder) => reminderWords.due(j.id, j.name, j.message);
 
 export class Reminders {
   readonly tools: Tool[];

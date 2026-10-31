@@ -2,12 +2,13 @@
 
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import { Predicate } from "effect";
+import { Result, Schema } from "effect";
 
 import { maybe, t } from "@vibevalley/i18n";
 import type { Question, CheckResult, CriterionCheck, IssueAnswer, Outcome } from "@vibevalley/protocol";
 
 import { clip, slice } from "@/base/clip.ts";
+import { lastJsonBlock, misfitField } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
 
 const summaryMax = 160;
@@ -61,7 +62,7 @@ export const summaryOf = (text: string) => reportVerdict(text) || conclusion(tex
 /** Said out loud on the farm, not only in the report. */
 const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unavailable"]);
 
-export const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
+const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
 
 export interface SessionRead {
   readonly outcome: Outcome;
@@ -77,41 +78,37 @@ export interface SessionRead {
   readonly answer?: IssueAnswer;
 }
 
-/** A json block in what a session said: the last one wins. */
-const jsonBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/gu;
+const AnswerLines = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Array(Schema.String)])));
 
-const answerLines = (v: unknown, field: string): string[] => {
-  if (v === undefined || v === null) return [];
-  if (typeof v === "string") return [v.trim()].filter(Boolean);
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v.map((l) => l.trim()).filter(Boolean);
-  throw new Error(t("server.session.answer.lines", { field }));
-};
+/** The conclusion block an answer issue asks for; a conclusion that is not a string reads as none. */
+const AnswerBlock = Schema.Struct({ conclusion: Schema.optional(Schema.Unknown), evidence: AnswerLines, unsure: AnswerLines, next: AnswerLines });
+
+const answerLines = (v: (typeof AnswerBlock.Type)["evidence"]): string[] =>
+  (v == null ? [] : typeof v === "string" ? [v] : v).map((l) => l.trim()).filter(Boolean);
+
+const answerOf = (raw: typeof AnswerBlock.Type): IssueAnswer => ({
+  conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
+  evidence: answerLines(raw.evidence),
+  unsure: answerLines(raw.unsure),
+  next: answerLines(raw.next),
+});
 
 /** The last block that reads as an answer with a conclusion and something it rests on; problem says why none did. */
 export function parseAnswer(text: string): { answer?: IssueAnswer; problem: string } {
-  const blocks = [...text.matchAll(jsonBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: t("server.session.answer.noBlock") };
-  let problem = "";
-  for (let i = blocks.length - 1; i >= 0; i--) {
-    let a: IssueAnswer;
-    try {
-      const raw: unknown = JSON.parse(blocks[i]!);
-      if (!Predicate.isObject(raw)) throw new Error(t("server.session.answer.notObject"));
-      a = {
-        conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
-        evidence: answerLines(raw.evidence, "evidence"),
-        unsure: answerLines(raw.unsure, "unsure"),
-        next: answerLines(raw.next, "next"),
-      };
-    } catch (e) {
-      problem = t("server.session.answer.unreadable", { why: messageOf(e) });
-      continue;
-    }
-    if (!a.conclusion) problem = t("server.session.answer.empty");
-    else if (a.evidence.length === 0) problem = t("server.session.answer.noEvidence");
-    else return { answer: a, problem: "" };
-  }
-  return { problem };
+  const read = lastJsonBlock(text, AnswerBlock, {
+    none: t("server.session.answer.noBlock"),
+    unparsed: (e) => t("server.session.answer.unreadable", { why: messageOf(e) }),
+    misfit: (issue) => {
+      const field = misfitField(issue);
+      const why = field === undefined ? t("server.session.answer.notObject") : t("server.session.answer.lines", { field });
+      return t("server.session.answer.unreadable", { why });
+    },
+    refuse: (raw) => {
+      const a = answerOf(raw);
+      return !a.conclusion ? t("server.session.answer.empty") : a.evidence.length === 0 ? t("server.session.answer.noEvidence") : undefined;
+    },
+  });
+  return Result.isSuccess(read) ? { answer: answerOf(read.success), problem: "" } : { problem: read.failure };
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */

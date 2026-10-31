@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, type Scope, Stream } from "effect";
+import { Effect, Predicate, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
@@ -17,7 +17,7 @@ import { type Hired, type HireOptions, type Roster, NotTakenIn, type Sessions } 
 import { notTakenIn } from "@/session/takeIn.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { nextTurn, untilGot, whenTrue } from "@/testing/until.ts";
+import { nextTurn, untilGot, waitFor, whenTrue } from "@/testing/until.ts";
 import { worldBelowTasks } from "@/testing/world.ts";
 
 import * as q from "../../db/generated/task_event.sql.ts";
@@ -168,7 +168,7 @@ class FakeWork implements TaskWork {
   handOver: Sessions["Service"]["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
       Effect.mapError((e) => {
-        const failure = e instanceof MergeFailure ? e : MergeFailure.error(String(e));
+        const failure = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(String(e));
         const words = notTakenIn(failure, id, settle);
         return new NotTakenIn({ failure, ...words, message: words.owner });
       }),
@@ -468,7 +468,6 @@ describe("task graphs", () => {
   it.live("a graph is a parent issue, its steps the issues under it", () =>
     run((f) =>
       Effect.gen(function* () {
-        const runPromise = Effect.runPromiseWith(yield* Effect.context());
         const id = yield* f.split("菱形", "diamond");
         yield* f.until(id, (g) => g.state === "draft");
         const parent = yield* f.issues.get(id);
@@ -484,7 +483,7 @@ describe("task graphs", () => {
         expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
         expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
         yield* f.tasks.act(id, "merge", owner);
-        yield* untilGot(async () => (await runPromise(f.issues.get(id))).delivered === "merged", "the graph's issue closed as merged");
+        yield* waitFor(f.issues.get(id), (i) => i.delivered === "merged", "the graph's issue closed as merged");
       }),
     ),
   );

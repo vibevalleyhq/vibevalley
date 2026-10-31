@@ -4,7 +4,7 @@
 // replies to that message, nothing of their own.
 
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Clock, Context, Effect, Layer, Semaphore } from "effect";
@@ -31,6 +31,7 @@ import {
 
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
+import { writeOnce } from "@/base/files.ts";
 import { newId } from "@/base/ids.ts";
 import { Channels } from "@/channel/chat.ts";
 import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
@@ -85,7 +86,7 @@ const listedMax = 200;
 
 const missingArtifact = (id: string) => missing(t("server.artifact.missing", { id }), [lookIn.artifact]);
 
-export const make = (options: ArtifactOptions = {}) =>
+const make = (options: ArtifactOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const chat = yield* Channels;
@@ -95,19 +96,13 @@ export const make = (options: ArtifactOptions = {}) =>
     const dir = join(config.home, "artifacts");
     const fileOf = (sha: string) => join(dir, sha);
 
-    const keep = (bytes: Buffer) =>
-      Effect.tryPromise({
-        try: async () => {
-          const sha = createHash("sha256").update(bytes).digest("hex");
-          await mkdir(dir, { recursive: true });
-          // The same bytes are the same file: a second one leaves the first.
-          await writeFile(fileOf(sha), bytes, { flag: "wx" }).catch((e: NodeJS.ErrnoException) => {
-            if (e.code !== "EEXIST") throw e;
-          });
-          return sha;
-        },
-        catch: (e) => refused(t("server.artifact.notKept", { why: String(e) })),
-      });
+    const keep = (bytes: Buffer) => {
+      const sha = createHash("sha256").update(bytes).digest("hex");
+      return writeOnce(fileOf(sha), bytes).pipe(
+        Effect.as(sha),
+        Effect.mapError((e) => refused(t("server.artifact.notKept", { why: String(e.cause) }))),
+      );
+    };
 
     const assemble = Effect.fnUntraced(function* (row: qa.ArtifactsResult) {
       const versions = row.body === "html" ? yield* db(qv.artifactVersions({ artifact_id: row.id })) : [];
@@ -249,74 +244,69 @@ export const make = (options: ArtifactOptions = {}) =>
     });
 
     const shape = Artifacts.of({
-      list: (q) =>
-        Effect.gen(function* () {
-          const rows = q.issue
-            ? yield* db(qa.artifactsForIssue({ issue: q.issue }))
-            : q.channel
-              ? yield* db(qa.artifactsInChannel({ channel_id: q.channel }))
-              : yield* db(qa.artifacts({ limit_n: BigInt(listedMax) }));
-          const out: Artifact[] = [];
-          // Both given: the issue's, in that channel.
-          for (const r of rows) if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
-          return out;
-        }),
-      get: (id) => Effect.flatMap(found(id), assemble),
-      content: (id, version) =>
-        Effect.gen(function* () {
-          const row = yield* found(id);
-          if (row.body === "blocks") return { version: row.seq, content: yield* blocks.markdown(id), body: "blocks" as const };
-          const { v } = yield* versionOf(id, version);
-          const content = yield* Effect.tryPromise({
-            try: () => readFile(fileOf(v.sha), "utf8"),
-            catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
-          });
-          return { version: v.version, content, body: "html" as const };
-        }),
-      file: (id, version) =>
-        Effect.gen(function* () {
-          const row = yield* one(qa.artifact({ id }));
-          const v = row?.body === "html" ? yield* one(qv.artifactVersion({ artifact_id: id, version })) : undefined;
-          return v ? fileOf(v.sha) : undefined;
-        }),
-      create: (maker, req) => lock.withPermits(1)(create(maker, req)),
-      version: (maker, req) => lock.withPermits(1)(version(maker, req)),
-      rename: (id, title) =>
-        lock.withPermits(1)(
-          Effect.gen(function* () {
-            yield* found(id);
-            const problem = artifactProblem({ title });
-            if (problem) return yield* Effect.fail(refused(problem));
-            yield* db(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
-            return yield* assemble(yield* found(id));
-          }),
-        ),
-      previewRemove: (id) =>
-        Effect.gen(function* () {
-          const row = yield* found(id);
-          const what =
-            row.body === "html"
-              ? t("server.artifact.preview.remove", { title: row.title, n: row.version })
-              : t("server.artifact.preview.removeBlocks", { title: row.title, n: (yield* blocks.blocks(id)).length });
-          return { does: row.channel_id !== null ? [what, t("server.artifact.preview.cards")] : [what] };
-        }),
-      remove: (id) =>
-        lock.withPermits(1)(
-          Effect.gen(function* () {
-            yield* found(id);
-            const versions = yield* db(qv.artifactVersions({ artifact_id: id }));
-            yield* db(qa.deleteArtifact({ id }));
-            for (const sha of new Set(versions.map((v) => v.sha))) {
-              const users = yield* one(qv.artifactShaUsers({ sha }));
-              if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
-            }
-          }),
-        ),
-      blocks: (id) =>
-        Effect.gen(function* () {
-          const list = yield* blocks.blocks(id);
-          return { artifact: yield* assemble(yield* found(id)), blocks: list };
-        }),
+      list: Effect.fn("Artifacts.list")(function* (q) {
+        const rows = q.issue
+          ? yield* db(qa.artifactsForIssue({ issue: q.issue }))
+          : q.channel
+            ? yield* db(qa.artifactsInChannel({ channel_id: q.channel }))
+            : yield* db(qa.artifacts({ limit_n: BigInt(listedMax) }));
+        const out: Artifact[] = [];
+        // Both given: the issue's, in that channel.
+        for (const r of rows) if (!q.channel || r.channel_id === q.channel) out.push(yield* assemble(r));
+        return out;
+      }),
+      get: Effect.fn("Artifacts.get")(function* (id) {
+        return yield* assemble(yield* found(id));
+      }),
+      content: Effect.fn("Artifacts.content")(function* (id, version) {
+        const row = yield* found(id);
+        if (row.body === "blocks") return { version: row.seq, content: yield* blocks.markdown(id), body: "blocks" as const };
+        const { v } = yield* versionOf(id, version);
+        const content = yield* Effect.tryPromise({
+          try: () => readFile(fileOf(v.sha), "utf8"),
+          catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
+        });
+        return { version: v.version, content, body: "html" as const };
+      }),
+      file: Effect.fn("Artifacts.file")(function* (id, version) {
+        const row = yield* one(qa.artifact({ id }));
+        const v = row?.body === "html" ? yield* one(qv.artifactVersion({ artifact_id: id, version })) : undefined;
+        return v ? fileOf(v.sha) : undefined;
+      }),
+      create: Effect.fn("Artifacts.create")(function* (maker, req) {
+        return yield* create(maker, req);
+      }, lock.withPermits(1)),
+      version: Effect.fn("Artifacts.version")(function* (maker, req) {
+        return yield* version(maker, req);
+      }, lock.withPermits(1)),
+      rename: Effect.fn("Artifacts.rename")(function* (id, title) {
+        yield* found(id);
+        const problem = artifactProblem({ title });
+        if (problem) return yield* Effect.fail(refused(problem));
+        yield* db(qa.artifactRenamed({ id, title: title.trim(), updated_at: yield* Clock.currentTimeMillis }));
+        return yield* assemble(yield* found(id));
+      }, lock.withPermits(1)),
+      previewRemove: Effect.fn("Artifacts.previewRemove")(function* (id) {
+        const row = yield* found(id);
+        const what =
+          row.body === "html"
+            ? t("server.artifact.preview.remove", { title: row.title, n: row.version })
+            : t("server.artifact.preview.removeBlocks", { title: row.title, n: (yield* blocks.blocks(id)).length });
+        return { does: row.channel_id !== null ? [what, t("server.artifact.preview.cards")] : [what] };
+      }),
+      remove: Effect.fn("Artifacts.remove")(function* (id) {
+        yield* found(id);
+        const versions = yield* db(qv.artifactVersions({ artifact_id: id }));
+        yield* db(qa.deleteArtifact({ id }));
+        for (const sha of new Set(versions.map((v) => v.sha))) {
+          const users = yield* one(qv.artifactShaUsers({ sha }));
+          if ((users?.n ?? 0) === 0) yield* Effect.promise(() => rm(fileOf(sha), { force: true }));
+        }
+      }, lock.withPermits(1)),
+      blocks: Effect.fn("Artifacts.blocks")(function* (id) {
+        const list = yield* blocks.blocks(id);
+        return { artifact: yield* assemble(yield* found(id)), blocks: list };
+      }),
       markdown: blocks.markdown,
       submit: blocks.submit,
       appendBlock: blocks.appendBlock,

@@ -104,6 +104,8 @@ describe("lan access", () => {
       yield* lan.setOpen(false);
       expect(
         yield* Effect.promise(() =>
+          // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
+          // @effect-diagnostics-next-line globalFetchInEffect:off
           fetch(addr + healthPath, { method: "POST" }).then(
             () => "answered",
             () => "shut",
@@ -144,9 +146,13 @@ describe("lan access", () => {
       expect(JSON.parse(me.body)).toMatchObject({ id: paired.device, lastSeen: expect.any(Number) });
       // A paired browser's cookie is a key as the header is.
       const byCookie = yield* Effect.promise(() =>
+        // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
+        // @effect-diagnostics-next-line globalFetchInEffect:off
         fetch(addr + pathOf("lan.me.get"), { method: "POST", headers: { cookie: `other=1; ${lanKeyCookie}=${paired.key}` } }),
       );
       expect(byCookie.status).toBe(200);
+      // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
+      // @effect-diagnostics-next-line globalFetchInEffect:off
       expect((yield* Effect.promise(() => fetch(addr + healthPath, { method: "POST", headers: { cookie: `${lanKeyCookie}=nope` } }))).status).toBe(401);
       for (const path of ["/mcp", "/mcp/x"]) expect((yield* Effect.promise(() => request("GET", addr + path, paired.key))).status).toBe(404);
       expect((yield* Effect.promise(() => request("POST", addr + "/pair", ""))).status).toBe(404);
@@ -202,6 +208,8 @@ describe("lan access", () => {
       const lan = yield* farm();
       const addr = yield* open(lan);
       const paired = yield* pair(lan, addr, "旧手机");
+      // The test reaches the listener as a paired phone's browser does, through the platform's own fetch.
+      // @effect-diagnostics-next-line globalFetchInEffect:off
       const res = yield* Effect.promise(() => fetch(addr + "/api/v1/state", { headers: { authorization: "Bearer " + paired.key } }));
       expect(res.status).toBe(200);
       const reader = res.body!.getReader();

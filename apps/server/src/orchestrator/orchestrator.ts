@@ -24,7 +24,7 @@ import { Notices, type Overdue } from "@/notice/notice.ts";
 import { Projects } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";
 import { Runtimes } from "@/runtime/runtime.ts";
-import { type AgentHost, Caller } from "@/session/host.ts";
+import { type AgentHost, Caller, type NotAnswered } from "@/session/host.ts";
 import { Sessions } from "@/session/session.ts";
 import { Setting } from "@/setting/setting.ts";
 import { isOpen } from "@/task/graph.ts";
@@ -87,7 +87,7 @@ export class Orchestrator extends Context.Service<
     readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
     /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in the default channel
      * as always; the whole answer comes back to be read out. Interrupting ends only this wait, not the shared run. */
-    readonly brief: (line: string) => Effect.Effect<string, unknown>;
+    readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
     /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
      * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
     readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
@@ -107,7 +107,7 @@ export interface OrchestratorOptions {
   readonly listen?: boolean;
 }
 
-export const make = (options: OrchestratorOptions = {}) =>
+const make = (options: OrchestratorOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;
@@ -452,35 +452,37 @@ export const make = (options: OrchestratorOptions = {}) =>
           }),
         );
       }),
-      brief: (line) =>
-        Effect.suspend(() => {
-          const me = new Caller();
-          forkHere(take({ source: "issue", line, channel: chat.defaultChannel(), caller: me }));
-          // An interrupted brief ends its caller: its words stop being kept for nobody.
-          return Stream.mkString(me.words).pipe(
-            Effect.map((said) => said.trim()),
-            Effect.ensuring(Effect.sync(() => me.end())),
-          );
-        }),
+      brief: Effect.fn("Orchestrator.brief")(function* (line) {
+        const me = new Caller();
+        forkHere(take({ source: "issue", line, channel: chat.defaultChannel(), caller: me }));
+        // An interrupted brief ends its caller: its words stop being kept for nobody.
+        return yield* Stream.mkString(me.words).pipe(
+          Effect.map((said) => said.trim()),
+          Effect.ensuring(Effect.sync(() => me.end())),
+        );
+      }),
       answerer: (on) => (model) => {
         if (model !== orchestratorModel) return undefined;
         if (on === "api") return (text, signal) => answer(lineWords.owner(text), signal);
         return (text, signal) => {
-          forkHere(Effect.ignore(chat.spoken(ownerId, text, "")));
+          forkHere(Effect.ignore(chat.spoken(ownerId, text, ""), { log: "Warn", message: "vibevalley: voice: the owner's spoken words were not kept" }));
           return answer(voiceNote + "\n" + lineWords.owner(text), signal);
         };
       },
-      stop: (agent) => Effect.flatMap(target(agent), (me) => me.host.stop),
-      markWrong: (on, want, agent) =>
-        Effect.flatMap(target(agent), (me) =>
-          me.host.markWrong(
-            on,
-            want,
-            modelId(me.id),
-            [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
-              (item) => item.name,
-            ),
+      stop: Effect.fn("Orchestrator.stop")(function* (agent) {
+        const me = yield* target(agent);
+        return yield* me.host.stop;
+      }),
+      markWrong: Effect.fn("Orchestrator.markWrong")(function* (on, want, agent) {
+        const me = yield* target(agent);
+        return yield* me.host.markWrong(
+          on,
+          want,
+          modelId(me.id),
+          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
+            (item) => item.name,
           ),
-        ),
+        );
+      }),
     });
   });

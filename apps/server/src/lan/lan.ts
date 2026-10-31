@@ -11,11 +11,10 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
 import { hostname, networkInterfaces } from "node:os";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
-import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 
-import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+import { NodeSink, NodeStream } from "@effect/platform-node";
+import { Cause, Clock, Context, Effect, FiberSet, Layer, Option, Schema, Semaphore, Stream } from "effect";
+import { HttpBody, HttpClient, HttpClientRequest, HttpMethod } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -37,7 +36,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
 import { callbackLog } from "@/base/log.ts";
-import { missing, lookIn } from "@/errors.ts";
+import { lookIn, messageOf, missing } from "@/errors.ts";
 
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
@@ -51,6 +50,14 @@ const seenEveryMs = 60_000;
 export const deviceHeader = "x-vibevalley-lan-device";
 
 const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
+
+/** The loopback server could not be reached, or its answer could not be streamed back to the device. */
+class ForwardFailed extends Schema.TaggedError<ForwardFailed, { readonly brand: unique symbol }>()("ForwardFailed", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
+
+const forwardFailed = (cause: unknown) => new ForwardFailed({ message: messageOf(cause), cause });
 
 interface Device extends LanDevice {
   readonly keyHash: string;
@@ -92,10 +99,10 @@ export class Lan extends Context.Service<
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-export const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
+const hostName = () => hostname().replace(/\.local$/u, "") || "vibevalley";
 
 /** Wi-Fi or Ethernet (en*, eth*, wlan*) before others; a private IPv4 address. */
-export function lanAddress(): string {
+function lanAddress(): string {
   let best = "";
   let rank = 3;
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
@@ -113,7 +120,7 @@ export function lanAddress(): string {
 const deviceName = (name: string) => [...name.split(/\s+/u).filter(Boolean).join(" ")].slice(0, 40).join("") || t("server.lan.aDevice");
 
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
-export const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
+const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
 
 const keyOf = (req: IncomingMessage) => {
   const auth = req.headers.authorization;
@@ -143,13 +150,14 @@ export interface LanOptions {
   readonly host?: string;
 }
 
-export const make = (options: LanOptions = {}) =>
+const make = (options: LanOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
     const { run: db } = yield* Db;
+    const http = yield* HttpClient.HttpClient;
     const address = options.address ?? lanAddress;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
@@ -231,18 +239,25 @@ export const make = (options: LanOptions = {}) =>
     /** Handed to the loopback server as it came, the device said; the answer streams back. */
     const forward = (req: IncomingMessage, res: ServerResponse, device: string) =>
       Effect.gen(function* () {
-        const headers = new Headers();
-        for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
-        if (device) headers.set(deviceHeader, device);
-        const body = req.method === "GET" || req.method === "HEAD" ? undefined : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
-        const answer = yield* Effect.tryPromise((signal) =>
-          fetch(`http://${upstream}${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(body ? { body, duplex: "half" } : {}), signal }),
+        const method = req.method;
+        if (!HttpMethod.isHttpMethod(method)) return refuseHttp(res, 405, t("server.lan.notRemote"));
+        const headers: Record<string, string> = {};
+        for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) headers[k] = Array.isArray(v) ? v.join(", ") : v;
+        if (device) headers[deviceHeader] = device;
+        const body =
+          method === "GET" || method === "HEAD"
+            ? HttpBody.empty
+            : HttpBody.stream(NodeStream.fromReadable({ evaluate: () => req, onError: forwardFailed }), req.headers["content-type"]);
+        const answer = yield* http
+          .execute(HttpClientRequest.make(method)(`http://${upstream}${req.url ?? "/"}`, { headers, body }))
+          .pipe(Effect.mapError(forwardFailed));
+        res.writeHead(answer.status, answer.headers);
+        yield* Stream.run(answer.stream, NodeSink.fromWritable({ evaluate: () => res, onError: forwardFailed })).pipe(
+          // A HEAD, a 204 or a 304 has no body to stream.
+          Effect.catchTag("HttpClientError", (e) => (e.reason._tag === "EmptyBodyError" ? Effect.sync(() => void res.end()) : Effect.fail(forwardFailed(e)))),
+          // Cut off (the device forgotten, the client gone): the answer under way ends with it, or a stream would stay open.
+          Effect.onInterrupt(() => Effect.sync(() => void res.destroy())),
         );
-        res.writeHead(answer.status, Object.fromEntries(answer.headers));
-        const streamed = answer.body;
-        if (!streamed) return void res.end();
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same web stream: the DOM's and Node's types name it apart
-        yield* Effect.tryPromise((signal) => pipeline(Readable.fromWeb(streamed as NodeReadableStream<Uint8Array>), res, { signal }));
       });
 
     /** One request on the listener, on the service's fibers: the client leaving, or its device being forgotten, interrupts
@@ -328,7 +343,7 @@ export const make = (options: LanOptions = {}) =>
         problem = "";
         server = s;
         const a = s.address();
-        port = typeof a === "object" && a !== null ? a.port : config.lan.port;
+        port = a === null || typeof a === "string" ? config.lan.port : a.port;
         logs.info(`vibevalley: lan access is open on port ${port}`);
         resume(Effect.void);
       });
@@ -384,27 +399,25 @@ export const make = (options: LanOptions = {}) =>
         }
         return status();
       }, opening.withPermits(1)),
-      startPairing: () =>
-        Effect.suspend(() => {
-          if (!open || !server) return Effect.fail(refuse(t("server.lan.notOpen")));
-          if (!url()) return Effect.fail(refuse(t("server.lan.noAddress")));
-          dropPairing();
-          pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
-          return Effect.succeed(status());
-        }),
+      startPairing: Effect.fn("Lan.startPairing")(function* () {
+        if (!open || !server) return yield* Effect.fail(refuse(t("server.lan.notOpen")));
+        if (!url()) return yield* Effect.fail(refuse(t("server.lan.noAddress")));
+        dropPairing();
+        pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
+        return status();
+      }),
       stopPairing: () => {
         dropPairing();
         return status();
       },
-      answer: (allow) =>
-        Effect.suspend(() => {
-          const p = livePairing();
-          if (!p || !p.asking) return Effect.fail(refuse(t("server.lan.noneAsking")));
-          const answer = p.answer;
-          pairing = undefined;
-          answer?.(allow);
-          return Effect.succeed(status());
-        }),
+      answer: Effect.fn("Lan.answer")(function* (allow) {
+        const p = livePairing();
+        if (!p || !p.asking) return yield* Effect.fail(refuse(t("server.lan.noneAsking")));
+        const answer = p.answer;
+        pairing = undefined;
+        answer?.(allow);
+        return status();
+      }),
       pair: Effect.fn("Lan.pair")(function* (code, given) {
         const name = deviceName(given);
         const p = livePairing();
@@ -447,17 +460,17 @@ export const make = (options: LanOptions = {}) =>
         conns.delete(id);
         return status();
       }),
-      previewForget: (id) =>
-        Effect.map(known(id), (d) => {
-          const open = conns.get(id)?.size ?? 0;
-          return { does: [t("server.lan.forget", { name: d.name }), ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
-        }),
-      me: (device) => {
+      previewForget: Effect.fn("Lan.previewForget")(function* (id) {
+        const d = yield* known(id);
+        const open = conns.get(id)?.size ?? 0;
+        return { does: [t("server.lan.forget", { name: d.name }), ...(open > 0 ? [t("server.lan.cut", { n: open })] : [])] };
+      }),
+      me: Effect.fn("Lan.me")(function* (device) {
         const d = device ? devices.get(device) : undefined;
-        if (!d) return Effect.fail(refuse(t("server.lan.local")));
+        if (!d) return yield* Effect.fail(refuse(t("server.lan.local")));
         const { keyHash: _, written: __, ...shown } = d;
-        return Effect.succeed(shown);
-      },
+        return shown;
+      }),
       setUpstream: (a) => {
         upstream = a;
       },

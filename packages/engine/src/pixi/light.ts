@@ -14,7 +14,7 @@ import type { PixelStage } from "./index";
 import { mirrorNormals, normalsOf, type NormalOptions } from "./normals";
 import type { Sky } from "./sky";
 
-export const MAX_LIGHTS = 32;
+const MAX_LIGHTS = 32;
 
 export interface PointLight {
   readonly x: number;
@@ -65,7 +65,7 @@ export function pixelsOf(texture: Texture): { readonly rgba: Uint8ClampedArray; 
 }
 
 /** A texture of `source`'s pixels taken at `resolution`: as many pixels per art pixel as the picture it goes with. */
-export function atResolution(texture: Texture, resolution: number): Texture {
+function atResolution(texture: Texture, resolution: number): Texture {
   if (resolution === 1) return texture;
   texture.source.resolution = resolution;
   return new Texture({ source: texture.source });

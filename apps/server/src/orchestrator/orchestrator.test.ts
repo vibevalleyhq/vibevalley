@@ -22,7 +22,7 @@ import { Notices } from "@/notice/notice.ts";
 import { Sessions } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
-import { gate, untilGot as until, whenTrue, within } from "@/testing/until.ts";
+import { gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import type { EvalCase } from "./evals.ts";
@@ -427,7 +427,6 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       const { in: saidIn } = yield* Said;
@@ -444,10 +443,7 @@ describe("the orchestrator", () => {
       expect(refused.text).toBe("合并：没挪：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
-      const merged = yield* until(async () => {
-        const t = await runPromise(issues.get(hired.session!.issue!));
-        return t.closedAt !== undefined && t;
-      }, "merged");
+      const merged = yield* waitFor(issues.get(hired.session!.issue!), (t) => t.closedAt !== undefined, "merged");
       // The helper said its words and committed nothing: done, with nothing to merge, and said so.
       expect(merged.delivered).toBe("none");
       const general = (yield* Channels).defaultChannel();
@@ -472,7 +468,6 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const runPromise = Effect.runPromiseWith(yield* Effect.context());
       const issues = yield* Issues;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
@@ -485,7 +480,7 @@ describe("the orchestrator", () => {
       expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
       yield* orchestrator.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
-      yield* until(async () => (await runPromise(issues.get(issue.id))).status === "in_review", "handed back");
+      yield* waitFor(issues.get(issue.id), (i) => i.status === "in_review", "handed back");
       yield* orchestrator.say("哪些在等我？", {}, undefined, "");
       const waiting = yield* until(() => words().find((w) => w.startsWith("工单：- #")), "listed");
       expect(waiting).toContain(`#${number}「首页偶尔白屏」等你验收`);

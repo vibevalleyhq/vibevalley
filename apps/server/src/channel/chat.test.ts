@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
@@ -165,7 +166,6 @@ type Farm = Effect.Success<typeof farm>;
 
 const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string, issue?: string) =>
   Effect.gen(function* () {
-    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     yield* f.core.apply({
       type: "hired",
       session: {
@@ -183,8 +183,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: strin
         refining: false,
       } as Session,
     });
-    let thread: Channel | undefined;
-    yield* until(async () => (thread = f.channel(await runPromise(f.chat.jobThread(id)))) !== undefined, "a job thread");
+    const thread = yield* waitFor(Effect.map(f.chat.jobThread(id), f.channel), (c) => c !== undefined, "a job thread");
     return thread!;
   });
 
@@ -747,6 +746,20 @@ describe("the chat", () => {
             { name: "截图.png", path: kept!.path },
           ]);
           expect(yield* Effect.flip(f.chat.say("", undefined, "", { attachments: ["nope"] }))).toMatchObject({ _tag: "Missing" });
+        }),
+      config,
+    );
+  });
+
+  it.live("regression: an attachment that cannot be kept is refused with the file system's own words", () => {
+    const config = testConfig();
+    // A file where the attachments folder should be: making the folder fails with EEXIST.
+    writeFileSync(join(config.home, "attachments"), "");
+    return run(
+      (f) =>
+        Effect.gen(function* () {
+          const refusal = yield* Effect.flip(f.chat.attach({ name: "a.txt", type: "", data: Buffer.from("x").toString("base64") }));
+          expect(refusal).toMatchObject({ _tag: "Refused", reason: expect.stringContaining("EEXIST") });
         }),
       config,
     );

@@ -35,7 +35,7 @@ export const spentText = (spent: Spent) => {
 };
 
 /** s.slice(-n), without splitting a character. */
-export function tail(s: string, n: number): string {
+function tail(s: string, n: number): string {
   const chars = [...s];
   let units = 0;
   for (let i = chars.length - 1; i >= 0; i--) {
@@ -109,7 +109,7 @@ export const channelLine = (c: { readonly name: string; readonly default?: boole
   "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
 
 /** How long, in round words. */
-export function spanWords(ms: number): string {
+function spanWords(ms: number): string {
   const m = Math.floor(Math.max(0, ms) / 60_000);
   if (m < 60) return `${Math.max(1, m)} 分钟`;
   if (m < 60 * 24) return `${Math.floor(m / 60)} 小时`;

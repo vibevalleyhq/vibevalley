@@ -5,7 +5,7 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
-import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -105,7 +105,7 @@ const named = ["id", "agent", "assignee", "session", "project", "name", "title",
 export function toolStart(name: string, args: unknown): ToolStart {
   let about = "";
   for (const k of named) {
-    const v: unknown = typeof args === "object" && args !== null ? Reflect.get(args, k) : undefined;
+    const v: unknown = Predicate.hasProperty(args, k) ? args[k] : undefined;
     if (typeof v === "string" && v.trim() !== "") {
       about = v;
       break;
@@ -124,7 +124,10 @@ export function toolStart(name: string, args: unknown): ToolStart {
 const spaces = /\s+/gu;
 
 /** Told to the model as the tool's failed result: the message is what it reads. */
-export class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly message: string }> {}
+class ToolRefusal extends Schema.TaggedError<ToolRefusal, { readonly brand: unique symbol }>()("ToolRefusal", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
 
@@ -134,9 +137,9 @@ const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is
 const said = (e: unknown) => toFailed(e).message;
 
 /** who throws for a caller nobody knows: the model reads it as the tool's failure. */
-const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e) }) });
+const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const agents = yield* Agents;
   const projects = yield* Projects;
@@ -156,7 +159,7 @@ export const make = Effect.gen(function* () {
   // Named by its endpoint (toolName): the name is never written a second time.
   const toolOf =
     <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
-    <K extends keyof All & Op>(op: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
+    <K extends keyof All & Op, E>(op: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, E>) => {
       const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
       return effectTool<unknown>({
         name: toolName(op),
@@ -411,21 +414,15 @@ export const make = Effect.gen(function* () {
       if (file === undefined || file.trim() === "") return yield* Effect.fail(refused(answers.artifact.noContent));
       const cwd = c.session ? run.find(c.session)?.place.cwd : undefined;
       if (!cwd) return yield* Effect.fail(refused(answers.artifact.noPlace));
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const root = await realpath(cwd);
-          const full = await realpath(resolve(root, file)).catch(() => {
-            throw new Error(answers.artifact.notFile(file));
-          });
-          if (full !== root && !full.startsWith(root + sep)) throw new Error(answers.artifact.outside(file));
-          const info = await stat(full);
-          if (!info.isFile()) throw new Error(answers.artifact.notFile(file));
-          // Read whole only when it may be kept; a bigger one is refused by its size as artifact.create would.
-          if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
-          return readFile(full, "utf8");
-        },
-        catch: (e) => refused(messageOf(e)),
-      });
+      const unread = (e: unknown) => refused(messageOf(e));
+      const root = yield* Effect.tryPromise({ try: () => realpath(cwd), catch: unread });
+      const full = yield* Effect.tryPromise({ try: () => realpath(resolve(root, file)), catch: () => refused(answers.artifact.notFile(file)) });
+      if (full !== root && !full.startsWith(root + sep)) return yield* Effect.fail(refused(answers.artifact.outside(file)));
+      const info = yield* Effect.tryPromise({ try: () => stat(full), catch: unread });
+      if (!info.isFile()) return yield* Effect.fail(refused(answers.artifact.notFile(file)));
+      // Read whole only when it may be kept; a bigger one is refused by its size as artifact.create would.
+      if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
+      return yield* Effect.tryPromise({ try: () => readFile(full, "utf8"), catch: unread });
     });
 
   const artifactList = (who: Who) =>

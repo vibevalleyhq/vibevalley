@@ -50,6 +50,8 @@ export interface Link {
 }
 
 /** A call the other side refused, with its reason: its input did not decode, its handler failed, or the bridge closed. */
+// A call's Promise rejects with it, in the page and in the mobile shell, neither of which runs Effect.
+// @effect-diagnostics-next-line extendsNativeError:off
 export class BridgeError extends Error {
   override readonly name = "BridgeError";
 }

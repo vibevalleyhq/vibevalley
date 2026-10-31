@@ -10,7 +10,7 @@ import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
-import type { Memory, MemoryKind } from "@vibevalley/protocol";
+import type { MemoryKind } from "@vibevalley/protocol";
 
 import { newId } from "@/base/ids.ts";
 import { redact } from "@/base/redact.ts";
@@ -157,9 +157,12 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       const all = [...pending];
       pending.clear();
       told.clear();
-      yield* Effect.forEach(all, ([session, project]) => Effect.ignore(flush(session, project, true)), { concurrency: "unbounded", discard: true }).pipe(
-        Effect.timeoutOption(prefetchTimeoutMs),
-      );
+      yield* Effect.forEach(
+        all,
+        ([session, project]) =>
+          Effect.ignore(flush(session, project, true), { log: "Warn", message: `vibevalley: everos: session ${session} was not flushed at stop` }),
+        { concurrency: "unbounded", discard: true },
+      ).pipe(Effect.timeoutOption(prefetchTimeoutMs));
     }),
     prefetch: Effect.fnUntraced(function* (cue) {
       if (c.read !== true || cue.text.trim() === "") return [];
@@ -223,5 +226,3 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     can: { list: false, forget: false, transcripts: true },
   };
 }
-
-export type { Memory };

@@ -2,8 +2,7 @@
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
-import { Clock, Data, Effect } from "effect";
-import { SqlClient } from "effect/sql";
+import { Clock, Effect, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
@@ -13,6 +12,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import type { Actor } from "@/base/actor.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
+import { bestEffort } from "@/base/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
@@ -48,7 +48,10 @@ export interface Note {
   readonly by: Actor;
 }
 
-export class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
+class MemoryRefused extends Schema.TaggedError<MemoryRefused, { readonly brand: unique symbol }>()("MemoryRefused", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** Fading marks the ones that would go if this many more were kept. */
 const fadingSoon = 10;
@@ -57,8 +60,7 @@ const recutBatch = 100;
 
 export const makeMemories = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const sql = yield* SqlClient.SqlClient;
-  const { attempt: db } = yield* Db;
+  const { attempt: db, run, attemptTx } = yield* Db;
 
   const list = (agent: string) =>
     db(
@@ -129,40 +131,38 @@ export const makeMemories = Effect.gen(function* () {
 
   const markRecalled = (ids: readonly string[]) =>
     Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: clock.currentTimeMillisUnsafe(), id })), { discard: true }).pipe(
-      Effect.catch((e) => Effect.logWarning(`a memory was recalled but not marked: ${String(e)}`)),
+      bestEffort("a memory was recalled but not marked"),
     );
 
   /** Reading for deduplication, keeping notes and pruning are one durable change. A stopped run leaves nothing. */
   const keep = (run: FinishedRun) =>
     run.outcome === "interrupted"
       ? Effect.void
-      : sql
-          .withTransaction(
-            Effect.gen(function* () {
-              const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
-              for (const note of memoryNotesOf(run.said)) {
-                const project = note.everywhere ? undefined : run.project;
-                if (!memoryIsNewNote(known, note.text, project)) continue;
-                yield* insertNote(run.agent, note.text, project, run.session, "session");
-                known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
-              }
-              const job = memoryJobText(run.job, run.summary, run.outcome);
-              yield* db(
-                q.keepJob({
-                  id: newId(),
-                  agent: run.agent,
-                  body: job,
-                  terms: termsText(job),
-                  terms_of: termsVersion,
-                  project: run.project,
-                  session: run.session,
-                  created_at: yield* Clock.currentTimeMillis,
-                }),
-              );
-              for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
-            }),
-          )
-          .pipe(Effect.catch((e) => Effect.logWarning(`what ${run.session} learned was not kept: ${String(e)}`)));
+      : attemptTx(
+          Effect.gen(function* () {
+            const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
+            for (const note of memoryNotesOf(run.said)) {
+              const project = note.everywhere ? undefined : run.project;
+              if (!memoryIsNewNote(known, note.text, project)) continue;
+              yield* insertNote(run.agent, note.text, project, run.session, "session");
+              known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
+            }
+            const job = memoryJobText(run.job, run.summary, run.outcome);
+            yield* db(
+              q.keepJob({
+                id: newId(),
+                agent: run.agent,
+                body: job,
+                terms: termsText(job),
+                terms_of: termsVersion,
+                project: run.project,
+                session: run.session,
+                created_at: yield* Clock.currentTimeMillis,
+              }),
+            );
+            for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
+          }),
+        ).pipe(bestEffort(`what ${run.session} learned was not kept`));
 
   const listed = Effect.fnUntraced(
     function* (agent: string) {
@@ -180,7 +180,10 @@ export const makeMemories = Effect.gen(function* () {
     const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
     const { id, at } = yield* insertNote(n.agent, body, project, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
-        Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed") }))),
+        Effect.andThen(
+          Effect.logWarning(`a note for ${n.agent}: ${String(e)}`),
+          Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed"), cause: e })),
+        ),
       ),
     );
     return {
@@ -197,7 +200,7 @@ export const makeMemories = Effect.gen(function* () {
     } satisfies Memory;
   });
 
-  const forget = (agent: string, id: string) => db(q.forget({ agent, id })).pipe(Effect.orDie);
+  const forget = (agent: string, id: string) => run(q.forget({ agent, id }));
 
   /** Cuts again what an older termsVersion cut, a batch at a time: the terms are an index derived from the body. */
   const recutTerms = Effect.gen(function* () {
@@ -206,7 +209,7 @@ export const makeMemories = Effect.gen(function* () {
       for (const r of rows) yield* db(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id }));
       if (rows.length < recutBatch) return;
     }
-  }).pipe(Effect.catch((e) => Effect.logWarning(`memories were not cut again: ${String(e)}`)));
+  }).pipe(bestEffort("memories were not cut again"));
 
   return { list, listed, matches, recallable, markRecalled, keep, write, forget, recutTerms };
 });

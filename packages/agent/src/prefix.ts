@@ -16,7 +16,7 @@ export const joinParts = (parts: readonly PromptPart[]) => parts.map((p) => p.te
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 
 /** In the order told. Tools last: they are sent before the system prompt, but are told after its own parts. */
-export const prefixParts = ["instructions", "env", "skills", "memory", "tools"] as const;
+const prefixParts = ["instructions", "env", "skills", "memory", "tools"] as const;
 
 export function prefixHashes(parts: readonly PromptPart[], tools: readonly ToolDeclaration[]): Record<string, string> {
   const hashes: Record<string, string> = {};

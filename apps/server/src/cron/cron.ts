@@ -3,7 +3,6 @@
 // is published for the orchestrator, who does it.
 
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
@@ -52,7 +51,7 @@ export class Crons extends Context.Service<
 }
 
 /** $TZ when it names a zone, else the system's. */
-export function localZone(): string {
+function localZone(): string {
   const tz = process.env.TZ;
   if (tz) {
     try {
@@ -65,12 +64,11 @@ export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agents;
   const chat = yield* Channels;
-  const sql = yield* SqlClient.SqlClient;
-  const { run: db } = yield* Db;
+  const { run: db, attempt } = yield* Db;
   // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
   const clock = yield* Clock.Clock;
   const now = () => clock.currentTimeMillisUnsafe();
@@ -113,9 +111,7 @@ export const make = Effect.gen(function* () {
       for (const s of dueCrons(core.state().crons, at)) {
         const missed = isMissed(s, at);
         const after = afterRun(s, at);
-        const written = yield* Effect.result(
-          Effect.provideService(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id }), SqlClient.SqlClient, sql),
-        );
+        const written = yield* Effect.result(attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })));
         if (written._tag === "Failure") {
           const failure = written.failure;
           yield* Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`);
@@ -197,10 +193,10 @@ export const make = Effect.gen(function* () {
       yield* core.apply({ type: "cronGone", id });
       return was;
     }, lock.withPermits(1)),
-    previewRemove: (id) =>
-      Effect.map(find(id), (was) => ({
-        does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })],
-      })),
+    previewRemove: Effect.fn("Crons.previewRemove")(function* (id) {
+      const was = yield* find(id);
+      return { does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })] };
+    }),
     tick,
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),
   });

@@ -3,7 +3,7 @@
 // (agent/brain/loop.test.ts holds the brain to that order), with Effect underneath: a run is a fiber of the agent's
 // scope, stopping it is a Deferred the model's stream and the tools race, a turn's tools are fibers side by side.
 
-import { Clock, Deferred, Effect, FiberSet, Option, Ref, type Scope, Stream } from "effect";
+import { Cause, Clock, Deferred, Effect, FiberSet, Option, Predicate, Ref, type Scope, Stream } from "effect";
 
 import { failedMessage, type LlmError, type Llm } from "@vibevalley/ai/llm";
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, ToolResultMessage } from "@vibevalley/ai/messages";
@@ -12,7 +12,7 @@ import type { Model, ThinkingLevel } from "@vibevalley/ai/models";
 import type { AssistantMessageEvent } from "@vibevalley/ai/response";
 import { type JsonSchema, toolArguments } from "@vibevalley/ai/tools";
 
-import { AgentBusy, CannotContinue, type ToolFailed } from "./errors.ts";
+import { AgentBusy, CannotContinue, messageOf, type ToolFailed } from "./errors.ts";
 
 export interface ToolResult {
   readonly content: readonly (TextContent | ImageContent)[];
@@ -391,7 +391,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
                 model: options.model.id,
                 usage: zeroUsage(),
                 stopReason: stopped ? "aborted" : "error",
-                errorMessage: String(cause),
+                errorMessage: messageOf(Cause.squash(cause)),
                 timestamp: yield* Clock.currentTimeMillis,
               };
               yield* options.onEvent({ type: "message_start", message: failure });
@@ -413,7 +413,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         const all = yield* Ref.get(messages);
         const last: unknown = all.at(-1);
         if (last === undefined) return yield* new CannotContinue({ message: "No messages to continue from" });
-        if (typeof last === "object" && last !== null && "role" in last && last.role === "assistant") {
+        if (Predicate.hasProperty(last, "role") && last.role === "assistant") {
           const steered = yield* takeOne(steering);
           if (steered.length > 0) return yield* start(steered, true);
           const later = yield* takeOne(followUps);

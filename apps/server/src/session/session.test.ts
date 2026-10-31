@@ -21,7 +21,7 @@ import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import { Sessions, type SessionsInside, watchStalls } from "./session.ts";
+import { NotRecorded, Sessions, type SessionsInside, watchStalls } from "./session.ts";
 const lab = (): Agent => ({ ...starter("lab"), effort: "" });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
@@ -111,7 +111,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
-      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
       expect((yield* sessions.deliver(id, "resume the work", { kind: "comment" })).kind).toBe("run");
       yield* until(() => phase(core, id) === "done" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
       expect(opens).toBe(3);
@@ -176,7 +176,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
-      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
       const resumed = yield* sessions.deliver(id, "resume the work", { kind: "comment" });
       expect(resumed.kind).toBe("refused");
       expect(JSON.stringify(resumed)).toContain("did not stop");
@@ -389,7 +389,7 @@ describe("sessions", () => {
       const sql = yield* SqlClient.SqlClient;
       const got = yield* sessions.send(lab(), "another", "demo", {
         issue: { id: issueId("i2"), number: 2 },
-        hiring: () => Effect.orDie(sql.unsafe("select no_such_column from issue_session")),
+        hiring: () => Effect.mapError(sql.unsafe("select no_such_column from issue_session"), (cause) => new NotRecorded({ message: cause.message, cause })),
       });
       expect(got.refused).toContain("工单没记下来");
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));

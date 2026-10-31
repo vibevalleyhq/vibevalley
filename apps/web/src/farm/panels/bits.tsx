@@ -70,7 +70,7 @@ const fileLook: Record<string, { fill: string; ink: string }> = {
 const patchInk = { added: "#3f6427", removed: "#c84a3a", hunk: "#4f8fbd", plain: "#46301d" } as const;
 const patchFill = { added: "#b4cb7c59", removed: "#c84a3a1a", hunk: undefined, plain: undefined } as const;
 
-export function Patch(props: { text: string }) {
+function Patch(props: { text: string }) {
   return (
     <div class="mx-2 mb-2 max-h-80 overflow-auto bg-cream-50 py-1">
       <For each={patchLines(props.text)} keyed={false}>

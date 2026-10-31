@@ -57,7 +57,7 @@ import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;
 
-export function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
+function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
   const info = catalog.find((r) => r.id === runtime);
   return {
     id: "",

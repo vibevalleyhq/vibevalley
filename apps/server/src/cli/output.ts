@@ -3,7 +3,7 @@
 // failure as JSON with what to do next; the exit code says which kind of failure it was without reading the words.
 // Everything goes through Effect's Stdio, so a test gives the command line its own.
 
-import { Data, Effect, Option, Schema, Stdio, Stream } from "effect";
+import { Effect, Option, Schema, Stdio, Stream } from "effect";
 
 /** Exit codes a script can branch on. */
 export const exit = {
@@ -28,15 +28,17 @@ export interface Next {
   readonly run?: readonly string[];
 }
 
+const NextStep: Schema.Codec<Next> = Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) });
+
 /** A command that did not go through, as it is printed: `{"error": {...}}` on stderr. */
-export class Failure extends Data.TaggedError("Failure")<{
-  readonly code: number;
+export class Failure extends Schema.TaggedError<Failure, { readonly brand: unique symbol }>()("Failure", {
+  code: Schema.Int,
   /** ApiError's tag (Refused, Missing…), the parser's (MissingArgument…), or Unreachable, InvalidJson, Server. */
-  readonly tag: string;
-  readonly text: string;
-  readonly status?: number;
-  readonly next?: readonly Next[];
-}> {}
+  tag: Schema.String,
+  text: Schema.String,
+  status: Schema.optionalKey(Schema.Int),
+  next: Schema.optionalKey(Schema.Array(NextStep)),
+}) {}
 
 const line = (to: "stdout" | "stderr", text: string) =>
   Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.orDie);
@@ -48,7 +50,7 @@ export const err = (text: string) => line("stderr", text);
 export const stdinText = Effect.flatMap(Stdio.Stdio, (io) => io.stdin.pipe(Stream.decodeText, Stream.mkString));
 
 /** A document as stdout takes it: laid out for a person on a terminal, one line otherwise. */
-export const printDocument = (value: unknown) =>
+const printDocument = (value: unknown) =>
   Effect.flatMap(Stdio.Stdio, (io) => io.stdoutIsTerminal).pipe(Effect.flatMap((tty) => out(tty ? JSON.stringify(value, null, 2) : JSON.stringify(value))));
 
 const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));

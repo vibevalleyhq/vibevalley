@@ -82,6 +82,7 @@ const env = (name: string, value: string | undefined) => {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
 };
+const envOf = (name: string) => process.env[name];
 
 describe("runtime", () => {
   it.live("what a runtime's probe said is said again in the farm's new language", () => {
@@ -561,7 +562,7 @@ describe("runtime", () => {
         concurrency: "unbounded",
       });
       expect([a.installation, b.installation]).toMatchObject([{ command: "first-bin" }, { command: "second-bin" }]);
-      expect(process.env.OAR_PI_BIN).toBe("external-default");
+      expect(envOf("OAR_PI_BIN")).toBe("external-default");
     }).pipe(Effect.ensuring(Effect.sync(() => env("OAR_PI_BIN", before))));
   });
 

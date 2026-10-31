@@ -36,6 +36,8 @@
 
 ## 检查管着的写法
 
+- 检查失败时说的话写三样：错在哪、为什么；`Fix:` 该怎么写（能照抄的一行，规则算得出的就算出来，比如 `parent-import` 给出 `@/…` 的写法、`no-cjk-literal` 给出该进哪个词典）；`See` 仓库里的一个文件。agent 读到的只有这句话，只说「不许」它就自己猜，猜的常常是绕过去。lint 规则经 `scripts/oxlint-plugin.ts` 的 `says` 写，`no-restricted-imports` 的话在 `vite.config.ts` 的 `refused` 里写一次，`scripts/oxlint-plugin.test.ts` 查格式和 `See` 的文件在不在；结构测试的 `expect(…, "<同样的三样>")`、脚本的报错照同一个格式写。能机械改对的给出自动修复（`vp check --fix`）。
+
 - 不写收窄的 `as`：外面来的值用 Schema 或类型守卫读，DOM 的值用 `instanceof`；确实只能断言的（库的类型缺口、自己写出又读回的文件），在那一行写 `// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- <为什么成立>`。测试、故事和样例不查：断言错了，读它的断言会失败。
 - 全局的属性是两个世界之间的契约（页面和它的壳、测试和它起的程序）：在门里声明一次（`declare global`、`interface Window`），之后按名字带着类型读写。门只有三个：`packages/protocol/src/host.ts`（宿主）、`apps/desktop/src/probe.ts`（桌面测试读的探针，只在 `VIBEVALLEY_DESKTOP_PROBE=1` 时有）、`apps/web/test/marks.ts`（页面测试自己埋的点）；转型 `window`、`globalThis`，`Object.assign` 到它们上，门外的 `declare global`，lint 的 `vibevalley/global-doors` 拦。
 - 正则都带 `u`：中文和 emoji 按码点算，`.`、`[^x]` 不会切开一个字。

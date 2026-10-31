@@ -5,7 +5,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
+import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Schema } from "effect";
 import { parse } from "yaml";
 
 import { t } from "@vibevalley/i18n";
@@ -52,7 +52,7 @@ export class ServerConfig extends Context.Service<
   }
 >()("vibevalley/ServerConfig") {}
 
-export const noticeBatchMs = 3_000;
+const noticeBatchMs = 3_000;
 
 export function defaults(home = homedir()): ServerConfig["Service"] {
   return {
@@ -81,7 +81,10 @@ export function defaults(home = homedir()): ServerConfig["Service"] {
 }
 
 /** Why the configuration cannot be read: the file, or a key's value. */
-export class ConfigError extends Data.TaggedError("ConfigError")<{ readonly message: string }> {}
+export class ConfigError extends Schema.TaggedError<ConfigError, { readonly brand: unique symbol }>()("ConfigError", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 const port = (name: string, value: number) => Keys.Int(name).pipe(Keys.withDefault(value));
 const text = (name: string, value: string) => Keys.String(name).pipe(Keys.withDefault(value));
@@ -144,10 +147,10 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
     if (optional) return undefined;
     return yield* new ConfigError({ message: t("server.base.noFile", { path }) });
   }
-  const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
+  const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}`, cause: e }));
   return yield* Effect.try({
     try: (): unknown => parse(body),
-    catch: (e) => new ConfigError({ message: `${path}: ${messageOf(e)}` }),
+    catch: (e) => new ConfigError({ message: `${path}: ${messageOf(e)}`, cause: e }),
   });
 });
 
@@ -170,7 +173,7 @@ export const loadConfig = Effect.fnUntraced(function* (
     agora: { app_id: env.AGORA_APP_ID, app_certificate: env.AGORA_APP_CERTIFICATE },
   });
   const provider = ConfigProvider.orElse(fromEnv, ConfigProvider.orElse(ownNames, ConfigProvider.fromUnknown(given ?? {})));
-  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
+  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => new ConfigError({ message: `${path}: ${e.message}`, cause: e }));
   for (const [name, n] of [
     ["port", read.port],
     ["voice.line.port", read.voice.line.port],

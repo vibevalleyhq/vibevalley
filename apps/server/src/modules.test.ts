@@ -42,7 +42,10 @@ const reads: Readonly<Record<string, string>> = {};
 describe("the modules", () => {
   it("hold every folder and file under src", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
-    expect(tops.filter((t) => !outside.includes(t) && moduleOf(t) === undefined)).toEqual([]);
+    expect(
+      tops.filter((t) => !outside.includes(t) && moduleOf(t) === undefined),
+      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: move it into the module whose concept it is, or add it to that module's folders in modules.ts. See apps/server/src/modules.ts",
+    ).toEqual([]);
   });
 
   it("import only the modules before them", () => {
@@ -56,8 +59,14 @@ describe("the modules", () => {
         if (moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)) found.push(`${from} -> ${to}`);
       }
     }
-    expect(found.filter((f) => !(f in pending))).toEqual([]);
-    expect(Object.keys(pending).filter((p) => !found.includes(p))).toEqual([]);
+    expect(
+      found.filter((f) => !(f in pending)),
+      "a module imports one after it in modules.ts, so the two lean on each other. Fix: move what both need into the earlier module (or base), or have the later one hand it down as a Stream; a shape they share lives in the module that defines it. See docs/architecture.md",
+    ).toEqual([]);
+    expect(
+      Object.keys(pending).filter((p) => !found.includes(p)),
+      "an import listed in pending is gone. Fix: drop it from pending. See apps/server/src/modules.test.ts",
+    ).toEqual([]);
   });
 
   it("read only their own part of the core state", () => {
@@ -74,7 +83,13 @@ describe("the modules", () => {
         if (owner && owner !== moduleOf(from)?.name) found.push(`${from} -> ${part}`);
       }
     }
-    expect(found.filter((f) => !(f in reads))).toEqual([]);
-    expect(Object.keys(reads).filter((r) => !found.includes(r))).toEqual([]);
+    expect(
+      found.filter((f) => !(f in reads)),
+      "a module reads another's part of the core state, so the owner's rules are skipped. Fix: ask the owning module's service for it (a method or a Stream), and keep core.state() reads to the module that owns the field. See docs/subsystems/core.md",
+    ).toEqual([]);
+    expect(
+      Object.keys(reads).filter((r) => !found.includes(r)),
+      "a read listed in reads is gone. Fix: drop it from reads. See apps/server/src/modules.test.ts",
+    ).toEqual([]);
   });
 });

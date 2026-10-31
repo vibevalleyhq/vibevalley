@@ -5,7 +5,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, Queue, Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Deferred, Effect, Exit, Fiber, Queue, Schema, Scope, Semaphore, Stream } from "effect";
 
 import { Brain, type BrainEvent, sessionUnfinished } from "@vibevalley/agent/brain";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -26,13 +26,19 @@ import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
 
+/** The input a caller waited on was not taken; cause is whatever stopped it, a defect included. */
+export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly brand: unique symbol }>()("NotAnswered", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
+
 /** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before.
  * Its words are read once: what came before the reader is kept for it. */
 export class Caller {
   private kept: string[] = [];
   private ended = false;
-  private failure: Cause.Cause<unknown> | undefined;
-  private reader: Queue.Queue<string, unknown> | undefined;
+  private failure: Cause.Cause<NotAnswered> | undefined;
+  private reader: Queue.Queue<string, NotAnswered | Cause.Done> | undefined;
 
   push(text: string) {
     if (this.ended) return;
@@ -46,14 +52,14 @@ export class Caller {
     if (this.reader) Queue.endUnsafe(this.reader);
   }
 
-  fail(error: unknown) {
+  fail(cause: unknown) {
     if (this.ended) return;
-    this.failure = Cause.fail(error);
+    this.failure = Cause.fail(new NotAnswered({ message: messageOf(cause), cause }));
     this.ended = true;
     if (this.reader) Queue.failCauseUnsafe(this.reader, this.failure);
   }
 
-  readonly words: Stream.Stream<string, unknown> = Stream.callback<string, unknown>((queue) =>
+  readonly words: Stream.Stream<string, NotAnswered> = Stream.callback<string, NotAnswered>((queue) =>
     Effect.sync(() => {
       for (const w of this.kept) Queue.offerUnsafe(queue, w);
       this.kept = [];
@@ -65,7 +71,10 @@ export class Caller {
 }
 
 /** Why the agent did not start: the model missing a key, or the host closing. The message is what the owner reads. */
-class CannotStart extends Data.TaggedError("CannotStart")<{ readonly message: string }> {}
+class CannotStart extends Schema.TaggedError<CannotStart, { readonly brand: unique symbol }>()("CannotStart", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 /** An input as the host keeps it: its route (kept in the transcript), and in process only the run it starts and the
  * caller waiting on its words. */
@@ -95,9 +104,9 @@ export interface HostOptions<R> {
   /** Words are not said for this route (the caller still gets them). */
   readonly quiet: (route: R) => boolean;
   /** Where words go: each of the model's answers in full, as one message; the caller has them as they grow. */
-  readonly say: (route: R, text: string, run: string) => Effect.Effect<void, unknown>;
+  readonly say: (route: R, text: string, run: string) => Effect.Effect<void>;
   /** route: the input it works for, once it has taken one in this run; its words go there. */
-  readonly state: (state: OrchestratorState, route?: R) => Effect.Effect<void, unknown>;
+  readonly state: (state: OrchestratorState, route?: R) => Effect.Effect<void>;
   /** The agent started, or folded its conversation: what the model saw before is gone from it. */
   readonly fresh: () => void;
   /** The run an input found in the transcript after a restart goes on with: its issue and trigger, from its route. */
@@ -110,7 +119,7 @@ export interface HostOptions<R> {
 
 /** What makes an input's text once it is its turn: whether the agent is busy (an input may be taken after a later one),
  * and what memory gained since the model last saw it. heard: the messages the text tells of, recorded on the run. */
-export type Build = (busy: boolean, memoryNews: string) => Effect.Effect<{ readonly text: string; readonly heard?: readonly string[] }, unknown>;
+export type Build<E> = (busy: boolean, memoryNews: string) => Effect.Effect<{ readonly text: string; readonly heard?: readonly string[] }, E>;
 
 export type Submitted = { readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string };
 
@@ -121,7 +130,7 @@ export interface AgentHost<R> {
   readonly unfinished: () => boolean;
   /** now joins the run under way; otherwise the input waits until the run would stop. false and why when the agent
    * cannot start: that input is recorded as a failed run of its own. */
-  readonly submit: (build: Build, input: Hosted<R>, now: boolean) => Effect.Effect<Submitted, unknown>;
+  readonly submit: <E>(build: Build<E>, input: Hosted<R>, now: boolean) => Effect.Effect<Submitted, E>;
   /** The run the last start was cut off in goes on, with the input it was taking, within maxAgeMs. */
   readonly resume: (maxAgeMs: number) => Effect.Effect<void>;
   /** The inputs waiting are dropped with the run. */
@@ -214,7 +223,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
       journal.usage(tokens, usageText(tokens, changed));
     };
 
-    const event = (e: BrainEvent): Effect.Effect<void, unknown> =>
+    const event = (e: BrainEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
         let run: RunInput | undefined;
         if (e.type === "message_start" && isHosted(e.message, o.inputType)) run = local.get(e.message)?.run ?? { by: { kind: "" } };
@@ -282,7 +291,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
     const start = Effect.gen(function* () {
       if (brain) return brain.brain;
       if (closing) return yield* new CannotStart({ message: stopped() });
-      const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e) }) });
+      const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e), cause: e }) });
       const scope = yield* Scope.fork(owner);
       // The brain publishes on its own fibers and waits for its listeners: its events go through a queue, followed one
       // at a time in order, so that the brain waits for none of what they start. The queue ends after the brain's own
@@ -315,7 +324,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
       return made;
     });
 
-    const submit = (build: Build, hosted: Hosted<R>, now: boolean): Effect.Effect<Submitted, unknown> =>
+    const submit = <E>(build: Build<E>, hosted: Hosted<R>, now: boolean): Effect.Effect<Submitted, E> =>
       Effect.suspend(() => {
         if (closing) return Effect.succeed(closeInput(hosted));
         const run: RunInput = { ...hosted.run, by: hosted.run.by.kind ? hosted.run.by : { kind: "comment" } };
@@ -434,7 +443,7 @@ const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.r
 /** The input that began the turn asked: logged when the input is taken, after it was made, so the message is no newer
  * than the step, and it holds the step's words (trimmed and maybe cut; the message puts what the owner adds before them).
  * Of those, the newest: an older one with the same words was taken before. -1 when none is. */
-export function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
+function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;
   lines.forEach((m, i) => {
@@ -444,7 +453,7 @@ export function turnAt(lines: readonly BrainMessage[], text: string, time: numbe
 }
 
 /** What followed an input until the next one, without the compactions written after a run. */
-export function turnOf(rest: readonly BrainMessage[], inputType: string): BrainMessage[] {
+function turnOf(rest: readonly BrainMessage[], inputType: string): BrainMessage[] {
   const out: BrainMessage[] = [];
   for (const m of rest) {
     if (isHosted(m, inputType)) break;

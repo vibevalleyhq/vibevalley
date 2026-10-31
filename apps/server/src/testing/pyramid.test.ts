@@ -30,7 +30,10 @@ describe("the test pyramid", () => {
             .filter((s) => s.startsWith(".") && resolve(f, s).startsWith("src/flows/"))
             .map((s) => `${f} imports ${s}`),
     );
-    expect(crossing).toEqual([]);
+    expect(
+      crossing,
+      "the flows' whole farm is built only in src/flows: a module test that builds it is a flow test in the wrong place, slow and with too much in the way. Fix: test the module through its service with testing/world.ts's world, or move the test into src/flows. See docs/subsystems/foundation.md",
+    ).toEqual([]);
   });
 
   it("replays each module's recorded cases in the process", () => {
@@ -40,7 +43,10 @@ describe("the test pyramid", () => {
       const chain = reach(f);
       return chain ? [chain.join(" → ")] : [];
     });
-    expect(leaving).toEqual([]);
+    expect(
+      leaving,
+      "a module's recorded.test.ts replays its golden data in the process, and this import chain reaches a database, a process or the network. Fix: import the pure function from a file that runs nothing, moving it (or the shapes it needs) out of the file that does, as project/shapes.ts was. See docs/subsystems/foundation.md",
+    ).toEqual([]);
   });
 
   it("follows imports into the workspace's packages", () => {

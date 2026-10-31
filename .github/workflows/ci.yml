@@ -26,9 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # No job pushes, so the token is not left in the checkout's git config.
+      # No job pushes, so the token is not left in the checkout's git config. Two commits deep: a pull request's merge
+      # commit and its first parent, the base scripts/regression.ts compares it with.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
+        with: { persist-credentials: false, fetch-depth: 2 }
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
       # @v1 lags behind (no cache-toolchain).
       - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
@@ -57,11 +58,20 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
         run: vpx scripts/commit-msg.ts --body "$BODY" && vpx scripts/commit-msg.ts --branch "$BRANCH"
+      - name: regression tests
+        # A pull request that removes or changes a test named "regression: …" names it in its body, and a fix adds one
+        # (scripts/regression.ts). HEAD^1 is the base the merge commit was made on.
+        if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BRANCH: ${{ github.head_ref }}
+        run: vpx scripts/regression.ts --base HEAD^1 --branch "$BRANCH" --body "$BODY"
       # A warning fails too: none are let in to pile up.
       - run: vp check --deny-warnings
       - run: vp run docs:verify
       - run: vp run scripts:test
       - run: vp run health:verify
+      - run: vp run deadcode
       - run: vp run effect:check
 
       # The server's tests in three parts at once; the types are the check job's (vp check covers every package).

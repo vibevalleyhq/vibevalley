@@ -7,7 +7,7 @@ import { format, type Params } from "./format";
 import { currentLocale, type Locale } from "./locale";
 
 export { currentLocale, LocaleValues, setLocale, type Locale } from "./locale";
-export { format, placeholderKinds, placeholders, type Params, type Value } from "./format";
+export { format, placeholders, type Params } from "./format";
 export type { Messages } from "./catalogs";
 
 export type MessageKey = keyof Messages;

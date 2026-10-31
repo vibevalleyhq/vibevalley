@@ -30,11 +30,5 @@ export function newest(items: readonly MemoryItem[], limit: number): MemoryItem[
   return [...items].toSorted((a, b) => b.at - a.at).slice(0, limit);
 }
 
-export function lastRecalled(items: readonly MemoryItem[]): MemoryItem | undefined {
-  let best: MemoryItem | undefined;
-  for (const m of items) if (m.recalledAt !== undefined && (best?.recalledAt === undefined || m.recalledAt > best.recalledAt)) best = m;
-  return best;
-}
-
 /** After a recall, its item flashes for this long. */
 export const flashFor = 10 * 60_000;

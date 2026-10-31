@@ -10,8 +10,8 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Clock, Context, Data, Effect, Fiber, FiberSet, Layer, Predicate, Schema, type Scope, Semaphore, Stream } from "effect";
-import { HttpEffect } from "effect/http";
+import { type Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { HttpBody, HttpClient, type HttpClientError, HttpEffect } from "effect/http";
 import type { Socket } from "effect/socket";
 
 import { t } from "@vibevalley/i18n";
@@ -19,7 +19,7 @@ import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrch
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 
 import { ServerConfig } from "@/base/config.ts";
-import { callbackLog } from "@/base/log.ts";
+import { callbackLog, bestEffort } from "@/base/log.ts";
 import { afterRealTime } from "@/base/time.ts";
 import { Channels } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
@@ -75,9 +75,16 @@ const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => (
   ...(settings ? { settings } : {}),
 });
 /** A step of a call outside the farm (Agora, the orchestrator's answer) that did not go; cause is what it threw. */
-class CallStepFailed extends Data.TaggedError("CallStepFailed")<{ readonly message: string; readonly cause: unknown }> {}
+class CallStepFailed extends Schema.TaggedError<CallStepFailed, { readonly brand: unique symbol }>()("CallStepFailed", {
+  message: Schema.String,
+  cause: Schema.Defect(),
+}) {}
 
 const callStepFailed = (cause: unknown) => new CallStepFailed({ message: messageOf(cause), cause });
+
+/** What an HTTP call's failure says to the owner: the network's own words (refused, reset), not the client's wrapper. */
+const causeText = (e: HttpClientError.HttpClientError | Cause.TimeoutError) =>
+  e._tag === "HttpClientError" && "cause" in e.reason && e.reason.cause !== undefined ? messageOf(e.reason.cause) : e.message;
 
 const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
 
@@ -180,26 +187,34 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
 
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
 
-/** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
- * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
+/** As Agora's SDK retries on its own: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute), else 1 s
+ * then 2 s; the last answer is the one handed back. */
+const agoraRetries = Schedule.exponential("1 second").pipe(
+  Schedule.setInputType<Response>(),
+  Schedule.while(({ input, attempt }) => attempt <= 2 && ([408, 429].includes(input.status) || input.status >= 500)),
+  Schedule.modifyDelay(({ input, duration }) => {
+    const after = Number(input.headers.get("Retry-After"));
+    return Effect.succeed(after > 0 ? Math.min(after * 1000, 60_000) : duration);
+  }),
+  Schedule.passthrough,
+);
+
+/** Agora's REST calls retried as its SDK would, but sleeping on the service's Clock: the SDK's own retries wait on real
+ * time, out of its reach. */
 export const retrying =
   (fetcher: typeof fetch, run: Run): typeof fetch =>
   (input, init) =>
     run(
-      Effect.gen(function* () {
-        for (let attempt = 0; ; attempt++) {
-          // A failed fetch goes back to the SDK as it is: it rejects the SDK's call, as the fetch itself would.
-          const res = yield* Effect.promise(() => fetcher(input, init));
-          if (attempt >= 2 || !([408, 429].includes(res.status) || res.status >= 500)) return res;
-          const after = Number(res.headers.get("Retry-After"));
-          yield* Effect.sleep(after > 0 ? Math.min(after * 1000, 60_000) : 1000 * 2 ** attempt);
-        }
-      }),
+      // A failed fetch goes back to the SDK as it is: it rejects the SDK's call, as the fetch itself would.
+      Effect.repeat(
+        Effect.promise(() => fetcher(input, init)),
+        agoraRetries,
+      ),
       init?.signal ? { signal: init.signal } : undefined,
     );
 
 /** Runs an Effect for the Promise side (the Agora SDK's fetch) on the service's fibers, so its sleeps are on its Clock. */
-export type Run = <A>(effect: Effect.Effect<A, unknown>, options?: { readonly signal: AbortSignal }) => Promise<A>;
+export type Run = <A>(effect: Effect.Effect<A>, options?: { readonly signal: AbortSignal }) => Promise<A>;
 
 export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
@@ -339,7 +354,7 @@ export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
   /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
-  readonly tunnel?: (port: number) => Effect.Effect<Tunnel, unknown>;
+  readonly tunnel?: (port: number) => Effect.Effect<Tunnel, LineFailed>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
   /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
@@ -355,7 +370,10 @@ export interface Tunnel {
 }
 
 /** Why the voice line cannot be had now; the message is the owner's. */
-class LineFailed extends Data.TaggedError("LineFailed")<{ readonly message: string }> {}
+class LineFailed extends Schema.TaggedError<LineFailed, { readonly brand: unique symbol }>()("LineFailed", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
 
 const cloudflared = (port: number) =>
   Effect.callback<Tunnel, LineFailed>((resume) => {
@@ -363,7 +381,7 @@ const cloudflared = (port: number) =>
     try {
       child = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      return resume(Effect.fail(new LineFailed({ message: messageOf(e) })));
+      return resume(Effect.fail(new LineFailed({ message: messageOf(e), cause: e })));
     }
     const close = () => child.kill();
     let settled = false;
@@ -397,21 +415,27 @@ const cloudflared = (port: number) =>
     });
   });
 
-/** The line refusing a keyless request counts as an answer. Asked over the real network. */
-const tunnelAnswers = (url: string) =>
+/** The line refusing a keyless request counts as an answer. Asked over the real network every 2 s; no ask starts after
+ * lineReadyMs. */
+export const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
   Effect.gen(function* () {
     const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
-    while ((yield* Clock.currentTimeMillis) < deadline) {
-      const res = yield* Effect.tryPromise((signal) =>
-        fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) }),
-      ).pipe(Effect.option);
-      if (res._tag === "Some" && res.value.status === 401) return true;
-      yield* Effect.sleep(2_000);
-    }
-    return false;
+    const every = 2_000;
+    return yield* client.post(url + "/llm/ready/chat/completions").pipe(
+      Effect.timeout("5 seconds"),
+      Effect.option,
+      Effect.map((res) => res._tag === "Some" && res.value.status === 401),
+      Effect.repeat(
+        Schedule.spaced(every).pipe(
+          Schedule.setInputType<boolean>(),
+          Schedule.while(({ input, now }) => !input && now + every < deadline),
+          Schedule.passthrough,
+        ),
+      ),
+    );
   });
 
-export const make = (options: VoiceOptions = {}) =>
+const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     const config = yield* ServerConfig;
@@ -422,6 +446,7 @@ export const make = (options: VoiceOptions = {}) =>
     const orchestrator = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
+    const httpClient = yield* HttpClient.HttpClient;
     // Fibers started from callbacks belong to this service: they end with it, and sleep on its Clock.
     const forkHere = yield* FiberSet.makeRuntime();
     const runHere: Run = yield* FiberSet.makeRuntimePromise();
@@ -497,7 +522,7 @@ export const make = (options: VoiceOptions = {}) =>
       options.tunnel ??
       ((port: number) =>
         Effect.tap(cloudflared(port), (item) =>
-          Effect.flatMap(tunnelAnswers(item.url), (answers) =>
+          Effect.flatMap(tunnelAnswers(httpClient, item.url), (answers) =>
             answers ? Effect.void : Effect.logInfo(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`),
           ),
         ));
@@ -511,7 +536,7 @@ export const make = (options: VoiceOptions = {}) =>
       return opening.withPermits(1)(
         Effect.gen(function* () {
           if (tunnel) return tunnel.url;
-          const item = yield* openTunnel(linePort).pipe(Effect.mapError((e) => (e instanceof LineFailed ? e : new LineFailed({ message: messageOf(e) }))));
+          const item = yield* openTunnel(linePort);
           if (stopped) {
             item.close();
             return yield* lineClosed();
@@ -763,13 +788,13 @@ export const make = (options: VoiceOptions = {}) =>
               // An agent that joins after its start was given up on is stopped; one that never joined has nothing to stop.
               if (pending && agora)
                 forkHere(
-                  Effect.tryPromise(() => pending).pipe(
+                  Effect.tryPromise({ try: () => pending, catch: callStepFailed }).pipe(
                     Effect.option,
                     Effect.flatMap((joined) =>
                       joined._tag === "None"
                         ? Effect.void
-                        : Effect.tryPromise(() => agora.stopAgent(joined.value)).pipe(
-                            Effect.catch((e) => Effect.logWarning("vibevalley: voice: the late agent could not be stopped: " + messageOf(e.cause))),
+                        : Effect.tryPromise({ try: () => agora.stopAgent(joined.value), catch: callStepFailed }).pipe(
+                            bestEffort("vibevalley: voice: the late agent could not be stopped"),
                           ),
                     ),
                   ),
@@ -801,17 +826,21 @@ export const make = (options: VoiceOptions = {}) =>
         calls.delete(agentId);
       }),
       heard,
-      heardCurrent: (text, picked, sendKey) =>
-        Effect.suspend(() => {
-          const live = [...calls].filter(([, c]) => !c.ending);
-          if (live.length > 1) return Effect.fail(failed(t("server.voice.manyCalls")));
-          if (live.length === 0) return Effect.fail(failed(t("server.voice.noCall")));
-          return heard(live[0]![0], text, picked, sendKey);
-        }),
+      heardCurrent: Effect.fn("Voice.heardCurrent")(function* (text, picked, sendKey) {
+        const live = [...calls].filter(([, c]) => !c.ending);
+        if (live.length > 1) return yield* Effect.fail(failed(t("server.voice.manyCalls")));
+        const [only] = live;
+        if (!only) return yield* Effect.fail(failed(t("server.voice.noCall")));
+        return yield* heard(only[0], text, picked, sendKey);
+      }),
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
-        if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""));
+        if (call.quick && text.trim() !== call.greeting)
+          yield* Effect.ignore(chat.spoken(defaultOrchestrator, text, ""), {
+            log: "Warn",
+            message: "vibevalley: voice: the orchestrator's spoken words were not kept",
+          });
       }),
       verifyMoss: Effect.fn("Voice.verifyMoss")(function* (given) {
         const key = given.trim() || settings.mossKey();
@@ -831,7 +860,9 @@ export const make = (options: VoiceOptions = {}) =>
         }
       }),
       mossProblem: () => (settings.mossKey() === "" ? t("server.voice.moss.noKey") : undefined),
-      mossLine: (page) => relay(page, settings.mossKey(), options.moss),
+      mossLine: Effect.fn("Voice.mossLine")(function* (page) {
+        return yield* relay(page, settings.mossKey(), options.moss);
+      }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
@@ -860,24 +891,20 @@ export const make = (options: VoiceOptions = {}) =>
         form.append("model", model);
         form.append("response_format", "json");
         // A local model's first request loads it, which takes a while.
-        const res = yield* Effect.tryPromise({
-          // Effect's own signal too: an interrupted dictation (the page went away) stops its upload, not only the timeout.
-          try: (signal) =>
-            fetch(url + "/audio/transcriptions", {
-              method: "POST",
-              body: form,
-              headers: d.key ? { authorization: "Bearer " + d.key } : {},
-              signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
-            }),
-          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: messageOf(e) }), "dictation"),
-        });
-        const raw = (yield* Effect.tryPromise({
-          try: () => res.text(),
-          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: messageOf(e) }), "call"),
-        })).slice(0, 1 << 20);
+        // An interrupted dictation (the page went away) stops its upload, as the timeout does.
+        const res = yield* httpClient
+          .post(url + "/audio/transcriptions", { headers: d.key ? { authorization: "Bearer " + d.key } : {}, body: HttpBody.formData(form) })
+          .pipe(
+            Effect.timeout("120 seconds"),
+            Effect.mapError((e) => unavailable(t("server.voice.dictation.unreachable", { why: causeText(e) }), "dictation")),
+          );
+        const raw = (yield* res.text.pipe(Effect.mapError((e) => unavailable(t("server.voice.dictation.cut", { why: causeText(e) }), "call")))).slice(
+          0,
+          1 << 20,
+        );
         const got = Schema.decodeOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
-        if (!res.ok)
+        if (res.status < 200 || res.status >= 300)
           return yield* Effect.fail(
             unavailable(t("server.voice.dictation.status", { status: res.status, detail: [...(detail || raw.trim())].slice(0, 200).join("") })),
           );
@@ -885,10 +912,9 @@ export const make = (options: VoiceOptions = {}) =>
         return { text: (got.value.text ?? "").trim() };
       }),
       lines: () => keys.size,
-      speak: (text) =>
-        Effect.suspend(() => {
-          const on = liveCall();
-          return on ? speakOn(on, text) : Effect.succeed(false);
-        }),
+      speak: Effect.fn("Voice.speak")(function* (text) {
+        const on = liveCall();
+        return on ? yield* speakOn(on, text) : false;
+      }),
     });
   });

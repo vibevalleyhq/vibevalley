@@ -19,7 +19,7 @@ export interface SwitchTarget {
   readonly at: number;
 }
 
-export const switchMax = 12;
+const switchMax = 12;
 
 /** The places for what is typed: `#` keeps channels and threads, `@` direct channels and profiles; the rest matches the
  * name anywhere, a name starting with it first, then the unread, then the newest talked in. Archived places are left out. */

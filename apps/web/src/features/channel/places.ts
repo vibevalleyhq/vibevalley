@@ -1,5 +1,5 @@
 import { type Chat, type Channel } from "@vibevalley/protocol";
-export const isTop = (c: Channel) => c.type !== "thread";
+const isTop = (c: Channel) => c.type !== "thread";
 
 export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
 

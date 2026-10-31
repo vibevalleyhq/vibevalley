@@ -2,7 +2,7 @@
 // on the Clock of the service that made it, so that a test's TestClock moves it as it moves the services.
 // The one file in apps/server/src that may touch the wall clock (vibevalley/no-wall-clock): wallTime below.
 
-import { Clock, Effect } from "effect";
+import { Clock, Effect, FiberSet, type Scope } from "effect";
 
 export interface Time {
   /** Unix milliseconds. */
@@ -13,12 +13,12 @@ export interface Time {
   readonly after: (ms: number, f: () => void) => () => void;
 }
 
-/** The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context. */
-export const timeHere: Effect.Effect<Time> = Effect.gen(function* () {
-  const context = yield* Effect.context();
+/** The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context, on fibers its
+ * scope owns, so a timer still pending when the service closes is interrupted rather than fired into a closed service. */
+export const timeHere: Effect.Effect<Time, never, Scope.Scope> = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const run = Effect.runPromiseWith(context);
-  const fork = Effect.runForkWith(context);
+  const run = yield* FiberSet.makeRuntimePromise();
+  const fork = yield* FiberSet.makeRuntime();
   return {
     now: () => clock.currentTimeMillisUnsafe(),
     sleep: (ms, signal) => run(Effect.sleep(Math.max(0, ms)), signal ? { signal } : undefined),

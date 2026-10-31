@@ -61,7 +61,7 @@ const readStored = (text: string): Stored => {
 };
 
 /** Over each code point's first UTF-16 unit, wrapping at 32 bits, as the client counts. */
-export function castHash(s: string): number {
+function castHash(s: string): number {
   let h = 0;
   for (const ch of s) {
     const cp = ch.codePointAt(0)!;
@@ -152,7 +152,7 @@ const installed = (template: AgentTemplate, beside: readonly Agent[], id?: strin
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "config.json");
   const disk = new FileWriter(file);
@@ -256,20 +256,18 @@ export const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, agents: [...x.agents, created] }));
       return created;
     }),
-    remove: (id) =>
-      Effect.andThen(
-        deletableAgent(id),
-        change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
-      ),
-    previewRemove: (id) =>
-      Effect.map(deletableAgent(id), (a) => ({
-        does: [t("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })],
-      })),
-    saveSkill: (skill) =>
-      Effect.as(
-        change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
-        skill,
-      ),
+    remove: Effect.fn("Agents.remove")(function* (id) {
+      yield* deletableAgent(id);
+      return yield* change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) }));
+    }),
+    previewRemove: Effect.fn("Agents.previewRemove")(function* (id) {
+      const a = yield* deletableAgent(id);
+      return { does: [t("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })] };
+    }),
+    saveSkill: Effect.fn("Agents.saveSkill")(function* (skill) {
+      yield* change((x) => ({ ...x, skills: upsert(x.skills, skill) }));
+      return skill;
+    }),
     createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(t("server.agent.newSkillId")));
       const stem =
@@ -283,30 +281,28 @@ export const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
       return created;
     }),
-    removeSkill: (id) =>
-      Effect.andThen(
-        deletableSkill(id),
-        change((x) => ({
-          ...x,
-          skills: x.skills.filter((k) => k.id !== id),
-          agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
-        })),
-      ),
-    previewRemoveSkill: (id) =>
-      Effect.map(deletableSkill(id), (k) => {
-        const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
-        return {
-          does: [
-            t("server.agent.removeSkill", { name: k.name }),
-            ...(holders.length > 0 ? [t("server.agent.unequip", { holders: list(holders.map((name) => t("server.agent.quoted", { name }))) })] : []),
-          ],
-        };
-      }),
-    saveSettings: (runtime, settings) =>
-      Effect.as(
-        change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } })),
-        settings,
-      ),
+    removeSkill: Effect.fn("Agents.removeSkill")(function* (id) {
+      yield* deletableSkill(id);
+      return yield* change((x) => ({
+        ...x,
+        skills: x.skills.filter((k) => k.id !== id),
+        agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
+      }));
+    }),
+    previewRemoveSkill: Effect.fn("Agents.previewRemoveSkill")(function* (id) {
+      const k = yield* deletableSkill(id);
+      const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
+      return {
+        does: [
+          t("server.agent.removeSkill", { name: k.name }),
+          ...(holders.length > 0 ? [t("server.agent.unequip", { holders: list(holders.map((name) => t("server.agent.quoted", { name }))) })] : []),
+        ],
+      };
+    }),
+    saveSettings: Effect.fn("Agents.saveSettings")(function* (runtime, settings) {
+      yield* change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } }));
+      return settings;
+    }),
     templates,
     installTemplate: Effect.fn("Agents.installTemplate")(function* (id) {
       const item = templateOf(id);
@@ -328,7 +324,7 @@ export const make = Effect.gen(function* () {
     addTemplate: Effect.fn("Agents.addTemplate")(function* (path) {
       const read = Effect.try({
         try: () => readTemplate(path, "added"),
-        catch: (e) => refused(e instanceof TemplateProblem ? e.message : String(e)),
+        catch: (e) => refused(Schema.is(TemplateProblem)(e) ? e.message : String(e)),
       });
       const item = yield* read;
       if (templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));
@@ -338,21 +334,23 @@ export const make = Effect.gen(function* () {
       });
       return { ...item, installed: [] };
     }),
-    removeTemplate: (id) =>
-      Effect.flatMap(deletableTemplate(id), (item) =>
-        Effect.try({
-          try: () => removeTemplate(config.home, item.id),
-          catch: (e) => refused(t("server.agent.notSaved", { file: id, why: messageOf(e) })),
-        }),
-      ),
-    previewRemoveTemplate: (id) =>
-      Effect.map(deletableTemplate(id), (item) => ({
+    removeTemplate: Effect.fn("Agents.removeTemplate")(function* (id) {
+      const item = yield* deletableTemplate(id);
+      return yield* Effect.try({
+        try: () => removeTemplate(config.home, item.id),
+        catch: (e) => refused(t("server.agent.notSaved", { file: id, why: messageOf(e) })),
+      });
+    }),
+    previewRemoveTemplate: Effect.fn("Agents.previewRemoveTemplate")(function* (id) {
+      const item = yield* deletableTemplate(id);
+      return {
         does: [
           item.installed.length > 0
             ? t("server.agent.template.deleteKept", { name: item.name, installed: item.installed.length })
             : t("server.agent.template.delete", { name: item.name }),
         ],
-      })),
+      };
+    }),
   });
   return shape;
 });

@@ -28,8 +28,6 @@ export class Mcp extends Context.Service<
   static readonly layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));
 }
 
-export { unknownCaller };
-
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
 export interface McpOptions {
@@ -37,7 +35,7 @@ export interface McpOptions {
   readonly who?: (token: string) => string;
 }
 
-export const make = (options: McpOptions = {}) =>
+const make = (options: McpOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const sessions = yield* Sessions;

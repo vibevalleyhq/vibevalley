@@ -23,13 +23,13 @@ describe("Caller", () => {
     }),
   );
 
-  it.effect("fails its reader with what failed it", () =>
+  it.effect("fails its reader with what failed it, as the cause", () =>
     Effect.gen(function* () {
       const caller = new Caller();
       caller.push("partly");
       caller.fail(new Error("no model"));
       const read = yield* Effect.flip(Stream.mkString(caller.words));
-      expect(read).toEqual(new Error("no model"));
+      expect(read).toMatchObject({ _tag: "NotAnswered", message: "no model", cause: new Error("no model") });
     }),
   );
 });

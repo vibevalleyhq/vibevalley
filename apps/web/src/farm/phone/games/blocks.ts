@@ -122,7 +122,7 @@ function draw(bag: readonly PieceKind[], seed: number): [PieceKind, PieceKind[],
 const spawn = (kind: PieceKind): Falling => ({ kind, turn: 0, x: Math.floor((blocksWidth - shapes[kind][0]) / 2), y: 0 });
 
 /** Above the top is fine. */
-export const fits = (well: readonly number[], p: Falling) =>
+const fits = (well: readonly number[], p: Falling) =>
   cellsOf(p).every(([x, y]) => x >= 0 && x < blocksWidth && y < blocksHeight && (y < 0 || well[y * blocksWidth + x] === 0));
 
 export function newBlocks(seed: number): Blocks {

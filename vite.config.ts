@@ -1,5 +1,54 @@
 import { defineConfig } from "vite-plus";
 
+import { effectRules } from "./scripts/effect-lint.ts";
+import { says } from "./scripts/oxlint-plugin.ts";
+
+// What no-restricted-imports says, each written once: what is wrong, how to fix it, and where to look
+// (scripts/oxlint-plugin.ts, says; its test reads these too).
+export const refused = {
+  bunTest: says(
+    "tests run on vitest, not bun",
+    'import { describe, expect, it } from "vite-plus/test" (in the server, `it.effect` from "@effect/vitest")',
+    "docs/subsystems/foundation.md",
+  ),
+  tempDir: says(
+    "a folder from mkdtempSync stays behind after the run",
+    "`tempDir()` from @vibevalley/testkit/temp, which removes it when the run ends",
+    "packages/testkit/src/temp.ts",
+  ),
+  agentWords: says(
+    "the agent says nothing to the owner: the server words what it did",
+    "return a value or a tagged error, and let apps/server turn it into words with t()",
+    "packages/agent/README.md",
+  ),
+  agentContract: says(
+    "the agent knows nothing of the farm's contract, so it runs without the farm",
+    "take what it needs as a parameter or an interface in packages/agent, and let apps/server fit the farm's shapes to it",
+    "packages/agent/README.md",
+  ),
+  packageToApp: says(
+    "a package does not reach into an app: apps depend on packages, never back",
+    "move what both need into the package, or have the app pass it in",
+    "docs/architecture.md",
+  ),
+  aiToAgent: says("packages/ai knows nothing of the agent, which is built on it", "move what ai needs down into packages/ai", "packages/ai/README.md"),
+  coreToBrain: says(
+    "the agent's core does not import its brain: the brain is built on core",
+    "move what core needs into packages/agent/src/core, or pass it in",
+    "packages/agent/README.md",
+  ),
+  react: says(
+    "the page is Solid 2; a React import resolves only because apps/mobile installs React",
+    "use solid-js, and the Solid version of the library",
+    "apps/web/README.md",
+  ),
+  useQuery: says(
+    "solid-query's useQuery tracks what its fetch reads, so a signal read inside refetches",
+    'import { useQuery } from "@/base/query"',
+    "apps/web/src/base/query.ts",
+  ),
+};
+
 export default defineConfig({
   // vp dev, build and preview at the root mean the page.
   defaultPackage: "./apps/web",
@@ -48,6 +97,8 @@ export default defineConfig({
         "effect-tsgo diagnostics --project apps/web/tsconfig.json --strict",
         "effect-tsgo diagnostics --project apps/desktop/tsconfig.json --strict",
       ],
+      // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
+      deadcode: "vpx scripts/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
     },
   },
@@ -69,14 +120,16 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: ["site/**", "apps/server/db/generated/**"],
-    // oxlint's defaults, and import for no-cycle; listing plugins replaces the defaults.
-    plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
+    // oxlint's defaults, import for no-cycle, and effecttsgo: Effect's rules, patched into oxlint by package.json's prepare
+    // (scripts/effect-lint.ts); listing plugins replaces the defaults.
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "effecttsgo"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "solid", specifier: "eslint-plugin-solid" },
       { name: "vibevalley", specifier: "./scripts/oxlint-plugin.ts" },
     ],
     rules: {
+      ...effectRules(),
       "vite-plus/prefer-vite-plus-imports": "error",
       "vibevalley/no-comment-divider": "error",
       // [...text] splits by code point, on purpose (docs/style/code.md).
@@ -154,7 +207,7 @@ export default defineConfig({
       {
         // Tests are vitest's, on Node.
         files: ["apps/**", "packages/**", "scripts/**"],
-        rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }] }] },
+        rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: refused.bunTest }] }] },
       },
       {
         // The server's tests make their folders with tempDir, which removes them when the run ends.
@@ -165,8 +218,8 @@ export default defineConfig({
             "error",
             {
               paths: [
-                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
-                { name: "node:fs", importNames: ["mkdtempSync"], message: "Use tempDir (@vibevalley/testkit/temp): it removes the folder when the run ends." },
+                { name: "bun:test", message: refused.bunTest },
+                { name: "node:fs", importNames: ["mkdtempSync"], message: refused.tempDir },
               ],
             },
           ],
@@ -283,13 +336,13 @@ export default defineConfig({
             "error",
             {
               paths: [
-                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
-                { name: "@vibevalley/i18n", message: "The agent says nothing to the owner: return a value or an error the server words." },
-                { name: "@vibevalley/protocol", message: "The agent knows nothing of the farm's contract." },
+                { name: "bun:test", message: refused.bunTest },
+                { name: "@vibevalley/i18n", message: refused.agentWords },
+                { name: "@vibevalley/protocol", message: refused.agentContract },
               ],
               patterns: [
-                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: "A package does not reach into an app." },
-                { group: ["@vibevalley/agent", "@vibevalley/agent/*"], message: "packages/ai knows nothing of the agent." },
+                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp },
+                { group: ["@vibevalley/agent", "@vibevalley/agent/*"], message: refused.aiToAgent },
               ],
             },
           ],
@@ -302,11 +355,11 @@ export default defineConfig({
             "error",
             {
               paths: [
-                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
-                { name: "@vibevalley/i18n", message: "The agent says nothing to the owner: return a value or an error the server words." },
-                { name: "@vibevalley/protocol", message: "The agent knows nothing of the farm's contract." },
+                { name: "bun:test", message: refused.bunTest },
+                { name: "@vibevalley/i18n", message: refused.agentWords },
+                { name: "@vibevalley/protocol", message: refused.agentContract },
               ],
-              patterns: [{ group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: "A package does not reach into an app." }],
+              patterns: [{ group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp }],
             },
           ],
         },
@@ -318,10 +371,10 @@ export default defineConfig({
           "no-restricted-imports": [
             "error",
             {
-              paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }],
+              paths: [{ name: "bun:test", message: refused.bunTest }],
               patterns: [
-                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: "A package does not reach into an app." },
-                { group: ["../*"], message: "core does not import the brain: the brain imports core." },
+                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp },
+                { group: ["../*"], message: refused.coreToBrain },
               ],
             },
           ],
@@ -359,6 +412,24 @@ export default defineConfig({
         rules: { "vibevalley/promise-boundary": "error" },
       },
       {
+        // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/oxlint-plugin.ts, try-promise-catch).
+        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**"],
+        excludeFiles: ["**/*.test.ts"],
+        rules: { "vibevalley/try-promise-catch": "error" },
+      },
+      {
+        // Errors are told apart by their tag, not their class (scripts/oxlint-plugin.ts, no-instanceof-tagged).
+        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**"],
+        excludeFiles: ["**/*.test.ts"],
+        rules: { "vibevalley/no-instanceof-tagged": "error" },
+      },
+      {
+        // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/oxlint-plugin.ts, no-object-guard).
+        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
+        excludeFiles: ["**/*.test.ts"],
+        rules: { "vibevalley/no-object-guard": "error" },
+      },
+      {
         // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
         // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
         // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).
@@ -393,6 +464,18 @@ export default defineConfig({
         // Doors to the outside, where null comes in and is turned into undefined: a stored column's text, the DOM's body.
         files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/draft.ts"],
         rules: { "vibevalley/one-absent": "off" },
+      },
+      {
+        // A service's methods open a span named after them, so the traces show each call (scripts/oxlint-plugin.ts, service-method-names).
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/service-method-names": "error" },
+      },
+      {
+        // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/db-door": "error" },
       },
       {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).
@@ -435,14 +518,14 @@ export default defineConfig({
               paths: [
                 ...["react", "react-dom", "react-router", "@tanstack/react-query", "react-markdown"].map((name) => ({
                   name,
-                  message: "The page is Solid 2 (apps/web/README.md).",
+                  message: refused.react,
                 })),
                 {
                   name: "@tanstack/solid-query",
                   importNames: ["useQuery"],
-                  message: "Use base/query.ts's useQuery: it runs the fetch untracked.",
+                  message: refused.useQuery,
                 },
-                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
+                { name: "bun:test", message: refused.bunTest },
               ],
             },
           ],

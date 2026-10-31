@@ -23,7 +23,7 @@ export interface RunSnapshot {
   readonly lifetime: Usage;
 }
 
-export function addUsage(a: Usage, b: Usage): Usage {
+function addUsage(a: Usage, b: Usage): Usage {
   const sum: Usage = {
     input: a.input + b.input,
     output: a.output + b.output,

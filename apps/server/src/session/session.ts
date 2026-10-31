@@ -12,10 +12,8 @@ import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
-  Cause,
   Clock,
   Context,
-  Data,
   Deferred,
   Effect,
   Exit,
@@ -23,15 +21,16 @@ import {
   FiberSet,
   FileSystem,
   Layer,
+  Metric,
   Option,
+  Predicate,
   PubSub,
+  Schema,
   type Scope,
   Semaphore,
-  Schema,
   Stream,
-  Metric,
 } from "effect";
-import { SqlClient, SqlError } from "effect/sql";
+import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -63,6 +62,7 @@ import { serverAddress, ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { timeHere } from "@/base/time.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
@@ -70,11 +70,11 @@ import { Core, type FactIn } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { Memories } from "@/memory/memory.ts";
 import { Projects } from "@/project/project.ts";
-import { type Merged, MergeFailure, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
 import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
 
 import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
-import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
+import { eventFacts, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { type Journal, Trajectories } from "./journal.ts";
@@ -140,7 +140,7 @@ interface Allocation {
   attached: boolean;
   failure?: string;
   /** Keep the failure too: oar's next close may be a no-op after a failed dispose. */
-  closing?: Deferred.Deferred<void, unknown>;
+  closing?: Deferred.Deferred<void, NotClosed>;
 }
 
 interface OarSession extends Allocation {
@@ -206,7 +206,7 @@ export class Sessions extends Context.Service<
     readonly handOver: (
       id: string,
       closed: SessionClose,
-      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
       settle?: Settle,
     ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
     /** What the session's branch would bring now; the conflict it shows is kept on the session. */
@@ -269,19 +269,27 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Executions open now" });
 
 /** A write of a session's own records (a run, the issue it works) that did not go through. */
-export class NotRecorded extends Data.TaggedError("NotRecorded")<{ readonly message: string; readonly cause?: unknown }> {}
+export class NotRecorded extends Schema.TaggedError<NotRecorded, { readonly brand: unique symbol }>()("NotRecorded", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
+
+/** oar's runtime session or its subagents did not close. */
+class NotClosed extends Schema.TaggedError<NotClosed, { readonly brand: unique symbol }>()("NotClosed", { message: Schema.String, cause: Schema.Defect() }) {}
+
+const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause), cause });
 
 /** Work that did not go in (see handOver); the session stays. */
-export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
-  readonly failure: MergeFailure;
+export class NotTakenIn extends Schema.TaggedError<NotTakenIn, { readonly brand: unique symbol }>()("NotTakenIn", {
+  failure: MergeFailure,
   /** What the helper is sent back with; "" when the owner settles it. */
-  readonly fix: string;
+  fix: Schema.String,
   /** What the owner is told; also the message. */
-  readonly owner: string;
-  readonly notice: string;
-  readonly short: string;
-  readonly message: string;
-}> {}
+  owner: Schema.String,
+  notice: Schema.String,
+  short: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** A failure's words, whatever it is. */
 const reasonText = (e: unknown): string => (e instanceof Error ? e.message : Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : String(e));
@@ -401,21 +409,14 @@ export const make = (options: SessionOptionsIn = {}) =>
     const chat = yield* Channels;
     const projects = yield* Projects;
     const runtimes = yield* Runtimes;
-    const sql = yield* SqlClient.SqlClient;
-    const { run: db } = yield* Db;
-    /** A write that must not stop a run: logged, and the run goes on. */
-    const logged = <A, E>(what: string, e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(
-        Effect.asVoid,
-        Effect.catch((err) => Effect.logWarning(`vibevalley: ${what}: ${String(err)}`)),
-      );
+    const { run: db, attempt } = yield* Db;
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const run = yield* FiberSet.makeRuntimePromise();
     const forkHere = yield* FiberSet.makeRuntime();
     /** A write whose failure the caller handles. */
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
-    const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
+      attempt(e).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+    const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
     // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
     // all ended with the service.
     const timers = yield* FiberMap.make<string>();
@@ -485,7 +486,11 @@ export const make = (options: SessionOptionsIn = {}) =>
       };
     };
     const keepHands = Effect.suspend(() =>
-      Effect.forEach([...hands.values()], (h) => logged(`session ${h.id}: what brings it back not kept`, qs.keepHand(handRow(h))), { discard: true }),
+      Effect.forEach(
+        [...hands.values()],
+        (h) => attempt(qs.keepHand(handRow(h))).pipe(bestEffort(`vibevalley: session ${h.id}: what brings it back not kept`)),
+        { discard: true },
+      ),
     );
 
     const save = () => {
@@ -494,8 +499,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
 
     const keep = (s: Session) =>
-      logged(
-        `session ${s.id} not kept`,
+      attempt(
         qs.keepSession({
           id: s.id,
           agent: s.agent,
@@ -507,10 +511,10 @@ export const make = (options: SessionOptionsIn = {}) =>
           graph: s.graph ? JSON.stringify(s.graph) : null,
           hired_at: s.hiredAt,
         }),
-      );
+      ).pipe(bestEffort(`vibevalley: session ${s.id} not kept`));
 
     const ended = (id: string, closed: SessionClose) =>
-      logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id }));
+      attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
 
     const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
 
@@ -525,9 +529,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
         tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
     };
-    /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
-    const keptRun = (what: string, e: Effect.Effect<unknown, NotRecorded>) =>
-      Effect.catch(Effect.asVoid(e), (err) => Effect.logWarning(`vibevalley: ${what}: ${err.message}`));
 
     /** Called before the input goes out, so the turn it opens finds it. */
     const expect = (h: Hand, by: RunTrigger) => void h.triggers.push(by);
@@ -542,13 +543,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.run = id;
       h.heard = [];
       h.journal.runStarted(id);
-      fire(keptRun(`${h.id}'s run not kept`, runs.start(id, h.id, issue, by)));
+      fire(runs.start(id, h.id, issue, by).pipe(bestEffort(`vibevalley: ${h.id}'s run not kept`)));
     };
 
     const heardInRun = (h: Hand, message: string) => {
       if (!h.run) return;
       h.heard.push(message);
-      fire(keptRun(`run ${h.run}`, runs.heard(h.run, h.heard)));
+      fire(runs.heard(h.run, h.heard).pipe(bestEffort(`vibevalley: run ${h.run}`)));
     };
 
     const endRun = (h: Hand, outcome: Outcome, summary: string, spent?: Spent) => {
@@ -557,7 +558,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.heard = [];
       if (!id) return;
       h.journal.runEnded(id, outcome);
-      fire(keptRun(`run ${id}`, runs.finish(id, outcome, summary, spent)));
+      fire(runs.finish(id, outcome, summary, spent).pipe(bestEffort(`vibevalley: run ${id}`)));
     };
 
     const closedLaunch = (h: Hand) => {
@@ -713,23 +714,24 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     /** Closes once, on the service's fibers: a caller that stops waiting does not stop the close, and every later call
      * waits for it and gets its outcome. */
-    const closeAllocation = (allocation: Allocation): Effect.Effect<void, unknown> =>
+    const closeAllocation = (allocation: Allocation): Effect.Effect<void, NotClosed> =>
       Effect.suspend(() => {
         if (allocation.closing) return Deferred.await(allocation.closing);
-        const closing = Deferred.makeUnsafe<void, unknown>();
+        const closing = Deferred.makeUnsafe<void, NotClosed>();
         allocation.closing = closing;
         const close = Effect.gen(function* () {
-          const crew = yield* Effect.exit(Effect.tryPromise(() => allocation.subagents.close()));
+          const crew = yield* Effect.exit(Effect.tryPromise({ try: () => allocation.subagents.close(), catch: notClosed }));
           // A failed prompt may have made oar close its Subagent already. Its no-op close is not proof that dispose succeeded.
-          const resources = yield* Effect.forEach([...allocation.resources], (session) => Effect.exit(Effect.tryPromise(() => session.dispose())), {
-            concurrency: "unbounded",
-          });
+          const resources = yield* Effect.forEach(
+            [...allocation.resources],
+            (session) => Effect.exit(Effect.tryPromise({ try: () => session.dispose(), catch: notClosed })),
+            { concurrency: "unbounded" },
+          );
           const failed = [crew, ...resources].find(Exit.isFailure);
           if (failed) return yield* failed;
         });
         forkHere(
           close.pipe(
-            Effect.mapError((e) => (e instanceof Cause.UnknownError ? e.cause : e)),
             Effect.onExit((exit) => Deferred.done(closing, exit)),
             Effect.ignore,
           ),
@@ -945,7 +947,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const handOver = Effect.fn("Sessions.handOver")(function* (
       id: string,
       closed: SessionClose,
-      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
       settle: Settle = "owner",
     ) {
       const h = hands.get(id);
@@ -962,7 +964,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           yield* rest(h);
           const merged = yield* use(h.place, h.lastText).pipe(
             Effect.mapError((e) => {
-              const f = e instanceof MergeFailure ? e : MergeFailure.error(reasonText(e));
+              const f = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(reasonText(e));
               if (f.kind === "conflict") apply({ type: "conflict", id: current.id, conflict: { base: f.base, files: [...f.files] } });
               const words = notTakenIn(f, current.name, settle);
               return new NotTakenIn({ failure: f, ...words, message: words.owner });
@@ -977,7 +979,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     });
 
     /** The freshest word on conflicts is a preview of the branch; the session's state follows it. */
-    const changesOf = Effect.fn("Sessions.changesOf")(function* (id: string) {
+    const changesOf = Effect.fn("Sessions.changes")(function* (id: string) {
       const place = hands.get(id)?.place;
       if (!place) return undefined;
       const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
@@ -1004,7 +1006,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db(qr.openRuns())) yield* keptRun(`run ${r.id}`, runs.finish(r.id, "interrupted", t("server.session.log.restarted")));
+      for (const r of yield* db(qr.openRuns()))
+        yield* runs.finish(r.id, "interrupted", t("server.session.log.restarted")).pipe(bestEffort(`vibevalley: run ${r.id}`));
       const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
@@ -1161,7 +1164,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             Effect.gen(function* () {
               if (opt.hiring) yield* opt.hiring(session);
               return yield* logOf(session);
-            }).pipe(Effect.catchDefect((e) => (SqlError.isSqlError(e) ? Effect.fail(e) : Effect.die(e)))),
+            }),
           ).pipe(Effect.onError((cause) => failedOpening(opened.session, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(cause) }))));
           if (registered._tag === "Failure") {
             const failed = yield* failedOpening(
@@ -1217,21 +1220,21 @@ export const make = (options: SessionOptionsIn = {}) =>
         );
       }, admission.withPermits(1)),
       deliver,
-      tell: (id, text, by) =>
-        Effect.map(deliver(id, text, by), (d) => {
-          const name = core.session(id)?.name ?? id;
-          switch (d.kind) {
-            case "steered":
-              return t("server.session.life.steered", { name });
-            case "queued":
-              return t("server.session.life.queued", { name });
-            case "run":
-              return t("server.session.life.started", { name, woke: d.woke === true });
-            case "refused":
-              break;
-          }
-          return d.reason ?? "";
-        }),
+      tell: Effect.fn("Sessions.tell")(function* (id, text, by) {
+        const d = yield* deliver(id, text, by);
+        const name = core.session(id)?.name ?? id;
+        switch (d.kind) {
+          case "steered":
+            return t("server.session.life.steered", { name });
+          case "queued":
+            return t("server.session.life.queued", { name });
+          case "run":
+            return t("server.session.life.started", { name, woke: d.woke === true });
+          case "refused":
+            break;
+        }
+        return d.reason ?? "";
+      }),
       stop: Effect.fn("Sessions.stop")(function* (id) {
         const s = hands.get(id)?.sess;
         if (!s || core.session(id)?.phase._tag !== "working") return false;
@@ -1307,7 +1310,10 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (Option.isNone(r) || r.value.ended_at === null) return undefined;
         return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
       }),
-      runs: (issue) => Effect.map(db(qr.runsOfIssue({ issue_id: issue })), (rows) => rows.map(runOf)),
+      runs: Effect.fn("Sessions.runs")(function* (issue) {
+        const rows = yield* db(qr.runsOfIssue({ issue_id: issue }));
+        return rows.map(runOf);
+      }),
       events: (id, r) => trajectories.events(id, r),
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
@@ -1317,7 +1323,9 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: (o) => makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
+      host: Effect.fn("Sessions.host")(function* <R>(o: HostOptions<R>) {
+        return yield* makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore);
+      }),
       restore,
     });
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
@@ -1356,5 +1364,3 @@ export type SessionsInside = Effect.Success<ReturnType<typeof make>>;
 
 /** Brings the sessions back once every service is built. */
 export const ready = Layer.effectDiscard(Effect.flatMap(Sessions, (s) => s.restore));
-
-export type { From };

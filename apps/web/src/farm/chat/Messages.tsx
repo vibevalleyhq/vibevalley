@@ -25,7 +25,7 @@ import { farmClock, readsLong } from "./labels";
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
 /** A message's text; a long one shows its first lines until opened. */
-export function ChatText(props: { text: string; link?: string }) {
+function ChatText(props: { text: string; link?: string }) {
   const [open, setOpen] = createSignal(false);
   return (
     <Show when={readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
@@ -81,7 +81,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
   );
 }
 
-export function SenderName(props: { m: ChatMessage }) {
+function SenderName(props: { m: ChatMessage }) {
   return (
     <Show when={props.m.fromKind === "session"} fallback={<>{props.m.name}</>}>
       {props.m.name} <span class="font-mono text-bark-500">@{props.m.from}</span>

@@ -3,270 +3,405 @@
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 3
+    "lintOff": 3,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 3
   },
   "apps/mobile": {
     "nonNull": 1,
     "doubleCast": 1,
     "cast": 3,
-    "lintOff": 5
+    "lintOff": 5,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 4
   },
   "apps/server": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "apps/web": {
     "nonNull": 3,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/agent": {
     "nonNull": 18,
     "doubleCast": 2,
     "cast": 5,
-    "lintOff": 8
+    "lintOff": 8,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 3
   },
   "packages/ai": {
     "nonNull": 10,
     "doubleCast": 0,
     "cast": 7,
-    "lintOff": 3
+    "lintOff": 3,
+    "orDie": 1,
+    "ignored": 0,
+    "swallowed": 1
   },
   "packages/base-ui": {
     "nonNull": 8,
     "doubleCast": 0,
     "cast": 4,
-    "lintOff": 5
+    "lintOff": 5,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/bridge": {
     "nonNull": 0,
     "doubleCast": 1,
     "cast": 2,
-    "lintOff": 3
+    "lintOff": 3,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/engine": {
-    "nonNull": 40,
+    "nonNull": 29,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/health": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 2
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/i18n": {
     "nonNull": 4,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/protocol": {
     "nonNull": 10,
     "doubleCast": 2,
     "cast": 2,
-    "lintOff": 4
+    "lintOff": 4,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "packages/stories": {
     "nonNull": 3,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 3
   },
   "packages/testkit": {
     "nonNull": 2,
     "doubleCast": 0,
     "cast": 6,
-    "lintOff": 1
+    "lintOff": 1,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "server: Agent Sessions": {
-    "nonNull": 16,
+    "nonNull": 14,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 2
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 2,
+    "swallowed": 1
   },
   "server: Agents": {
     "nonNull": 35,
     "doubleCast": 1,
     "cast": 9,
-    "lintOff": 4
+    "lintOff": 4,
+    "orDie": 0,
+    "ignored": 5,
+    "swallowed": 2
   },
   "server: Collaboration": {
     "nonNull": 42,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 2,
+    "swallowed": 0
   },
   "server: Gamification": {
     "nonNull": 2,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "server: Gateway": {
-    "nonNull": 7,
+    "nonNull": 6,
     "doubleCast": 0,
-    "cast": 15,
-    "lintOff": 7
+    "cast": 13,
+    "lintOff": 6,
+    "orDie": 4,
+    "ignored": 5,
+    "swallowed": 0
   },
   "server: Issues": {
-    "nonNull": 29,
+    "nonNull": 25,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 2
+    "lintOff": 2,
+    "orDie": 1,
+    "ignored": 0,
+    "swallowed": 1
   },
   "server: Notifications": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "server: Orchestrator": {
     "nonNull": 7,
     "doubleCast": 0,
     "cast": 4,
-    "lintOff": 3
+    "lintOff": 3,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "server: Platform": {
     "nonNull": 6,
     "doubleCast": 0,
     "cast": 4,
-    "lintOff": 6
+    "lintOff": 6,
+    "orDie": 3,
+    "ignored": 0,
+    "swallowed": 2
   },
   "server: Source Control": {
     "nonNull": 35,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 9,
+    "ignored": 1,
+    "swallowed": 1
   },
   "web: app": {
     "nonNull": 9,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: base": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 3,
-    "lintOff": 4
+    "lintOff": 4,
+    "orDie": 0,
+    "ignored": 1,
+    "swallowed": 2
   },
   "web: farm": {
     "nonNull": 67,
     "doubleCast": 0,
     "cast": 8,
-    "lintOff": 3
+    "lintOff": 3,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 7
   },
   "web: features/agent": {
     "nonNull": 3,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/artifact": {
     "nonNull": 4,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 1
+    "lintOff": 1,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 1
   },
   "web: features/catalog": {
     "nonNull": 11,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 2
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 1
   },
   "web: features/channel": {
     "nonNull": 13,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 1
+    "lintOff": 1,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 3
   },
   "web: features/connector": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/issue": {
     "nonNull": 20,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 3
   },
   "web: features/lan": {
     "nonNull": 1,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/memory": {
     "nonNull": 3,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/notice": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 2
   },
   "web: features/orchestrator": {
     "nonNull": 1,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/project": {
     "nonNull": 22,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 1
+    "lintOff": 1,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/runtime": {
     "nonNull": 4,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 1
+    "lintOff": 1,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/session": {
     "nonNull": 14,
     "doubleCast": 0,
     "cast": 2,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 2
   },
   "web: features/setting": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/task": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: features/voice": {
     "nonNull": 7,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 6
   },
   "web: tree": {
     "nonNull": 25,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 0
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: ui": {
     "nonNull": 16,
     "doubleCast": 4,
     "cast": 1,
-    "lintOff": 5
+    "lintOff": 5,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 3
   }
 }

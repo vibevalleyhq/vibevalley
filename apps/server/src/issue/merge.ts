@@ -1,4 +1,4 @@
-import { Clock, Effect, Semaphore } from "effect";
+import { Clock, Effect, Semaphore, Predicate } from "effect";
 import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -8,7 +8,7 @@ import type { Channels } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import type { Projects } from "@/project/project.ts";
-import { type Merged, MergeFailure, type Workplace } from "@/project/shapes.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/shapes.ts";
 import type { NotTakenIn, Sessions } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
@@ -49,7 +49,7 @@ export function merging(d: MergeDeps) {
     yield* core.notice("warn", line);
     return refused(owner);
   });
-  const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, unknown>) =>
+  const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, MergeFailure | ProjectError>) =>
     sessions.handOver(id, "merged", use).pipe(Effect.catchTag("NotTakenIn", (e) => Effect.flatMap(notTaken(id, e), Effect.fail)));
 
   const mergeSession = Effect.fn("Issues.mergeSession")(function* (id: string) {
@@ -65,7 +65,7 @@ export function merging(d: MergeDeps) {
   const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: Issue, said: string) {
     const pr = yield* projects
       .submitPullRequest(place, issue, pullRequestConclusion(said))
-      .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : MergeFailure.error(e.message))));
+      .pipe(Effect.mapError((e) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(e.message))));
     yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
     return { pullRequest: pr, text: t("shared.join.labeled", { label: "PR", text: pr.url }), commits: 0 };
   });

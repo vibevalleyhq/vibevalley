@@ -6,7 +6,7 @@
 
 ## Checks
 
-<!-- The commands and what they printed; for pages or services, acceptance's evidence (screenshots, logs). A test written first: what it said before the fix. -->
+<!-- The commands and what they printed; for pages or services, vv-acceptance's evidence (screenshots, logs). A test written first: what it said before the fix. -->
 
 - [ ] `vp check`
 - [ ] 
