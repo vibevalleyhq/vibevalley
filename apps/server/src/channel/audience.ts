@@ -5,7 +5,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId } from "@vibevalley/protocol";
 
-const agentLike = (kind: string) => kind === "session" || kind === "orchestrator";
+/** Only an agent's wake counts as a hop; the owner and the farm are not agents. */
+const isAgent = (kind: T.ActorKind) => kind === "session" || kind === "orchestrator";
 
 export class Audience {
   private follows = new Map<string, Set<string>>();
@@ -65,14 +66,23 @@ export class Audience {
   }
 
   /** InsertDelivery: an agent's or the orchestrator's message that wakes its recipient, held by nothing, counts. */
-  delivered(d: { channel: string; message: string; recipient: string; senderKind: string; recipientKind: string; wakes: boolean; held: boolean; at: number }) {
-    if (!d.wakes || d.held || !agentLike(d.senderKind)) return;
+  delivered(d: {
+    channel: string;
+    message: string;
+    recipient: string;
+    senderKind: T.ActorKind;
+    recipientKind: T.ActorKind;
+    wakes: boolean;
+    held: boolean;
+    at: number;
+  }) {
+    if (!d.wakes || d.held || !isAgent(d.senderKind)) return;
     this.lastWakeOf.set(d.recipient, Math.max(this.lastWakeOf.get(d.recipient) ?? 0, d.at));
-    if (agentLike(d.recipientKind) && d.message > (this.ownerLast.get(d.channel) ?? "")) this.hopsIn.set(d.channel, this.hops(d.channel) + 1);
+    if (isAgent(d.recipientKind) && d.message > (this.ownerLast.get(d.channel) ?? "")) this.hopsIn.set(d.channel, this.hops(d.channel) + 1);
   }
 }
 
-export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "direct" | "dispatch" | "addressed" | "graph";
+export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "direct" | "addressed";
 
 export type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
 
