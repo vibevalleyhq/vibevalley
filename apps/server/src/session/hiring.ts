@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import type { Session } from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 
-import { runtimeLabel } from "@/agent/seed.ts";
+import { runtimeLabel } from "@/runtime/presets.ts";
 
 export interface SessionLimits {
   readonly workspace: number;

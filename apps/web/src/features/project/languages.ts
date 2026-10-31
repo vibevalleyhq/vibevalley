@@ -45,7 +45,7 @@ const langs: Record<string, LangDef> = {
   sass: { label: "Sass", color: "#c6538c", names: ["scss", "sass"] },
   powershell: { label: "PowerShell", color: "#012456", names: ["powershell", "ps1"] },
   terraform: { label: "Terraform", color: "#844fba", names: ["hcl", "terraform", "tf"] },
-  other: { label: t("web.project.project.otherLang"), color: "#a08c70", names: [] },
+  other: { label: t("web.project.otherLang"), color: "#a08c70", names: [] },
 };
 
 const byName = new Map(Object.entries(langs).flatMap(([id, def]) => def.names.map((n) => [n, id] as const)));

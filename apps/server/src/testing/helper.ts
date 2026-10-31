@@ -11,8 +11,8 @@ import { Effect } from "effect";
 
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
-import { factsOf, presetOf } from "@/agent/seed.ts";
 import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
+import { factsOf, presetOf } from "@/runtime/presets.ts";
 import { briefBreak } from "@/session/briefing.ts";
 
 import { until } from "./until.ts";

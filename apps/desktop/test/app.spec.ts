@@ -1,6 +1,6 @@
 // The whole desktop app: Electron starts the server (apps/server) (a temporary home), the window shows the page it serves, the
 // state stream brings an issue made through the API to the board without a reload, and a notice the page sends through
-// the host interface reaches the main process. Which calls ring is apps/web/src/features/notice/tray.ts's (its own tests).
+// the host interface reaches the main process. Which calls ring is apps/web/src/features/inbox/tray.ts's (its own tests).
 
 import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

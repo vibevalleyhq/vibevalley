@@ -7,10 +7,10 @@ import { Cause, Effect, Exit, Layer } from "effect";
 import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 
 import { ServerConfig } from "@/base/config.ts";
+import { defaultSettings } from "@/runtime/presets.ts";
 import { testConfig, starter } from "@/testing/layers.ts";
 
 import { Agents, withCast } from "./agent.ts";
-import { defaultSettings } from "./seed.ts";
 
 const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(Agents.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config))))));

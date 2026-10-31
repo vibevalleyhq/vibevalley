@@ -12,9 +12,9 @@ export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]):
   const waiting = inbox.flatMap((c) => (c.words.tray ? [c.words.tray] : []));
   const unread = unreadTotal(state.chat);
   const lines = [
-    state.call === "live" ? (working > 0 ? t("web.notice.tray.working", { n: working }) : t("web.notice.tray.idle")) : t("web.notice.tray.off"),
+    state.call === "live" ? (working > 0 ? t("web.inbox.tray.working", { n: working }) : t("web.inbox.tray.idle")) : t("web.inbox.tray.off"),
     ...waiting,
-    ...(unread > 0 ? [t("web.notice.tray.unread", { n: unread })] : []),
+    ...(unread > 0 ? [t("web.inbox.tray.unread", { n: unread })] : []),
   ];
   const title = [...(working > 0 ? [`${working}`] : []), ...(waiting.length > 0 ? [`${waiting.length}!`] : [])].join(" · ");
   return { title, lines };

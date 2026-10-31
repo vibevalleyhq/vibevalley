@@ -143,7 +143,7 @@ const unmanned = (n: Task): Task => {
 
 /** The sessions a graph's steps are worked by; tests play them. */
 export interface TaskWork {
-  readonly hire: (agent: Agent, task: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
+  readonly hire: (agent: Agent, brief: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
   readonly tell: (id: string, text: string) => Effect.Effect<string>;
   readonly dismiss: Sessions["Service"]["dismiss"];
   readonly find: (id: string) => Roster | undefined;

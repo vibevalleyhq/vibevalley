@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { add, begin, finished, readyTasks, requeue, settle, type AgentTask, AgentTaskError, text, update } from "./agentTask.ts";
+import { add, begin, finished, readyTodos, requeue, settle, type Todo, TodoError, text, update } from "./todo.ts";
 
-const ids = (g: readonly AgentTask[]) => g.map((t) => t.id);
+const ids = (g: readonly Todo[]) => g.map((t) => t.id);
 
 const three = () => {
   const [g, problems] = add(
@@ -17,10 +17,10 @@ const three = () => {
   return g;
 };
 
-describe("an agent's own tasks", () => {
+describe("an agent's own todos", () => {
   it("added tasks wait, and the first is ready", () => {
     const g = three();
-    expect(ids(readyTasks(g))).toEqual(["read"]);
+    expect(ids(readyTodos(g))).toEqual(["read"]);
     expect([g[0]!.by, g[0]!.title, g[0]!.after]).toEqual(["self", "读 auth 的代码", []]);
   });
 
@@ -51,9 +51,9 @@ describe("an agent's own tasks", () => {
 
   it("done or skipped lets the next start", () => {
     let g = update(three(), "read", { state: "done", result: "token 在 auth/jwt.go 里判断" });
-    expect(ids(readyTasks(g))).toEqual(["fix"]);
+    expect(ids(readyTodos(g))).toEqual(["fix"]);
     g = update(g, "fix", { state: "skipped" });
-    expect(ids(readyTasks(g))).toEqual(["test"]);
+    expect(ids(readyTodos(g))).toEqual(["test"]);
     expect(finished(g)).toBe(false);
     expect(finished(update(g, "test", { state: "done" }))).toBe(true);
   });
@@ -64,8 +64,8 @@ describe("an agent's own tasks", () => {
     expect([g[0]!.tries, g[0]!.brief]).toEqual([1, "用 sudo 读"]);
     g = update(g, "read", { state: "done" });
     expect(() => update(g, "read", { brief: "再读" })).toThrow(/做完了/u);
-    expect(() => update(g, "read", { state: "waiting" })).toThrow(AgentTaskError);
-    expect(() => update(g, "nope", { state: "done" })).toThrow(AgentTaskError);
+    expect(() => update(g, "read", { state: "waiting" })).toThrow(TodoError);
+    expect(() => update(g, "nope", { state: "done" })).toThrow(TodoError);
     expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/u);
   });
 
@@ -91,14 +91,14 @@ describe("an agent's own tasks", () => {
       ],
     );
     g = begin(g, "a");
-    expect([g[0]!.state, readyTasks(g).length]).toEqual(["working", 0]);
+    expect([g[0]!.state, readyTodos(g).length]).toEqual(["working", 0]);
     g = settle(g, "a", "超时了", true);
     expect([g[0]!.state, g[0]!.tries]).toEqual(["waiting", 1]);
     g = settle(begin(g, "a"), "a", "还是超时", true);
     expect(g[0]!.state).toBe("failed");
     g = update(g, "a", { state: "waiting" });
     g = settle(begin(g, "a"), "a", "A 在 x.go", false);
-    expect([g[0]!.state, g[0]!.result, ids(readyTasks(g))]).toEqual(["done", "A 在 x.go", ["b"]]);
+    expect([g[0]!.state, g[0]!.result, ids(readyTodos(g))]).toEqual(["done", "A 在 x.go", ["b"]]);
     expect(requeue(begin(g, "b"), ["b"])[1]!.state).toBe("waiting");
   });
 });

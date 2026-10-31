@@ -96,8 +96,8 @@ export const reminders = {
   canceled: (name: string) => "取消了「" + name + "」。",
 };
 
-/** An agent's own tasks, as a model reads and changes them (agentTask.ts). */
-export const agentTask = {
+/** An agent's own todos, as a model reads and changes them (todo.ts). */
+export const todoWords = {
   duplicateId: (id: string) => "id「" + id + "」重复了",
   selfWait: (id: string) => "「" + id + "」不能等自己",
   missingAfter: (id: string, other: string) => "「" + id + "」要等的「" + other + "」不存在",
@@ -126,8 +126,8 @@ export const agentTask = {
   waitingOn: (ids: readonly string[]) => "（等 " + ids.join("、") + "）",
 };
 
-/** The agent's own task tools: todo_add, todo_update, todo_list (agentTaskTools.ts). */
-export const agentTaskTools = {
+/** The agent's own todo tools: todo_add, todo_update, todo_list (todoTools.ts). */
+export const todoToolWords = {
   addDescription:
     "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
     "可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 todo_update 标上。",

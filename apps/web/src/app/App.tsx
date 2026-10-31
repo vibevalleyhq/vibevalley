@@ -9,14 +9,15 @@ import { ready, useProjects } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { Keyed } from "@/base/util";
 import { FarmPage } from "@/farm/FarmPage";
+import { projectMap } from "@/farm/map/ProjectMap";
 import { farmState } from "@/farm/store";
 import { AgentsRoute } from "@/features/agent";
 import { ArtifactsPage } from "@/features/artifact";
 import { CatalogPage } from "@/features/catalog";
 import { ChatPage } from "@/features/channel";
+import { Follow } from "@/features/inbox";
 import { IssuesPage } from "@/features/issue";
 import { PairPage } from "@/features/lan";
-import { Follow } from "@/features/notice";
 import { OrchestratorPage } from "@/features/orchestrator";
 import { ProjectsPage, sortProjects } from "@/features/project";
 import { RuntimesPage } from "@/features/runtime";
@@ -43,7 +44,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   orchestrator: (rest) => <OrchestratorPage rest={rest()} />,
   agents: (rest) => <AgentsRoute rest={rest()} />,
   runtimes: (rest) => <RuntimesPage rest={rest()} />,
-  projects: (rest) => <ProjectsPage rest={rest()} />,
+  projects: (rest) => <ProjectsPage rest={rest()} skin={projectMap} />,
   catalog: (rest) => <CatalogPage rest={rest()} />,
   artifacts: (rest) => <ArtifactsPage rest={rest()} />,
 };

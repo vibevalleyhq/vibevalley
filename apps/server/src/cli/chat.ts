@@ -11,11 +11,11 @@ import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
 import { Clock, Effect, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
 
-import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { Brain, type BrainEvent, standaloneOwner } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { userMessage } from "@vibevalley/agent/messages";
+import { memoryStore } from "@vibevalley/agent/todoStore";
 import { t, currentLocale } from "@vibevalley/i18n";
 
 import { modelClient } from "@/agent/model.ts";
@@ -128,7 +128,7 @@ export const ownChat = (values: OwnChat) =>
       tools: codingTools({ cwd }),
       mcpServers: servers,
       reminders: !asked,
-      tasks: memoryStore(),
+      todos: memoryStore(),
     });
     for (const why of agent.mcpStatus().failed) console.error(dim(why));
     let prompt = () => {};

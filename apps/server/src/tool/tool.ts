@@ -207,11 +207,11 @@ const make = Effect.gen(function* () {
   // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
   const participant = (c: Caller) => c.session || c.agent;
 
-  // Which profile takes a task: the one named (a profile's name or id, or a runtime), else the one the owner picked for
+  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for
   // this input, else by the farm's rule. A name that matches none is said, not taken for "anyone".
-  const choose = Effect.fnUntraced(function* (task: string, name: string, picked: string): Effect.fn.Return<Agent | string> {
+  const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<Agent | string> {
     const key = name.trim();
-    const a = yield* runtimes.choose(task, key, picked);
+    const a = yield* runtimes.choose(brief, key, picked);
     if (!a) return answers.noAgentToDispatch;
     if (key && a.id !== key && a.name !== key && a.runtime !== key) return answers.noAgentOrRuntime(key);
     return a;

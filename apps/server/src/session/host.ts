@@ -232,7 +232,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
           e.type !== "compaction_start" &&
           e.type !== "compaction_end" &&
           e.type !== "prefix_changed" &&
-          e.type !== "tasks_changed"
+          e.type !== "todos_changed"
         )
           yield* inProcess
             .observe(e, run)

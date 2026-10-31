@@ -1,6 +1,6 @@
-// A trajectory a row per step: the round in the gutter, what kind of step in the tag, its text cut to a line until the
-// row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
-// wrong, which saves it as a case of its evals.
+// A trajectory a row per step: the run in the gutter, what kind of step in the tag, its text cut to a line until the
+// row is opened; a waterfall of the runs over it and their totals under it. The orchestrator's lets what it heard be
+// marked wrong, which saves it as a case of its evals.
 
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
@@ -27,7 +27,7 @@ import {
   lanes,
   oneLine,
   readableInput,
-  roundsOf,
+  runsOf,
   secondsText,
   shownEvents,
   spanColor,
@@ -36,9 +36,9 @@ import {
   tokensText,
   type TrajectorySummary,
   waterfallOf,
-} from "./rounds";
+} from "./runs";
 
-/** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
+/** Saves the model turn its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
 const laneNames: Record<Lane, string> = {
@@ -74,7 +74,7 @@ const haystack = (step: SessionEvent, tag: string) => [tag, step.text, step.tool
 function summaryText(s: TrajectorySummary) {
   const hit = cacheHit(s);
   return [
-    t("web.session.trajectory.rounds", { n: s.rounds }),
+    t("web.session.trajectory.runs", { n: s.runs }),
     t("web.session.trajectory.steps", { n: s.steps }),
     t("web.session.trajectory.modelTime", { took: secondsText(s.modelMs) }),
     t("web.session.trajectory.toolTime", { took: secondsText(s.toolMs) }),
@@ -134,7 +134,7 @@ export function Trajectory(props: {
   const [query, setQuery] = createSignal("");
   const [open, setOpen] = createSignal<ReadonlySet<number>>(new Set());
   const [marked, setMarked] = createSignal<number>();
-  // The rounds marked wrong here, by their asked step: the case's file.
+  // The messages marked wrong here, by their step: the case's file.
   const [wrong, setWrong] = createSignal<ReadonlyMap<number, string>>(new Map());
   let scroller: HTMLDivElement | undefined;
   let atBottom = true;
@@ -165,19 +165,19 @@ export function Trajectory(props: {
     const firstAsked = shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
     const q = query().trim().toLowerCase();
     const out: RowSpec[] = [];
-    let turn = 0;
-    for (const round of roundsOf(shown())) {
-      if (round.asked) turn++;
+    let n = 0;
+    for (const view of runsOf(shown())) {
+      if (view.run !== undefined) n++;
       let first = true;
-      for (const step of round.asked ? [round.asked, ...round.steps] : round.steps) {
+      for (const step of view.asked ? [view.asked, ...view.steps] : view.steps) {
         const tag = tagOf(step, props.asked, step.seq === firstAsked);
         if (q && !haystack(step, tag).includes(q)) continue;
         out.push(
           omitUndefined({
             step,
             tag,
-            gutter: first ? (round.asked ? t("web.session.trajectory.round", { n: turn }) : t("web.session.trajectory.earlier")) : undefined,
-            when: first ? ago((round.asked ?? round.steps[0]!).time, props.now) : undefined,
+            gutter: first ? (view.run !== undefined ? t("web.session.trajectory.run", { n }) : t("web.session.trajectory.earlier")) : undefined,
+            when: first ? ago((view.asked ?? view.steps[0]!).time, props.now) : undefined,
             markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
           }),
         );
@@ -369,7 +369,7 @@ function ToolDetail(props: { step: SessionEvent }) {
   );
 }
 
-/** Rounds side by side by how long each took; the idle time between them is a fixed gap. */
+/** Runs side by side by how long each took; the idle time between them is a fixed gap. */
 function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (seq: number) => string; onPick: (seq: number) => void }) {
   let box!: HTMLDivElement;
   const [width, setWidth] = createSignal(0);
@@ -384,23 +384,23 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   const between = 4;
   const bars = createMemo(() => {
     const fall = waterfallOf(props.steps, props.end);
-    const rounds = fall.rounds;
-    if (width() <= 0 || rounds.length === 0) return [];
-    const room = Math.max(0, width() - between * (rounds.length - 1));
-    const took = rounds.map(([a, b]) => b - a);
+    const runs = fall.runs;
+    if (width() <= 0 || runs.length === 0) return [];
+    const room = Math.max(0, width() - between * (runs.length - 1));
+    const took = runs.map(([a, b]) => b - a);
     const total = took.reduce((n, t) => n + t, 0);
-    const widths = took.map((t) => (total > 0 ? (room * t) / total : room / rounds.length));
+    const widths = took.map((t) => (total > 0 ? (room * t) / total : room / runs.length));
     const lefts: number[] = [];
     let x = 0;
     for (const w of widths) {
       lefts.push(x);
       x += w + between;
     }
-    const at = (r: number, t: number) => lefts[r]! + (took[r]! > 0 ? ((t - rounds[r]![0]) / took[r]!) * widths[r]! : 0);
+    const at = (r: number, t: number) => lefts[r]! + (took[r]! > 0 ? ((t - runs[r]![0]) / took[r]!) * widths[r]! : 0);
     let r = 0;
     return fall.spans.map((span) => {
-      while (r + 1 < rounds.length && span.start >= rounds[r + 1]![0]) r++;
-      while (r > 0 && span.start < rounds[r]![0]) r--;
+      while (r + 1 < runs.length && span.start >= runs[r + 1]![0]) r++;
+      while (r > 0 && span.start < runs[r]![0]) r--;
       const left = at(r, span.start);
       return {
         seq: span.seq,
@@ -438,7 +438,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   );
 }
 
-/** 这一轮做错了 floats over what began the round. */
+/** 这一轮做错了 floats over a message it heard. */
 function Markable(props: { step: number; send: MarkWrong; file?: string | undefined; onMarked: (file: string) => void; children: JSX.Element }) {
   const [writing, setWriting] = createSignal(false);
   const [busy, setBusy] = createSignal(false);

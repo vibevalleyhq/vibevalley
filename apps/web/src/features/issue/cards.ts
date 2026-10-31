@@ -165,14 +165,14 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       lines.push(head.name);
       if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(t("web.issue.card.quiet", { took: tookText(now - phase.quietSince) }));
       if (sessions.length > 1) lines.push(t("web.issue.card.nth", { n: sessions.length }));
-      const turns = Math.round(now0.runs);
+      const runs = Math.round(now0.runs);
       const cny = now0.spent?.cny;
       const took = tagOpen(tag)
         ? t("web.issue.card.open", { took: tookText(now - head.hiredAt) })
         : t("web.issue.card.used", { took: tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt) });
       lines.push(
         [
-          tag === "working" ? t("web.issue.card.turn", { n: turns + 1 }) : t("web.issue.card.turns", { n: turns }),
+          tag === "working" ? t("web.issue.card.run", { n: runs + 1 }) : t("web.issue.card.runs", { n: runs }),
           took,
           ...(cny !== undefined ? [`¥${cny.toFixed(2)}`] : []),
         ].join(" · "),

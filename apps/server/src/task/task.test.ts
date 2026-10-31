@@ -123,7 +123,7 @@ class FakeWork implements TaskWork {
     await Effect.runPromise(this.core.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: outcome as never, summary, runs: 1 }));
   }
 
-  hire = (agent: Agent, task: string, project: string, opt: HireOptions): Effect.Effect<Hired> => {
+  hire = (agent: Agent, brief: string, project: string, opt: HireOptions): Effect.Effect<Hired> => {
     const self = this;
     return Effect.gen(function* () {
       const id = `w${++self.n}`;
@@ -132,7 +132,7 @@ class FakeWork implements TaskWork {
         name: "帮工" + id,
         agent: agent.id,
         runtime: agent.runtime,
-        brief: task,
+        brief,
         project,
         worktree: "/wt/" + id,
         hiredAt: Date.now(),
@@ -143,7 +143,7 @@ class FakeWork implements TaskWork {
       } as Session;
       yield* self.core.apply({ type: "hired", session: h });
       if (opt.issue) yield* self.issues.ran(opt.issue, h).pipe(Effect.orDie);
-      void self.run(id, task);
+      void self.run(id, brief);
       return { session: h };
     });
   };
@@ -448,7 +448,7 @@ describe("task graphs", () => {
       { agent: a("y", "claude", "前端", "页面"), usable: true },
       { agent: a("z", "codex"), usable: false },
     ];
-    for (const [task, named, want] of [
+    for (const [text, named, want] of [
       ["改页面的前端", "", "y"],
       ["随便", "", "x"],
       ["随便", "z", "z"],
@@ -456,7 +456,7 @@ describe("task graphs", () => {
       ["随便", "claude", "y"],
       ["随便", "codex", "x"],
     ] as const)
-      expect(chooseAgent(cands, task, named, "")?.id).toBe(want);
+      expect(chooseAgent(cands, text, named, "")?.id).toBe(want);
     expect(chooseAgent(cands.slice(2), "x", "", "")).toBeUndefined();
     expect(clip("  一二三\n四五  ", 4)).toBe("一二三…");
     const brief = splitBrief("做个打卡", "clock", [a("lab", "pi", "实验")]);

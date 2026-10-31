@@ -216,6 +216,12 @@ const RULES: readonly Rule[] = [
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//u,
   },
   {
+    name: "the project map's farm words in the workbench",
+    pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.project\.(map|project|growth)\b/u,
+    says: "the projects page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/web/src/farm/map, web.farm.map.*), handed in as ProjectsSkin",
+    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
+  },
+  {
     name: "the one orchestrator under its old names",
     pattern: /\b(orchestratorAgent|orchestratorHome|orchestratorLook|setOrchestratorLook|orchestratorChannel)\b/u,
     says: "a profile's role (isOrchestrator, role: \"orchestrator\"); defaultOrchestrator only for what names none; agentHome; the profile's look.manager; WorkspaceState.orchestrators[id].channel",
@@ -274,8 +280,31 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "the inbox module under the notice name",
-    pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\./u,
-    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*); a notice is Core.notice, a one-line word to the owner; the page's features/notice stays",
+    pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\.|features\/notice\b|web\.notice\./u,
+    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the owner",
+  },
+  {
+    name: "the page's log split into rounds or turns of its own",
+    pattern:
+      /\b(Round|RoundView|roundsOf|roundLabel|roundMs|liveRound|failedRound|finishedRound|TurnSteps|turnLabel)\b|features\/session\/rounds\b|web\.session\.rounds\.|web\.session\.trajectory\.rounds?\b|web\.issue\.card\.turns?\b/u,
+    says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the owner's word for a Run",
+    dirs: ["apps/web/src", "apps/web/test"],
+  },
+  {
+    name: "an agent's own todo under the task name",
+    pattern:
+      /\b(AgentTask|AgentTaskStore|AgentTaskRunner|AgentTaskError|makeTaskRunner|taskTools|tasks_changed)\b|agentTask(Store|Tools)?(\.ts)?["']|agent\/taskStore\b|"vibevalley\/tasks"/u,
+    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in runtime/todoStore.ts; a task is only a plan's (Task)",
+  },
+  {
+    name: "the text given to a helper as a task",
+    pattern: /\breopenTask\b/u,
+    says: "the text a helper is given is its brief (reopenBrief, Sessions.send(agent, brief, …), Issues.hire(agent, brief, …), chooseAgent(candidates, brief, …))",
+  },
+  {
+    name: "a runtime's preset read from the agent's seeds",
+    pattern: /\b(presetOf|factsOf|runtimeIds|runtimeLabel|defaultSettings)\b.*["']@\/agent\/seed(\.ts)?["']/u,
+    says: "the runtimes' presets, facts, order and default settings are runtime/presets.ts (presets.json); agent/seed.ts keeps the achievements and the issue templates",
   },
   {
     name: "the orchestrator in a local called manager",

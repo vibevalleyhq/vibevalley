@@ -2296,6 +2296,52 @@ export const catalogs = {
         copy: "复制 .jsonl",
       },
     },
+    "web.farm.map": {
+      finding: "在找……",
+      islands: "{n} 座岛",
+      peopled: "{n} 座有人",
+      working: "在做 {n}/{of} 张",
+      queued: "排队 {n}",
+      stake: "空位，点了派活",
+      locked: "空位都占着",
+      sack: "排队的活",
+      send: "派一件活 · {project}",
+      plot: "{name}的地",
+      open: "空位，派一件活到 {project}",
+      wait: "等地",
+      queuedTip: "排队：{title}",
+      queuedLabel: "排队的活：{title}",
+      enter: "进{project}的农场",
+      enterWord: "进岛",
+      homeless: "不在哪个项目里：",
+      sea: "工作目录下还没有项目，地图上还是一片海。",
+      notDrafted: "先没起草：{why}",
+      sowIntro: "种在 {project}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
+      job: "要做的事",
+      jobExample: "比如：登录页加一个「记住我」",
+      todo: "先写成待办",
+      sow: "种下",
+      gone: "工作目录里没有这个项目了，只剩还在岛上的帮工。",
+      worktrees: "worktree · {n} 个",
+      noHelpers: "岛上还没有帮工：每派一件活来，就多一个 worktree。",
+      noMore: "不再往这里派活。",
+      canSend: "还能再派 {n} 件活，马上开工（这个项目最多同时 {of} 个帮工）。",
+      shut: "已经有 {n} 张工单在做，派来的活先排队。",
+      full: "满了：{n} 个帮工都在干活，派来的活先排队。",
+      queue: "排队 · {n} 件",
+      see: "看这张工单",
+      growth: "长势 · {label}",
+      growthSince: "长势 · {label} · 最近一次提交：{since}",
+      crop: { never: "还没动过土", day: "正旺", week: "在长", month: "冒着芽", quarter: "有点干了", older: "荒了" },
+      island: {
+        branch: "\n分支 {branch}",
+        open: "空位：派一件活来，马上开工",
+        shut: "已经有 {n} 张工单在做，等有工单做完",
+        gone: "不在工作目录里了",
+        working: "{full, select, true {在干 {n}/{of}（满了）} other {在干 {n}/{of}}}",
+        queued: "排队 {n}",
+      },
+    },
     "web.farm.phone": {
       ringing: "来电…",
       decline: "挂断",
@@ -2389,6 +2435,7 @@ export const catalogs = {
       },
       chatTab: "田头",
     },
+    "web.inbox": { tray: { working: "{n} 个帮工在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
       reading: "在读……",
       never: "算了",
@@ -2674,8 +2721,8 @@ export const catalogs = {
         nth: "第 {n} 次",
         open: "开了 {took}",
         used: "用了 {took}",
-        turn: "第 {n} 轮",
-        turns: "{n} 轮",
+        run: "第 {n} 轮",
+        runs: "{n} 轮",
         orchestratorWorking: "管家在做",
         missingFlag: "记录缺失",
         graph: "计划：{title}",
@@ -2826,7 +2873,6 @@ export const catalogs = {
         recalledLast: "想起过 {n} 次，上次 {last}",
       },
     },
-    "web.notice": { tray: { working: "{n} 个帮工在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.orchestrator": {
       looks: {
         farmer: { name: "青年农夫", blurb: "草帽、背带裤，爱笑的年轻人。" },
@@ -2864,41 +2910,48 @@ export const catalogs = {
       none: "工作目录下还没有项目。点「新增项目」新建一个，或从 GitHub 下载一个。",
       copied: "复制好了：{path}",
       notCopied: "复制不了：选中路径自己复制吧。",
-      growth: "长势：{label}",
-      growthTag: "长势 · {label}",
-      broken: "开垦于",
-      neverDug: "还没动过土",
-      tilled: "耕作",
+      recency: {
+        label: "最近一次提交：{label}",
+        never: "还没有提交",
+        day: "一天内有提交",
+        week: "一周内有提交",
+        month: "一个月内有提交",
+        quarter: "三个月内有提交",
+        older: "三个月没有提交",
+      },
+      firstCommit: "第一次提交",
+      noCommits: "还没有提交",
+      commitCount: "提交",
       commits: "{n} 次提交",
-      crops: "庄稼",
+      code: "代码",
       lines: "{n} 行",
       uncounted: "没数",
-      planted: "种了",
-      kinds: "{n} 样",
+      languages: "语言",
+      kinds: "{n} 种",
       copyPath: "复制路径",
       counting: "在数……",
       recount: "重新统计",
       countedAgo: "{ago}数过",
-      whatPlanted: "种了什么",
+      whatLanguages: "用了哪些语言",
       byLines: "按行数，不算空行 · tokei 数的",
       linesAndFiles: "{lines} 行 · {files} 个文件",
-      empty: "这块地还空着：没有数得出来的代码。",
-      noTokei: "数庄稼要用 tokei，这台机器上还没有。",
+      empty: "还没有数得出来的代码。",
+      noTokei: "数代码行数要用 tokei，这台机器上还没有。",
       install: "在终端里装一个：",
       or: "（或 ",
       thenRecount: "），装好点上面的「重新统计」。",
-      level: { "0": "空着", "1": "撒了种", "2": "发了芽", "3": "长了叶", "4": "开了花" },
-      year: "过去一年 · 一格一天，提交越多长得越高",
+      level: { "0": "没有提交", "1": "少", "2": "一些", "3": "较多", "4": "很多" },
+      year: "过去一年 · 一格一天，提交越多格子越满",
       dayCommits: "{n} 次提交，{level}",
-      untouched: "没动土",
+      noCommitsThatDay: "没有提交",
       busiest: "最忙的一天：{day}，{n} 次提交",
-      calendar: "耕作日历",
+      calendar: "提交日历",
       inYear: "一年里",
-      daysWorked: "动过土的日子",
+      daysWorked: "有提交的日子",
       days: "{n} 天",
       longest: "最长连着干",
       current: "最近连着干",
-      yearLabel: "过去一年 {commits} 次提交，{days} 天动过土",
+      yearLabel: "过去一年 {commits} 次提交，{days} 天有提交",
       readingCommits: "在读提交",
       rows: { "0": "", "1": "一", "2": "", "3": "三", "4": "", "5": "五", "6": "" },
       fewer: "少",
@@ -2908,7 +2961,7 @@ export const catalogs = {
       times: "{n} 次",
       rest: "还有 {people} 位，一共 {commits} 次。",
       how: "怎么来",
-      fresh: "开一块新地",
+      fresh: "新建一个",
       github: "去别人家看看",
       githubAddress: "GitHub 地址",
       githubHint: "公开仓库的主页地址。下载到本地后，就能查看项目和安排帮工。",
@@ -2916,57 +2969,12 @@ export const catalogs = {
       nameHint: "保存在工作目录里；已有同名项目不会被覆盖。",
       nameExample: "比如 raft-source",
       downloading: "正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。",
-      making: "正在开地…",
+      making: "正在新建…",
       cancel: "取消",
       busy: "进行中…",
       download: "下载到工作目录",
       create: "创建项目",
-      map: {
-        islands: "{n} 座岛",
-        peopled: "{n} 座有人",
-        working: "在做 {n}/{of} 张",
-        queued: "排队 {n}",
-        stake: "空位，点了派活",
-        locked: "空位都占着",
-        sack: "排队的活",
-        send: "派一件活 · {project}",
-        plot: "{name}的地",
-        open: "空位，派一件活到 {project}",
-        wait: "等地",
-        queuedTip: "排队：{title}",
-        queuedLabel: "排队的活：{title}",
-        enter: "进{project}的农场",
-        enterWord: "进岛",
-        homeless: "不在哪个项目里：",
-        sea: "工作目录下还没有项目，地图上还是一片海。",
-        notDrafted: "先没起草：{why}",
-        sowIntro: "种在 {project}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
-        job: "要做的事",
-        jobExample: "比如：登录页加一个「记住我」",
-        todo: "先写成待办",
-        sow: "种下",
-        gone: "工作目录里没有这个项目了，只剩还在岛上的帮工。",
-        worktrees: "worktree · {n} 个",
-        noHelpers: "岛上还没有帮工：每派一件活来，就多一个 worktree。",
-        noMore: "不再往这里派活。",
-        canSend: "还能再派 {n} 件活，马上开工（这个项目最多同时 {of} 个帮工）。",
-        shut: "已经有 {n} 张工单在做，派来的活先排队。",
-        full: "满了：{n} 个帮工都在干活，派来的活先排队。",
-        queue: "排队 · {n} 件",
-        see: "看这张工单",
-        growth: "长势 · {label}",
-        growthSince: "长势 · {label} · 最近一次提交：{since}",
-      },
-      project: {
-        otherLang: "其他",
-        growth: { empty: "还没动过土", flowering: "正旺", leafy: "在长", sprout: "冒着芽", dry: "有点干了", withered: "荒了" },
-        branch: "\n分支 {branch}",
-        open: "空位：派一件活来，马上开工",
-        shut: "已经有 {n} 张工单在做，等有工单做完",
-        gone: "不在工作目录里了",
-        working: "{full, select, true {在干 {n}/{of}（满了）} other {在干 {n}/{of}}}",
-        queued: "排队 {n}",
-      },
+      otherLang: "其他",
     },
     "web.runtime": {
       capability: {
@@ -3119,7 +3127,7 @@ export const catalogs = {
         pending: "还没返回",
         noOutput: "没有输出",
       },
-      rounds: {
+      runs: {
         farm: {
           channel_message_send: "在频道里说话",
           channel_message_list: "读频道的消息",
@@ -3129,8 +3137,9 @@ export const catalogs = {
         },
         span: { heard: "收到", recalled: "想起", thinking: "思考", said: "说", retry: "重试", cache: "缓存", error: "出错", farm: "频道", tool: "工具" },
         earlier: "更早的几步",
+        unasked: "自己起的一轮",
         subagentGot: "帮手接到",
-        job: "工单",
+        issue: "工单",
         told: "带话",
         usedTools: "用了 {n} 个工具",
         process: "这一轮的轨迹",
@@ -3139,14 +3148,14 @@ export const catalogs = {
       },
       trajectory: {
         lane: { asked: "收到", model: "模型", tool: "工具" },
-        rounds: "{n} 轮",
+        runs: "{n} 轮",
         steps: "{n} 步",
         modelTime: "模型用时 {took}",
         toolTime: "工具用时 {took}",
         cacheHit: "缓存命中 {pct}%",
         tokens: "输入 {input} / 输出 {output} token",
         quiet: "还没有动静。",
-        round: "第 {n} 轮",
+        run: "第 {n} 轮",
         earlier: "更早",
         search: "搜索轨迹",
         searchHint: "搜索",
@@ -5972,6 +5981,52 @@ export const catalogs = {
         copy: "Copy .jsonl",
       },
     },
+    "web.farm.map": {
+      finding: "Looking…",
+      islands: "{n, plural, one {# island} other {# islands}}",
+      peopled: "{n} with helpers",
+      working: "{n}/{of} being worked on",
+      queued: "{n} queued",
+      stake: "A free spot: click to send work",
+      locked: "Every spot taken",
+      sack: "Queued work",
+      send: "Send a ticket · {project}",
+      plot: "{name}'s plot",
+      open: "A free spot: send a ticket to {project}",
+      wait: "Waiting for a plot",
+      queuedTip: "Queued: {title}",
+      queuedLabel: "Queued work: {title}",
+      enter: "Enter {project}'s farm",
+      enterWord: "Enter",
+      homeless: "Not in any project: ",
+      sea: "No projects in the work folder yet: the map is all sea.",
+      notDrafted: "Not drafted: {why}",
+      sowIntro: "Planting in {project}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
+      job: "What to do",
+      jobExample: "Such as: add Remember me to the sign-in page",
+      todo: "Write it as a to-do",
+      sow: "Plant it",
+      gone: "This project is no longer in the work folder; only the helpers still on the island are left.",
+      worktrees: "worktrees · {n}",
+      noHelpers: "No helpers on the island yet: each ticket sent here adds a worktree.",
+      noMore: "No more work is sent here.",
+      canSend: "{n} more tickets can start at once (this project takes at most {of} helpers at a time).",
+      shut: "{n} tickets are already being worked on: new work queues.",
+      full: "Full: all {n} helpers are working, so new work queues.",
+      queue: "Queued · {n}",
+      see: "See this ticket",
+      growth: "Growth · {label}",
+      growthSince: "Growth · {label} · last commit {since}",
+      crop: { never: "never dug", day: "thriving", week: "growing", month: "sprouting", quarter: "drying out", older: "gone wild" },
+      island: {
+        branch: "\nbranch {branch}",
+        open: "Free spot: send a ticket here and it starts at once",
+        shut: "{n} tickets are already being worked on: wait for one to finish",
+        gone: "no longer in the work folder",
+        working: "{full, select, true {working {n}/{of} (full)} other {working {n}/{of}}}",
+        queued: "{n} queued",
+      },
+    },
     "web.farm.phone": {
       ringing: "Incoming…",
       decline: "Decline",
@@ -6081,6 +6136,14 @@ export const catalogs = {
         next: "Next",
       },
       chatTab: "CHAT",
+    },
+    "web.inbox": {
+      tray: {
+        working: "{n, plural, one {# helper working} other {# helpers working}}",
+        idle: "Open, nothing being worked on",
+        off: "Not open yet",
+        unread: "{n} unread in the channels",
+      },
     },
     "web.issue": {
       reading: "Reading…",
@@ -6369,8 +6432,8 @@ export const catalogs = {
         nth: "attempt {n}",
         open: "open for {took}",
         used: "took {took}",
-        turn: "round {n}",
-        turns: "{n, plural, one {# round} other {# rounds}}",
+        run: "round {n}",
+        runs: "{n, plural, one {# round} other {# rounds}}",
         orchestratorWorking: "the manager is on it",
         missingFlag: "Record missing",
         graph: "Plan: {title}",
@@ -6525,14 +6588,6 @@ export const catalogs = {
         recalledLast: "recalled {n} times, last {last}",
       },
     },
-    "web.notice": {
-      tray: {
-        working: "{n, plural, one {# helper working} other {# helpers working}}",
-        idle: "Open, nothing being worked on",
-        off: "Not open yet",
-        unread: "{n} unread in the channels",
-      },
-    },
     "web.orchestrator": {
       looks: {
         farmer: { name: "Young farmer", blurb: "Straw hat and overalls, always smiling." },
@@ -6570,37 +6625,44 @@ export const catalogs = {
       none: "No projects in the work folder yet. Press New project to add one, or download one from GitHub.",
       copied: "Copied: {path}",
       notCopied: "Cannot copy: select the path and copy it yourself.",
-      growth: "Growth: {label}",
-      growthTag: "Growth · {label}",
-      broken: "Broken ground",
-      neverDug: "Never dug",
-      tilled: "Tilled",
+      recency: {
+        label: "Last commit: {label}",
+        never: "No commits yet",
+        day: "Committed in the last day",
+        week: "Committed in the last week",
+        month: "Committed in the last month",
+        quarter: "Committed in the last three months",
+        older: "No commits for three months",
+      },
+      firstCommit: "First commit",
+      noCommits: "No commits yet",
+      commitCount: "Commits",
       commits: "{n} commits",
-      crops: "Crops",
+      code: "Code",
       lines: "{n} lines",
       uncounted: "Not counted",
-      planted: "Planted",
-      kinds: "{n} kinds",
+      languages: "Languages",
+      kinds: "{n}",
       copyPath: "Copy the path",
       counting: "Counting…",
       recount: "Count again",
       countedAgo: "counted {ago}",
-      whatPlanted: "What is planted",
+      whatLanguages: "Languages used",
       byLines: "By lines, blank lines left out · counted by tokei",
       linesAndFiles: "{lines} lines · {files} files",
-      empty: "This plot is still bare: no code that can be counted.",
-      noTokei: "Counting crops needs tokei, which is not on this computer yet.",
+      empty: "No code that can be counted yet.",
+      noTokei: "Counting lines needs tokei, which is not on this computer yet.",
       install: "Install it in a terminal: ",
       or: " (or ",
       thenRecount: "), then press Count again above.",
-      level: { "0": "bare", "1": "seeded", "2": "sprouted", "3": "leafy", "4": "flowering" },
-      year: "The past year · a cell a day, taller with more commits",
+      level: { "0": "none", "1": "a few", "2": "some", "3": "many", "4": "the most" },
+      year: "The past year · a cell a day, fuller with more commits",
       dayCommits: "{n} commits, {level}",
-      untouched: "untouched",
+      noCommitsThatDay: "no commits",
       busiest: "Busiest day: {day}, {n} commits",
-      calendar: "Tilling calendar",
+      calendar: "Commit calendar",
       inYear: "In a year",
-      daysWorked: "Days worked",
+      daysWorked: "Days with commits",
       days: "{n, plural, one {# day} other {# days}}",
       longest: "Longest streak",
       current: "Current streak",
@@ -6614,7 +6676,7 @@ export const catalogs = {
       times: "{n}",
       rest: "{people} more, {commits} in all.",
       how: "How",
-      fresh: "Break new ground",
+      fresh: "Start empty",
       github: "Visit a neighbor",
       githubAddress: "GitHub address",
       githubHint: "A public repository's home page. Once downloaded, you can see the project and set helpers on it.",
@@ -6622,57 +6684,12 @@ export const catalogs = {
       nameHint: "Kept in the work folder; a project of the same name is never overwritten.",
       nameExample: "such as raft-source",
       downloading: "Downloading the repository… a big one takes longer, up to 3 minutes.",
-      making: "Breaking ground…",
+      making: "Creating…",
       cancel: "Cancel",
       busy: "Working…",
       download: "Download to the work folder",
       create: "Create the project",
-      map: {
-        islands: "{n, plural, one {# island} other {# islands}}",
-        peopled: "{n} with helpers",
-        working: "{n}/{of} being worked on",
-        queued: "{n} queued",
-        stake: "A free spot: click to send work",
-        locked: "Every spot taken",
-        sack: "Queued work",
-        send: "Send a ticket · {project}",
-        plot: "{name}'s plot",
-        open: "A free spot: send a ticket to {project}",
-        wait: "Waiting for a plot",
-        queuedTip: "Queued: {title}",
-        queuedLabel: "Queued work: {title}",
-        enter: "Enter {project}'s farm",
-        enterWord: "Enter",
-        homeless: "Not in any project: ",
-        sea: "No projects in the work folder yet: the map is all sea.",
-        notDrafted: "Not drafted: {why}",
-        sowIntro: "Planting in {project}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
-        job: "What to do",
-        jobExample: "Such as: add Remember me to the sign-in page",
-        todo: "Write it as a to-do",
-        sow: "Plant it",
-        gone: "This project is no longer in the work folder; only the helpers still on the island are left.",
-        worktrees: "worktrees · {n}",
-        noHelpers: "No helpers on the island yet: each ticket sent here adds a worktree.",
-        noMore: "No more work is sent here.",
-        canSend: "{n} more tickets can start at once (this project takes at most {of} helpers at a time).",
-        shut: "{n} tickets are already being worked on: new work queues.",
-        full: "Full: all {n} helpers are working, so new work queues.",
-        queue: "Queued · {n}",
-        see: "See this ticket",
-        growth: "Growth · {label}",
-        growthSince: "Growth · {label} · last commit {since}",
-      },
-      project: {
-        otherLang: "Other",
-        growth: { empty: "never dug", flowering: "thriving", leafy: "growing", sprout: "sprouting", dry: "drying out", withered: "gone wild" },
-        branch: "\nbranch {branch}",
-        open: "Free spot: send a ticket here and it starts at once",
-        shut: "{n} tickets are already being worked on: wait for one to finish",
-        gone: "no longer in the work folder",
-        working: "{full, select, true {working {n}/{of} (full)} other {working {n}/{of}}}",
-        queued: "{n} queued",
-      },
+      otherLang: "Other",
     },
     "web.runtime": {
       capability: {
@@ -6828,7 +6845,7 @@ export const catalogs = {
         pending: "Not returned yet",
         noOutput: "No output",
       },
-      rounds: {
+      runs: {
         farm: {
           channel_message_send: "speaking in the chat",
           channel_message_list: "reading the chat",
@@ -6848,8 +6865,9 @@ export const catalogs = {
           tool: "Tool",
         },
         earlier: "Earlier steps",
+        unasked: "A round it began itself",
         subagentGot: "Subagent got",
-        job: "Ticket",
+        issue: "Ticket",
         told: "Passed on",
         usedTools: "{n, plural, one {used # tool} other {used # tools}}",
         process: "This round's work",
@@ -6858,14 +6876,14 @@ export const catalogs = {
       },
       trajectory: {
         lane: { asked: "Heard", model: "Model", tool: "Tool" },
-        rounds: "{n, plural, one {# round} other {# rounds}}",
+        runs: "{n, plural, one {# round} other {# rounds}}",
         steps: "{n, plural, one {# step} other {# steps}}",
         modelTime: "model {took}",
         toolTime: "tools {took}",
         cacheHit: "cache hit {pct}%",
         tokens: "input {input} / output {output} tokens",
         quiet: "Nothing yet.",
-        round: "Round {n}",
+        run: "Round {n}",
         earlier: "Earlier",
         search: "Search the trajectory",
         searchHint: "Search",
@@ -9436,6 +9454,53 @@ export interface Messages {
   "web.farm.log.said": undefined;
   "web.farm.log.spent": { readonly spent: string | number };
   "web.farm.log.you": undefined;
+  "web.farm.map.canSend": { readonly n: string | number; readonly of: string | number };
+  "web.farm.map.crop.day": undefined;
+  "web.farm.map.crop.month": undefined;
+  "web.farm.map.crop.never": undefined;
+  "web.farm.map.crop.older": undefined;
+  "web.farm.map.crop.quarter": undefined;
+  "web.farm.map.crop.week": undefined;
+  "web.farm.map.enter": { readonly project: string | number };
+  "web.farm.map.enterWord": undefined;
+  "web.farm.map.finding": undefined;
+  "web.farm.map.full": { readonly n: string | number };
+  "web.farm.map.gone": undefined;
+  "web.farm.map.growth": { readonly label: string | number };
+  "web.farm.map.growthSince": { readonly label: string | number; readonly since: string | number };
+  "web.farm.map.homeless": undefined;
+  "web.farm.map.island.branch": { readonly branch: string | number };
+  "web.farm.map.island.gone": undefined;
+  "web.farm.map.island.open": undefined;
+  "web.farm.map.island.queued": { readonly n: string | number };
+  "web.farm.map.island.shut": { readonly n: string | number };
+  "web.farm.map.island.working": { readonly full: boolean; readonly n: string | number; readonly of: string | number };
+  "web.farm.map.islands": { readonly n: number };
+  "web.farm.map.job": undefined;
+  "web.farm.map.jobExample": undefined;
+  "web.farm.map.locked": undefined;
+  "web.farm.map.noHelpers": undefined;
+  "web.farm.map.noMore": undefined;
+  "web.farm.map.notDrafted": { readonly why: string | number };
+  "web.farm.map.open": { readonly project: string | number };
+  "web.farm.map.peopled": { readonly n: string | number };
+  "web.farm.map.plot": { readonly name: string | number };
+  "web.farm.map.queue": { readonly n: string | number };
+  "web.farm.map.queued": { readonly n: string | number };
+  "web.farm.map.queuedLabel": { readonly title: string | number };
+  "web.farm.map.queuedTip": { readonly title: string | number };
+  "web.farm.map.sack": undefined;
+  "web.farm.map.sea": undefined;
+  "web.farm.map.see": undefined;
+  "web.farm.map.send": { readonly project: string | number };
+  "web.farm.map.shut": { readonly n: string | number };
+  "web.farm.map.sow": undefined;
+  "web.farm.map.sowIntro": { readonly project: string | number };
+  "web.farm.map.stake": undefined;
+  "web.farm.map.todo": undefined;
+  "web.farm.map.wait": undefined;
+  "web.farm.map.working": { readonly n: string | number; readonly of: string | number };
+  "web.farm.map.worktrees": { readonly n: string | number };
   "web.farm.menu.agents": undefined;
   "web.farm.menu.catalog": undefined;
   "web.farm.menu.chat": undefined;
@@ -9729,6 +9794,10 @@ export interface Messages {
   "web.farm.yard.taskBoard.label": undefined;
   "web.farm.yard.tasks.hint": undefined;
   "web.farm.yard.warehouse.hint": undefined;
+  "web.inbox.tray.idle": undefined;
+  "web.inbox.tray.off": undefined;
+  "web.inbox.tray.unread": { readonly n: string | number };
+  "web.inbox.tray.working": { readonly n: number };
   "web.issue.acts.carry": undefined;
   "web.issue.acts.goesOn": { readonly helper: string | number };
   "web.issue.acts.rejectWith": undefined;
@@ -9776,8 +9845,8 @@ export interface Messages {
   "web.issue.card.queued": undefined;
   "web.issue.card.quiet": { readonly took: string | number };
   "web.issue.card.refining": { readonly name: string | number };
-  "web.issue.card.turn": { readonly n: string | number };
-  "web.issue.card.turns": { readonly n: number };
+  "web.issue.card.run": { readonly n: string | number };
+  "web.issue.card.runs": { readonly n: number };
   "web.issue.card.used": { readonly took: string | number };
   "web.issue.card.waiting": { readonly ago: string | number };
   "web.issue.card.written": { readonly ago: string | number };
@@ -10164,10 +10233,6 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
-  "web.notice.tray.idle": undefined;
-  "web.notice.tray.off": undefined;
-  "web.notice.tray.unread": { readonly n: string | number };
-  "web.notice.tray.working": { readonly n: number };
   "web.opening.cannotStart": { readonly why: string | number };
   "web.opening.label": undefined;
   "web.opening.waking": undefined;
@@ -10203,19 +10268,19 @@ export interface Messages {
   "web.project.add": undefined;
   "web.project.all": undefined;
   "web.project.allLine": undefined;
-  "web.project.broken": undefined;
   "web.project.busiest": { readonly day: string | number; readonly n: string | number };
   "web.project.busy": undefined;
   "web.project.byLines": undefined;
   "web.project.calendar": undefined;
   "web.project.cancel": undefined;
+  "web.project.code": undefined;
+  "web.project.commitCount": undefined;
   "web.project.commits": { readonly n: string | number };
   "web.project.copied": { readonly path: string | number };
   "web.project.copyPath": undefined;
   "web.project.countedAgo": { readonly ago: string | number };
   "web.project.counting": undefined;
   "web.project.create": undefined;
-  "web.project.crops": undefined;
   "web.project.current": undefined;
   "web.project.dayCommits": { readonly level: string | number; readonly n: string | number };
   "web.project.days": { readonly n: number };
@@ -10225,16 +10290,16 @@ export interface Messages {
   "web.project.empty": undefined;
   "web.project.fewer": undefined;
   "web.project.finding": undefined;
+  "web.project.firstCommit": undefined;
   "web.project.fresh": undefined;
   "web.project.github": undefined;
   "web.project.githubAddress": undefined;
   "web.project.githubHint": undefined;
-  "web.project.growth": { readonly label: string | number };
-  "web.project.growthTag": { readonly label: string | number };
   "web.project.how": undefined;
   "web.project.inYear": undefined;
   "web.project.install": undefined;
   "web.project.kinds": { readonly n: string | number };
+  "web.project.languages": undefined;
   "web.project.level.0": undefined;
   "web.project.level.1": undefined;
   "web.project.level.2": undefined;
@@ -10245,65 +10310,26 @@ export interface Messages {
   "web.project.list": undefined;
   "web.project.longest": undefined;
   "web.project.making": undefined;
-  "web.project.map.canSend": { readonly n: string | number; readonly of: string | number };
-  "web.project.map.enter": { readonly project: string | number };
-  "web.project.map.enterWord": undefined;
-  "web.project.map.full": { readonly n: string | number };
-  "web.project.map.gone": undefined;
-  "web.project.map.growth": { readonly label: string | number };
-  "web.project.map.growthSince": { readonly label: string | number; readonly since: string | number };
-  "web.project.map.homeless": undefined;
-  "web.project.map.islands": { readonly n: number };
-  "web.project.map.job": undefined;
-  "web.project.map.jobExample": undefined;
-  "web.project.map.locked": undefined;
-  "web.project.map.noHelpers": undefined;
-  "web.project.map.noMore": undefined;
-  "web.project.map.notDrafted": { readonly why: string | number };
-  "web.project.map.open": { readonly project: string | number };
-  "web.project.map.peopled": { readonly n: string | number };
-  "web.project.map.plot": { readonly name: string | number };
-  "web.project.map.queue": { readonly n: string | number };
-  "web.project.map.queued": { readonly n: string | number };
-  "web.project.map.queuedLabel": { readonly title: string | number };
-  "web.project.map.queuedTip": { readonly title: string | number };
-  "web.project.map.sack": undefined;
-  "web.project.map.sea": undefined;
-  "web.project.map.see": undefined;
-  "web.project.map.send": { readonly project: string | number };
-  "web.project.map.shut": { readonly n: string | number };
-  "web.project.map.sow": undefined;
-  "web.project.map.sowIntro": { readonly project: string | number };
-  "web.project.map.stake": undefined;
-  "web.project.map.todo": undefined;
-  "web.project.map.wait": undefined;
-  "web.project.map.working": { readonly n: string | number; readonly of: string | number };
-  "web.project.map.worktrees": { readonly n: string | number };
   "web.project.more": undefined;
   "web.project.name": undefined;
   "web.project.nameExample": undefined;
   "web.project.nameHint": undefined;
-  "web.project.neverDug": undefined;
+  "web.project.noCommits": undefined;
+  "web.project.noCommitsThatDay": undefined;
   "web.project.noTokei": undefined;
   "web.project.none": undefined;
   "web.project.notCopied": undefined;
   "web.project.notGit": undefined;
   "web.project.or": undefined;
-  "web.project.planted": undefined;
-  "web.project.project.branch": { readonly branch: string | number };
-  "web.project.project.gone": undefined;
-  "web.project.project.growth.dry": undefined;
-  "web.project.project.growth.empty": undefined;
-  "web.project.project.growth.flowering": undefined;
-  "web.project.project.growth.leafy": undefined;
-  "web.project.project.growth.sprout": undefined;
-  "web.project.project.growth.withered": undefined;
-  "web.project.project.open": undefined;
-  "web.project.project.otherLang": undefined;
-  "web.project.project.queued": { readonly n: string | number };
-  "web.project.project.shut": { readonly n: string | number };
-  "web.project.project.working": { readonly full: boolean; readonly n: string | number; readonly of: string | number };
+  "web.project.otherLang": undefined;
   "web.project.readingCommits": undefined;
+  "web.project.recency.day": undefined;
+  "web.project.recency.label": { readonly label: string | number };
+  "web.project.recency.month": undefined;
+  "web.project.recency.never": undefined;
+  "web.project.recency.older": undefined;
+  "web.project.recency.quarter": undefined;
+  "web.project.recency.week": undefined;
   "web.project.recount": undefined;
   "web.project.repos": undefined;
   "web.project.rest": { readonly commits: string | number; readonly people: string | number };
@@ -10315,12 +10341,10 @@ export interface Messages {
   "web.project.rows.5": undefined;
   "web.project.rows.6": undefined;
   "web.project.thenRecount": undefined;
-  "web.project.tilled": undefined;
   "web.project.times": { readonly n: string | number };
   "web.project.title": undefined;
   "web.project.uncounted": undefined;
-  "web.project.untouched": undefined;
-  "web.project.whatPlanted": undefined;
+  "web.project.whatLanguages": undefined;
   "web.project.who": undefined;
   "web.project.whoWhen": undefined;
   "web.project.year": undefined;
@@ -10470,32 +10494,33 @@ export interface Messages {
   "web.session.log.told": undefined;
   "web.session.log.tool": { readonly name: string | number };
   "web.session.log.unfold": undefined;
-  "web.session.rounds.earlier": undefined;
-  "web.session.rounds.farm.channel_message_list": undefined;
-  "web.session.rounds.farm.channel_message_send": undefined;
-  "web.session.rounds.farm.channel_unread_list": undefined;
-  "web.session.rounds.farm.other": { readonly tool: string | number };
-  "web.session.rounds.farm.session_list": undefined;
-  "web.session.rounds.job": undefined;
-  "web.session.rounds.process": undefined;
-  "web.session.rounds.span.cache": undefined;
-  "web.session.rounds.span.error": undefined;
-  "web.session.rounds.span.farm": undefined;
-  "web.session.rounds.span.heard": undefined;
-  "web.session.rounds.span.recalled": undefined;
-  "web.session.rounds.span.retry": undefined;
-  "web.session.rounds.span.said": undefined;
-  "web.session.rounds.span.thinking": undefined;
-  "web.session.rounds.span.tool": undefined;
-  "web.session.rounds.subagentGot": undefined;
-  "web.session.rounds.tag.said": undefined;
-  "web.session.rounds.tag.subagentSaid": undefined;
-  "web.session.rounds.tag.subagentThought": undefined;
-  "web.session.rounds.tag.thought": undefined;
-  "web.session.rounds.tag.usage": undefined;
-  "web.session.rounds.thoughtFor": { readonly n: string | number; readonly took: string | number };
-  "web.session.rounds.told": undefined;
-  "web.session.rounds.usedTools": { readonly n: number };
+  "web.session.runs.earlier": undefined;
+  "web.session.runs.farm.channel_message_list": undefined;
+  "web.session.runs.farm.channel_message_send": undefined;
+  "web.session.runs.farm.channel_unread_list": undefined;
+  "web.session.runs.farm.other": { readonly tool: string | number };
+  "web.session.runs.farm.session_list": undefined;
+  "web.session.runs.issue": undefined;
+  "web.session.runs.process": undefined;
+  "web.session.runs.span.cache": undefined;
+  "web.session.runs.span.error": undefined;
+  "web.session.runs.span.farm": undefined;
+  "web.session.runs.span.heard": undefined;
+  "web.session.runs.span.recalled": undefined;
+  "web.session.runs.span.retry": undefined;
+  "web.session.runs.span.said": undefined;
+  "web.session.runs.span.thinking": undefined;
+  "web.session.runs.span.tool": undefined;
+  "web.session.runs.subagentGot": undefined;
+  "web.session.runs.tag.said": undefined;
+  "web.session.runs.tag.subagentSaid": undefined;
+  "web.session.runs.tag.subagentThought": undefined;
+  "web.session.runs.tag.thought": undefined;
+  "web.session.runs.tag.usage": undefined;
+  "web.session.runs.thoughtFor": { readonly n: string | number; readonly took: string | number };
+  "web.session.runs.told": undefined;
+  "web.session.runs.unasked": undefined;
+  "web.session.runs.usedTools": { readonly n: number };
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
   "web.session.trajectory.earlier": undefined;
   "web.session.trajectory.failed": undefined;
@@ -10516,9 +10541,9 @@ export interface Messages {
   "web.session.trajectory.pending": undefined;
   "web.session.trajectory.pick": undefined;
   "web.session.trajectory.quiet": undefined;
-  "web.session.trajectory.round": { readonly n: string | number };
-  "web.session.trajectory.rounds": { readonly n: number };
+  "web.session.trajectory.run": { readonly n: string | number };
   "web.session.trajectory.running": undefined;
+  "web.session.trajectory.runs": { readonly n: number };
   "web.session.trajectory.search": undefined;
   "web.session.trajectory.searchHint": undefined;
   "web.session.trajectory.sent": undefined;

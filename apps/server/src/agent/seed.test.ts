@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import presetsEn from "@/runtime/presets.en.json";
+import presetsZh from "@/runtime/presets.json";
+
 import seedsEn from "./seeds.en.json";
 import seedsZh from "./seeds.json";
 import catalogEn from "./template_catalog.en.json";
@@ -18,11 +21,13 @@ describe("the seeds in each language", () => {
   it("differ only in their words", () => {
     expect(shape(seedsEn)).toEqual(shape(seedsZh));
     expect(shape(catalogEn)).toEqual(shape(catalogZh));
+    expect(shape(presetsEn)).toEqual(shape(presetsZh));
   });
 
   it("the English ones are English", () => {
     const han = /\p{Script=Han}/u;
     expect(JSON.stringify(seedsEn)).not.toMatch(han);
     expect(JSON.stringify(catalogEn)).not.toMatch(han);
+    expect(JSON.stringify(presetsEn)).not.toMatch(han);
   });
 });

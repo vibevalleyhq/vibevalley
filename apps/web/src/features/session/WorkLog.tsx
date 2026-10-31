@@ -17,26 +17,26 @@ import {
   isLongText,
   lastTime,
   readableInput,
-  type Round,
-  roundLabel,
-  roundMs,
-  roundsOf,
+  runLabel,
+  runMs,
+  runsOf,
+  runTitle,
+  type RunView,
   shownEvents,
   spanColor,
   spanLabel,
   spansOf,
-  turnLabel,
-} from "./rounds";
+} from "./runs";
 
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
-export function TurnSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
+export function RunSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
   const [open, setOpen] = createSignal(false);
   const all = createSessionEvents(
     () => props.session,
     () => !!props.run,
   );
   const steps = () => all().filter((e) => e.run === props.run);
-  const label = () => (props.run ? turnLabel(steps(), props.orchestrator ?? false) : undefined);
+  const label = () => (props.run ? runLabel(steps(), props.orchestrator ?? false) : undefined);
   const now = useNow();
   return (
     <Show when={label()}>
@@ -61,24 +61,24 @@ export function TurnSteps(props: { session: string; run: string | undefined; orc
   );
 }
 
-/** A session's steps by round, each round folded to its answer but the last. */
+/** A session's steps by run, each run folded to its answer but the last. */
 export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; class?: string }) {
   const shown = () => shownEvents(props.steps);
-  const rounds = () => roundsOf(shown());
+  const runs = () => runsOf(shown());
   const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
   return (
     <div
       class={["max-h-[352px] divide-y divide-line overflow-y-auto rounded-md border border-line bg-page", props.class]}
       aria-label={t("web.session.log.process")}
     >
-      <For each={rounds()} keyed={(r) => r.asked?.seq ?? -1}>
+      <For each={runs()} keyed={(r) => r.run ?? (r.asked ?? r.steps[0])?.seq ?? -1}>
         {(r, i) => (
-          <RoundView
-            round={r()}
-            last={i() === rounds().length - 1}
-            live={!(props.working !== true) && i() === rounds().length - 1}
+          <RunFold
+            run={r()}
+            last={i() === runs().length - 1}
+            live={!(props.working !== true) && i() === runs().length - 1}
             now={props.now}
-            label={roundLabel(r(), firstAsked(), props.asked)}
+            label={runTitle(r(), firstAsked(), props.asked)}
           />
         )}
       </For>
@@ -86,13 +86,13 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
   );
 }
 
-function RoundView(props: { round: Round; last: boolean; live: boolean; now: number; label: string }) {
+function RunFold(props: { run: RunView; last: boolean; live: boolean; now: number; label: string }) {
   const [toggled, setToggled] = createSignal<boolean>();
   const open = () => toggled() ?? props.last;
-  const end = () => (props.live ? props.now : (lastTime(props.round) ?? props.now));
+  const end = () => (props.live ? props.now : (lastTime(props.run) ?? props.now));
   const shown = () => {
-    const answer = answerOf(props.round);
-    return open() ? props.round.steps : answer ? [answer] : [];
+    const answer = answerOf(props.run);
+    return open() ? props.run.steps : answer ? [answer] : [];
   };
   return (
     <div class="flex flex-col gap-1.5 px-2 pt-2 pb-2.5">
@@ -105,20 +105,20 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
         <Icon name="expand" size={12} class={["transition-transform duration-120", { "rotate-90": open() }]} />
         <span class="text-sm font-semibold">{props.label}</span>
         <span class="min-w-0 flex-1 truncate text-xs text-muted">
-          {t("web.session.log.steps", { n: props.round.steps.length, took: tookText(roundMs(props.round, end())) })}
+          {t("web.session.log.steps", { n: props.run.steps.length, took: tookText(runMs(props.run, end())) })}
           {props.live ? t("web.session.log.live") : ""}
         </span>
-        <Show when={props.round.asked}>{(asked) => <When at={asked().time} now={props.now} />}</Show>
+        <Show when={props.run.asked}>{(asked) => <When at={asked().time} now={props.now} />}</Show>
       </button>
-      <Show when={props.round.asked}>
+      <Show when={props.run.asked}>
         {(asked) => (
           <div class="rounded-md bg-wheat/15 px-3 py-2">
             <Folded text={asked().text} lines={4} />
           </div>
         )}
       </Show>
-      <Show when={props.round.steps.length > 0}>
-        <TimeBar round={props.round} end={end()} />
+      <Show when={props.run.steps.length > 0}>
+        <TimeBar run={props.run} end={end()} />
       </Show>
       <For each={shown()} keyed={(s) => s.seq}>
         {(s) => (
@@ -127,17 +127,17 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
           </div>
         )}
       </For>
-      <Show when={!open() && props.round.steps.length > shown().length}>
+      <Show when={!open() && props.run.steps.length > shown().length}>
         <button type="button" onClick={() => setToggled(true)} class="cursor-pointer self-start pl-1.5 text-sm text-water hover:underline">
-          {t("web.session.log.see", { n: props.round.steps.length })}
+          {t("web.session.log.see", { n: props.run.steps.length })}
         </button>
       </Show>
     </div>
   );
 }
 
-function TimeBar(props: { round: Round; end: number }) {
-  const spans = () => spansOf(props.round, props.end);
+function TimeBar(props: { run: RunView; end: number }) {
+  const spans = () => spansOf(props.run, props.end);
   // The shortest span still shows: at least 1/80 of the bar.
   const least = () => {
     const total = spans().reduce((n, s) => n + s.ms, 0);
@@ -209,7 +209,7 @@ function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: st
 
 function Step(props: { step: SessionEvent; now: number }) {
   const sub = () => props.step.under !== undefined;
-  // Not rows: a run's bounds split the rounds, a result is shown in its call (shownEvents).
+  // Not rows: a run's bounds (each step carries its run), a result is shown in its call (shownEvents).
   return (
     <Switch>
       <Match when={props.step.type === "user/message"}>

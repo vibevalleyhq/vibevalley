@@ -164,7 +164,7 @@ const farm = Effect.gen(function* () {
 
 type Farm = Effect.Success<typeof farm>;
 
-const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string, issue?: string) =>
+const hire = (f: Farm, x: FakeSessions, id: string, brief: string, project: string, channel?: string, issue?: string) =>
   Effect.gen(function* () {
     yield* f.core.apply({
       type: "hired",
@@ -173,7 +173,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: strin
         name: "帮工" + id,
         agent: "lab",
         runtime: "pi",
-        brief: task,
+        brief,
         project,
         hiredAt: Date.now(),
         runs: 0,
@@ -188,10 +188,10 @@ const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: strin
   });
 
 /** Hired, and its first turn reported in its thread. */
-const hireAndRun = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string) =>
+const hireAndRun = (f: Farm, x: FakeSessions, id: string, brief: string, project: string, channel?: string) =>
   Effect.gen(function* () {
-    const thread = yield* hire(f, x, id, task, project, channel);
-    expect(x.deliver(id, task).kind).toBe("run");
+    const thread = yield* hire(f, x, id, brief, project, channel);
+    expect(x.deliver(id, brief).kind).toBe("run");
     yield* until(() => f.messagesOf(thread.id).some((m) => m.kind === "report" && m.from === id), "its first report");
     return thread;
   });

@@ -24,7 +24,7 @@
     "pending": "还没返回",
     "noOutput": "没有输出"
   },
-  "rounds": {
+  "runs": {
     "farm": {
       "channel_message_send": "在频道里说话",
       "channel_message_list": "读频道的消息",
@@ -44,8 +44,9 @@
       "tool": "工具"
     },
     "earlier": "更早的几步",
+    "unasked": "自己起的一轮",
     "subagentGot": "帮手接到",
-    "job": "工单",
+    "issue": "工单",
     "told": "带话",
     "usedTools": "用了 {n} 个工具",
     "process": "这一轮的轨迹",
@@ -64,14 +65,14 @@
       "model": "模型",
       "tool": "工具"
     },
-    "rounds": "{n} 轮",
+    "runs": "{n} 轮",
     "steps": "{n} 步",
     "modelTime": "模型用时 {took}",
     "toolTime": "工具用时 {took}",
     "cacheHit": "缓存命中 {pct}%",
     "tokens": "输入 {input} / 输出 {output} token",
     "quiet": "还没有动静。",
-    "round": "第 {n} 轮",
+    "run": "第 {n} 轮",
     "earlier": "更早",
     "search": "搜索轨迹",
     "searchHint": "搜索",

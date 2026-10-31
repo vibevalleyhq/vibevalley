@@ -4,8 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 import type { Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { sessionAppendSystemPrompt, sessionDisallowedTools, sessionEffort, sessionEnv, sessionMcpServers, sessionSystemPrompt } from "@vibevalley/protocol";
 
-import { factsOf } from "@/agent/seed.ts";
-
+import { factsOf } from "./presets.ts";
 import { moneyStop } from "./quota.ts";
 
 const blank = (s: string | undefined) => (s ?? "").trim() === "";
@@ -60,7 +59,7 @@ export interface Candidate {
 }
 
 /** The profile named (by id or name, else a usable one on the runtime named), else the one picked, else the usable one whose tags the brief names most. */
-export function chooseAgent(candidates: readonly Candidate[], task: string, named: string, picked: string): Agent | undefined {
+export function chooseAgent(candidates: readonly Candidate[], brief: string, named: string, picked: string): Agent | undefined {
   if (named) {
     const byName = candidates.find((c) => c.agent.id === named || c.agent.name === named) ?? candidates.find((c) => c.agent.runtime === named && c.usable);
     if (byName) return byName.agent;
@@ -69,7 +68,7 @@ export function chooseAgent(candidates: readonly Candidate[], task: string, name
     const chosen = candidates.find((c) => c.agent.id === picked);
     if (chosen) return chosen.agent;
   }
-  const text = task.toLowerCase();
+  const text = brief.toLowerCase();
   let best: Agent | undefined;
   let bestScore = -1;
   for (const c of candidates) {

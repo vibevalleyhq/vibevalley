@@ -10,8 +10,8 @@
 
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
-| Workspace | 大地图 | `/projects` 的「全部」（`features/project/ProjectMap.tsx`） | `WorkspaceState`；目录是服务端 `ServerConfig` 的 `workRoot`、`home`（不进协议） | |
-| 项目 | 大地图上的一座岛 | `/projects/:project`（`features/project`；岛的地和空位是 `ProjectMap.tsx` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `Workplace` | `/api/v1/project/…` |
+| Workspace | 大地图 | `/projects` 的「全部」（`farm/map/ProjectMap.tsx`，农场的皮，`app/` 交给项目页） | `WorkspaceState`；目录是服务端 `ServerConfig` 的 `workRoot`、`home`（不进协议） | |
+| 项目 | 大地图上的一座岛 | `/projects/:project`（`features/project`；岛的地和空位是 `farm/map/ProjectMap.tsx` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `Workplace` | `/api/v1/project/…` |
 | 档案 | 一种小动物（管家是田头的人） | `/agents`（`features/agent`） | `Agent`（`role` 是管家或帮工） | `/api/v1/agent/…` |
 | 档案模板 | — | `/agents/templates`（`features/agent/TemplatesPage.tsx`） | `AgentTemplate`、档案上的 `from` | `/api/v1/agent/template/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |

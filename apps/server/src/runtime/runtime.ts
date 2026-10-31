@@ -15,8 +15,6 @@ import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, Ru
 
 import { Agents } from "@/agent/agent.ts";
 import { modelClient } from "@/agent/model.ts";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@/agent/seed.ts";
-import { dbStores } from "@/agent/taskStore.ts";
 import { projectsDir, ServerConfig } from "@/base/config.ts";
 import { FileWriter } from "@/base/files.ts";
 import { jsonOrNone } from "@/base/json.ts";
@@ -29,8 +27,10 @@ import { Setting } from "@/setting/setting.ts";
 import { dshRuntime } from "./dsh.ts";
 import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
 import { piBalance } from "./pi.ts";
+import { factsOf, presetOf, runtimeIds, runtimeLabel } from "./presets.ts";
 import { inCny, price, type Rate } from "./price.ts";
 import { moneyStop, quotaOf } from "./quota.ts";
+import { dbTodoStores } from "./todoStore.ts";
 import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 /** Past this a probe counts as unknown. */
@@ -76,7 +76,7 @@ export class Runtimes extends Context.Service<
     /** Every profile, and whether it can be sent now. */
     readonly candidates: Effect.Effect<Candidate[]>;
     /** Who the farm sends for a task now: chooseAgent over the candidates. */
-    readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
+    readonly choose: (brief: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
     /** Validates the effective options on every opening; availability and spending only gate new work. */
     readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
     readonly runtime: (id: string) => Runtime | undefined;
@@ -102,7 +102,7 @@ export class Runtimes extends Context.Service<
           llm: (model) => modelClient(model, keys.deepseekApiKey, service),
           time,
           owner: { run: yield* FiberSet.makeRuntimePromise(), scope: yield* Effect.scope },
-          tasks: yield* dbStores,
+          todos: yield* dbTodoStores,
         });
         return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
       }),
@@ -506,8 +506,8 @@ export const make = (options: RuntimeOptions = {}) =>
       }),
       assess,
       candidates,
-      choose: Effect.fn("Runtimes.choose")(function* (task, named, picked) {
-        return chooseAgent(yield* candidates, task, named, picked);
+      choose: Effect.fn("Runtimes.choose")(function* (brief, named, picked) {
+        return chooseAgent(yield* candidates, brief, named, picked);
       }),
       resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);

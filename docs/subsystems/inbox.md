@@ -15,7 +15,7 @@
 
 - 服务端 `apps/server/src/inbox`（`Inbox`，自成 Inbox 模块）：`inbox.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`patrol.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），`away.ts` 的 `forOwner` 是哪些话送到农场外的主人那里，黄金数据在 `testdata/rules.jsonl.gz`。
 - Inbox 在 `apps/server/src/inbox/items.ts`（`inbox`、`inboxEntries`，每件的话）；拼帧（`projection/frame.ts`）把它放在 `StateFrame.inbox`，和 `state`、`view` 并排。哪些是刚来的（`freshOf`）页面也要算，留在 `packages/protocol`。
-- 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/features/notice/Follow.tsx`、`apps/web/src/features/notice/tray.ts`。
+- 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/features/inbox/Follow.tsx`、`apps/web/src/features/inbox/tray.ts`。
 
 ## 模型和不变量
 
@@ -68,4 +68,4 @@
 - `apps/server/src/inbox/patrol.test.ts`：巡查照黄金数据。
 - `apps/server/src/orchestrator/orchestrator.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
 - `apps/server/src/voice/voice.test.ts`「tells what comes together once」：通话里两件刚来的合成一段说。
-- 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/features/notice/tray.test.ts`（菜单栏）。
+- 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/features/inbox/tray.test.ts`（菜单栏）。

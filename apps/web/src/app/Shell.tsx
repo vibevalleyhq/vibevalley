@@ -12,7 +12,7 @@ import { useRouter } from "@/base/router";
 import { pressed } from "@/base/shortcuts";
 import { useUpdates } from "@/base/updates";
 import { QuickSwitcher, switcher } from "@/features/channel";
-import { waitingOnOwner } from "@/features/notice";
+import { waitingOnOwner } from "@/features/inbox";
 import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";

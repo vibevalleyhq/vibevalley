@@ -147,23 +147,23 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
      * minute is 刚刚, and the time in all is left out then: two "under a minute"s said nothing. */
     statusLine(now: number, cny?: number) {
       const s = session ?? head;
-      const turns = Math.round(s.runs);
+      const runs = Math.round(s.runs);
       const waited = attention.since !== undefined ? now - attention.since : undefined;
       const used = (endedAt(head) ?? now) - sessions[0]!.hiredAt;
       return [
         t(`shared.attention.${attention.state}`),
         ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
         head.name,
-        ...(turns > 0 ? [t("web.issue.issue.ran", { n: turns })] : []),
+        ...(runs > 0 ? [t("web.issue.issue.ran", { n: runs })] : []),
         ...(used >= 60_000 ? [t("web.issue.issue.used", { span: spanText(used) })] : []),
         ...((cny ?? s.spent?.cny) !== undefined ? [`¥${(cny ?? s.spent!.cny!).toFixed(2)}`] : []),
       ].join(" · ");
     },
     usedLine(steps: SessionEvent[], now: number) {
       const s = session ?? head;
-      const turns = s.runs > 0 ? Math.round(s.runs) : steps.filter((e) => e.type === "run/start").length;
+      const runs = s.runs > 0 ? Math.round(s.runs) : steps.filter((e) => e.type === "run/start").length;
       return [
-        t("web.issue.card.turns", { n: turns }),
+        t("web.issue.card.runs", { n: runs }),
         tookText((endedAt(head) ?? now) - head.hiredAt),
         ...(s.spent?.cny !== undefined ? [t("web.base.money.spent", { yuan: `¥${s.spent.cny.toFixed(2)}` })] : []),
         ...(head.spent && head.spent.tokens > 0 ? [`${Math.round(head.spent.tokens)} token`] : []),

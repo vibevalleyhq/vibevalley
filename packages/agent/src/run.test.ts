@@ -6,9 +6,6 @@ import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevall
 import { objectSchema } from "@vibevalley/ai/tools";
 import { until } from "@vibevalley/testkit/until";
 
-import * as engine from "./agentTask.ts";
-import { memoryStore } from "./agentTaskStore.ts";
-import { makeTaskRunner } from "./agentTaskTools.ts";
 import { Brain, type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { textTool } from "./core/tool.ts";
@@ -16,6 +13,9 @@ import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, withAgent } from "./testing.ts";
+import * as engine from "./todo.ts";
+import { memoryStore } from "./todoStore.ts";
+import { makeTodoRunner } from "./todoTools.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -240,7 +240,7 @@ describe("a compaction", () => {
 
 const subagentBrief = (c: Request) => messageText(c.messages[0]!);
 
-describe("the agent's own tasks", () => {
+describe("the agent's own todos", () => {
   // A and B go out together; C waits for both, then goes; each comes back to the agent as an input.
   it.effect("sends a subagent's tasks when ready, and they come back", () => {
     const dir = home();
@@ -279,7 +279,7 @@ describe("the agent's own tasks", () => {
           yield* until(() => sent.length === 3 && told === 3, "sent.length === 3 && told === 3");
           expect(yield* store.load).toEqual([]);
         }),
-      { tasks: store, reminders: false },
+      { todos: store, reminders: false },
     );
   });
 
@@ -314,12 +314,12 @@ describe("the agent's own tasks", () => {
           expect(g[0]).toMatchObject({ state: "waiting" });
           expect(g[0]!.tries ?? 0).toBe(0);
         }),
-      { tools: [wait], tasks: store, reminders: false },
+      { tools: [wait], todos: store, reminders: false },
     );
   });
 
-  // A run that stops with its own tasks ready is reminded, at most maxNudges times while the graph stays the same.
-  it.effect("reminds a stopped run of its own tasks a few times", () =>
+  // A run that stops with its own todos ready is reminded, at most maxNudges times while the graph stays the same.
+  it.effect("reminds a stopped run of its own todos a few times", () =>
     Effect.gen(function* () {
       const dir = home();
       let nudged = 0;
@@ -351,12 +351,12 @@ describe("the agent's own tasks", () => {
             expect(nudged).toBe(2);
             events = [...r.events];
           }),
-        { tasks: memoryStore(), maxNudges: 2, reminders: false },
+        { todos: memoryStore(), maxNudges: 2, reminders: false },
       );
-      const changed = events.filter((e) => e.type === "tasks_changed");
+      const changed = events.filter((e) => e.type === "todos_changed");
       // The task was one change.
       expect(changed.length).toBe(1);
-      expect(changed[0]!.type === "tasks_changed" && changed[0]!.tasks.length).toBe(2);
+      expect(changed[0]!.type === "todos_changed" && changed[0]!.todos.length).toBe(2);
     }),
   );
 
@@ -365,7 +365,7 @@ describe("the agent's own tasks", () => {
       const store = memoryStore();
       const summaries = yield* Effect.scoped(
         Effect.gen(function* () {
-          const runner = yield* makeTaskRunner(store, undefined, () => Effect.void);
+          const runner = yield* makeTodoRunner(store, undefined, () => Effect.void);
           const before = yield* runner.summary;
           yield* store.change((g) => engine.add(g, [{ id: "a", brief: "读" }])[0]);
           return [before, yield* runner.summary];

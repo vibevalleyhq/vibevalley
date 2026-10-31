@@ -12,9 +12,6 @@ import type { ModelClient } from "@vibevalley/ai/client";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 import type { ThinkingLevel } from "@vibevalley/ai/models";
 
-import { finished, type AgentTask } from "./agentTask.ts";
-import type { AgentTaskStore } from "./agentTaskStore.ts";
-import { type AgentTaskRunner, makeTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction, type Summarized } from "./compaction.ts";
 import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/errors.ts";
 import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
@@ -29,6 +26,9 @@ import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
 import { type Subagent, selfTools, subagentInstructions, subagentTool } from "./self.ts";
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
+import { finished, type Todo } from "./todo.ts";
+import type { TodoStore } from "./todoStore.ts";
+import { type TodoRunner, makeTodoRunner, todoTools, watchedStore } from "./todoTools.ts";
 
 type Own = CustomMessage | CompactionSummaryMessage;
 
@@ -47,8 +47,8 @@ export type BrainEvent =
     }
   /** The parts of the prompt's start that changed since the request before, with no compaction between. */
   | { readonly type: "prefix_changed"; readonly parts: string[] }
-  /** Its own tasks after a change, whoever made it; empty once finished. */
-  | { readonly type: "tasks_changed"; readonly tasks: AgentTask[] };
+  /** Its own todos after a change, whoever made it; empty once finished. */
+  | { readonly type: "todos_changed"; readonly todos: Todo[] };
 
 /** Run in order with the events: the brain goes on once it is done. */
 export type Listener = (e: BrainEvent) => Effect.Effect<void>;
@@ -88,11 +88,11 @@ export interface BrainOptions {
   readonly noSession?: boolean;
   /** A subagent never can. */
   readonly noSubagents?: boolean;
-  /** Its own tasks and the tools to task and mark it; absent, none. */
-  readonly tasks?: AgentTaskStore;
-  /** Subagents out on its tasks at once; 3 when absent. */
+  /** Its own todos and the tools to add and mark them; absent, none. */
+  readonly todos?: TodoStore;
+  /** Subagents out on its todos at once; 3 when absent. */
   readonly maxSubagents?: number;
-  /** Times a run that stops with its own tasks ready is reminded of them while the graph stays the same; 3 when absent. */
+  /** Times a run that stops with its own todos ready is reminded of them while the graph stays the same; 3 when absent. */
   readonly maxNudges?: number;
   /** Absent: when it keeps a session. */
   readonly reminders?: boolean;
@@ -163,16 +163,16 @@ const sameMessages = (a: readonly BrainMessage[], b: readonly BrainMessage[]) =>
 export class Brain {
   // Set in make, before anything can call the brain.
   private core!: Agent<Own>;
-  /** What follows a run, an idle fold under way, the first look at its tasks: fibers of the brain's scope. */
+  /** What follows a run, an idle fold under way, the first look at its todos: fibers of the brain's scope. */
   private fibers!: FiberSet.FiberSet;
   private idleFold!: FiberHandle.FiberHandle;
-  private tasks: AgentTaskRunner | undefined;
+  private todos: TodoRunner | undefined;
 
   private readonly session: SessionFile | undefined;
   private readonly skillDirs: readonly string[];
   private readonly folding: CompactionOptions;
   private readonly toolset: readonly Tool[];
-  private readonly taskStore: AgentTaskStore | undefined;
+  private readonly todoStore: TodoStore | undefined;
   private readonly subagent: Subagent | undefined;
   private readonly reminders: Reminders | undefined;
   private readonly listeners = new Set<Listener>();
@@ -260,18 +260,18 @@ export class Brain {
         ).pipe(Effect.mapError(toolFailed));
       own.push(subagentTool(this.subagent));
     }
-    if (options.tasks) {
-      const store = watchedStore(options.tasks, (g) => this.publish({ type: "tasks_changed", tasks: finished(g) ? [] : g }));
-      this.taskStore = store;
+    if (options.todos) {
+      const store = watchedStore(options.todos, (g) => this.publish({ type: "todos_changed", todos: finished(g) ? [] : g }));
+      this.todoStore = store;
       own.push(
-        ...taskTools(
+        ...todoTools(
           store,
           this.subagent !== undefined,
-          Effect.suspend(() => this.tasks?.advance ?? Effect.void),
+          Effect.suspend(() => this.todos?.advance ?? Effect.void),
         ),
       );
       // A fold replaces the turns that showed the graph: the summary carries it on.
-      this.folding = { ...this.folding, append: () => Effect.suspend(() => this.tasks?.summary ?? Effect.succeed("")) };
+      this.folding = { ...this.folding, append: () => Effect.suspend(() => this.todos?.summary ?? Effect.succeed("")) };
     }
 
     this.refreshPrefix();
@@ -289,9 +289,9 @@ export class Brain {
     return Effect.gen(function* () {
       self.fibers = yield* FiberSet.make();
       self.idleFold = yield* FiberHandle.make();
-      if (self.taskStore)
-        self.tasks = yield* makeTaskRunner(
-          self.taskStore,
+      if (self.todoStore)
+        self.todos = yield* makeTodoRunner(
+          self.todoStore,
           self.subagent,
           (text) => self.later(taskMessage(text, self.now())),
           options.maxSubagents ?? 3,
@@ -320,7 +320,7 @@ export class Brain {
       // The first look is at once: what came due while it was away runs now, once.
       if (self.reminders) yield* Effect.forkScoped(Effect.repeat(self.tick(), Schedule.spaced(reminderTickMs)));
       // What a process that went left out goes out again, now that the agent can be told.
-      if (self.tasks) yield* FiberSet.run(self.fibers, self.tasks.recover);
+      if (self.todos) yield* FiberSet.run(self.fibers, self.todos.recover);
     });
   }
 
@@ -512,8 +512,8 @@ export class Brain {
       self.waiters = [];
       yield* self.publish({ type: "agent_settled", run: result });
       for (const w of waiters) yield* Deferred.succeed(w, result);
-      if (self.tasks && !result.aborted && !result.failed && alive()) {
-        const text = yield* self.tasks.nudge;
+      if (self.todos && !result.aborted && !result.failed && alive()) {
+        const text = yield* self.todos.nudge;
         if (text) yield* self.later(taskMessage(text, self.now()));
       }
     });
@@ -569,11 +569,11 @@ export class Brain {
     return this.accounting.snapshot();
   }
 
-  /** Stops the run under way and calls back the subagents out on its tasks. */
+  /** Stops the run under way and calls back the subagents out on its todos. */
   stop(): Effect.Effect<void> {
     const self = this;
     return Effect.gen(function* () {
-      if (self.tasks) yield* self.tasks.stop;
+      if (self.todos) yield* self.todos.stop;
       yield* self.core.clearQueues;
       if (self.accounting.active()) self.stopping = true;
       yield* self.core.abort;
@@ -691,7 +691,7 @@ export class Brain {
       yield* self.stopIdle();
       yield* self.core.abort;
       yield* self.core.idle;
-      if (self.tasks) yield* self.tasks.close;
+      if (self.todos) yield* self.todos.close;
       // A queued continuation cancelled before it starts has no end event.
       yield* self.ended();
       self.listeners.clear();

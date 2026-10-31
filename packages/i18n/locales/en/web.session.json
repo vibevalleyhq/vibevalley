@@ -24,7 +24,7 @@
     "pending": "Not returned yet",
     "noOutput": "No output"
   },
-  "rounds": {
+  "runs": {
     "farm": {
       "channel_message_send": "speaking in the chat",
       "channel_message_list": "reading the chat",
@@ -44,8 +44,9 @@
       "tool": "Tool"
     },
     "earlier": "Earlier steps",
+    "unasked": "A round it began itself",
     "subagentGot": "Subagent got",
-    "job": "Ticket",
+    "issue": "Ticket",
     "told": "Passed on",
     "usedTools": "{n, plural, one {used # tool} other {used # tools}}",
     "process": "This round's work",
@@ -64,14 +65,14 @@
       "model": "Model",
       "tool": "Tool"
     },
-    "rounds": "{n, plural, one {# round} other {# rounds}}",
+    "runs": "{n, plural, one {# round} other {# rounds}}",
     "steps": "{n, plural, one {# step} other {# steps}}",
     "modelTime": "model {took}",
     "toolTime": "tools {took}",
     "cacheHit": "cache hit {pct}%",
     "tokens": "input {input} / output {output} tokens",
     "quiet": "Nothing yet.",
-    "round": "Round {n}",
+    "run": "Round {n}",
     "earlier": "Earlier",
     "search": "Search the trajectory",
     "searchHint": "Search",

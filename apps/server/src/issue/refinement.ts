@@ -34,7 +34,7 @@ export interface RefinementDeps {
   readonly get: (ref: string) => Effect.Effect<Issue, ApiError>;
   /** The issue while it was never sent (no task graph's). */
   readonly unsent: (id: string) => Effect.Effect<Issue, ApiError>;
-  readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
+  readonly hire: (agent: Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
   readonly publish: (id: string) => Effect.Effect<void>;
 }
 

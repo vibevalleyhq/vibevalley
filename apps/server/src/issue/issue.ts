@@ -127,7 +127,7 @@ export class Issues extends Context.Service<
     readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
     readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
     /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
-    readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
+    readonly hire: (agent: Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
     /** A session starts on an existing issue: open it and link the session in one write. */
     readonly ran: (id: string, session: Session) => Effect.Effect<void, NotRecorded>;
     /** The issues of a task graph as the graph has them now, published as one commit once written; the database refusing
@@ -184,7 +184,7 @@ const triggerOf = jsonOf(S.RunTrigger);
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
-function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
+function reopenBrief(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
   const how = handedOver
     ? t("server.issue.brief.handedOver", { name: last.name, id: last.id })
     : t("server.issue.brief.reopened", { name: last.name, id: last.id });
@@ -478,7 +478,7 @@ const make = (options: IssueOptions = {}) =>
       yield* publish(id);
     });
 
-    const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
+    const hire = Effect.fn("Issues.hire")(function* (agent: Agent, brief: string, project: string, opt: HireOptions = {}) {
       if (store.isOrchestrator(agent.id)) return { refused: t("server.issue.orchestratorNotHelper") };
       if (!agent.enabled) return { refused: t("server.issue.disabled", { name: agent.name }) };
       for (const i of yield* runtimes.problemsOf(agent))
@@ -491,7 +491,7 @@ const make = (options: IssueOptions = {}) =>
       const prepared = yield* Effect.result(
         opt.issue
           ? get(opt.issue)
-          : attemptAdd({ title: task, project: where, assignee: agent.id }).pipe(
+          : attemptAdd({ title: brief, project: where, assignee: agent.id }).pipe(
               // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
               Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
             ),
@@ -499,7 +499,11 @@ const make = (options: IssueOptions = {}) =>
       if (prepared._tag === "Failure") return { refused: t("server.issue.notRecorded", { name: agent.name, why: reasonOf(prepared.failure) }) };
       const issue = prepared.success;
       // A draft's session is not one of the issue's sessions: the issue stays unsent.
-      const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(opt.refining !== true ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
+      const hired = yield* sessions.send(agent, brief, where, {
+        ...opt,
+        issue,
+        ...(opt.refining !== true ? { hiring: (w: Session) => ran(issue.id, w) } : {}),
+      });
       if (!hired.session && !opt.issue && !hired.retainedWork) {
         yield* db(q.removeIssue({ id: issue.id }));
         yield* reloadSessions;
@@ -603,8 +607,8 @@ const make = (options: IssueOptions = {}) =>
       const where = issue.project ?? "";
       const changes = yield* projects.branchChanges(where, issueBranch(issue.number)).pipe(Effect.mapError((e) => refused(e.message)));
       const previous = (changes?.commits.length ?? 0) > 0;
-      const task = reopenTask(issue, last, text, previous, agent.id !== last.agent);
-      const hired = yield* hire(agent, task, where, { channel, issue: issue.id, trigger: by });
+      const brief = reopenBrief(issue, last, text, previous, agent.id !== last.agent);
+      const hired = yield* hire(agent, brief, where, { channel, issue: issue.id, trigger: by });
       if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
       return hired.session.id;
     });

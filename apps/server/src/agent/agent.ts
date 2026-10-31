@@ -22,8 +22,8 @@ import * as S from "@vibevalley/protocol/schema";
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { defaultSettings } from "@/runtime/presets.ts";
 
-import { defaultSettings } from "./seed.ts";
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 
 interface Stored {

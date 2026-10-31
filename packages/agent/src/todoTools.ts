@@ -1,20 +1,20 @@
-// The agent's own tasks (agentTask.ts): it tasks the steps of one piece of work, marks them as it goes, and reads
+// The agent's own todos (todo.ts): it lists the steps of one piece of work, marks them as it goes, and reads
 // the whole graph back after each call. The runner moves it along: a subagent's task whose waits are settled goes to a
 // subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
-// own tasks are its to do; nothing here does them.
+// own todos are its to do; nothing here does them.
 
 import { Effect, FiberSet, Schema, type Scope } from "effect";
 
-import * as engine from "./agentTask.ts";
-import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Tool } from "./core/loop.ts";
 import { schemaEffectTool } from "./core/tool.ts";
 import { head } from "./head.ts";
-import { agentTaskTools as words } from "./prompts.ts";
+import { todoToolWords as words } from "./prompts.ts";
 import type { Subagent } from "./self.ts";
+import * as engine from "./todo.ts";
+import type { TodoStore } from "./todoStore.ts";
 
 /** Every change, whoever makes it, is told to changed. */
-export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => Effect.Effect<void>): AgentTaskStore {
+export function watchedStore(store: TodoStore, changed: (g: engine.Todo[]) => Effect.Effect<void>): TodoStore {
   return {
     load: store.load,
     change: (f) => Effect.tap(store.change(f), (g) => (g === undefined ? Effect.void : changed(g))),
@@ -22,8 +22,8 @@ export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTas
 }
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
-export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effect.Effect<void>): Tool[] {
-  const task = schemaEffectTool({
+export function todoTools(store: TodoStore, canHelp: boolean, changed: Effect.Effect<void>): Tool[] {
+  const add = schemaEffectTool({
     name: "todo_add",
     description: words.addDescription,
     parameters: Schema.Struct({
@@ -80,10 +80,10 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
     parameters: Schema.Struct({}),
     run: () => Effect.map(store.load, engine.text),
   });
-  return [task, update, list];
+  return [add, update, list];
 }
 
-export interface AgentTaskRunner {
+export interface TodoRunner {
   /** Sends out what is ready and fits. Run after the graph changes and when a subagent comes back. */
   readonly advance: Effect.Effect<void>;
   /** Calls the subagents back; their tasks wait again. The graph stays as it is otherwise. */
@@ -94,20 +94,20 @@ export interface AgentTaskRunner {
   readonly recover: Effect.Effect<void>;
   /** The open graph for a fold's summary: what the turns it replaces showed. */
   readonly summary: Effect.Effect<string>;
-  /** What to remind a run that stopped of: its own tasks that are ready, unless the graph has not moved through
+  /** What to remind a run that stopped of: its own todos that are ready, unless the graph has not moved through
    * maxNudges reminders already (it is stuck; the owner or another input will move it). "" for nothing. */
   readonly nudge: Effect.Effect<string>;
 }
 
 /** subagent undefined: this agent cannot send subagents (a subagent itself, or the orchestrator). The subagents out are
  * fibers of the scope. */
-export const makeTaskRunner = (
-  store: AgentTaskStore,
+export const makeTodoRunner = (
+  store: TodoStore,
   subagent: Subagent | undefined,
   tell: (text: string) => Effect.Effect<void>,
   max = 3,
   maxNudges = 3,
-): Effect.Effect<AgentTaskRunner, never, Scope.Scope> =>
+): Effect.Effect<TodoRunner, never, Scope.Scope> =>
   Effect.gen(function* () {
     const fibers = yield* FiberSet.make();
     /** The tasks a subagent is out on, until it answers. */
@@ -120,13 +120,13 @@ export const makeTaskRunner = (
     const advance: Effect.Effect<void> = Effect.suspend(() => {
       if (!subagent || closed) return Effect.void;
       return Effect.gen(function* () {
-        let picked: engine.AgentTask[] = [];
+        let picked: engine.Todo[] = [];
         const moved = yield* store
           .change((g) => {
             picked = [];
             let room = max - out.size;
             let next = g;
-            for (const t of engine.readyTasks(g)) {
+            for (const t of engine.readyTodos(g)) {
               if (room <= 0) break;
               if (t.by !== "subagent" || out.has(t.id)) continue;
               next = engine.begin(next, t.id);
@@ -148,7 +148,7 @@ export const makeTaskRunner = (
     });
 
     // Called back (stop, close), its fiber is interrupted before anything is recorded: stop puts the task back to waiting.
-    const send = (t: engine.AgentTask): Effect.Effect<void> =>
+    const send = (t: engine.Todo): Effect.Effect<void> =>
       Effect.gen(function* () {
         const { said, failed } = yield* subagent!(t.brief, t.title).pipe(
           Effect.map((said) => ({ said, failed: false })),
@@ -196,7 +196,7 @@ export const makeTaskRunner = (
       summary: Effect.map(store.load, (g) => (g.length === 0 ? "" : words.foldedSummary(engine.text(g)))),
       nudge: Effect.map(store.load, (g) => {
         const own = engine
-          .readyTasks(g)
+          .readyTodos(g)
           .filter((t) => t.by === "self")
           .map((t) => t.id);
         if (own.length === 0) {

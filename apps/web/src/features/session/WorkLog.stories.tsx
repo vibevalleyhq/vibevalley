@@ -1,11 +1,11 @@
 import type { OrchestratorEval } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
-import { failedRound, finishedRound, liveRound, nowAfter } from "./session.samples";
+import { failedRun, finishedRun, liveRun, nowAfter, toldTwiceRun } from "./session.samples";
 import { Trajectory } from "./Trajectory";
 import { WorkLog } from "./WorkLog";
 
-const twoRounds = [...finishedRound, ...liveRound];
+const twoRuns = [...finishedRun, ...liveRun];
 
 export default stories({
   title: "界面/执行/干活的经过",
@@ -14,7 +14,7 @@ export default stories({
       note: "一轮做完：交给它的话、想起的、想的、读改跑（失败的那次红着）、重试、用了多少、它说的。",
       render: () => (
         <div class="w-full max-w-2xl">
-          <WorkLog steps={finishedRound} now={nowAfter(finishedRound)} />
+          <WorkLog steps={finishedRun} now={nowAfter(finishedRun)} />
         </div>
       ),
     }),
@@ -22,7 +22,7 @@ export default stories({
       note: "第二轮还在跑：上一轮折起来，这一轮开着，命令还没回来。",
       render: () => (
         <div class="w-full max-w-2xl">
-          <WorkLog steps={twoRounds} now={nowAfter(twoRounds)} working />
+          <WorkLog steps={twoRuns} now={nowAfter(twoRuns)} working />
         </div>
       ),
     }),
@@ -30,7 +30,15 @@ export default stories({
       note: "这一轮出错停了：原因在最后一行。",
       render: () => (
         <div class="w-full max-w-2xl">
-          <WorkLog steps={failedRound} now={nowAfter(failedRound)} />
+          <WorkLog steps={failedRun} now={nowAfter(failedRun)} />
+        </div>
+      ),
+    }),
+    ToldTwice: story({
+      note: "干到一半又带了一句话：还是这一轮，后来的话在步骤里。",
+      render: () => (
+        <div class="w-full max-w-2xl">
+          <WorkLog steps={toldTwiceRun} now={nowAfter(toldTwiceRun)} />
         </div>
       ),
     }),
@@ -41,8 +49,8 @@ export default stories({
       controls: { marking: { kind: "choice", options: ["ok", "refused"] } },
       render: (a) => (
         <Trajectory
-          steps={twoRounds}
-          now={nowAfter(twoRounds)}
+          steps={twoRuns}
+          now={nowAfter(twoRuns)}
           working
           onMarkWrong={(step, want) =>
             a.marking === "ok"

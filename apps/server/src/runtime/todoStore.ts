@@ -1,11 +1,11 @@
-// The agents' own tasks (agent/brain agentTask.ts) in the farm's database, table agent_task, one open graph per keeper
+// The agents' own todos (packages/agent todo.ts) in the farm's database, table agent_task, one open graph per keeper
 // (a session of the vibevalley runtime).
 
 import { Clock, Effect, Schema } from "effect";
 
-import { finished, type AgentTask } from "@vibevalley/agent/agentTask";
-import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 import { toolFailed } from "@vibevalley/agent/core/errors";
+import { finished, type Todo } from "@vibevalley/agent/todo";
+import type { TodoStore } from "@vibevalley/agent/todoStore";
 
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
@@ -14,7 +14,7 @@ import { jsonOrNone } from "@/base/json.ts";
 import * as q from "../../db/generated/agent_task.sql.ts";
 
 const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
-const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
+const fromRow = (r: q.OpenAgentTasksResult): Todo => ({
   id: r.id,
   title: r.title,
   brief: r.brief,
@@ -26,11 +26,11 @@ const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
 });
 
 /** A finished graph stays, stamped finished_at: putting it away only empties the keeper's open graph. */
-export const dbStores: Effect.Effect<(keeper: string) => AgentTaskStore, never, Db> = Effect.gen(function* () {
+export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, Db> = Effect.gen(function* () {
   const db = yield* Db;
   return (keeper) => ({
     load: Effect.map(db.run(q.openAgentTasks({ keeper })), (rows) => rows.map(fromRow)),
-    change: <G extends AgentTask[] | undefined>(f: (g: AgentTask[]) => G) =>
+    change: <G extends Todo[] | undefined>(f: (g: Todo[]) => G) =>
       db.inTx(
         Effect.gen(function* () {
           const rows = yield* db.run(q.openAgentTasks({ keeper }));

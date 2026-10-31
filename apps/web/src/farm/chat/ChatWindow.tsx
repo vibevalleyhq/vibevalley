@@ -35,7 +35,7 @@ import {
   useMessage,
   useFollowed,
 } from "@/features/channel";
-import { TurnSteps } from "@/features/session";
+import { RunSteps } from "@/features/session";
 import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
 import { OrchestratorFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
@@ -412,7 +412,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <TurnSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
+    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <RunSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
   return (
     <Switch
       fallback={
@@ -440,7 +440,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.fromKind === "session" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={props.m.fromKind === "session" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
       <Match when={props.m.fromKind === "owner"}>

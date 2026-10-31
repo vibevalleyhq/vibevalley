@@ -1,6 +1,6 @@
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
 
-import { mergeSteps } from "./rounds";
+import { mergeSteps } from "./runs";
 
 interface Log {
   readonly id: string;

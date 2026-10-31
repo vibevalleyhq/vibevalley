@@ -7,11 +7,11 @@ import { join } from "node:path";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 
-import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 import { type BrainEvent, type BrainOwner, openBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import type { McpServer } from "@vibevalley/agent/mcp";
 import { messageText, userMessage } from "@vibevalley/agent/messages";
+import type { TodoStore } from "@vibevalley/agent/todoStore";
 import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { models } from "@vibevalley/ai/models";
 import { t } from "@vibevalley/i18n";
@@ -34,8 +34,8 @@ export interface RuntimeOptions {
   readonly home?: () => string;
   /** Asked each session, so a key saved meanwhile is used; "" is the default model. Throws when there is no model to use. */
   readonly llm: (model: string) => ModelClient;
-  /** Where a session keeps its own tasks; absent, it keeps none. */
-  readonly tasks?: (session: string) => AgentTaskStore;
+  /** Where a session keeps its own todos; absent, it keeps none. */
+  readonly todos?: (session: string) => TodoStore;
   /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
   readonly time: Time;
   /** Where the sessions' brains run: the Runtimes service's fibers and scope, or standaloneOwner on the command line. */
@@ -68,7 +68,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const llm = llmOf(o.model ?? "");
     const kernel = createSessionKernel(o.resume);
     const instructions = o.systemPrompt ?? [helperInstructions(), ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
-    const tasks = options.tasks?.(kernel.sessionId);
+    const todos = options.todos?.(kernel.sessionId);
     const agent = await openBrain(options.owner, {
       name: "helper",
       instructions,
@@ -82,7 +82,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       noMemory: true,
       session: kernel.sessionId,
       reminders: false,
-      ...(tasks ? { tasks } : {}),
+      ...(todos ? { todos } : {}),
     });
     const queued: { input: string; inputId?: string }[] = [];
     let active = false;
@@ -163,9 +163,9 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
             },
           ]);
           break;
-        case "tasks_changed":
-          // oar has no event for a task: the graph goes in the raw record, where the session's trajectory keeps it.
-          frame("vibevalley/tasks", { tasks: e.tasks });
+        case "todos_changed":
+          // oar has no event for a todo: the graph goes in the raw record, where the session's trajectory keeps it.
+          frame("vibevalley/todos", { todos: e.todos });
           break;
         case "agent_settled":
           end(

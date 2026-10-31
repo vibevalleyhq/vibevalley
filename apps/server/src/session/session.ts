@@ -180,7 +180,7 @@ export class Sessions extends Context.Service<
     /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
      * been idle longest, and says who. */
     readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
-    readonly send: (agent: Agent, task: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
+    readonly send: (agent: Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
     readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
     /** deliver, in words for whoever sent it. */
     readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
@@ -801,13 +801,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       allocations.set(id, allocation);
       yield* Metric.update(running, allocations.size);
       const opening = Effect.gen(function* () {
-        const task = text && agent.personaMode === "prompt" ? text + briefBreak + input : input;
+        const brief = text && agent.personaMode === "prompt" ? text + briefBreak + input : input;
         const spawned = yield* Effect.promise(() =>
           subagents
             .spawn({
               runtime: base.id,
               name: id,
-              task,
+              task: brief,
               cwd: place.cwd,
               ...(r.model ? { model: r.model } : {}),
               ...(r.effort ? { effort: r.effort } : {}),
@@ -1118,7 +1118,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (dismissed._tag === "Failure") return { refused: reasonOf(dismissed.failure) };
         return { evicted: oldest.name };
       }),
-      send: Effect.fn("Sessions.send")(function* (agent, task, where, opt) {
+      send: Effect.fn("Sessions.send")(function* (agent, brief, where, opt) {
         const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);
         if (unclosed) return { refused: unclosed.failure ?? t("server.session.life.issueNotReturned"), retainedWork: true as const };
         const full = roomFor(agent.runtime, where);
@@ -1132,13 +1132,13 @@ export const make = (options: SessionOptionsIn = {}) =>
         let released = false;
         const starting = Effect.gen(function* () {
           const recalled = new Set<string>();
-          const recall = yield* remind(agent.id, id, place.project, task, recalled);
+          const recall = yield* remind(agent.id, id, place.project, brief, recalled);
           const session: Session = {
             id,
             name: sessionName(core.state().sessions, agent.id, agent.name),
             agent: agent.id,
             runtime: agent.runtime,
-            brief: task,
+            brief,
             project: place.project,
             hiredAt: yield* Clock.currentTimeMillis,
             runs: 0,
@@ -1158,7 +1158,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               if (result.kept) yield* core.notice("warn", result.reason);
               return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
             });
-          const opened = yield* open(agent, session, place, withRecall(recall, task), "");
+          const opened = yield* open(agent, session, place, withRecall(recall, brief), "");
           if (!opened.session) return yield* refuseStart(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused }), opened.retained);
           const registered = yield* Effect.result(
             Effect.gen(function* () {

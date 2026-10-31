@@ -14,7 +14,6 @@ import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/pr
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { Agents } from "@/agent/agent.ts";
-import { factsOf, presetOf, runtimeIds } from "@/agent/seed.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
 import { layer as projection } from "@/projection/projection.ts";
@@ -23,6 +22,7 @@ import { testConfig } from "@/testing/layers.ts";
 import { nextTurn, whenTrue } from "@/testing/until.ts";
 
 import { piBalance } from "./pi.ts";
+import { factsOf, presetOf, runtimeIds } from "./presets.ts";
 import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
 

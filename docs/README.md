@@ -92,7 +92,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 技能 | skill | skill（`Skill`） | 档案能带的技能；农场里画成技能书 | 插件（指技能时） |
 | 人设 | persona | `persona.md`、`PersonaMode` | 档案的性格和说话的方式：当系统提示，或放在每一轮的开头 | |
 | 帮手 | subagent | subagent（`agent_task_executor` 的 `subagent`） | 帮工或管家在自己的进程里另开的 agent，替它查一件事，答完就走 | |
-| 自己的任务 | todo | `AgentTask`（`agent_task` 表，工具 `todo_add`、`todo_update`、`todo_list`） | agent 给自己记的待办，不是工单 | |
+| 自己的任务 | todo | `Todo`（`agent_task` 表，工具 `todo_add`、`todo_update`、`todo_list`） | agent 给自己记的待办，不是工单 | |
 | 计划 | plan | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
 | 一件 | task | task（`Task`，带 `task` 的子工单；拆出来的草稿是 `TaskDraft`） | 计划里的一件，一个帮工做 | 步骤、step（指一件时）、节点、node（指一件时） |
 | 派活 | dispatch | hire（`Issues.hire`、事实 `FactHired`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |

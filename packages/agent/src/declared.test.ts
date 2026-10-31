@@ -6,11 +6,11 @@ import { Effect } from "effect";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { memoryStore } from "./agentTaskStore.ts";
-import { taskTools } from "./agentTaskTools.ts";
 import { codingTools } from "./coding.ts";
 import { Reminders } from "./reminders.ts";
 import { selfTools, subagentTool } from "./self.ts";
+import { memoryStore } from "./todoStore.ts";
+import { todoTools } from "./todoTools.ts";
 
 // The model is shown these bytes, and they lead every request: a change here is a change in the prompt, made on purpose
 // (VIBEVALLEY_GOLDEN=update rewrites testdata/declared.json; look at the diff).
@@ -25,8 +25,8 @@ it("the brain's tools are declared to the model as they always were", () => {
       self: selfTools({ now: Date.now, home: dir, skills: () => [], memory: true }),
       subagent: [subagentTool(() => Effect.succeed(""))],
       reminders: reminders.tools,
-      tasks: taskTools(memoryStore(), true, Effect.void),
-      "tasks on its own": taskTools(memoryStore(), false, Effect.void),
+      tasks: todoTools(memoryStore(), true, Effect.void),
+      "tasks on its own": todoTools(memoryStore(), false, Effect.void),
     };
     const declared = Object.fromEntries(
       Object.entries(sets).map(([set, tools]) => [

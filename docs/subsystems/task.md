@@ -2,7 +2,7 @@
 
 计划（`TaskGraph`）把一件很长的编码活拆成有先后的几件（`Task`），每件一个帮工，按 DAG 推进：等的都合进去了才开工，互不依赖的同时做。计划是带 `graph` 的父工单，每一件是带 `task` 的子工单；它有自己的计划分支，每一件做完由农场跑检查、合进计划分支，全部做完主人一次合进主分支。农场里叫种植计划，是院子里的图纸桌（计划板）。
 
-VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`）是另一回事，在 `packages/agent`，和计划只共用 `packages/agent/src/dag.ts` 的边的规则（见[agent 自己的任务](docs/subsystems/agent.md#自己的任务)）。
+VibeValley 自己的 agent 在一个会话里给自己记的任务（`Todo`）是另一回事，在 `packages/agent`，和计划只共用 `packages/agent/src/dag.ts` 的边的规则（见[agent 自己的任务](docs/subsystems/agent.md#自己的任务)）。
 
 ## 管什么，不管什么
 
