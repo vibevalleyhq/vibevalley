@@ -213,7 +213,6 @@ export const catalogs = {
       channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
       channelTaken: "已经有叫 {name} 的频道了",
       hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
-      notBack: "帮工还没接回来",
       breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
       dispatch: {
         step: "做计划 {graph} 的「{task}」",
@@ -3826,7 +3825,6 @@ export const catalogs = {
       channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
       channelTaken: "There is already a channel called {name}",
       hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
-      notBack: "The helpers have not come back yet",
       breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
       dispatch: {
         step: 'task "{task}" of the plan {graph}',
@@ -7615,7 +7613,6 @@ export interface Messages {
   "server.channel.noHelper": { readonly id: string | number };
   "server.channel.noMessage": { readonly n: string | number };
   "server.channel.noMessageId": { readonly id: string | number };
-  "server.channel.notBack": undefined;
   "server.channel.notOrchestrator": { readonly id: string | number };
   "server.channel.notYours": undefined;
   "server.channel.queuedThere": { readonly n: string | number };

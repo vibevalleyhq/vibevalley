@@ -20,8 +20,9 @@ Status: proposed
 
 ## 进度
 
-第一步的形状已经就位：`Delivered`、`LaunchActivity`、`InputConsumed`、`SessionNews` 搬进 `apps/server/src/session/shapes.ts`，`Session` 直接给出 `present`、`runOf`、`reportOf`、`onIssue`，`Channel` 不用再经 `Helpers` 才知道这些。剩下的还是第 1–4 个 PR 的主体：换模块顺序、`Channel` 直接 `yield* Session`、删 `Helpers`/`useHelpers`/`helpersBack`，再把 `chat.test.ts` 搭到 `world.ts` 上。换顺序时 `chat.test.ts` 要先有假的 `Session` 层，不能只靠 `useHelpers`。
+第 1 个 PR 的形状和结构已经落地：`Delivered`、`LaunchActivity`、`InputConsumed`、`SessionNews` 在 `session/shapes.ts`；`Session` 给出 `present`、`runOf`、`reportOf`、`onIssue`；模块顺序换成 Agent Sessions → Collaboration；`Channel` 直接 `yield* Session` 并订阅它的流，`Helpers`、`useHelpers`、`helpersBack`、`activity`、`consumed`、`sessionNews` 都删了；`channelStart` 排在 `agentSessionsStart` 后面，给接回来的帮工开串、送出等着的话。`chat.test.ts` 用一个 played Session（`Channel.layerWith`）跑，不再靠注入。剩下第 2–4 个 PR：`post(w, heard)` 接缝、`Mailbox` 模块搬家、表改名。
 
+## Proposal
 ## Proposal
 
 两件事分开做：先把 Collaboration 挪到 Agent Sessions 上面，`Channel` 直接读 `Session`，端口消失；再把「交话」拆成新模块 `mailbox` 的服务 `Mailbox`，排在 Collaboration 后面，`chat.ts` 只记话。行为不变：现有的测试、黄金数据和 flows 原样通过是每一步的门槛。

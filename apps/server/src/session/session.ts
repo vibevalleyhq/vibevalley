@@ -41,7 +41,6 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { Agent } from "@/agent/agent.ts";
 import { newId } from "@/base/ids.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel } from "@/channel/chat.ts";
 import { Core, type FactIn } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { serverAddress, ServerConfig } from "@/infra/config.ts";
@@ -304,7 +303,6 @@ export const make = (options: SessionOptionsIn = {}) =>
     const fs = yield* FileSystem.FileSystem;
     const store = yield* Agent;
     const memories = yield* Memory;
-    const chat = yield* Channel;
     const projects = yield* Project;
     const runtimes = yield* Runtime;
     const db = yield* Db;
@@ -973,7 +971,6 @@ export const make = (options: SessionOptionsIn = {}) =>
         }
       }
       if (hands.size > 0) yield* Effect.logInfo(`vibevalley: brought back ${hands.size} helpers`);
-      yield* chat.helpersBack;
     });
 
     // The sessions are let go first: a turn cut off by the shutdown is reported when the farm comes back, not on the way out.
@@ -1254,21 +1251,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       }),
       restore,
     });
-    // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
-    chat.useHelpers({
-      present: (id) => hands.has(id),
-      deliver,
-      currentRun,
-      report: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
-      onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
-      sessionOf: shape.sessionOf,
-      presentSessions: shape.presentSessions,
-    });
     // A round reported on a session marked conflicting may have settled it: the mark is looked at again.
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, (n) => (n._tag === "reported" && n.session?.conflict ? recheck(n.report.id) : Effect.void)));
-    yield* Effect.forkScoped(Stream.runForEach(yield* shape.launches, chat.activity));
-    yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
-    yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));
     // A handle for tests: what the shape does not say.
     return Object.assign(shape, {
       hands,

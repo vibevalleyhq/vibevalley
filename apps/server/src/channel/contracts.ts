@@ -7,7 +7,6 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "@/base/json.ts";
 import { type ApiError } from "@/errors.ts";
-import type { Delivered, InputConsumed, LaunchActivity, SessionNews } from "@/session/shapes.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
@@ -339,31 +338,6 @@ export interface ChannelService {
   /** How the orchestrator writes the place it answers in: a direct channel's own address, else its channel's. */
   readonly addressOf: (channel: string) => Effect.Effect<{ readonly direct: boolean; readonly target: string }>;
   readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
-  /** Agent Sessions registers the helpers; until then a message for one waits. */
-  readonly useHelpers: (helpers: Helpers) => void;
-  /** Once the helpers on the farm are back: what waited for each goes to it now. */
-  readonly helpersBack: Effect.Effect<void>;
-  /** What a helper's launch did. */
-  readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
-  /** Messages a helper took as input. */
-  readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
-  /** A helper hired, reported or gone: its thread opens, the report is posted in it, its thread closes. */
-  readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
-}
-
-/** The participants that work: the channels hand them what is said to them and hear what they did. The channels know a
- * helper by its id and nothing of how it works. */
-export interface Helpers {
-  /** On the farm now: it can be handed a message. */
-  readonly present: (id: string) => boolean;
-  readonly deliver: (id: string, text: string, by: T.RunTrigger) => Effect.Effect<Delivered>;
-  /** The run a participant is in now (a helper's, the orchestrator's), for what it says; undefined between runs. */
-  readonly currentRun: (id: string) => string | undefined;
-  /** A helper's report, from what it last said in full. */
-  readonly report: (id: string) => string;
-  /** The helper working the issue now, if one is. */
-  readonly onIssue: (issue: string) => string | undefined;
-  /** A helper on the farm now, and all of them. */
-  readonly sessionOf: (id: string) => T.Session | undefined;
-  readonly presentSessions: () => readonly T.Session[];
+  /** The chat's startup, after the sessions came back: their threads, and what waited for them. */
+  readonly start: Effect.Effect<void, ApiError>;
 }

@@ -134,7 +134,7 @@
 ## 和谁打交道
 
 - **工单（`issue`）**：经 `send` 派活、经 `deliver` 带话、经 `handOver` 合并（合并方式由工单给：`projects.merge`、提 PR 并存下回执、结束 PR）、经 `dismiss` 收工；订阅 `news`（`SessionNews`：`hired`、`reported` 带着那一刻的 Session、`left`，按施加的顺序）：交回带来结果和问题，走了让工单判断要不要关上；订阅 `finishedRuns` 关上管家答完的工单。别的模块要看地里的帮工经 `sessionOf`、`presentSessions`，不直接读核心状态里的 `sessions`。`issue.history.list` 一次返回工单、它真实的 Session（在地里的从核心状态，走了的从 `session` 表）和缺失记录的号（`missingSessions`），查库失败报错，页面对缺失的显示「记录缺失」，不补造歇着的帮工。
-- **频道（`channel`）**：帮工模块在频道下面不能被它 import，所以由帮工模块推给它：登记 `Helpers`，把 `news` 交给 `sessionNews`；投递经 `deliver`（触发是 `comment`，带消息号）；订阅 `launches`（一次启动 `<id>#<n>` 的 `spoke`、`ended`、`closed`、`compacting`）判断投递收没收到，订阅 `inputsConsumed` 提交管家的摘要回执；汇报由频道贴进工单串。
+- **频道（`channel`）**：频道在帮工模块上面，直接读 `Session` 的查询（`sessionOf`、`presentSessions`、`runOf`、`reportOf`、`onIssue`、`present`）并订阅 `news`、`launches`（一次启动 `<id>#<n>` 的 `spoke`、`ended`、`closed`、`compacting`）、`inputsConsumed`；投递经 `deliver`（触发是 `comment`，带消息号），汇报由频道贴进工单串。没有 `Helpers` 端口。
 - **计划（`task`）**：经 `tell` 带话（触发 `task`），经 `handOver`（关成 `completed`：步骤的工单完成、交付进计划的分支，由计划写）用项目的 `mergeInto` 合进计划分支；订阅 `news` 推进计划里的一步。
 - **项目（`project`）**：worktree 的开和放、上限、项目的规矩和合并、PR；Session 只决定在哪干。
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
