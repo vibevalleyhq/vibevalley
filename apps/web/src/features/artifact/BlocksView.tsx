@@ -71,6 +71,10 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
   onSettled(() => {
     let stop: (() => void) | undefined;
     let stopSuggestions: (() => void) | undefined;
+    void api.artifact.suggestion
+      .list({ id: props.id })
+      .then(setSuggestions)
+      .catch(() => {});
     stopSuggestions = followSuggestions(
       String(props.id),
       (e) => setSuggestions(e.suggestions),
@@ -142,11 +146,14 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
   const resolve = async (suggestion: Suggestion, accept: boolean) => {
     setWorking(suggestion.id);
     const artifact = props.id;
-    await acting.run(async () => {
-      if (accept) await api.artifact.suggestion.accept({ id: artifact, suggestion: suggestion.id });
-      else await api.artifact.suggestion.reject({ id: artifact, suggestion: suggestion.id });
+    const done = await acting.run(async () => {
+      const result = accept
+        ? await api.artifact.suggestion.accept({ id: artifact, suggestion: suggestion.id })
+        : await api.artifact.suggestion.reject({ id: artifact, suggestion: suggestion.id });
       await editor.load();
+      return result;
     });
+    if (done) setSuggestions((list) => list.map((x) => (x.id === done.id ? done : x)));
     setWorking(undefined);
   };
 
