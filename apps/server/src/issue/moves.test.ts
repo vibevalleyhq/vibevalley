@@ -119,6 +119,14 @@ describe("moves and the attention", () => {
     ] as Fact[])
       state = reduce(state, fact)[0];
     expect(state.issues[0]!.moves).toContain("done");
+    const issues = state.issues;
+    state = reduce(state, { type: "call", state: "live", reason: "", at: 2 })[0];
+    expect(state.issues).toBe(issues);
+    state = reduce(state, { type: "run", id: hired.id, at: 2 })[0];
+    state = reduce(state, { type: "quiet", id: hired.id, since: 2, at: 2 })[0];
+    expect(state.issues[0]!.attention).toMatchObject({ state: "stuck", stuck: "quiet", since: 2 });
+    state = reduce(state, { type: "doing", id: hired.id, action: "thinking", label: "", at: 2 })[0];
+    expect(state.issues[0]!.attention.state).toBe("working");
     state = reduce(state, { type: "report", questions: [], checks: [], at: 3, id: sessionId("w1"), outcome: "failed", summary: "没做成", runs: 2 })[0];
     expect(state.issues[0]!.moves).toEqual(["todo", "canceled"]);
   });
