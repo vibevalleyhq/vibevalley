@@ -41,7 +41,7 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { Agent } from "@/agent/agent.ts";
 import { newId } from "@/base/ids.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core, type FactIn } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import { serverAddress, ServerConfig } from "@/infra/config.ts";
@@ -60,6 +60,7 @@ import { type Journal, makeTrajectories } from "./journal.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
+import type { Delivered, InputConsumed, LaunchActivity, SessionNews } from "./shapes.ts";
 import { conflictOf, notTakenIn, sameConflict, type Settle } from "./takeIn.ts";
 
 export type { SessionNews };
@@ -179,6 +180,14 @@ export class Session extends Context.Service<
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
     readonly sessionOf: (id: string) => T.Session | undefined;
     readonly presentSessions: () => readonly T.Session[];
+    /** On the farm now: it can be handed a message. */
+    readonly present: (id: string) => boolean;
+    /** The run it is in now; undefined between runs. */
+    readonly runOf: (id: string) => string | undefined;
+    /** Its report, from what it last said in full. */
+    readonly reportOf: (id: string) => string;
+    /** The helper working the issue now, if one is. */
+    readonly onIssue: (issue: string) => string | undefined;
     /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
      * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
      * it works. Work that does not go in keeps the session and its branch, marks a conflict, and says in NotTakenIn what
@@ -1224,6 +1233,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       events: (id, r) => trajectories.events(id, r),
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
+      present: (id) => hands.has(id),
+      runOf: (id) => {
+        const run = hands.get(id)?.run ?? executions.get(id)?.() ?? "";
+        return run === "" ? undefined : run;
+      },
+      reportOf: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
+      onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
       launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),

@@ -7,10 +7,13 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "@/base/json.ts";
 import { type ApiError } from "@/errors.ts";
+import type { Delivered, InputConsumed, LaunchActivity, SessionNews } from "@/session/shapes.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
 import { type InboxMessage, type Picked } from "./wake.ts";
+
+export type { Delivered, InputConsumed, LaunchActivity, SessionNews } from "@/session/shapes.ts";
 
 export interface Info {
   readonly id: string;
@@ -346,34 +349,6 @@ export interface ChannelService {
   readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
   /** A helper hired, reported or gone: its thread opens, the report is posted in it, its thread closes. */
   readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
-}
-
-/** What came of handing a helper a message. */
-export interface Delivered {
-  readonly kind: "run" | "steered" | "queued" | "refused";
-  readonly launch?: string;
-  readonly woke?: boolean;
-  readonly reason?: string;
-}
-
-/** What a helper's launch did, as the channels hear it: it spoke, its turn ended or closed, it compacts. */
-export type LaunchActivity =
-  | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
-  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: T.Outcome; readonly spoke: boolean }
-  | { readonly kind: "closed"; readonly id: string; readonly launch: string }
-  | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
-
-/** The messages a helper took as input: they are seen. */
-/** What happened to a helper, as the sessions tell it: the fact, and the session as it stood after it (none once it
- * left). */
-export type SessionNews =
-  | { readonly _tag: "hired"; readonly session: T.Session }
-  | { readonly _tag: "reported"; readonly report: T.FactReport; readonly session: T.Session | undefined }
-  | { readonly _tag: "left"; readonly left: T.FactLeft };
-
-export interface InputConsumed {
-  readonly session: string;
-  readonly messages: string[];
 }
 
 /** The participants that work: the channels hand them what is said to them and hear what they did. The channels know a
