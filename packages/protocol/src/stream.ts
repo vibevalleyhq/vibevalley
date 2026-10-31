@@ -1,15 +1,26 @@
 // Reads one of the server's SSE streams (statePath, eventsPath, livePath) with fetch rather than EventSource: a host may
 // serve the page under a scheme EventSource does not take, and fetch lets the caller pass its own.
 
-import { type eventsPath, type livePath, type statePath, type LiveEvent, type SideEvent, type StateFrame } from "./shapes";
+import { Cause, Exit, Schema } from "effect";
+
+import * as S from "./schema";
+import { eventsPath, livePath, statePath, type LiveEvent, type SideEvent, type StateFrame } from "./shapes";
 
 /** What each long-lived stream carries, by its path. The server writes each with the Schema for it (http/streams.ts
- * checks its Schemas against this), so a payload read here is taken as that shape, not decoded again on every frame. */
+ * checks its Schemas against this). */
 export interface Streams {
   [statePath]: StateFrame;
   [eventsPath]: SideEvent;
   [livePath]: LiveEvent;
 }
+
+/** Each payload is decoded with the Schema its stream is written with: a server of another version is told, not taken
+ * for the shape. */
+const decoders: { readonly [P in keyof Streams]: (json: unknown) => Exit.Exit<Streams[P], Schema.SchemaError> } = {
+  [statePath]: Schema.decodeUnknownExit(S.StateFrame),
+  [eventsPath]: Schema.decodeUnknownExit(S.SideEvent),
+  [livePath]: Schema.decodeUnknownExit(S.LiveEvent),
+};
 
 /** The server writes a comment line on every stream this often, however quiet it is (apps/server/src/http/streams.ts). */
 export const streamHeartbeatMs = 20_000;
@@ -75,8 +86,10 @@ export async function readStream<P extends keyof Streams>(
           .map((line) => line.slice(6))
           .join("\n");
         buffer = buffer.slice(end + 2);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server writes each stream's frames in the shape Streams gives its path
-        if (data) onEvent(JSON.parse(data) as Streams[P]);
+        if (!data) continue;
+        const decoded = decoders[path](JSON.parse(data));
+        if (Exit.isFailure(decoded)) throw new Error(`${url}: a frame not in its shape: ${Cause.pretty(decoded.cause)}`);
+        onEvent(decoded.value);
       }
     }
   } finally {

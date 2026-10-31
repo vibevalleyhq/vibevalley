@@ -1,5 +1,7 @@
 // For the rules' tests: frames that come from the test, not from a server.
 
+import type { StateFrame } from "@vibevalley/protocol";
+
 import type { Frames, FramesSource } from "./frames";
 
 export interface TestFrames {
@@ -25,3 +27,13 @@ export function testFrames(start: Partial<Frames> = {}): TestFrames {
     },
   };
 }
+
+/** An empty farm's frame at this seq. */
+export const frameAt = (seq: number): StateFrame => ({
+  seq,
+  state: { call: "idle", callReason: "", sessions: [], issues: [], orchestrators: {}, crons: [], connectors: [] },
+  inbox: [],
+  graphs: [],
+  effects: [],
+  view: { level: { level: 1, xp: 0, need: 100 }, plots: {}, achievements: [] },
+});

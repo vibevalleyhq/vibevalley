@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 import { streamSilenceMs } from "@vibevalley/protocol";
 
 import { frames } from "./frames";
+import { frameAt } from "./testing";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -22,7 +23,7 @@ function server() {
     });
     return Promise.resolve(new Response(body));
   });
-  const send = (seq: number) => opened.at(-1)?.(`data: ${JSON.stringify({ seq })}\n\n`);
+  const send = (seq: number) => opened.at(-1)?.(`data: ${JSON.stringify(frameAt(seq))}\n\n`);
   return { fetch, send };
 }
 

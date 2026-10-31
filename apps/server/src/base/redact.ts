@@ -2,6 +2,15 @@
 // name that says it is one. The server's log (redactOutput) and whatever memory sends outside the farm both go through
 // redact.
 
+import { Brand } from "effect";
+
+import { head } from "./clip.ts";
+
+/** Text that went through redact: only this module makes one, so whatever sends text off the farm asks for this type and
+ * a caller cannot forget to redact. */
+export type RedactedString = string & Brand.Brand<"RedactedString">;
+const redactedString = Brand.nominal<RedactedString>();
+
 const shapes = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
   /\bsk-[A-Za-z0-9_-]{16,}/gu,
@@ -20,11 +29,14 @@ const named = /(\b[a-z0-9_.-]*(?:api[_-]?key|secret|token|password|passwd|access
 
 const redacted = "[redacted]";
 
-export function redact(text: string): string {
+export function redact(text: string): RedactedString {
   for (const shape of shapes) text = text.replace(shape, redacted);
   text = text.replace(bearer, `$1${redacted}`);
-  return text.replace(named, (m, name: string, value: string) => (value === redacted ? m : name + redacted));
+  return redactedString(text.replace(named, (m, name: string, value: string) => (value === redacted ? m : name + redacted)));
 }
+
+/** Its first n UTF-16 units, trimmed: cut after redacting, as a secret cut first may no longer look like one. */
+export const redactedHead = (text: RedactedString, n: number): RedactedString => redactedString(head(text.trim(), n));
 
 /** Everything the process writes to stream goes through redact first: the server's log, and what a library prints. A
  * secret split across two writes gets through; console writes a line at a time. */

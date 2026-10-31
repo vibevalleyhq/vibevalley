@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 
-import { BridgeError, call, connect, push, serve } from "../src/index";
+import { BridgeError, call, callTimeoutMs, connect, push, serve } from "../src/index";
 import { linkPair } from "../src/testing";
 
 const contract = {
@@ -75,4 +75,39 @@ test("closing the asking side rejects what is unanswered; closing the answering 
   client.close();
   await expect(unanswered).rejects.toThrow("the bridge is closed");
   await expect(client.call.say("late")).rejects.toThrow(BridgeError);
+});
+
+test("a call not answered in its time is refused, and a slow call waits as long as its contract says", async () => {
+  vi.useFakeTimers();
+  try {
+    const [near] = linkPair();
+    const slow = { ...contract, wait: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }) };
+    const client = connect(slow, near);
+    const hung = client.call.add({ a: 1, b: 2 });
+    let waited = false;
+    void client.call.wait().catch(() => (waited = true));
+    vi.advanceTimersByTime(callTimeoutMs);
+    await expect(hung).rejects.toThrow(new BridgeError(`add was not answered in ${callTimeoutMs} ms`));
+    vi.advanceTimersByTime(60 * 60_000);
+    await Promise.resolve();
+    expect(waited).toBe(false);
+    client.close();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("a listener that throws does not keep a push from the others", async () => {
+  const [near, far] = linkPair();
+  const server = serve(contract, far, { add: () => 0, say: () => undefined });
+  const client = connect(contract, near);
+  const heard: number[] = [];
+  const thrown = new Promise<unknown>((resolve) => process.once("uncaughtException", resolve));
+  client.on("ticked", () => {
+    throw new Error("broken listener");
+  });
+  client.on("ticked", ({ n }) => heard.push(n));
+  server.push("ticked", { n: 1 });
+  expect(heard).toEqual([1]);
+  expect(await thrown).toEqual(new Error("broken listener"));
 });

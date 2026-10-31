@@ -6,6 +6,7 @@ import { filledNear } from "@vibevalley/engine/framing";
 import { currentLocale } from "@vibevalley/i18n";
 import { farmFraming } from "@vibevalley/protocol/host";
 
+import { navigationOf, pageWebPreferences } from "./boundary";
 import { ground, trafficLights } from "./chrome";
 
 /** The smallest window: twice the farm. */
@@ -42,7 +43,7 @@ export function mainWindow(o: {
       backgroundColor: ground(nativeTheme.shouldUseDarkColors),
       // The page reaches the top edge; it leaves the strip the host says (chrome.ts titleBar) to drag the window by.
       ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: trafficLights } : {}),
-      webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
+      webPreferences: pageWebPreferences(join(__dirname, "preload.cjs")),
     });
     made.setAspectRatio(3 / 2);
     // A size between two whole scales leaves bars around the farm: once a resize ends, the window takes the nearest
@@ -56,15 +57,14 @@ export function mainWindow(o: {
     });
     // The page stays on the server's origin; any other link opens in the browser.
     made.webContents.setWindowOpenHandler(({ url: to }) => {
-      void shell.openExternal(to);
+      if (navigationOf(to, undefined) === "browser") void shell.openExternal(to);
       return { action: "deny" };
     });
     made.webContents.on("will-navigate", (event, to) => {
-      const target = new URL(to);
-      const server = o.server();
-      if (server !== undefined && target.origin === new URL(server).origin) return;
+      const where = navigationOf(to, o.server());
+      if (where === "stay") return;
       event.preventDefault();
-      if (target.protocol === "http:" || target.protocol === "https:") void shell.openExternal(to);
+      if (where === "browser") void shell.openExternal(to);
     });
     made.once("ready-to-show", () => made.show());
     made.on("closed", () => (window = undefined));
