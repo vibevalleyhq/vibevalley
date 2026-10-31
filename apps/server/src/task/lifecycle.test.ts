@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -10,6 +9,7 @@ import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
+import { gitIn } from "@/testing/git.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
@@ -17,7 +17,7 @@ import { world } from "@/testing/world.ts";
 import { freshTask } from "./editing.ts";
 import { graphView } from "./graph.ts";
 import { Task } from "./task.ts";
-const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+const git = gitIn;
 
 describe("a task's workplace", () => {
   it.live("a rejected check releases the handover before asking the same session to fix it", () => {

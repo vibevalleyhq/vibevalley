@@ -2,8 +2,6 @@
 // memory kept by one session and recalled by the next). No binary, login or model: the helpers are oar's scripted
 // runtime over real git repositories in temporary folders, doing what the words of their brief say (testing/helper.ts).
 
-import { execFileSync } from "node:child_process";
-
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 import { Effect, Stream } from "effect";
@@ -14,6 +12,7 @@ import { Core } from "@/core/core.ts";
 import type { ServerConfig } from "@/infra/config.ts";
 import { agentSessionsStart, gamification, inboxStart, taskGraphsStart } from "@/services.ts";
 import { type Hired } from "@/session/session.ts";
+import { gitIn } from "@/testing/git.ts";
 import { helper } from "@/testing/helper.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until as untilHeld, waitFor } from "@/testing/until.ts";
@@ -92,4 +91,4 @@ export const mustHire = (h: Hired): T.Session => {
   return h.session;
 };
 
-export const git = (dir: string, ...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" }).trim();
+export const git = gitIn;

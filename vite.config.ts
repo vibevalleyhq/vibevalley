@@ -202,7 +202,7 @@ export default defineConfig({
       // or they could run together.
       "eslint/no-await-in-loop": "error",
       // ({ secret: _, ...rest }) leaves a field out.
-      "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
     overrides: [
       {
@@ -515,6 +515,26 @@ export default defineConfig({
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/db-door": "error" },
+      },
+      {
+        // A process is started only by its door: one per kind, which kills the group on a timeout (scripts/oxlint-plugin.ts, child-process-door).
+        files: ["apps/**", "packages/**"],
+        excludeFiles: [
+          "**/scripts/**",
+          "apps/server/src/project/git.ts",
+          "apps/server/src/runtime/dsh.ts",
+          "apps/server/src/voice/voice.ts",
+          "apps/server/src/testing/git.ts",
+          "apps/server/src/testing/helper.ts",
+          "apps/desktop/src/island.ts",
+          "apps/desktop/src/server.ts",
+          "apps/desktop/src/update.ts",
+          "apps/web/test/fixtures.ts",
+          "apps/web/test/global-setup.ts",
+          "packages/agent/src/coding.ts",
+          "packages/health/src/collect.ts",
+        ],
+        rules: { "vibevalley/child-process-door": "error" },
       },
       {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).

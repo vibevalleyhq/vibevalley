@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -19,6 +18,7 @@ import { reasonOf } from "@/errors.ts";
 import { Session } from "@/session/session.ts";
 import { freshTask } from "@/task/editing.ts";
 import { graphView } from "@/task/graph.ts";
+import { gitIn } from "@/testing/git.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
@@ -38,7 +38,7 @@ const farm = (runtimes = [busy]) => {
   return { config: c, layer: world({ config: c, runtimes, repos: ["demo"] }) };
 };
 
-const git = (dir: string, ...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+const git = gitIn;
 
 const noWorktree = (root: string) => {
   const dir = join(root, "projects", "demo");

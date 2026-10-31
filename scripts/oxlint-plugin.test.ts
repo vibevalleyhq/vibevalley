@@ -193,6 +193,16 @@ tester.run("db-door", rule("db-door"), {
   invalid: [
     { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
     { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/store.ts", errors: [{ messageId: "transaction" }] },
+    { code: 'import * as Sql from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
+    { code: 'import * as Sql from "effect/sql/SqlClient";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
+  ],
+});
+
+tester.run("child-process-door", rule("child-process-door"), {
+  valid: [{ code: 'import type { ChildProcess } from "node:child_process";', filename: "/repo/apps/web/test/a.ts" }, 'import { join } from "node:path";'],
+  invalid: [
+    { code: 'import { execFileSync } from "node:child_process";', errors: [{ messageId: "spawn" }] },
+    { code: 'import * as cp from "child_process";', errors: [{ messageId: "spawn" }] },
   ],
 });
 
@@ -330,6 +340,8 @@ tester.run("no-object-guard", rule("no-object-guard"), {
     { code: 'const ok = x !== null && typeof x === "object"', errors: [{ messageId: "guard" }] },
     { code: 'const ok = typeof v.a === "object" && v.a !== null && !Array.isArray(v.a)', errors: [{ messageId: "guard" }] },
     { code: 'const ok = ready && typeof x === "object" && x != null', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = typeof (x) === "object" && (x) !== null', errors: [{ messageId: "guard" }] },
+    { code: 'const ok = typeof x === "object" && ( x ) !== null', errors: [{ messageId: "guard" }] },
   ],
 });
 
@@ -342,6 +354,7 @@ tester.run("service-method-names", rule("service-method-names"), {
     "Lan.of({ answer: (id) => lookup(id), me: () => Effect.runSync(read) })",
     "GitError.of(code, stderr)",
     "const call = (x) => x;\nGame.of({ want: (s) => call(s) })",
+    'const blocks = { submit: Effect.fn("Artifact.submit")(function* (b) { return b; }) };\nArtifact.of({ submit: blocks.submit })',
   ],
   invalid: [
     { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
@@ -360,6 +373,14 @@ tester.run("service-method-names", rule("service-method-names"), {
     {
       code: "Task.of({ act: Effect.fn(function* (id) { return id; }) })",
       errors: [{ messageId: "name", data: { service: "Task", method: "act", given: "nothing" } }],
+    },
+    {
+      code: 'const blocks = { submit: Effect.fn("BlockStore.submit")(function* (b) { return b; }) };\nArtifact.of({ submit: blocks.submit })',
+      errors: [{ messageId: "name", data: { service: "Artifact", method: "submit", given: '"BlockStore.submit"' } }],
+    },
+    {
+      code: "const blocks = { submit: (b) => Effect.succeed(b) };\nArtifact.of({ submit: blocks.submit })",
+      errors: [{ messageId: "unnamed" }],
     },
   ],
 });

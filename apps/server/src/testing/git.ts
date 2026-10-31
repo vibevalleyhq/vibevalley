@@ -14,6 +14,13 @@ export const gitSync = (dir: string, ...args: string[]) =>
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 
+/** Runs git in dir as dir's own config says (no test user); its output, trimmed. A failure throws with what git said. */
+export const gitIn = (dir: string, ...args: string[]) => gitInEnv(dir, {}, ...args);
+
+/** gitIn with these in its environment (a commit's dates). */
+export const gitInEnv = (dir: string, env: Record<string, string>, ...args: string[]) =>
+  execFileSync("git", args, { cwd: dir, encoding: "utf8", env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] }).trim();
+
 /** A projects folder of its own, under a work root of its own. */
 export function projectsDir(): string {
   const root = join(tempDir("vibevalley-work-"), "projects");

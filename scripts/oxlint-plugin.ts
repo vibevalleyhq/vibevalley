@@ -659,15 +659,44 @@ const dbDoor = defineRule({
     if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/infra/db.ts")) return {};
     return {
       ImportDeclaration(node) {
-        if (node.source.value !== "effect/sql" || node.importKind === "type") return;
+        const from = node.source.value;
+        if ((from !== "effect/sql" && from !== "effect/sql/SqlClient") || node.importKind === "type") return;
         for (const s of node.specifiers)
-          if (s.type === "ImportSpecifier" && s.importKind !== "type" && s.imported.type === "Identifier" && s.imported.name === "SqlClient")
+          // The whole namespace carries the SqlClient as well.
+          if (
+            s.type === "ImportNamespaceSpecifier" ||
+            (from === "effect/sql" &&
+              s.type === "ImportSpecifier" &&
+              s.importKind !== "type" &&
+              s.imported.type === "Identifier" &&
+              s.imported.name === "SqlClient")
+          )
             context.report({ node: s, messageId: "client" });
       },
       CallExpression(node) {
         const c = node.callee;
         if (c.type === "MemberExpression" && c.property.type === "Identifier" && c.property.name === "withTransaction")
           context.report({ node, messageId: "transaction" });
+      },
+    };
+  },
+});
+
+const childProcessDoor = defineRule({
+  meta: {
+    messages: {
+      spawn: says(
+        "a process started here is one more place that must kill its whole group on a timeout and keep what it printed, which the doors already do",
+        "git through `apps/server/src/project/git.ts` (tests: `gitSync`, `gitIn` in `apps/server/src/testing/git.ts`), a helper's command through `runtime/dsh.ts`; a new kind of process gets its own door, added to the list in vite.config.ts",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ImportDeclaration(node) {
+        if ((node.source.value === "node:child_process" || node.source.value === "child_process") && node.importKind !== "type")
+          context.report({ node, messageId: "spawn" });
       },
     };
   },
@@ -1006,7 +1035,19 @@ const serviceMethodNames = defineRule({
     const returns = new Map<Node, Node[]>();
     const services: { service: string; object: ESTree.ObjectExpression }[] = [];
 
-    const resolve = (n: Node): Node => (n.type === "Identifier" ? (consts.get(n.name) ?? n) : n);
+    /** A name's initialiser, or a member of an object literal a name holds in this file (`helpers.m`, a method handed
+     * over from a sibling object). */
+    const resolve = (n: Node): Node => {
+      if (n.type === "Identifier") return consts.get(n.name) ?? n;
+      if (n.type !== "MemberExpression" || n.computed || n.object.type !== "Identifier" || n.property.type !== "Identifier") return n;
+      const held = consts.get(n.object.name);
+      const name = n.property.name;
+      const member =
+        held?.type === "ObjectExpression"
+          ? held.properties.find((p) => p.type === "Property" && !p.computed && p.key.type === "Identifier" && p.key.name === name)
+          : undefined;
+      return member?.type === "Property" ? resolve(member.value) : n;
+    };
     const returnedBy = (fn: Node): Node[] => {
       if (fn.type === "ArrowFunctionExpression" && fn.body.type !== "BlockStatement") return [fn.body];
       return returns.get(fn) ?? [];
@@ -1171,6 +1212,7 @@ export default definePlugin({
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
     "db-door": dbDoor,
+    "child-process-door": childProcessDoor,
     "atom-door": atomDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,
