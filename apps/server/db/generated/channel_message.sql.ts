@@ -801,6 +801,22 @@ export const deleteMessagesIn = Effect.fn("DeleteMessagesIn")(function* (params:
   })(params)
 })
 
+export const DeleteThreadMessagesInParams = Schema.Struct({
+  ["id"]: Schema.NullOr(Schema.String),
+})
+export type DeleteThreadMessagesInParams = typeof DeleteThreadMessagesInParams.Type
+
+
+export const DeleteThreadMessagesInSql = "-- name: DeleteThreadMessagesIn :exec\n-- Remove child messages before their channels, then the root messages those channels reference.\ndelete from channel_message where channel_id in (select t.id from channel t where t.parent_id = $1);"
+
+export const deleteThreadMessagesIn = Effect.fn("DeleteThreadMessagesIn")(function* (params: DeleteThreadMessagesInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DeleteThreadMessagesInParams,
+    execute: (p) => sql.unsafe(DeleteThreadMessagesInSql, [p["id"]]),
+  })(params)
+})
+
 export const SetEmbedsParams = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),

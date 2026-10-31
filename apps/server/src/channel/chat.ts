@@ -1898,10 +1898,11 @@ const make = Effect.gen(function* () {
       const gone = new Set([model.channel(id), ...model.threadsOf(id)].flatMap((c) => (c ? [targetOfChannel(c)] : [])));
       yield* tx(
         Effect.gen(function* () {
-          yield* db.run(qm.deleteMessagesIn({ id }));
+          yield* db.run(qm.deleteThreadMessagesIn({ id }));
           yield* db.run(qf.deleteFollowsIn({ id }));
           yield* db.run(qr.deleteCursorsIn({ id }));
           yield* db.run(qc.deleteThreadsOf({ id }));
+          yield* db.run(qm.deleteMessagesIn({ id }));
           yield* db.run(qc.deleteChannel({ id }));
         }),
       );

@@ -150,6 +150,10 @@ order by m.id desc limit sqlc.arg(n)::int;
 -- A channel deleted: what was said in it and its threads goes (their mentions, deliveries and seen marks with them).
 delete from channel_message where channel_id = sqlc.arg(id) or channel_id in (select t.id from channel t where t.parent_id = sqlc.arg(id));
 
+-- name: DeleteThreadMessagesIn :exec
+-- Remove child messages before their channels, then the root messages those channels reference.
+delete from channel_message where channel_id in (select t.id from channel t where t.parent_id = sqlc.arg(id));
+
 -- name: SetEmbeds :exec
 -- The previews read for its links, once they are: a change like any other.
 update channel_message set meta = sqlc.narg(meta), revision = sqlc.arg(revision) where id = sqlc.arg(id);
