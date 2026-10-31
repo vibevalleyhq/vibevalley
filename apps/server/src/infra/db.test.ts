@@ -53,6 +53,22 @@ describe("the database", () => {
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
+  it.effect("a failed outer transaction keeps none of its work, and the inner work with it", () =>
+    Effect.gen(function* () {
+      const db = yield* Db;
+      yield* Effect.exit(
+        db.inTx(
+          Effect.gen(function* () {
+            yield* db.run(addLanDevice({ id: "outer", name: "外层", key_hash: "a", paired_at: 1 }));
+            yield* db.inTx(Effect.andThen(db.run(addLanDevice({ id: "inner", name: "内层", key_hash: "b", paired_at: 2 })), Effect.void));
+            return yield* Effect.fail("no");
+          }),
+        ),
+      );
+      expect(yield* db.run(lanDevices())).toEqual([]);
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
+  );
+
   it.effect("attemptTx keeps the database's failure as a value, and keeps none of the work", () =>
     Effect.gen(function* () {
       const db = yield* Db;

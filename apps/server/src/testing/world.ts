@@ -68,7 +68,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     issue: { background: false, ...(options.talkIdleMs !== undefined ? { talkIdleMs: options.talkIdleMs } : {}) },
   };
   const below = platform(config);
-  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
+  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), collaboration(o), issuesBelowTaskGraphs(o));
 }
 
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds

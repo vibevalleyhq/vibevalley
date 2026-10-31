@@ -34,7 +34,8 @@
     "memory_search": "Search the memory",
     "memory_create": "Remember for a helper",
     "artifact_block_create": "Add to an artifact",
-    "artifact_block_update": "Change an artifact's block"
+    "artifact_block_update": "Change an artifact's block",
+    "artifact_block_delete": "Delete an artifact's block"
   },
   "about": "{label}: {about}"
 }

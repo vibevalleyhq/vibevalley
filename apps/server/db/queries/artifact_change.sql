@@ -10,3 +10,6 @@ values (sqlc.arg(artifact_id), sqlc.arg(seq), sqlc.arg(batch_id), sqlc.arg(actor
 -- name: PruneArtifactChanges :exec
 -- A batch older than before: a client sends a batch again within seconds, not days.
 delete from artifact_change where created_at < sqlc.arg(before);
+
+-- name: ArtifactChangesAfter :many
+select * from artifact_change where artifact_id = sqlc.arg(artifact_id) and seq > sqlc.arg(seq) order by seq limit sqlc.arg(n);

@@ -34,7 +34,8 @@
     "memory_search": "翻记性",
     "memory_create": "替帮工记",
     "artifact_block_create": "往产出里加一块",
-    "artifact_block_update": "改产出的一块"
+    "artifact_block_update": "改产出的一块",
+    "artifact_block_delete": "删产出的一块"
   },
   "about": "{label}：{about}"
 }

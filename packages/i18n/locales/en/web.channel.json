@@ -69,6 +69,8 @@
     "refuse": "Refuse"
   },
   "messages": {
+    "quotedBlock": "On a block of “{title}”: {text}",
+    "quotedGone": "it was deleted",
     "label": "Messages",
     "containing": "Messages with \"{text}\"",
     "start": "The start of the messages",
@@ -138,6 +140,8 @@
     "send": "Send",
     "sendHint": "Enter sends · Shift+Enter for a new line",
     "replying": "Replying to {name}",
+    "quotedBlock": "Pointing at: {text}",
+    "cancelQuote": "Stop pointing at it",
     "cancelReply": "Cancel the reply",
     "attach": "Attach a file",
     "uploadFailed": "Not uploaded: {why}"

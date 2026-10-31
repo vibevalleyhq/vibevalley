@@ -499,6 +499,29 @@ export function MessageRow(props: {
       </Show>
       <Show when={props.m.attachments.length > 0 ? props.m.attachments : undefined}>{(files) => <Attachments files={files()} />}</Show>
       <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</Show>
+      <Show when={props.m.deleted === undefined && (props.m.blocks?.length ?? 0) > 0 ? props.m.blocks : undefined}>
+        {(blocks) => (
+          <div class="mt-1 flex flex-col gap-1">
+            <For each={blocks()} keyed={(b) => `${b.artifactId}:${b.blockId}`}>
+              {(b) => (
+                <div
+                  data-testid="message-quoted-block"
+                  data-key={b().blockId}
+                  class="flex max-w-md items-center gap-2 rounded-md border-l-2 border-wheat bg-hover px-2 py-1 text-xs text-muted"
+                >
+                  <Icon name="artifacts" size={12} />
+                  <span class="min-w-0 flex-1 truncate">
+                    {t("web.channel.messages.quotedBlock", {
+                      title: b().title,
+                      text: b().deleted === true ? t("web.channel.messages.quotedGone") : (b().text ?? ""),
+                    })}
+                  </span>
+                </div>
+              )}
+            </For>
+          </div>
+        )}
+      </Show>
       <Show when={props.m.deleted === undefined && props.m.text}>{(text) => <LinkedMessages text={text()} />}</Show>
       <Show when={props.m.deleted === undefined && props.m.embeds.length > 0 ? props.m.embeds : undefined}>{(embeds) => <Embeds embeds={embeds()} />}</Show>
       <Show when={props.m.reactions.length > 0}>

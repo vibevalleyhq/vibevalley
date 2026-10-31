@@ -4,12 +4,13 @@ import { selfTools } from "@vibevalley/agent/self";
 import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
+import type { OrchestratorEval, QuotedBlock, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
 import { traitsOf } from "@/agent/prompts.ts";
+import { Artifact } from "@/artifact/artifact.ts";
 import { orchestrator } from "@/base/actor.ts";
 import { Channel, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
 import type { Picked } from "@/channel/wake.ts";
@@ -117,6 +118,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const run = yield* Session;
     const issue = yield* Issue;
     const chat = yield* Channel;
+    const artifacts = yield* Artifact;
     const tasks = yield* Task;
     const cron = yield* Cron;
     const tool = yield* Tool;
@@ -427,12 +429,33 @@ const make = (options: OrchestratorOptions = {}) =>
       }
     };
 
+    /** What the blocks the owner pointed at read now: the version quoted, and whether they changed or went. */
+    const quote = (refs: SayMore["blockRefs"]): Effect.Effect<QuotedBlock[]> =>
+      Effect.forEach(refs ?? [], (ref) =>
+        Effect.gen(function* () {
+          const snapshot = yield* artifacts.blocks(ref.artifactId);
+          const block = snapshot.blocks.find((b) => b.id === ref.blockId);
+          return {
+            artifactId: ref.artifactId,
+            blockId: ref.blockId,
+            rev: ref.rev,
+            title: snapshot.artifact.title,
+            ...(block ? { type: block.type, text: block.text.map((s) => s.t).join(""), nowRev: block.rev } : { deleted: true }),
+          } satisfies QuotedBlock;
+        }).pipe(Effect.catch((e) => Effect.as(Effect.logWarning("quoting a block failed", e), undefined))),
+      ).pipe(Effect.map((all) => all.flatMap((b) => (b === undefined ? [] : [b]))));
+
     return Orchestrator.of({
       say: Effect.fn("Orchestrator.say")(function* (text, pick, channel, sendKey, more) {
         const a = pick.agent ? store.agent(pick.agent) : undefined;
         const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
+        const blocks = yield* quote(more?.blockRefs);
         yield* core.open();
-        yield* chat.say(text, channel, sendKey, { ...more, ...(picked.agent || picked.project ? { picked } : {}) });
+        yield* chat.say(text, channel, sendKey, {
+          ...more,
+          ...(blocks.length > 0 ? { blocks } : {}),
+          ...(picked.agent || picked.project ? { picked } : {}),
+        });
       }),
       heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
         yield* core.open();

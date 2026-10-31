@@ -108,22 +108,16 @@ export interface AudienceInput {
 }
 
 /** Who hears a message: in a direct channel the owner's words wake the peer and no one else hears anything; elsewhere
- * who is named first (the strongest reason wins), then the thread's owner and followers, or the channel's. */
-export function chatAudience(i: AudienceInput): Delivery[] {
+ * who is named first (the strongest reason wins), then the thread's owner and followers, or the channel's. The brakes are
+ * not applied here: see brakes. */
+export function whoHears(i: AudienceInput): Delivery[] {
   const out: Delivery[] = [];
   if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken === true) return out;
-  const byAgent = i.fromKind === "session" || i.fromKind === "orchestrator";
   const present = i.present ?? i.sessions;
-  let hops = i.hops;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
     if (recipient === i.from || out.some((d) => d.recipient === recipient)) return;
     if (!i.orchestrators.includes(recipient) && !present.includes(recipient)) return;
-    let heldBy: HeldBy | undefined;
-    if (wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
-    else if (wakes && byAgent && !i.orchestrators.includes(recipient) && i.cooling.includes(recipient)) heldBy = "cooldown";
-    else if (wakes && i.fromKind !== "owner" && i.broken.includes(recipient)) heldBy = "wake_breaker";
-    if (wakes && byAgent && !heldBy) hops++;
-    out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
+    out.push({ recipient, reason, wakes });
   };
 
   // With an orchestrator, the owner's words go to it; with a helper profile, to the session talking for it now (none
@@ -155,6 +149,28 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     }
   } else if (owner) add(owner, "own_thread", true);
   return out;
+}
+
+/** The three brakes, in the order they win: agents waking agents too many hops, a session cooled down, a session that
+ * would not wake again. A held delivery stays in the list, so what was sent can still be read. */
+export function brakes(deliveries: readonly Delivery[], i: AudienceInput): Delivery[] {
+  const out: Delivery[] = [];
+  const byAgent = i.fromKind === "session" || i.fromKind === "orchestrator";
+  let hops = i.hops;
+  for (const d of deliveries) {
+    let heldBy: HeldBy | undefined;
+    if (d.wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
+    else if (d.wakes && byAgent && !i.orchestrators.includes(d.recipient) && i.cooling.includes(d.recipient)) heldBy = "cooldown";
+    else if (d.wakes && i.fromKind !== "owner" && i.broken.includes(d.recipient)) heldBy = "wake_breaker";
+    if (d.wakes && byAgent && !heldBy) hops++;
+    out.push({ ...d, ...(heldBy ? { heldBy } : {}) });
+  }
+  return out;
+}
+
+/** Who hears it, after the brakes. */
+export function chatAudience(i: AudienceInput): Delivery[] {
+  return brakes(whoHears(i), i);
 }
 
 export const hopLimitText = (limit: number) => t("server.channel.hopLimit", { limit });

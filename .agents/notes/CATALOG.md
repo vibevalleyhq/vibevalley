@@ -2,11 +2,10 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（37 篇）
+## proposed（28 篇）
 
 ### feature
 
-- 2026-10-30 [产出画布：边聊边改、指块带话、按位置插删块](.agents/notes/proposed/feature/2026-10-30-artifact-canvas.md)
 - 2026-10-27 [自己的实时模型经本机 WebSocket 接电话，其余照旧走声网](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [管家给主人报告：早报、项目健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)
@@ -17,18 +16,10 @@
 - 2026-10-10 [pi 打磨好之后接回其他 runtime](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)
 - 2026-10-09 [商店和每日任务](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)
 - 2026-10-09 [手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)
-- 2026-10-09 [每个动作至少播完一小段](.agents/notes/proposed/feature/2026-10-09-action-queue.md)
 
 ### architecture
 
-- 2026-10-31 [静态检查与可观测性：先封已有规则的绕过](.agents/notes/proposed/architecture/2026-10-31-static-gates-and-observability.md)
-- 2026-10-31 [协议与客户端：来源边界、调用回收与服务重启](.agents/notes/proposed/architecture/2026-10-31-protocol-bridge-and-client-architecture.md)
-- 2026-10-31 [目录调整的启动条件与依赖边界](.agents/notes/proposed/architecture/2026-10-31-monorepo-package-directory-blueprint.md)
-- 2026-10-31 [模块边界：先减少无关事实触发的工单重算](.agents/notes/proposed/architecture/2026-10-31-module-boundaries-and-decoupling.md)
 - 2026-10-31 [频道只记话，信箱把话交给 agent：从 `Channel` 拆出 `Mailbox`，去掉 `useHelpers`](.agents/notes/proposed/architecture/2026-10-31-mailbox-out-of-channels.md)
-- 2026-10-31 [Effect 运行时：按取消、回收与延迟证据改造](.agents/notes/proposed/architecture/2026-10-31-effect-runtime-and-concurrency.md)
-- 2026-10-31 [深模块：收回调用方重复承担的领域步骤](.agents/notes/proposed/architecture/2026-10-31-deep-module-consolidation.md)
-- 2026-10-31 [数据库与测试：验证事务、回收隔离与查询成本](.agents/notes/proposed/architecture/2026-10-31-database-and-testing-architecture.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），主人用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
 - 2026-10-27 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)

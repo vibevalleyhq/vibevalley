@@ -3,7 +3,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./client": "./src/client.ts",
+    "./llm": "./src/llm.ts",
+    "./messages": "./src/messages.ts",
+    "./models": "./src/models.ts",
+    "./response": "./src/response.ts",
+    "./testing": "./src/testing.ts",
+    "./tools": "./src/tools.ts"
   },
   "dependencies": {
     "effect": "catalog:"

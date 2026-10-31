@@ -22,6 +22,8 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   const card = page.locator(`[data-testid="artifact-card"][data-key="${made.id}"]`);
   await expect(card).toHaveAttribute("data-version", "1");
   await card.click();
+  await expect(page.getByTestId("artifact-canvas")).toBeVisible();
+  await page.getByTestId("artifact-canvas-page").click();
   await expect(page).toHaveURL(new RegExp(`/artifacts/${made.id}\\?v=1$`, "u"));
   const shown = page.getByTestId("artifact");
   await expect(shown).toHaveAttribute("data-version", "1");

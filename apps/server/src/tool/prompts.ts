@@ -266,14 +266,25 @@ export const params = {
     replyTo: "回复同一处的哪一条：它的消息号（msg=）",
   },
   blockCreate: {
+    afterBlock: "插在这一块后面（同一层里）；空字符串是这一层最前面，不填是最后面",
+    checked: "todo 的勾选状态；默认 false",
+    language: "code 的语言，比如 ts、sql",
     level: "标题的级别 1–3，只给 heading 用；默认 2",
+    parentId: "插在哪个父块下面；不填是顶层",
     text: "这一块的字；可以用 **粗**、_斜_、行内代码、~~删~~ 和链接；代码块照原样存",
     type: "块的类型：paragraph（默认）、heading、bulleted、numbered、todo、quote、code",
   },
   blockUpdate: {
     baseRev: "你读到或写下这一块时它是第几版",
     block: "块的 id",
-    text: "这一块完整的新字，不是增量",
+    checked: "todo 的勾选状态",
+    language: "code 的语言，比如 ts、sql",
+    level: "标题的级别 1–3",
+    text: "这一块完整的新字，不是增量；不填就不改字",
+    type: "换成这个类型；和 level、checked、language 一起用",
+  },
+  blockDelete: {
+    block: "要删的块的 id；子块一起删",
   },
   issueSplit: {
     tasksDescription: "子工单，每张一个帮工在自己的分支上做完、提交、单独验证",
@@ -349,6 +360,11 @@ export const descriptions = {
     "做一个产出：要交给主人看的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，主人在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
   "artifact.version.create":
     "给一个网页（html）产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。一起写的产出不出新版，一块一块改它。",
+  "artifact.block.create":
+    "在一个一起写的产出里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，接着改就用回答里的 id 和版本调 artifact_block_update。",
+  "artifact.block.update":
+    "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本。",
+  "artifact.block.delete": "删一块（子块一起删），置成墓碑；主人要删掉哪一段、或你写的某一块不要了时用。",
 } satisfies Partial<Record<Op, string>>;
 
 /** A session's tools' descriptions; channel_message_list is the orchestrator's. */
@@ -363,9 +379,10 @@ export const sessionDescriptions = {
   "memory.create":
     "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 project 记这个项目的；project 写空字符串记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
   "artifact.block.create":
-    "在一个一起写的产出末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
+    "在一个一起写的产出里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
   "artifact.block.update":
-    "把一块的字整段换成新的。baseRev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
+    "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
+  "artifact.block.delete": "删一块（子块一起删），置成墓碑；主人要删掉哪一段、或你写的某一块不要了时用。",
   "artifact.list":
     "列出产出：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几版、谁做的、最新这版改了什么。",
   "artifact.get": "看一个产出：每一版是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
@@ -546,5 +563,7 @@ export const answers = {
     updated: (id: string, rev: number | undefined) => `改好了〔${id}〕，现在是第 ${rev} 版。`,
     notUpdated: (reason: string | undefined, rev: number | undefined, currentLine: string) =>
       `没改：${reason}，现在是第 ${rev} 版。${currentLine ? "\n现在的字：" + currentLine : ""}`,
+    deleted: (id: string) => `删掉了〔${id}〕，子块一起。`,
+    alreadyDeleted: (id: string) => `〔${id}〕已经删掉了，没再改。`,
   },
 };

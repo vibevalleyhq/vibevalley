@@ -99,6 +99,7 @@ describe("mcp", () => {
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).toSorted()).toEqual([
         "artifact_block_create",
+        "artifact_block_delete",
         "artifact_block_update",
         "artifact_content_get",
         "artifact_create",
@@ -244,12 +245,14 @@ describe("mcp", () => {
         batchId: "owner",
         ops: [{ op: "update_text", blockId: blockId(block), baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
       });
-      const stale = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 2, text: "帮工又改" });
-      expect(stale).toContain("没改：这一块刚被别人改过，现在是第 3 版");
-      expect(stale).toContain("主人改过的");
+      const suggested = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 3, text: "帮工建议的字" });
+      expect(suggested).toContain("提了建议");
+      const open = (yield* artifacts.suggestions(d.id)).filter((s) => s.status === "open");
+      expect(open.map((s) => [s.blockId, s.baseRev, s.author])).toEqual([[block, 3, "lab"]]);
+      yield* artifacts.acceptSuggestion(d.id, open[0]!.id, "owner");
       const snap = yield* artifacts.blocks(d.id);
-      expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["主人改过的", "owner", "lab"]);
-      expect(yield* artifacts.markdown(d.id)).toBe("主人改过的\n\n# 下周\n");
+      expect([snap.blocks[0]!.text[0]!.t, snap.blocks[0]!.updatedBy, snap.blocks[1]!.updatedBy]).toEqual(["帮工建议的字", "owner", "lab"]);
+      expect(yield* artifacts.markdown(d.id)).toBe("帮工建议的字\n\n# 下周\n");
       expect(yield* tool("artifact_content_get", { id: "nope" })).toContain("没成");
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
