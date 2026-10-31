@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Effect } from "effect";
+import { Cause, Effect, Metric } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
@@ -15,6 +15,8 @@ import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { reasonOf } from "@/errors.ts";
+import { dbQueries } from "@/infra/db.ts";
+import { gitRuns } from "@/project/git.ts";
 import { Session } from "@/session/session.ts";
 import { freshTask } from "@/task/editing.ts";
 import { graphView } from "@/task/graph.ts";
@@ -64,6 +66,23 @@ const occupied = (core: Core["Service"], runtime: string) =>
   });
 
 describe("issues", () => {
+  // A budget: a board of twenty issues is one read of the table, and asks git nothing.
+  it.live("listing twenty issues reads the database at most twice and runs no git", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issues = yield* Issue;
+      const before = (yield* Metric.value(dbQueries)).count;
+      for (let n = 1; n <= 20; n++) yield* issues.add({ title: `第 ${n} 件`, project: "demo" });
+      // The counter counts: adding them asked the database.
+      expect((yield* Metric.value(dbQueries)).count).toBeGreaterThan(before);
+      const [queries, gits] = [(yield* Metric.value(dbQueries)).count, (yield* Metric.value(gitRuns)).count];
+      expect((yield* issues.list()).length).toBe(20);
+      const used = { queries: (yield* Metric.value(dbQueries)).count - queries, gits: (yield* Metric.value(gitRuns)).count - gits };
+      expect(used.queries, JSON.stringify(used)).toBeLessThanOrEqual(2);
+      expect(used.gits).toBe(0);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("a prompt that starts then fails keeps the unclosed startup reserved", () => {
     let turns = 0;
     let wrote = () => {};

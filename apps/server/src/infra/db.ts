@@ -7,13 +7,16 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
-import { type Cause, Clock, Context, Deferred, Duration, Effect, Layer, Option } from "effect";
+import { type Cause, Clock, Context, Deferred, Duration, Effect, Layer, Metric, Option } from "effect";
 import { SqlClient, type SqlError } from "effect/sql";
 
 import { messageOf } from "@/errors.ts";
 
 import { baselineHash, baselineSql } from "./baseline.ts";
 import { dbDir, ServerConfig } from "./config.ts";
+
+/** Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. */
+export const dbQueries = Metric.counter("vibevalley.db.queries", { description: "Queries run on the database", incremental: true });
 
 /** Longer than this, a transaction is said in the log: everything else waited for it. */
 const txLongMs = 500;
@@ -168,6 +171,7 @@ export class Db extends Context.Service<
       const sql = yield* SqlClient.SqlClient;
       // Every query passes through these: a span each would bury the traces, and the caller's span already says what it was for.
       const attempt = Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E> {
+        yield* Metric.update(dbQueries, 1);
         return yield* Effect.provideService(query, SqlClient.SqlClient, sql);
       });
       const run = Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A> {

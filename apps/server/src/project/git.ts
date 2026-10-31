@@ -3,7 +3,7 @@
 
 import { spawn } from "node:child_process";
 
-import { Effect, Schema } from "effect";
+import { Effect, Metric, Schema } from "effect";
 
 import { messageOf } from "@/errors.ts";
 import { afterRealTime } from "@/infra/time.ts";
@@ -94,7 +94,10 @@ export class GitError extends Schema.TaggedError<GitError, { readonly brand: uni
   }
 }
 
-export const gitRun = (cwd: string, ...args: string[]) => run("git", args, { cwd });
+/** Every git command run: what a test holds a path's budget to (listing issues runs none). */
+export const gitRuns = Metric.counter("vibevalley.git.runs", { description: "git commands run", incremental: true });
+
+export const gitRun = (cwd: string, ...args: string[]) => Effect.andThen(Metric.update(gitRuns, 1), run("git", args, { cwd }));
 
 /** The output, trimmed; a failure is a GitError with what git said. */
 export const git = (cwd: string, ...args: string[]): Effect.Effect<string, GitError> =>

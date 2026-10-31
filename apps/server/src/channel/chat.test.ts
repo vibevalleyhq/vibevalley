@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
+import { Effect, Fiber, Layer, Metric, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
@@ -15,7 +15,7 @@ import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { Database, Db } from "@/infra/db.ts";
+import { dbQueries, Database, Db } from "@/infra/db.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
@@ -221,6 +221,21 @@ const run = <A, E>(
 };
 
 describe("the chat", () => {
+  // A budget, at what it takes today: one line from the owner in the general channel, written, delivered and told. A
+  // change that asks more fails here; one that asks less lowers it.
+  it.live("one line from the owner reads and writes the database a bounded number of times", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        yield* f.chat.say("先暖一下", undefined, "");
+        const before = (yield* Metric.value(dbQueries)).count;
+        yield* f.chat.say("今天进度怎么样", undefined, "");
+        const used = (yield* Metric.value(dbQueries)).count - before;
+        expect(used).toBeGreaterThan(0);
+        expect(used, `${used} queries`).toBeLessThanOrEqual(17);
+      }),
+    ),
+  );
+
   it.live("a dispatched issue opens a thread under its dispatch", () =>
     run((f, x) =>
       Effect.gen(function* () {
