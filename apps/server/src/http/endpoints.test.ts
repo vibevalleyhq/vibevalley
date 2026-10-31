@@ -34,6 +34,17 @@ describe("the endpoints the agents' tools stand on", () => {
       expect(yield* call(() => api.channel.unread.list())).toEqual([]);
 
       const open = yield* call(() => api.issue.create({ title: "修登录", project: "app" }));
+      const read = yield* call(() => api.issue.get({ id: open.id }));
+      for (const id of [open.id, String(open.number), `#${open.number}`]) {
+        expect(yield* call(() => api.issue.get({ id }))).toEqual(read);
+        expect(yield* call(() => api.issue.run.list({ id }))).toEqual([]);
+        expect(yield* call(() => api.issue.timeline.get({ id }))).toEqual(yield* call(() => api.issue.timeline.get({ id: open.id })));
+        expect(yield* call(() => api.issue.status.previewUpdate({ id, status: "canceled" }))).toEqual(
+          yield* call(() => api.issue.status.previewUpdate({ id: open.id, status: "canceled" })),
+        );
+        expect(yield* refusal(() => api.issue.diff.get({ id }))).toEqual(yield* refusal(() => api.issue.diff.get({ id: open.id })));
+        expect(yield* call(() => api.issue.previewDelete({ id }))).toEqual(yield* call(() => api.issue.previewDelete({ id: open.id })));
+      }
       yield* call(() => api.issue.create({ title: "加打卡" }));
       expect((yield* call(() => api.issue.list({}))).map((t) => t.title).toSorted()).toEqual(["修登录", "加打卡"]);
       expect((yield* call(() => api.issue.list({ project: "app" }))).map((t) => t.title)).toEqual(["修登录"]);

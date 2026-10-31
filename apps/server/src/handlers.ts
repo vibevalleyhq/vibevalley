@@ -211,17 +211,15 @@ export const handlers = Effect.gen(function* () {
     "issue.review": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
     "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => tasks.splitIssueOf(id, body.title ?? "", body.tasks)),
     "issue.history.list": () => issues.history(),
-    "issue.get": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.get(id)),
-    "issue.run.list": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => Effect.andThen(issues.get(id), sessions.runs(id))),
-    "issue.timeline.get": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.timeline(id)),
+    "issue.get": ({ id }) => issues.get(id),
+    "issue.run.list": ({ id }) => Effect.flatMap(issues.get(id), (issue) => sessions.runs(issue.id)),
+    "issue.timeline.get": ({ id }) => issues.timeline(id),
     "issue.create": ({ requestKey, ...body }) => createOnce(requestKey, applied(issues.add(body))),
     "issue.update": ({ id: ref, ...body }) => applied(Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body, owner))),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
-    "issue.previewDelete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.previewRemove(id)),
-    "issue.status.previewUpdate": ({ id: ref, ...body }) =>
-      Effect.flatMap(issues.idOf(ref), (id) =>
-        issues.previewStatus(id, body.status, body.text ?? "", body.assignee ? { assignee: body.assignee } : {}, body.edit),
-      ),
+    "issue.previewDelete": ({ id }) => issues.previewRemove(id),
+    "issue.status.previewUpdate": ({ id, ...body }) =>
+      issues.previewStatus(id, body.status, body.text ?? "", body.assignee ? { assignee: body.assignee } : {}, body.edit),
     "issue.refine": ({ id: ref, ...body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.defaultChannel())),
     "issue.status.update": ({ id: ref, ...body }) =>
       statusOnce(
@@ -234,7 +232,7 @@ export const handlers = Effect.gen(function* () {
       ),
     "issue.comment.create": ({ id: ref, ...body }) =>
       Effect.flatMap(issues.idOf(ref), (id) => Effect.map(issues.comment(id, body.text, body.sendKey ?? ""), (): T.Applied => ({ seq: core.seq() }))),
-    "issue.diff.get": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, owner)),
+    "issue.diff.get": ({ id }) => issues.changes(id, owner),
     "project.template.list": ({ id }) => issues.templates(id),
     "graph.split": (body) => tasks.split(body.goal, body.project, body.agent ?? "", owner),
     "graph.task.update": ({ id, task, ...body }) => tasks.editTask(id, task, body, owner),
